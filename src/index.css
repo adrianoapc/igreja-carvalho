@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,7 +18,7 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 15%;
 
-    --primary: 217 91% 35%;
+    --primary: 215 19.3182% 34.5098%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96%;
@@ -34,7 +35,7 @@ All colors MUST be HSL.
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 217 91% 35%;
+    --ring: 109 57.1429% 38.4314%;
 
     --radius: 0.75rem;
 
@@ -53,6 +54,7 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 91% 30%;
     --sidebar-ring: 43 96% 56%;
+    --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   }
 
   .dark {
@@ -86,7 +88,7 @@ All colors MUST be HSL.
 
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 45%), hsl(217 91% 55%));
     --gradient-accent: linear-gradient(135deg, hsl(43 96% 56%), hsl(43 96% 66%));
-    
+
     --sidebar-background: 215 28% 10%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 43 96% 56%;
@@ -95,6 +97,7 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 215 28% 15%;
     --sidebar-ring: 43 96% 56%;
+    --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   }
 }
 
