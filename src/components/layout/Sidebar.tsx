@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
   { icon: Home, label: "Dashboard", path: "/" },
+  { icon: Megaphone, label: "Banners", path: "/banners" },
   { icon: Users, label: "Membros", path: "/membros" },
   { icon: UserPlus, label: "Visitantes", path: "/visitantes" },
   { icon: MessageCircle, label: "Pedidos de Oração", path: "/oracoes" },

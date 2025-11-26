@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MessageCircle, Heart, Calendar } from "lucide-react";
+import { BannerDisplay } from "@/components/BannerDisplay";
 
 const stats = [
   {
@@ -32,6 +33,21 @@ const stats = [
   },
 ];
 
+const activeBanners = [
+  {
+    id: 1,
+    title: "Culto Especial de Ação de Graças",
+    message: "Junte-se a nós neste domingo para um culto especial de ação de graças. Teremos louvor, testemunhos e uma palavra poderosa!",
+    type: "success" as const
+  },
+  {
+    id: 2,
+    title: "Atualização Sistema de Dízimos",
+    message: "Nosso sistema de contribuições online está temporariamente indisponível. Use os envelopes físicos neste domingo.",
+    type: "warning" as const
+  }
+];
+
 export default function Dashboard() {
   return (
     <div className="space-y-8">
@@ -39,6 +55,8 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground mt-1">Visão geral da igreja</p>
       </div>
+
+      <BannerDisplay banners={activeBanners} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
