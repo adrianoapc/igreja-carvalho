@@ -44,14 +44,23 @@ export default function Public() {
           <p className="text-muted-foreground text-lg mb-6">
             Explore nossos recursos públicos ou faça login para acessar mais funcionalidades
           </p>
-          <Button 
-            onClick={() => navigate("/auth")}
-            className="bg-gradient-primary shadow-soft"
-            size="lg"
-          >
-            <LogIn className="w-5 h-5 mr-2" />
-            Fazer Login / Cadastrar
-          </Button>
+          <div className="flex gap-4 justify-center">
+            <Button 
+              onClick={() => navigate("/auth")}
+              className="bg-gradient-primary shadow-soft"
+              size="lg"
+            >
+              <LogIn className="w-5 h-5 mr-2" />
+              Fazer Login / Cadastrar
+            </Button>
+            <Button 
+              onClick={() => navigate("/first-admin")}
+              variant="outline"
+              size="lg"
+            >
+              Configurar Sistema
+            </Button>
+          </div>
         </div>
 
         {/* Features Grid */}
