@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
@@ -13,6 +13,7 @@ const menuItems = [
   { icon: Calendar, label: "Cultos", path: "/cultos" },
   { icon: DollarSign, label: "Finanças", path: "/financas" },
   { icon: BookOpen, label: "Ensinamentos", path: "/ensinamentos" },
+  { icon: Shield, label: "Administração", path: "/admin" },
 ];
 
 export default function Sidebar() {
