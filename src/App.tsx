@@ -16,6 +16,7 @@ import Financas from "./pages/Financas";
 import Ensinamentos from "./pages/Ensinamentos";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
+import FirstAdmin from "./pages/FirstAdmin";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
 
@@ -49,6 +50,7 @@ const App = () => (
           {/* Rotas públicas */}
           <Route path="/public" element={<Public />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/first-admin" element={<FirstAdmin />} />
           
           {/* Rotas protegidas para membros */}
           <Route
