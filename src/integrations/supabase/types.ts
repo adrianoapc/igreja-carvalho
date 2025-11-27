@@ -19,9 +19,11 @@ export type Database = {
           active: boolean | null
           created_at: string | null
           created_by: string | null
+          expires_at: string | null
           id: string
           image_url: string | null
           message: string
+          scheduled_at: string | null
           title: string
           type: string
           updated_at: string | null
@@ -30,9 +32,11 @@ export type Database = {
           active?: boolean | null
           created_at?: string | null
           created_by?: string | null
+          expires_at?: string | null
           id?: string
           image_url?: string | null
           message: string
+          scheduled_at?: string | null
           title: string
           type?: string
           updated_at?: string | null
@@ -41,9 +45,11 @@ export type Database = {
           active?: boolean | null
           created_at?: string | null
           created_by?: string | null
+          expires_at?: string | null
           id?: string
           image_url?: string | null
           message?: string
+          scheduled_at?: string | null
           title?: string
           type?: string
           updated_at?: string | null
@@ -169,7 +175,48 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      active_banners: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string | null
+          image_url: string | null
+          message: string | null
+          scheduled_at: string | null
+          title: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          message?: string | null
+          scheduled_at?: string | null
+          title?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          message?: string | null
+          scheduled_at?: string | null
+          title?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_user_module_access: {
@@ -180,6 +227,14 @@ export type Database = {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
+        }
+        Returns: boolean
+      }
+      is_banner_active: {
+        Args: {
+          p_active: boolean
+          p_expires_at: string
+          p_scheduled_at: string
         }
         Returns: boolean
       }
