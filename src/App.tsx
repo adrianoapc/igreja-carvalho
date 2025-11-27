@@ -21,8 +21,6 @@ import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
 
-import React from "react";
-
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
