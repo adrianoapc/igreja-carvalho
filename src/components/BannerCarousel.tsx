@@ -92,15 +92,20 @@ export default function BannerCarousel() {
     <div className="w-full max-w-5xl mx-auto px-4">
       <Carousel
         opts={{
-          align: "start",
+          align: "center",
           loop: true,
+          dragFree: false,
+          containScroll: "trimSnaps",
+          skipSnaps: false,
         }}
         plugins={[
           Autoplay({
             delay: 5000,
+            stopOnInteraction: true,
+            stopOnMouseEnter: true,
           }),
         ]}
-        className="w-full"
+        className="w-full touch-pan-y"
       >
         <CarouselContent>
           {banners.map((banner) => (
