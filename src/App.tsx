@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Banners from "./pages/Banners";
 import Membros from "./pages/Membros";
 import Visitantes from "./pages/Visitantes";
+import Kids from "./pages/Kids";
 import Oracoes from "./pages/Oracoes";
 import Testemunhos from "./pages/Testemunhos";
 import Cultos from "./pages/Cultos";
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/banners" element={<Banners />} />
             <Route path="/membros" element={<Membros />} />
             <Route path="/visitantes" element={<Visitantes />} />
+            <Route path="/kids" element={<Kids />} />
             <Route path="/oracoes" element={<Oracoes />} />
             <Route path="/testemunhos" element={<Testemunhos />} />
             <Route path="/cultos" element={<Cultos />} />
