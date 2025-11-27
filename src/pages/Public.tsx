@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Calendar, MessageSquare, BookOpen, Image, LogIn } from "lucide-react";
+import BannerCarousel from "@/components/BannerCarousel";
 
 export default function Public() {
   const navigate = useNavigate();
@@ -61,6 +62,11 @@ export default function Public() {
               Configurar Sistema
             </Button>
           </div>
+        </div>
+
+        {/* Banner Carousel */}
+        <div className="mb-12">
+          <BannerCarousel />
         </div>
 
         {/* Features Grid */}
