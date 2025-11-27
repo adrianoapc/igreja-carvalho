@@ -5,11 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Eye, EyeOff, Megaphone, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, EyeOff, Megaphone, Upload, X, Image as ImageIcon, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const imageSchema = z.object({
   file: z.instanceof(File),
@@ -25,6 +28,8 @@ interface Banner {
   type: string;
   image_url: string | null;
   active: boolean;
+  scheduled_at: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +42,8 @@ export default function Banners() {
   const [isLoading, setIsLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [scheduledAt, setScheduledAt] = useState<Date | undefined>();
+  const [expiresAt, setExpiresAt] = useState<Date | undefined>();
   const [newBanner, setNewBanner] = useState({
     title: "",
     message: "",
@@ -163,6 +170,16 @@ export default function Banners() {
       return;
     }
 
+    // Validar datas
+    if (scheduledAt && expiresAt && expiresAt <= scheduledAt) {
+      toast({
+        title: "Erro nas datas",
+        description: "A data de expiração deve ser posterior à data de início",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -177,17 +194,23 @@ export default function Banners() {
         type: newBanner.type,
         image_url: imageUrl,
         active: true,
+        scheduled_at: scheduledAt?.toISOString(),
+        expires_at: expiresAt?.toISOString(),
       });
 
       if (error) throw error;
 
       toast({
         title: "Banner criado!",
-        description: "O banner está ativo e visível para todos.",
+        description: scheduledAt 
+          ? `Será publicado em ${format(scheduledAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`
+          : "O banner está ativo e visível para todos.",
       });
 
       setIsCreating(false);
       setNewBanner({ title: "", message: "", type: "info" });
+      setScheduledAt(undefined);
+      setExpiresAt(undefined);
       setImageFile(null);
       setImagePreview(null);
       loadBanners();
@@ -356,6 +379,38 @@ export default function Banners() {
               </select>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="scheduledAt">
+                  <CalendarIcon className="w-4 h-4 inline mr-1" />
+                  Data de Publicação (Opcional)
+                </Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Se não definir, será publicado imediatamente
+                </p>
+                <DateTimePicker
+                  value={scheduledAt}
+                  onChange={setScheduledAt}
+                  placeholder="Publicar agora"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="expiresAt">
+                  <Clock className="w-4 h-4 inline mr-1" />
+                  Data de Expiração (Opcional)
+                </Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Banner será ocultado automaticamente
+                </p>
+                <DateTimePicker
+                  value={expiresAt}
+                  onChange={setExpiresAt}
+                  placeholder="Sem expiração"
+                />
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="image">Imagem (Opcional)</Label>
               <p className="text-xs text-muted-foreground mb-2">
@@ -407,6 +462,8 @@ export default function Banners() {
                 variant="outline"
                 onClick={() => {
                   setIsCreating(false);
+                  setScheduledAt(undefined);
+                  setExpiresAt(undefined);
                   setImageFile(null);
                   setImagePreview(null);
                 }}
@@ -431,8 +488,14 @@ export default function Banners() {
             </CardContent>
           </Card>
         ) : (
-          banners.map((banner) => (
-            <Card key={banner.id} className={`shadow-soft ${!banner.active ? "opacity-60" : ""}`}>
+          banners.map((banner) => {
+            const now = new Date();
+            const isScheduled = banner.scheduled_at && new Date(banner.scheduled_at) > now;
+            const isExpired = banner.expires_at && new Date(banner.expires_at) < now;
+            const isActive = banner.active && !isScheduled && !isExpired;
+
+            return (
+            <Card key={banner.id} className={`shadow-soft ${!isActive ? "opacity-60" : ""}`}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -442,7 +505,17 @@ export default function Banners() {
                       <Badge variant={getTypeColor(banner.type)}>
                         {getTypeLabel(banner.type)}
                       </Badge>
-                      {banner.active ? (
+                      {isScheduled ? (
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="w-3 h-3" />
+                          Agendado
+                        </Badge>
+                      ) : isExpired ? (
+                        <Badge variant="secondary" className="gap-1">
+                          <EyeOff className="w-3 h-3" />
+                          Expirado
+                        </Badge>
+                      ) : banner.active ? (
                         <Badge variant="outline" className="gap-1">
                           <Eye className="w-3 h-3" />
                           Ativo
@@ -488,14 +561,27 @@ export default function Banners() {
                 </CardContent>
               )}
               <CardContent className={banner.image_url ? "" : "pt-0"}>
-                <div className="flex gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                   <span>
                     Criado: {new Date(banner.created_at).toLocaleDateString("pt-BR")}
                   </span>
+                  {banner.scheduled_at && (
+                    <span className="flex items-center gap-1">
+                      <CalendarIcon className="w-3 h-3" />
+                      Publicação: {format(new Date(banner.scheduled_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    </span>
+                  )}
+                  {banner.expires_at && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Expira: {format(new Date(banner.expires_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    </span>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
     </div>

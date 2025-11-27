@@ -175,48 +175,7 @@ export type Database = {
       }
     }
     Views: {
-      active_banners: {
-        Row: {
-          active: boolean | null
-          created_at: string | null
-          created_by: string | null
-          expires_at: string | null
-          id: string | null
-          image_url: string | null
-          message: string | null
-          scheduled_at: string | null
-          title: string | null
-          type: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          active?: boolean | null
-          created_at?: string | null
-          created_by?: string | null
-          expires_at?: string | null
-          id?: string | null
-          image_url?: string | null
-          message?: string | null
-          scheduled_at?: string | null
-          title?: string | null
-          type?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          active?: boolean | null
-          created_at?: string | null
-          created_by?: string | null
-          expires_at?: string | null
-          id?: string | null
-          image_url?: string | null
-          message?: string | null
-          scheduled_at?: string | null
-          title?: string | null
-          type?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       get_user_module_access: {
