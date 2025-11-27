@@ -17,6 +17,7 @@ import Ensinamentos from "./pages/Ensinamentos";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
 import FirstAdmin from "./pages/FirstAdmin";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
 
@@ -149,6 +150,16 @@ const App = () => (
               <ProtectedRoute>
                 <MainLayout>
                   <Ensinamentos />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Admin />
                 </MainLayout>
               </ProtectedRoute>
             }
