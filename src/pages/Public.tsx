@@ -21,9 +21,9 @@ export default function Public() {
     },
     {
       icon: <Image className="w-8 h-8" />,
-      title: "Banners",
+      title: "Anúncios",
       description: "Fique por dentro dos avisos e novidades",
-      available: false
+      available: true
     },
     {
       icon: <BookOpen className="w-8 h-8" />,
@@ -76,7 +76,11 @@ export default function Public() {
               <CardContent>
                 <p className="text-muted-foreground mb-4">{feature.description}</p>
                 {feature.available ? (
-                  <Button variant="outline" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => navigate("/announcements")}
+                  >
                     Acessar
                   </Button>
                 ) : (

@@ -16,6 +16,7 @@ import Financas from "./pages/Financas";
 import Ensinamentos from "./pages/Ensinamentos";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
+import Announcements from "./pages/Announcements";
 import FirstAdmin from "./pages/FirstAdmin";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -51,6 +52,7 @@ function App() {
         <Routes>
           {/* Rotas públicas */}
           <Route path="/public" element={<Public />} />
+          <Route path="/announcements" element={<Announcements />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/first-admin" element={<FirstAdmin />} />
           
