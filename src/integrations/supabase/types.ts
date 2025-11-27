@@ -14,16 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      module_permissions: {
+        Row: {
+          access_level: Database["public"]["Enums"]["access_level"]
+          id: string
+          module_name: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          access_level: Database["public"]["Enums"]["access_level"]
+          id?: string
+          module_name: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          access_level?: Database["public"]["Enums"]["access_level"]
+          id?: string
+          module_name?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          data_cadastro_membro: string | null
+          data_primeira_visita: string | null
+          email: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          status: Database["public"]["Enums"]["user_status"]
+          telefone: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_cadastro_membro?: string | null
+          data_primeira_visita?: string | null
+          email?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["user_status"]
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_cadastro_membro?: string | null
+          data_primeira_visita?: string | null
+          email?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["user_status"]
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_module_access: {
+        Args: { _module_name: string; _user_id: string }
+        Returns: Database["public"]["Enums"]["access_level"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_member: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      access_level:
+        | "visualizar"
+        | "criar_editar"
+        | "aprovar_gerenciar"
+        | "acesso_completo"
+      app_role:
+        | "admin"
+        | "pastor"
+        | "lider"
+        | "secretario"
+        | "tesoureiro"
+        | "professor"
+        | "membro"
+      user_status: "visitante" | "frequentador" | "membro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +254,23 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      access_level: [
+        "visualizar",
+        "criar_editar",
+        "aprovar_gerenciar",
+        "acesso_completo",
+      ],
+      app_role: [
+        "admin",
+        "pastor",
+        "lider",
+        "secretario",
+        "tesoureiro",
+        "professor",
+        "membro",
+      ],
+      user_status: ["visitante", "frequentador", "membro"],
+    },
   },
 } as const
