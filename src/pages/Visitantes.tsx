@@ -25,6 +25,8 @@ interface Visitante {
   aceitou_jesus: boolean | null;
   deseja_contato: boolean | null;
   recebeu_brinde: boolean | null;
+  status: "visitante" | "frequentador" | "membro";
+  user_id: string | null;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -277,6 +279,7 @@ export default function Visitantes() {
             onOpenChange={setDetailsOpen}
             visitante={selectedVisitante}
             onAgendarContato={handleAgendarFromDetails}
+            onUpdate={fetchVisitantes}
           />
         </>
       )}
