@@ -45,6 +45,7 @@ import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPesso
 import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
+import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
 import { AtribuirFuncaoDialog } from "@/components/membros/AtribuirFuncaoDialog";
 import { formatarCPF, formatarTelefone, formatarCEP } from "@/lib/validators";
 
@@ -111,6 +112,7 @@ export default function PessoaDetalhes() {
   const [editarContatosOpen, setEditarContatosOpen] = useState(false);
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
+  const [editarStatusOpen, setEditarStatusOpen] = useState(false);
   const [compactView, setCompactView] = useState(true);
   const [atribuirFuncaoOpen, setAtribuirFuncaoOpen] = useState(false);
 
@@ -224,6 +226,15 @@ export default function PessoaDetalhes() {
                 <Badge variant={getStatusBadgeVariant(pessoa.status)}>
                   {getStatusLabel(pessoa.status)}
                 </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditarStatusOpen(true)}
+                  className="h-7 px-2 text-xs"
+                >
+                  <Edit className="w-3 h-3 mr-1" />
+                  Alterar Status
+                </Button>
               </div>
             </div>
           </div>
@@ -845,6 +856,15 @@ export default function PessoaDetalhes() {
             onOpenChange={setAtribuirFuncaoOpen}
             membroId={pessoa.id}
             membroNome={pessoa.nome}
+            onSuccess={fetchPessoa}
+          />
+
+          <EditarStatusDialog
+            open={editarStatusOpen}
+            onOpenChange={setEditarStatusOpen}
+            pessoaId={pessoa.id}
+            statusAtual={pessoa.status}
+            nome={pessoa.nome}
             onSuccess={fetchPessoa}
           />
         </>
