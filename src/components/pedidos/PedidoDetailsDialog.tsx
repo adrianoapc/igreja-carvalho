@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, User, Mail, Phone } from "lucide-react";
+import { Clock, User, Mail, Phone, EyeOff } from "lucide-react";
 
 interface PedidoDetailsDialogProps {
   open: boolean;
@@ -20,7 +20,22 @@ export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: Pe
   const [loading, setLoading] = React.useState(false);
   const [status, setStatus] = React.useState(pedido.status);
   const [observacoes, setObservacoes] = React.useState(pedido.observacoes_intercessor || "");
+  const [pessoaNome, setPessoaNome] = React.useState<string>("");
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    const fetchPessoaNome = async () => {
+      if (pedido.pessoa_id) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('nome')
+          .eq('id', pedido.pessoa_id)
+          .single();
+        if (data) setPessoaNome(data.nome);
+      }
+    };
+    fetchPessoaNome();
+  }, [pedido.pessoa_id]);
 
   const handleUpdate = async () => {
     setLoading(true);
@@ -60,9 +75,24 @@ export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: Pe
     }
   };
 
-  const solicitante = pedido.anonimo 
-    ? "Anônimo"
-    : pedido.profiles?.nome || pedido.nome_solicitante || "Não identificado";
+  const getNomeExibicao = () => {
+    if (pedido.anonimo) return "Anônimo";
+    if (pessoaNome) return pessoaNome;
+    if (pedido.profiles?.nome) return pedido.profiles.nome;
+    if (pedido.nome_solicitante) return pedido.nome_solicitante;
+    return "Não identificado";
+  };
+
+  const mascarar = (texto: string | null | undefined) => {
+    if (!texto) return "";
+    if (texto.includes("@")) {
+      // Email
+      const [user, domain] = texto.split("@");
+      return `${user.substring(0, 2)}***@${domain}`;
+    }
+    // Telefone
+    return texto.substring(0, 4) + "***" + texto.substring(texto.length - 2);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,10 +103,16 @@ export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: Pe
 
         <div className="space-y-6">
           <div className="flex items-start justify-between">
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-muted-foreground" />
-                <span className="font-semibold">{solicitante}</span>
+                <span className="font-semibold">{getNomeExibicao()}</span>
+                {pedido.anonimo && (
+                  <Badge variant="secondary" className="gap-1">
+                    <EyeOff className="w-3 h-3" />
+                    Anônimo
+                  </Badge>
+                )}
               </div>
               {!pedido.anonimo && pedido.email_solicitante && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -84,10 +120,22 @@ export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: Pe
                   {pedido.email_solicitante}
                 </div>
               )}
+              {pedido.anonimo && pedido.email_solicitante && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Mail className="w-3 h-3" />
+                  {mascarar(pedido.email_solicitante)}
+                </div>
+              )}
               {!pedido.anonimo && pedido.telefone_solicitante && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="w-3 h-3" />
                   {pedido.telefone_solicitante}
+                </div>
+              )}
+              {pedido.anonimo && pedido.telefone_solicitante && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Phone className="w-3 h-3" />
+                  {mascarar(pedido.telefone_solicitante)}
                 </div>
               )}
             </div>

@@ -238,6 +238,7 @@ export type Database = {
           nome_solicitante: string | null
           observacoes_intercessor: string | null
           pedido: string
+          pessoa_id: string | null
           status: Database["public"]["Enums"]["status_pedido"]
           telefone_solicitante: string | null
           tipo: Database["public"]["Enums"]["tipo_pedido"]
@@ -256,6 +257,7 @@ export type Database = {
           nome_solicitante?: string | null
           observacoes_intercessor?: string | null
           pedido: string
+          pessoa_id?: string | null
           status?: Database["public"]["Enums"]["status_pedido"]
           telefone_solicitante?: string | null
           tipo?: Database["public"]["Enums"]["tipo_pedido"]
@@ -274,6 +276,7 @@ export type Database = {
           nome_solicitante?: string | null
           observacoes_intercessor?: string | null
           pedido?: string
+          pessoa_id?: string | null
           status?: Database["public"]["Enums"]["status_pedido"]
           telefone_solicitante?: string | null
           tipo?: Database["public"]["Enums"]["tipo_pedido"]
@@ -293,6 +296,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pedidos_oracao_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -436,38 +446,53 @@ export type Database = {
       }
       testemunhos: {
         Row: {
-          autor_id: string
+          anonimo: boolean | null
+          autor_id: string | null
           categoria: Database["public"]["Enums"]["categoria_testemunho"]
           created_at: string
           data_publicacao: string | null
+          email_externo: string | null
           id: string
           mensagem: string
+          nome_externo: string | null
+          pessoa_id: string | null
           publicar: boolean
           status: Database["public"]["Enums"]["status_testemunho"]
+          telefone_externo: string | null
           titulo: string
           updated_at: string
         }
         Insert: {
-          autor_id: string
+          anonimo?: boolean | null
+          autor_id?: string | null
           categoria?: Database["public"]["Enums"]["categoria_testemunho"]
           created_at?: string
           data_publicacao?: string | null
+          email_externo?: string | null
           id?: string
           mensagem: string
+          nome_externo?: string | null
+          pessoa_id?: string | null
           publicar?: boolean
           status?: Database["public"]["Enums"]["status_testemunho"]
+          telefone_externo?: string | null
           titulo: string
           updated_at?: string
         }
         Update: {
-          autor_id?: string
+          anonimo?: boolean | null
+          autor_id?: string | null
           categoria?: Database["public"]["Enums"]["categoria_testemunho"]
           created_at?: string
           data_publicacao?: string | null
+          email_externo?: string | null
           id?: string
           mensagem?: string
+          nome_externo?: string | null
+          pessoa_id?: string | null
           publicar?: boolean
           status?: Database["public"]["Enums"]["status_testemunho"]
+          telefone_externo?: string | null
           titulo?: string
           updated_at?: string
         }
@@ -475,6 +500,13 @@ export type Database = {
           {
             foreignKeyName: "testemunhos_autor_id_fkey"
             columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "testemunhos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -557,6 +589,10 @@ export type Database = {
     Functions: {
       alocar_pedido_balanceado: {
         Args: { p_pedido_id: string }
+        Returns: string
+      }
+      buscar_pessoa_por_contato: {
+        Args: { p_email?: string; p_nome?: string; p_telefone?: string }
         Returns: string
       }
       get_user_module_access: {
