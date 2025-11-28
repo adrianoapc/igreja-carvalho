@@ -27,6 +27,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
     tipo: "visitante" as "visitante" | "frequentador",
     observacoes: "",
     aceitou_jesus: false,
+    batizado: false,
     deseja_contato: true,
     recebeu_brinde: false,
   });
@@ -106,6 +107,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
             status: formData.tipo,
             observacoes: formData.observacoes.trim() || visitanteExistente.observacoes,
             aceitou_jesus: formData.aceitou_jesus || visitanteExistente.aceitou_jesus,
+            batizado: formData.batizado || visitanteExistente.batizado,
             deseja_contato: formData.deseja_contato,
             recebeu_brinde: formData.recebeu_brinde || visitanteExistente.recebeu_brinde,
           })
@@ -130,6 +132,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
             email: formData.email.trim() || null,
             observacoes: formData.observacoes.trim() || null,
             aceitou_jesus: formData.aceitou_jesus,
+            batizado: formData.batizado,
             deseja_contato: formData.deseja_contato,
             recebeu_brinde: formData.recebeu_brinde,
             status: formData.tipo,
@@ -180,6 +183,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         tipo: "visitante",
         observacoes: "",
         aceitou_jesus: false,
+        batizado: false,
         deseja_contato: true,
         recebeu_brinde: false,
       });
@@ -297,6 +301,23 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
                 Aceitou Jesus
+              </label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="batizado"
+                checked={formData.batizado}
+                onCheckedChange={(checked) => 
+                  setFormData({ ...formData, batizado: checked as boolean })
+                }
+                disabled={loading}
+              />
+              <label
+                htmlFor="batizado"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Convertido/Batizado
               </label>
             </div>
 
