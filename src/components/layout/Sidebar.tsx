@@ -33,6 +33,7 @@ const pessoasItems = [
 ];
 
 const intercessaoItems = [
+  { icon: HandHeart, label: "Geral", path: "/intercessao" },
   { icon: MessageCircle, label: "Pedidos de Oração", path: "/intercessao/pedidos" },
   { icon: Users, label: "Intercessores", path: "/intercessao/intercessores" },
   { icon: Heart, label: "Testemunhos", path: "/intercessao/testemunhos" },
