@@ -42,6 +42,10 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 35%), hsl(217 91% 45%));
     --gradient-accent: linear-gradient(135deg, hsl(43 96% 56%), hsl(43 96% 66%));
     --gradient-subtle: linear-gradient(180deg, hsl(210 40% 98%), hsl(0 0% 100%));
+    --gradient-info: linear-gradient(135deg, hsl(200 80% 50% / 0.08), hsl(200 80% 50% / 0.03));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36% / 0.08), hsl(142 76% 36% / 0.03));
+    --gradient-warning: linear-gradient(135deg, hsl(45 93% 47% / 0.08), hsl(45 93% 47% / 0.03));
+    --gradient-spiritual: linear-gradient(135deg, hsl(270 60% 60% / 0.08), hsl(270 60% 60% / 0.03));
 
     --shadow-soft: 0 2px 8px -2px hsl(217 91% 35% / 0.1);
     --shadow-medium: 0 4px 16px -4px hsl(217 91% 35% / 0.15);
@@ -88,6 +92,10 @@ All colors MUST be HSL.
 
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 45%), hsl(217 91% 55%));
     --gradient-accent: linear-gradient(135deg, hsl(43 96% 56%), hsl(43 96% 66%));
+    --gradient-info: linear-gradient(135deg, hsl(200 80% 50% / 0.12), hsl(200 80% 50% / 0.05));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36% / 0.12), hsl(142 76% 36% / 0.05));
+    --gradient-warning: linear-gradient(135deg, hsl(45 93% 47% / 0.12), hsl(45 93% 47% / 0.05));
+    --gradient-spiritual: linear-gradient(135deg, hsl(270 60% 60% / 0.12), hsl(270 60% 60% / 0.05));
 
     --sidebar-background: 215 28% 10%;
     --sidebar-foreground: 210 40% 98%;
@@ -108,5 +116,27 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .profile-card-hover {
+    @apply transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1 hover:scale-[1.02];
+  }
+  
+  .card-gradient-info {
+    background: var(--gradient-info);
+  }
+  
+  .card-gradient-success {
+    background: var(--gradient-success);
+  }
+  
+  .card-gradient-warning {
+    background: var(--gradient-warning);
+  }
+  
+  .card-gradient-spiritual {
+    background: var(--gradient-spiritual);
   }
 }
