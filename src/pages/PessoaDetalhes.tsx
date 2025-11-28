@@ -27,6 +27,11 @@ import {
   Home,
   Briefcase,
   FileText,
+  Cake,
+  Droplets,
+  Crown,
+  UserCheck,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -299,79 +304,92 @@ export default function PessoaDetalhes() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-muted/30">
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
               <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Idade</p>
-                <p className="text-lg font-semibold">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Idade</p>
+                  <Cake className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-2xl font-bold">
                   {pessoa.data_nascimento
-                    ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()} anos`
-                    : "Não informado"}
+                    ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()}`
+                    : "—"}
+                </p>
+                {pessoa.data_nascimento && (
+                  <p className="text-xs text-muted-foreground mt-1">anos</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sexo</p>
+                  <User className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-2xl font-bold">{pessoa.sexo || "—"}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estado Civil</p>
+                  <Heart className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-2xl font-bold">{pessoa.estado_civil || "—"}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Batizado</p>
+                  <Droplets className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-2xl font-bold">{pessoa.batizado ? "Sim" : "Não"}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pastor</p>
+                  <BookOpen className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-2xl font-bold">{pessoa.e_pastor ? "Sim" : "Não"}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Liderança</p>
+                  <Crown className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-2xl font-bold">{pessoa.e_lider ? "Sim" : "Não"}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Telefone</p>
+                  <Phone className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-base font-semibold">
+                  {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "—"}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30">
+            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
               <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Sexo</p>
-                <p className="text-lg font-semibold">{pessoa.sexo || "Não informado"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Estado Civil</p>
-                <p className="text-lg font-semibold">{pessoa.estado_civil || "Não informado"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">É batizado?</p>
-                <p className="text-lg font-semibold">{pessoa.batizado ? "Sim" : "Não"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">É pastor?</p>
-                <p className="text-lg font-semibold">{pessoa.e_pastor ? "Sim" : "Não"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Faz parte da liderança?</p>
-                <p className="text-lg font-semibold">{pessoa.e_lider ? "Sim" : "Não"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Telefone</p>
-                <p className="text-lg font-semibold">
-                  {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "Não informado"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">E-mail</p>
-                <p className="text-lg font-semibold">{pessoa.email || "Não informado"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Necessidades especiais</p>
-                <p className="text-lg font-semibold">{pessoa.necessidades_especiais || "Não"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Status na Igreja</p>
-                <p className="text-lg font-semibold">{pessoa.status_igreja?.toUpperCase() || "ATIVO"}</p>
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Necessidades</p>
+                  <AlertCircle className="w-4 h-4 text-primary/60" />
+                </div>
+                <p className="text-base font-semibold truncate">{pessoa.necessidades_especiais || "Nenhuma"}</p>
               </CardContent>
             </Card>
           </div>
