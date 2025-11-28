@@ -111,7 +111,7 @@ export default function PessoaDetalhes() {
   const [editarContatosOpen, setEditarContatosOpen] = useState(false);
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
-  const [compactView, setCompactView] = useState(false);
+  const [compactView, setCompactView] = useState(true);
   const [atribuirFuncaoOpen, setAtribuirFuncaoOpen] = useState(false);
 
   const fetchPessoa = async () => {
@@ -327,14 +327,14 @@ export default function PessoaDetalhes() {
             </Button>
           </div>
           
-          <div className={`grid gap-4 ${compactView ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
+          <div className={`grid gap-4 ${compactView ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6'}`}>
             <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Idade</p>
-                  {!compactView && <Cake className="w-4 h-4 text-primary/70" />}
+                  {compactView && <Cake className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={compactView ? "text-lg font-bold leading-none" : "text-xl font-bold leading-none"}>
+                <p className="text-sm font-semibold leading-none">
                   {pessoa.data_nascimento
                     ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()} anos`
                     : "—"}
@@ -343,74 +343,74 @@ export default function PessoaDetalhes() {
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sexo</p>
-                  {!compactView && <User className="w-4 h-4 text-primary/70" />}
+                  {compactView && <User className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none truncate`}>{pessoa.sexo || "—"}</p>
+                <p className="text-sm font-semibold leading-none truncate">{pessoa.sexo || "—"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Estado Civil</p>
-                  {!compactView && <Heart className="w-4 h-4 text-primary/70" />}
+                  {compactView && <Heart className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none truncate`}>{pessoa.estado_civil || "—"}</p>
+                <p className="text-sm font-semibold leading-none truncate">{pessoa.estado_civil || "—"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Batizado</p>
-                  {!compactView && <Droplets className="w-4 h-4 text-primary/70" />}
+                  {compactView && <Droplets className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none`}>{pessoa.batizado ? "Sim" : "Não"}</p>
+                <p className="text-sm font-semibold leading-none">{pessoa.batizado ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pastor</p>
-                  {!compactView && <BookOpen className="w-4 h-4 text-primary/70" />}
+                  {compactView && <BookOpen className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none`}>{pessoa.e_pastor ? "Sim" : "Não"}</p>
+                <p className="text-sm font-semibold leading-none">{pessoa.e_pastor ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Liderança</p>
-                  {!compactView && <Crown className="w-4 h-4 text-primary/70" />}
+                  {compactView && <Crown className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none`}>{pessoa.e_lider ? "Sim" : "Não"}</p>
+                <p className="text-sm font-semibold leading-none">{pessoa.e_lider ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-success profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefone</p>
-                  {!compactView && <Phone className="w-4 h-4 text-primary/70" />}
+                  {compactView && <Phone className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={`${compactView ? "text-sm" : "text-base"} font-semibold leading-none truncate`}>
+                <p className="text-sm font-semibold leading-none truncate">
                   {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "—"}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-warning profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-4" : "pt-6"}>
-                <div className="flex items-start justify-between mb-3">
+              <CardContent className={compactView ? "pt-6" : "pt-4"}>
+                <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Necessidades</p>
-                  {!compactView && <AlertCircle className="w-4 h-4 text-primary/70" />}
+                  {compactView && <AlertCircle className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className={`${compactView ? "text-sm" : "text-base"} font-semibold leading-none truncate`}>{pessoa.necessidades_especiais || "Nenhuma"}</p>
+                <p className="text-sm font-semibold leading-none truncate">{pessoa.necessidades_especiais || "Nenhuma"}</p>
               </CardContent>
             </Card>
           </div>
