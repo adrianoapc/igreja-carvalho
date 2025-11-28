@@ -25,6 +25,7 @@ interface Visitante {
   data_ultima_visita: string | null;
   numero_visitas: number;
   aceitou_jesus: boolean | null;
+  batizado: boolean | null;
   deseja_contato: boolean | null;
   recebeu_brinde: boolean | null;
   status: "visitante" | "frequentador" | "membro";
@@ -215,6 +216,12 @@ export default function Visitantes() {
                     <Badge variant="outline" className="text-xs">
                       <Check className="w-3 h-3 mr-1" />
                       Aceitou Jesus
+                    </Badge>
+                  )}
+                  {visitante.batizado && (
+                    <Badge variant="outline" className="text-xs bg-primary/10">
+                      <Check className="w-3 h-3 mr-1" />
+                      Convertido
                     </Badge>
                   )}
                   {visitante.deseja_contato && (
