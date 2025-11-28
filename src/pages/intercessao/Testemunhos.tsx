@@ -1,14 +1,15 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Heart, Clock, ArrowLeft, Search, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { NovoTestemunhoDialog } from "@/components/testemunhos/NovoTestemunhoDialog";
+import { TestemunhoDetailsDialog } from "@/components/testemunhos/TestemunhoDetailsDialog";
 
 interface Testemunho {
   id: string;
@@ -45,6 +46,9 @@ export default function Testemunhos() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState("todos");
   const [statusTab, setStatusTab] = useState("aberto");
+  const [novoDialogOpen, setNovoDialogOpen] = useState(false);
+  const [selectedTestemunho, setSelectedTestemunho] = useState<Testemunho | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   const fetchTestemunhos = async () => {
     try {
@@ -127,7 +131,10 @@ export default function Testemunhos() {
             Compartilhe as bênçãos e milagres
           </p>
         </div>
-        <Button className="bg-gradient-primary shadow-soft">
+        <Button 
+          className="bg-gradient-primary shadow-soft"
+          onClick={() => setNovoDialogOpen(true)}
+        >
           <Plus className="w-4 h-4 mr-2" />
           <span className="hidden sm:inline">Novo Testemunho</span>
           <span className="sm:hidden">Novo</span>
@@ -220,7 +227,15 @@ export default function Testemunhos() {
                     {testemunho.mensagem}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2 mt-3 md:mt-4">
-                    <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full sm:w-auto text-xs md:text-sm"
+                      onClick={() => {
+                        setSelectedTestemunho(testemunho);
+                        setDetailsDialogOpen(true);
+                      }}
+                    >
                       Ver Detalhes
                     </Button>
                     {!testemunho.publicar && (
@@ -309,6 +324,20 @@ export default function Testemunhos() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Dialogs */}
+      <NovoTestemunhoDialog
+        open={novoDialogOpen}
+        onOpenChange={setNovoDialogOpen}
+        onSuccess={fetchTestemunhos}
+      />
+
+      <TestemunhoDetailsDialog
+        testemunho={selectedTestemunho}
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        onSuccess={fetchTestemunhos}
+      />
     </div>
   );
 }
