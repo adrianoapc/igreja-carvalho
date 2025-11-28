@@ -7,18 +7,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Heart, Clock, ArrowLeft, Search, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data - será substituído por dados reais do Supabase
-const allTestemunhos = Array.from({ length: 25 }, (_, i) => ({
-  id: i + 1,
-  nome: `Pessoa ${i + 1}`,
-  testemunho: `Testemunho de fé e gratidão a Deus número ${i + 1}. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
-  data: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR"),
-  categoria: ["saude", "familia", "financeiro", "trabalho", "espiritual", "ministerial", "casamento", "outro"][i % 8],
-  status: ["aberto", "publico", "arquivado"][i % 3],
-  aprovado: Math.random() > 0.3,
-}));
+interface Testemunho {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  categoria: string;
+  status: string;
+  publicar: boolean;
+  data_publicacao: string | null;
+  created_at: string;
+  autor_id: string;
+  profiles: {
+    nome: string;
+  };
+}
 
 const CATEGORIAS = [
   { value: "todos", label: "Todos" },
@@ -32,42 +37,47 @@ const CATEGORIAS = [
   { value: "outro", label: "Outros" },
 ];
 
-const ITEMS_PER_PAGE = 6;
-
 export default function Testemunhos() {
   const navigate = useNavigate();
-  const [displayedTestemunhos, setDisplayedTestemunhos] = useState(allTestemunhos.slice(0, ITEMS_PER_PAGE));
+  const { toast } = useToast();
+  const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState("todos");
   const [statusTab, setStatusTab] = useState("aberto");
-  
-  const loadMore = useCallback(() => {
-    setIsLoading(true);
-    
-    setTimeout(() => {
-      const nextPage = page + 1;
-      const start = nextPage * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE;
-      const newItems = allTestemunhos.slice(start, end);
-      
-      if (newItems.length > 0) {
-        setDisplayedTestemunhos(prev => [...prev, ...newItems]);
-        setPage(nextPage);
-      }
-      
-      if (end >= allTestemunhos.length) {
-        setHasMore(false);
-      }
-      
-      setIsLoading(false);
-    }, 800);
+
+  const fetchTestemunhos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("testemunhos")
+        .select(`
+          *,
+          profiles!testemunhos_autor_id_fkey(nome)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setTestemunhos(data || []);
+    } catch (error) {
+      console.error("Erro ao buscar testemunhos:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os testemunhos",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTestemunhos();
   }, []);
-
-  const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll(loadMore);
-
-  const filteredTestemunhos = displayedTestemunhos.filter(t => {
-    const matchesSearch = t.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.testemunho.toLowerCase().includes(searchTerm.toLowerCase());
+  
+  const filteredTestemunhos = testemunhos.filter(t => {
+    const matchesSearch = t.profiles.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.mensagem.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategoria = categoriaFilter === "todos" || t.categoria === categoriaFilter;
     const matchesStatus = t.status === statusTab;
     return matchesSearch && matchesCategoria && matchesStatus;
@@ -79,10 +89,31 @@ export default function Testemunhos() {
   };
 
   const testemunhosPorStatus = {
-    aberto: allTestemunhos.filter(t => t.status === "aberto").length,
-    publico: allTestemunhos.filter(t => t.status === "publico").length,
-    arquivado: allTestemunhos.filter(t => t.status === "arquivado").length,
+    aberto: testemunhos.filter(t => t.status === "aberto").length,
+    publico: testemunhos.filter(t => t.status === "publico").length,
+    arquivado: testemunhos.filter(t => t.status === "arquivado").length,
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
+        <div className="flex items-center gap-2 md:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/intercessao")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Testemunhos</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Compartilhe as bênçãos e milagres
+            </p>
+          </div>
+        </div>
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">Carregando testemunhos...</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
@@ -148,10 +179,9 @@ export default function Testemunhos() {
 
         <TabsContent value={statusTab} className="space-y-3 md:space-y-4 mt-4 md:mt-6">
           <div className="grid gap-3 md:gap-4">
-            {filteredTestemunhos.map((testemunho, index) => (
+            {filteredTestemunhos.map((testemunho) => (
               <Card 
                 key={testemunho.id} 
-                ref={index === filteredTestemunhos.length - 1 ? loadMoreRef : null}
                 className="shadow-soft hover:shadow-medium transition-shadow"
               >
                 <CardHeader className="pb-3 p-4 md:p-6">
@@ -161,19 +191,22 @@ export default function Testemunhos() {
                         <Heart className="w-4 h-4 md:w-5 md:h-5 text-accent-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg truncate">{testemunho.nome}</CardTitle>
+                        <CardTitle className="text-base md:text-lg truncate">{testemunho.titulo}</CardTitle>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground">{testemunho.profiles.nome}</span>
                           <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <span className="text-xs text-muted-foreground">{testemunho.data}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(testemunho.created_at).toLocaleDateString("pt-BR")}
+                          </span>
                           <Badge variant="outline" className="text-xs">
                             {getCategoriaLabel(testemunho.categoria)}
                           </Badge>
                         </div>
                       </div>
                     </div>
-                    {testemunho.aprovado ? (
+                    {testemunho.publicar ? (
                       <Badge className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 whitespace-nowrap text-xs">
-                        Aprovado
+                        Publicado
                       </Badge>
                     ) : (
                       <Badge className="bg-accent/20 text-accent-foreground whitespace-nowrap text-xs">
@@ -184,19 +217,78 @@ export default function Testemunhos() {
                 </CardHeader>
                 <CardContent className="p-4 md:p-6 pt-0">
                   <p className="text-sm md:text-base text-muted-foreground line-clamp-3">
-                    {testemunho.testemunho}
+                    {testemunho.mensagem}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2 mt-3 md:mt-4">
                     <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
                       Ver Detalhes
                     </Button>
-                    {!testemunho.aprovado && (
-                      <Button variant="outline" size="sm" className="text-primary w-full sm:w-auto text-xs md:text-sm">
-                        Aprovar
+                    {!testemunho.publicar && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-primary w-full sm:w-auto text-xs md:text-sm"
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase
+                              .from("testemunhos")
+                              .update({ 
+                                publicar: true,
+                                data_publicacao: new Date().toISOString()
+                              })
+                              .eq("id", testemunho.id);
+
+                            if (error) throw error;
+
+                            toast({
+                              title: "Sucesso",
+                              description: "Testemunho publicado com sucesso"
+                            });
+
+                            fetchTestemunhos();
+                          } catch (error) {
+                            console.error("Erro ao publicar:", error);
+                            toast({
+                              title: "Erro",
+                              description: "Não foi possível publicar o testemunho",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
+                      >
+                        Publicar
                       </Button>
                     )}
                     {testemunho.status === "aberto" && (
-                      <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full sm:w-auto text-xs md:text-sm"
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase
+                              .from("testemunhos")
+                              .update({ status: "publico" })
+                              .eq("id", testemunho.id);
+
+                            if (error) throw error;
+
+                            toast({
+                              title: "Sucesso",
+                              description: "Testemunho tornado público"
+                            });
+
+                            fetchTestemunhos();
+                          } catch (error) {
+                            console.error("Erro ao tornar público:", error);
+                            toast({
+                              title: "Erro",
+                              description: "Não foi possível tornar o testemunho público",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
+                      >
                         Tornar Público
                       </Button>
                     )}
@@ -204,35 +296,8 @@ export default function Testemunhos() {
                 </CardContent>
               </Card>
             ))}
-            
-            {isLoading && (
-              <div className="grid gap-3 md:gap-4">
-                {[1, 2].map((i) => (
-                  <Card key={i} className="shadow-soft">
-                    <CardHeader className="pb-3 p-4 md:p-6">
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="w-10 h-10 rounded-full" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-5 w-32" />
-                          <Skeleton className="h-3 w-24" />
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 md:p-6 pt-0">
-                      <Skeleton className="h-12 w-full" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!hasMore && filteredTestemunhos.length > 0 && (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                Todos os testemunhos foram carregados
-              </div>
-            )}
 
-            {filteredTestemunhos.length === 0 && !isLoading && (
+            {filteredTestemunhos.length === 0 && (
               <Card className="p-6 md:p-8 text-center">
                 <p className="text-sm text-muted-foreground">
                   {searchTerm || categoriaFilter !== "todos" 

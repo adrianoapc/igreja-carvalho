@@ -31,11 +31,16 @@ export default function Intercessao() {
           .select("ativo")
           .eq("ativo", true);
 
+        // Testemunhos
+        const { data: testemunhos } = await supabase
+          .from("testemunhos")
+          .select("publicar");
+
         setStats({
           pedidosPendentes: pedidos?.filter(p => p.status === "pendente").length || 0,
           pedidosEmOracao: pedidos?.filter(p => p.status === "em_oracao").length || 0,
           intercessoresAtivos: intercessores?.length || 0,
-          testemunhosPendentes: 0, // Será atualizado quando criar tabela de testemunhos
+          testemunhosPendentes: testemunhos?.filter(t => !t.publicar).length || 0,
         });
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);

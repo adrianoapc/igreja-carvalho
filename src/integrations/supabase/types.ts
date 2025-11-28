@@ -434,6 +434,53 @@ export type Database = {
         }
         Relationships: []
       }
+      testemunhos: {
+        Row: {
+          autor_id: string
+          categoria: Database["public"]["Enums"]["categoria_testemunho"]
+          created_at: string
+          data_publicacao: string | null
+          id: string
+          mensagem: string
+          publicar: boolean
+          status: Database["public"]["Enums"]["status_testemunho"]
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          autor_id: string
+          categoria?: Database["public"]["Enums"]["categoria_testemunho"]
+          created_at?: string
+          data_publicacao?: string | null
+          id?: string
+          mensagem: string
+          publicar?: boolean
+          status?: Database["public"]["Enums"]["status_testemunho"]
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          autor_id?: string
+          categoria?: Database["public"]["Enums"]["categoria_testemunho"]
+          created_at?: string
+          data_publicacao?: string | null
+          id?: string
+          mensagem?: string
+          publicar?: boolean
+          status?: Database["public"]["Enums"]["status_testemunho"]
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "testemunhos_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -557,7 +604,17 @@ export type Database = {
         | "tesoureiro"
         | "professor"
         | "membro"
+      categoria_testemunho:
+        | "espiritual"
+        | "casamento"
+        | "familia"
+        | "saude"
+        | "trabalho"
+        | "financeiro"
+        | "ministerial"
+        | "outro"
       status_pedido: "pendente" | "em_oracao" | "respondido" | "arquivado"
+      status_testemunho: "aberto" | "publico" | "arquivado"
       tipo_pedido:
         | "saude"
         | "familia"
@@ -709,7 +766,18 @@ export const Constants = {
         "professor",
         "membro",
       ],
+      categoria_testemunho: [
+        "espiritual",
+        "casamento",
+        "familia",
+        "saude",
+        "trabalho",
+        "financeiro",
+        "ministerial",
+        "outro",
+      ],
       status_pedido: ["pendente", "em_oracao", "respondido", "arquivado"],
+      status_testemunho: ["aberto", "publico", "arquivado"],
       tipo_pedido: [
         "saude",
         "familia",
