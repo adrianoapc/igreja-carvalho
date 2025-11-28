@@ -110,25 +110,50 @@ export function useAuth() {
   };
 
   const hasAccess = (moduleName: string, requiredLevel?: string): boolean => {
-    if (!profile) return false;
+    if (!profile) {
+      console.log("hasAccess: No profile found");
+      return false;
+    }
+    
+    console.log("hasAccess check:", { 
+      moduleName, 
+      requiredLevel, 
+      profileStatus: profile.status,
+      permissionsCount: permissions.length 
+    });
     
     // Visitantes e frequentadores não têm acesso
-    if (profile.status !== "membro") return false;
+    if (profile.status !== "membro") {
+      console.log("hasAccess: User is not a member");
+      return false;
+    }
 
     // Se não especificar nível, só verifica se tem algum acesso
     if (!requiredLevel) {
-      return permissions.some(p => p.module_name === moduleName);
+      const hasAnyAccess = permissions.some(p => p.module_name === moduleName);
+      console.log("hasAccess (any):", hasAnyAccess);
+      return hasAnyAccess;
     }
 
     // Verificar nível específico
     const permission = permissions.find(p => p.module_name === moduleName);
-    if (!permission) return false;
+    if (!permission) {
+      console.log("hasAccess: No permission found for module");
+      return false;
+    }
 
     const levels = ["visualizar", "criar_editar", "aprovar_gerenciar", "acesso_completo"];
     const requiredIndex = levels.indexOf(requiredLevel);
     const userIndex = levels.indexOf(permission.access_level);
 
-    return userIndex >= requiredIndex;
+    const hasRequiredLevel = userIndex >= requiredIndex;
+    console.log("hasAccess (level):", { 
+      required: requiredLevel, 
+      user: permission.access_level, 
+      hasAccess: hasRequiredLevel 
+    });
+    
+    return hasRequiredLevel;
   };
 
   return {
