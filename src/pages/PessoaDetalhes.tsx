@@ -304,92 +304,89 @@ export default function PessoaDetalhes() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Idade</p>
-                  <Cake className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Idade</p>
+                  <Cake className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-2xl font-bold">
+                <p className="text-xl font-bold leading-none">
                   {pessoa.data_nascimento
-                    ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()}`
+                    ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()} anos`
                     : "—"}
                 </p>
-                {pessoa.data_nascimento && (
-                  <p className="text-xs text-muted-foreground mt-1">anos</p>
-                )}
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sexo</p>
-                  <User className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sexo</p>
+                  <User className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-2xl font-bold">{pessoa.sexo || "—"}</p>
+                <p className="text-xl font-bold leading-none truncate">{pessoa.sexo || "—"}</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estado Civil</p>
-                  <Heart className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Estado Civil</p>
+                  <Heart className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-2xl font-bold">{pessoa.estado_civil || "—"}</p>
+                <p className="text-xl font-bold leading-none truncate">{pessoa.estado_civil || "—"}</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Batizado</p>
-                  <Droplets className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Batizado</p>
+                  <Droplets className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-2xl font-bold">{pessoa.batizado ? "Sim" : "Não"}</p>
+                <p className="text-xl font-bold leading-none">{pessoa.batizado ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pastor</p>
-                  <BookOpen className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pastor</p>
+                  <BookOpen className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-2xl font-bold">{pessoa.e_pastor ? "Sim" : "Não"}</p>
+                <p className="text-xl font-bold leading-none">{pessoa.e_pastor ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Liderança</p>
-                  <Crown className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Liderança</p>
+                  <Crown className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-2xl font-bold">{pessoa.e_lider ? "Sim" : "Não"}</p>
+                <p className="text-xl font-bold leading-none">{pessoa.e_lider ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-success profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Telefone</p>
-                  <Phone className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefone</p>
+                  <Phone className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-base font-semibold">
+                <p className="text-base font-semibold leading-none truncate">
                   {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "—"}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 border-l-4 border-l-primary/40">
+            <Card className="border-l-4 border-l-primary/40 card-gradient-warning profile-card-hover overflow-hidden">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Necessidades</p>
-                  <AlertCircle className="w-4 h-4 text-primary/60" />
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Necessidades</p>
+                  <AlertCircle className="w-4 h-4 text-primary/70" />
                 </div>
-                <p className="text-base font-semibold truncate">{pessoa.necessidades_especiais || "Nenhuma"}</p>
+                <p className="text-base font-semibold leading-none truncate">{pessoa.necessidades_especiais || "Nenhuma"}</p>
               </CardContent>
             </Card>
           </div>
