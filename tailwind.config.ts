@@ -94,17 +94,17 @@ export default {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out'
   		},
-  		fontFamily: {
-  			sans: [
-  				'Open Sans',
-  				'ui-sans-serif',
-  				'system-ui',
-  				'sans-serif',
-  				'Apple Color Emoji',
-  				'Segoe UI Emoji',
-  				'Segoe UI Symbol',
-  				'Noto Color Emoji'
-  			],
+		fontFamily: {
+			sans: [
+				'Inter',
+				'ui-sans-serif',
+				'system-ui',
+				'sans-serif',
+				'Apple Color Emoji',
+				'Segoe UI Emoji',
+				'Segoe UI Symbol',
+				'Noto Color Emoji'
+			],
   			serif: [
   				'ui-serif',
   				'Georgia',
