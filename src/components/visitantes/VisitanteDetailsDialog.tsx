@@ -26,6 +26,8 @@ interface Visitante {
   telefone: string | null;
   email: string | null;
   data_primeira_visita: string | null;
+  data_ultima_visita: string | null;
+  numero_visitas: number;
   aceitou_jesus: boolean | null;
   deseja_contato: boolean | null;
   recebeu_brinde: boolean | null;
@@ -138,12 +140,23 @@ export function VisitanteDetailsDialog({
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-lg font-semibold">{visitante.nome}</h3>
-                    {visitante.data_primeira_visita && (
-                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                        <Calendar className="w-3 h-3" />
-                        Primeira visita: {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
-                      </p>
-                    )}
+                    <div className="flex flex-wrap gap-2 items-center mt-2">
+                      <Badge variant="outline" className="bg-primary/10">
+                        {visitante.numero_visitas} {visitante.numero_visitas === 1 ? 'visita' : 'visitas'}
+                      </Badge>
+                      {visitante.data_primeira_visita && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          1ª visita: {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
+                      )}
+                      {visitante.data_ultima_visita && visitante.data_ultima_visita !== visitante.data_primeira_visita && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Última: {format(new Date(visitante.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <Separator />

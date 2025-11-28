@@ -54,23 +54,89 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      // Inserir visitante
-      const { data: visitanteData, error: visitanteError } = await supabase
+      // Verificar se já existe um visitante com o mesmo email ou telefone
+      let query = supabase
         .from("profiles")
-        .insert({
-          nome: formData.nome.trim(),
-          telefone: formData.telefone.trim() || null,
-          email: formData.email.trim() || null,
-          aceitou_jesus: formData.aceitou_jesus,
-          deseja_contato: formData.deseja_contato,
-          recebeu_brinde: formData.recebeu_brinde,
-          status: "visitante",
-          data_primeira_visita: new Date().toISOString(),
-        })
-        .select()
-        .single();
+        .select("*")
+        .eq("status", "visitante");
 
-      if (visitanteError) throw visitanteError;
+      const conditions = [];
+      if (formData.email.trim()) {
+        conditions.push(supabase
+          .from("profiles")
+          .select("*")
+          .eq("status", "visitante")
+          .eq("email", formData.email.trim()));
+      }
+      if (formData.telefone.trim()) {
+        conditions.push(supabase
+          .from("profiles")
+          .select("*")
+          .eq("status", "visitante")
+          .eq("telefone", formData.telefone.trim()));
+      }
+
+      // Verificar duplicatas
+      let visitanteExistente = null;
+      for (const condition of conditions) {
+        const { data } = await condition;
+        if (data && data.length > 0) {
+          visitanteExistente = data[0];
+          break;
+        }
+      }
+
+      let visitanteData;
+
+      if (visitanteExistente) {
+        // Atualizar visitante existente
+        const { data: updatedData, error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            numero_visitas: (visitanteExistente.numero_visitas || 0) + 1,
+            data_ultima_visita: new Date().toISOString(),
+            aceitou_jesus: formData.aceitou_jesus || visitanteExistente.aceitou_jesus,
+            deseja_contato: formData.deseja_contato,
+            recebeu_brinde: formData.recebeu_brinde || visitanteExistente.recebeu_brinde,
+          })
+          .eq("id", visitanteExistente.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        visitanteData = updatedData;
+
+        toast({
+          title: "Visitante Reconhecido",
+          description: `${visitanteData.nome} já tem ${visitanteData.numero_visitas} visita(s) registrada(s)!`,
+        });
+      } else {
+        // Inserir novo visitante
+        const { data: newData, error: insertError } = await supabase
+          .from("profiles")
+          .insert({
+            nome: formData.nome.trim(),
+            telefone: formData.telefone.trim() || null,
+            email: formData.email.trim() || null,
+            aceitou_jesus: formData.aceitou_jesus,
+            deseja_contato: formData.deseja_contato,
+            recebeu_brinde: formData.recebeu_brinde,
+            status: "visitante",
+            data_primeira_visita: new Date().toISOString(),
+            data_ultima_visita: new Date().toISOString(),
+            numero_visitas: 1,
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        visitanteData = newData;
+
+        toast({
+          title: "Sucesso",
+          description: "Visitante registrado com sucesso"
+        });
+      }
 
       // Se deseja contato, criar agendamento automático para 3 dias depois
       if (formData.deseja_contato && visitanteData) {
@@ -85,7 +151,9 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
             data_contato: dataContato.toISOString(),
             tipo_contato: "telefonico",
             status: "agendado",
-            observacoes: "Contato automático agendado após registro"
+            observacoes: visitanteExistente 
+              ? "Contato automático - visita recorrente" 
+              : "Contato automático agendado após registro"
           });
 
         if (contatoError) {
@@ -93,11 +161,6 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
           // Não bloqueamos o cadastro se falhar o agendamento
         }
       }
-
-      toast({
-        title: "Sucesso",
-        description: "Visitante registrado com sucesso"
-      });
 
       setFormData({
         nome: "",

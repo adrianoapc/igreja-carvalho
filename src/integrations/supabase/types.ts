@@ -227,10 +227,12 @@ export type Database = {
           created_at: string | null
           data_cadastro_membro: string | null
           data_primeira_visita: string | null
+          data_ultima_visita: string | null
           deseja_contato: boolean | null
           email: string | null
           id: string
           nome: string
+          numero_visitas: number
           observacoes: string | null
           recebeu_brinde: boolean | null
           status: Database["public"]["Enums"]["user_status"]
@@ -243,10 +245,12 @@ export type Database = {
           created_at?: string | null
           data_cadastro_membro?: string | null
           data_primeira_visita?: string | null
+          data_ultima_visita?: string | null
           deseja_contato?: boolean | null
           email?: string | null
           id?: string
           nome: string
+          numero_visitas?: number
           observacoes?: string | null
           recebeu_brinde?: boolean | null
           status?: Database["public"]["Enums"]["user_status"]
@@ -259,10 +263,12 @@ export type Database = {
           created_at?: string | null
           data_cadastro_membro?: string | null
           data_primeira_visita?: string | null
+          data_ultima_visita?: string | null
           deseja_contato?: boolean | null
           email?: string | null
           id?: string
           nome?: string
+          numero_visitas?: number
           observacoes?: string | null
           recebeu_brinde?: boolean | null
           status?: Database["public"]["Enums"]["user_status"]
