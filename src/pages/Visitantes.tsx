@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Phone, Mail, Check, X, Gift, Calendar, PhoneCall } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,7 @@ export default function Visitantes() {
   const [displayedVisitantes, setDisplayedVisitantes] = useState<Visitante[]>([]);
   const [allVisitantes, setAllVisitantes] = useState<Visitante[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "visitante" | "frequentador">("todos");
   const [registrarOpen, setRegistrarOpen] = useState(false);
   const [agendarContatoOpen, setAgendarContatoOpen] = useState(false);
   const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(null);
@@ -92,11 +94,21 @@ export default function Visitantes() {
 
   const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll(loadMore);
 
-  const filteredVisitantes = displayedVisitantes.filter(v =>
-    v.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.telefone?.includes(searchTerm) ||
-    v.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVisitantes = displayedVisitantes.filter(v => {
+    const matchesSearch = v.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.telefone?.includes(searchTerm) ||
+      v.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "todos" || v.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const countByStatus = {
+    todos: allVisitantes.length,
+    visitante: allVisitantes.filter(v => v.status === "visitante").length,
+    frequentador: allVisitantes.filter(v => v.status === "frequentador").length,
+  };
 
   const handleOpenDetails = (visitante: Visitante) => {
     navigate(`/pessoas/${visitante.id}`);
@@ -124,16 +136,30 @@ export default function Visitantes() {
       </div>
 
       <Card className="shadow-soft">
-        <CardHeader className="p-4 md:p-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
-                placeholder="Buscar visitantes..." 
-                className="pl-10 text-sm md:text-base"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+        <CardHeader className="p-4 md:p-6 space-y-4">
+          <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="todos" className="text-xs md:text-sm">
+                Todos ({countByStatus.todos})
+              </TabsTrigger>
+              <TabsTrigger value="visitante" className="text-xs md:text-sm">
+                Visitantes ({countByStatus.visitante})
+              </TabsTrigger>
+              <TabsTrigger value="frequentador" className="text-xs md:text-sm">
+                Frequentadores ({countByStatus.frequentador})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Buscar por nome, telefone ou email..." 
+              className="pl-10 text-sm md:text-base"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </CardHeader>
         <CardContent className="p-3 md:p-6">
           <div className="space-y-3 md:space-y-4">
