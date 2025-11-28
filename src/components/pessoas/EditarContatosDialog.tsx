@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
+import InputMask from "react-input-mask";
+import { removerFormatacao } from "@/lib/validators";
 
 const contatosSchema = z.object({
   cep: z.string().max(10).nullable(),
@@ -83,13 +85,13 @@ export function EditarContatosDialog({
       const { error } = await supabase
         .from("profiles")
         .update({
-          cep: validatedData.cep || null,
+          cep: validatedData.cep ? removerFormatacao(validatedData.cep) : null,
           cidade: validatedData.cidade || null,
           bairro: validatedData.bairro || null,
-          estado: validatedData.estado || null,
+          estado: validatedData.estado?.toUpperCase() || null,
           endereco: validatedData.endereco || null,
           email: validatedData.email || null,
-          telefone: validatedData.telefone || null,
+          telefone: validatedData.telefone ? removerFormatacao(validatedData.telefone) : null,
         })
         .eq("id", pessoaId);
 
@@ -132,15 +134,21 @@ export function EditarContatosDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cep">CEP</Label>
-              <Input
-                id="cep"
+              <InputMask
+                mask="99999-999"
                 value={formData.cep}
                 onChange={(e) =>
                   setFormData({ ...formData, cep: e.target.value })
                 }
-                maxLength={10}
-                placeholder="00000-000"
-              />
+              >
+                {(inputProps: any) => (
+                  <Input
+                    {...inputProps}
+                    id="cep"
+                    placeholder="00000-000"
+                  />
+                )}
+              </InputMask>
             </div>
 
             <div className="space-y-2">
@@ -207,15 +215,22 @@ export function EditarContatosDialog({
 
             <div className="space-y-2">
               <Label htmlFor="telefone">Celular</Label>
-              <Input
-                id="telefone"
-                type="tel"
+              <InputMask
+                mask="(99) 99999-9999"
                 value={formData.telefone}
                 onChange={(e) =>
                   setFormData({ ...formData, telefone: e.target.value })
                 }
-                maxLength={20}
-              />
+              >
+                {(inputProps: any) => (
+                  <Input
+                    {...inputProps}
+                    id="telefone"
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                  />
+                )}
+              </InputMask>
             </div>
           </div>
 
