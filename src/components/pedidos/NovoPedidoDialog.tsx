@@ -1,4 +1,4 @@
-import { useState } from "react";
+import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +17,13 @@ interface NovoPedidoDialogProps {
 }
 
 export function NovoPedidoDialog({ open, onOpenChange, onSuccess }: NovoPedidoDialogProps) {
-  const [loading, setLoading] = useState(false);
-  const [anonimo, setAnonimo] = useState(false);
-  const [tipo, setTipo] = useState("outro");
-  const [pedido, setPedido] = useState("");
-  const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
-  const [telefone, setTelefone] = useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [anonimo, setAnonimo] = React.useState(false);
+  const [tipo, setTipo] = React.useState("outro");
+  const [pedido, setPedido] = React.useState("");
+  const [nome, setNome] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [telefone, setTelefone] = React.useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,11 +22,11 @@ interface Intercessor {
 }
 
 export function IntercessoresManager() {
-  const [intercessores, setIntercessores] = useState<Intercessor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
+  const [intercessores, setIntercessores] = React.useState<Intercessor[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [formData, setFormData] = React.useState({
     nome: "",
     email: "",
     telefone: "",
@@ -64,7 +64,7 @@ export function IntercessoresManager() {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchIntercessores();
   }, []);
 

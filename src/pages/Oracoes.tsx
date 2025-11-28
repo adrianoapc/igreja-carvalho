@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,9 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Clock, User, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { NovoPedidoDialog } from "@/components/pedidos/NovoPedidoDialog";
-import { PedidoDetailsDialog } from "@/components/pedidos/PedidoDetailsDialog";
-import { IntercessoresManager } from "@/components/pedidos/IntercessoresManager";
+
+// Lazy load components to avoid circular dependencies
+const NovoPedidoDialog = React.lazy(() => import("@/components/pedidos/NovoPedidoDialog").then(m => ({ default: m.NovoPedidoDialog })));
+const PedidoDetailsDialog = React.lazy(() => import("@/components/pedidos/PedidoDetailsDialog").then(m => ({ default: m.PedidoDetailsDialog })));
+const IntercessoresManager = React.lazy(() => import("@/components/pedidos/IntercessoresManager").then(m => ({ default: m.IntercessoresManager })));
 
 interface Pedido {
   id: string;
@@ -67,11 +69,11 @@ const getStatusLabel = (status: string) => {
 };
 
 export default function Oracoes() {
-  const [pedidos, setPedidos] = useState<Pedido[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
+  const [pedidos, setPedidos] = React.useState<Pedido[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [novoPedidoOpen, setNovoPedidoOpen] = React.useState(false);
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
+  const [selectedPedido, setSelectedPedido] = React.useState<Pedido | null>(null);
   const { toast } = useToast();
 
   const fetchPedidos = async () => {
@@ -99,7 +101,7 @@ export default function Oracoes() {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchPedidos();
   }, []);
 
@@ -276,24 +278,28 @@ export default function Oracoes() {
         </TabsContent>
 
         <TabsContent value="intercessores" className="mt-6">
-          <IntercessoresManager />
+          <React.Suspense fallback={<div className="flex items-center justify-center p-8">Carregando...</div>}>
+            <IntercessoresManager />
+          </React.Suspense>
         </TabsContent>
       </Tabs>
 
-      <NovoPedidoDialog 
-        open={novoPedidoOpen}
-        onOpenChange={setNovoPedidoOpen}
-        onSuccess={fetchPedidos}
-      />
-
-      {selectedPedido && (
-        <PedidoDetailsDialog
-          open={detailsOpen}
-          onOpenChange={setDetailsOpen}
-          pedido={selectedPedido}
-          onUpdate={fetchPedidos}
+      <React.Suspense fallback={null}>
+        <NovoPedidoDialog 
+          open={novoPedidoOpen}
+          onOpenChange={setNovoPedidoOpen}
+          onSuccess={fetchPedidos}
         />
-      )}
+
+        {selectedPedido && (
+          <PedidoDetailsDialog
+            open={detailsOpen}
+            onOpenChange={setDetailsOpen}
+            pedido={selectedPedido}
+            onUpdate={fetchPedidos}
+          />
+        )}
+      </React.Suspense>
     </div>
   );
 }
