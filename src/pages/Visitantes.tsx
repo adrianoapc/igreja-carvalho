@@ -47,7 +47,7 @@ export default function Visitantes() {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("status", "visitante")
+        .in("status", ["visitante", "frequentador"])
         .order("data_primeira_visita", { ascending: false });
 
       if (error) throw error;
@@ -111,14 +111,14 @@ export default function Visitantes() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Visitantes</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">Registre e acompanhe os visitantes</p>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Registre e acompanhe visitantes e frequentadores</p>
         </div>
         <Button 
           className="bg-gradient-primary shadow-soft w-full sm:w-auto"
           onClick={() => setRegistrarOpen(true)}
         >
           <Plus className="w-4 h-4 mr-2" />
-          <span className="hidden sm:inline">Registrar Visitante</span>
+          <span className="hidden sm:inline">Registrar Pessoa</span>
           <span className="sm:hidden">Registrar</span>
         </Button>
       </div>
@@ -179,6 +179,9 @@ export default function Visitantes() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={visitante.status === "visitante" ? "default" : "secondary"} className="text-xs">
+                    {visitante.status === "visitante" ? "Visitante" : "Frequentador"}
+                  </Badge>
                   <Badge variant="outline" className="text-xs bg-primary/10">
                     {visitante.numero_visitas} {visitante.numero_visitas === 1 ? 'visita' : 'visitas'}
                   </Badge>

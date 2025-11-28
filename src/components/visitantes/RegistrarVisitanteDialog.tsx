@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
@@ -22,6 +24,8 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
     nome: "",
     telefone: "",
     email: "",
+    tipo: "visitante" as "visitante" | "frequentador",
+    observacoes: "",
     aceitou_jesus: false,
     deseja_contato: true,
     recebeu_brinde: false,
@@ -56,11 +60,11 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      // Verificar se já existe um visitante com o mesmo email ou telefone
+      // Verificar se já existe uma pessoa com o mesmo email ou telefone
       let query = supabase
         .from("profiles")
         .select("*")
-        .eq("status", "visitante");
+        .in("status", ["visitante", "frequentador"]);
 
       const telefoneNormalizado = formData.telefone.trim() ? removerFormatacao(formData.telefone.trim()) : null;
       
@@ -69,14 +73,14 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         conditions.push(supabase
           .from("profiles")
           .select("*")
-          .eq("status", "visitante")
+          .in("status", ["visitante", "frequentador"])
           .eq("email", formData.email.trim()));
       }
       if (telefoneNormalizado) {
         conditions.push(supabase
           .from("profiles")
           .select("*")
-          .eq("status", "visitante")
+          .in("status", ["visitante", "frequentador"])
           .eq("telefone", telefoneNormalizado));
       }
 
@@ -93,12 +97,14 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
       let visitanteData;
 
       if (visitanteExistente) {
-        // Atualizar visitante existente
+        // Atualizar registro existente
         const { data: updatedData, error: updateError } = await supabase
           .from("profiles")
           .update({
             numero_visitas: (visitanteExistente.numero_visitas || 0) + 1,
             data_ultima_visita: new Date().toISOString(),
+            status: formData.tipo,
+            observacoes: formData.observacoes.trim() || visitanteExistente.observacoes,
             aceitou_jesus: formData.aceitou_jesus || visitanteExistente.aceitou_jesus,
             deseja_contato: formData.deseja_contato,
             recebeu_brinde: formData.recebeu_brinde || visitanteExistente.recebeu_brinde,
@@ -111,21 +117,22 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         visitanteData = updatedData;
 
         toast({
-          title: "Visitante Reconhecido",
+          title: "Registro Atualizado",
           description: `${visitanteData.nome} já tem ${visitanteData.numero_visitas} visita(s) registrada(s)!`,
         });
       } else {
-        // Inserir novo visitante
+        // Inserir novo registro
         const { data: newData, error: insertError } = await supabase
           .from("profiles")
           .insert({
             nome: formData.nome.trim(),
             telefone: telefoneNormalizado,
             email: formData.email.trim() || null,
+            observacoes: formData.observacoes.trim() || null,
             aceitou_jesus: formData.aceitou_jesus,
             deseja_contato: formData.deseja_contato,
             recebeu_brinde: formData.recebeu_brinde,
-            status: "visitante",
+            status: formData.tipo,
             data_primeira_visita: new Date().toISOString(),
             data_ultima_visita: new Date().toISOString(),
             numero_visitas: 1,
@@ -138,12 +145,12 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
 
         toast({
           title: "Sucesso",
-          description: "Visitante registrado com sucesso"
+          description: `${formData.tipo === "visitante" ? "Visitante" : "Frequentador"} registrado com sucesso`
         });
       }
 
-      // Se deseja contato, criar agendamento automático para 3 dias depois
-      if (formData.deseja_contato && visitanteData) {
+      // Se deseja contato E é visitante, criar agendamento automático para 3 dias depois
+      if (formData.deseja_contato && visitanteData && formData.tipo === "visitante") {
         const dataContato = new Date();
         dataContato.setDate(dataContato.getDate() + 3);
 
@@ -170,6 +177,8 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         nome: "",
         telefone: "",
         email: "",
+        tipo: "visitante",
+        observacoes: "",
         aceitou_jesus: false,
         deseja_contato: true,
         recebeu_brinde: false,
@@ -193,13 +202,32 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Registrar Visitante</DialogTitle>
+          <DialogTitle>Registrar Pessoa</DialogTitle>
           <DialogDescription>
-            Preencha os dados do visitante
+            Preencha os dados da pessoa
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="tipo">Tipo *</Label>
+            <Select
+              value={formData.tipo}
+              onValueChange={(value: "visitante" | "frequentador") => 
+                setFormData({ ...formData, tipo: value })
+              }
+              disabled={loading}
+            >
+              <SelectTrigger id="tipo">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="visitante">Visitante</SelectItem>
+                <SelectItem value="frequentador">Frequentador</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="nome">Nome *</Label>
             <Input
@@ -239,6 +267,18 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="email@exemplo.com"
               disabled={loading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="observacoes">Observações</Label>
+            <Textarea
+              id="observacoes"
+              value={formData.observacoes}
+              onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+              placeholder="Observações sobre a pessoa..."
+              disabled={loading}
+              className="min-h-[80px]"
             />
           </div>
 
