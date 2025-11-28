@@ -98,13 +98,35 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
       let visitanteData;
 
       if (visitanteExistente) {
+        // Verificar se a pessoa já é frequentador
+        if (visitanteExistente.status === "frequentador" && formData.tipo === "visitante") {
+          toast({
+            title: "Aviso",
+            description: `${visitanteExistente.nome} já é frequentador. Use o tipo correto ao registrar.`,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        const novoNumeroVisitas = (visitanteExistente.numero_visitas || 0) + 1;
+        
+        // Promover automaticamente para frequentador após 2 visitas
+        let novoStatus = formData.tipo;
+        let mensagemPromocao = "";
+        
+        if (visitanteExistente.status === "visitante" && novoNumeroVisitas > 2) {
+          novoStatus = "frequentador";
+          mensagemPromocao = " Foi promovido a Frequentador!";
+        }
+
         // Atualizar registro existente
         const { data: updatedData, error: updateError } = await supabase
           .from("profiles")
           .update({
-            numero_visitas: (visitanteExistente.numero_visitas || 0) + 1,
+            numero_visitas: novoNumeroVisitas,
             data_ultima_visita: new Date().toISOString(),
-            status: formData.tipo,
+            status: novoStatus,
             observacoes: formData.observacoes.trim() || visitanteExistente.observacoes,
             aceitou_jesus: formData.aceitou_jesus || visitanteExistente.aceitou_jesus,
             batizado: formData.batizado || visitanteExistente.batizado,
@@ -118,9 +140,25 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         if (updateError) throw updateError;
         visitanteData = updatedData;
 
+        // Se houve promoção, notificar admins
+        if (mensagemPromocao) {
+          await supabase.rpc('notify_admins', {
+            p_title: 'Promoção para Frequentador',
+            p_message: `${visitanteData.nome} foi promovido automaticamente a Frequentador após ${novoNumeroVisitas} visitas`,
+            p_type: 'promocao_status',
+            p_related_user_id: visitanteData.user_id,
+            p_metadata: {
+              nome: visitanteData.nome,
+              status_anterior: 'visitante',
+              status_novo: 'frequentador',
+              numero_visitas: novoNumeroVisitas
+            }
+          });
+        }
+
         toast({
-          title: "Registro Atualizado",
-          description: `${visitanteData.nome} já tem ${visitanteData.numero_visitas} visita(s) registrada(s)!`,
+          title: mensagemPromocao ? "🎉 Promoção Automática!" : "Registro Atualizado",
+          description: `${visitanteData.nome} já tem ${visitanteData.numero_visitas} visita(s) registrada(s)!${mensagemPromocao}`,
         });
       } else {
         // Inserir novo registro
@@ -152,8 +190,8 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         });
       }
 
-      // Se deseja contato E é visitante, criar agendamento automático para 3 dias depois
-      if (formData.deseja_contato && visitanteData && formData.tipo === "visitante") {
+      // Se deseja contato E é visitante (não foi promovido), criar agendamento automático para 3 dias depois
+      if (formData.deseja_contato && visitanteData && visitanteData.status === "visitante") {
         const dataContato = new Date();
         dataContato.setDate(dataContato.getDate() + 3);
 
