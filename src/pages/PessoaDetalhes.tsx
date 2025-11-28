@@ -32,6 +32,10 @@ import {
   Crown,
   UserCheck,
   AlertCircle,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -41,6 +45,7 @@ import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPesso
 import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
+import { AtribuirFuncaoDialog } from "@/components/membros/AtribuirFuncaoDialog";
 import { formatarCPF, formatarTelefone, formatarCEP } from "@/lib/validators";
 
 interface PessoaDetalhesData {
@@ -106,6 +111,8 @@ export default function PessoaDetalhes() {
   const [editarContatosOpen, setEditarContatosOpen] = useState(false);
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
+  const [compactView, setCompactView] = useState(false);
+  const [atribuirFuncaoOpen, setAtribuirFuncaoOpen] = useState(false);
 
   const fetchPessoa = async () => {
     if (!id) return;
@@ -217,9 +224,6 @@ export default function PessoaDetalhes() {
                 <Badge variant={getStatusBadgeVariant(pessoa.status)}>
                   {getStatusLabel(pessoa.status)}
                 </Badge>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Edit className="w-4 h-4" />
-                </Button>
               </div>
             </div>
           </div>
@@ -296,21 +300,41 @@ export default function PessoaDetalhes() {
 
         {/* Tab: Perfil */}
         <TabsContent value="perfil" className="space-y-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold">Informações do Perfil</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Visualização consolidada dos dados cadastrais. Use as outras abas para editar.
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">Informações do Perfil</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Visualização consolidada dos dados cadastrais. Use as outras abas para editar.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCompactView(!compactView)}
+              className="gap-2"
+            >
+              {compactView ? (
+                <>
+                  <Maximize2 className="w-4 h-4" />
+                  Expandir
+                </>
+              ) : (
+                <>
+                  <Minimize2 className="w-4 h-4" />
+                  Compactar
+                </>
+              )}
+            </Button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`grid gap-4 ${compactView ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
             <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Idade</p>
-                  <Cake className="w-4 h-4 text-primary/70" />
+                  {!compactView && <Cake className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-xl font-bold leading-none">
+                <p className={compactView ? "text-lg font-bold leading-none" : "text-xl font-bold leading-none"}>
                   {pessoa.data_nascimento
                     ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()} anos`
                     : "—"}
@@ -319,74 +343,74 @@ export default function PessoaDetalhes() {
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sexo</p>
-                  <User className="w-4 h-4 text-primary/70" />
+                  {!compactView && <User className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-xl font-bold leading-none truncate">{pessoa.sexo || "—"}</p>
+                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none truncate`}>{pessoa.sexo || "—"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Estado Civil</p>
-                  <Heart className="w-4 h-4 text-primary/70" />
+                  {!compactView && <Heart className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-xl font-bold leading-none truncate">{pessoa.estado_civil || "—"}</p>
+                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none truncate`}>{pessoa.estado_civil || "—"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Batizado</p>
-                  <Droplets className="w-4 h-4 text-primary/70" />
+                  {!compactView && <Droplets className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-xl font-bold leading-none">{pessoa.batizado ? "Sim" : "Não"}</p>
+                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none`}>{pessoa.batizado ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pastor</p>
-                  <BookOpen className="w-4 h-4 text-primary/70" />
+                  {!compactView && <BookOpen className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-xl font-bold leading-none">{pessoa.e_pastor ? "Sim" : "Não"}</p>
+                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none`}>{pessoa.e_pastor ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Liderança</p>
-                  <Crown className="w-4 h-4 text-primary/70" />
+                  {!compactView && <Crown className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-xl font-bold leading-none">{pessoa.e_lider ? "Sim" : "Não"}</p>
+                <p className={`${compactView ? "text-lg" : "text-xl"} font-bold leading-none`}>{pessoa.e_lider ? "Sim" : "Não"}</p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-success profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefone</p>
-                  <Phone className="w-4 h-4 text-primary/70" />
+                  {!compactView && <Phone className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-base font-semibold leading-none truncate">
+                <p className={`${compactView ? "text-sm" : "text-base"} font-semibold leading-none truncate`}>
                   {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "—"}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="border-l-4 border-l-primary/40 card-gradient-warning profile-card-hover overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className={compactView ? "pt-4" : "pt-6"}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Necessidades</p>
-                  <AlertCircle className="w-4 h-4 text-primary/70" />
+                  {!compactView && <AlertCircle className="w-4 h-4 text-primary/70" />}
                 </div>
-                <p className="text-base font-semibold leading-none truncate">{pessoa.necessidades_especiais || "Nenhuma"}</p>
+                <p className={`${compactView ? "text-sm" : "text-base"} font-semibold leading-none truncate`}>{pessoa.necessidades_especiais || "Nenhuma"}</p>
               </CardContent>
             </Card>
           </div>
@@ -600,6 +624,14 @@ export default function PessoaDetalhes() {
                 <div className="h-8 w-1 bg-green-600 rounded" />
                 <CardTitle>Funções na Igreja</CardTitle>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAtribuirFuncaoOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Atribuir função
+              </Button>
             </CardHeader>
             <CardContent>
               {funcoes.length > 0 ? (
@@ -607,7 +639,7 @@ export default function PessoaDetalhes() {
                   {funcoes.map((funcao) => (
                     <div
                       key={funcao.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
                       <div>
                         <p className="font-semibold">{funcao.nome}</p>
@@ -618,14 +650,49 @@ export default function PessoaDetalhes() {
                           })}
                         </p>
                       </div>
-                      <Badge variant={funcao.ativo ? "default" : "secondary"}>
-                        {funcao.ativo ? "Ativa" : "Inativa"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={funcao.ativo ? "default" : "secondary"}>
+                          {funcao.ativo ? "Ativa" : "Inativa"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={async () => {
+                            if (confirm("Deseja realmente remover esta função?")) {
+                              try {
+                                const { error } = await supabase
+                                  .from("membro_funcoes")
+                                  .delete()
+                                  .eq("id", funcao.id);
+                                
+                                if (error) throw error;
+                                
+                                toast({
+                                  title: "Sucesso",
+                                  description: "Função removida com sucesso",
+                                });
+                                
+                                fetchPessoa();
+                              } catch (error: any) {
+                                toast({
+                                  title: "Erro",
+                                  description: error.message || "Não foi possível remover a função",
+                                  variant: "destructive",
+                                });
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
+                  <Shield className="w-12 h-12 mx-auto mb-2 opacity-20" />
                   <p>Nenhuma função atribuída</p>
                 </div>
               )}
@@ -770,6 +837,14 @@ export default function PessoaDetalhes() {
               tipo_sanguineo: pessoa.tipo_sanguineo,
               observacoes: pessoa.observacoes,
             }}
+            onSuccess={fetchPessoa}
+          />
+
+          <AtribuirFuncaoDialog
+            open={atribuirFuncaoOpen}
+            onOpenChange={setAtribuirFuncaoOpen}
+            membroId={pessoa.id}
+            membroNome={pessoa.nome}
             onSuccess={fetchPessoa}
           />
         </>
