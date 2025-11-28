@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Banners from "./pages/Banners";
 import Membros from "./pages/Membros";
 import Visitantes from "./pages/Visitantes";
+import ContatosDashboard from "./pages/ContatosDashboard";
 import Kids from "./pages/Kids";
 import Oracoes from "./pages/Oracoes";
 import Testemunhos from "./pages/Testemunhos";
@@ -93,6 +94,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Visitantes />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contatos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ContatosDashboard />
                 </MainLayout>
               </ProtectedRoute>
             }

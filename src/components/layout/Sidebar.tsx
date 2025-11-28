@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +17,7 @@ const menuItems = [
   { icon: Megaphone, label: "Banners", path: "/banners" },
   { icon: Users, label: "Membros", path: "/membros" },
   { icon: UserPlus, label: "Visitantes", path: "/visitantes" },
+  { icon: PhoneCall, label: "Contatos Agendados", path: "/contatos" },
   { icon: Baby, label: "Kids", path: "/kids" },
   { icon: MessageCircle, label: "Pedidos de Oração", path: "/oracoes" },
   { icon: Heart, label: "Testemunhos", path: "/testemunhos" },
