@@ -32,7 +32,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { EditarPerfilDialog } from "@/components/pessoas/EditarPerfilDialog";
 import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPessoaisDialog";
 import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
@@ -97,7 +96,6 @@ export default function PessoaDetalhes() {
   const [pessoa, setPessoa] = useState<PessoaDetalhesData | null>(null);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editarPerfilOpen, setEditarPerfilOpen] = useState(false);
   const [editarPessoaisOpen, setEditarPessoaisOpen] = useState(false);
   const [editarContatosOpen, setEditarContatosOpen] = useState(false);
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
@@ -292,12 +290,11 @@ export default function PessoaDetalhes() {
 
         {/* Tab: Perfil */}
         <TabsContent value="perfil" className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h3 className="text-lg font-semibold">Informações do Perfil</h3>
-            <Button variant="outline" size="sm" onClick={() => setEditarPerfilOpen(true)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Editar perfil
-            </Button>
+            <p className="text-sm text-muted-foreground mt-1">
+              Visualização consolidada dos dados cadastrais. Use as outras abas para editar.
+            </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -314,8 +311,8 @@ export default function PessoaDetalhes() {
 
             <Card className="bg-muted/30">
               <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Como está se sentindo?</p>
-                <p className="text-lg font-semibold">Não informou</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Sexo</p>
+                <p className="text-lg font-semibold">{pessoa.sexo || "Não informado"}</p>
               </CardContent>
             </Card>
 
@@ -358,8 +355,22 @@ export default function PessoaDetalhes() {
 
             <Card className="bg-muted/30">
               <CardContent className="pt-6">
+                <p className="text-sm font-medium text-muted-foreground mb-1">E-mail</p>
+                <p className="text-lg font-semibold">{pessoa.email || "Não informado"}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30">
+              <CardContent className="pt-6">
                 <p className="text-sm font-medium text-muted-foreground mb-1">Necessidades especiais</p>
                 <p className="text-lg font-semibold">{pessoa.necessidades_especiais || "Não"}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30">
+              <CardContent className="pt-6">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Status na Igreja</p>
+                <p className="text-lg font-semibold">{pessoa.status_igreja?.toUpperCase() || "ATIVO"}</p>
               </CardContent>
             </Card>
           </div>
@@ -676,20 +687,6 @@ export default function PessoaDetalhes() {
       {/* Diálogos de Edição */}
       {pessoa && (
         <>
-          <EditarPerfilDialog
-            open={editarPerfilOpen}
-            onOpenChange={setEditarPerfilOpen}
-            pessoaId={pessoa.id}
-            dadosAtuais={{
-              telefone: pessoa.telefone,
-              necessidades_especiais: pessoa.necessidades_especiais,
-              batizado: pessoa.batizado,
-              e_pastor: pessoa.e_pastor,
-              e_lider: pessoa.e_lider,
-            }}
-            onSuccess={fetchPessoa}
-          />
-
           <EditarDadosPessoaisDialog
             open={editarPessoaisOpen}
             onOpenChange={setEditarPessoaisOpen}
@@ -701,6 +698,7 @@ export default function PessoaDetalhes() {
               data_casamento: pessoa.data_casamento,
               rg: pessoa.rg,
               cpf: pessoa.cpf,
+              necessidades_especiais: pessoa.necessidades_especiais,
             }}
             onSuccess={fetchPessoa}
           />
