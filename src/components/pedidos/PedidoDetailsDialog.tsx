@@ -1,4 +1,4 @@
-import { useState } from "react";
+import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +17,9 @@ interface PedidoDetailsDialogProps {
 }
 
 export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: PedidoDetailsDialogProps) {
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(pedido.status);
-  const [observacoes, setObservacoes] = useState(pedido.observacoes_intercessor || "");
+  const [loading, setLoading] = React.useState(false);
+  const [status, setStatus] = React.useState(pedido.status);
+  const [observacoes, setObservacoes] = React.useState(pedido.observacoes_intercessor || "");
   const { toast } = useToast();
 
   const handleUpdate = async () => {
