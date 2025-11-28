@@ -32,6 +32,11 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { EditarPerfilDialog } from "@/components/pessoas/EditarPerfilDialog";
+import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPessoaisDialog";
+import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
+import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
+import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 
 interface PessoaDetalhesData {
   id: string;
@@ -91,56 +96,61 @@ export default function PessoaDetalhes() {
   const [pessoa, setPessoa] = useState<PessoaDetalhesData | null>(null);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editarPerfilOpen, setEditarPerfilOpen] = useState(false);
+  const [editarPessoaisOpen, setEditarPessoaisOpen] = useState(false);
+  const [editarContatosOpen, setEditarContatosOpen] = useState(false);
+  const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
+  const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
+
+  const fetchPessoa = async () => {
+    if (!id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      setPessoa(data);
+
+      // Buscar funções da pessoa
+      const { data: funcoesData } = await supabase
+        .from("membro_funcoes")
+        .select(`
+          id,
+          data_inicio,
+          ativo,
+          funcoes_igreja (
+            id,
+            nome
+          )
+        `)
+        .eq("membro_id", id)
+        .order("data_inicio", { ascending: false });
+
+      setFuncoes(
+        funcoesData?.map((f: any) => ({
+          id: f.id,
+          nome: f.funcoes_igreja.nome,
+          data_inicio: f.data_inicio,
+          ativo: f.ativo,
+        })) || []
+      );
+    } catch (error) {
+      console.error("Erro ao buscar pessoa:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os dados da pessoa.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchPessoa = async () => {
-      if (!id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", id)
-          .single();
-
-        if (error) throw error;
-        setPessoa(data);
-
-        // Buscar funções da pessoa
-        const { data: funcoesData } = await supabase
-          .from("membro_funcoes")
-          .select(`
-            id,
-            data_inicio,
-            ativo,
-            funcoes_igreja (
-              id,
-              nome
-            )
-          `)
-          .eq("membro_id", id)
-          .order("data_inicio", { ascending: false });
-
-        setFuncoes(
-          funcoesData?.map((f: any) => ({
-            id: f.id,
-            nome: f.funcoes_igreja.nome,
-            data_inicio: f.data_inicio,
-            ativo: f.ativo,
-          })) || []
-        );
-      } catch (error) {
-        console.error("Erro ao buscar pessoa:", error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os dados da pessoa.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPessoa();
   }, [id, toast]);
 
@@ -281,6 +291,14 @@ export default function PessoaDetalhes() {
 
         {/* Tab: Perfil */}
         <TabsContent value="perfil" className="space-y-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Informações do Perfil</h3>
+            <Button variant="outline" size="sm" onClick={() => setEditarPerfilOpen(true)}>
+              <Edit className="w-4 h-4 mr-2" />
+              Editar perfil
+            </Button>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="bg-muted/30">
               <CardContent className="pt-6">
@@ -437,7 +455,7 @@ export default function PessoaDetalhes() {
                 <div className="h-8 w-1 bg-green-600 rounded" />
                 <CardTitle>Contatos</CardTitle>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setEditarContatosOpen(true)}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar contato
               </Button>
@@ -485,7 +503,7 @@ export default function PessoaDetalhes() {
                 <div className="h-8 w-1 bg-green-600 rounded" />
                 <CardTitle>Dados eclesiásticos</CardTitle>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setEditarEclesiasticosOpen(true)}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar dados eclesiásticos
               </Button>
@@ -587,7 +605,7 @@ export default function PessoaDetalhes() {
                 <div className="h-8 w-1 bg-green-600 rounded" />
                 <CardTitle>Dados adicionais</CardTitle>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setEditarAdicionaisOpen(true)}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar dados adicionais
               </Button>
@@ -645,6 +663,89 @@ export default function PessoaDetalhes() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Diálogos de Edição */}
+      {pessoa && (
+        <>
+          <EditarPerfilDialog
+            open={editarPerfilOpen}
+            onOpenChange={setEditarPerfilOpen}
+            pessoaId={pessoa.id}
+            dadosAtuais={{
+              telefone: pessoa.telefone,
+              necessidades_especiais: pessoa.necessidades_especiais,
+              batizado: pessoa.batizado,
+              e_pastor: pessoa.e_pastor,
+              e_lider: pessoa.e_lider,
+            }}
+            onSuccess={fetchPessoa}
+          />
+
+          <EditarDadosPessoaisDialog
+            open={editarPessoaisOpen}
+            onOpenChange={setEditarPessoaisOpen}
+            pessoaId={pessoa.id}
+            dadosAtuais={{
+              sexo: pessoa.sexo,
+              data_nascimento: pessoa.data_nascimento,
+              estado_civil: pessoa.estado_civil,
+              data_casamento: pessoa.data_casamento,
+              rg: pessoa.rg,
+              cpf: pessoa.cpf,
+            }}
+            onSuccess={fetchPessoa}
+          />
+
+          <EditarContatosDialog
+            open={editarContatosOpen}
+            onOpenChange={setEditarContatosOpen}
+            pessoaId={pessoa.id}
+            dadosAtuais={{
+              cep: pessoa.cep,
+              cidade: pessoa.cidade,
+              bairro: pessoa.bairro,
+              estado: pessoa.estado,
+              endereco: pessoa.endereco,
+              email: pessoa.email,
+              telefone: pessoa.telefone,
+            }}
+            onSuccess={fetchPessoa}
+          />
+
+          <EditarDadosEclesiasticosDialog
+            open={editarEclesiasticosOpen}
+            onOpenChange={setEditarEclesiasticosOpen}
+            pessoaId={pessoa.id}
+            dadosAtuais={{
+              entrou_por: pessoa.entrou_por,
+              data_entrada: pessoa.data_entrada,
+              status_igreja: pessoa.status_igreja,
+              data_conversao: pessoa.data_conversao,
+              batizado: pessoa.batizado,
+              data_batismo: pessoa.data_batismo,
+              e_lider: pessoa.e_lider,
+              e_pastor: pessoa.e_pastor,
+            }}
+            onSuccess={fetchPessoa}
+          />
+
+          <EditarDadosAdicionaisDialog
+            open={editarAdicionaisOpen}
+            onOpenChange={setEditarAdicionaisOpen}
+            pessoaId={pessoa.id}
+            dadosAtuais={{
+              escolaridade: pessoa.escolaridade,
+              profissao: pessoa.profissao,
+              nacionalidade: pessoa.nacionalidade,
+              naturalidade: pessoa.naturalidade,
+              entrevistado_por: pessoa.entrevistado_por,
+              cadastrado_por: pessoa.cadastrado_por,
+              tipo_sanguineo: pessoa.tipo_sanguineo,
+            }}
+            onSuccess={fetchPessoa}
+          />
+        </>
+      )}
     </div>
   );
 }

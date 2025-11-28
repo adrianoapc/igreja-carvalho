@@ -1,0 +1,240 @@
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
+import { z } from "zod";
+
+const dadosPessoaisSchema = z.object({
+  sexo: z.string().max(20).nullable(),
+  data_nascimento: z.string().nullable(),
+  estado_civil: z.string().max(50).nullable(),
+  data_casamento: z.string().nullable(),
+  rg: z.string().max(20).nullable(),
+  cpf: z.string().max(14).nullable(),
+});
+
+interface EditarDadosPessoaisDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  pessoaId: string;
+  dadosAtuais: {
+    sexo: string | null;
+    data_nascimento: string | null;
+    estado_civil: string | null;
+    data_casamento: string | null;
+    rg: string | null;
+    cpf: string | null;
+  };
+  onSuccess: () => void;
+}
+
+export function EditarDadosPessoaisDialog({
+  open,
+  onOpenChange,
+  pessoaId,
+  dadosAtuais,
+  onSuccess,
+}: EditarDadosPessoaisDialogProps) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    sexo: dadosAtuais.sexo || "",
+    data_nascimento: dadosAtuais.data_nascimento || "",
+    estado_civil: dadosAtuais.estado_civil || "",
+    data_casamento: dadosAtuais.data_casamento || "",
+    rg: dadosAtuais.rg || "",
+    cpf: dadosAtuais.cpf || "",
+  });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        sexo: dadosAtuais.sexo || "",
+        data_nascimento: dadosAtuais.data_nascimento || "",
+        estado_civil: dadosAtuais.estado_civil || "",
+        data_casamento: dadosAtuais.data_casamento || "",
+        rg: dadosAtuais.rg || "",
+        cpf: dadosAtuais.cpf || "",
+      });
+    }
+  }, [open, dadosAtuais]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const validatedData = dadosPessoaisSchema.parse(formData);
+      setLoading(true);
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          sexo: validatedData.sexo || null,
+          data_nascimento: validatedData.data_nascimento || null,
+          estado_civil: validatedData.estado_civil || null,
+          data_casamento: validatedData.data_casamento || null,
+          rg: validatedData.rg || null,
+          cpf: validatedData.cpf || null,
+        })
+        .eq("id", pessoaId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Dados pessoais atualizados com sucesso",
+      });
+
+      onSuccess();
+      onOpenChange(false);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Erro de validação",
+          description: error.issues[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: error.message || "Não foi possível atualizar os dados",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar Dados Pessoais</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="sexo">Sexo</Label>
+              <Select
+                value={formData.sexo}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, sexo: value })
+                }
+              >
+                <SelectTrigger id="sexo">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Masculino">Masculino</SelectItem>
+                  <SelectItem value="Feminino">Feminino</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dataNascimento">Data de Nascimento</Label>
+              <Input
+                id="dataNascimento"
+                type="date"
+                value={formData.data_nascimento}
+                onChange={(e) =>
+                  setFormData({ ...formData, data_nascimento: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="estadoCivil">Estado Civil</Label>
+              <Select
+                value={formData.estado_civil}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, estado_civil: value })
+                }
+              >
+                <SelectTrigger id="estadoCivil">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Solteiro(a)">Solteiro(a)</SelectItem>
+                  <SelectItem value="Casado(a)">Casado(a)</SelectItem>
+                  <SelectItem value="Divorciado(a)">Divorciado(a)</SelectItem>
+                  <SelectItem value="Viúvo(a)">Viúvo(a)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dataCasamento">Data de Casamento</Label>
+              <Input
+                id="dataCasamento"
+                type="date"
+                value={formData.data_casamento}
+                onChange={(e) =>
+                  setFormData({ ...formData, data_casamento: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rg">RG</Label>
+              <Input
+                id="rg"
+                value={formData.rg}
+                onChange={(e) =>
+                  setFormData({ ...formData, rg: e.target.value })
+                }
+                maxLength={20}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cpf">CPF</Label>
+              <Input
+                id="cpf"
+                value={formData.cpf}
+                onChange={(e) =>
+                  setFormData({ ...formData, cpf: e.target.value })
+                }
+                maxLength={14}
+                placeholder="000.000.000-00"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
