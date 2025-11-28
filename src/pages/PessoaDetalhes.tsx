@@ -203,81 +203,78 @@ export default function PessoaDetalhes() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-2 md:gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
       </div>
 
       {/* Profile Header */}
-      <div className="flex items-start gap-4 mb-6">
-        <Avatar className="w-20 h-20 border-4 border-green-500">
-          <AvatarFallback className="text-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
+      <div className="flex flex-col sm:flex-row items-start gap-4">
+        <Avatar className="w-16 h-16 md:w-20 md:h-20 border-4 border-green-500 flex-shrink-0">
+          <AvatarFallback className="text-xl md:text-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
             {pessoa.nome.charAt(0)}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">{pessoa.nome}</h1>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant={getStatusBadgeVariant(pessoa.status)}>
-                  {getStatusLabel(pessoa.status)}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditarStatusOpen(true)}
-                  className="h-7 px-2 text-xs"
-                >
-                  <Edit className="w-3 h-3 mr-1" />
-                  Alterar Status
-                </Button>
-              </div>
-            </div>
+        <div className="flex-1 w-full min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold truncate">{pessoa.nome}</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <Badge variant={getStatusBadgeVariant(pessoa.status)} className="text-xs">
+              {getStatusLabel(pessoa.status)}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEditarStatusOpen(true)}
+              className="h-7 px-2 text-xs"
+            >
+              <Edit className="w-3 h-3 mr-1" />
+              <span className="hidden sm:inline">Alterar Status</span>
+              <span className="sm:hidden">Status</span>
+            </Button>
           </div>
-          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-2 text-xs md:text-sm text-muted-foreground">
             {pessoa.user_id ? (
               <span className="flex items-center gap-1">
-                <Check className="w-4 h-4 text-green-500" />
-                é usuário da plataforma
+                <Check className="w-3 h-3 md:w-4 md:h-4 text-green-500" />
+                usuário da plataforma
               </span>
             ) : (
               <span className="flex items-center gap-1">
-                <X className="w-4 h-4 text-muted-foreground" />
-                não é usuário da plataforma
+                <X className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground" />
+                não é usuário
               </span>
             )}
-            <Separator orientation="vertical" className="h-4" />
-            <span>ID do perfil: {pessoa.id.slice(0, 8)}</span>
+            <Separator orientation="vertical" className="hidden sm:block h-4" />
+            <span className="truncate">ID: {pessoa.id.slice(0, 8)}</span>
           </div>
         </div>
       </div>
 
       {/* Church Info */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">Igreja Carvalho</h3>
+      <Card>
+        <CardContent className="p-4 md:pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-base md:text-lg">Igreja Carvalho</h3>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="text-sm text-muted-foreground">Funções:</span>
+                <span className="text-xs md:text-sm text-muted-foreground">Funções:</span>
                 {funcoes.length > 0 ? (
                   funcoes
                     .filter((f) => f.ativo)
                     .map((funcao) => (
-                      <Badge key={funcao.id} variant="outline">
+                      <Badge key={funcao.id} variant="outline" className="text-xs">
                         {funcao.nome}
                       </Badge>
                     ))
                 ) : (
-                  <Badge variant="outline">Nenhum</Badge>
+                  <Badge variant="outline" className="text-xs">Nenhum</Badge>
                 )}
               </div>
             </div>
-            <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+            <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-xs w-fit">
               {pessoa.status_igreja?.toUpperCase() || "ATIVO"}
             </Badge>
           </div>
@@ -286,35 +283,35 @@ export default function PessoaDetalhes() {
 
       {/* Tabs */}
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="perfil">
-            <User className="w-4 h-4 mr-2" />
-            Perfil
+        <TabsList className="grid w-full grid-cols-5 h-auto">
+          <TabsTrigger value="perfil" className="flex-col gap-1 py-2 px-1 text-xs">
+            <User className="w-4 h-4" />
+            <span className="hidden sm:inline">Perfil</span>
           </TabsTrigger>
-          <TabsTrigger value="pessoais">
-            <Heart className="w-4 h-4 mr-2" />
-            Pessoais
+          <TabsTrigger value="pessoais" className="flex-col gap-1 py-2 px-1 text-xs">
+            <Heart className="w-4 h-4" />
+            <span className="hidden sm:inline">Pessoais</span>
           </TabsTrigger>
-          <TabsTrigger value="contatos">
-            <Phone className="w-4 h-4 mr-2" />
-            Contatos
+          <TabsTrigger value="contatos" className="flex-col gap-1 py-2 px-1 text-xs">
+            <Phone className="w-4 h-4" />
+            <span className="hidden sm:inline">Contatos</span>
           </TabsTrigger>
-          <TabsTrigger value="igreja">
-            <Church className="w-4 h-4 mr-2" />
-            Igreja
+          <TabsTrigger value="igreja" className="flex-col gap-1 py-2 px-1 text-xs">
+            <Church className="w-4 h-4" />
+            <span className="hidden sm:inline">Igreja</span>
           </TabsTrigger>
-          <TabsTrigger value="mais">
-            <MoreHorizontal className="w-4 h-4 mr-2" />
-            Mais
+          <TabsTrigger value="mais" className="flex-col gap-1 py-2 px-1 text-xs">
+            <MoreHorizontal className="w-4 h-4" />
+            <span className="hidden sm:inline">Mais</span>
           </TabsTrigger>
         </TabsList>
 
         {/* Tab: Perfil */}
-        <TabsContent value="perfil" className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
+        <TabsContent value="perfil" className="space-y-4 md:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold">Informações do Perfil</h3>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h3 className="text-base md:text-lg font-semibold">Informações do Perfil</h3>
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
                 Visualização consolidada dos dados cadastrais. Use as outras abas para editar.
               </p>
             </div>
@@ -322,30 +319,30 @@ export default function PessoaDetalhes() {
               variant="outline"
               size="sm"
               onClick={() => setCompactView(!compactView)}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               {compactView ? (
                 <>
                   <Maximize2 className="w-4 h-4" />
-                  Expandir
+                  <span className="text-xs md:text-sm">Expandir</span>
                 </>
               ) : (
                 <>
                   <Minimize2 className="w-4 h-4" />
-                  Compactar
+                  <span className="text-xs md:text-sm">Compactar</span>
                 </>
               )}
             </Button>
           </div>
           
-          <div className={`grid gap-4 ${compactView ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6'}`}>
+          <div className={`grid gap-3 md:gap-4 ${compactView ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'}`}>
             <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
+              <CardContent className={compactView ? "p-3 md:pt-6" : "p-3 md:pt-4"}>
+                <div className="flex items-start justify-between mb-1 md:mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Idade</p>
-                  {compactView && <Cake className="w-4 h-4 text-primary/70" />}
+                  {compactView && <Cake className="w-3 h-3 md:w-4 md:h-4 text-primary/70" />}
                 </div>
-                <p className="text-sm font-semibold leading-none">
+                <p className="text-xs md:text-sm font-semibold leading-none">
                   {pessoa.data_nascimento
                     ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()} anos`
                     : "—"}
@@ -427,38 +424,42 @@ export default function PessoaDetalhes() {
           </div>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Células</CardTitle>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  Indicar para um líder
-                </Button>
-                <Button variant="outline" size="sm">
-                  Adicionar Célula
-                </Button>
+            <CardHeader className="p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 md:h-8 w-1 bg-green-600 rounded" />
+                  <CardTitle className="text-base md:text-lg">Células</CardTitle>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button variant="outline" size="sm" className="text-xs md:text-sm">
+                    Indicar para um líder
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs md:text-sm">
+                    Adicionar Célula
+                  </Button>
+                </div>
               </div>
             </CardHeader>
           </Card>
         </TabsContent>
 
         {/* Tab: Pessoais */}
-        <TabsContent value="pessoais" className="space-y-6">
+        <TabsContent value="pessoais" className="space-y-4 md:space-y-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Dados pessoais</CardTitle>
+            <CardHeader className="p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 md:h-8 w-1 bg-green-600 rounded" />
+                  <CardTitle className="text-base md:text-lg">Dados pessoais</CardTitle>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setEditarPessoaisOpen(true)} className="w-full sm:w-auto">
+                  <Edit className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                  <span className="text-xs md:text-sm">Editar dados pessoais</span>
+                </Button>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setEditarPessoaisOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Editar dados pessoais
-              </Button>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="p-4 md:p-6">
+              <div className="grid grid-cols-1 gap-4 md:gap-6">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Sexo:</p>
                   <p className="text-base font-semibold">{pessoa.sexo || "Não informado"}</p>
