@@ -27,9 +27,9 @@ const menuItems = [
 
 const pessoasItems = [
   { icon: UsersRound, label: "Geral", path: "/pessoas" },
-  { icon: Users, label: "Membros", path: "/membros" },
-  { icon: UserPlus, label: "Visitantes", path: "/visitantes" },
-  { icon: PhoneCall, label: "Contatos Agendados", path: "/contatos" },
+  { icon: Users, label: "Membros", path: "/pessoas/membros" },
+  { icon: UserPlus, label: "Visitantes", path: "/pessoas/visitantes" },
+  { icon: PhoneCall, label: "Contatos Agendados", path: "/pessoas/contatos" },
 ];
 
 const intercessaoItems = [

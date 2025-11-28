@@ -43,6 +43,8 @@ export default function Pessoas() {
       action: () => navigate("/membros"),
     },
   ]);
+  
+  const [contatosCount, setContatosCount] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -64,6 +66,18 @@ export default function Pessoas() {
           { ...prev[2], value: frequentadores.toString() },
           { ...prev[3], value: membros.toString() },
         ]);
+        
+        // Buscar contatos agendados
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        
+        const { count } = await supabase
+          .from("visitante_contatos")
+          .select("*", { count: "exact", head: true })
+          .gte("data_contato", hoje.toISOString())
+          .in("status", ["agendado", "pendente"]);
+          
+        setContatosCount(count || 0);
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
       }
@@ -77,29 +91,33 @@ export default function Pessoas() {
       title: "Visitantes",
       description: "Gerenciar e promover visitantes",
       icon: UserPlus,
-      path: "/visitantes",
-      badge: `${stats[1].value} cadastrados`,
+      path: "/pessoas/visitantes",
+      count: stats[1].value,
+      label: "cadastrados"
     },
     {
       title: "Membros",
       description: "Visualizar e editar perfis de membros",
       icon: Users,
-      path: "/membros",
-      badge: `${stats[3].value} ativos`,
+      path: "/pessoas/membros",
+      count: stats[3].value,
+      label: "ativos"
     },
     {
       title: "Contatos Agendados",
       description: "Acompanhar contatos com visitantes",
       icon: PhoneCall,
-      path: "/contatos",
-      badge: "0 agendados",
+      path: "/pessoas/contatos",
+      count: contatosCount.toString(),
+      label: "agendados"
     },
     {
       title: "Frequentadores",
       description: "Pessoas com múltiplas visitas",
       icon: UserCheck,
       path: "/pessoas/frequentadores",
-      badge: `${stats[2].value} ativos`,
+      count: stats[2].value,
+      label: "ativos"
     },
   ];
 
@@ -161,14 +179,12 @@ export default function Pessoas() {
                   <div className="p-2 md:p-3 rounded-full bg-primary/10 flex-shrink-0">
                     <Icon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <h3 className="font-semibold text-sm md:text-base truncate">{action.title}</h3>
-                      {action.badge && (
-                        <Badge variant="secondary" className="text-xs w-fit">
-                          {action.badge}
-                        </Badge>
-                      )}
+                      <Badge variant="secondary" className="text-xs w-fit">
+                        {action.count} {action.label}
+                      </Badge>
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">
                       {action.description}
