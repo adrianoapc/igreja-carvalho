@@ -7,6 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import InputMask from "react-input-mask";
+import { removerFormatacao } from "@/lib/validators";
 
 interface RegistrarVisitanteDialogProps {
   open: boolean;
@@ -60,6 +62,8 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         .select("*")
         .eq("status", "visitante");
 
+      const telefoneNormalizado = formData.telefone.trim() ? removerFormatacao(formData.telefone.trim()) : null;
+      
       const conditions = [];
       if (formData.email.trim()) {
         conditions.push(supabase
@@ -68,12 +72,12 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
           .eq("status", "visitante")
           .eq("email", formData.email.trim()));
       }
-      if (formData.telefone.trim()) {
+      if (telefoneNormalizado) {
         conditions.push(supabase
           .from("profiles")
           .select("*")
           .eq("status", "visitante")
-          .eq("telefone", formData.telefone.trim()));
+          .eq("telefone", telefoneNormalizado));
       }
 
       // Verificar duplicatas
@@ -116,7 +120,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
           .from("profiles")
           .insert({
             nome: formData.nome.trim(),
-            telefone: formData.telefone.trim() || null,
+            telefone: telefoneNormalizado,
             email: formData.email.trim() || null,
             aceitou_jesus: formData.aceitou_jesus,
             deseja_contato: formData.deseja_contato,
@@ -209,14 +213,21 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
 
           <div className="space-y-2">
             <Label htmlFor="telefone">Telefone</Label>
-            <Input
-              id="telefone"
-              type="tel"
+            <InputMask
+              mask="(99) 99999-9999"
               value={formData.telefone}
               onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-              placeholder="(11) 98765-4321"
               disabled={loading}
-            />
+            >
+              {(inputProps: any) => (
+                <Input
+                  {...inputProps}
+                  id="telefone"
+                  type="tel"
+                  placeholder="(00) 00000-0000"
+                />
+              )}
+            </InputMask>
           </div>
 
           <div className="space-y-2">

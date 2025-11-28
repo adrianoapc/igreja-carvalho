@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
+import InputMask from "react-input-mask";
+import { removerFormatacao } from "@/lib/validators";
 
 const perfilSchema = z.object({
   telefone: z.string().max(20, "Telefone deve ter no máximo 20 caracteres").nullable(),
@@ -76,7 +78,7 @@ export function EditarPerfilDialog({
       const { error } = await supabase
         .from("profiles")
         .update({
-          telefone: validatedData.telefone || null,
+          telefone: validatedData.telefone ? removerFormatacao(validatedData.telefone) : null,
           necessidades_especiais: validatedData.necessidades_especiais || null,
           batizado: validatedData.batizado,
           e_pastor: validatedData.e_pastor,
@@ -122,15 +124,22 @@ export function EditarPerfilDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="telefone">Telefone</Label>
-            <Input
-              id="telefone"
-              type="tel"
+            <InputMask
+              mask="(99) 99999-9999"
               value={formData.telefone}
               onChange={(e) =>
                 setFormData({ ...formData, telefone: e.target.value })
               }
-              maxLength={20}
-            />
+            >
+              {(inputProps: any) => (
+                <Input
+                  {...inputProps}
+                  id="telefone"
+                  type="tel"
+                  placeholder="(00) 00000-0000"
+                />
+              )}
+            </InputMask>
           </div>
 
           <div className="space-y-2">

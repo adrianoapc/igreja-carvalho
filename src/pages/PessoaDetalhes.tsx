@@ -37,6 +37,7 @@ import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPesso
 import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
+import { formatarCPF, formatarTelefone, formatarCEP } from "@/lib/validators";
 
 interface PessoaDetalhesData {
   id: string;
@@ -349,7 +350,9 @@ export default function PessoaDetalhes() {
             <Card className="bg-muted/30">
               <CardContent className="pt-6">
                 <p className="text-sm font-medium text-muted-foreground mb-1">Telefone</p>
-                <p className="text-lg font-semibold">{pessoa.telefone || "Não informado"}</p>
+                <p className="text-lg font-semibold">
+                  {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "Não informado"}
+                </p>
               </CardContent>
             </Card>
 
@@ -424,7 +427,9 @@ export default function PessoaDetalhes() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">CPF:</p>
-                  <p className="text-base font-semibold">{pessoa.cpf || "Não informado"}</p>
+                  <p className="text-base font-semibold">
+                    {pessoa.cpf ? formatarCPF(pessoa.cpf) : "Não informado"}
+                  </p>
                 </div>
                 <div className="md:col-span-2">
                   <p className="text-sm font-medium text-muted-foreground mb-1">Necessidades especiais:</p>
@@ -464,7 +469,9 @@ export default function PessoaDetalhes() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">CEP:</p>
-                  <p className="text-base font-semibold">{pessoa.cep || "Não informado"}</p>
+                  <p className="text-base font-semibold">
+                    {pessoa.cep ? formatarCEP(pessoa.cep) : "Não informado"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Cidade:</p>
@@ -488,7 +495,9 @@ export default function PessoaDetalhes() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Celular:</p>
-                  <p className="text-base font-semibold">{pessoa.telefone || "Não informado"}</p>
+                  <p className="text-base font-semibold">
+                    {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "Não informado"}
+                  </p>
                 </div>
               </div>
             </CardContent>

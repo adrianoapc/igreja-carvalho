@@ -20,6 +20,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
+import InputMask from "react-input-mask";
+import { validarCPF, removerFormatacao } from "@/lib/validators";
 
 const dadosPessoaisSchema = z.object({
   sexo: z.string().max(20).nullable(),
@@ -27,7 +29,16 @@ const dadosPessoaisSchema = z.object({
   estado_civil: z.string().max(50).nullable(),
   data_casamento: z.string().nullable(),
   rg: z.string().max(20).nullable(),
-  cpf: z.string().max(14).nullable(),
+  cpf: z
+    .string()
+    .nullable()
+    .refine(
+      (val) => {
+        if (!val || val.trim() === "" || val.replace(/\D/g, "") === "") return true;
+        return validarCPF(val);
+      },
+      { message: "CPF inválido" }
+    ),
 });
 
 interface EditarDadosPessoaisDialogProps {
@@ -91,7 +102,7 @@ export function EditarDadosPessoaisDialog({
           estado_civil: validatedData.estado_civil || null,
           data_casamento: validatedData.data_casamento || null,
           rg: validatedData.rg || null,
-          cpf: validatedData.cpf || null,
+          cpf: validatedData.cpf ? removerFormatacao(validatedData.cpf) : null,
         })
         .eq("id", pessoaId);
 
@@ -208,15 +219,21 @@ export function EditarDadosPessoaisDialog({
 
             <div className="space-y-2">
               <Label htmlFor="cpf">CPF</Label>
-              <Input
-                id="cpf"
+              <InputMask
+                mask="999.999.999-99"
                 value={formData.cpf}
                 onChange={(e) =>
                   setFormData({ ...formData, cpf: e.target.value })
                 }
-                maxLength={14}
-                placeholder="000.000.000-00"
-              />
+              >
+                {(inputProps: any) => (
+                  <Input
+                    {...inputProps}
+                    id="cpf"
+                    placeholder="000.000.000-00"
+                  />
+                )}
+              </InputMask>
             </div>
           </div>
 

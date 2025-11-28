@@ -13,6 +13,7 @@ import { AgendarContatoDialog } from "@/components/visitantes/AgendarContatoDial
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { formatarTelefone } from "@/lib/validators";
 
 interface Visitante {
   id: string;
@@ -152,7 +153,7 @@ export default function Visitantes() {
                       {visitante.telefone && (
                         <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground">
                           <Phone className="w-3 h-3 flex-shrink-0" />
-                          {visitante.telefone}
+                          {formatarTelefone(visitante.telefone)}
                         </span>
                       )}
                       {visitante.email && (

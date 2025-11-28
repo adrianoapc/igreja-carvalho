@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { AtribuirFuncaoDialog } from "@/components/membros/AtribuirFuncaoDialog";
 import { GerenciarFuncoesDialog } from "@/components/membros/GerenciarFuncoesDialog";
+import { formatarTelefone } from "@/lib/validators";
 
 interface Membro {
   id: string;
@@ -194,7 +195,7 @@ export default function Membros() {
                         {membro.telefone && (
                           <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground">
                             <Phone className="w-3 h-3 flex-shrink-0" />
-                            {membro.telefone}
+                            {formatarTelefone(membro.telefone)}
                           </span>
                         )}
                       </div>
