@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -22,6 +23,7 @@ const dadosAdicionaisSchema = z.object({
   entrevistado_por: z.string().max(100).nullable(),
   cadastrado_por: z.string().max(100).nullable(),
   tipo_sanguineo: z.string().max(10).nullable(),
+  observacoes: z.string().max(1000).nullable(),
 });
 
 interface EditarDadosAdicionaisDialogProps {
@@ -36,6 +38,7 @@ interface EditarDadosAdicionaisDialogProps {
     entrevistado_por: string | null;
     cadastrado_por: string | null;
     tipo_sanguineo: string | null;
+    observacoes: string | null;
   };
   onSuccess: () => void;
 }
@@ -56,6 +59,7 @@ export function EditarDadosAdicionaisDialog({
     entrevistado_por: dadosAtuais.entrevistado_por || "",
     cadastrado_por: dadosAtuais.cadastrado_por || "",
     tipo_sanguineo: dadosAtuais.tipo_sanguineo || "",
+    observacoes: dadosAtuais.observacoes || "",
   });
   const { toast } = useToast();
 
@@ -69,6 +73,7 @@ export function EditarDadosAdicionaisDialog({
         entrevistado_por: dadosAtuais.entrevistado_por || "",
         cadastrado_por: dadosAtuais.cadastrado_por || "",
         tipo_sanguineo: dadosAtuais.tipo_sanguineo || "",
+        observacoes: dadosAtuais.observacoes || "",
       });
     }
   }, [open, dadosAtuais]);
@@ -90,6 +95,7 @@ export function EditarDadosAdicionaisDialog({
           entrevistado_por: validatedData.entrevistado_por || null,
           cadastrado_por: validatedData.cadastrado_por || null,
           tipo_sanguineo: validatedData.tipo_sanguineo || null,
+          observacoes: validatedData.observacoes || null,
         })
         .eq("id", pessoaId);
 
@@ -212,6 +218,20 @@ export function EditarDadosAdicionaisDialog({
                 }
                 maxLength={10}
                 placeholder="Ex: O+"
+              />
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="observacoes">Observações</Label>
+              <Textarea
+                id="observacoes"
+                value={formData.observacoes}
+                onChange={(e) =>
+                  setFormData({ ...formData, observacoes: e.target.value })
+                }
+                maxLength={1000}
+                placeholder="Informações adicionais sobre a pessoa"
+                className="min-h-[100px]"
               />
             </div>
           </div>

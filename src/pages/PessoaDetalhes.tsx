@@ -78,6 +78,7 @@ interface PessoaDetalhesData {
   entrevistado_por: string | null;
   cadastrado_por: string | null;
   tipo_sanguineo: string | null;
+  observacoes: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -660,6 +661,10 @@ export default function PessoaDetalhes() {
                   <p className="text-sm font-medium text-muted-foreground mb-1">Tipo sanguíneo</p>
                   <p className="text-base font-semibold">{pessoa.tipo_sanguineo || "Não informado"}</p>
                 </div>
+                <div className="md:col-span-2">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Observações</p>
+                  <p className="text-base font-semibold">{pessoa.observacoes || "Não informado"}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -748,6 +753,7 @@ export default function PessoaDetalhes() {
               entrevistado_por: pessoa.entrevistado_por,
               cadastrado_por: pessoa.cadastrado_por,
               tipo_sanguineo: pessoa.tipo_sanguineo,
+              observacoes: pessoa.observacoes,
             }}
             onSuccess={fetchPessoa}
           />
