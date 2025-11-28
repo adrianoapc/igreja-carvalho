@@ -21,9 +21,14 @@ interface Testemunho {
   data_publicacao: string | null;
   created_at: string;
   autor_id: string;
+  anonimo: boolean;
+  nome_externo: string | null;
+  email_externo: string | null;
+  telefone_externo: string | null;
+  pessoa_id: string | null;
   profiles: {
     nome: string;
-  };
+  } | null;
 }
 
 const CATEGORIAS = [
@@ -74,12 +79,20 @@ export default function Testemunhos() {
     }
   };
 
+  const getNomeExibicao = (testemunho: Testemunho) => {
+    if (testemunho.anonimo) return "Anônimo";
+    if (testemunho.profiles?.nome) return testemunho.profiles.nome;
+    if (testemunho.nome_externo) return testemunho.nome_externo;
+    return "Não identificado";
+  };
+
   useEffect(() => {
     fetchTestemunhos();
   }, []);
   
   const filteredTestemunhos = testemunhos.filter(t => {
-    const matchesSearch = t.profiles.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const nomeExibido = getNomeExibicao(t);
+    const matchesSearch = nomeExibido.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.mensagem.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategoria = categoriaFilter === "todos" || t.categoria === categoriaFilter;
@@ -200,7 +213,7 @@ export default function Testemunhos() {
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-base md:text-lg truncate">{testemunho.titulo}</CardTitle>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <span className="text-xs text-muted-foreground">{testemunho.profiles.nome}</span>
+                          <span className="text-xs text-muted-foreground">{getNomeExibicao(testemunho)}</span>
                           <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                           <span className="text-xs text-muted-foreground">
                             {new Date(testemunho.created_at).toLocaleDateString("pt-BR")}
