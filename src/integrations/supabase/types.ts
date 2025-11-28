@@ -56,6 +56,33 @@ export type Database = {
         }
         Relationships: []
       }
+      funcoes_igreja: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       intercessores: {
         Row: {
           ativo: boolean | null
@@ -91,6 +118,54 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      membro_funcoes: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          funcao_id: string
+          id: string
+          membro_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          funcao_id: string
+          id?: string
+          membro_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          funcao_id?: string
+          id?: string
+          membro_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membro_funcoes_funcao_id_fkey"
+            columns: ["funcao_id"]
+            isOneToOne: false
+            referencedRelation: "funcoes_igreja"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membro_funcoes_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       module_permissions: {
         Row: {

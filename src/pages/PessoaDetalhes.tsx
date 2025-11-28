@@ -77,11 +77,19 @@ interface PessoaDetalhesData {
   updated_at: string | null;
 }
 
+interface Funcao {
+  id: string;
+  nome: string;
+  data_inicio: string;
+  ativo: boolean;
+}
+
 export default function PessoaDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [pessoa, setPessoa] = useState<PessoaDetalhesData | null>(null);
+  const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,6 +105,30 @@ export default function PessoaDetalhes() {
 
         if (error) throw error;
         setPessoa(data);
+
+        // Buscar funções da pessoa
+        const { data: funcoesData } = await supabase
+          .from("membro_funcoes")
+          .select(`
+            id,
+            data_inicio,
+            ativo,
+            funcoes_igreja (
+              id,
+              nome
+            )
+          `)
+          .eq("membro_id", id)
+          .order("data_inicio", { ascending: false });
+
+        setFuncoes(
+          funcoesData?.map((f: any) => ({
+            id: f.id,
+            nome: f.funcoes_igreja.nome,
+            data_inicio: f.data_inicio,
+            ativo: f.ativo,
+          })) || []
+        );
       } catch (error) {
         console.error("Erro ao buscar pessoa:", error);
         toast({
@@ -198,11 +230,21 @@ export default function PessoaDetalhes() {
       <Card className="mb-6">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <h3 className="font-semibold text-lg">Igreja Carvalho</h3>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <span className="text-sm text-muted-foreground">Funções:</span>
-                <Badge variant="outline">Nenhum</Badge>
+                {funcoes.length > 0 ? (
+                  funcoes
+                    .filter((f) => f.ativo)
+                    .map((funcao) => (
+                      <Badge key={funcao.id} variant="outline">
+                        {funcao.nome}
+                      </Badge>
+                    ))
+                ) : (
+                  <Badge variant="outline">Nenhum</Badge>
+                )}
               </div>
             </div>
             <Badge variant="default" className="bg-green-600 hover:bg-green-700">
@@ -495,6 +537,44 @@ export default function PessoaDetalhes() {
                   <p className="text-base font-semibold">{pessoa.e_pastor ? "Sim" : "Não"}</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-1 bg-green-600 rounded" />
+                <CardTitle>Funções na Igreja</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {funcoes.length > 0 ? (
+                <div className="space-y-3">
+                  {funcoes.map((funcao) => (
+                    <div
+                      key={funcao.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+                    >
+                      <div>
+                        <p className="font-semibold">{funcao.nome}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Desde:{" "}
+                          {format(new Date(funcao.data_inicio), "dd/MM/yyyy", {
+                            locale: ptBR,
+                          })}
+                        </p>
+                      </div>
+                      <Badge variant={funcao.ativo ? "default" : "secondary"}>
+                        {funcao.ativo ? "Ativa" : "Inativa"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Nenhuma função atribuída</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
