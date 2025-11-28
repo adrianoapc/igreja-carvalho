@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, UserPlus, UserCheck, TrendingUp, PhoneCall, ArrowRight } from "lucide-react";
+import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboard";
@@ -16,6 +16,7 @@ export default function Pessoas() {
       icon: Users,
       description: "Todas as pessoas cadastradas",
       color: "bg-primary/10 text-primary",
+      action: () => navigate("/pessoas/todos"),
     },
     {
       title: "Visitantes",
@@ -31,6 +32,7 @@ export default function Pessoas() {
       icon: UserCheck,
       description: "Com acesso ao app",
       color: "bg-secondary/10 text-secondary-foreground",
+      action: () => navigate("/pessoas/frequentadores"),
     },
     {
       title: "Membros",
@@ -76,14 +78,14 @@ export default function Pessoas() {
       description: "Gerenciar e promover visitantes",
       icon: UserPlus,
       path: "/visitantes",
-      badge: "0 aguardando",
+      badge: `${stats[1].value} cadastrados`,
     },
     {
       title: "Membros",
       description: "Visualizar e editar perfis de membros",
       icon: Users,
       path: "/membros",
-      badge: null,
+      badge: `${stats[3].value} ativos`,
     },
     {
       title: "Contatos Agendados",
@@ -93,11 +95,11 @@ export default function Pessoas() {
       badge: "0 agendados",
     },
     {
-      title: "Conversões",
-      description: "Histórico de promoções de status",
-      icon: TrendingUp,
-      path: "#",
-      badge: "Em breve",
+      title: "Frequentadores",
+      description: "Pessoas com múltiplas visitas",
+      icon: UserCheck,
+      path: "/pessoas/frequentadores",
+      badge: `${stats[2].value} ativos`,
     },
   ];
 
