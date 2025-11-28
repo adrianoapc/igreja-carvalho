@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Banners from "./pages/Banners";
+import Pessoas from "./pages/Pessoas";
+import PessoaDetalhes from "./pages/PessoaDetalhes";
 import Membros from "./pages/Membros";
 import Visitantes from "./pages/Visitantes";
 import ContatosDashboard from "./pages/ContatosDashboard";
@@ -74,6 +76,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Banners />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pessoas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Pessoas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pessoas/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <PessoaDetalhes />
                 </MainLayout>
               </ProtectedRoute>
             }
