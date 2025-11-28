@@ -212,6 +212,11 @@ export default function Visitantes() {
                   <Badge variant="outline" className="text-xs bg-primary/10">
                     {visitante.numero_visitas} {visitante.numero_visitas === 1 ? 'visita' : 'visitas'}
                   </Badge>
+                  {visitante.status === "visitante" && visitante.numero_visitas >= 2 && (
+                    <Badge variant="outline" className="text-xs bg-accent/10 text-accent-foreground">
+                      Próxima visita = Frequentador
+                    </Badge>
+                  )}
                   {visitante.aceitou_jesus && (
                     <Badge variant="outline" className="text-xs">
                       <Check className="w-3 h-3 mr-1" />
