@@ -14,8 +14,10 @@ import Membros from "./pages/Membros";
 import Visitantes from "./pages/Visitantes";
 import ContatosDashboard from "./pages/ContatosDashboard";
 import Kids from "./pages/Kids";
-import Oracoes from "./pages/Oracoes";
-import Testemunhos from "./pages/Testemunhos";
+import Intercessao from "./pages/Intercessao";
+import PedidosOracao from "./pages/intercessao/PedidosOracao";
+import Intercessores from "./pages/intercessao/Intercessores";
+import TestemunhosIntercessao from "./pages/intercessao/Testemunhos";
 import Cultos from "./pages/Cultos";
 import Financas from "./pages/Financas";
 import Ensinamentos from "./pages/Ensinamentos";
@@ -163,21 +165,41 @@ function App() {
             }
           />
           <Route
-            path="/oracoes"
+            path="/intercessao"
             element={
               <ProtectedRoute>
                 <MainLayout>
-                  <Oracoes />
+                  <Intercessao />
                 </MainLayout>
               </ProtectedRoute>
             }
           />
           <Route
-            path="/testemunhos"
+            path="/intercessao/pedidos"
             element={
               <ProtectedRoute>
                 <MainLayout>
-                  <Testemunhos />
+                  <PedidosOracao />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/intercessao/intercessores"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Intercessores />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/intercessao/testemunhos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <TestemunhosIntercessao />
                 </MainLayout>
               </ProtectedRoute>
             }
