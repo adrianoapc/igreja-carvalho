@@ -102,16 +102,16 @@ export default function Pessoas() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Pessoas</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Pessoas</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
           Dashboard centralizado de gestão de pessoas
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -122,17 +122,17 @@ export default function Pessoas() {
               }`}
               onClick={stat.action}
             >
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">{stat.title}</p>
+                    <h3 className="text-xl md:text-2xl font-bold mt-1">{stat.value}</h3>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
                       {stat.description}
                     </p>
                   </div>
-                  <div className={`p-3 rounded-full ${stat.color}`}>
-                    <Icon className="w-6 h-6" />
+                  <div className={`p-2 md:p-3 rounded-full ${stat.color} flex-shrink-0`}>
+                    <Icon className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                 </div>
               </CardContent>
@@ -143,36 +143,36 @@ export default function Pessoas() {
 
       {/* Quick Actions */}
       <Card>
-        <CardHeader>
-          <CardTitle>Acesso Rápido</CardTitle>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg md:text-xl">Acesso Rápido</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent className="p-3 md:p-6">
+          <div className="grid grid-cols-1 gap-3 md:gap-4">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
                 <div
                   key={action.title}
-                  className="flex items-center gap-4 p-4 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                  className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors"
                   onClick={() => action.path !== "#" && navigate(action.path)}
                 >
-                  <div className="p-3 rounded-full bg-primary/10">
-                    <Icon className="w-6 h-6 text-primary" />
+                  <div className="p-2 md:p-3 rounded-full bg-primary/10 flex-shrink-0">
+                    <Icon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{action.title}</h3>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                      <h3 className="font-semibold text-sm md:text-base truncate">{action.title}</h3>
                       {action.badge && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs w-fit">
                           {action.badge}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">
                       {action.description}
                     </p>
                   </div>
-                  <ArrowRight className="w-5 h-5 text-muted-foreground" />
+                  <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground flex-shrink-0" />
                 </div>
               );
             })}
@@ -185,13 +185,13 @@ export default function Pessoas() {
 
       {/* Recent Activity */}
       <Card>
-        <CardHeader>
-          <CardTitle>Atividade Recente</CardTitle>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg md:text-xl">Atividade Recente</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <p>Nenhuma atividade recente</p>
-            <p className="text-sm mt-1">
+        <CardContent className="p-3 md:p-6">
+          <div className="text-center py-6 md:py-8 text-muted-foreground">
+            <p className="text-sm md:text-base">Nenhuma atividade recente</p>
+            <p className="text-xs md:text-sm mt-1">
               As últimas interações com pessoas aparecerão aqui
             </p>
           </div>

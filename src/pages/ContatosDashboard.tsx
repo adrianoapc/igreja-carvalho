@@ -145,44 +145,44 @@ export default function ContatosDashboard() {
   const renderContato = (contato: Contato) => (
     <div
       key={contato.id}
-      className="p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors space-y-3"
+      className="p-3 md:p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors space-y-3"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 space-y-2 min-w-0">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold flex-shrink-0">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold text-sm md:text-base flex-shrink-0">
               {contato.visitante.nome.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-foreground">{contato.visitante.nome}</p>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <User className="w-3 h-3" />
-                {contato.membro_responsavel.nome}
+              <p className="font-medium text-sm md:text-base text-foreground truncate">{contato.visitante.nome}</p>
+              <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 truncate">
+                <User className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{contato.membro_responsavel.nome}</span>
               </p>
             </div>
           </div>
 
-          <div className="space-y-1 text-sm">
+          <div className="space-y-1 text-xs md:text-sm">
             {contato.visitante.telefone && (
               <p className="flex items-center gap-2 text-muted-foreground">
-                <Phone className="w-3 h-3" />
+                <Phone className="w-3 h-3 flex-shrink-0" />
                 {contato.visitante.telefone}
               </p>
             )}
             {contato.visitante.email && (
               <p className="flex items-center gap-2 text-muted-foreground truncate">
-                <Mail className="w-3 h-3" />
-                {contato.visitante.email}
+                <Mail className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{contato.visitante.email}</span>
               </p>
             )}
             <p className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="w-3 h-3" />
+              <Clock className="w-3 h-3 flex-shrink-0" />
               {format(parseISO(contato.data_contato), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </p>
           </div>
 
           {contato.observacoes && (
-            <p className="text-sm text-muted-foreground italic">
+            <p className="text-xs md:text-sm text-muted-foreground italic line-clamp-2">
               {contato.observacoes}
             </p>
           )}
@@ -202,11 +202,11 @@ export default function ContatosDashboard() {
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Button
           size="sm"
           variant="outline"
-          className="flex-1"
+          className="flex-1 text-xs md:text-sm"
           onClick={() => marcarComoRealizado(contato.id)}
         >
           <CheckCircle className="w-3 h-3 mr-1" />
@@ -215,7 +215,7 @@ export default function ContatosDashboard() {
         <Button
           size="sm"
           variant="outline"
-          className="flex-1"
+          className="flex-1 text-xs md:text-sm"
           onClick={() => marcarComoNaoRealizado(contato.id)}
         >
           <XCircle className="w-3 h-3 mr-1" />
@@ -251,10 +251,10 @@ export default function ContatosDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Contatos Agendados</h1>
-        <p className="text-muted-foreground mt-1">Acompanhe os contatos programados com visitantes</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contatos Agendados</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">Acompanhe os contatos programados com visitantes</p>
       </div>
 
       {contatos.length === 0 ? (
@@ -265,16 +265,16 @@ export default function ContatosDashboard() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {hoje.length > 0 && (
             <Card className="shadow-soft border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-primary">
-                  <Calendar className="w-5 h-5" />
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-primary text-base md:text-lg">
+                  <Calendar className="w-4 h-4 md:w-5 md:h-5" />
                   Hoje ({hoje.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 p-3 md:p-6">
                 {hoje.map(renderContato)}
               </CardContent>
             </Card>
@@ -282,13 +282,13 @@ export default function ContatosDashboard() {
 
           {amanha.length > 0 && (
             <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Calendar className="w-4 h-4 md:w-5 md:h-5" />
                   Amanhã ({amanha.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 p-3 md:p-6">
                 {amanha.map(renderContato)}
               </CardContent>
             </Card>
@@ -296,13 +296,13 @@ export default function ContatosDashboard() {
 
           {proximos.length > 0 && (
             <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Calendar className="w-4 h-4 md:w-5 md:h-5" />
                   Próximos Dias ({proximos.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 p-3 md:p-6">
                 {proximos.map(renderContato)}
               </CardContent>
             </Card>
