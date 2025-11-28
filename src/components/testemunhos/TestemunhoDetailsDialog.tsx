@@ -53,16 +53,26 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
   const [pessoaNome, setPessoaNome] = useState<string>("");
 
   const [formData, setFormData] = useState({
-    titulo: testemunho.titulo,
-    mensagem: testemunho.mensagem,
-    categoria: testemunho.categoria,
-    status: testemunho.status,
-    publicar: testemunho.publicar,
+    titulo: testemunho?.titulo || "",
+    mensagem: testemunho?.mensagem || "",
+    categoria: testemunho?.categoria || "",
+    status: testemunho?.status || "aberto",
+    publicar: testemunho?.publicar || false,
   });
 
   const isAdmin = hasAccess("testemunhos", "aprovar_gerenciar");
 
   useEffect(() => {
+    if (!testemunho) return;
+    
+    setFormData({
+      titulo: testemunho.titulo,
+      mensagem: testemunho.mensagem,
+      categoria: testemunho.categoria,
+      status: testemunho.status,
+      publicar: testemunho.publicar,
+    });
+
     const fetchPessoaNome = async () => {
       if (testemunho.pessoa_id) {
         const { data } = await supabase
@@ -74,7 +84,7 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
       }
     };
     fetchPessoaNome();
-  }, [testemunho.pessoa_id]);
+  }, [testemunho]);
 
   const handleUpdate = async () => {
     setErrors({});
@@ -190,6 +200,7 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
   };
 
   const getNomeExibicao = () => {
+    if (!testemunho) return "Não identificado";
     if (testemunho.anonimo) return "Anônimo";
     if (pessoaNome) return pessoaNome;
     if (testemunho.nome_externo) return testemunho.nome_externo;
@@ -209,6 +220,8 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
   const getCategoriaLabel = (categoria: string) => {
     return CATEGORIAS.find(c => c.value === categoria)?.label || categoria;
   };
+
+  if (!testemunho) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
