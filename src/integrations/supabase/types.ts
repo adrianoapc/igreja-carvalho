@@ -224,55 +224,136 @@ export type Database = {
       profiles: {
         Row: {
           aceitou_jesus: boolean | null
+          bairro: string | null
+          batizado: boolean | null
+          cadastrado_por: string | null
+          cep: string | null
+          cidade: string | null
+          cpf: string | null
           created_at: string | null
+          data_batismo: string | null
           data_cadastro_membro: string | null
+          data_casamento: string | null
+          data_conversao: string | null
+          data_entrada: string | null
+          data_nascimento: string | null
           data_primeira_visita: string | null
           data_ultima_visita: string | null
           deseja_contato: boolean | null
+          e_lider: boolean | null
+          e_pastor: boolean | null
           email: string | null
+          endereco: string | null
+          entrevistado_por: string | null
+          entrou_por: string | null
+          escolaridade: string | null
+          estado: string | null
+          estado_civil: string | null
           id: string
+          nacionalidade: string | null
+          naturalidade: string | null
+          necessidades_especiais: string | null
           nome: string
           numero_visitas: number
           observacoes: string | null
+          profissao: string | null
           recebeu_brinde: boolean | null
+          rg: string | null
+          sexo: string | null
           status: Database["public"]["Enums"]["user_status"]
+          status_igreja: string | null
           telefone: string | null
+          tipo_sanguineo: string | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           aceitou_jesus?: boolean | null
+          bairro?: string | null
+          batizado?: boolean | null
+          cadastrado_por?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cpf?: string | null
           created_at?: string | null
+          data_batismo?: string | null
           data_cadastro_membro?: string | null
+          data_casamento?: string | null
+          data_conversao?: string | null
+          data_entrada?: string | null
+          data_nascimento?: string | null
           data_primeira_visita?: string | null
           data_ultima_visita?: string | null
           deseja_contato?: boolean | null
+          e_lider?: boolean | null
+          e_pastor?: boolean | null
           email?: string | null
+          endereco?: string | null
+          entrevistado_por?: string | null
+          entrou_por?: string | null
+          escolaridade?: string | null
+          estado?: string | null
+          estado_civil?: string | null
           id?: string
+          nacionalidade?: string | null
+          naturalidade?: string | null
+          necessidades_especiais?: string | null
           nome: string
           numero_visitas?: number
           observacoes?: string | null
+          profissao?: string | null
           recebeu_brinde?: boolean | null
+          rg?: string | null
+          sexo?: string | null
           status?: Database["public"]["Enums"]["user_status"]
+          status_igreja?: string | null
           telefone?: string | null
+          tipo_sanguineo?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           aceitou_jesus?: boolean | null
+          bairro?: string | null
+          batizado?: boolean | null
+          cadastrado_por?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cpf?: string | null
           created_at?: string | null
+          data_batismo?: string | null
           data_cadastro_membro?: string | null
+          data_casamento?: string | null
+          data_conversao?: string | null
+          data_entrada?: string | null
+          data_nascimento?: string | null
           data_primeira_visita?: string | null
           data_ultima_visita?: string | null
           deseja_contato?: boolean | null
+          e_lider?: boolean | null
+          e_pastor?: boolean | null
           email?: string | null
+          endereco?: string | null
+          entrevistado_por?: string | null
+          entrou_por?: string | null
+          escolaridade?: string | null
+          estado?: string | null
+          estado_civil?: string | null
           id?: string
+          nacionalidade?: string | null
+          naturalidade?: string | null
+          necessidades_especiais?: string | null
           nome?: string
           numero_visitas?: number
           observacoes?: string | null
+          profissao?: string | null
           recebeu_brinde?: boolean | null
+          rg?: string | null
+          sexo?: string | null
           status?: Database["public"]["Enums"]["user_status"]
+          status_igreja?: string | null
           telefone?: string | null
+          tipo_sanguineo?: string | null
           updated_at?: string | null
           user_id?: string | null
         }

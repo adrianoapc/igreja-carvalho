@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, UserPlus, UserCheck, TrendingUp, PhoneCall, ArrowRight } from "lucide-react";
@@ -7,8 +8,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function Pessoas() {
   const navigate = useNavigate();
-
-  const stats = [
+  const [stats, setStats] = useState([
     {
       title: "Total de Pessoas",
       value: "0",
@@ -39,7 +39,35 @@ export default function Pessoas() {
       color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
       action: () => navigate("/membros"),
     },
-  ];
+  ]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const { data: profiles, error } = await supabase
+          .from("profiles")
+          .select("status");
+
+        if (error) throw error;
+
+        const total = profiles?.length || 0;
+        const visitantes = profiles?.filter((p) => p.status === "visitante").length || 0;
+        const frequentadores = profiles?.filter((p) => p.status === "frequentador").length || 0;
+        const membros = profiles?.filter((p) => p.status === "membro").length || 0;
+
+        setStats((prev) => [
+          { ...prev[0], value: total.toString() },
+          { ...prev[1], value: visitantes.toString() },
+          { ...prev[2], value: frequentadores.toString() },
+          { ...prev[3], value: membros.toString() },
+        ]);
+      } catch (error) {
+        console.error("Erro ao buscar estatísticas:", error);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const quickActions = [
     {

@@ -10,9 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { RegistrarVisitanteDialog } from "@/components/visitantes/RegistrarVisitanteDialog";
 import { AgendarContatoDialog } from "@/components/visitantes/AgendarContatoDialog";
-import { VisitanteDetailsDialog } from "@/components/visitantes/VisitanteDetailsDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 
 interface Visitante {
   id: string;
@@ -37,9 +37,9 @@ export default function Visitantes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [registrarOpen, setRegistrarOpen] = useState(false);
   const [agendarContatoOpen, setAgendarContatoOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const fetchVisitantes = async () => {
     try {
@@ -98,17 +98,11 @@ export default function Visitantes() {
   );
 
   const handleOpenDetails = (visitante: Visitante) => {
-    setSelectedVisitante(visitante);
-    setDetailsOpen(true);
+    navigate(`/pessoas/${visitante.id}`);
   };
 
   const handleAgendarContato = (visitante: Visitante) => {
     setSelectedVisitante(visitante);
-    setAgendarContatoOpen(true);
-  };
-
-  const handleAgendarFromDetails = () => {
-    setDetailsOpen(false);
     setAgendarContatoOpen(true);
   };
   return (
@@ -265,23 +259,13 @@ export default function Visitantes() {
       />
 
       {selectedVisitante && (
-        <>
-          <AgendarContatoDialog
-            open={agendarContatoOpen}
-            onOpenChange={setAgendarContatoOpen}
-            visitanteId={selectedVisitante.id}
-            visitanteNome={selectedVisitante.nome}
-            onSuccess={fetchVisitantes}
-          />
-
-          <VisitanteDetailsDialog
-            open={detailsOpen}
-            onOpenChange={setDetailsOpen}
-            visitante={selectedVisitante}
-            onAgendarContato={handleAgendarFromDetails}
-            onUpdate={fetchVisitantes}
-          />
-        </>
+        <AgendarContatoDialog
+          open={agendarContatoOpen}
+          onOpenChange={setAgendarContatoOpen}
+          visitanteId={selectedVisitante.id}
+          visitanteNome={selectedVisitante.nome}
+          onSuccess={fetchVisitantes}
+        />
       )}
     </div>
   );
