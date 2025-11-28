@@ -16,9 +16,21 @@ import {
   Gift,
   PhoneCall,
   Clock,
-  User
+  User,
+  ArrowRight
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 
 interface Visitante {
   id: string;
@@ -31,6 +43,8 @@ interface Visitante {
   aceitou_jesus: boolean | null;
   deseja_contato: boolean | null;
   recebeu_brinde: boolean | null;
+  status: "visitante" | "frequentador" | "membro";
+  user_id: string | null;
 }
 
 interface Contato {
@@ -51,16 +65,21 @@ interface VisitanteDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   visitante: Visitante;
   onAgendarContato: () => void;
+  onUpdate?: () => void;
 }
 
 export function VisitanteDetailsDialog({ 
   open, 
   onOpenChange, 
   visitante,
-  onAgendarContato 
+  onAgendarContato,
+  onUpdate
 }: VisitanteDetailsDialogProps) {
   const [contatos, setContatos] = useState<Contato[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showPromoteDialog, setShowPromoteDialog] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (open && visitante.id) {
@@ -126,149 +145,252 @@ export function VisitanteDetailsDialog({
     return tipos[tipo] || tipo;
   };
 
+  const getNextStatus = () => {
+    if (visitante.status === "visitante") return "frequentador";
+    if (visitante.status === "frequentador") return "membro";
+    return null;
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "visitante": return "outline";
+      case "frequentador": return "secondary";
+      case "membro": return "default";
+      default: return "outline";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "visitante": return "Visitante";
+      case "frequentador": return "Frequentador";
+      case "membro": return "Membro";
+      default: return status;
+    }
+  };
+
+  const handlePromote = async () => {
+    const nextStatus = getNextStatus();
+    if (!nextStatus) return;
+
+    setPromoting(true);
+    try {
+      const updateData: any = { status: nextStatus };
+      
+      // Se está promovendo para membro, adiciona data_cadastro_membro
+      if (nextStatus === "membro") {
+        updateData.data_cadastro_membro = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", visitante.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Status atualizado",
+        description: `${visitante.nome} foi promovido para ${getStatusLabel(nextStatus)}`,
+      });
+
+      setShowPromoteDialog(false);
+      onOpenChange(false);
+      onUpdate?.();
+    } catch (error) {
+      console.error("Erro ao promover:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status",
+        variant: "destructive",
+      });
+    } finally {
+      setPromoting(false);
+    }
+  };
+
+  const nextStatus = getNextStatus();
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Detalhes do Visitante</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Visitante</DialogTitle>
+          </DialogHeader>
 
-        <ScrollArea className="max-h-[calc(90vh-8rem)]">
-          <div className="space-y-4 pr-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">{visitante.nome}</h3>
-                    <div className="flex flex-wrap gap-2 items-center mt-2">
-                      <Badge variant="outline" className="bg-primary/10">
-                        {visitante.numero_visitas} {visitante.numero_visitas === 1 ? 'visita' : 'visitas'}
-                      </Badge>
-                      {visitante.data_primeira_visita && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          1ª visita: {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
-                        </p>
-                      )}
-                      {visitante.data_ultima_visita && visitante.data_ultima_visita !== visitante.data_primeira_visita && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          Última: {format(new Date(visitante.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-2">
-                    {visitante.telefone && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        <span>{visitante.telefone}</span>
-                      </div>
-                    )}
-                    {visitante.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <span>{visitante.email}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <Separator />
-
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      {visitante.aceitou_jesus ? (
-                        <Check className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <X className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm">Aceitou Jesus</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {visitante.deseja_contato ? (
-                        <Check className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <X className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm">Deseja contato</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {visitante.recebeu_brinde ? (
-                        <Gift className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <Gift className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm">Recebeu brinde</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">Histórico de Contatos</h4>
-              <Button size="sm" onClick={onAgendarContato}>
-                <PhoneCall className="w-4 h-4 mr-2" />
-                Agendar Contato
-              </Button>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-8 text-sm text-muted-foreground">
-                Carregando contatos...
-              </div>
-            ) : contatos.length === 0 ? (
+          <ScrollArea className="max-h-[calc(90vh-8rem)]">
+            <div className="space-y-4 pr-4">
               <Card>
-                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhum contato agendado ainda
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">{visitante.nome}</h3>
+                      <div className="flex flex-wrap gap-2 items-center mt-2">
+                        <Badge variant={getStatusBadgeVariant(visitante.status)}>
+                          {getStatusLabel(visitante.status)}
+                        </Badge>
+                        <Badge variant="outline" className="bg-primary/10">
+                          {visitante.numero_visitas} {visitante.numero_visitas === 1 ? 'visita' : 'visitas'}
+                        </Badge>
+                        {visitante.data_primeira_visita && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            1ª visita: {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                          </p>
+                        )}
+                        {visitante.data_ultima_visita && visitante.data_ultima_visita !== visitante.data_primeira_visita && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            Última: {format(new Date(visitante.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      {visitante.telefone && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="w-4 h-4 text-muted-foreground" />
+                          <span>{visitante.telefone}</span>
+                        </div>
+                      )}
+                      {visitante.email && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="w-4 h-4 text-muted-foreground" />
+                          <span>{visitante.email}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        {visitante.aceitou_jesus ? (
+                          <Check className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <X className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <span className="text-sm">Aceitou Jesus</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {visitante.deseja_contato ? (
+                          <Check className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <X className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <span className="text-sm">Deseja contato</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {visitante.recebeu_brinde ? (
+                          <Gift className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <Gift className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <span className="text-sm">Recebeu brinde</span>
+                      </div>
+                    </div>
+
+                    {nextStatus && (
+                      <>
+                        <Separator />
+                        <Button 
+                          className="w-full"
+                          onClick={() => setShowPromoteDialog(true)}
+                        >
+                          <ArrowRight className="w-4 h-4 mr-2" />
+                          Promover para {getStatusLabel(nextStatus)}
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="space-y-3">
-                {contatos.map((contato) => (
-                  <Card key={contato.id}>
-                    <CardContent className="pt-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">
-                              {format(new Date(contato.data_contato), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {getTipoLabel(contato.tipo_contato)}
-                            </Badge>
+
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold">Histórico de Contatos</h4>
+                <Button size="sm" onClick={onAgendarContato}>
+                  <PhoneCall className="w-4 h-4 mr-2" />
+                  Agendar Contato
+                </Button>
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  Carregando contatos...
+                </div>
+              ) : contatos.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                    Nenhum contato agendado ainda
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {contatos.map((contato) => (
+                    <Card key={contato.id}>
+                      <CardContent className="pt-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">
+                                {format(new Date(contato.data_contato), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {getTipoLabel(contato.tipo_contato)}
+                              </Badge>
+                            </div>
+                            
+                            {contato.profiles && (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <User className="w-3 h-3" />
+                                <span>{contato.profiles.nome}</span>
+                              </div>
+                            )}
+                            
+                            {contato.observacoes && (
+                              <p className="text-sm text-muted-foreground">{contato.observacoes}</p>
+                            )}
                           </div>
                           
-                          {contato.profiles && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <User className="w-3 h-3" />
-                              <span>{contato.profiles.nome}</span>
-                            </div>
-                          )}
-                          
-                          {contato.observacoes && (
-                            <p className="text-sm text-muted-foreground">{contato.observacoes}</p>
-                          )}
+                          <Badge className={getStatusColor(contato.status)}>
+                            {contato.status === "agendado" && "Agendado"}
+                            {contato.status === "realizado" && "Realizado"}
+                            {contato.status === "cancelado" && "Cancelado"}
+                          </Badge>
                         </div>
-                        
-                        <Badge className={getStatusColor(contato.status)}>
-                          {contato.status === "agendado" && "Agendado"}
-                          {contato.status === "realizado" && "Realizado"}
-                          {contato.status === "cancelado" && "Cancelado"}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Promover para {nextStatus && getStatusLabel(nextStatus)}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a promover <strong>{visitante.nome}</strong> de {getStatusLabel(visitante.status)} para {nextStatus && getStatusLabel(nextStatus)}.
+              {nextStatus === "frequentador" && " Isso permitirá que a pessoa tenha acesso ao aplicativo."}
+              {nextStatus === "membro" && " Isso registrará a data de cadastro como membro e permitirá atribuição de cargos."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={promoting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePromote} disabled={promoting}>
+              {promoting ? "Promovendo..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
