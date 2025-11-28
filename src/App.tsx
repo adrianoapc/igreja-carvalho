@@ -125,7 +125,7 @@ function App() {
             }
           />
           <Route
-            path="/membros"
+            path="/pessoas/membros"
             element={
               <ProtectedRoute>
                 <MainLayout>
@@ -135,7 +135,7 @@ function App() {
             }
           />
           <Route
-            path="/visitantes"
+            path="/pessoas/visitantes"
             element={
               <ProtectedRoute>
                 <MainLayout>
@@ -145,7 +145,7 @@ function App() {
             }
           />
           <Route
-            path="/contatos"
+            path="/pessoas/contatos"
             element={
               <ProtectedRoute>
                 <MainLayout>

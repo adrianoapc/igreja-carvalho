@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Phone, Mail, User, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Calendar, Phone, Mail, User, Clock, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -31,6 +32,7 @@ export default function ContatosDashboard() {
   const [contatos, setContatos] = useState<Contato[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const fetchContatos = async () => {
     try {
@@ -252,9 +254,14 @@ export default function ContatosDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contatos Agendados</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">Acompanhe os contatos programados com visitantes</p>
+      <div className="flex items-center gap-2 md:gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/pessoas")}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contatos Agendados</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Acompanhe os contatos programados com visitantes</p>
+        </div>
       </div>
 
       {contatos.length === 0 ? (
