@@ -390,7 +390,7 @@ export default function PessoaDetalhes() {
                 <div className="h-8 w-1 bg-green-600 rounded" />
                 <CardTitle>Dados pessoais</CardTitle>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setEditarPessoaisOpen(true)}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar dados pessoais
               </Button>
