@@ -10,6 +10,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OptimizedImage } from "@/components/OptimizedImage";
 import Autoplay from "embla-carousel-autoplay";
 
 interface Banner {
@@ -89,7 +90,7 @@ export default function BannerCarousel() {
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4">
+    <div className="w-full max-w-5xl mx-auto px-2 md:px-4">
       <Carousel
         opts={{
           align: "center",
@@ -108,43 +109,45 @@ export default function BannerCarousel() {
         className="w-full touch-pan-y"
       >
         <CarouselContent>
-          {banners.map((banner) => (
+          {banners.map((banner, index) => (
             <CarouselItem key={banner.id}>
               <Card className="border-0 shadow-lg overflow-hidden">
                 <CardContent className="p-0">
                   {banner.image_url ? (
                     <div className="relative">
-                      <img
+                      <OptimizedImage
                         src={banner.image_url}
                         alt={banner.title}
-                        className="w-full h-[300px] object-cover"
+                        aspectRatio="16/9"
+                        priority={index === 0}
+                        className="w-full h-[250px] md:h-[300px]"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
-                      <div className="absolute bottom-0 left-0 right-0 p-6">
-                        <div className="flex items-start justify-between gap-4 mb-2">
-                          <h3 className="text-2xl font-bold text-foreground">
+                      <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4 mb-2">
+                          <h3 className="text-xl md:text-2xl font-bold text-foreground">
                             {banner.title}
                           </h3>
-                          <Badge className={getBannerTypeColor(banner.type)}>
+                          <Badge className={getBannerTypeColor(banner.type) + " whitespace-nowrap"}>
                             {getBannerTypeLabel(banner.type)}
                           </Badge>
                         </div>
-                        <p className="text-foreground/90 line-clamp-3">
+                        <p className="text-sm md:text-base text-foreground/90 line-clamp-2 md:line-clamp-3">
                           {banner.message}
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-6 min-h-[300px] flex flex-col justify-center bg-gradient-to-br from-secondary to-secondary/50">
-                      <div className="flex items-start justify-between gap-4 mb-4">
-                        <h3 className="text-2xl font-bold text-foreground">
+                    <div className="p-4 md:p-6 min-h-[250px] md:min-h-[300px] flex flex-col justify-center bg-gradient-to-br from-secondary to-secondary/50">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4 mb-4">
+                        <h3 className="text-xl md:text-2xl font-bold text-foreground">
                           {banner.title}
                         </h3>
-                        <Badge className={getBannerTypeColor(banner.type)}>
+                        <Badge className={getBannerTypeColor(banner.type) + " whitespace-nowrap"}>
                           {getBannerTypeLabel(banner.type)}
                         </Badge>
                       </div>
-                      <p className="text-foreground/80 line-clamp-6">
+                      <p className="text-sm md:text-base text-foreground/80 line-clamp-4 md:line-clamp-6">
                         {banner.message}
                       </p>
                     </div>
@@ -154,8 +157,8 @@ export default function BannerCarousel() {
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselPrevious className="left-4" />
-        <CarouselNext className="right-4" />
+        <CarouselPrevious className="left-2 md:left-4" />
+        <CarouselNext className="right-2 md:right-4" />
       </Carousel>
     </div>
   );

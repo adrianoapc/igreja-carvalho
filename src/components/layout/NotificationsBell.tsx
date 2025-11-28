@@ -44,7 +44,7 @@ export default function NotificationsBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0" align="end">
+      <PopoverContent className="w-80 sm:w-96 p-0" align="end">
         <div className="flex items-center justify-between p-4 border-b">
           <h3 className="font-semibold">Notificações</h3>
           {unreadCount > 0 && (
@@ -60,7 +60,7 @@ export default function NotificationsBell() {
           )}
         </div>
 
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[300px] sm:h-[400px]">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Bell className="w-12 h-12 mb-2 opacity-20" />
@@ -71,18 +71,18 @@ export default function NotificationsBell() {
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-4 hover:bg-secondary/50 transition-colors cursor-pointer ${
+                  className={`p-3 md:p-4 hover:bg-secondary/50 transition-colors cursor-pointer ${
                     !notification.read ? "bg-primary/5" : ""
                   }`}
                   onClick={() => !notification.read && markAsRead(notification.id)}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="text-2xl">{getNotificationIcon(notification.type)}</div>
+                  <div className="flex items-start gap-2 md:gap-3">
+                    <div className="text-xl md:text-2xl flex-shrink-0">{getNotificationIcon(notification.type)}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{notification.title}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-xs md:text-sm truncate">{notification.title}</p>
+                          <p className="text-xs md:text-sm text-muted-foreground mt-1 line-clamp-2">
                             {notification.message}
                           </p>
                           <p className="text-xs text-muted-foreground mt-2">
@@ -95,7 +95,7 @@ export default function NotificationsBell() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 flex-shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteNotification(notification.id);
