@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,9 +15,16 @@ import {
 const menuItems = [
   { icon: Home, label: "Dashboard", path: "/" },
   { icon: Megaphone, label: "Banners", path: "/banners" },
+];
+
+const pessoasItems = [
+  { icon: UsersRound, label: "Geral", path: "/pessoas" },
   { icon: Users, label: "Membros", path: "/membros" },
   { icon: UserPlus, label: "Visitantes", path: "/visitantes" },
   { icon: PhoneCall, label: "Contatos Agendados", path: "/contatos" },
+];
+
+const modulosItems = [
   { icon: Baby, label: "Kids", path: "/kids" },
   { icon: MessageCircle, label: "Pedidos de Oração", path: "/oracoes" },
   { icon: Heart, label: "Testemunhos", path: "/testemunhos" },
@@ -51,6 +58,58 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton asChild tooltip={item.label}>
+                      <NavLink
+                        to={item.path}
+                        end
+                        className="hover:bg-sidebar-accent"
+                        activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                      >
+                        <Icon className="w-5 h-5" />
+                        {!isCollapsed && <span>{item.label}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Pessoas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {pessoasItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton asChild tooltip={item.label}>
+                      <NavLink
+                        to={item.path}
+                        end
+                        className="hover:bg-sidebar-accent"
+                        activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                      >
+                        <Icon className="w-5 h-5" />
+                        {!isCollapsed && <span>{item.label}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Módulos</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {modulosItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.path}>
