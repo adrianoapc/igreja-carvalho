@@ -8,6 +8,8 @@ import Dashboard from "./pages/Dashboard";
 import Banners from "./pages/Banners";
 import Pessoas from "./pages/Pessoas";
 import PessoaDetalhes from "./pages/PessoaDetalhes";
+import TodosPessoas from "./pages/TodosPessoas";
+import Frequentadores from "./pages/Frequentadores";
 import Membros from "./pages/Membros";
 import Visitantes from "./pages/Visitantes";
 import ContatosDashboard from "./pages/ContatosDashboard";
@@ -96,6 +98,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <PessoaDetalhes />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pessoas/todos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <TodosPessoas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pessoas/frequentadores"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Frequentadores />
                 </MainLayout>
               </ProtectedRoute>
             }
