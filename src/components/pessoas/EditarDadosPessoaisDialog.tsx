@@ -39,6 +39,7 @@ const dadosPessoaisSchema = z.object({
       },
       { message: "CPF inválido" }
     ),
+  necessidades_especiais: z.string().max(500).nullable(),
 });
 
 interface EditarDadosPessoaisDialogProps {
@@ -52,6 +53,7 @@ interface EditarDadosPessoaisDialogProps {
     data_casamento: string | null;
     rg: string | null;
     cpf: string | null;
+    necessidades_especiais: string | null;
   };
   onSuccess: () => void;
 }
@@ -71,6 +73,7 @@ export function EditarDadosPessoaisDialog({
     data_casamento: dadosAtuais.data_casamento || "",
     rg: dadosAtuais.rg || "",
     cpf: dadosAtuais.cpf || "",
+    necessidades_especiais: dadosAtuais.necessidades_especiais || "",
   });
   const { toast } = useToast();
 
@@ -83,6 +86,7 @@ export function EditarDadosPessoaisDialog({
         data_casamento: dadosAtuais.data_casamento || "",
         rg: dadosAtuais.rg || "",
         cpf: dadosAtuais.cpf || "",
+        necessidades_especiais: dadosAtuais.necessidades_especiais || "",
       });
     }
   }, [open, dadosAtuais]);
@@ -103,6 +107,7 @@ export function EditarDadosPessoaisDialog({
           data_casamento: validatedData.data_casamento || null,
           rg: validatedData.rg || null,
           cpf: validatedData.cpf ? removerFormatacao(validatedData.cpf) : null,
+          necessidades_especiais: validatedData.necessidades_especiais || null,
         })
         .eq("id", pessoaId);
 
@@ -234,6 +239,21 @@ export function EditarDadosPessoaisDialog({
                   />
                 )}
               </InputMask>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="necessidades">Necessidades especiais</Label>
+              <Input
+                id="necessidades"
+                value={formData.necessidades_especiais}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    necessidades_especiais: e.target.value,
+                  })
+                }
+                maxLength={500}
+              />
             </div>
           </div>
 
