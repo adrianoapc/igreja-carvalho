@@ -56,6 +56,42 @@ export type Database = {
         }
         Relationships: []
       }
+      intercessores: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          email: string | null
+          id: string
+          max_pedidos: number | null
+          nome: string
+          telefone: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          max_pedidos?: number | null
+          nome: string
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          max_pedidos?: number | null
+          nome?: string
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       module_permissions: {
         Row: {
           access_level: Database["public"]["Enums"]["access_level"]
@@ -112,6 +148,78 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      pedidos_oracao: {
+        Row: {
+          anonimo: boolean | null
+          created_at: string | null
+          data_alocacao: string | null
+          data_criacao: string | null
+          data_resposta: string | null
+          email_solicitante: string | null
+          id: string
+          intercessor_id: string | null
+          membro_id: string | null
+          nome_solicitante: string | null
+          observacoes_intercessor: string | null
+          pedido: string
+          status: Database["public"]["Enums"]["status_pedido"]
+          telefone_solicitante: string | null
+          tipo: Database["public"]["Enums"]["tipo_pedido"]
+          updated_at: string | null
+        }
+        Insert: {
+          anonimo?: boolean | null
+          created_at?: string | null
+          data_alocacao?: string | null
+          data_criacao?: string | null
+          data_resposta?: string | null
+          email_solicitante?: string | null
+          id?: string
+          intercessor_id?: string | null
+          membro_id?: string | null
+          nome_solicitante?: string | null
+          observacoes_intercessor?: string | null
+          pedido: string
+          status?: Database["public"]["Enums"]["status_pedido"]
+          telefone_solicitante?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_pedido"]
+          updated_at?: string | null
+        }
+        Update: {
+          anonimo?: boolean | null
+          created_at?: string | null
+          data_alocacao?: string | null
+          data_criacao?: string | null
+          data_resposta?: string | null
+          email_solicitante?: string | null
+          id?: string
+          intercessor_id?: string | null
+          membro_id?: string | null
+          nome_solicitante?: string | null
+          observacoes_intercessor?: string | null
+          pedido?: string
+          status?: Database["public"]["Enums"]["status_pedido"]
+          telefone_solicitante?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_pedido"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_oracao_intercessor_id_fkey"
+            columns: ["intercessor_id"]
+            isOneToOne: false
+            referencedRelation: "intercessores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_oracao_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -178,6 +286,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      alocar_pedido_balanceado: {
+        Args: { p_pedido_id: string }
+        Returns: string
+      }
       get_user_module_access: {
         Args: { _module_name: string; _user_id: string }
         Returns: Database["public"]["Enums"]["access_level"]
@@ -223,6 +335,15 @@ export type Database = {
         | "tesoureiro"
         | "professor"
         | "membro"
+      status_pedido: "pendente" | "em_oracao" | "respondido" | "arquivado"
+      tipo_pedido:
+        | "saude"
+        | "familia"
+        | "financeiro"
+        | "trabalho"
+        | "espiritual"
+        | "agradecimento"
+        | "outro"
       user_status: "visitante" | "frequentador" | "membro"
     }
     CompositeTypes: {
@@ -365,6 +486,16 @@ export const Constants = {
         "tesoureiro",
         "professor",
         "membro",
+      ],
+      status_pedido: ["pendente", "em_oracao", "respondido", "arquivado"],
+      tipo_pedido: [
+        "saude",
+        "familia",
+        "financeiro",
+        "trabalho",
+        "espiritual",
+        "agradecimento",
+        "outro",
       ],
       user_status: ["visitante", "frequentador", "membro"],
     },
