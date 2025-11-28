@@ -50,7 +50,12 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
     setLoading(true);
 
     try {
-      const { error } = await supabase
+      // Pegar o usuário atual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      // Inserir visitante
+      const { data: visitanteData, error: visitanteError } = await supabase
         .from("profiles")
         .insert({
           nome: formData.nome.trim(),
@@ -61,9 +66,33 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
           recebeu_brinde: formData.recebeu_brinde,
           status: "visitante",
           data_primeira_visita: new Date().toISOString(),
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (visitanteError) throw visitanteError;
+
+      // Se deseja contato, criar agendamento automático para 3 dias depois
+      if (formData.deseja_contato && visitanteData) {
+        const dataContato = new Date();
+        dataContato.setDate(dataContato.getDate() + 3);
+
+        const { error: contatoError } = await supabase
+          .from("visitante_contatos")
+          .insert({
+            visitante_id: visitanteData.id,
+            membro_responsavel_id: user.id,
+            data_contato: dataContato.toISOString(),
+            tipo_contato: "telefonico",
+            status: "agendado",
+            observacoes: "Contato automático agendado após registro"
+          });
+
+        if (contatoError) {
+          console.error("Erro ao criar agendamento:", contatoError);
+          // Não bloqueamos o cadastro se falhar o agendamento
+        }
+      }
 
       toast({
         title: "Sucesso",
