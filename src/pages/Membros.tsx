@@ -1,17 +1,48 @@
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Mail, Phone } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Search, Plus, Mail, Phone, Loader2 } from "lucide-react";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
-const membros = [
-  { id: 1, nome: "João Silva", email: "joao@email.com", telefone: "(11) 98765-4321", departamento: "Louvor", status: "Ativo" },
-  { id: 2, nome: "Maria Santos", email: "maria@email.com", telefone: "(11) 98765-4322", departamento: "Intercessão", status: "Ativo" },
-  { id: 3, nome: "Pedro Costa", email: "pedro@email.com", telefone: "(11) 98765-4323", departamento: "Mídia", status: "Ativo" },
-  { id: 4, nome: "Ana Paula", email: "ana@email.com", telefone: "(11) 98765-4324", departamento: "Crianças", status: "Ativo" },
-  { id: 5, nome: "Carlos Oliveira", email: "carlos@email.com", telefone: "(11) 98765-4325", departamento: "Jovens", status: "Ativo" },
-];
+const allMembros = Array.from({ length: 50 }, (_, i) => ({
+  id: i + 1,
+  nome: `Membro ${i + 1}`,
+  email: `membro${i + 1}@email.com`,
+  telefone: `(11) ${98765 + i}-${4321 + i}`,
+  departamento: ["Louvor", "Intercessão", "Mídia", "Crianças", "Jovens"][i % 5],
+  status: "Ativo",
+}));
+
+const ITEMS_PER_PAGE = 10;
 
 export default function Membros() {
+  const [displayedMembros, setDisplayedMembros] = useState(allMembros.slice(0, ITEMS_PER_PAGE));
+  
+  const loadMore = useCallback(() => {
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      const nextPage = page + 1;
+      const start = nextPage * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+      const newItems = allMembros.slice(start, end);
+      
+      if (newItems.length > 0) {
+        setDisplayedMembros(prev => [...prev, ...newItems]);
+        setPage(nextPage);
+      }
+      
+      if (end >= allMembros.length) {
+        setHasMore(false);
+      }
+      
+      setIsLoading(false);
+    }, 800);
+  }, []);
+
+  const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll(loadMore);
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -40,8 +71,12 @@ export default function Membros() {
         </CardHeader>
         <CardContent className="p-3 md:p-6">
           <div className="space-y-3 md:space-y-4">
-            {membros.map((membro) => (
-              <div key={membro.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 md:p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors">
+            {displayedMembros.map((membro, index) => (
+              <div 
+                key={membro.id} 
+                ref={index === displayedMembros.length - 1 ? loadMoreRef : null}
+                className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 md:p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+              >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-bold text-base md:text-lg flex-shrink-0">
                     {membro.nome.charAt(0)}
@@ -69,6 +104,26 @@ export default function Membros() {
                 </div>
               </div>
             ))}
+            
+            {isLoading && (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 md:p-4 rounded-lg bg-secondary">
+                    <Skeleton className="w-10 h-10 md:w-12 md:h-12 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {!hasMore && displayedMembros.length > 0 && (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                Todos os membros foram carregados
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

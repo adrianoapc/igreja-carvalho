@@ -1,16 +1,48 @@
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Heart, Clock } from "lucide-react";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
-const testemunhos = [
-  { id: 1, nome: "Ana Maria", testemunho: "Fui curada de uma doença grave após as orações da igreja. Glória a Deus!", data: "25/11/2024", categoria: "Cura", aprovado: true },
-  { id: 2, nome: "Roberto Silva", testemunho: "Consegui o emprego que tanto orava! Deus é fiel!", data: "24/11/2024", categoria: "Provisão", aprovado: true },
-  { id: 3, nome: "Juliana Costa", testemunho: "Meu casamento foi restaurado através das ministrações da igreja", data: "23/11/2024", categoria: "Relacionamento", aprovado: false },
-  { id: 4, nome: "Marcos Paulo", testemunho: "Deus transformou minha vida completamente após aceitar Jesus", data: "22/11/2024", categoria: "Salvação", aprovado: true },
-];
+const allTestemunhos = Array.from({ length: 25 }, (_, i) => ({
+  id: i + 1,
+  nome: `Pessoa ${i + 1}`,
+  testemunho: `Testemunho de fé e gratidão a Deus número ${i + 1}. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
+  data: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR"),
+  categoria: ["Cura", "Provisão", "Relacionamento", "Salvação", "Outro"][i % 5],
+  aprovado: Math.random() > 0.3,
+}));
+
+const ITEMS_PER_PAGE = 6;
 
 export default function Testemunhos() {
+  const [displayedTestemunhos, setDisplayedTestemunhos] = useState(allTestemunhos.slice(0, ITEMS_PER_PAGE));
+  
+  const loadMore = useCallback(() => {
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      const nextPage = page + 1;
+      const start = nextPage * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+      const newItems = allTestemunhos.slice(start, end);
+      
+      if (newItems.length > 0) {
+        setDisplayedTestemunhos(prev => [...prev, ...newItems]);
+        setPage(nextPage);
+      }
+      
+      if (end >= allTestemunhos.length) {
+        setHasMore(false);
+      }
+      
+      setIsLoading(false);
+    }, 800);
+  }, []);
+
+  const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll(loadMore);
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -26,8 +58,12 @@ export default function Testemunhos() {
       </div>
 
       <div className="grid gap-3 md:gap-4">
-        {testemunhos.map((testemunho) => (
-          <Card key={testemunho.id} className="shadow-soft hover:shadow-medium transition-shadow">
+        {displayedTestemunhos.map((testemunho, index) => (
+          <Card 
+            key={testemunho.id} 
+            ref={index === displayedTestemunhos.length - 1 ? loadMoreRef : null}
+            className="shadow-soft hover:shadow-medium transition-shadow"
+          >
             <CardHeader className="pb-3 p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div className="flex items-center gap-2 md:gap-3">
@@ -61,6 +97,33 @@ export default function Testemunhos() {
             </CardContent>
           </Card>
         ))}
+        
+        {isLoading && (
+          <div className="grid gap-3 md:gap-4">
+            {[1, 2].map((i) => (
+              <Card key={i} className="shadow-soft">
+                <CardHeader className="pb-3 p-4 md:p-6">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 md:p-6 pt-0">
+                  <Skeleton className="h-12 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+        
+        {!hasMore && displayedTestemunhos.length > 0 && (
+          <div className="text-center py-4 text-sm text-muted-foreground">
+            Todos os testemunhos foram carregados
+          </div>
+        )}
       </div>
     </div>
   );
