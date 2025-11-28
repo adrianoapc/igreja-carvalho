@@ -32,6 +32,17 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess }: NovoPedidoDi
     setLoading(true);
 
     try {
+      // Buscar pessoa por contato se não estiver autenticado
+      let pessoaId = null;
+      if (!user && (nome || email || telefone)) {
+        const { data: pessoaData } = await supabase.rpc('buscar_pessoa_por_contato', {
+          p_nome: nome || null,
+          p_email: email || null,
+          p_telefone: telefone || null,
+        });
+        pessoaId = pessoaData;
+      }
+
       const pedidoData: any = {
         tipo,
         pedido,
@@ -42,6 +53,8 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess }: NovoPedidoDi
       if (!anonimo) {
         if (user) {
           pedidoData.membro_id = user.id;
+        } else if (pessoaId) {
+          pedidoData.pessoa_id = pessoaId;
         } else {
           pedidoData.nome_solicitante = nome;
           pedidoData.email_solicitante = email;

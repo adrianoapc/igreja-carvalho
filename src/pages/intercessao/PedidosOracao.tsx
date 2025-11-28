@@ -96,7 +96,7 @@ export default function PedidosOracao() {
         .select(`
           *,
           intercessores(nome),
-          profiles(nome)
+          profiles!pedidos_oracao_membro_id_fkey(nome)
         `)
         .order("data_criacao", { ascending: false });
 
