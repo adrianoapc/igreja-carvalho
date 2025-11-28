@@ -223,39 +223,48 @@ export type Database = {
       }
       profiles: {
         Row: {
+          aceitou_jesus: boolean | null
           created_at: string | null
           data_cadastro_membro: string | null
           data_primeira_visita: string | null
+          deseja_contato: boolean | null
           email: string | null
           id: string
           nome: string
           observacoes: string | null
+          recebeu_brinde: boolean | null
           status: Database["public"]["Enums"]["user_status"]
           telefone: string | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
+          aceitou_jesus?: boolean | null
           created_at?: string | null
           data_cadastro_membro?: string | null
           data_primeira_visita?: string | null
+          deseja_contato?: boolean | null
           email?: string | null
           id?: string
           nome: string
           observacoes?: string | null
+          recebeu_brinde?: boolean | null
           status?: Database["public"]["Enums"]["user_status"]
           telefone?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          aceitou_jesus?: boolean | null
           created_at?: string | null
           data_cadastro_membro?: string | null
           data_primeira_visita?: string | null
+          deseja_contato?: boolean | null
           email?: string | null
           id?: string
           nome?: string
           observacoes?: string | null
+          recebeu_brinde?: boolean | null
           status?: Database["public"]["Enums"]["user_status"]
           telefone?: string | null
           updated_at?: string | null
@@ -280,6 +289,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      visitante_contatos: {
+        Row: {
+          created_at: string | null
+          data_contato: string
+          id: string
+          membro_responsavel_id: string
+          observacoes: string | null
+          status: string | null
+          tipo_contato: string | null
+          updated_at: string | null
+          visitante_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_contato: string
+          id?: string
+          membro_responsavel_id: string
+          observacoes?: string | null
+          status?: string | null
+          tipo_contato?: string | null
+          updated_at?: string | null
+          visitante_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data_contato?: string
+          id?: string
+          membro_responsavel_id?: string
+          observacoes?: string | null
+          status?: string | null
+          tipo_contato?: string | null
+          updated_at?: string | null
+          visitante_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_membro_responsavel"
+            columns: ["membro_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "fk_visitante"
+            columns: ["visitante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
