@@ -12,49 +12,50 @@ const testemunhos = [
 
 export default function Testemunhos() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Testemunhos</h1>
-          <p className="text-muted-foreground mt-1">Compartilhe as bênçãos e milagres</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Testemunhos</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Compartilhe as bênçãos e milagres</p>
         </div>
-        <Button className="bg-gradient-primary shadow-soft">
+        <Button className="bg-gradient-primary shadow-soft w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
-          Novo Testemunho
+          <span className="hidden sm:inline">Novo Testemunho</span>
+          <span className="sm:hidden">Adicionar</span>
         </Button>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-3 md:gap-4">
         {testemunhos.map((testemunho) => (
           <Card key={testemunho.id} className="shadow-soft hover:shadow-medium transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-accent flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-accent-foreground" />
+            <CardHeader className="pb-3 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-accent flex items-center justify-center flex-shrink-0">
+                    <Heart className="w-4 h-4 md:w-5 md:h-5 text-accent-foreground" />
                   </div>
-                  <div>
-                    <CardTitle className="text-lg">{testemunho.nome}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Clock className="w-3 h-3 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base md:text-lg truncate">{testemunho.nome}</CardTitle>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                       <span className="text-xs text-muted-foreground">{testemunho.data}</span>
-                      <Badge variant="outline" className="ml-2">{testemunho.categoria}</Badge>
+                      <Badge variant="outline" className="text-xs">{testemunho.categoria}</Badge>
                     </div>
                   </div>
                 </div>
                 {testemunho.aprovado ? (
-                  <Badge className="bg-green-100 text-green-700">Aprovado</Badge>
+                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 whitespace-nowrap">Aprovado</Badge>
                 ) : (
-                  <Badge className="bg-accent/20 text-accent-foreground">Pendente</Badge>
+                  <Badge className="bg-accent/20 text-accent-foreground whitespace-nowrap">Pendente</Badge>
                 )}
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{testemunho.testemunho}</p>
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" size="sm">Ver Detalhes</Button>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <p className="text-sm md:text-base text-muted-foreground line-clamp-3">{testemunho.testemunho}</p>
+              <div className="flex flex-col sm:flex-row gap-2 mt-3 md:mt-4">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">Ver Detalhes</Button>
                 {!testemunho.aprovado && (
-                  <Button variant="outline" size="sm" className="text-primary">Aprovar</Button>
+                  <Button variant="outline" size="sm" className="text-primary w-full sm:w-auto text-xs md:text-sm">Aprovar</Button>
                 )}
               </div>
             </CardContent>

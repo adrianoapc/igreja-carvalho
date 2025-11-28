@@ -101,28 +101,29 @@ export default function Kids() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Kids</h1>
-          <p className="text-muted-foreground mt-1">Gerenciamento de crianças e salas</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Kids</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Gerenciamento de crianças e salas</p>
         </div>
         <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2 w-full sm:w-auto">
               <Plus className="w-4 h-4" />
-              Cadastrar Criança
+              <span className="hidden sm:inline">Cadastrar Criança</span>
+              <span className="sm:hidden">Cadastrar</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
             <DialogHeader>
               <DialogTitle>Cadastrar Nova Criança</DialogTitle>
               <DialogDescription>
                 Preencha os dados da criança para cadastro no Kids
               </DialogDescription>
             </DialogHeader>
-            <form className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form className="space-y-4 p-4 md:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="nome">Nome Completo *</Label>
                   <Input id="nome" placeholder="Nome da criança" />
@@ -149,7 +150,7 @@ export default function Kids() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="responsavel">Nome do Responsável *</Label>
                   <Input id="responsavel" placeholder="Nome completo" />

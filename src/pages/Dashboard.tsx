@@ -50,29 +50,29 @@ const activeBanners = [
 
 export default function Dashboard() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-6 lg:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Visão geral da igreja</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">Visão geral da igreja</p>
       </div>
 
       <BannerDisplay banners={activeBanners} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <Card key={stat.title} className="shadow-soft hover:shadow-medium transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <Icon className="w-5 h-5 text-primary-foreground" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gradient-primary flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4 md:w-5 md:h-5 text-primary-foreground" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+              <CardContent className="p-4 md:p-6 pt-0">
+                <div className="text-2xl md:text-3xl font-bold text-foreground">{stat.value}</div>
                 <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
               </CardContent>
             </Card>
@@ -80,24 +80,24 @@ export default function Dashboard() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 lg:gap-6">
         <Card className="shadow-soft">
-          <CardHeader>
-            <CardTitle>Próximos Cultos</CardTitle>
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-lg md:text-xl">Próximos Cultos</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 md:space-y-4 p-4 md:p-6 pt-0">
             {[
               { day: "Domingo", date: "26 Nov", time: "10:00", type: "Culto de Celebração" },
               { day: "Quarta", date: "29 Nov", time: "19:30", type: "Culto de Oração" },
               { day: "Domingo", date: "3 Dez", time: "10:00", type: "Culto de Celebração" },
             ].map((culto, index) => (
-              <div key={index} className="flex items-center justify-between p-4 rounded-lg bg-secondary">
+              <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-4 rounded-lg bg-secondary gap-2 sm:gap-0">
                 <div>
-                  <p className="font-medium text-foreground">{culto.type}</p>
-                  <p className="text-sm text-muted-foreground">{culto.day}, {culto.date}</p>
+                  <p className="font-medium text-sm md:text-base text-foreground">{culto.type}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">{culto.day}, {culto.date}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-primary">{culto.time}</p>
+                <div className="text-left sm:text-right">
+                  <p className="text-xs md:text-sm font-medium text-primary">{culto.time}</p>
                 </div>
               </div>
             ))}
@@ -105,22 +105,22 @@ export default function Dashboard() {
         </Card>
 
         <Card className="shadow-soft">
-          <CardHeader>
-            <CardTitle>Pedidos Recentes</CardTitle>
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-lg md:text-xl">Pedidos Recentes</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 md:space-y-4 p-4 md:p-6 pt-0">
             {[
               { name: "Maria Silva", request: "Oração pela saúde da família", time: "Há 2 horas" },
               { name: "João Santos", request: "Agradecimento pela nova oportunidade", time: "Há 5 horas" },
               { name: "Ana Paula", request: "Oração pelos estudos", time: "Há 1 dia" },
             ].map((pedido, index) => (
-              <div key={index} className="flex items-start gap-3 p-4 rounded-lg bg-secondary">
-                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-medium">
+              <div key={index} className="flex items-start gap-2 md:gap-3 p-3 md:p-4 rounded-lg bg-secondary">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-medium text-sm md:text-base flex-shrink-0">
                   {pedido.name.charAt(0)}
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">{pedido.name}</p>
-                  <p className="text-sm text-muted-foreground">{pedido.request}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm md:text-base text-foreground truncate">{pedido.name}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">{pedido.request}</p>
                   <p className="text-xs text-muted-foreground mt-1">{pedido.time}</p>
                 </div>
               </div>
