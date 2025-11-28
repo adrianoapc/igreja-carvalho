@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Users, UserPlus, UserCheck, TrendingUp, PhoneCall, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboard";
 
 export default function Pessoas() {
   const navigate = useNavigate();
@@ -178,6 +179,9 @@ export default function Pessoas() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Aniversários Dashboard */}
+      <AniversariosDashboard />
 
       {/* Recent Activity */}
       <Card>
