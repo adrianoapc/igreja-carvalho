@@ -20,6 +20,8 @@ interface Visitante {
   telefone: string | null;
   email: string | null;
   data_primeira_visita: string | null;
+  data_ultima_visita: string | null;
+  numero_visitas: number;
   aceitou_jesus: boolean | null;
   deseja_contato: boolean | null;
   recebeu_brinde: boolean | null;
@@ -166,7 +168,13 @@ export default function Visitantes() {
                       {visitante.data_primeira_visita && (
                         <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground">
                           <Calendar className="w-3 h-3 flex-shrink-0" />
-                          {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                          1ª visita: {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                        </span>
+                      )}
+                      {visitante.data_ultima_visita && visitante.data_ultima_visita !== visitante.data_primeira_visita && (
+                        <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground">
+                          <Calendar className="w-3 h-3 flex-shrink-0" />
+                          Última: {format(new Date(visitante.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}
                         </span>
                       )}
                     </div>
@@ -174,6 +182,9 @@ export default function Visitantes() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="text-xs bg-primary/10">
+                    {visitante.numero_visitas} {visitante.numero_visitas === 1 ? 'visita' : 'visitas'}
+                  </Badge>
                   {visitante.aceitou_jesus && (
                     <Badge variant="outline" className="text-xs">
                       <Check className="w-3 h-3 mr-1" />
