@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -9,8 +9,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const menuItems = [
   { icon: Home, label: "Dashboard", path: "/" },
@@ -24,10 +32,14 @@ const pessoasItems = [
   { icon: PhoneCall, label: "Contatos Agendados", path: "/contatos" },
 ];
 
+const intercessaoItems = [
+  { icon: MessageCircle, label: "Pedidos de Oração", path: "/intercessao/pedidos" },
+  { icon: Users, label: "Intercessores", path: "/intercessao/intercessores" },
+  { icon: Heart, label: "Testemunhos", path: "/intercessao/testemunhos" },
+];
+
 const modulosItems = [
   { icon: Baby, label: "Kids", path: "/kids" },
-  { icon: MessageCircle, label: "Pedidos de Oração", path: "/oracoes" },
-  { icon: Heart, label: "Testemunhos", path: "/testemunhos" },
   { icon: Calendar, label: "Cultos", path: "/cultos" },
   { icon: DollarSign, label: "Finanças", path: "/financas" },
   { icon: BookOpen, label: "Ensinamentos", path: "/ensinamentos" },
@@ -101,6 +113,51 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Intercessão</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Intercessão">
+                      <HandHeart className="w-5 h-5" />
+                      {!isCollapsed && (
+                        <>
+                          <span>Intercessão</span>
+                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {intercessaoItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink
+                                to={item.path}
+                                end
+                                className="hover:bg-sidebar-accent"
+                                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                              >
+                                <Icon className="w-4 h-4" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
