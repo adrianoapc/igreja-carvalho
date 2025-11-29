@@ -37,6 +37,7 @@ const intercessaoItems = [
   { icon: MessageCircle, label: "Pedidos de Oração", path: "/intercessao/pedidos" },
   { icon: Users, label: "Intercessores", path: "/intercessao/intercessores" },
   { icon: Heart, label: "Testemunhos", path: "/intercessao/testemunhos" },
+  { icon: Heart, label: "Sentimentos", path: "/intercessao/sentimentos" },
 ];
 
 const modulosItems = [

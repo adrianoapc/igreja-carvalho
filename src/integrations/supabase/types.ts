@@ -444,6 +444,44 @@ export type Database = {
         }
         Relationships: []
       }
+      sentimentos_membros: {
+        Row: {
+          created_at: string
+          data_registro: string
+          id: string
+          mensagem: string | null
+          pessoa_id: string
+          sentimento: Database["public"]["Enums"]["sentimento_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          mensagem?: string | null
+          pessoa_id: string
+          sentimento: Database["public"]["Enums"]["sentimento_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          mensagem?: string | null
+          pessoa_id?: string
+          sentimento?: Database["public"]["Enums"]["sentimento_tipo"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sentimentos_membros_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       testemunhos: {
         Row: {
           anonimo: boolean | null
@@ -649,6 +687,16 @@ export type Database = {
         | "financeiro"
         | "ministerial"
         | "outro"
+      sentimento_tipo:
+        | "feliz"
+        | "cuidadoso"
+        | "abencoado"
+        | "grato"
+        | "angustiado"
+        | "sozinho"
+        | "triste"
+        | "doente"
+        | "com_pouca_fe"
       status_pedido: "pendente" | "em_oracao" | "respondido" | "arquivado"
       status_testemunho: "aberto" | "publico" | "arquivado"
       tipo_pedido:
@@ -811,6 +859,17 @@ export const Constants = {
         "financeiro",
         "ministerial",
         "outro",
+      ],
+      sentimento_tipo: [
+        "feliz",
+        "cuidadoso",
+        "abencoado",
+        "grato",
+        "angustiado",
+        "sozinho",
+        "triste",
+        "doente",
+        "com_pouca_fe",
       ],
       status_pedido: ["pendente", "em_oracao", "respondido", "arquivado"],
       status_testemunho: ["aberto", "publico", "arquivado"],

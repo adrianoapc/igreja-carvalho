@@ -18,6 +18,7 @@ import Intercessao from "./pages/Intercessao";
 import PedidosOracao from "./pages/intercessao/PedidosOracao";
 import Intercessores from "./pages/intercessao/Intercessores";
 import TestemunhosIntercessao from "./pages/intercessao/Testemunhos";
+import Sentimentos from "./pages/intercessao/Sentimentos";
 import Cultos from "./pages/Cultos";
 import Financas from "./pages/Financas";
 import Ensinamentos from "./pages/Ensinamentos";
@@ -200,6 +201,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <TestemunhosIntercessao />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/intercessao/sentimentos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Sentimentos />
                 </MainLayout>
               </ProtectedRoute>
             }
