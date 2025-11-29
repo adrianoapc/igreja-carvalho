@@ -56,6 +56,160 @@ export type Database = {
         }
         Relationships: []
       }
+      bases_ministeriais: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          responsavel_id: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          responsavel_id?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          responsavel_id?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bases_ministeriais_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categorias_financeiras: {
+        Row: {
+          ativo: boolean
+          cor: string | null
+          created_at: string
+          id: string
+          nome: string
+          secao_dre: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          secao_dre?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          secao_dre?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      centros_custo: {
+        Row: {
+          ativo: boolean
+          base_ministerial_id: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          base_ministerial_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          base_ministerial_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "centros_custo_base_ministerial_id_fkey"
+            columns: ["base_ministerial_id"]
+            isOneToOne: false
+            referencedRelation: "bases_ministeriais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contas: {
+        Row: {
+          agencia: string | null
+          ativo: boolean
+          banco: string | null
+          conta_numero: string | null
+          created_at: string
+          id: string
+          nome: string
+          observacoes: string | null
+          saldo_atual: number
+          saldo_inicial: number
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          conta_numero?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          saldo_atual?: number
+          saldo_inicial?: number
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          conta_numero?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          saldo_atual?: number
+          saldo_inicial?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       edge_function_config: {
         Row: {
           created_at: string | null
@@ -92,6 +246,57 @@ export type Database = {
           schedule_cron?: string
           schedule_description?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      fornecedores: {
+        Row: {
+          ativo: boolean
+          cep: string | null
+          cidade: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string | null
+          tipo_pessoa: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone?: string | null
+          tipo_pessoa: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string | null
+          tipo_pessoa?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -521,6 +726,41 @@ export type Database = {
           },
         ]
       }
+      subcategorias_financeiras: {
+        Row: {
+          ativo: boolean
+          categoria_id: string
+          created_at: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_id: string
+          created_at?: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategorias_financeiras_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       testemunhos: {
         Row: {
           anonimo: boolean | null
@@ -586,6 +826,140 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transacoes_financeiras: {
+        Row: {
+          anexo_url: string | null
+          base_ministerial_id: string | null
+          categoria_id: string | null
+          centro_custo_id: string | null
+          conta_id: string
+          created_at: string
+          data_competencia: string | null
+          data_fim_recorrencia: string | null
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao: string
+          forma_pagamento: string | null
+          fornecedor_id: string | null
+          id: string
+          lancado_por: string | null
+          numero_parcela: number | null
+          observacoes: string | null
+          recorrencia: string | null
+          status: string
+          subcategoria_id: string | null
+          tipo: string
+          tipo_lancamento: string
+          total_parcelas: number | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          anexo_url?: string | null
+          base_ministerial_id?: string | null
+          categoria_id?: string | null
+          centro_custo_id?: string | null
+          conta_id: string
+          created_at?: string
+          data_competencia?: string | null
+          data_fim_recorrencia?: string | null
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao: string
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          lancado_por?: string | null
+          numero_parcela?: number | null
+          observacoes?: string | null
+          recorrencia?: string | null
+          status?: string
+          subcategoria_id?: string | null
+          tipo: string
+          tipo_lancamento: string
+          total_parcelas?: number | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          anexo_url?: string | null
+          base_ministerial_id?: string | null
+          categoria_id?: string | null
+          centro_custo_id?: string | null
+          conta_id?: string
+          created_at?: string
+          data_competencia?: string | null
+          data_fim_recorrencia?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao?: string
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          lancado_por?: string | null
+          numero_parcela?: number | null
+          observacoes?: string | null
+          recorrencia?: string | null
+          status?: string
+          subcategoria_id?: string | null
+          tipo?: string
+          tipo_lancamento?: string
+          total_parcelas?: number | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transacoes_financeiras_base_ministerial_id_fkey"
+            columns: ["base_ministerial_id"]
+            isOneToOne: false
+            referencedRelation: "bases_ministeriais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_centro_custo_id_fkey"
+            columns: ["centro_custo_id"]
+            isOneToOne: false
+            referencedRelation: "centros_custo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_lancado_por_fkey"
+            columns: ["lancado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias_financeiras"
             referencedColumns: ["id"]
           },
         ]
