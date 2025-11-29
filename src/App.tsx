@@ -21,6 +21,7 @@ import TestemunhosIntercessao from "./pages/intercessao/Testemunhos";
 import Sentimentos from "./pages/intercessao/Sentimentos";
 import Cultos from "./pages/Cultos";
 import Financas from "./pages/Financas";
+import FinancasDashboard from "./pages/financas/Dashboard";
 import Entradas from "./pages/financas/Entradas";
 import Saidas from "./pages/financas/Saidas";
 import Contas from "./pages/financas/Contas";
@@ -238,6 +239,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Financas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/dashboard"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <FinancasDashboard />
                 </MainLayout>
               </ProtectedRoute>
             }

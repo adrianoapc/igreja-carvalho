@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, UserCog, ArrowRight, Plus } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, UserCog, ArrowRight, Plus, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -194,11 +194,20 @@ export default function Financas() {
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Finanças</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Gestão completa do módulo financeiro
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Finanças</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Gestão completa do módulo financeiro
+          </p>
+        </div>
+        <Button
+          onClick={() => navigate("/financas/dashboard")}
+          className="flex items-center gap-2"
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span className="hidden sm:inline">Dashboard</span>
+        </Button>
       </div>
 
       {/* Card de Total em Caixa */}

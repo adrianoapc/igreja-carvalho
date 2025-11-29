@@ -42,6 +42,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const [recorrencia, setRecorrencia] = useState<"diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral">("mensal");
   const [dataFimRecorrencia, setDataFimRecorrencia] = useState<Date | undefined>();
   const [observacoes, setObservacoes] = useState("");
+  const [anexoFile, setAnexoFile] = useState<File | null>(null);
+  const [anexoUrl, setAnexoUrl] = useState<string>("");
 
   // Preencher formulário quando estiver editando
   useEffect(() => {
@@ -59,6 +61,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setFormaPagamento(transacao.forma_pagamento || "");
       setObservacoes(transacao.observacoes || "");
       setTipoLancamento(transacao.tipo_lancamento || "unico");
+      setAnexoUrl(transacao.anexo_url || "");
       if (transacao.total_parcelas) setTotalParcelas(String(transacao.total_parcelas));
       if (transacao.recorrencia) setRecorrencia(transacao.recorrencia);
       if (transacao.data_fim_recorrencia) setDataFimRecorrencia(new Date(transacao.data_fim_recorrencia));
@@ -85,6 +88,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setDataFimRecorrencia(undefined);
     setObservacoes("");
     setTipoLancamento("unico");
+    setAnexoFile(null);
+    setAnexoUrl("");
   };
 
   const { data: contas } = useQuery({
@@ -183,6 +188,27 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const valorNumerico = parseFloat(valor.replace(',', '.')) || 0;
       const { data: userData } = await supabase.auth.getUser();
 
+      // Fazer upload do anexo se houver
+      let anexoPath = anexoUrl;
+      if (anexoFile) {
+        const fileExt = anexoFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${tipo}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('transacoes-anexos')
+          .upload(filePath, anexoFile);
+
+        if (uploadError) throw uploadError;
+
+        // Obter URL pública
+        const { data: urlData } = supabase.storage
+          .from('transacoes-anexos')
+          .getPublicUrl(filePath);
+
+        anexoPath = urlData.publicUrl;
+      }
+
       const transacaoData = {
         tipo,
         tipo_lancamento: tipoLancamento,
@@ -204,6 +230,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           ? format(dataFimRecorrencia, 'yyyy-MM-dd') 
           : null,
         observacoes: observacoes || null,
+        anexo_url: anexoPath || null,
         lancado_por: userData.user?.id,
       };
 
@@ -542,6 +569,39 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="anexo">Anexo (Nota Fiscal / Comprovante)</Label>
+              <div className="space-y-2">
+                <Input
+                  id="anexo"
+                  type="file"
+                  accept="image/*,application/pdf,.doc,.docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setAnexoFile(file);
+                  }}
+                  className="cursor-pointer"
+                />
+                {anexoUrl && !anexoFile && (
+                  <div className="text-xs text-muted-foreground">
+                    <a 
+                      href={anexoUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Ver anexo atual
+                    </a>
+                  </div>
+                )}
+                {anexoFile && (
+                  <p className="text-xs text-muted-foreground">
+                    Novo arquivo selecionado: {anexoFile.name}
+                  </p>
                 )}
               </div>
             </div>
