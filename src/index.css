@@ -53,15 +53,22 @@ All colors MUST be HSL.
     --shadow-soft: 0 2px 8px -2px hsl(217 91% 35% / 0.1);
     --shadow-medium: 0 4px 16px -4px hsl(217 91% 35% / 0.15);
 
-    --sidebar-background: 217 91% 35%;
-    --sidebar-foreground: 0 0% 9%;
-    --sidebar-primary: 161 93% 30%;
+    --sidebar-background: 0, 100%, 99%; /* #fffefe */
+    --sidebar-foreground: 113, 28%, 22%; /* #2c4828 */
+    --sidebar-primary: 128, 52%, 47%; /* #39b54b */
+    --sidebar-accent: 62, 55%, 88%; /* #eff0cf */
+
+    //--sidebar-background: 113°, 28%, 22%;
+    //--sidebar-foreground: 0 0% 9%;
+    //--sidebar-primary: 161 93% 30%;
     --sidebar-primary-foreground: 151 80% 95%;
-    --sidebar-accent: 0 0% 32%;
+    //--sidebar-accent: 0 0% 32%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 83%;
     --sidebar-ring: 161 93% 30%;
-    --font-sans: 'Work Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    --font-sans:
+      "Work Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, "Noto Sans", sans-serif;
 
     --chart-1: 158 64% 51%;
     --chart-2: 141 69% 58%;
@@ -69,8 +76,9 @@ All colors MUST be HSL.
     --chart-4: 82 77% 55%;
     --chart-5: 0 0% 45%;
     --sidebar: 0 0% 98%;
-    --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-    --font-mono: 'Inconsolata', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    --font-serif: "Lora", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    --font-mono:
+      "Inconsolata", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
@@ -127,7 +135,9 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 178 84% 10%;
     --sidebar-border: 0 0% 32%;
     --sidebar-ring: 158 64% 51%;
-    --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+    --font-sans:
+      "Open Sans", ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol,
+      Noto Color Emoji;
 
     --chart-1: 156 71% 66%;
     --chart-2: 141 76% 73%;
