@@ -144,7 +144,7 @@ export default function Entradas() {
   };
 
   const totalEntradas = transacoesFiltradas?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalPago = transacoesFiltradas?.filter(t => t.status === 'pago').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalRecebido = transacoesFiltradas?.filter(t => t.status === 'pago').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const totalPendente = transacoesFiltradas?.filter(t => t.status === 'pendente').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
   const getStatusColor = (status: string) => {
@@ -273,7 +273,7 @@ export default function Entradas() {
             )}
             {statusFilter !== 'all' && (
               <Badge variant="secondary" className="gap-1.5 pr-1">
-                Status: {statusFilter === 'pendente' ? 'Pendente' : statusFilter === 'pago' ? 'Pago' : 'Atrasado'}
+                Status: {statusFilter === 'pendente' ? 'Pendente' : statusFilter === 'pago' ? 'Recebido' : 'Atrasado'}
                 <button 
                   onClick={() => setStatusFilter('all')} 
                   className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
@@ -309,7 +309,7 @@ export default function Entradas() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Recebido</p>
-                <p className="text-lg font-bold">{formatCurrency(totalPago)}</p>
+                <p className="text-lg font-bold">{formatCurrency(totalRecebido)}</p>
               </div>
             </div>
           </CardContent>
@@ -366,7 +366,7 @@ export default function Entradas() {
                             <Calendar className="w-3 h-3" />
                             <span>Venc: {format(new Date(transacao.data_vencimento), 'dd/MM/yyyy', { locale: ptBR })}</span>
                             {transacao.data_pagamento && (
-                              <span> • Pago: {format(new Date(transacao.data_pagamento), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                              <span> • Recebido: {format(new Date(transacao.data_pagamento), 'dd/MM/yyyy', { locale: ptBR })}</span>
                             )}
                           </div>
                           {transacao.anexo_url && (
@@ -389,7 +389,7 @@ export default function Entradas() {
                         <div className="text-right flex-shrink-0">
                           <p className="text-lg font-bold text-green-600">{formatCurrency(Number(transacao.valor))}</p>
                           <Badge className={`text-xs mt-1 ${getStatusColor(transacao.status)}`}>
-                            {transacao.status === 'pago' ? 'Pago' : transacao.status === 'pendente' ? 'Pendente' : 'Atrasado'}
+                            {transacao.status === 'pago' ? 'Recebido' : transacao.status === 'pendente' ? 'Pendente' : 'Atrasado'}
                           </Badge>
                         </div>
                         <TransacaoActionsMenu
