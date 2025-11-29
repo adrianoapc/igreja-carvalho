@@ -414,7 +414,7 @@ export default function Saidas() {
                         <div className="text-right flex-shrink-0">
                           <p className="text-lg font-bold text-red-600">{formatCurrency(Number(transacao.valor))}</p>
                           <Badge className={`text-xs mt-1 ${getStatusColor(transacao.status)}`}>
-                            {transacao.status}
+                            {transacao.status === 'pago' ? 'Pago' : transacao.status === 'pendente' ? 'Pendente' : 'Atrasado'}
                           </Badge>
                         </div>
                         <TransacaoActionsMenu
