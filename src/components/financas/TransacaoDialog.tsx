@@ -32,11 +32,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const [dataVencimento, setDataVencimento] = useState<Date>(new Date());
   const [dataCompetencia, setDataCompetencia] = useState<Date>(new Date());
   const [contaId, setContaId] = useState("");
-  const [categoriaId, setCategoriaId] = useState("");
-  const [subcategoriaId, setSubcategoriaId] = useState("");
-  const [centroCustoId, setCentroCustoId] = useState("");
-  const [baseMinisterialId, setBaseMinisterialId] = useState("");
-  const [fornecedorId, setFornecedorId] = useState("");
+  const [categoriaId, setCategoriaId] = useState("none");
+  const [subcategoriaId, setSubcategoriaId] = useState("none");
+  const [centroCustoId, setCentroCustoId] = useState("none");
+  const [baseMinisterialId, setBaseMinisterialId] = useState("none");
+  const [fornecedorId, setFornecedorId] = useState("none");
   const [formaPagamento, setFormaPagamento] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("1");
   const [recorrencia, setRecorrencia] = useState<"diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral">("mensal");
@@ -53,11 +53,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setDataVencimento(transacao.data_vencimento ? new Date(transacao.data_vencimento) : new Date());
       setDataCompetencia(transacao.data_competencia ? new Date(transacao.data_competencia) : new Date());
       setContaId(transacao.conta_id || "");
-      setCategoriaId(transacao.categoria_id || "");
-      setSubcategoriaId(transacao.subcategoria_id || "");
-      setCentroCustoId(transacao.centro_custo_id || "");
-      setBaseMinisterialId(transacao.base_ministerial_id || "");
-      setFornecedorId(transacao.fornecedor_id || "");
+      setCategoriaId(transacao.categoria_id || "none");
+      setSubcategoriaId(transacao.subcategoria_id || "none");
+      setCentroCustoId(transacao.centro_custo_id || "none");
+      setBaseMinisterialId(transacao.base_ministerial_id || "none");
+      setFornecedorId(transacao.fornecedor_id || "none");
       setFormaPagamento(transacao.forma_pagamento || "");
       setObservacoes(transacao.observacoes || "");
       setTipoLancamento(transacao.tipo_lancamento || "unico");
@@ -77,11 +77,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setDataVencimento(new Date());
     setDataCompetencia(new Date());
     setContaId("");
-    setCategoriaId("");
-    setSubcategoriaId("");
-    setCentroCustoId("");
-    setBaseMinisterialId("");
-    setFornecedorId("");
+    setCategoriaId("none");
+    setSubcategoriaId("none");
+    setCentroCustoId("none");
+    setBaseMinisterialId("none");
+    setFornecedorId("none");
     setFormaPagamento("");
     setTotalParcelas("1");
     setRecorrencia("mensal");
@@ -217,11 +217,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         data_vencimento: format(dataVencimento, 'yyyy-MM-dd'),
         data_competencia: format(dataCompetencia, 'yyyy-MM-dd'),
         conta_id: contaId,
-        categoria_id: categoriaId || null,
-        subcategoria_id: subcategoriaId || null,
-        centro_custo_id: centroCustoId || null,
-        base_ministerial_id: baseMinisterialId || null,
-        fornecedor_id: fornecedorId || null,
+        categoria_id: categoriaId && categoriaId !== 'none' ? categoriaId : null,
+        subcategoria_id: subcategoriaId && subcategoriaId !== 'none' ? subcategoriaId : null,
+        centro_custo_id: centroCustoId && centroCustoId !== 'none' ? centroCustoId : null,
+        base_ministerial_id: baseMinisterialId && baseMinisterialId !== 'none' ? baseMinisterialId : null,
+        fornecedor_id: fornecedorId && fornecedorId !== 'none' ? fornecedorId : null,
         forma_pagamento: formaPagamento || null,
         total_parcelas: tipoLancamento === 'parcelado' ? parseInt(totalParcelas) : null,
         numero_parcela: tipoLancamento === 'parcelado' ? 1 : null,
@@ -345,7 +345,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                       <SelectValue placeholder="Selecione a conta" />
                     </SelectTrigger>
                     <SelectContent>
-                      {contas?.map((conta) => (
+                      {contas?.filter(conta => conta.id && conta.id !== '').map((conta) => (
                         <SelectItem key={conta.id} value={conta.id}>
                           {conta.nome}
                         </SelectItem>
@@ -481,14 +481,14 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   <Label htmlFor="categoria">Categoria</Label>
                   <Select value={categoriaId} onValueChange={(value) => {
                     setCategoriaId(value);
-                    setSubcategoriaId(""); // Reset subcategoria
+                    setSubcategoriaId("none"); // Reset subcategoria
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
-                      {categorias?.map((cat) => (
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {categorias?.filter(cat => cat.id && cat.id !== '').map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {cat.nome}
                         </SelectItem>
@@ -502,14 +502,14 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   <Select 
                     value={subcategoriaId} 
                     onValueChange={setSubcategoriaId}
-                    disabled={!categoriaId}
+                    disabled={!categoriaId || categoriaId === 'none'}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma subcategoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
-                      {subcategorias?.map((sub) => (
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {subcategorias?.filter(sub => sub.id && sub.id !== '').map((sub) => (
                         <SelectItem key={sub.id} value={sub.id}>
                           {sub.nome}
                         </SelectItem>
@@ -525,8 +525,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                       <SelectValue placeholder="Selecione uma base" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
-                      {bases?.map((base) => (
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {bases?.filter(base => base.id && base.id !== '').map((base) => (
                         <SelectItem key={base.id} value={base.id}>
                           {base.titulo}
                         </SelectItem>
@@ -542,8 +542,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                       <SelectValue placeholder="Selecione um centro" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
-                      {centros?.map((centro) => (
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {centros?.filter(centro => centro.id && centro.id !== '').map((centro) => (
                         <SelectItem key={centro.id} value={centro.id}>
                           {centro.nome}
                         </SelectItem>
@@ -560,8 +560,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                         <SelectValue placeholder="Selecione um fornecedor" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Nenhum</SelectItem>
-                        {fornecedores?.map((forn) => (
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {fornecedores?.filter(forn => forn.id && forn.id !== '').map((forn) => (
                           <SelectItem key={forn.id} value={forn.id}>
                             {forn.nome}
                           </SelectItem>
