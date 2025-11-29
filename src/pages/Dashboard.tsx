@@ -1,6 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Users, MessageCircle, Heart, Calendar } from "lucide-react";
 import { BannerDisplay } from "@/components/BannerDisplay";
+import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 
 const stats = [
   {
@@ -49,12 +53,39 @@ const activeBanners = [
 ];
 
 export default function Dashboard() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
+
+  useEffect(() => {
+    // Abrir dialog se vier de uma notificação
+    if (searchParams.get('sentimento') === 'true') {
+      setSentimentoDialogOpen(true);
+      // Limpar o parâmetro da URL
+      searchParams.delete('sentimento');
+      setSearchParams(searchParams);
+    }
+  }, [searchParams, setSearchParams]);
+
   return (
     <div className="space-y-4 md:space-y-6 lg:space-y-8">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">Visão geral da igreja</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Visão geral da igreja</p>
+        </div>
+        <Button 
+          onClick={() => setSentimentoDialogOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Heart className="w-4 h-4" />
+          <span className="hidden sm:inline">Como você está?</span>
+        </Button>
       </div>
+
+      <RegistrarSentimentoDialog 
+        open={sentimentoDialogOpen}
+        onOpenChange={setSentimentoDialogOpen}
+      />
 
       <BannerDisplay banners={activeBanners} />
 
