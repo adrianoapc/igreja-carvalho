@@ -7,11 +7,13 @@ import { useState } from "react";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 import { ImportarExcelDialog } from "@/components/financas/ImportarExcelDialog";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
+import { TransacaoFiltros } from "@/components/financas/TransacaoFiltros";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useMemo } from "react";
 
 export default function Saidas() {
   const navigate = useNavigate();
@@ -19,6 +21,13 @@ export default function Saidas() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<any>(null);
   const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano'>('mes');
+  
+  // Estados dos filtros
+  const [busca, setBusca] = useState("");
+  const [contaFilter, setContaFilter] = useState("all");
+  const [categoriaFilter, setCategoriaFilter] = useState("all");
+  const [fornecedorFilter, setFornecedorFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
@@ -44,12 +53,12 @@ export default function Saidas() {
         .from('transacoes_financeiras')
         .select(`
           *,
-          conta:conta_id(nome),
-          categoria:categoria_id(nome, cor),
+          conta:conta_id(nome, id),
+          categoria:categoria_id(nome, cor, id),
           subcategoria:subcategoria_id(nome),
           base_ministerial:base_ministerial_id(titulo),
           centro_custo:centro_custo_id(nome),
-          fornecedor:fornecedor_id(nome)
+          fornecedor:fornecedor_id(nome, id)
         `)
         .eq('tipo', 'saida')
         .gte('data_vencimento', dateRange.inicio.toISOString().split('T')[0])
@@ -61,6 +70,81 @@ export default function Saidas() {
     },
   });
 
+  // Buscar contas, categorias e fornecedores para os filtros
+  const { data: contas } = useQuery({
+    queryKey: ['contas-filtro'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contas')
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: categorias } = useQuery({
+    queryKey: ['categorias-filtro-saida'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categorias_financeiras')
+        .select('id, nome')
+        .eq('ativo', true)
+        .eq('tipo', 'saida')
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: fornecedores } = useQuery({
+    queryKey: ['fornecedores-filtro'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fornecedores')
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Aplicar filtros
+  const transacoesFiltradas = useMemo(() => {
+    if (!transacoes) return [];
+    
+    return transacoes.filter(t => {
+      // Filtro de busca por descrição
+      if (busca && !t.descricao.toLowerCase().includes(busca.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro de conta
+      if (contaFilter !== "all" && t.conta_id !== contaFilter) {
+        return false;
+      }
+      
+      // Filtro de categoria
+      if (categoriaFilter !== "all" && t.categoria_id !== categoriaFilter) {
+        return false;
+      }
+      
+      // Filtro de fornecedor
+      if (fornecedorFilter !== "all" && t.fornecedor_id !== fornecedorFilter) {
+        return false;
+      }
+      
+      // Filtro de status
+      if (statusFilter !== "all" && t.status !== statusFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [transacoes, busca, contaFilter, categoriaFilter, fornecedorFilter, statusFilter]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -68,9 +152,9 @@ export default function Saidas() {
     }).format(value);
   };
 
-  const totalSaidas = transacoes?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalPago = transacoes?.filter(t => t.status === 'pago').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalPendente = transacoes?.filter(t => t.status === 'pendente').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalSaidas = transacoesFiltradas?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalPago = transacoesFiltradas?.filter(t => t.status === 'pago').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalPendente = transacoesFiltradas?.filter(t => t.status === 'pendente').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -137,6 +221,30 @@ export default function Saidas() {
         </CardContent>
       </Card>
 
+      {/* Filtros Avançados */}
+      <TransacaoFiltros
+        busca={busca}
+        setBusca={setBusca}
+        contaId={contaFilter}
+        setContaId={setContaFilter}
+        categoriaId={categoriaFilter}
+        setCategoriaId={setCategoriaFilter}
+        fornecedorId={fornecedorFilter}
+        setFornecedorId={setFornecedorFilter}
+        status={statusFilter}
+        setStatus={setStatusFilter}
+        contas={contas || []}
+        categorias={categorias || []}
+        fornecedores={fornecedores || []}
+        onLimpar={() => {
+          setBusca("");
+          setContaFilter("all");
+          setCategoriaFilter("all");
+          setFornecedorFilter("all");
+          setStatusFilter("all");
+        }}
+      />
+
       {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         <Card className="shadow-soft">
@@ -188,9 +296,9 @@ export default function Saidas() {
         <CardContent className="p-4 md:p-6 pt-0">
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
-          ) : transacoes && transacoes.length > 0 ? (
+          ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
             <div className="space-y-3">
-              {transacoes.map((transacao) => (
+              {transacoesFiltradas.map((transacao) => (
                 <Card key={transacao.id} className="border">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
