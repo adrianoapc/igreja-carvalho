@@ -2,11 +2,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Heart, Info } from "lucide-react";
+import { ArrowLeft, Heart, Info, TrendingUp, TrendingDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
+import { format, subDays, startOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 type SentimentoTipo = 'feliz' | 'cuidadoso' | 'abencoado' | 'grato' | 'angustiado' | 'sozinho' | 'triste' | 'doente' | 'com_pouca_fe';
 
@@ -29,6 +32,12 @@ const sentimentosConfig: Record<SentimentoTipo, SentimentoConfig> = {
   com_pouca_fe: { emoji: '😰', label: 'Com pouca fé', color: 'text-gray-600', type: 'negative' }
 };
 
+interface TrendData {
+  data: string;
+  positivos: number;
+  negativos: number;
+}
+
 export default function Sentimentos() {
   const navigate = useNavigate();
   const [periodo, setPeriodo] = useState("7");
@@ -43,6 +52,8 @@ export default function Sentimentos() {
     doente: 0,
     com_pouca_fe: 0
   });
+  const [trendData, setTrendData] = useState<TrendData[]>([]);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
   useEffect(() => {
     fetchStats();
@@ -56,8 +67,9 @@ export default function Sentimentos() {
 
       const { data, error } = await supabase
         .from('sentimentos_membros')
-        .select('sentimento')
-        .gte('data_registro', dataInicio.toISOString());
+        .select('sentimento, data_registro')
+        .gte('data_registro', dataInicio.toISOString())
+        .order('data_registro', { ascending: true });
 
       if (error) throw error;
 
@@ -78,10 +90,51 @@ export default function Sentimentos() {
         doente: counts.doente || 0,
         com_pouca_fe: counts.com_pouca_fe || 0
       });
+
+      setTotalRegistros(data?.length || 0);
+
+      // Preparar dados de tendência
+      const trend: Record<string, { positivos: number; negativos: number }> = {};
+      
+      data?.forEach(item => {
+        const dia = format(new Date(item.data_registro), 'dd/MM', { locale: ptBR });
+        if (!trend[dia]) {
+          trend[dia] = { positivos: 0, negativos: 0 };
+        }
+        
+        const config = sentimentosConfig[item.sentimento as SentimentoTipo];
+        if (config.type === 'positive') {
+          trend[dia].positivos++;
+        } else {
+          trend[dia].negativos++;
+        }
+      });
+
+      const trendArray: TrendData[] = Object.entries(trend).map(([data, values]) => ({
+        data,
+        ...values
+      }));
+
+      setTrendData(trendArray);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
     }
   };
+
+  const totalPositivos = stats.feliz + stats.cuidadoso + stats.abencoado + stats.grato;
+  const totalNegativos = stats.angustiado + stats.sozinho + stats.triste + stats.doente + stats.com_pouca_fe;
+  const percentualPositivo = totalRegistros > 0 ? ((totalPositivos / totalRegistros) * 100).toFixed(1) : "0";
+
+  const pieData = [
+    { name: 'Positivos', value: totalPositivos, color: 'hsl(var(--chart-1))' },
+    { name: 'Negativos', value: totalNegativos, color: 'hsl(var(--chart-2))' }
+  ];
+
+  const barData = Object.entries(sentimentosConfig).map(([key, config]) => ({
+    name: config.label,
+    value: stats[key as SentimentoTipo],
+    fill: config.type === 'positive' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-2))'
+  }));
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
@@ -96,67 +149,189 @@ export default function Sentimentos() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Sentimentos</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard de Bem-Estar</h1>
             <p className="text-sm md:text-base text-muted-foreground">
-              Como os membros estão se sentindo
+              Métricas e análise de sentimentos da igreja
             </p>
           </div>
         </div>
       </div>
 
+      {/* Métricas Gerais */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+        <Card>
+          <CardHeader className="p-4 md:p-6 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total de Registros</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="text-2xl md:text-3xl font-bold text-foreground">{totalRegistros}</div>
+            <p className="text-xs text-muted-foreground mt-1">Últimos {periodo} dias</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="p-4 md:p-6 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sentimentos Positivos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+              <div className="text-2xl md:text-3xl font-bold text-green-600">{totalPositivos}</div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{percentualPositivo}% do total</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="p-4 md:p-6 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sentimentos Negativos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-5 h-5 text-red-600" />
+              <div className="text-2xl md:text-3xl font-bold text-red-600">{totalNegativos}</div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{(100 - parseFloat(percentualPositivo)).toFixed(1)}% do total</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+        {/* Gráfico de Tendência */}
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle className="text-base md:text-lg">Tendência ao Longo do Tempo</CardTitle>
+              <Select value={periodo} onValueChange={setPeriodo}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 dias</SelectItem>
+                  <SelectItem value="15">15 dias</SelectItem>
+                  <SelectItem value="30">30 dias</SelectItem>
+                  <SelectItem value="90">90 dias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="data" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <RechartsTooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="positivos" 
+                  stroke="hsl(var(--chart-1))" 
+                  strokeWidth={2}
+                  name="Positivos"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="negativos" 
+                  stroke="hsl(var(--chart-2))" 
+                  strokeWidth={2}
+                  name="Negativos"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Pizza - Distribuição */}
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-base md:text-lg">Distribuição Geral</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detalhamento por Sentimento */}
       <Card>
         <CardHeader className="p-4 md:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Heart className="w-5 h-5 text-primary" />
-              <CardTitle className="text-base md:text-lg">Sentimentos</CardTitle>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-xs">
-                      Os membros podem registrar diariamente como estão se sentindo.
-                      Sentimentos negativos direcionam para pedidos de oração.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Select value={periodo} onValueChange={setPeriodo}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">7 dias</SelectItem>
-                <SelectItem value="15">15 dias</SelectItem>
-                <SelectItem value="30">30 dias</SelectItem>
-                <SelectItem value="90">90 dias</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-2">
+            <Heart className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base md:text-lg">Detalhamento por Sentimento</CardTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs text-xs">
+                    Os membros podem registrar diariamente como estão se sentindo.
+                    Sentimentos negativos direcionam para pedidos de oração.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
-          <div className="space-y-3">
-            {(Object.entries(sentimentosConfig) as [SentimentoTipo, SentimentoConfig][]).map(([key, config]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{config.emoji}</span>
-                  <span className="font-medium text-sm md:text-base">{config.label}</span>
-                </div>
-                <Badge
-                  variant={config.type === 'positive' ? 'default' : 'destructive'}
-                  className={`${config.color} text-base md:text-lg font-semibold`}
-                >
-                  {stats[key]}
-                </Badge>
-              </div>
-            ))}
-          </div>
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={barData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis 
+                dataKey="name" 
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                angle={-45}
+                textAnchor="end"
+                height={100}
+              />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <RechartsTooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+              />
+              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
 
