@@ -8,9 +8,8 @@ import { Plus, Clock, User, Search, ArrowLeft, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
-
-const NovoPedidoDialog = React.lazy(() => import("@/components/pedidos/NovoPedidoDialog").then(m => ({ default: m.NovoPedidoDialog })));
-const PedidoDetailsDialog = React.lazy(() => import("@/components/pedidos/PedidoDetailsDialog").then(m => ({ default: m.PedidoDetailsDialog })));
+import { NovoPedidoDialog } from "@/components/pedidos/NovoPedidoDialog";
+import { PedidoDetailsDialog } from "@/components/pedidos/PedidoDetailsDialog";
 
 interface Pedido {
   id: string;
@@ -355,22 +354,20 @@ export default function PedidosOracao() {
         </TabsContent>
       </Tabs>
 
-      <React.Suspense fallback={null}>
-        <NovoPedidoDialog 
-          open={novoPedidoOpen}
-          onOpenChange={setNovoPedidoOpen}
-          onSuccess={fetchPedidos}
-        />
+      <NovoPedidoDialog 
+        open={novoPedidoOpen}
+        onOpenChange={setNovoPedidoOpen}
+        onSuccess={fetchPedidos}
+      />
 
-        {selectedPedido && (
-          <PedidoDetailsDialog
-            open={detailsOpen}
-            onOpenChange={setDetailsOpen}
-            pedido={selectedPedido}
-            onUpdate={fetchPedidos}
-          />
-        )}
-      </React.Suspense>
+      {selectedPedido && (
+        <PedidoDetailsDialog
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          pedido={selectedPedido}
+          onUpdate={fetchPedidos}
+        />
+      )}
     </div>
   );
 }
