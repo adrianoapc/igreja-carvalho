@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload, Paperclip } from "lucide-react";
+import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload, Paperclip, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
@@ -223,6 +223,67 @@ export default function Entradas() {
             </Button>
           </div>
         </div>
+
+        {/* Active Filters Display */}
+        {(periodo !== 'mes' || busca || contaFilter !== 'all' || categoriaFilter !== 'all' || statusFilter !== 'all') && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {periodo !== 'mes' && (
+              <Badge variant="secondary" className="gap-1.5 pr-1">
+                Período: {periodo === 'hoje' ? 'Hoje' : periodo === 'semana' ? 'Semana' : periodo === 'ano' ? 'Ano' : 'Customizado'}
+                <button 
+                  onClick={() => setPeriodo('mes')} 
+                  className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {busca && (
+              <Badge variant="secondary" className="gap-1.5 pr-1">
+                Busca: {busca}
+                <button 
+                  onClick={() => setBusca('')} 
+                  className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {contaFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1.5 pr-1">
+                Conta: {contas?.find(c => c.id === contaFilter)?.nome}
+                <button 
+                  onClick={() => setContaFilter('all')} 
+                  className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {categoriaFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1.5 pr-1">
+                Categoria: {categorias?.find(c => c.id === categoriaFilter)?.nome}
+                <button 
+                  onClick={() => setCategoriaFilter('all')} 
+                  className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {statusFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1.5 pr-1">
+                Status: {statusFilter === 'pendente' ? 'Pendente' : statusFilter === 'pago' ? 'Pago' : 'Atrasado'}
+                <button 
+                  onClick={() => setStatusFilter('all')} 
+                  className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Resumo */}
