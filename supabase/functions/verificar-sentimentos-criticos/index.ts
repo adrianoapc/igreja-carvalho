@@ -31,6 +31,30 @@ Deno.serve(async (req) => {
 
     console.log('Iniciando verificação de sentimentos críticos...');
 
+    // Verificar se a função está ativa
+    const { data: config, error: configError } = await supabase
+      .from('edge_function_config')
+      .select('enabled')
+      .eq('function_name', 'verificar-sentimentos-criticos')
+      .single();
+
+    if (configError) {
+      console.error('Erro ao buscar configuração:', configError);
+    }
+
+    if (config && !config.enabled) {
+      console.log('Função desativada, pulando execução');
+      await supabase.rpc('log_edge_function_execution', {
+        p_function_name: 'verificar-sentimentos-criticos',
+        p_status: 'skipped',
+        p_details: 'Função desativada'
+      });
+      return new Response(JSON.stringify({ message: 'Função desativada' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
     // Buscar todos os sentimentos dos últimos 7 dias
     const seteDiasAtras = new Date();
     seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
@@ -153,6 +177,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Registrar execução bem-sucedida
+    await supabase.rpc('log_edge_function_execution', {
+      p_function_name: 'verificar-sentimentos-criticos',
+      p_status: 'success',
+      p_details: `${pessoasEmRisco.length} pessoa(s) em risco detectada(s)`
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -167,6 +198,18 @@ Deno.serve(async (req) => {
     );
   } catch (error: any) {
     console.error('Erro na verificação de sentimentos críticos:', error);
+    
+    // Registrar erro
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    await supabase.rpc('log_edge_function_execution', {
+      p_function_name: 'verificar-sentimentos-criticos',
+      p_status: 'error',
+      p_details: error.message
+    });
+
     return new Response(
       JSON.stringify({ error: error.message }),
       {

@@ -56,6 +56,45 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_function_config: {
+        Row: {
+          created_at: string | null
+          enabled: boolean
+          execution_count: number | null
+          function_name: string
+          id: string
+          last_execution: string | null
+          last_execution_status: string | null
+          schedule_cron: string
+          schedule_description: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean
+          execution_count?: number | null
+          function_name: string
+          id?: string
+          last_execution?: string | null
+          last_execution_status?: string | null
+          schedule_cron: string
+          schedule_description: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean
+          execution_count?: number | null
+          function_name?: string
+          id?: string
+          last_execution?: string | null
+          last_execution_status?: string | null
+          schedule_cron?: string
+          schedule_description?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       funcoes_igreja: {
         Row: {
           ativo: boolean | null
@@ -653,6 +692,10 @@ export type Database = {
         Returns: boolean
       }
       is_member: { Args: { _user_id: string }; Returns: boolean }
+      log_edge_function_execution: {
+        Args: { p_details?: string; p_function_name: string; p_status: string }
+        Returns: undefined
+      }
       notify_admins: {
         Args: {
           p_message: string
