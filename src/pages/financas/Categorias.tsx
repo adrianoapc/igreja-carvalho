@@ -3,14 +3,34 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, ArrowLeft, ChevronRight, ChevronDown, Edit, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { CategoriaDialog } from "@/components/financas/CategoriaDialog";
+import { SubcategoriaDialog } from "@/components/financas/SubcategoriaDialog";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Categorias() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [categoriaDialogOpen, setCategoriaDialogOpen] = useState(false);
+  const [subcategoriaDialogOpen, setSubcategoriaDialogOpen] = useState(false);
+  const [selectedCategoria, setSelectedCategoria] = useState<any>(null);
+  const [selectedSubcategoria, setSelectedSubcategoria] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ type: 'categoria' | 'subcategoria', id: string } | null>(null);
 
   const { data: categorias, isLoading } = useQuery({
     queryKey: ['categorias-financeiras'],
@@ -35,6 +55,37 @@ export default function Categorias() {
         ? prev.filter(catId => catId !== id)
         : [...prev, id]
     );
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return;
+
+    try {
+      if (itemToDelete.type === 'categoria') {
+        const { error } = await supabase
+          .from('categorias_financeiras')
+          .update({ ativo: false })
+          .eq('id', itemToDelete.id);
+        
+        if (error) throw error;
+        toast.success("Categoria removida com sucesso!");
+      } else {
+        const { error } = await supabase
+          .from('subcategorias_financeiras')
+          .update({ ativo: false })
+          .eq('id', itemToDelete.id);
+        
+        if (error) throw error;
+        toast.success("Subcategoria removida com sucesso!");
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['categorias-financeiras'] });
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao remover item");
+    } finally {
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+    }
   };
 
   const categoriasEntrada = categorias?.filter(c => c.tipo === 'entrada') || [];
@@ -70,14 +121,42 @@ export default function Categorias() {
           
           <div className="flex gap-1 flex-shrink-0">
             {hasSubcategorias && (
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCategoria(categoria);
+                  setSelectedSubcategoria(null);
+                  setSubcategoriaDialogOpen(true);
+                }}
+              >
                 <Plus className="w-4 h-4" />
               </Button>
             )}
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedCategoria(categoria);
+                setCategoriaDialogOpen(true);
+              }}
+            >
               <Edit className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0 text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                setItemToDelete({ type: 'categoria', id: categoria.id });
+                setDeleteDialogOpen(true);
+              }}
+            >
               <Trash className="w-4 h-4" />
             </Button>
           </div>
@@ -95,10 +174,27 @@ export default function Categorias() {
                   <p className="text-xs text-muted-foreground">{categoria.secao_dre}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0"
+                    onClick={() => {
+                      setSelectedCategoria(categoria);
+                      setSelectedSubcategoria(sub);
+                      setSubcategoriaDialogOpen(true);
+                    }}
+                  >
                     <Edit className="w-3 h-3" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0 text-destructive"
+                    onClick={() => {
+                      setItemToDelete({ type: 'subcategoria', id: sub.id });
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
                     <Trash className="w-3 h-3" />
                   </Button>
                 </div>
@@ -127,7 +223,13 @@ export default function Categorias() {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Categorias</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Organize suas transações financeiras</p>
           </div>
-          <Button className="bg-gradient-primary shadow-soft">
+          <Button 
+            className="bg-gradient-primary shadow-soft"
+            onClick={() => {
+              setSelectedCategoria(null);
+              setCategoriaDialogOpen(true);
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Nova Categoria</span>
             <span className="sm:hidden">Nova</span>
@@ -177,6 +279,39 @@ export default function Categorias() {
           )}
         </TabsContent>
       </Tabs>
+
+      <CategoriaDialog
+        open={categoriaDialogOpen}
+        onOpenChange={setCategoriaDialogOpen}
+        categoria={selectedCategoria}
+      />
+
+      {selectedCategoria && (
+        <SubcategoriaDialog
+          open={subcategoriaDialogOpen}
+          onOpenChange={setSubcategoriaDialogOpen}
+          categoriaId={selectedCategoria.id}
+          categoriaNome={selectedCategoria.nome}
+          subcategoria={selectedSubcategoria}
+        />
+      )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar remoção</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este item? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

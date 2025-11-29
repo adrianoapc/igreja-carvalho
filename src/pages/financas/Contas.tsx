@@ -1,13 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet } from "lucide-react";
+import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { ContaDialog } from "@/components/financas/ContaDialog";
+import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
 
 export default function Contas() {
   const navigate = useNavigate();
+  const [contaDialogOpen, setContaDialogOpen] = useState(false);
+  const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
+  const [selectedConta, setSelectedConta] = useState<any>(null);
 
   const { data: contas, isLoading } = useQuery({
     queryKey: ['contas'],
@@ -65,7 +71,13 @@ export default function Contas() {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contas</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie contas bancárias e caixas</p>
           </div>
-          <Button className="bg-gradient-primary shadow-soft">
+          <Button 
+            className="bg-gradient-primary shadow-soft"
+            onClick={() => {
+              setSelectedConta(null);
+              setContaDialogOpen(true);
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Nova Conta</span>
             <span className="sm:hidden">Nova</span>
@@ -89,9 +101,33 @@ export default function Contas() {
                     {getTipoIcon(conta.tipo)}
                     <CardTitle className="text-base md:text-lg">{conta.nome}</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {getTipoLabel(conta.tipo)}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="secondary" className="text-xs">
+                      {getTipoLabel(conta.tipo)}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        setSelectedConta(conta);
+                        setAjusteSaldoDialogOpen(true);
+                      }}
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        setSelectedConta(conta);
+                        setContaDialogOpen(true);
+                      }}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
@@ -123,6 +159,20 @@ export default function Contas() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      <ContaDialog
+        open={contaDialogOpen}
+        onOpenChange={setContaDialogOpen}
+        conta={selectedConta}
+      />
+
+      {selectedConta && (
+        <AjusteSaldoDialog
+          open={ajusteSaldoDialogOpen}
+          onOpenChange={setAjusteSaldoDialogOpen}
+          conta={selectedConta}
+        />
       )}
     </div>
   );

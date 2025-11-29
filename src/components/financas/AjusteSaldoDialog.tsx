@@ -1,0 +1,159 @@
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface AjusteSaldoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  conta: any;
+}
+
+export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDialogProps) {
+  const [valor, setValor] = useState("");
+  const [tipoAjuste, setTipoAjuste] = useState<"entrada" | "saida">("entrada");
+  const [data, setData] = useState<Date>(new Date());
+  const [descricao, setDescricao] = useState("");
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const valorNumerico = parseFloat(valor.replace(',', '.')) || 0;
+      const novoSaldo = tipoAjuste === "entrada" 
+        ? conta.saldo_atual + valorNumerico
+        : conta.saldo_atual - valorNumerico;
+
+      const { error } = await supabase
+        .from('contas')
+        .update({
+          saldo_atual: novoSaldo,
+          observacoes: conta.observacoes 
+            ? `${conta.observacoes}\n\nAjuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
+            : `Ajuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
+        })
+        .eq('id', conta.id);
+
+      if (error) throw error;
+
+      toast.success("Saldo ajustado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['contas'] });
+      queryClient.invalidateQueries({ queryKey: ['contas-resumo'] });
+      onOpenChange(false);
+      
+      // Reset form
+      setValor("");
+      setTipoAjuste("entrada");
+      setData(new Date());
+      setDescricao("");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao ajustar saldo");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Ajuste de saldo - {conta?.nome}</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Um ajuste de saldo é necessário sempre que houver uma disparidade significativa entre o saldo contábil e o saldo real da conta.
+          </p>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="valor">Valor do ajuste *</Label>
+              <Input
+                id="valor"
+                type="number"
+                step="0.01"
+                value={valor}
+                onChange={(e) => setValor(e.target.value)}
+                placeholder="R$ 0,00"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="tipo">Tipo do ajuste *</Label>
+              <Select value={tipoAjuste} onValueChange={(value: any) => setTipoAjuste(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entrada">Entrada (+)</SelectItem>
+                  <SelectItem value="saida">Saída (-)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Data do ajuste *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !data && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {data ? format(data, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={data}
+                    onSelect={(date) => date && setData(date)}
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="descricao">Descrição (opcional)</Label>
+            <Textarea
+              id="descricao"
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="Digite aqui o motivo do ajuste"
+              rows={3}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading} className="bg-gradient-primary">
+              {loading ? "Ajustando..." : "Ajustar saldo"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
