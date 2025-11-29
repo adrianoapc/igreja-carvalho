@@ -3,24 +3,26 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, ArrowLeft, Calendar, TrendingDown, Building2, FileText, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 import { ImportarExcelDialog } from "@/components/financas/ImportarExcelDialog";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
-import { TransacaoFiltros } from "@/components/financas/TransacaoFiltros";
+import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useMemo } from "react";
 
 export default function Saidas() {
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<any>(null);
-  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano'>('mes');
+  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano' | 'customizado'>('mes');
+  
+  // Range de data customizado
+  const [dataInicio, setDataInicio] = useState<Date | undefined>();
+  const [dataFim, setDataFim] = useState<Date | undefined>();
   
   // Estados dos filtros
   const [busca, setBusca] = useState("");
@@ -32,6 +34,11 @@ export default function Saidas() {
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
     const now = new Date();
+    
+    if (periodo === 'customizado' && dataInicio && dataFim) {
+      return { inicio: startOfDay(dataInicio), fim: endOfDay(dataFim) };
+    }
+    
     switch (periodo) {
       case 'hoje':
         return { inicio: startOfDay(now), fim: endOfDay(now) };
@@ -41,14 +48,17 @@ export default function Saidas() {
         return { inicio: startOfMonth(now), fim: endOfMonth(now) };
       case 'ano':
         return { inicio: startOfYear(now), fim: endOfYear(now) };
+      default:
+        return { inicio: startOfMonth(now), fim: endOfMonth(now) };
     }
   };
 
   const dateRange = getDateRange();
 
-  const { data: transacoes, isLoading } = useQuery({
-    queryKey: ['saidas', periodo],
+  const { data: transacoes, isLoading, refetch } = useQuery({
+    queryKey: ['saidas', periodo, dataInicio, dataFim],
     queryFn: async () => {
+      const dateRange = getDateRange();
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select(`
@@ -187,13 +197,44 @@ export default function Saidas() {
             <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie os pagamentos da igreja</p>
           </div>
           <div className="flex gap-2">
+            <FiltrosSheet
+              periodo={periodo}
+              setPeriodo={setPeriodo}
+              dataInicio={dataInicio}
+              setDataInicio={setDataInicio}
+              dataFim={dataFim}
+              setDataFim={setDataFim}
+              busca={busca}
+              setBusca={setBusca}
+              contaId={contaFilter}
+              setContaId={setContaFilter}
+              categoriaId={categoriaFilter}
+              setCategoriaId={setCategoriaFilter}
+              fornecedorId={fornecedorFilter}
+              setFornecedorId={setFornecedorFilter}
+              status={statusFilter}
+              setStatus={setStatusFilter}
+              contas={contas || []}
+              categorias={categorias || []}
+              fornecedores={fornecedores || []}
+              onLimpar={() => {
+                setBusca("");
+                setContaFilter("all");
+                setCategoriaFilter("all");
+                setFornecedorFilter("all");
+                setStatusFilter("all");
+                setPeriodo("mes");
+                setDataInicio(undefined);
+                setDataFim(undefined);
+              }}
+              onAplicar={() => refetch()}
+            />
             <Button 
               variant="outline"
               onClick={() => setImportDialogOpen(true)}
             >
               <Upload className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Importar Excel</span>
-              <span className="sm:hidden">Importar</span>
+              <span className="hidden sm:inline">Importar</span>
             </Button>
             <Button 
               className="bg-gradient-primary shadow-soft"
@@ -206,44 +247,6 @@ export default function Saidas() {
           </div>
         </div>
       </div>
-
-      {/* Filtros de Período */}
-      <Card className="shadow-soft">
-        <CardContent className="p-4">
-          <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as any)}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="hoje">Hoje</TabsTrigger>
-              <TabsTrigger value="semana">Semana</TabsTrigger>
-              <TabsTrigger value="mes">Mês</TabsTrigger>
-              <TabsTrigger value="ano">Ano</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* Filtros Avançados */}
-      <TransacaoFiltros
-        busca={busca}
-        setBusca={setBusca}
-        contaId={contaFilter}
-        setContaId={setContaFilter}
-        categoriaId={categoriaFilter}
-        setCategoriaId={setCategoriaFilter}
-        fornecedorId={fornecedorFilter}
-        setFornecedorId={setFornecedorFilter}
-        status={statusFilter}
-        setStatus={setStatusFilter}
-        contas={contas || []}
-        categorias={categorias || []}
-        fornecedores={fornecedores || []}
-        onLimpar={() => {
-          setBusca("");
-          setContaFilter("all");
-          setCategoriaFilter("all");
-          setFornecedorFilter("all");
-          setStatusFilter("all");
-        }}
-      />
 
       {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
