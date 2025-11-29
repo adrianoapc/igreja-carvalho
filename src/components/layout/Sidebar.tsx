@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -40,10 +40,20 @@ const intercessaoItems = [
   { icon: Heart, label: "Sentimentos", path: "/intercessao/sentimentos" },
 ];
 
+const financasItems = [
+  { icon: DollarSign, label: "Geral", path: "/financas" },
+  { icon: TrendingUp, label: "Entradas", path: "/financas/entradas" },
+  { icon: TrendingDown, label: "Saídas", path: "/financas/saidas" },
+  { icon: Building2, label: "Contas", path: "/financas/contas" },
+  { icon: Target, label: "Bases Ministeriais", path: "/financas/bases-ministeriais" },
+  { icon: Target, label: "Centros de Custo", path: "/financas/centros-custo" },
+  { icon: FolderTree, label: "Categorias", path: "/financas/categorias" },
+  { icon: UserCog, label: "Fornecedores", path: "/financas/fornecedores" },
+];
+
 const modulosItems = [
   { icon: Baby, label: "Kids", path: "/kids" },
   { icon: Calendar, label: "Cultos", path: "/cultos" },
-  { icon: DollarSign, label: "Finanças", path: "/financas" },
   { icon: BookOpen, label: "Ensinamentos", path: "/ensinamentos" },
   { icon: Shield, label: "Administração", path: "/admin" },
 ];
@@ -158,6 +168,51 @@ export function AppSidebar() {
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {intercessaoItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink
+                                to={item.path}
+                                end
+                                className="hover:bg-sidebar-accent"
+                                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                              >
+                                <Icon className="w-4 h-4" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Finanças</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Finanças">
+                      <DollarSign className="w-5 h-5" />
+                      {!isCollapsed && (
+                        <>
+                          <span>Finanças</span>
+                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {financasItems.map((item) => {
                         const Icon = item.icon;
                         return (
                           <SidebarMenuSubItem key={item.path}>

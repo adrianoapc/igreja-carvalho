@@ -21,7 +21,6 @@ import TestemunhosIntercessao from "./pages/intercessao/Testemunhos";
 import Sentimentos from "./pages/intercessao/Sentimentos";
 import Cultos from "./pages/Cultos";
 import Financas from "./pages/Financas";
-import FinancasGeral from "./pages/financas";
 import Entradas from "./pages/financas/Entradas";
 import Saidas from "./pages/financas/Saidas";
 import Contas from "./pages/financas/Contas";
@@ -242,16 +241,77 @@ function App() {
                 </MainLayout>
               </ProtectedRoute>
             }
-          >
-            <Route index element={<FinancasGeral />} />
-            <Route path="entradas" element={<Entradas />} />
-            <Route path="saidas" element={<Saidas />} />
-            <Route path="contas" element={<Contas />} />
-            <Route path="bases-ministeriais" element={<BasesMinisteriais />} />
-            <Route path="centros-custo" element={<CentrosCusto />} />
-            <Route path="categorias" element={<Categorias />} />
-            <Route path="fornecedores" element={<Fornecedores />} />
-          </Route>
+          />
+          <Route
+            path="/financas/entradas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Entradas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/saidas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Saidas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/contas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Contas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/bases-ministeriais"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <BasesMinisteriais />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/centros-custo"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <CentrosCusto />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/categorias"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Categorias />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/fornecedores"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Fornecedores />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/ensinamentos"
             element={
