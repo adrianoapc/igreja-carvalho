@@ -24,7 +24,7 @@ export default function Pessoas() {
       icon: UserPlus,
       description: "Aguardando conversão",
       color: "bg-accent/10 text-accent-foreground",
-      action: () => navigate("/visitantes"),
+      action: () => navigate("/pessoas/visitantes"),
     },
     {
       title: "Frequentadores",
@@ -40,18 +40,16 @@ export default function Pessoas() {
       icon: Users,
       description: "Membros ativos",
       color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
-      action: () => navigate("/membros"),
+      action: () => navigate("/pessoas/membros"),
     },
   ]);
-  
+
   const [contatosCount, setContatosCount] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data: profiles, error } = await supabase
-          .from("profiles")
-          .select("status");
+        const { data: profiles, error } = await supabase.from("profiles").select("status");
 
         if (error) throw error;
 
@@ -66,17 +64,17 @@ export default function Pessoas() {
           { ...prev[2], value: frequentadores.toString() },
           { ...prev[3], value: membros.toString() },
         ]);
-        
+
         // Buscar contatos agendados
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
-        
+
         const { count } = await supabase
           .from("visitante_contatos")
           .select("*", { count: "exact", head: true })
           .gte("data_contato", hoje.toISOString())
           .in("status", ["agendado", "pendente"]);
-          
+
         setContatosCount(count || 0);
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
@@ -93,7 +91,7 @@ export default function Pessoas() {
       icon: UserPlus,
       path: "/pessoas/visitantes",
       count: stats[1].value,
-      label: "cadastrados"
+      label: "cadastrados",
     },
     {
       title: "Membros",
@@ -101,7 +99,7 @@ export default function Pessoas() {
       icon: Users,
       path: "/pessoas/membros",
       count: stats[3].value,
-      label: "ativos"
+      label: "ativos",
     },
     {
       title: "Contatos Agendados",
@@ -109,7 +107,7 @@ export default function Pessoas() {
       icon: PhoneCall,
       path: "/pessoas/contatos",
       count: contatosCount.toString(),
-      label: "agendados"
+      label: "agendados",
     },
     {
       title: "Frequentadores",
@@ -117,7 +115,7 @@ export default function Pessoas() {
       icon: UserCheck,
       path: "/pessoas/frequentadores",
       count: stats[2].value,
-      label: "ativos"
+      label: "ativos",
     },
   ];
 
@@ -125,9 +123,7 @@ export default function Pessoas() {
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-foreground">Pessoas</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Dashboard centralizado de gestão de pessoas
-        </p>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">Dashboard centralizado de gestão de pessoas</p>
       </div>
 
       {/* Stats Cards */}
@@ -137,9 +133,7 @@ export default function Pessoas() {
           return (
             <Card
               key={stat.title}
-              className={`cursor-pointer transition-all hover:shadow-md ${
-                stat.action ? "hover:scale-105" : ""
-              }`}
+              className={`cursor-pointer transition-all hover:shadow-md ${stat.action ? "hover:scale-105" : ""}`}
               onClick={stat.action}
             >
               <CardContent className="p-4 md:p-6">
@@ -147,9 +141,7 @@ export default function Pessoas() {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs md:text-sm text-muted-foreground truncate">{stat.title}</p>
                     <h3 className="text-xl md:text-2xl font-bold mt-1">{stat.value}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 truncate">
-                      {stat.description}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">{stat.description}</p>
                   </div>
                   <div className={`p-2 md:p-3 rounded-full ${stat.color} flex-shrink-0`}>
                     <Icon className="w-5 h-5 md:w-6 md:h-6" />
@@ -179,16 +171,14 @@ export default function Pessoas() {
                   <div className="p-2 md:p-3 rounded-full bg-primary/10 flex-shrink-0">
                     <Icon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                   </div>
-                   <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <h3 className="font-semibold text-sm md:text-base truncate">{action.title}</h3>
                       <Badge variant="secondary" className="text-xs w-fit">
                         {action.count} {action.label}
                       </Badge>
                     </div>
-                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">
-                      {action.description}
-                    </p>
+                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">{action.description}</p>
                   </div>
                   <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground flex-shrink-0" />
                 </div>
@@ -209,9 +199,7 @@ export default function Pessoas() {
         <CardContent className="p-3 md:p-6">
           <div className="text-center py-6 md:py-8 text-muted-foreground">
             <p className="text-sm md:text-base">Nenhuma atividade recente</p>
-            <p className="text-xs md:text-sm mt-1">
-              As últimas interações com pessoas aparecerão aqui
-            </p>
+            <p className="text-xs md:text-sm mt-1">As últimas interações com pessoas aparecerão aqui</p>
           </div>
         </CardContent>
       </Card>
