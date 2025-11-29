@@ -23,8 +23,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Search, UserCog, Shield, ArrowUpCircle, Trash2 } from "lucide-react";
+import { Search, UserCog, Shield, ArrowUpCircle, Trash2, Heart, Calendar as CalendarIcon, AlertTriangle, Settings } from "lucide-react";
 import { z } from "zod";
+import EdgeFunctionCard from "@/components/admin/EdgeFunctionCard";
 
 const updateUserSchema = z.object({
   status: z.enum(["visitante", "frequentador", "membro"]),
@@ -217,8 +218,8 @@ export default function Admin() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Administração de Usuários</h1>
-          <p className="text-muted-foreground mt-1">Gerencie usuários, status e permissões</p>
+          <h1 className="text-3xl font-bold text-foreground">Administração</h1>
+          <p className="text-muted-foreground mt-1">Gerencie usuários, permissões e configurações do sistema</p>
         </div>
         <Shield className="w-12 h-12 text-primary opacity-20" />
       </div>
@@ -227,6 +228,10 @@ export default function Admin() {
         <TabsList>
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="permissions">Permissões</TabsTrigger>
+          <TabsTrigger value="settings">
+            <Settings className="w-4 h-4 mr-2" />
+            Configurações
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
@@ -400,6 +405,63 @@ export default function Admin() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <Card className="shadow-soft">
+            <CardHeader>
+              <CardTitle>Automações e Edge Functions</CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Gerencie as funções automáticas do sistema, visualize status e execute manualmente quando necessário.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <EdgeFunctionCard
+                  title="Sentimentos Diários"
+                  description="Notificação diária perguntando aos membros como estão se sentindo"
+                  functionName="notificar-sentimentos-diario"
+                  schedule="Diariamente às 9h (horário de Brasília)"
+                  icon={<Heart className="w-5 h-5" />}
+                />
+                
+                <EdgeFunctionCard
+                  title="Alertas Críticos"
+                  description="Verifica membros com sentimentos negativos repetidos e notifica líderes"
+                  functionName="verificar-sentimentos-criticos"
+                  schedule="Diariamente às 8h (horário de Brasília)"
+                  icon={<AlertTriangle className="w-5 h-5" />}
+                />
+                
+                <EdgeFunctionCard
+                  title="Aniversários"
+                  description="Notifica sobre aniversários, casamentos e batismos do dia seguinte"
+                  functionName="notificar-aniversarios"
+                  schedule="Diariamente às 8h (horário de Brasília)"
+                  icon={<CalendarIcon className="w-5 h-5" />}
+                />
+              </div>
+
+              <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div>
+                    <h3 className="font-medium text-sm mb-2 flex items-center gap-2">
+                      <Settings className="w-4 h-4" />
+                      Informações Importantes
+                    </h3>
+                  </div>
+                </div>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>As funções são executadas automaticamente nos horários programados</li>
+                  <li>Você pode executar manualmente usando o botão "Executar Agora" em cada função</li>
+                  <li>Os horários seguem o fuso horário de Brasília (UTC-3)</li>
+                  <li>As execuções automáticas são gerenciadas pelo sistema de cron jobs do backend</li>
+                  <li>Logs detalhados e histórico completo estão disponíveis no backend</li>
+                  <li>Alterações nos horários de execução devem ser feitas diretamente no backend</li>
+                </ul>
               </div>
             </CardContent>
           </Card>
