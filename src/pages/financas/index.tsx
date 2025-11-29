@@ -2,9 +2,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function FinancasGeral() {
   const navigate = useNavigate();
+
+  const { data: contas } = useQuery({
+    queryKey: ['contas-resumo'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contas')
+        .select('saldo_atual')
+        .eq('ativo', true);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const totalEmCaixa = contas?.reduce((sum, conta) => sum + Number(conta.saldo_atual), 0) || 0;
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -46,7 +70,7 @@ export default function FinancasGeral() {
             </div>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
-            <div className="text-2xl md:text-3xl font-bold text-foreground">R$ 0,00</div>
+            <div className="text-2xl md:text-3xl font-bold text-foreground">{formatCurrency(totalEmCaixa)}</div>
             <p className="text-xs text-muted-foreground mt-1">Saldo atual</p>
           </CardContent>
         </Card>
