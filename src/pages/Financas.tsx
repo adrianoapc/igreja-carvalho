@@ -175,6 +175,14 @@ export default function Financas() {
       color: "bg-orange-100 dark:bg-orange-900/20",
       iconColor: "text-orange-600",
     },
+    {
+      title: "Formas de Pagamento",
+      description: "Métodos de pagamento disponíveis",
+      icon: DollarSign,
+      path: "/financas/formas-pagamento",
+      color: "bg-teal-100 dark:bg-teal-900/20",
+      iconColor: "text-teal-600",
+    },
   ];
 
   const quickActions = [

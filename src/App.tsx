@@ -29,6 +29,7 @@ import BasesMinisteriais from "./pages/financas/BasesMinisteriais";
 import CentrosCusto from "./pages/financas/CentrosCusto";
 import Categorias from "./pages/financas/Categorias";
 import Fornecedores from "./pages/financas/Fornecedores";
+import FormasPagamento from "./pages/financas/FormasPagamento";
 import Ensinamentos from "./pages/Ensinamentos";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
@@ -319,6 +320,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Fornecedores />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/formas-pagamento"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <FormasPagamento />
                 </MainLayout>
               </ProtectedRoute>
             }

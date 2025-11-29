@@ -249,6 +249,30 @@ export type Database = {
         }
         Relationships: []
       }
+      formas_pagamento: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fornecedores: {
         Row: {
           ativo: boolean
@@ -842,21 +866,26 @@ export type Database = {
           data_fim_recorrencia: string | null
           data_pagamento: string | null
           data_vencimento: string
+          desconto: number | null
           descricao: string
           forma_pagamento: string | null
           fornecedor_id: string | null
           id: string
+          juros: number | null
           lancado_por: string | null
+          multas: number | null
           numero_parcela: number | null
           observacoes: string | null
           recorrencia: string | null
           status: string
           subcategoria_id: string | null
+          taxas_administrativas: number | null
           tipo: string
           tipo_lancamento: string
           total_parcelas: number | null
           updated_at: string
           valor: number
+          valor_liquido: number | null
         }
         Insert: {
           anexo_url?: string | null
@@ -869,21 +898,26 @@ export type Database = {
           data_fim_recorrencia?: string | null
           data_pagamento?: string | null
           data_vencimento: string
+          desconto?: number | null
           descricao: string
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
+          juros?: number | null
           lancado_por?: string | null
+          multas?: number | null
           numero_parcela?: number | null
           observacoes?: string | null
           recorrencia?: string | null
           status?: string
           subcategoria_id?: string | null
+          taxas_administrativas?: number | null
           tipo: string
           tipo_lancamento: string
           total_parcelas?: number | null
           updated_at?: string
           valor: number
+          valor_liquido?: number | null
         }
         Update: {
           anexo_url?: string | null
@@ -896,21 +930,26 @@ export type Database = {
           data_fim_recorrencia?: string | null
           data_pagamento?: string | null
           data_vencimento?: string
+          desconto?: number | null
           descricao?: string
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
+          juros?: number | null
           lancado_por?: string | null
+          multas?: number | null
           numero_parcela?: number | null
           observacoes?: string | null
           recorrencia?: string | null
           status?: string
           subcategoria_id?: string | null
+          taxas_administrativas?: number | null
           tipo?: string
           tipo_lancamento?: string
           total_parcelas?: number | null
           updated_at?: string
           valor?: number
+          valor_liquido?: number | null
         }
         Relationships: [
           {
