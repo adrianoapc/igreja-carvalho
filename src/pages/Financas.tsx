@@ -22,6 +22,47 @@ export default function Financas() {
     },
   });
 
+  // Calcular entradas e saídas do mês atual
+  const { data: transacoesEntrada } = useQuery({
+    queryKey: ['entradas-mes-atual'],
+    queryFn: async () => {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      const { data, error } = await supabase
+        .from('transacoes_financeiras')
+        .select('valor')
+        .eq('tipo', 'entrada')
+        .eq('status', 'pago')
+        .gte('data_pagamento', firstDay.toISOString().split('T')[0])
+        .lte('data_pagamento', lastDay.toISOString().split('T')[0]);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: transacoesSaida } = useQuery({
+    queryKey: ['saidas-mes-atual'],
+    queryFn: async () => {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      const { data, error } = await supabase
+        .from('transacoes_financeiras')
+        .select('valor')
+        .eq('tipo', 'saida')
+        .eq('status', 'pago')
+        .gte('data_pagamento', firstDay.toISOString().split('T')[0])
+        .lte('data_pagamento', lastDay.toISOString().split('T')[0]);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: categorias } = useQuery({
     queryKey: ['categorias-count'],
     queryFn: async () => {
@@ -49,6 +90,8 @@ export default function Financas() {
   });
 
   const totalEmCaixa = contas?.reduce((sum, conta) => sum + Number(conta.saldo_atual), 0) || 0;
+  const totalEntradasMes = transacoesEntrada?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalSaidasMes = transacoesSaida?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -64,7 +107,7 @@ export default function Financas() {
       icon: TrendingUp,
       path: "/financas/entradas",
       stats: [
-        { label: "Este mês", value: "R$ 0,00", color: "text-green-600" },
+        { label: "Este mês", value: formatCurrency(totalEntradasMes), color: "text-green-600" },
       ],
       color: "bg-green-100 dark:bg-green-900/20",
       iconColor: "text-green-600",
@@ -75,7 +118,7 @@ export default function Financas() {
       icon: TrendingDown,
       path: "/financas/saidas",
       stats: [
-        { label: "Este mês", value: "R$ 0,00", color: "text-red-600" },
+        { label: "Este mês", value: formatCurrency(totalSaidasMes), color: "text-red-600" },
       ],
       color: "bg-red-100 dark:bg-red-900/20",
       iconColor: "text-red-600",
