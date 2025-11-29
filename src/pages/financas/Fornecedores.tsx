@@ -1,13 +1,31 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building, User } from "lucide-react";
+import { Plus, ArrowLeft, Building, User, Edit, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { FornecedorDialog } from "@/components/financas/FornecedorDialog";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Fornecedores() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedFornecedor, setSelectedFornecedor] = useState<any>(null);
+  const [fornecedorToDelete, setFornecedorToDelete] = useState<string | null>(null);
 
   const { data: fornecedores, isLoading } = useQuery({
     queryKey: ['fornecedores'],
@@ -22,6 +40,26 @@ export default function Fornecedores() {
       return data;
     },
   });
+
+  const handleDeleteConfirm = async () => {
+    if (!fornecedorToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('fornecedores')
+        .update({ ativo: false })
+        .eq('id', fornecedorToDelete);
+      
+      if (error) throw error;
+      toast.success("Fornecedor removido com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['fornecedores'] });
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao remover fornecedor");
+    } finally {
+      setDeleteDialogOpen(false);
+      setFornecedorToDelete(null);
+    }
+  };
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -40,7 +78,13 @@ export default function Fornecedores() {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Fornecedores</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Cadastro de fornecedores e beneficiários</p>
           </div>
-          <Button className="bg-gradient-primary shadow-soft">
+          <Button 
+            className="bg-gradient-primary shadow-soft"
+            onClick={() => {
+              setSelectedFornecedor(null);
+              setDialogOpen(true);
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Novo Fornecedor</span>
             <span className="sm:hidden">Novo</span>
@@ -72,9 +116,33 @@ export default function Fornecedores() {
                       <h3 className="text-base md:text-lg font-semibold text-foreground">
                         {fornecedor.nome}
                       </h3>
-                      <Badge variant="secondary" className="text-xs">
-                        {fornecedor.tipo_pessoa === 'juridica' ? 'PJ' : 'PF'}
-                      </Badge>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Badge variant="secondary" className="text-xs">
+                          {fornecedor.tipo_pessoa === 'juridica' ? 'PJ' : 'PF'}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => {
+                            setSelectedFornecedor(fornecedor);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive"
+                          onClick={() => {
+                            setFornecedorToDelete(fornecedor.id);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-1 text-sm text-muted-foreground">
                       {fornecedor.cpf_cnpj && (
@@ -98,6 +166,29 @@ export default function Fornecedores() {
           </CardContent>
         </Card>
       )}
+
+      <FornecedorDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        fornecedor={selectedFornecedor}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar remoção</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este fornecedor? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

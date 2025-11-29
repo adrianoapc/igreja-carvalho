@@ -2,9 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 
 export default function Entradas() {
   const navigate = useNavigate();
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -22,7 +25,10 @@ export default function Entradas() {
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Entradas</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie os recebimentos da igreja</p>
         </div>
-        <Button className="bg-gradient-primary shadow-soft w-full sm:w-auto">
+        <Button 
+          className="bg-gradient-primary shadow-soft w-full sm:w-auto"
+          onClick={() => setDialogOpen(true)}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Nova Entrada
         </Button>
@@ -38,6 +44,12 @@ export default function Entradas() {
           </p>
         </CardContent>
       </Card>
+
+      <TransacaoDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        tipo="entrada"
+      />
     </div>
   );
 }
