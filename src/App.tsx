@@ -21,6 +21,14 @@ import TestemunhosIntercessao from "./pages/intercessao/Testemunhos";
 import Sentimentos from "./pages/intercessao/Sentimentos";
 import Cultos from "./pages/Cultos";
 import Financas from "./pages/Financas";
+import FinancasGeral from "./pages/financas";
+import Entradas from "./pages/financas/Entradas";
+import Saidas from "./pages/financas/Saidas";
+import Contas from "./pages/financas/Contas";
+import BasesMinisteriais from "./pages/financas/BasesMinisteriais";
+import CentrosCusto from "./pages/financas/CentrosCusto";
+import Categorias from "./pages/financas/Categorias";
+import Fornecedores from "./pages/financas/Fornecedores";
 import Ensinamentos from "./pages/Ensinamentos";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
@@ -234,7 +242,16 @@ function App() {
                 </MainLayout>
               </ProtectedRoute>
             }
-          />
+          >
+            <Route index element={<FinancasGeral />} />
+            <Route path="entradas" element={<Entradas />} />
+            <Route path="saidas" element={<Saidas />} />
+            <Route path="contas" element={<Contas />} />
+            <Route path="bases-ministeriais" element={<BasesMinisteriais />} />
+            <Route path="centros-custo" element={<CentrosCusto />} />
+            <Route path="categorias" element={<Categorias />} />
+            <Route path="fornecedores" element={<Fornecedores />} />
+          </Route>
           <Route
             path="/ensinamentos"
             element={
