@@ -12,9 +12,22 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
 import { Trash2, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function NotificationsBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const navigate = useNavigate();
+
+  const handleNotificationClick = (notification: any) => {
+    if (!notification.read) {
+      markAsRead(notification.id);
+    }
+
+    // Se for notificação de sentimento diário, redirecionar para dashboard com o dialog
+    if (notification.type === 'sentimento_diario') {
+      navigate('/?sentimento=true');
+    }
+  };
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -24,6 +37,8 @@ export default function NotificationsBell() {
         return "⬆️";
       case "atribuicao_cargo":
         return "🎭";
+      case "sentimento_diario":
+        return "❤️";
       default:
         return "📢";
     }
@@ -74,7 +89,7 @@ export default function NotificationsBell() {
                   className={`p-3 md:p-4 hover:bg-secondary/50 transition-colors cursor-pointer ${
                     !notification.read ? "bg-primary/5" : ""
                   }`}
-                  onClick={() => !notification.read && markAsRead(notification.id)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start gap-2 md:gap-3">
                     <div className="text-xl md:text-2xl flex-shrink-0">{getNotificationIcon(notification.type)}</div>
