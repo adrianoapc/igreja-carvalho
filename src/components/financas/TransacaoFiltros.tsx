@@ -69,7 +69,7 @@ export function TransacaoFiltros({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as contas</SelectItem>
-              {contas?.map((conta) => (
+              {contas?.filter(conta => conta.id && conta.id !== '').map((conta) => (
                 <SelectItem key={conta.id} value={conta.id}>
                   {conta.nome}
                 </SelectItem>
@@ -86,7 +86,7 @@ export function TransacaoFiltros({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as categorias</SelectItem>
-              {categorias?.map((categoria) => (
+              {categorias?.filter(categoria => categoria.id && categoria.id !== '').map((categoria) => (
                 <SelectItem key={categoria.id} value={categoria.id}>
                   {categoria.nome}
                 </SelectItem>
@@ -104,7 +104,7 @@ export function TransacaoFiltros({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os fornecedores</SelectItem>
-                {fornecedores?.map((fornecedor) => (
+                {fornecedores?.filter(fornecedor => fornecedor.id && fornecedor.id !== '').map((fornecedor) => (
                   <SelectItem key={fornecedor.id} value={fornecedor.id}>
                     {fornecedor.nome}
                   </SelectItem>
