@@ -54,7 +54,7 @@ All colors MUST be HSL.
     --shadow-medium: 0 4px 16px -4px hsl(217 91% 35% / 0.15);
 
     --sidebar-background: 113, 28%, 22%; /* #fffefe */
-    --sidebar-foreground: 113, 28%, 22%; /* #2c4828 */
+    --sidebar-foreground: 0 0% 9%; /* #2c4828 */
     --sidebar-primary: 128, 52%, 47%; /* #39b54b */
     --sidebar-accent: 62, 55%, 88%; /* #eff0cf */
 
