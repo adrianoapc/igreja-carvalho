@@ -53,17 +53,17 @@ All colors MUST be HSL.
     --shadow-soft: 0 2px 8px -2px hsl(217 91% 35% / 0.1);
     --shadow-medium: 0 4px 16px -4px hsl(217 91% 35% / 0.15);
 
-    --sidebar-background: 113, 28%, 22%; /* #fffefe */
-    --sidebar-foreground: 0 0% 9%; /* #2c4828 */
-    --sidebar-primary: 128, 52%, 47%; /* #39b54b */
-    --sidebar-accent: 62, 55%, 88%; /* #eff0cf */
+    --sidebar-background: 113, 28%, 22%; /* fundo verde escuro #2c4828 */
+    --sidebar-foreground: 0 0% 98%; /* texto quase branco */
 
-    //--sidebar-background: 113°, 28%, 22%;
-    //--sidebar-foreground: 0 0% 9%;
-    //--sidebar-primary: 161 93% 30%;
-    --sidebar-primary-foreground: 151 80% 95%;
-    //--sidebar-accent: 0 0% 32%;
-    //--sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-primary: 128, 52%, 47%; /* item ativo #39b54b */
+    --sidebar-primary-foreground: 151, 80%, 95%; /* texto do item ativo */
+
+    --sidebar-accent: 62, 55%, 88%; /* hover background #eff0cf */
+
+    /* Para manter a leitura no hover: verde escuro (melhor contraste) */
+    --sidebar-accent-foreground: 113, 28%, 22%; /* texto no hover */
+
     --sidebar-accent-foreground: 113, 28%, 22%;
     --sidebar-border: 0 0% 83%;
     --sidebar-ring: 161 93% 30%;
