@@ -39,11 +39,13 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: Tran
     try {
       const updateData: any = { status: newStatus };
       
-      // Se marcar como pago, adicionar data de pagamento
-      if (newStatus === "pago") {
-        updateData.data_pagamento = new Date().toISOString().split('T')[0];
-      } else if (newStatus === "pendente") {
+      // Se marcar como pendente, remover todos os dados de pagamento/recebimento
+      if (newStatus === "pendente") {
         updateData.data_pagamento = null;
+        updateData.juros = 0;
+        updateData.multas = 0;
+        updateData.desconto = 0;
+        updateData.taxas_administrativas = 0;
       }
 
       const { error } = await supabase
@@ -53,7 +55,7 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: Tran
 
       if (error) throw error;
 
-      toast.success(`Status atualizado para ${newStatus}`);
+      toast.success(`Status atualizado para ${newStatus === 'pendente' ? 'Pendente' : 'Pago'}`);
       queryClient.invalidateQueries({ queryKey: ['entradas'] });
       queryClient.invalidateQueries({ queryKey: ['saidas'] });
     } catch (error) {
