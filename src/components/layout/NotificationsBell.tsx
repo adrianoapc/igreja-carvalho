@@ -39,6 +39,8 @@ export default function NotificationsBell() {
         return "🎭";
       case "sentimento_diario":
         return "❤️";
+      case "alerta_sentimento_critico":
+        return "⚠️";
       default:
         return "📢";
     }
