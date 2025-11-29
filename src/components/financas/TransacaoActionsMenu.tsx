@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
+import { ConfirmarPagamentoDialog } from "./ConfirmarPagamentoDialog";
 
 interface TransacaoActionsMenuProps {
   transacaoId: string;
@@ -32,6 +33,7 @@ interface TransacaoActionsMenuProps {
 export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: TransacaoActionsMenuProps) {
   const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showConfirmarPagamentoDialog, setShowConfirmarPagamentoDialog] = useState(false);
 
   const handleStatusChange = async (newStatus: string) => {
     try {
@@ -93,7 +95,7 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: Tran
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {status !== "pago" && (
-            <DropdownMenuItem onClick={() => handleStatusChange("pago")}>
+            <DropdownMenuItem onClick={() => setShowConfirmarPagamentoDialog(true)}>
               <CheckCircle2 className="mr-2 h-4 w-4" />
               Marcar como Pago
             </DropdownMenuItem>
@@ -129,6 +131,13 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: Tran
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ConfirmarPagamentoDialog
+        open={showConfirmarPagamentoDialog}
+        onOpenChange={setShowConfirmarPagamentoDialog}
+        transacaoId={transacaoId}
+        tipo={tipo}
+      />
     </>
   );
 }
