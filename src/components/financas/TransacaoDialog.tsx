@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -44,6 +45,14 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const [observacoes, setObservacoes] = useState("");
   const [anexoFile, setAnexoFile] = useState<File | null>(null);
   const [anexoUrl, setAnexoUrl] = useState<string>("");
+  
+  // Novos campos de confirmação de pagamento/recebimento
+  const [foiPago, setFoiPago] = useState(false);
+  const [dataPagamento, setDataPagamento] = useState<Date | undefined>();
+  const [juros, setJuros] = useState("");
+  const [multas, setMultas] = useState("");
+  const [desconto, setDesconto] = useState("");
+  const [taxasAdministrativas, setTaxasAdministrativas] = useState("");
 
   // Preencher formulário quando estiver editando
   useEffect(() => {
@@ -62,6 +71,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setObservacoes(transacao.observacoes || "");
       setTipoLancamento(transacao.tipo_lancamento || "unico");
       setAnexoUrl(transacao.anexo_url || "");
+      setFoiPago(transacao.status === 'pago');
+      setDataPagamento(transacao.data_pagamento ? new Date(transacao.data_pagamento) : undefined);
+      setJuros(transacao.juros ? String(transacao.juros) : "");
+      setMultas(transacao.multas ? String(transacao.multas) : "");
+      setDesconto(transacao.desconto ? String(transacao.desconto) : "");
+      setTaxasAdministrativas(transacao.taxas_administrativas ? String(transacao.taxas_administrativas) : "");
       if (transacao.total_parcelas) setTotalParcelas(String(transacao.total_parcelas));
       if (transacao.recorrencia) setRecorrencia(transacao.recorrencia);
       if (transacao.data_fim_recorrencia) setDataFimRecorrencia(new Date(transacao.data_fim_recorrencia));
@@ -90,6 +105,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setTipoLancamento("unico");
     setAnexoFile(null);
     setAnexoUrl("");
+    setFoiPago(false);
+    setDataPagamento(undefined);
+    setJuros("");
+    setMultas("");
+    setDesconto("");
+    setTaxasAdministrativas("");
   };
 
   const { data: contas } = useQuery({
@@ -180,6 +201,20 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     },
   });
 
+  const { data: formasPagamento } = useQuery({
+    queryKey: ['formas-pagamento-select'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('formas_pagamento')
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('nome');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -216,13 +251,14 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         valor: valorNumerico,
         data_vencimento: format(dataVencimento, 'yyyy-MM-dd'),
         data_competencia: format(dataCompetencia, 'yyyy-MM-dd'),
+        data_pagamento: foiPago && dataPagamento ? format(dataPagamento, 'yyyy-MM-dd') : null,
         conta_id: contaId,
         categoria_id: categoriaId && categoriaId !== 'none' ? categoriaId : null,
         subcategoria_id: subcategoriaId && subcategoriaId !== 'none' ? subcategoriaId : null,
         centro_custo_id: centroCustoId && centroCustoId !== 'none' ? centroCustoId : null,
         base_ministerial_id: baseMinisterialId && baseMinisterialId !== 'none' ? baseMinisterialId : null,
         fornecedor_id: fornecedorId && fornecedorId !== 'none' ? fornecedorId : null,
-        forma_pagamento: formaPagamento || null,
+        forma_pagamento: formaPagamento && formaPagamento !== 'none' ? formaPagamento : null,
         total_parcelas: tipoLancamento === 'parcelado' ? parseInt(totalParcelas) : null,
         numero_parcela: tipoLancamento === 'parcelado' ? 1 : null,
         recorrencia: tipoLancamento === 'recorrente' ? recorrencia : null,
@@ -232,6 +268,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         observacoes: observacoes || null,
         anexo_url: anexoPath || null,
         lancado_por: userData.user?.id,
+        status: foiPago ? 'pago' : 'pendente',
+        juros: foiPago && juros ? parseFloat(juros.replace(',', '.')) : 0,
+        multas: foiPago && multas ? parseFloat(multas.replace(',', '.')) : 0,
+        desconto: foiPago && desconto ? parseFloat(desconto.replace(',', '.')) : 0,
+        taxas_administrativas: foiPago && taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(',', '.')) : 0,
       };
 
       let error;
@@ -246,7 +287,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         // Criar nova transação
         const result = await supabase
           .from('transacoes_financeiras')
-          .insert({ ...transacaoData, status: 'pendente' });
+          .insert(transacaoData);
         error = result.error;
       }
 
@@ -330,12 +371,19 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
                 <div>
                   <Label htmlFor="forma-pagamento">Forma de {tipo === 'entrada' ? 'recebimento' : 'pagamento'}</Label>
-                  <Input
-                    id="forma-pagamento"
-                    value={formaPagamento}
-                    onChange={(e) => setFormaPagamento(e.target.value)}
-                    placeholder="Ex: Dinheiro, PIX, Cartão"
-                  />
+                  <Select value={formaPagamento} onValueChange={setFormaPagamento}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a forma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Não especificado</SelectItem>
+                      {formasPagamento?.filter(forma => forma.id && forma.id !== '').map((forma) => (
+                        <SelectItem key={forma.id} value={forma.nome}>
+                          {forma.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -571,6 +619,101 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Seção de Confirmação de Pagamento/Recebimento */}
+            <div className="p-4 border border-primary/20 rounded-lg bg-primary/5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="foi-pago" className="text-base font-semibold">
+                    Esse lançamento já foi {tipo === 'entrada' ? 'recebido' : 'pago'}?
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ative para confirmar o {tipo === 'entrada' ? 'recebimento' : 'pagamento'} e registrar detalhes
+                  </p>
+                </div>
+                <Switch
+                  id="foi-pago"
+                  checked={foiPago}
+                  onCheckedChange={setFoiPago}
+                />
+              </div>
+
+              {foiPago && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div>
+                    <Label>Data do {tipo === 'entrada' ? 'recebimento' : 'pagamento'} *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dataPagamento && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dataPagamento ? format(dataPagamento, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={dataPagamento}
+                          onSelect={setDataPagamento}
+                          locale={ptBR}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <Label htmlFor="juros">Juros</Label>
+                      <Input
+                        id="juros"
+                        type="text"
+                        value={juros}
+                        onChange={(e) => setJuros(e.target.value)}
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="multas">Multas</Label>
+                      <Input
+                        id="multas"
+                        type="text"
+                        value={multas}
+                        onChange={(e) => setMultas(e.target.value)}
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="desconto">Desconto</Label>
+                      <Input
+                        id="desconto"
+                        type="text"
+                        value={desconto}
+                        onChange={(e) => setDesconto(e.target.value)}
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="taxas">Taxas administrativas</Label>
+                      <Input
+                        id="taxas"
+                        type="text"
+                        value={taxasAdministrativas}
+                        onChange={(e) => setTaxasAdministrativas(e.target.value)}
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
