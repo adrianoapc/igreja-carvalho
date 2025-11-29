@@ -85,6 +85,15 @@ export default function Intercessao() {
       color: "bg-accent/10",
       iconColor: "text-accent-foreground",
     },
+    {
+      title: "Sentimentos",
+      description: "Acompanhe como os membros estão se sentindo",
+      icon: Heart,
+      path: "/intercessao/sentimentos",
+      stats: [],
+      color: "bg-pink-100 dark:bg-pink-900/20",
+      iconColor: "text-pink-600",
+    },
   ];
 
   const quickActions = [
