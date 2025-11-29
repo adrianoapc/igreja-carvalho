@@ -28,6 +28,37 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Verificar se a função está ativa
+    const { data: config, error: configError } = await supabaseClient
+      .from('edge_function_config')
+      .select('enabled')
+      .eq('function_name', 'notificar-aniversarios')
+      .single();
+
+    if (configError) {
+      console.error('Erro ao buscar configuração:', configError);
+    }
+
+    if (config && !config.enabled) {
+      console.log('Função desativada, pulando execução');
+      await supabaseClient.rpc('log_edge_function_execution', {
+        p_function_name: 'notificar-aniversarios',
+        p_status: 'skipped',
+        p_details: 'Função desativada'
+      });
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Função desativada',
+          aniversarios_encontrados: 0 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
     // Buscar todas as pessoas com pelo menos uma data preenchida
     const { data: pessoas, error: fetchError } = await supabaseClient
       .from('profiles')
@@ -130,6 +161,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Registrar execução bem-sucedida
+    await supabaseClient.rpc('log_edge_function_execution', {
+      p_function_name: 'notificar-aniversarios',
+      p_status: 'success',
+      p_details: `${notificacoes.length} aniversário(s) encontrado(s)`
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -144,6 +182,23 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Erro na função:', error)
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+    
+    // Registrar erro
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      await supabaseClient.rpc('log_edge_function_execution', {
+        p_function_name: 'notificar-aniversarios',
+        p_status: 'error',
+        p_details: errorMessage
+      });
+    } catch (logError) {
+      console.error('Erro ao registrar log:', logError);
+    }
+
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {

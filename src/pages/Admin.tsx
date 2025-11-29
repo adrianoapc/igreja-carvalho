@@ -415,7 +415,7 @@ export default function Admin() {
             <CardHeader>
               <CardTitle>Automações e Edge Functions</CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
-                Gerencie as funções automáticas do sistema, visualize status e execute manualmente quando necessário.
+                Gerencie as funções automáticas: ative/desative, configure horários e execute manualmente.
               </p>
             </CardHeader>
             <CardContent>
@@ -424,7 +424,6 @@ export default function Admin() {
                   title="Sentimentos Diários"
                   description="Notificação diária perguntando aos membros como estão se sentindo"
                   functionName="notificar-sentimentos-diario"
-                  schedule="Diariamente às 9h (horário de Brasília)"
                   icon={<Heart className="w-5 h-5" />}
                 />
                 
@@ -432,7 +431,6 @@ export default function Admin() {
                   title="Alertas Críticos"
                   description="Verifica membros com sentimentos negativos repetidos e notifica líderes"
                   functionName="verificar-sentimentos-criticos"
-                  schedule="Diariamente às 8h (horário de Brasília)"
                   icon={<AlertTriangle className="w-5 h-5" />}
                 />
                 
@@ -440,7 +438,6 @@ export default function Admin() {
                   title="Aniversários"
                   description="Notifica sobre aniversários, casamentos e batismos do dia seguinte"
                   functionName="notificar-aniversarios"
-                  schedule="Diariamente às 8h (horário de Brasília)"
                   icon={<CalendarIcon className="w-5 h-5" />}
                 />
               </div>
@@ -450,17 +447,17 @@ export default function Admin() {
                   <div>
                     <h3 className="font-medium text-sm mb-2 flex items-center gap-2">
                       <Settings className="w-4 h-4" />
-                      Informações Importantes
+                      Como Usar
                     </h3>
                   </div>
                 </div>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>As funções são executadas automaticamente nos horários programados</li>
-                  <li>Você pode executar manualmente usando o botão "Executar Agora" em cada função</li>
-                  <li>Os horários seguem o fuso horário de Brasília (UTC-3)</li>
-                  <li>As execuções automáticas são gerenciadas pelo sistema de cron jobs do backend</li>
-                  <li>Logs detalhados e histórico completo estão disponíveis no backend</li>
-                  <li>Alterações nos horários de execução devem ser feitas diretamente no backend</li>
+                  <li><strong>Ativar/Desativar:</strong> Use o toggle para pausar temporariamente uma função sem deletá-la</li>
+                  <li><strong>Configurar Horário:</strong> Clique no ícone de engrenagem para alterar o horário de execução</li>
+                  <li><strong>Executar Manualmente:</strong> Use "Executar Agora" para testar ou forçar uma execução</li>
+                  <li><strong>Horários:</strong> Todos os horários são no fuso de Brasília (UTC-3)</li>
+                  <li><strong>Status:</strong> O badge mostra se a função está ativa ou desativada</li>
+                  <li><strong>Contador:</strong> Acompanhe quantas vezes cada função foi executada</li>
                 </ul>
               </div>
             </CardContent>
