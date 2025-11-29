@@ -72,7 +72,14 @@ export default {
   		},
   		boxShadow: {
   			soft: 'var(--shadow-soft)',
-  			medium: 'var(--shadow-medium)'
+  			medium: 'var(--shadow-medium)',
+  			'2xs': 'var(--shadow-2xs)',
+  			xs: 'var(--shadow-xs)',
+  			sm: 'var(--shadow-sm)',
+  			md: 'var(--shadow-md)',
+  			lg: 'var(--shadow-lg)',
+  			xl: 'var(--shadow-xl)',
+  			'2xl': 'var(--shadow-2xl)'
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -101,18 +108,22 @@ export default {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out'
   		},
-		fontFamily: {
-			sans: [
-				'Inter',
-				'ui-sans-serif',
-				'system-ui',
-				'sans-serif',
-				'Apple Color Emoji',
-				'Segoe UI Emoji',
-				'Segoe UI Symbol',
-				'Noto Color Emoji'
-			],
+  		fontFamily: {
+  			sans: [
+  				'Work Sans',
+  				'ui-sans-serif',
+  				'system-ui',
+  				'-apple-system',
+  				'BlinkMacSystemFont',
+  				'Segoe UI',
+  				'Roboto',
+  				'Helvetica Neue',
+  				'Arial',
+  				'Noto Sans',
+  				'sans-serif'
+  			],
   			serif: [
+  				'Lora',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
@@ -121,6 +132,7 @@ export default {
   				'serif'
   			],
   			mono: [
+  				'Inconsolata',
   				'ui-monospace',
   				'SFMono-Regular',
   				'Menlo',
