@@ -1,12 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload } from "lucide-react";
+import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload, Paperclip } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 import { ImportarExcelDialog } from "@/components/financas/ImportarExcelDialog";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
+import { TransacaoFiltros } from "@/components/financas/TransacaoFiltros";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +20,12 @@ export default function Entradas() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<any>(null);
   const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano'>('mes');
+  
+  // Estados dos filtros
+  const [busca, setBusca] = useState("");
+  const [contaFilter, setContaFilter] = useState("all");
+  const [categoriaFilter, setCategoriaFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
@@ -44,8 +51,8 @@ export default function Entradas() {
         .from('transacoes_financeiras')
         .select(`
           *,
-          conta:conta_id(nome),
-          categoria:categoria_id(nome, cor),
+          conta:conta_id(nome, id),
+          categoria:categoria_id(nome, cor, id),
           subcategoria:subcategoria_id(nome),
           base_ministerial:base_ministerial_id(titulo),
           centro_custo:centro_custo_id(nome),
@@ -61,6 +68,63 @@ export default function Entradas() {
     },
   });
 
+  // Buscar contas e categorias para os filtros
+  const { data: contas } = useQuery({
+    queryKey: ['contas-filtro'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contas')
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: categorias } = useQuery({
+    queryKey: ['categorias-filtro-entrada'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categorias_financeiras')
+        .select('id, nome')
+        .eq('ativo', true)
+        .eq('tipo', 'entrada')
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Aplicar filtros
+  const transacoesFiltradas = useMemo(() => {
+    if (!transacoes) return [];
+    
+    return transacoes.filter(t => {
+      // Filtro de busca por descrição
+      if (busca && !t.descricao.toLowerCase().includes(busca.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro de conta
+      if (contaFilter !== "all" && t.conta_id !== contaFilter) {
+        return false;
+      }
+      
+      // Filtro de categoria
+      if (categoriaFilter !== "all" && t.categoria_id !== categoriaFilter) {
+        return false;
+      }
+      
+      // Filtro de status
+      if (statusFilter !== "all" && t.status !== statusFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [transacoes, busca, contaFilter, categoriaFilter, statusFilter]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -68,9 +132,9 @@ export default function Entradas() {
     }).format(value);
   };
 
-  const totalEntradas = transacoes?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalPago = transacoes?.filter(t => t.status === 'pago').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalPendente = transacoes?.filter(t => t.status === 'pendente').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalEntradas = transacoesFiltradas?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalPago = transacoesFiltradas?.filter(t => t.status === 'pago').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalPendente = transacoesFiltradas?.filter(t => t.status === 'pendente').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -137,6 +201,26 @@ export default function Entradas() {
         </CardContent>
       </Card>
 
+      {/* Filtros Avançados */}
+      <TransacaoFiltros
+        busca={busca}
+        setBusca={setBusca}
+        contaId={contaFilter}
+        setContaId={setContaFilter}
+        categoriaId={categoriaFilter}
+        setCategoriaId={setCategoriaFilter}
+        status={statusFilter}
+        setStatus={setStatusFilter}
+        contas={contas || []}
+        categorias={categorias || []}
+        onLimpar={() => {
+          setBusca("");
+          setContaFilter("all");
+          setCategoriaFilter("all");
+          setStatusFilter("all");
+        }}
+      />
+
       {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         <Card className="shadow-soft">
@@ -188,9 +272,9 @@ export default function Entradas() {
         <CardContent className="p-4 md:p-6 pt-0">
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
-          ) : transacoes && transacoes.length > 0 ? (
+          ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
             <div className="space-y-3">
-              {transacoes.map((transacao) => (
+              {transacoesFiltradas.map((transacao) => (
                 <Card key={transacao.id} className="border">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -220,6 +304,20 @@ export default function Entradas() {
                               <span> • Pago: {format(new Date(transacao.data_pagamento), 'dd/MM/yyyy', { locale: ptBR })}</span>
                             )}
                           </div>
+                          {transacao.anexo_url && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Paperclip className="w-3 h-3" />
+                              <a 
+                                href={transacao.anexo_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Ver anexo
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
