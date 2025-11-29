@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText } from "lucide-react";
+import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
+import { ImportarExcelDialog } from "@/components/financas/ImportarExcelDialog";
+import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +16,8 @@ import { ptBR } from "date-fns/locale";
 export default function Entradas() {
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [editingTransacao, setEditingTransacao] = useState<any>(null);
   const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano'>('mes');
 
   // Calcular datas de início e fim baseado no período selecionado
@@ -98,14 +102,24 @@ export default function Entradas() {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Entradas</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie os recebimentos da igreja</p>
           </div>
-          <Button 
-            className="bg-gradient-primary shadow-soft"
-            onClick={() => setDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Nova Entrada</span>
-            <span className="sm:hidden">Nova</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setImportDialogOpen(true)}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Importar Excel</span>
+              <span className="sm:hidden">Importar</span>
+            </Button>
+            <Button 
+              className="bg-gradient-primary shadow-soft"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Nova Entrada</span>
+              <span className="sm:hidden">Nova</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -208,11 +222,22 @@ export default function Entradas() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-lg font-bold text-green-600">{formatCurrency(Number(transacao.valor))}</p>
-                        <Badge className={`text-xs mt-1 ${getStatusColor(transacao.status)}`}>
-                          {transacao.status}
-                        </Badge>
+                      <div className="flex items-start gap-2">
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-lg font-bold text-green-600">{formatCurrency(Number(transacao.valor))}</p>
+                          <Badge className={`text-xs mt-1 ${getStatusColor(transacao.status)}`}>
+                            {transacao.status}
+                          </Badge>
+                        </div>
+                        <TransacaoActionsMenu
+                          transacaoId={transacao.id}
+                          status={transacao.status}
+                          tipo="entrada"
+                          onEdit={() => {
+                            setEditingTransacao(transacao);
+                            setDialogOpen(true);
+                          }}
+                        />
                       </div>
                     </div>
                   </CardContent>
@@ -229,7 +254,17 @@ export default function Entradas() {
 
       <TransacaoDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditingTransacao(null);
+        }}
+        tipo="entrada"
+        transacao={editingTransacao}
+      />
+
+      <ImportarExcelDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
         tipo="entrada"
       />
     </div>

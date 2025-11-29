@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,9 +20,12 @@ interface TransacaoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tipo: "entrada" | "saida";
+  transacao?: any;
 }
 
-export function TransacaoDialog({ open, onOpenChange, tipo }: TransacaoDialogProps) {
+export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: TransacaoDialogProps) {
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
   const [tipoLancamento, setTipoLancamento] = useState<"unico" | "recorrente" | "parcelado">("unico");
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
@@ -39,8 +42,50 @@ export function TransacaoDialog({ open, onOpenChange, tipo }: TransacaoDialogPro
   const [recorrencia, setRecorrencia] = useState<"diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral">("mensal");
   const [dataFimRecorrencia, setDataFimRecorrencia] = useState<Date | undefined>();
   const [observacoes, setObservacoes] = useState("");
-  const [loading, setLoading] = useState(false);
-  const queryClient = useQueryClient();
+
+  // Preencher formulário quando estiver editando
+  useEffect(() => {
+    if (transacao && open) {
+      setDescricao(transacao.descricao || "");
+      setValor(String(transacao.valor || ""));
+      setDataVencimento(transacao.data_vencimento ? new Date(transacao.data_vencimento) : new Date());
+      setDataCompetencia(transacao.data_competencia ? new Date(transacao.data_competencia) : new Date());
+      setContaId(transacao.conta_id || "");
+      setCategoriaId(transacao.categoria_id || "");
+      setSubcategoriaId(transacao.subcategoria_id || "");
+      setCentroCustoId(transacao.centro_custo_id || "");
+      setBaseMinisterialId(transacao.base_ministerial_id || "");
+      setFornecedorId(transacao.fornecedor_id || "");
+      setFormaPagamento(transacao.forma_pagamento || "");
+      setObservacoes(transacao.observacoes || "");
+      setTipoLancamento(transacao.tipo_lancamento || "unico");
+      if (transacao.total_parcelas) setTotalParcelas(String(transacao.total_parcelas));
+      if (transacao.recorrencia) setRecorrencia(transacao.recorrencia);
+      if (transacao.data_fim_recorrencia) setDataFimRecorrencia(new Date(transacao.data_fim_recorrencia));
+    } else if (!open) {
+      // Resetar form ao fechar
+      resetForm();
+    }
+  }, [transacao, open]);
+
+  const resetForm = () => {
+    setDescricao("");
+    setValor("");
+    setDataVencimento(new Date());
+    setDataCompetencia(new Date());
+    setContaId("");
+    setCategoriaId("");
+    setSubcategoriaId("");
+    setCentroCustoId("");
+    setBaseMinisterialId("");
+    setFornecedorId("");
+    setFormaPagamento("");
+    setTotalParcelas("1");
+    setRecorrencia("mensal");
+    setDataFimRecorrencia(undefined);
+    setObservacoes("");
+    setTipoLancamento("unico");
+  };
 
   const { data: contas } = useQuery({
     queryKey: ['contas-select'],
@@ -145,7 +190,6 @@ export function TransacaoDialog({ open, onOpenChange, tipo }: TransacaoDialogPro
         valor: valorNumerico,
         data_vencimento: format(dataVencimento, 'yyyy-MM-dd'),
         data_competencia: format(dataCompetencia, 'yyyy-MM-dd'),
-        status: 'pendente',
         conta_id: contaId,
         categoria_id: categoriaId || null,
         subcategoria_id: subcategoriaId || null,
@@ -163,28 +207,31 @@ export function TransacaoDialog({ open, onOpenChange, tipo }: TransacaoDialogPro
         lancado_por: userData.user?.id,
       };
 
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .insert(transacaoData);
+      let error;
+      if (transacao) {
+        // Atualizar transação existente
+        const result = await supabase
+          .from('transacoes_financeiras')
+          .update(transacaoData)
+          .eq('id', transacao.id);
+        error = result.error;
+      } else {
+        // Criar nova transação
+        const result = await supabase
+          .from('transacoes_financeiras')
+          .insert({ ...transacaoData, status: 'pendente' });
+        error = result.error;
+      }
 
       if (error) throw error;
 
-      toast.success(`${tipo === 'entrada' ? 'Entrada' : 'Saída'} cadastrada com sucesso!`);
-      queryClient.invalidateQueries({ queryKey: ['transacoes-financeiras'] });
+      toast.success(`${tipo === 'entrada' ? 'Entrada' : 'Saída'} ${transacao ? 'atualizada' : 'cadastrada'} com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ['entradas'] });
+      queryClient.invalidateQueries({ queryKey: ['saidas'] });
       onOpenChange(false);
-      
-      // Reset form
-      setDescricao("");
-      setValor("");
-      setObservacoes("");
-      setCategoriaId("");
-      setSubcategoriaId("");
-      setCentroCustoId("");
-      setBaseMinisterialId("");
-      setFornecedorId("");
-      setFormaPagamento("");
+      resetForm();
     } catch (error: any) {
-      toast.error(error.message || "Erro ao cadastrar transação");
+      toast.error(error.message || `Erro ao ${transacao ? 'atualizar' : 'cadastrar'} transação`);
     } finally {
       setLoading(false);
     }
@@ -195,7 +242,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo }: TransacaoDialogPro
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {tipo === 'entrada' ? 'Nova Entrada' : 'Nova Saída'}
+            {transacao ? 'Editar' : tipo === 'entrada' ? 'Nova Entrada' : 'Nova Saída'}
           </DialogTitle>
         </DialogHeader>
 
