@@ -1,16 +1,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, UserCog, Users } from "lucide-react";
+import { Plus, UserCog, Users, Edit, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import PosicaoDialog from "@/components/cultos/PosicaoDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Posicao {
   id: string;
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  time_id: string;
   time: {
     id: string;
     nome: string;
@@ -21,6 +33,10 @@ interface Posicao {
 export default function Posicoes() {
   const [posicoes, setPosicoes] = useState<Posicao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [posicaoEditando, setPosicaoEditando] = useState<Posicao | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [posicaoDeletar, setPosicaoDeletar] = useState<Posicao | null>(null);
 
   useEffect(() => {
     loadPosicoes();
@@ -45,6 +61,67 @@ export default function Posicoes() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleNovaPosicao = () => {
+    setPosicaoEditando(null);
+    setDialogOpen(true);
+  };
+
+  const handleEditarPosicao = (posicao: Posicao) => {
+    setPosicaoEditando(posicao);
+    setDialogOpen(true);
+  };
+
+  const handleDeletarPosicao = (posicao: Posicao) => {
+    setPosicaoDeletar(posicao);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmarDelecao = async () => {
+    if (!posicaoDeletar) return;
+
+    try {
+      // Verificar se existem membros ou escalas com esta posição
+      const { count: membrosCount } = await supabase
+        .from("membros_time")
+        .select("*", { count: "exact", head: true })
+        .eq("posicao_id", posicaoDeletar.id);
+
+      const { count: escalasCount } = await supabase
+        .from("escalas_culto")
+        .select("*", { count: "exact", head: true })
+        .eq("posicao_id", posicaoDeletar.id);
+
+      if ((membrosCount || 0) > 0 || (escalasCount || 0) > 0) {
+        toast.error("Não é possível deletar esta posição", {
+          description: "Existem membros ou escalas vinculados a esta posição. Remova os vínculos primeiro ou desative a posição."
+        });
+        setDeleteDialogOpen(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("posicoes_time")
+        .delete()
+        .eq("id", posicaoDeletar.id);
+
+      if (error) throw error;
+
+      toast.success("Posição deletada com sucesso!");
+      loadPosicoes();
+    } catch (error: any) {
+      toast.error("Erro ao deletar posição", {
+        description: error.message
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setPosicaoDeletar(null);
+    }
+  };
+
+  const handleDialogSuccess = () => {
+    loadPosicoes();
   };
 
   if (loading) {
@@ -81,9 +158,16 @@ export default function Posicoes() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Posições dos Times</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Visualize todas as posições organizadas por time
+            Gerencie as posições de cada time
           </p>
         </div>
+        <Button 
+          className="bg-gradient-primary shadow-soft w-full sm:w-auto"
+          onClick={handleNovaPosicao}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Nova Posição
+        </Button>
       </div>
 
       <div className="grid gap-4 md:gap-6">
@@ -114,17 +198,37 @@ export default function Posicoes() {
                   >
                     <UserCog className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium">{posicao.nome}</p>
                         <Badge variant={posicao.ativo ? "default" : "secondary"} className="text-xs">
                           {posicao.ativo ? "Ativo" : "Inativo"}
                         </Badge>
                       </div>
                       {posicao.descricao && (
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                           {posicao.descricao}
                         </p>
                       )}
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => handleEditarPosicao(posicao)}
+                        >
+                          <Edit className="w-3 h-3 mr-1" />
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs text-destructive hover:text-destructive"
+                          onClick={() => handleDeletarPosicao(posicao)}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Deletar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -138,13 +242,46 @@ export default function Posicoes() {
             <CardContent className="p-8 text-center">
               <UserCog className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Nenhuma posição cadastrada</h3>
-              <p className="text-sm text-muted-foreground">
-                As posições são criadas ao gerenciar os times.
+              <p className="text-sm text-muted-foreground mb-4">
+                Comece criando a primeira posição para seus times.
               </p>
+              <Button onClick={handleNovaPosicao}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Posição
+              </Button>
             </CardContent>
           </Card>
         )}
       </div>
+
+      <PosicaoDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        posicao={posicaoEditando}
+        onSuccess={handleDialogSuccess}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja deletar a posição <strong>{posicaoDeletar?.nome}</strong>?
+              <br /><br />
+              Esta ação não pode ser desfeita. Se houver membros ou escalas vinculados a esta posição, você precisará removê-los primeiro.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarDelecao}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Deletar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
