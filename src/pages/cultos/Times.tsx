@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Settings } from "lucide-react";
+import { Plus, Users, Settings, Edit } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import TimeDialog from "@/components/cultos/TimeDialog";
 
 interface Time {
   id: string;
@@ -28,6 +29,8 @@ export default function Times() {
   const [times, setTimes] = useState<Time[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todos");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [timeEditando, setTimeEditando] = useState<Time | null>(null);
 
   useEffect(() => {
     loadTimes();
@@ -65,6 +68,20 @@ export default function Times() {
     ? times
     : times.filter(t => t.categoria === categoriaFiltro);
 
+  const handleNovoTime = () => {
+    setTimeEditando(null);
+    setDialogOpen(true);
+  };
+
+  const handleEditarTime = (time: Time) => {
+    setTimeEditando(time);
+    setDialogOpen(true);
+  };
+
+  const handleDialogSuccess = () => {
+    loadTimes();
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 md:space-y-6">
@@ -89,7 +106,10 @@ export default function Times() {
             Gerencie as equipes e departamentos
           </p>
         </div>
-        <Button className="bg-gradient-primary shadow-soft w-full sm:w-auto">
+        <Button 
+          className="bg-gradient-primary shadow-soft w-full sm:w-auto"
+          onClick={handleNovoTime}
+        >
           <Plus className="w-4 h-4 mr-2" />
           <span className="hidden sm:inline">Novo Time</span>
           <span className="sm:hidden">Adicionar</span>
@@ -164,10 +184,21 @@ export default function Times() {
                     {time.membros_count} {time.membros_count === 1 ? "membro" : "membros"}
                   </span>
                 </div>
-                <Button variant="outline" size="sm" className="text-xs md:text-sm">
-                  <Settings className="w-3 h-3 md:w-4 md:h-4 mr-2" />
-                  Gerenciar
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-xs md:text-sm"
+                    onClick={() => handleEditarTime(time)}
+                  >
+                    <Edit className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs md:text-sm">
+                    <Settings className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                    Gerenciar
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -183,7 +214,7 @@ export default function Times() {
                   ? "Comece criando seu primeiro time."
                   : "Não há times nesta categoria."}
               </p>
-              <Button onClick={() => setCategoriaFiltro("todos")}>
+              <Button onClick={handleNovoTime}>
                 <Plus className="w-4 h-4 mr-2" />
                 Novo Time
               </Button>
@@ -191,6 +222,13 @@ export default function Times() {
           </Card>
         )}
       </div>
+
+      <TimeDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        time={timeEditando}
+        onSuccess={handleDialogSuccess}
+      />
     </div>
   );
 }
