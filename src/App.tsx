@@ -20,6 +20,9 @@ import Intercessores from "./pages/intercessao/Intercessores";
 import TestemunhosIntercessao from "./pages/intercessao/Testemunhos";
 import Sentimentos from "./pages/intercessao/Sentimentos";
 import Cultos from "./pages/Cultos";
+import CultosGeral from "./pages/cultos/Geral";
+import CultosEventos from "./pages/cultos/Eventos";
+import CultosTimes from "./pages/cultos/Times";
 import Financas from "./pages/Financas";
 import FinancasDashboard from "./pages/financas/Dashboard";
 import Entradas from "./pages/financas/Entradas";
@@ -233,7 +236,11 @@ function App() {
                 </MainLayout>
               </ProtectedRoute>
             }
-          />
+          >
+            <Route path="geral" element={<CultosGeral />} />
+            <Route path="eventos" element={<CultosEventos />} />
+            <Route path="times" element={<CultosTimes />} />
+          </Route>
           <Route
             path="/financas"
             element={

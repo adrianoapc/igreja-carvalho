@@ -94,6 +94,68 @@ export type Database = {
           },
         ]
       }
+      cancoes_culto: {
+        Row: {
+          artista: string | null
+          bpm: number | null
+          cifra: string | null
+          created_at: string
+          culto_id: string
+          duracao_minutos: number | null
+          id: string
+          letra: string | null
+          link_spotify: string | null
+          link_youtube: string | null
+          observacoes: string | null
+          ordem: number
+          titulo: string
+          tom: string | null
+          updated_at: string
+        }
+        Insert: {
+          artista?: string | null
+          bpm?: number | null
+          cifra?: string | null
+          created_at?: string
+          culto_id: string
+          duracao_minutos?: number | null
+          id?: string
+          letra?: string | null
+          link_spotify?: string | null
+          link_youtube?: string | null
+          observacoes?: string | null
+          ordem: number
+          titulo: string
+          tom?: string | null
+          updated_at?: string
+        }
+        Update: {
+          artista?: string | null
+          bpm?: number | null
+          cifra?: string | null
+          created_at?: string
+          culto_id?: string
+          duracao_minutos?: number | null
+          id?: string
+          letra?: string | null
+          link_spotify?: string | null
+          link_youtube?: string | null
+          observacoes?: string | null
+          ordem?: number
+          titulo?: string
+          tom?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancoes_culto_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias_financeiras: {
         Row: {
           ativo: boolean
@@ -210,6 +272,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cultos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_culto: string
+          descricao: string | null
+          duracao_minutos: number | null
+          id: string
+          local: string | null
+          observacoes: string | null
+          pregador: string | null
+          status: string
+          tema: string | null
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_culto: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          id?: string
+          local?: string | null
+          observacoes?: string | null
+          pregador?: string | null
+          status?: string
+          tema?: string | null
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_culto?: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          id?: string
+          local?: string | null
+          observacoes?: string | null
+          pregador?: string | null
+          status?: string
+          tema?: string | null
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       edge_function_config: {
         Row: {
           created_at: string | null
@@ -248,6 +361,71 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      escalas_culto: {
+        Row: {
+          confirmado: boolean
+          created_at: string
+          culto_id: string
+          id: string
+          observacoes: string | null
+          pessoa_id: string
+          posicao_id: string | null
+          time_id: string
+          updated_at: string
+        }
+        Insert: {
+          confirmado?: boolean
+          created_at?: string
+          culto_id: string
+          id?: string
+          observacoes?: string | null
+          pessoa_id: string
+          posicao_id?: string | null
+          time_id: string
+          updated_at?: string
+        }
+        Update: {
+          confirmado?: boolean
+          created_at?: string
+          culto_id?: string
+          id?: string
+          observacoes?: string | null
+          pessoa_id?: string
+          posicao_id?: string | null
+          time_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalas_culto_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_culto_posicao_id_fkey"
+            columns: ["posicao_id"]
+            isOneToOne: false
+            referencedRelation: "posicoes_time"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_culto_time_id_fkey"
+            columns: ["time_id"]
+            isOneToOne: false
+            referencedRelation: "times_culto"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       familias: {
         Row: {
@@ -432,6 +610,50 @@ export type Database = {
         }
         Relationships: []
       }
+      liturgia_culto: {
+        Row: {
+          created_at: string
+          culto_id: string
+          descricao: string | null
+          duracao_minutos: number | null
+          id: string
+          ordem: number
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          culto_id: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          id?: string
+          ordem: number
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          culto_id?: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          id?: string
+          ordem?: number
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liturgia_culto_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membro_funcoes: {
         Row: {
           ativo: boolean | null
@@ -476,6 +698,102 @@ export type Database = {
             columns: ["membro_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membros_time: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          data_entrada: string | null
+          id: string
+          pessoa_id: string
+          posicao_id: string | null
+          time_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          data_entrada?: string | null
+          id?: string
+          pessoa_id: string
+          posicao_id?: string | null
+          time_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          data_entrada?: string | null
+          id?: string
+          pessoa_id?: string
+          posicao_id?: string | null
+          time_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membros_time_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membros_time_posicao_id_fkey"
+            columns: ["posicao_id"]
+            isOneToOne: false
+            referencedRelation: "posicoes_time"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membros_time_time_id_fkey"
+            columns: ["time_id"]
+            isOneToOne: false
+            referencedRelation: "times_culto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      midias_culto: {
+        Row: {
+          created_at: string
+          culto_id: string
+          descricao: string | null
+          id: string
+          tipo: string
+          titulo: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          culto_id: string
+          descricao?: string | null
+          id?: string
+          tipo: string
+          titulo: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          culto_id?: string
+          descricao?: string | null
+          id?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "midias_culto_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
             referencedColumns: ["id"]
           },
         ]
@@ -615,6 +933,44 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posicoes_time: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          time_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          time_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          time_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posicoes_time_time_id_fkey"
+            columns: ["time_id"]
+            isOneToOne: false
+            referencedRelation: "times_culto"
             referencedColumns: ["id"]
           },
         ]
@@ -898,6 +1254,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      times_culto: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       transacoes_financeiras: {
         Row: {
