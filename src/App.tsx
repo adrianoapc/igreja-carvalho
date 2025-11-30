@@ -28,6 +28,7 @@ import CultosCategorias from "./pages/cultos/Categorias";
 import CultosPosicoes from "./pages/cultos/Posicoes";
 import Financas from "./pages/Financas";
 import FinancasDashboard from "./pages/financas/Dashboard";
+import FinancasProjecao from "./pages/financas/Projecao";
 import Entradas from "./pages/financas/Entradas";
 import Saidas from "./pages/financas/Saidas";
 import Insights from "./pages/financas/Insights";
@@ -265,6 +266,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <FinancasDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/projecao"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <FinancasProjecao />
                 </MainLayout>
               </ProtectedRoute>
             }

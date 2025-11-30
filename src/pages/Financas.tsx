@@ -198,6 +198,18 @@ export default function Financas() {
       icon: Plus,
       action: () => navigate("/financas/saidas"),
     },
+    {
+      title: "Dashboard",
+      description: "Análises e indicadores",
+      icon: BarChart3,
+      action: () => navigate("/financas/dashboard"),
+    },
+    {
+      title: "Projeção",
+      description: "Projeção financeira",
+      icon: TrendingUp,
+      action: () => navigate("/financas/projecao"),
+    },
   ];
 
   return (
@@ -318,7 +330,7 @@ export default function Financas() {
           <CardTitle className="text-base md:text-lg">Ações Rápidas</CardTitle>
         </CardHeader>
         <CardContent className="p-3 md:p-6 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
