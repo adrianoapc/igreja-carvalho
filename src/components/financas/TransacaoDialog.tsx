@@ -557,6 +557,25 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-3">Informações Básicas</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tipo === 'saida' && (
+                  <div className="md:col-span-2">
+                    <Label htmlFor="fornecedor">Fornecedor</Label>
+                    <Select value={fornecedorId} onValueChange={setFornecedorId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um fornecedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {fornecedores?.filter(forn => forn.id && forn.id !== '').map((forn) => (
+                          <SelectItem key={forn.id} value={forn.id}>
+                            {forn.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="md:col-span-2">
                   <Label htmlFor="descricao">Descrição *</Label>
                   <Input
@@ -811,25 +830,6 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                     </SelectContent>
                   </Select>
                 </div>
-
-                {tipo === 'saida' && (
-                  <div className="md:col-span-2">
-                    <Label htmlFor="fornecedor">Fornecedor</Label>
-                    <Select value={fornecedorId} onValueChange={setFornecedorId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um fornecedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {fornecedores?.filter(forn => forn.id && forn.id !== '').map((forn) => (
-                          <SelectItem key={forn.id} value={forn.id}>
-                            {forn.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </div>
             </div>
 
