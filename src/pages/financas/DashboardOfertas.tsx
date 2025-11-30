@@ -101,34 +101,15 @@ export default function DashboardOfertas() {
 
       const { data, error } = await supabase
         .from("transacoes_financeiras")
-        .select("*, categorias_financeiras(nome)")
+        .select("*")
         .eq("tipo", "entrada")
-        .or(`descricao.ilike.%oferta%,categorias_financeiras.nome.ilike.%oferta%`)
+        .ilike("descricao", "%oferta%")
         .gte("data_vencimento", datas.inicio)
         .lte("data_vencimento", datas.fim)
         .order("data_vencimento", { ascending: false });
 
       if (error) throw error;
-      
-      // Extrair forma de pagamento da descrição quando não estiver no campo
-      const transacoesProcessadas = (data || []).map(t => {
-        let formaPagamento = t.forma_pagamento;
-        
-        if (!formaPagamento && t.descricao) {
-          // Extrair forma de pagamento da descrição
-          const descricao = t.descricao.toLowerCase();
-          if (descricao.includes("dinheiro")) formaPagamento = "Dinheiro";
-          else if (descricao.includes("pix")) formaPagamento = "PIX";
-          else if (descricao.includes("c.credito") || descricao.includes("cartão de crédito")) formaPagamento = "Cartão de Crédito";
-          else if (descricao.includes("c.debito") || descricao.includes("cartão de débito")) formaPagamento = "Cartão de Débito";
-          else if (descricao.includes("boleto")) formaPagamento = "Boleto";
-          else if (descricao.includes("transferência")) formaPagamento = "Transferência";
-        }
-        
-        return { ...t, forma_pagamento: formaPagamento || "Não especificado" };
-      });
-      
-      return transacoesProcessadas;
+      return data || [];
     },
     enabled: !!datas,
   });
