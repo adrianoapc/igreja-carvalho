@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Users, Music, Clock, BarChart3 } from "lucide-react";
+import { Plus, Calendar, Users, Music, Clock, BarChart3, Image } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,8 @@ export default function CultosGeral() {
     proximosCultos: 0,
     timesAtivos: 0,
     membrosEscalados: 0,
-    cultosRealizados: 0
+    cultosRealizados: 0,
+    midiasAtivas: 0
   });
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function CultosGeral() {
   const loadStats = async () => {
     const now = new Date().toISOString();
     
-    const [cultos, times, escalas, realizados] = await Promise.all([
+    const [cultos, times, escalas, realizados, midias] = await Promise.all([
       supabase
         .from("cultos")
         .select("id", { count: "exact" })
@@ -38,14 +39,19 @@ export default function CultosGeral() {
       supabase
         .from("cultos")
         .select("id", { count: "exact" })
-        .eq("status", "realizado")
+        .eq("status", "realizado"),
+      supabase
+        .from("midias")
+        .select("id", { count: "exact" })
+        .eq("ativo", true)
     ]);
 
     setStats({
       proximosCultos: cultos.count || 0,
       timesAtivos: times.count || 0,
       membrosEscalados: escalas.count || 0,
-      cultosRealizados: realizados.count || 0
+      cultosRealizados: realizados.count || 0,
+      midiasAtivas: midias.count || 0
     });
   };
 
@@ -70,6 +76,13 @@ export default function CultosGeral() {
       icon: BarChart3,
       path: "/cultos/liturgia-dashboard",
       stats: [{ label: "Cultos", value: stats.cultosRealizados }]
+    },
+    {
+      title: "Mídias",
+      description: "Gerenciar conteúdo visual e comunicação",
+      icon: Image,
+      path: "/cultos/midias",
+      stats: [{ label: "Mídias Ativas", value: stats.midiasAtivas }]
     }
   ];
 
@@ -91,6 +104,12 @@ export default function CultosGeral() {
       description: "Estatísticas de participação",
       icon: BarChart3,
       action: () => navigate("/cultos/liturgia-dashboard")
+    },
+    {
+      title: "Gerenciar Mídias",
+      description: "Adicionar ou editar mídias",
+      icon: Image,
+      action: () => navigate("/cultos/midias")
     }
   ];
 
