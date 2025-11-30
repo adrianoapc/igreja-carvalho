@@ -229,6 +229,52 @@ export default function Contas() {
                           </PopoverContent>
                         </Popover>
                       </div>
+
+                      {/* Totalizador */}
+                      {transacoes && transacoes.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Entradas</p>
+                            <p className="text-sm font-bold text-green-600">
+                              {formatCurrency(
+                                transacoes
+                                  .filter(t => t.tipo === 'entrada')
+                                  .reduce((sum, t) => sum + Number(t.valor), 0)
+                              )}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Saídas</p>
+                            <p className="text-sm font-bold text-red-600">
+                              {formatCurrency(
+                                transacoes
+                                  .filter(t => t.tipo === 'saida')
+                                  .reduce((sum, t) => sum + Number(t.valor), 0)
+                              )}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Saldo</p>
+                            <p className={cn(
+                              "text-sm font-bold",
+                              (transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0) -
+                               transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0)) >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            )}>
+                              {formatCurrency(
+                                transacoes
+                                  .filter(t => t.tipo === 'entrada')
+                                  .reduce((sum, t) => sum + Number(t.valor), 0) -
+                                transacoes
+                                  .filter(t => t.tipo === 'saida')
+                                  .reduce((sum, t) => sum + Number(t.valor), 0)
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <Tabs defaultValue="todos" className="w-full">
                         <TabsList className="grid w-full grid-cols-3 mb-4">
                           <TabsTrigger value="todos" className="text-xs">
