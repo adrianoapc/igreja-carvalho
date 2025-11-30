@@ -847,32 +847,41 @@ export type Database = {
           },
         ]
       }
-      midias_culto: {
+      midias: {
         Row: {
+          ativo: boolean
+          canal: string
           created_at: string
           culto_id: string
           descricao: string | null
           id: string
+          ordem: number
           tipo: string
           titulo: string
           updated_at: string
           url: string
         }
         Insert: {
+          ativo?: boolean
+          canal?: string
           created_at?: string
           culto_id: string
           descricao?: string | null
           id?: string
+          ordem?: number
           tipo: string
           titulo: string
           updated_at?: string
           url: string
         }
         Update: {
+          ativo?: boolean
+          canal?: string
           created_at?: string
           culto_id?: string
           descricao?: string | null
           id?: string
+          ordem?: number
           tipo?: string
           titulo?: string
           updated_at?: string
