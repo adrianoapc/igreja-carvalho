@@ -2,3 +2,9 @@ project_id = "mcomwaelbwvyotvudnzt"
 
 [functions.processar-nota-fiscal]
 verify_jwt = true
+
+[functions.receber-pedido-make]
+verify_jwt = false
+
+[functions.receber-testemunho-make]
+verify_jwt = false
