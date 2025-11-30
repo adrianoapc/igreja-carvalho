@@ -160,6 +160,34 @@ export default function Entradas() {
     }
   };
 
+  const getStatusDisplay = (transacao: any) => {
+    if (transacao.status === 'pago') return 'Recebido';
+    if (transacao.status === 'pendente') {
+      const hoje = new Date();
+      const vencimento = new Date(transacao.data_vencimento);
+      if (vencimento < hoje) {
+        return 'Atrasado';
+      }
+      return 'Pendente';
+    }
+    return 'Atrasado';
+  };
+
+  const getStatusColorDynamic = (transacao: any) => {
+    if (transacao.status === 'pago') {
+      return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400';
+    }
+    if (transacao.status === 'pendente') {
+      const hoje = new Date();
+      const vencimento = new Date(transacao.data_vencimento);
+      if (vencimento < hoje) {
+        return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400';
+      }
+      return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400';
+    }
+    return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400';
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col gap-3">
@@ -388,8 +416,8 @@ export default function Entradas() {
                       <div className="flex items-start gap-2">
                         <div className="text-right flex-shrink-0">
                           <p className="text-lg font-bold text-green-600">{formatCurrency(Number(transacao.valor))}</p>
-                          <Badge className={`text-xs mt-1 ${getStatusColor(transacao.status)}`}>
-                            {transacao.status === 'pago' ? 'Recebido' : transacao.status === 'pendente' ? 'Pendente' : 'Atrasado'}
+                          <Badge className={`text-xs mt-1 ${getStatusColorDynamic(transacao)}`}>
+                            {getStatusDisplay(transacao)}
                           </Badge>
                         </div>
                         <TransacaoActionsMenu
