@@ -363,8 +363,7 @@ export default function MidiasGeral() {
   const handleCloseDialog = (open: boolean) => {
     setDialogOpen(open);
     if (!open) {
-      // Limpar mídia editando quando fechar o dialog
-      setTimeout(() => setMidiaEditando(undefined), 300);
+      setMidiaEditando(undefined);
     }
   };
 
