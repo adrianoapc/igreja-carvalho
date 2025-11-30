@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink, FileText, Video, Image as ImageIcon } from "lucide-react";
 
 interface Culto {
   id: string;
@@ -616,24 +616,101 @@ Qualquer dúvida, entre em contato conosco.`;
                           
                           {/* Mídias vinculadas */}
                           {midiasVinculadas.has(item.id) && midiasVinculadas.get(item.id)!.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Film className="w-3 h-3" />
-                                <span>Mídias:</span>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {midiasVinculadas.get(item.id)!.map(midia => (
-                                  <Badge
-                                    key={midia.id}
-                                    variant="outline"
-                                    className="text-xs cursor-pointer hover:bg-accent"
-                                    onClick={() => window.open(midia.url, '_blank')}
-                                  >
-                                    <ExternalLink className="w-3 h-3 mr-1" />
-                                    {midia.titulo}
-                                  </Badge>
-                                ))}
-                              </div>
+                            <div className="mt-3">
+                              {item.tipo === "Anúncios" ? (
+                                // Visualização expandida em galeria para Anúncios
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm font-medium">
+                                    <Film className="w-4 h-4 text-primary" />
+                                    <span>Mídias de Anúncios ({midiasVinculadas.get(item.id)!.length})</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    {midiasVinculadas.get(item.id)!.map(midia => {
+                                      const isImage = midia.tipo === 'Imagem' || midia.url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                                      const isVideo = midia.tipo === 'Vídeo' || midia.url.match(/\.(mp4|webm|ogg|youtube|vimeo)$/i);
+                                      
+                                      return (
+                                        <Card 
+                                          key={midia.id}
+                                          className="group cursor-pointer hover:shadow-lg transition-all hover:scale-105"
+                                          onClick={() => window.open(midia.url, '_blank')}
+                                        >
+                                          <CardContent className="p-0">
+                                            {/* Thumbnail */}
+                                            <div className="relative aspect-video bg-muted rounded-t-lg overflow-hidden">
+                                              {isImage ? (
+                                                <img 
+                                                  src={midia.url} 
+                                                  alt={midia.titulo}
+                                                  className="w-full h-full object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    e.currentTarget.parentElement!.classList.add('flex', 'items-center', 'justify-center');
+                                                    const icon = document.createElement('div');
+                                                    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                                                    e.currentTarget.parentElement!.appendChild(icon);
+                                                  }}
+                                                />
+                                              ) : (
+                                                <div className="w-full h-full flex items-center justify-center">
+                                                  {isVideo ? (
+                                                    <Video className="w-8 h-8 text-muted-foreground" />
+                                                  ) : (
+                                                    <FileText className="w-8 h-8 text-muted-foreground" />
+                                                  )}
+                                                </div>
+                                              )}
+                                              
+                                              {/* Overlay com ícone de link */}
+                                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                                <ExternalLink className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                              </div>
+                                              
+                                              {/* Badge de tipo */}
+                                              <div className="absolute top-2 right-2">
+                                                <Badge variant="secondary" className="text-xs">
+                                                  {midia.tipo}
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                            
+                                            {/* Título */}
+                                            <div className="p-2">
+                                              <p className="text-xs font-medium line-clamp-2 text-center">
+                                                {midia.titulo}
+                                              </p>
+                                              <p className="text-xs text-muted-foreground text-center mt-1">
+                                                {midia.canal}
+                                              </p>
+                                            </div>
+                                          </CardContent>
+                                        </Card>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : (
+                                // Visualização compacta em badges para outros tipos
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Film className="w-3 h-3" />
+                                    <span>Mídias:</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {midiasVinculadas.get(item.id)!.map(midia => (
+                                      <Badge
+                                        key={midia.id}
+                                        variant="outline"
+                                        className="text-xs cursor-pointer hover:bg-accent"
+                                        onClick={() => window.open(midia.url, '_blank')}
+                                      >
+                                        <ExternalLink className="w-3 h-3 mr-1" />
+                                        {midia.titulo}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
