@@ -219,15 +219,24 @@ export default function RelatorioOferta() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/financas')}
-          className="w-fit"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/financas')}
+            className="w-fit"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/financas/dashboard-ofertas')}
+          >
+            Ver Dashboard
+          </Button>
+        </div>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Relatório de Oferta</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
