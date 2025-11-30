@@ -18,16 +18,16 @@ interface Time {
   membros_count: number;
 }
 
-const CATEGORIAS = {
-  musica: { label: "Música", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400" },
-  tecnico: { label: "Técnico", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400" },
-  kids: { label: "Kids", color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400" },
-  hospitalidade: { label: "Hospitalidade", color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400" },
-  outro: { label: "Outro", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400" }
-};
+interface Categoria {
+  id: string;
+  nome: string;
+  cor: string;
+  ativo: boolean;
+}
 
 export default function Times() {
   const [times, setTimes] = useState<Time[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -37,7 +37,23 @@ export default function Times() {
 
   useEffect(() => {
     loadTimes();
+    loadCategorias();
   }, []);
+
+  const loadCategorias = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("categorias_times")
+        .select("*")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+
+      if (error) throw error;
+      setCategorias(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar categorias");
+    }
+  };
 
   const loadTimes = async () => {
     try {
@@ -134,17 +150,21 @@ export default function Times() {
         >
           Todos ({times.length})
         </Button>
-        {Object.entries(CATEGORIAS).map(([key, cat]) => {
-          const count = times.filter(t => t.categoria === key).length;
+        {categorias.map((cat) => {
+          const count = times.filter(t => t.categoria === cat.id).length;
           return (
             <Button
-              key={key}
-              variant={categoriaFiltro === key ? "default" : "outline"}
+              key={cat.id}
+              variant={categoriaFiltro === cat.id ? "default" : "outline"}
               size="sm"
-              onClick={() => setCategoriaFiltro(key)}
+              onClick={() => setCategoriaFiltro(cat.id)}
               className="text-xs md:text-sm"
             >
-              {cat.label} ({count})
+              <div 
+                className="w-2 h-2 rounded-full mr-2" 
+                style={{ backgroundColor: cat.cor }}
+              />
+              {cat.nome} ({count})
             </Button>
           );
         })}
@@ -167,9 +187,16 @@ export default function Times() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <CardTitle className="text-lg md:text-xl">{time.nome}</CardTitle>
-                        <Badge className={CATEGORIAS[time.categoria as keyof typeof CATEGORIAS]?.color}>
-                          {CATEGORIAS[time.categoria as keyof typeof CATEGORIAS]?.label}
-                        </Badge>
+                        {categorias.find(c => c.id === time.categoria) && (
+                          <Badge 
+                            style={{ 
+                              backgroundColor: categorias.find(c => c.id === time.categoria)?.cor + '20',
+                              color: categorias.find(c => c.id === time.categoria)?.cor
+                            }}
+                          >
+                            {categorias.find(c => c.id === time.categoria)?.nome}
+                          </Badge>
+                        )}
                       </div>
                       {time.descricao && (
                         <p className="text-xs md:text-sm text-muted-foreground mt-1">

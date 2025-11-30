@@ -23,6 +23,8 @@ import Cultos from "./pages/Cultos";
 import CultosGeral from "./pages/cultos/Geral";
 import CultosEventos from "./pages/cultos/Eventos";
 import CultosTimes from "./pages/cultos/Times";
+import CultosCategorias from "./pages/cultos/Categorias";
+import CultosPosicoes from "./pages/cultos/Posicoes";
 import Financas from "./pages/Financas";
 import FinancasDashboard from "./pages/financas/Dashboard";
 import Entradas from "./pages/financas/Entradas";
@@ -240,6 +242,8 @@ function App() {
             <Route path="geral" element={<CultosGeral />} />
             <Route path="eventos" element={<CultosEventos />} />
             <Route path="times" element={<CultosTimes />} />
+            <Route path="categorias" element={<CultosCategorias />} />
+            <Route path="posicoes" element={<CultosPosicoes />} />
           </Route>
           <Route
             path="/financas"

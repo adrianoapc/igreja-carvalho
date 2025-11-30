@@ -35,13 +35,12 @@ const timeSchema = z.object({
   ativo: z.boolean()
 });
 
-const CATEGORIAS = [
-  { value: "musica", label: "Música" },
-  { value: "tecnico", label: "Técnico" },
-  { value: "kids", label: "Kids" },
-  { value: "hospitalidade", label: "Hospitalidade" },
-  { value: "outro", label: "Outro" }
-];
+interface Categoria {
+  id: string;
+  nome: string;
+  cor: string;
+  ativo: boolean;
+}
 
 const CORES_SUGERIDAS = [
   "#8B5CF6", // Purple
@@ -56,6 +55,7 @@ const CORES_SUGERIDAS = [
 
 export default function TimeDialog({ open, onOpenChange, time, onSuccess }: TimeDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "",
@@ -63,6 +63,27 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
     cor: "#8B5CF6",
     ativo: true
   });
+
+  useEffect(() => {
+    if (open) {
+      loadCategorias();
+    }
+  }, [open]);
+
+  const loadCategorias = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("categorias_times")
+        .select("*")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+
+      if (error) throw error;
+      setCategorias(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar categorias");
+    }
+  };
 
   useEffect(() => {
     if (time) {
@@ -171,9 +192,15 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
                 <SelectValue placeholder="Selecione uma categoria" />
               </SelectTrigger>
               <SelectContent className="bg-background z-50">
-                {CATEGORIAS.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    {cat.label}
+                {categorias.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: cat.cor }}
+                      />
+                      {cat.nome}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
