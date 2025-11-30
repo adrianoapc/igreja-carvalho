@@ -254,6 +254,33 @@ export type Database = {
           },
         ]
       }
+      configuracoes_igreja: {
+        Row: {
+          created_at: string | null
+          id: string
+          logo_url: string | null
+          nome_igreja: string
+          subtitulo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          nome_igreja?: string
+          subtitulo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          nome_igreja?: string
+          subtitulo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       contas: {
         Row: {
           agencia: string | null
