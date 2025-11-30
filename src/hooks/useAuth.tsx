@@ -28,29 +28,29 @@ export function useAuth() {
 
   useEffect(() => {
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Defer Supabase calls
-          setTimeout(() => {
-            loadUserData(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setPermissions([]);
-          setLoading(false);
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        // Defer Supabase calls
+        setTimeout(() => {
+          loadUserData(session.user.id);
+        }, 0);
+      } else {
+        setProfile(null);
+        setPermissions([]);
+        setLoading(false);
       }
-    );
+    });
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         loadUserData(session.user.id);
       } else {
@@ -64,25 +64,18 @@ export function useAuth() {
   const loadUserData = async (userId: string) => {
     try {
       // Carregar perfil
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
 
       if (profileData) {
         setProfile(profileData);
 
         // Carregar permissões se for membro
         if (profileData.status === "membro") {
-          const { data: rolesData } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", userId);
+          const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", userId);
 
           if (rolesData && rolesData.length > 0) {
-            const roles = rolesData.map(r => r.role);
-            
+            const roles = rolesData.map((r) => r.role);
+
             const { data: permissionsData } = await supabase
               .from("module_permissions")
               .select("module_name, access_level")
@@ -111,32 +104,32 @@ export function useAuth() {
 
   const hasAccess = (moduleName: string, requiredLevel?: string): boolean => {
     if (!profile) {
-      console.log("hasAccess: No profile found");
+      // console.log("hasAccess: No profile found");
       return false;
     }
-    
-    console.log("hasAccess check:", { 
-      moduleName, 
-      requiredLevel, 
+
+    console.log("hasAccess check:", {
+      moduleName,
+      requiredLevel,
       profileStatus: profile.status,
-      permissionsCount: permissions.length 
+      permissionsCount: permissions.length,
     });
-    
+
     // Visitantes e frequentadores não têm acesso
     if (profile.status !== "membro") {
-      console.log("hasAccess: User is not a member");
+      //console.log("hasAccess: User is not a member");
       return false;
     }
 
     // Se não especificar nível, só verifica se tem algum acesso
     if (!requiredLevel) {
-      const hasAnyAccess = permissions.some(p => p.module_name === moduleName);
-      console.log("hasAccess (any):", hasAnyAccess);
+      const hasAnyAccess = permissions.some((p) => p.module_name === moduleName);
+      //console.log("hasAccess (any):", hasAnyAccess);
       return hasAnyAccess;
     }
 
     // Verificar nível específico
-    const permission = permissions.find(p => p.module_name === moduleName);
+    const permission = permissions.find((p) => p.module_name === moduleName);
     if (!permission) {
       console.log("hasAccess: No permission found for module");
       return false;
@@ -147,12 +140,12 @@ export function useAuth() {
     const userIndex = levels.indexOf(permission.access_level);
 
     const hasRequiredLevel = userIndex >= requiredIndex;
-    console.log("hasAccess (level):", { 
-      required: requiredLevel, 
-      user: permission.access_level, 
-      hasAccess: hasRequiredLevel 
+    console.log("hasAccess (level):", {
+      required: requiredLevel,
+      user: permission.access_level,
+      hasAccess: hasRequiredLevel,
     });
-    
+
     return hasRequiredLevel;
   };
 
