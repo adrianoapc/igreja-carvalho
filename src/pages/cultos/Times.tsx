@@ -73,9 +73,9 @@ export default function Times() {
         .select(`
           *,
           membros_time(
-            count,
             pessoa_id,
             posicao_id,
+            ativo,
             profiles:pessoa_id(id, nome),
             posicoes_time:posicao_id(nome)
           )
@@ -87,7 +87,7 @@ export default function Times() {
 
       const timesWithCount = data?.map(time => {
         const membros = time.membros_time
-          ?.filter((m: any) => m.profiles)
+          ?.filter((m: any) => m.profiles && m.ativo)
           ?.map((m: any) => ({
             id: m.profiles.id,
             nome: m.profiles.nome,
@@ -96,7 +96,7 @@ export default function Times() {
 
         return {
           ...time,
-          membros_count: time.membros_time?.[0]?.count || 0,
+          membros_count: membros.length,
           membros: membros
         };
       }) || [];
