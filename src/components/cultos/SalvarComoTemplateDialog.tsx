@@ -52,7 +52,7 @@ export function SalvarComoTemplateDialog({
 
       // Criar template
       const { data: novoTemplate, error: templateError } = await supabase
-        .from("templates_liturgia")
+        .from("templates_culto")
         .insert({
           nome: nome.trim(),
           descricao: descricao.trim() || null,
@@ -76,7 +76,7 @@ export function SalvarComoTemplateDialog({
       }));
 
       const { error: itensInsertError } = await supabase
-        .from("itens_template_liturgia")
+        .from("itens_template_culto")
         .insert(itensTemplate);
 
       if (itensInsertError) throw itensInsertError;
