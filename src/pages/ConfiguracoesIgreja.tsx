@@ -15,7 +15,8 @@ export default function ConfiguracoesIgreja() {
     id: "",
     nome_igreja: "Igreja App",
     subtitulo: "Gestão Completa",
-    logo_url: null as string | null
+    logo_url: null as string | null,
+    webhook_make_liturgia: null as string | null
   });
   const [novoLogo, setNovoLogo] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -123,7 +124,8 @@ export default function ConfiguracoesIgreja() {
         .update({
           nome_igreja: config.nome_igreja,
           subtitulo: config.subtitulo,
-          logo_url: logoUrl
+          logo_url: logoUrl,
+          webhook_make_liturgia: config.webhook_make_liturgia
         })
         .eq("id", config.id);
 
@@ -238,6 +240,21 @@ export default function ConfiguracoesIgreja() {
               onChange={(e) => setConfig(prev => ({ ...prev, subtitulo: e.target.value }))}
               placeholder="Subtítulo ou slogan"
             />
+          </div>
+
+          {/* Webhook Make Liturgia */}
+          <div className="space-y-2">
+            <Label htmlFor="webhook">Webhook Make.com (Liturgia)</Label>
+            <Input
+              id="webhook"
+              type="url"
+              value={config.webhook_make_liturgia || ""}
+              onChange={(e) => setConfig(prev => ({ ...prev, webhook_make_liturgia: e.target.value }))}
+              placeholder="https://hook.us1.make.com/..."
+            />
+            <p className="text-xs text-muted-foreground">
+              URL do webhook do Make.com para receber notificações de liturgia
+            </p>
           </div>
 
           {/* Botão Salvar */}

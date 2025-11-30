@@ -262,6 +262,7 @@ export type Database = {
           nome_igreja: string
           subtitulo: string | null
           updated_at: string | null
+          webhook_make_liturgia: string | null
         }
         Insert: {
           created_at?: string | null
@@ -270,6 +271,7 @@ export type Database = {
           nome_igreja?: string
           subtitulo?: string | null
           updated_at?: string | null
+          webhook_make_liturgia?: string | null
         }
         Update: {
           created_at?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           nome_igreja?: string
           subtitulo?: string | null
           updated_at?: string | null
+          webhook_make_liturgia?: string | null
         }
         Relationships: []
       }
