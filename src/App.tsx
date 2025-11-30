@@ -29,6 +29,7 @@ import Financas from "./pages/Financas";
 import FinancasDashboard from "./pages/financas/Dashboard";
 import Entradas from "./pages/financas/Entradas";
 import Saidas from "./pages/financas/Saidas";
+import Insights from "./pages/financas/Insights";
 import Contas from "./pages/financas/Contas";
 import BasesMinisteriais from "./pages/financas/BasesMinisteriais";
 import CentrosCusto from "./pages/financas/CentrosCusto";
@@ -281,6 +282,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Saidas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/insights"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Insights />
                 </MainLayout>
               </ProtectedRoute>
             }
