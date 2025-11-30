@@ -554,6 +554,72 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </RadioGroup>
             </div>
 
+            {tipoLancamento === 'parcelado' && (
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Parcelamento</h3>
+                <div>
+                  <Label htmlFor="parcelas">Número de parcelas *</Label>
+                  <Input
+                    id="parcelas"
+                    type="number"
+                    min="2"
+                    value={totalParcelas}
+                    onChange={(e) => setTotalParcelas(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            {tipoLancamento === 'recorrente' && (
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Recorrência</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="recorrencia">Frequência *</Label>
+                    <Select value={recorrencia} onValueChange={(value: any) => setRecorrencia(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="diaria">Diária</SelectItem>
+                        <SelectItem value="semanal">Semanal</SelectItem>
+                        <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                        <SelectItem value="mensal">Mensal</SelectItem>
+                        <SelectItem value="bimestral">Bimestral</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Data fim da recorrência</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dataFimRecorrencia && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dataFimRecorrencia ? format(dataFimRecorrencia, "dd/MM/yyyy", { locale: ptBR }) : "Opcional"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={dataFimRecorrencia}
+                          onSelect={setDataFimRecorrencia}
+                          locale={ptBR}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-3">Informações Básicas</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -687,71 +753,6 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </div>
             </div>
 
-            {tipoLancamento === 'parcelado' && (
-              <div className="border-t pt-4">
-                <h3 className="font-semibold mb-3">Parcelamento</h3>
-                <div>
-                  <Label htmlFor="parcelas">Número de parcelas *</Label>
-                  <Input
-                    id="parcelas"
-                    type="number"
-                    min="2"
-                    value={totalParcelas}
-                    onChange={(e) => setTotalParcelas(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            {tipoLancamento === 'recorrente' && (
-              <div className="border-t pt-4">
-                <h3 className="font-semibold mb-3">Recorrência</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="recorrencia">Frequência *</Label>
-                    <Select value={recorrencia} onValueChange={(value: any) => setRecorrencia(value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="diaria">Diária</SelectItem>
-                        <SelectItem value="semanal">Semanal</SelectItem>
-                        <SelectItem value="quinzenal">Quinzenal</SelectItem>
-                        <SelectItem value="mensal">Mensal</SelectItem>
-                        <SelectItem value="bimestral">Bimestral</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Data fim da recorrência</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !dataFimRecorrencia && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dataFimRecorrencia ? format(dataFimRecorrencia, "dd/MM/yyyy", { locale: ptBR }) : "Opcional"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={dataFimRecorrencia}
-                          onSelect={setDataFimRecorrencia}
-                          locale={ptBR}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-3">Classificação Contábil</h3>
