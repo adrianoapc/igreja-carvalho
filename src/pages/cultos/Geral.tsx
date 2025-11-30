@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Users, Music, Clock } from "lucide-react";
+import { Plus, Calendar, Users, Music, Clock, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +63,13 @@ export default function CultosGeral() {
       icon: Users,
       path: "/cultos/times",
       stats: [{ label: "Times Ativos", value: stats.timesAtivos }]
+    },
+    {
+      title: "Dashboard Liturgia",
+      description: "Estatísticas e análise de participação",
+      icon: BarChart3,
+      path: "/cultos/liturgia-dashboard",
+      stats: [{ label: "Cultos", value: stats.cultosRealizados }]
     }
   ];
 
@@ -78,6 +85,12 @@ export default function CultosGeral() {
       description: "Adicionar ou editar times",
       icon: Users,
       action: () => navigate("/cultos/times")
+    },
+    {
+      title: "Ver Dashboard Liturgia",
+      description: "Estatísticas de participação",
+      icon: BarChart3,
+      action: () => navigate("/cultos/liturgia-dashboard")
     }
   ];
 

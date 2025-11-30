@@ -26,6 +26,7 @@ import CultosEventos from "./pages/cultos/Eventos";
 import CultosTimes from "./pages/cultos/Times";
 import CultosCategorias from "./pages/cultos/Categorias";
 import CultosPosicoes from "./pages/cultos/Posicoes";
+import LiturgiaDashboard from "./pages/cultos/LiturgiaDashboard";
 import Financas from "./pages/Financas";
 import FinancasDashboard from "./pages/financas/Dashboard";
 import FinancasProjecao from "./pages/financas/Projecao";
@@ -249,6 +250,7 @@ function App() {
             <Route path="times" element={<CultosTimes />} />
             <Route path="categorias" element={<CultosCategorias />} />
             <Route path="posicoes" element={<CultosPosicoes />} />
+            <Route path="liturgia-dashboard" element={<LiturgiaDashboard />} />
           </Route>
           <Route
             path="/financas"
