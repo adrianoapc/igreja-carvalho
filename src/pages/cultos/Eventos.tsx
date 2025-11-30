@@ -1,13 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, Clock, MapPin, User, Users as UsersIcon } from "lucide-react";
+import { Plus, Calendar, Clock, MapPin, User, Users as UsersIcon, List, CalendarDays } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import EscalasDialog from "@/components/cultos/EscalasDialog";
+import CalendarioMensal from "@/components/cultos/CalendarioMensal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Culto {
   id: string;
@@ -34,6 +36,7 @@ export default function Eventos() {
   const [loading, setLoading] = useState(true);
   const [escalasDialogOpen, setEscalasDialogOpen] = useState(false);
   const [cultoSelecionado, setCultoSelecionado] = useState<Culto | null>(null);
+  const [escalasCount, setEscalasCount] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadCultos();
@@ -48,6 +51,21 @@ export default function Eventos() {
 
       if (error) throw error;
       setCultos(data || []);
+
+      // Carregar contagem de escalas para cada culto
+      if (data && data.length > 0) {
+        const { data: escalasData } = await supabase
+          .from("escalas_culto")
+          .select("culto_id");
+        
+        if (escalasData) {
+          const counts: Record<string, number> = {};
+          escalasData.forEach((escala) => {
+            counts[escala.culto_id] = (counts[escala.culto_id] || 0) + 1;
+          });
+          setEscalasCount(counts);
+        }
+      }
     } catch (error: any) {
       toast.error("Erro ao carregar eventos", {
         description: error.message
@@ -91,8 +109,22 @@ export default function Eventos() {
         </Button>
       </div>
 
-      {/* Lista de Cultos/Eventos */}
-      <div className="grid gap-4 md:gap-6">
+      {/* Tabs para alternar entre Lista e Calendário */}
+      <Tabs defaultValue="lista" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="lista" className="flex items-center gap-2">
+            <List className="w-4 h-4" />
+            <span className="hidden sm:inline">Lista</span>
+          </TabsTrigger>
+          <TabsTrigger value="calendario" className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4" />
+            <span className="hidden sm:inline">Calendário</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="lista" className="mt-4">
+          {/* Lista de Cultos/Eventos */}
+          <div className="grid gap-4 md:gap-6">
         {cultos.map((culto) => {
           const dataCulto = new Date(culto.data_culto);
           const statusConfig = STATUS_CONFIG[culto.status as keyof typeof STATUS_CONFIG];
@@ -183,22 +215,32 @@ export default function Eventos() {
           );
         })}
 
-        {cultos.length === 0 && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Nenhum evento cadastrado</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Comece criando seu primeiro culto ou evento.
-              </p>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Evento
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            {cultos.length === 0 && (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Nenhum evento cadastrado</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Comece criando seu primeiro culto ou evento.
+                  </p>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Evento
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="calendario" className="mt-4">
+          <CalendarioMensal 
+            cultos={cultos}
+            escalasCount={escalasCount}
+            onCultoClick={handleGerenciarEscalas}
+          />
+        </TabsContent>
+      </Tabs>
 
       <EscalasDialog
         open={escalasDialogOpen}
