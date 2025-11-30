@@ -16,6 +16,7 @@ interface NotaFiscalData {
   descricao: string;
   numero_nota?: string;
   tipo_documento?: string;
+  anexo_url?: string;
 }
 
 interface ProcessarNotaFiscalDialogProps {
@@ -88,10 +89,34 @@ export default function ProcessarNotaFiscalDialog({
           throw new Error(data.error);
         }
 
+        // Fazer upload do arquivo para o Storage
+        toast.loading('Salvando arquivo...', { id: 'processing' });
+        
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `notas-fiscais/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('transaction-attachments')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Obter URL pública do arquivo
+        const { data: { publicUrl } } = supabase.storage
+          .from('transaction-attachments')
+          .getPublicUrl(filePath);
+
         toast.success('Nota fiscal processada com sucesso!', { id: 'processing' });
         
-        // Passar dados extraídos para o componente pai
-        onDadosExtraidos(data.dados);
+        // Passar dados extraídos + URL do anexo para o componente pai
+        onDadosExtraidos({
+          ...data.dados,
+          anexo_url: publicUrl
+        });
         onOpenChange(false);
         
         // Limpar estado

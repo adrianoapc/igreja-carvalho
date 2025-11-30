@@ -240,6 +240,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         setObservacoes(`Nota Fiscal: ${dados.numero_nota}\n${dados.tipo_documento ? `Tipo: ${dados.tipo_documento}\n` : ''}${observacoes}`);
       }
 
+      // Definir URL do anexo se disponível
+      if (dados.anexo_url) {
+        setAnexoUrl(dados.anexo_url);
+      }
+
       // Buscar ou criar fornecedor
       if (dados.fornecedor_nome) {
         // Limpar CNPJ/CPF (remover formatação)
