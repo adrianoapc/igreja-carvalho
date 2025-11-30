@@ -36,6 +36,7 @@ import FinancasProjecao from "./pages/financas/Projecao";
 import Entradas from "./pages/financas/Entradas";
 import Saidas from "./pages/financas/Saidas";
 import Insights from "./pages/financas/Insights";
+import RelatorioOferta from "./pages/financas/RelatorioOferta";
 import Contas from "./pages/financas/Contas";
 import BasesMinisteriais from "./pages/financas/BasesMinisteriais";
 import CentrosCusto from "./pages/financas/CentrosCusto";
@@ -301,6 +302,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <FinancasProjecao />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/relatorio-oferta"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <RelatorioOferta />
                 </MainLayout>
               </ProtectedRoute>
             }
