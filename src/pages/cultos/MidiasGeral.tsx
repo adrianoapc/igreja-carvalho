@@ -360,6 +360,14 @@ export default function MidiasGeral() {
     setDialogOpen(true);
   };
 
+  const handleCloseDialog = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      // Limpar mídia editando quando fechar o dialog
+      setTimeout(() => setMidiaEditando(undefined), 300);
+    }
+  };
+
   const handleDeletar = async (id: string) => {
     try {
       // Buscar URL da mídia para deletar do storage
@@ -534,7 +542,7 @@ export default function MidiasGeral() {
 
       <MidiaDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={handleCloseDialog}
         midia={midiaEditando}
         onSuccess={loadMidias}
       />
