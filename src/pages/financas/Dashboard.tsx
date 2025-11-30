@@ -281,7 +281,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-soft">
+        <Card 
+          className="shadow-soft hover:shadow-md transition-all cursor-pointer"
+          onClick={() => navigate('/financas/contas')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
