@@ -115,13 +115,11 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
   };
 
   const loadMidias = async () => {
-    if (!culto) return;
-    
     try {
+      // Carregar todas as mídias ativas (não filtrar por culto_id pois são reutilizáveis)
       const { data, error } = await supabase
         .from("midias")
         .select("id, titulo, tipo, canal, url, ativo")
-        .eq("culto_id", culto.id)
         .eq("ativo", true)
         .order("titulo", { ascending: true });
 
