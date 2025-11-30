@@ -1,32 +1,23 @@
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { LogOut, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
 export default function UserMenu() {
-  const { profile, signOut } = useAuth();
+  const {
+    profile,
+    signOut
+  } = useAuth();
   const navigate = useNavigate();
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/public");
   };
-
   if (!profile) return null;
-
-  return (
-    <DropdownMenu>
+  return <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold">
+        <Button variant="outline" size="sm" className="gap-2 bg-[#eff0cf]">
+          <div className="w-8 h-8 rounded-full bg-gradient-accent flex items-center justify-center font-bold bg-[#eff0cf] text-[#010f0d]">
             {profile.nome.charAt(0).toUpperCase()}
           </div>
           <span className="hidden md:inline">{profile.nome}</span>
@@ -53,6 +44,5 @@ export default function UserMenu() {
           <span>Sair</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
-  );
+    </DropdownMenu>;
 }
