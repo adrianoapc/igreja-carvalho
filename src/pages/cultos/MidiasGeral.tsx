@@ -153,7 +153,7 @@ function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
   );
 }
 
-export default function Midias() {
+export default function MidiasGeral() {
   const [midias, setMidias] = useState<Midia[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -167,6 +167,21 @@ export default function Midias() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Detectar canal inicial da URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const canalParam = params.get("canal");
+    if (canalParam && ["app", "redes_sociais", "telao", "site"].includes(canalParam)) {
+      setCanalAtivo(canalParam);
+    }
+    
+    // Abrir dialog de nova mídia se tiver parâmetro novo=true
+    const novoParam = params.get("novo");
+    if (novoParam === "true") {
+      setDialogOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     loadMidias();
