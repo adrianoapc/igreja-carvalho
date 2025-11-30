@@ -694,6 +694,7 @@ export type Database = {
           descricao: string | null
           duracao_minutos: number | null
           id: string
+          midias_ids: string[] | null
           ordem: number
           responsavel_externo: string | null
           responsavel_id: string | null
@@ -707,6 +708,7 @@ export type Database = {
           descricao?: string | null
           duracao_minutos?: number | null
           id?: string
+          midias_ids?: string[] | null
           ordem: number
           responsavel_externo?: string | null
           responsavel_id?: string | null
@@ -720,6 +722,7 @@ export type Database = {
           descricao?: string | null
           duracao_minutos?: number | null
           id?: string
+          midias_ids?: string[] | null
           ordem?: number
           responsavel_externo?: string | null
           responsavel_id?: string | null

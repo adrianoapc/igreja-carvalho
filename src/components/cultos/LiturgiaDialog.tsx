@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink } from "lucide-react";
 
 interface Culto {
   id: string;
@@ -24,6 +24,15 @@ interface Membro {
   nome: string;
 }
 
+interface Midia {
+  id: string;
+  titulo: string;
+  tipo: string;
+  canal: string;
+  url: string;
+  ativo: boolean;
+}
+
 interface ItemLiturgia {
   id: string;
   tipo: string;
@@ -33,6 +42,7 @@ interface ItemLiturgia {
   duracao_minutos: number | null;
   responsavel_id: string | null;
   responsavel_externo: string | null;
+  midias_ids: string[] | null;
   responsavel?: {
     nome: string;
     telefone: string | null;
@@ -62,9 +72,12 @@ const TIPOS_LITURGIA = [
 export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDialogProps) {
   const [itens, setItens] = useState<ItemLiturgia[]>([]);
   const [membros, setMembros] = useState<Membro[]>([]);
+  const [midias, setMidias] = useState<Midia[]>([]);
+  const [midiasVinculadas, setMidiasVinculadas] = useState<Map<string, Midia[]>>(new Map());
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState<ItemLiturgia | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showMidiasDialog, setShowMidiasDialog] = useState(false);
 
   // Form state
   const [tipo, setTipo] = useState("");
@@ -74,11 +87,13 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
   const [responsavelId, setResponsavelId] = useState<string>("");
   const [isConvidadoExterno, setIsConvidadoExterno] = useState(false);
   const [nomeConvidadoExterno, setNomeConvidadoExterno] = useState("");
+  const [midiasSelecionadas, setMidiasSelecionadas] = useState<string[]>([]);
 
   useEffect(() => {
     if (open && culto) {
       loadItens();
       loadMembros();
+      loadMidias();
     }
   }, [open, culto]);
 
@@ -99,6 +114,56 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     }
   };
 
+  const loadMidias = async () => {
+    if (!culto) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("midias")
+        .select("id, titulo, tipo, canal, url, ativo")
+        .eq("culto_id", culto.id)
+        .eq("ativo", true)
+        .order("titulo", { ascending: true });
+
+      if (error) throw error;
+      setMidias(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar mídias", {
+        description: error.message
+      });
+    }
+  };
+
+  const loadMidiasVinculadas = async (itens: ItemLiturgia[]) => {
+    try {
+      const idsComMidias = itens
+        .filter(item => item.midias_ids && item.midias_ids.length > 0)
+        .map(item => item.midias_ids!)
+        .flat();
+
+      if (idsComMidias.length === 0) return;
+
+      const { data, error } = await supabase
+        .from("midias")
+        .select("id, titulo, tipo, canal, url, ativo")
+        .in("id", idsComMidias);
+
+      if (error) throw error;
+
+      const midiasMap = new Map<string, Midia[]>();
+      itens.forEach(item => {
+        if (item.midias_ids && item.midias_ids.length > 0) {
+          const midiasDoItem = data?.filter(m => item.midias_ids!.includes(m.id)) || [];
+          midiasMap.set(item.id, midiasDoItem);
+        }
+      });
+
+      setMidiasVinculadas(midiasMap);
+    } catch (error: any) {
+      console.error("Erro ao carregar mídias vinculadas:", error.message);
+    }
+  };
+
   const loadItens = async () => {
     if (!culto) return;
     
@@ -114,7 +179,9 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
         .order("ordem", { ascending: true });
 
       if (error) throw error;
-      setItens(data || []);
+      const itensData = data || [];
+      setItens(itensData);
+      await loadMidiasVinculadas(itensData);
     } catch (error: any) {
       toast.error("Erro ao carregar liturgia", {
         description: error.message
@@ -132,6 +199,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setResponsavelId("");
     setIsConvidadoExterno(false);
     setNomeConvidadoExterno("");
+    setMidiasSelecionadas([]);
     setEditando(null);
     setShowForm(false);
   };
@@ -147,6 +215,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setTitulo(item.titulo);
     setDescricao(item.descricao || "");
     setDuracaoMinutos(item.duracao_minutos || undefined);
+    setMidiasSelecionadas(item.midias_ids || []);
     
     // Verificar se é convidado externo ou membro
     if (item.responsavel_externo) {
@@ -183,6 +252,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
         duracao_minutos: duracaoMinutos || null,
         responsavel_id: isConvidadoExterno ? null : (responsavelId || null),
         responsavel_externo: isConvidadoExterno ? nomeConvidadoExterno.trim() : null,
+        midias_ids: midiasSelecionadas.length > 0 ? midiasSelecionadas : null,
       };
 
       if (editando) {
@@ -454,6 +524,38 @@ Qualquer dúvida, entre em contato conosco.`;
                   />
                 </div>
 
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Mídias Relacionadas</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowMidiasDialog(true)}
+                      disabled={midias.length === 0}
+                    >
+                      <Film className="w-4 h-4 mr-2" />
+                      Selecionar Mídias
+                    </Button>
+                  </div>
+                  {midiasSelecionadas.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {midias
+                        .filter(m => midiasSelecionadas.includes(m.id))
+                        .map(midia => (
+                          <Badge key={midia.id} variant="secondary" className="text-xs">
+                            {midia.titulo}
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
+                  {midias.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Nenhuma mídia cadastrada para este culto
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={resetForm} disabled={loading}>
                     Cancelar
@@ -506,10 +608,33 @@ Qualquer dúvida, entre em contato conosco.`;
                             ) : null}
                           </div>
                           <h4 className="font-medium text-sm">{item.titulo}</h4>
-                          {item.descricao && (
+                           {item.descricao && (
                             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                               {item.descricao}
                             </p>
+                          )}
+                          
+                          {/* Mídias vinculadas */}
+                          {midiasVinculadas.has(item.id) && midiasVinculadas.get(item.id)!.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Film className="w-3 h-3" />
+                                <span>Mídias:</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {midiasVinculadas.get(item.id)!.map(midia => (
+                                  <Badge
+                                    key={midia.id}
+                                    variant="outline"
+                                    className="text-xs cursor-pointer hover:bg-accent"
+                                    onClick={() => window.open(midia.url, '_blank')}
+                                  >
+                                    <ExternalLink className="w-3 h-3 mr-1" />
+                                    {midia.titulo}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
 
@@ -564,6 +689,70 @@ Qualquer dúvida, entre em contato conosco.`;
             </div>
           </ScrollArea>
         </div>
+
+        {/* Dialog de seleção de mídias */}
+        <Dialog open={showMidiasDialog} onOpenChange={setShowMidiasDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Selecionar Mídias</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="max-h-[400px] pr-4">
+              <div className="space-y-2">
+                {midias.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma mídia disponível
+                  </p>
+                ) : (
+                  midias.map(midia => (
+                    <Card
+                      key={midia.id}
+                      className={`cursor-pointer transition-colors ${
+                        midiasSelecionadas.includes(midia.id)
+                          ? 'border-primary bg-accent'
+                          : 'hover:bg-accent/50'
+                      }`}
+                      onClick={() => {
+                        setMidiasSelecionadas(prev =>
+                          prev.includes(midia.id)
+                            ? prev.filter(id => id !== midia.id)
+                            : [...prev, midia.id]
+                        );
+                      }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm truncate">{midia.titulo}</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs">
+                                {midia.tipo}
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                {midia.canal}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Checkbox
+                            checked={midiasSelecionadas.includes(midia.id)}
+                            onCheckedChange={() => {}}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowMidiasDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={() => setShowMidiasDialog(false)}>
+                Confirmar ({midiasSelecionadas.length})
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
