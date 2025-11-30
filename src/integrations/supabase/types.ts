@@ -1472,6 +1472,7 @@ export type Database = {
       templates_culto: {
         Row: {
           ativo: boolean
+          categoria: string | null
           created_at: string
           descricao: string | null
           duracao_padrao: number | null
@@ -1487,6 +1488,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          categoria?: string | null
           created_at?: string
           descricao?: string | null
           duracao_padrao?: number | null
@@ -1502,6 +1504,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          categoria?: string | null
           created_at?: string
           descricao?: string | null
           duracao_padrao?: number | null

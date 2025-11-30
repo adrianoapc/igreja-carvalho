@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -24,6 +25,29 @@ export function SalvarComoTemplateDialog({
   const [loading, setLoading] = useState(false);
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [incluirEscalas, setIncluirEscalas] = useState(false);
+
+  useEffect(() => {
+    if (open && cultoId) {
+      loadCultoData();
+    }
+  }, [open, cultoId]);
+
+  const loadCultoData = async () => {
+    try {
+      const { data: culto } = await supabase
+        .from("cultos")
+        .select("*")
+        .eq("id", cultoId)
+        .single();
+
+      if (culto) {
+        setNome(`Template - ${culto.titulo}`);
+      }
+    } catch (error: any) {
+      console.error("Erro ao carregar dados do culto:", error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +60,15 @@ export function SalvarComoTemplateDialog({
     setLoading(true);
 
     try {
+      // Buscar dados do culto
+      const { data: culto, error: cultoError } = await supabase
+        .from("cultos")
+        .select("*")
+        .eq("id", cultoId)
+        .single();
+
+      if (cultoError) throw cultoError;
+
       // Buscar itens da liturgia atual
       const { data: itensLiturgia, error: itensError } = await supabase
         .from("liturgia_culto")
@@ -50,12 +83,20 @@ export function SalvarComoTemplateDialog({
         return;
       }
 
-      // Criar template
+      // Criar template com dados do culto
       const { data: novoTemplate, error: templateError } = await supabase
         .from("templates_culto")
         .insert({
           nome: nome.trim(),
           descricao: descricao.trim() || null,
+          tipo_culto: culto.tipo,
+          tema_padrao: culto.tema,
+          local_padrao: culto.local,
+          duracao_padrao: culto.duracao_minutos,
+          pregador_padrao: culto.pregador,
+          observacoes_padrao: culto.observacoes,
+          incluir_escalas: incluirEscalas,
+          categoria: "Geral",
           ativo: true
         })
         .select()
@@ -81,11 +122,38 @@ export function SalvarComoTemplateDialog({
 
       if (itensInsertError) throw itensInsertError;
 
+      // Salvar escalas se solicitado
+      if (incluirEscalas) {
+        const { data: escalas, error: escalasError } = await supabase
+          .from("escalas_culto")
+          .select("time_id, posicao_id, pessoa_id, observacoes")
+          .eq("culto_id", cultoId);
+
+        if (escalasError) throw escalasError;
+
+        if (escalas && escalas.length > 0) {
+          const escalasTemplate = escalas.map(escala => ({
+            template_id: novoTemplate.id,
+            time_id: escala.time_id,
+            posicao_id: escala.posicao_id,
+            pessoa_id: escala.pessoa_id,
+            observacoes: escala.observacoes
+          }));
+
+          const { error: escalasInsertError } = await supabase
+            .from("escalas_template")
+            .insert(escalasTemplate);
+
+          if (escalasInsertError) throw escalasInsertError;
+        }
+      }
+
       toast.success("Template criado com sucesso");
       onSuccess?.();
       onOpenChange(false);
       setNome("");
       setDescricao("");
+      setIncluirEscalas(false);
     } catch (error: any) {
       console.error("Erro ao salvar template:", error);
       toast.error(error.message || "Erro ao salvar template");
@@ -122,6 +190,17 @@ export function SalvarComoTemplateDialog({
               placeholder="Descreva quando usar este template..."
               rows={3}
             />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="incluirEscalas"
+              checked={incluirEscalas}
+              onCheckedChange={(checked) => setIncluirEscalas(checked as boolean)}
+            />
+            <Label htmlFor="incluirEscalas" className="text-sm font-normal cursor-pointer">
+              Incluir escalas de times no template
+            </Label>
           </div>
 
           <div className="flex gap-2 justify-end">

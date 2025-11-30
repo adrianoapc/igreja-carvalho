@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -13,10 +14,11 @@ import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, FileText, Info } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { TemplatePreviewDialog } from "./TemplatePreviewDialog";
 
 interface Culto {
   id: string;
@@ -55,6 +57,10 @@ type CultoFormData = z.infer<typeof cultoSchema>;
 
 export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: CultoDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false);
+  const [templateApplied, setTemplateApplied] = useState(false);
   const isEditing = !!culto;
 
   const form = useForm<CultoFormData>({
@@ -73,6 +79,10 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
   });
 
   useEffect(() => {
+    if (open && !isEditing) {
+      loadTemplates();
+    }
+    
     if (culto) {
       const dataCulto = new Date(culto.data_culto);
       form.reset({
@@ -99,8 +109,36 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         tema: "",
         status: "planejado",
       });
+      setTemplateApplied(false);
     }
-  }, [culto, form]);
+  }, [culto, form, open, isEditing]);
+
+  const loadTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("templates_culto")
+        .select("id, nome, categoria, tipo_culto")
+        .eq("ativo", true)
+        .order("categoria, nome");
+
+      if (error) throw error;
+      setTemplates(data || []);
+    } catch (error: any) {
+      console.error("Erro ao carregar templates:", error);
+    }
+  };
+
+  const handleApplyTemplate = (template: any) => {
+    form.setValue("tipo", template.tipo_culto || "");
+    form.setValue("titulo", template.tema_padrao || "");
+    form.setValue("duracao_minutos", template.duracao_padrao || 120);
+    form.setValue("local", template.local_padrao || "");
+    form.setValue("pregador", template.pregador_padrao || "");
+    form.setValue("tema", template.tema_padrao || "");
+    
+    setTemplateApplied(true);
+    toast.success("Template aplicado! Configure data e finalize a criação.");
+  };
 
   const onSubmit = async (data: CultoFormData) => {
     setLoading(true);
@@ -131,11 +169,19 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         if (error) throw error;
         toast.success("Evento atualizado com sucesso!");
       } else {
-        const { error } = await supabase
+        const { data: novoCulto, error: cultoError } = await supabase
           .from("cultos")
-          .insert([cultoData]);
+          .insert([cultoData])
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (cultoError) throw cultoError;
+
+        // Se template foi aplicado, copiar liturgia e escalas
+        if (templateApplied && selectedTemplateId && novoCulto) {
+          await aplicarTemplateAoCulto(selectedTemplateId, novoCulto.id);
+        }
+
         toast.success("Evento criado com sucesso!");
       }
 
@@ -150,6 +196,65 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
     }
   };
 
+  const aplicarTemplateAoCulto = async (templateId: string, cultoId: string) => {
+    try {
+      // Buscar template completo
+      const { data: template } = await supabase
+        .from("templates_culto")
+        .select("*")
+        .eq("id", templateId)
+        .single();
+
+      if (!template) return;
+
+      // Copiar itens de liturgia
+      const { data: itensTemplate } = await supabase
+        .from("itens_template_culto")
+        .select("*")
+        .eq("template_id", templateId)
+        .order("ordem");
+
+      if (itensTemplate && itensTemplate.length > 0) {
+        const novosItens = itensTemplate.map(item => ({
+          culto_id: cultoId,
+          ordem: item.ordem,
+          tipo: item.tipo,
+          titulo: item.titulo,
+          descricao: item.descricao,
+          duracao_minutos: item.duracao_minutos,
+          responsavel_externo: item.responsavel_externo,
+          midias_ids: item.midias_ids
+        }));
+
+        await supabase.from("liturgia_culto").insert(novosItens);
+      }
+
+      // Copiar escalas se incluídas
+      if (template.incluir_escalas) {
+        const { data: escalasTemplate } = await supabase
+          .from("escalas_template")
+          .select("*")
+          .eq("template_id", templateId);
+
+        if (escalasTemplate && escalasTemplate.length > 0) {
+          const novasEscalas = escalasTemplate.map(escala => ({
+            culto_id: cultoId,
+            time_id: escala.time_id,
+            posicao_id: escala.posicao_id,
+            pessoa_id: escala.pessoa_id,
+            observacoes: escala.observacoes,
+            confirmado: false
+          }));
+
+          await supabase.from("escalas_culto").insert(novasEscalas);
+        }
+      }
+    } catch (error: any) {
+      console.error("Erro ao aplicar template:", error);
+      toast.error("Template aplicado com avisos - verifique liturgia e escalas");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -158,6 +263,50 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
             {isEditing ? "Editar Evento" : "Novo Evento"}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Seleção de Template (apenas para novos cultos) */}
+        {!isEditing && !templateApplied && templates.length > 0 && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <span className="text-sm">
+                Deseja usar um template existente?
+              </span>
+              <div className="flex items-center gap-2">
+                <Select value={selectedTemplateId || ""} onValueChange={setSelectedTemplateId}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Selecionar template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setShowTemplatePreview(true)}
+                  disabled={!selectedTemplateId}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Preview
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {templateApplied && !isEditing && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              Template aplicado! Configure a data e revise os detalhes antes de salvar.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -395,6 +544,14 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
           </form>
         </Form>
       </DialogContent>
+
+      {/* Preview Dialog */}
+      <TemplatePreviewDialog
+        open={showTemplatePreview}
+        onOpenChange={setShowTemplatePreview}
+        templateId={selectedTemplateId}
+        onConfirm={handleApplyTemplate}
+      />
     </Dialog>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, FileText, ArrowLeft, Copy } from "lucide-react";
@@ -18,6 +19,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const CATEGORIAS_FILTER = [
+  "Todos",
+  "Culto Dominical",
+  "Culto Especial",
+  "Celebrações",
+  "Eventos",
+  "Reuniões",
+  "Geral"
+];
+
 interface Template {
   id: string;
   nome: string;
@@ -25,6 +36,8 @@ interface Template {
   ativo: boolean;
   created_at: string;
   itens_count?: number;
+  categoria?: string;
+  tipo_culto?: string;
 }
 
 export default function Templates() {
@@ -35,6 +48,7 @@ export default function Templates() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | undefined>();
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+  const [categoriaFilter, setCategoriaFilter] = useState("Todos");
 
   useEffect(() => {
     loadTemplates();
@@ -196,6 +210,17 @@ export default function Templates() {
         </Button>
       </div>
 
+      {/* Filtros de Categoria */}
+      <Tabs value={categoriaFilter} onValueChange={setCategoriaFilter} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
+          {CATEGORIAS_FILTER.map((cat) => (
+            <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm">
+              {cat}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
       {templates.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -211,7 +236,11 @@ export default function Templates() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {templates.map((template) => (
+          {templates
+            .filter(template => 
+              categoriaFilter === "Todos" || template.categoria === categoriaFilter
+            )
+            .map((template) => (
             <Card key={template.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
@@ -230,6 +259,17 @@ export default function Templates() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {template.categoria && (
+                      <Badge variant="outline">{template.categoria}</Badge>
+                    )}
+                    {template.tipo_culto && (
+                      <Badge variant="secondary" className="text-xs">
+                        {template.tipo_culto}
+                      </Badge>
+                    )}
+                  </div>
+                  
                   <div className="text-sm text-muted-foreground">
                     <FileText className="h-4 w-4 inline mr-1" />
                     {template.itens_count || 0} {template.itens_count === 1 ? "item" : "itens"}

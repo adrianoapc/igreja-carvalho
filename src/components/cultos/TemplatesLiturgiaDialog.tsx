@@ -24,6 +24,15 @@ const TIPOS_CULTO = [
   "Outro"
 ];
 
+const CATEGORIAS_TEMPLATE = [
+  "Culto Dominical",
+  "Culto Especial",
+  "Celebrações",
+  "Eventos",
+  "Reuniões",
+  "Geral"
+];
+
 interface ItemTemplate {
   ordem: number;
   tipo: string;
@@ -49,6 +58,7 @@ interface TemplatesLiturgiaDialogProps {
     pregador_padrao?: string;
     observacoes_padrao?: string;
     incluir_escalas?: boolean;
+    categoria?: string;
   };
   onSuccess?: () => void;
 }
@@ -69,6 +79,7 @@ export function TemplatesLiturgiaDialog({
   const [pregadorPadrao, setPregadorPadrao] = useState("");
   const [observacoesPadrao, setObservacoesPadrao] = useState("");
   const [incluirEscalas, setIncluirEscalas] = useState(false);
+  const [categoria, setCategoria] = useState("Geral");
 
   useEffect(() => {
     if (template) {
@@ -81,6 +92,7 @@ export function TemplatesLiturgiaDialog({
       setPregadorPadrao(template.pregador_padrao || "");
       setObservacoesPadrao(template.observacoes_padrao || "");
       setIncluirEscalas(template.incluir_escalas || false);
+      setCategoria(template.categoria || "Geral");
     } else {
       setNome("");
       setDescricao("");
@@ -91,6 +103,7 @@ export function TemplatesLiturgiaDialog({
       setPregadorPadrao("");
       setObservacoesPadrao("");
       setIncluirEscalas(false);
+      setCategoria("Geral");
     }
   }, [template, open]);
 
@@ -114,7 +127,8 @@ export function TemplatesLiturgiaDialog({
         duracao_padrao: duracaoPadrao || null,
         pregador_padrao: pregadorPadrao.trim() || null,
         observacoes_padrao: observacoesPadrao.trim() || null,
-        incluir_escalas: incluirEscalas
+        incluir_escalas: incluirEscalas,
+        categoria: categoria
       };
 
       if (template) {
@@ -180,6 +194,22 @@ export function TemplatesLiturgiaDialog({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="categoria">Categoria *</Label>
+              <Select value={categoria} onValueChange={setCategoria} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS_TEMPLATE.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="tipoCulto">Tipo de Culto</Label>
               <Select value={tipoCulto} onValueChange={setTipoCulto}>
                 <SelectTrigger>
@@ -194,6 +224,9 @@ export function TemplatesLiturgiaDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             <div className="space-y-2">
               <Label htmlFor="duracaoPadrao">Duração Padrão (min)</Label>
