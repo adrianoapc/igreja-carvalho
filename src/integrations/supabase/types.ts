@@ -1597,6 +1597,7 @@ export type Database = {
         Args: { p_details?: string; p_function_name: string; p_status: string }
         Returns: undefined
       }
+      mask_cpf_cnpj: { Args: { cpf_cnpj: string }; Returns: string }
       notify_admins: {
         Args: {
           p_message: string
