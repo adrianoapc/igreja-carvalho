@@ -217,6 +217,96 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     },
   });
 
+  // Função para buscar sugestões baseadas em transações anteriores do fornecedor
+  const buscarSugestoesFornecedor = async (fornecedorIdParam: string) => {
+    if (!fornecedorIdParam || fornecedorIdParam === 'none') return;
+
+    try {
+      // Buscar últimas 20 transações do fornecedor
+      const { data: transacoes, error } = await supabase
+        .from('transacoes_financeiras')
+        .select('categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id')
+        .eq('fornecedor_id', fornecedorIdParam)
+        .not('categoria_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      if (!transacoes || transacoes.length === 0) return;
+
+      // Contar frequência de cada categoria/subcategoria/centro de custo
+      const categoriaFreq: Record<string, number> = {};
+      const subcategoriaFreq: Record<string, number> = {};
+      const centroCustoFreq: Record<string, number> = {};
+      const baseMinisterialFreq: Record<string, number> = {};
+
+      transacoes.forEach(t => {
+        if (t.categoria_id) {
+          categoriaFreq[t.categoria_id] = (categoriaFreq[t.categoria_id] || 0) + 1;
+        }
+        if (t.subcategoria_id) {
+          subcategoriaFreq[t.subcategoria_id] = (subcategoriaFreq[t.subcategoria_id] || 0) + 1;
+        }
+        if (t.centro_custo_id) {
+          centroCustoFreq[t.centro_custo_id] = (centroCustoFreq[t.centro_custo_id] || 0) + 1;
+        }
+        if (t.base_ministerial_id) {
+          baseMinisterialFreq[t.base_ministerial_id] = (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
+        }
+      });
+
+      // Encontrar os mais frequentes
+      const getMaisFrequente = (freq: Record<string, number>) => {
+        const entries = Object.entries(freq);
+        if (entries.length === 0) return null;
+        return entries.reduce((a, b) => a[1] > b[1] ? a : b)[0];
+      };
+
+      const categoriaSugerida = getMaisFrequente(categoriaFreq);
+      const subcategoriaSugerida = getMaisFrequente(subcategoriaFreq);
+      const centroCustoSugerido = getMaisFrequente(centroCustoFreq);
+      const baseMinisterialSugerida = getMaisFrequente(baseMinisterialFreq);
+
+      // Aplicar sugestões apenas se os campos estiverem vazios
+      if (categoriaSugerida && (categoriaId === 'none' || categoriaId === '')) {
+        setCategoriaId(categoriaSugerida);
+      }
+      if (subcategoriaSugerida && (subcategoriaId === 'none' || subcategoriaId === '')) {
+        setSubcategoriaId(subcategoriaSugerida);
+      }
+      if (centroCustoSugerido && (centroCustoId === 'none' || centroCustoId === '')) {
+        setCentroCustoId(centroCustoSugerido);
+      }
+      if (baseMinisterialSugerida && (baseMinisterialId === 'none' || baseMinisterialId === '')) {
+        setBaseMinisterialId(baseMinisterialSugerida);
+      }
+
+      // Notificar usuário sobre sugestões aplicadas
+      const sugestoesAplicadas = [];
+      if (categoriaSugerida) sugestoesAplicadas.push('categoria');
+      if (subcategoriaSugerida) sugestoesAplicadas.push('subcategoria');
+      if (centroCustoSugerido) sugestoesAplicadas.push('centro de custo');
+      if (baseMinisterialSugerida) sugestoesAplicadas.push('base ministerial');
+
+      if (sugestoesAplicadas.length > 0) {
+        toast.success('💡 Sugestões aplicadas', {
+          description: `Baseado em transações anteriores: ${sugestoesAplicadas.join(', ')}`
+        });
+      }
+
+    } catch (error) {
+      console.error('Erro ao buscar sugestões:', error);
+      // Não mostrar erro ao usuário, apenas log
+    }
+  };
+
+  // Monitorar mudanças no fornecedor para aplicar sugestões
+  useEffect(() => {
+    if (fornecedorId && fornecedorId !== 'none' && open) {
+      buscarSugestoesFornecedor(fornecedorId);
+    }
+  }, [fornecedorId, open]);
+
   // Função para processar dados da nota fiscal
   const handleDadosNotaFiscal = async (dados: any) => {
     try {
@@ -267,6 +357,9 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         if (fornecedorExistente) {
           setFornecedorId(fornecedorExistente.id);
           toast.success('Fornecedor encontrado!', { id: 'process-nf' });
+          
+          // Buscar sugestões baseadas em transações anteriores
+          await buscarSugestoesFornecedor(fornecedorExistente.id);
         } else {
           // Criar novo fornecedor
           const { data: novoFornecedor, error: fornecedorError } = await supabase
@@ -285,6 +378,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           setFornecedorId(novoFornecedor.id);
           queryClient.invalidateQueries({ queryKey: ['fornecedores-select'] });
           toast.success('Novo fornecedor criado!', { id: 'process-nf' });
+          
+          // Como é novo fornecedor, não há histórico para sugestões
         }
       } else {
         toast.success('Dados da nota fiscal carregados!', { id: 'process-nf' });
