@@ -225,7 +225,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       // Buscar últimas 20 transações do fornecedor
       const { data: transacoes, error } = await supabase
         .from('transacoes_financeiras')
-        .select('categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id')
+        .select('categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento')
         .eq('fornecedor_id', fornecedorIdParam)
         .not('categoria_id', 'is', null)
         .order('created_at', { ascending: false })
@@ -234,11 +234,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       if (error) throw error;
       if (!transacoes || transacoes.length === 0) return;
 
-      // Contar frequência de cada categoria/subcategoria/centro de custo
+      // Contar frequência de cada campo
       const categoriaFreq: Record<string, number> = {};
       const subcategoriaFreq: Record<string, number> = {};
       const centroCustoFreq: Record<string, number> = {};
       const baseMinisterialFreq: Record<string, number> = {};
+      const contaFreq: Record<string, number> = {};
+      const formaPagamentoFreq: Record<string, number> = {};
 
       transacoes.forEach(t => {
         if (t.categoria_id) {
@@ -253,6 +255,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         if (t.base_ministerial_id) {
           baseMinisterialFreq[t.base_ministerial_id] = (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
         }
+        if (t.conta_id) {
+          contaFreq[t.conta_id] = (contaFreq[t.conta_id] || 0) + 1;
+        }
+        if (t.forma_pagamento) {
+          formaPagamentoFreq[t.forma_pagamento] = (formaPagamentoFreq[t.forma_pagamento] || 0) + 1;
+        }
       });
 
       // Encontrar os mais frequentes
@@ -266,6 +274,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const subcategoriaSugerida = getMaisFrequente(subcategoriaFreq);
       const centroCustoSugerido = getMaisFrequente(centroCustoFreq);
       const baseMinisterialSugerida = getMaisFrequente(baseMinisterialFreq);
+      const contaSugerida = getMaisFrequente(contaFreq);
+      const formaPagamentoSugerida = getMaisFrequente(formaPagamentoFreq);
 
       // Aplicar sugestões apenas se os campos estiverem vazios
       if (categoriaSugerida && (categoriaId === 'none' || categoriaId === '')) {
@@ -280,6 +290,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       if (baseMinisterialSugerida && (baseMinisterialId === 'none' || baseMinisterialId === '')) {
         setBaseMinisterialId(baseMinisterialSugerida);
       }
+      if (contaSugerida && (contaId === '' || !contaId)) {
+        setContaId(contaSugerida);
+      }
+      if (formaPagamentoSugerida && (formaPagamento === '' || !formaPagamento)) {
+        setFormaPagamento(formaPagamentoSugerida);
+      }
 
       // Notificar usuário sobre sugestões aplicadas
       const sugestoesAplicadas = [];
@@ -287,6 +303,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       if (subcategoriaSugerida) sugestoesAplicadas.push('subcategoria');
       if (centroCustoSugerido) sugestoesAplicadas.push('centro de custo');
       if (baseMinisterialSugerida) sugestoesAplicadas.push('base ministerial');
+      if (contaSugerida) sugestoesAplicadas.push('conta');
+      if (formaPagamentoSugerida) sugestoesAplicadas.push('forma de pagamento');
 
       if (sugestoesAplicadas.length > 0) {
         toast.success('💡 Sugestões aplicadas', {
