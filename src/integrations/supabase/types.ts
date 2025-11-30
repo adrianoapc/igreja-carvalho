@@ -854,8 +854,10 @@ export type Database = {
           created_at: string
           culto_id: string
           descricao: string | null
+          expires_at: string | null
           id: string
           ordem: number
+          scheduled_at: string | null
           tipo: string
           titulo: string
           updated_at: string
@@ -867,8 +869,10 @@ export type Database = {
           created_at?: string
           culto_id: string
           descricao?: string | null
+          expires_at?: string | null
           id?: string
           ordem?: number
+          scheduled_at?: string | null
           tipo: string
           titulo: string
           updated_at?: string
@@ -880,8 +884,10 @@ export type Database = {
           created_at?: string
           culto_id?: string
           descricao?: string | null
+          expires_at?: string | null
           id?: string
           ordem?: number
+          scheduled_at?: string | null
           tipo?: string
           titulo?: string
           updated_at?: string
@@ -1638,6 +1644,10 @@ export type Database = {
         Returns: boolean
       }
       is_member: { Args: { _user_id: string }; Returns: boolean }
+      is_midia_active: {
+        Args: { p_ativo: boolean; p_expires_at: string; p_scheduled_at: string }
+        Returns: boolean
+      }
       log_edge_function_execution: {
         Args: { p_details?: string; p_function_name: string; p_status: string }
         Returns: undefined
