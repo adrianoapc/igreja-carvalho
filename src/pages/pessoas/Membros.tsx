@@ -154,7 +154,7 @@ export default function Membros() {
                             <Mail className="w-3 h-3 flex-shrink-0" />
                             <span className="truncate">{membro.email}</span>
                           </span>}
-                        {membro.telefone && <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground">
+                        {membro.telefone && <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground text-center">
                             <Phone className="w-3 h-3 flex-shrink-0" />
                             {formatarTelefone(membro.telefone)}
                           </span>}
@@ -162,7 +162,7 @@ export default function Membros() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleAtribuirFuncao(membro)}>
+                    <Button variant="outline" size="sm" onClick={() => handleAtribuirFuncao(membro)} className="text-center">
                       <UserPlus className="w-4 h-4 mr-1" />
                       <span className="hidden sm:inline">Atribuir</span>
                     </Button>
