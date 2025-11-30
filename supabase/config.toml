@@ -1,1 +1,4 @@
 project_id = "mcomwaelbwvyotvudnzt"
+
+[functions.processar-nota-fiscal]
+verify_jwt = true

@@ -9,13 +9,14 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, FileImage } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import ProcessarNotaFiscalDialog from "./ProcessarNotaFiscalDialog";
 
 interface TransacaoDialogProps {
   open: boolean;
@@ -27,6 +28,7 @@ interface TransacaoDialogProps {
 export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: TransacaoDialogProps) {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const [processarNotaDialogOpen, setProcessarNotaDialogOpen] = useState(false);
   const [tipoLancamento, setTipoLancamento] = useState<"unico" | "recorrente" | "parcelado">("unico");
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
@@ -215,6 +217,83 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     },
   });
 
+  // Função para processar dados da nota fiscal
+  const handleDadosNotaFiscal = async (dados: any) => {
+    try {
+      toast.loading('Processando dados da nota fiscal...', { id: 'process-nf' });
+
+      // Preencher campos básicos
+      setDescricao(dados.descricao || "");
+      setValor(String(dados.valor_total || ""));
+      
+      if (dados.data_emissao) {
+        setDataVencimento(new Date(dados.data_emissao));
+        setDataCompetencia(new Date(dados.data_emissao));
+      }
+      
+      if (dados.data_vencimento) {
+        setDataVencimento(new Date(dados.data_vencimento));
+      }
+
+      // Adicionar número da nota às observações
+      if (dados.numero_nota) {
+        setObservacoes(`Nota Fiscal: ${dados.numero_nota}\n${dados.tipo_documento ? `Tipo: ${dados.tipo_documento}\n` : ''}${observacoes}`);
+      }
+
+      // Buscar ou criar fornecedor
+      if (dados.fornecedor_nome) {
+        // Limpar CNPJ/CPF (remover formatação)
+        const cnpjCpfLimpo = dados.fornecedor_cnpj_cpf?.replace(/\D/g, '') || null;
+
+        // Buscar fornecedor existente por nome ou CNPJ/CPF
+        let fornecedorQuery = supabase
+          .from('fornecedores')
+          .select('id')
+          .eq('nome', dados.fornecedor_nome)
+          .eq('ativo', true)
+          .limit(1);
+
+        if (cnpjCpfLimpo) {
+          fornecedorQuery = fornecedorQuery.or(`cpf_cnpj.eq.${cnpjCpfLimpo}`);
+        }
+
+        const { data: fornecedorExistente } = await fornecedorQuery.single();
+
+        if (fornecedorExistente) {
+          setFornecedorId(fornecedorExistente.id);
+          toast.success('Fornecedor encontrado!', { id: 'process-nf' });
+        } else {
+          // Criar novo fornecedor
+          const { data: novoFornecedor, error: fornecedorError } = await supabase
+            .from('fornecedores')
+            .insert({
+              nome: dados.fornecedor_nome,
+              cpf_cnpj: cnpjCpfLimpo,
+              tipo_pessoa: cnpjCpfLimpo?.length === 14 ? 'juridica' : cnpjCpfLimpo?.length === 11 ? 'fisica' : 'juridica',
+              ativo: true
+            })
+            .select('id')
+            .single();
+
+          if (fornecedorError) throw fornecedorError;
+
+          setFornecedorId(novoFornecedor.id);
+          queryClient.invalidateQueries({ queryKey: ['fornecedores-select'] });
+          toast.success('Novo fornecedor criado!', { id: 'process-nf' });
+        }
+      } else {
+        toast.success('Dados da nota fiscal carregados!', { id: 'process-nf' });
+      }
+
+    } catch (error: any) {
+      console.error('Erro ao processar dados da nota fiscal:', error);
+      toast.error('Erro ao processar dados', {
+        description: error.message,
+        id: 'process-nf'
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -309,9 +388,24 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {transacao ? 'Editar' : tipo === 'entrada' ? 'Nova Entrada' : 'Nova Saída'}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>
+              {transacao ? 'Editar' : tipo === 'entrada' ? 'Nova Entrada' : 'Nova Saída'}
+            </DialogTitle>
+            {!transacao && tipo === 'saida' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setProcessarNotaDialogOpen(true)}
+                className="gap-2"
+              >
+                <FileImage className="w-4 h-4" />
+                <span className="hidden sm:inline">Processar com IA</span>
+                <span className="sm:hidden">IA</span>
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -771,6 +865,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           </div>
         </form>
       </DialogContent>
+
+      <ProcessarNotaFiscalDialog
+        open={processarNotaDialogOpen}
+        onOpenChange={setProcessarNotaDialogOpen}
+        onDadosExtraidos={handleDadosNotaFiscal}
+      />
     </Dialog>
   );
 }
