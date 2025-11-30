@@ -11,7 +11,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink, FileText, Video, Image as ImageIcon } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink, FileText, Video, Image as ImageIcon, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Culto {
   id: string;
@@ -69,6 +86,92 @@ const TIPOS_LITURGIA = [
   "Outro"
 ];
 
+// Componente sortable para mídia selecionada
+function MidiaSelecionadaItem({ midia, index, onRemove }: { midia: Midia; index: number; onRemove: (id: string) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: midia.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const isImage = midia.tipo === 'Imagem' || midia.tipo === 'imagem' || midia.url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+  const isVideo = midia.tipo === 'Vídeo' || midia.tipo === 'video' || midia.url.match(/\.(mp4|webm|ogg)$/i);
+
+  return (
+    <Card ref={setNodeRef} style={style} className="border-primary/50">
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2">
+          {/* Drag Handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing flex items-center flex-shrink-0"
+          >
+            <GripVertical className="w-4 h-4 text-muted-foreground" />
+          </div>
+          
+          {/* Ordem */}
+          <Badge variant="outline" className="text-xs flex-shrink-0">
+            #{index + 1}
+          </Badge>
+          
+          {/* Thumbnail */}
+          <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+            {isImage ? (
+              <img 
+                src={midia.url} 
+                alt={midia.titulo}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const parent = e.currentTarget.parentElement;
+                  if (parent) {
+                    parent.classList.add('flex', 'items-center', 'justify-center');
+                    parent.innerHTML = '<svg class="w-6 h-6 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                  }
+                }}
+              />
+            ) : isVideo ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <Video className="w-6 h-6 text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <FileText className="w-6 h-6 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-xs truncate">{midia.titulo}</p>
+            <Badge variant="secondary" className="text-xs mt-1">
+              {midia.tipo}
+            </Badge>
+          </div>
+          
+          {/* Botão remover */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onRemove(midia.id)}
+            className="flex-shrink-0"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDialogProps) {
   const [itens, setItens] = useState<ItemLiturgia[]>([]);
   const [membros, setMembros] = useState<Membro[]>([]);
@@ -88,6 +191,13 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
   const [isConvidadoExterno, setIsConvidadoExterno] = useState(false);
   const [nomeConvidadoExterno, setNomeConvidadoExterno] = useState("");
   const [midiasSelecionadas, setMidiasSelecionadas] = useState<string[]>([]);
+
+  const sensorsMidias = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     if (open && culto) {
@@ -388,6 +498,30 @@ Qualquer dúvida, entre em contato conosco.`;
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDragEndMidias = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      setMidiasSelecionadas((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const toggleMidiaSelecao = (midiaId: string) => {
+    setMidiasSelecionadas(prev =>
+      prev.includes(midiaId)
+        ? prev.filter(id => id !== midiaId)
+        : [...prev, midiaId]
+    );
+  };
+
+  const removerMidiaSelecionada = (midiaId: string) => {
+    setMidiasSelecionadas(prev => prev.filter(id => id !== midiaId));
   };
 
   const duracaoTotal = itens.reduce((sum, item) => sum + (item.duracao_minutos || 0), 0);
@@ -767,58 +901,129 @@ Qualquer dúvida, entre em contato conosco.`;
 
         {/* Dialog de seleção de mídias */}
         <Dialog open={showMidiasDialog} onOpenChange={setShowMidiasDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Selecionar Mídias</DialogTitle>
             </DialogHeader>
-            <ScrollArea className="max-h-[400px] pr-4">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden">
+              {/* Lista de mídias disponíveis */}
               <div className="space-y-2">
-                {midias.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhuma mídia disponível
-                  </p>
-                ) : (
-                  midias.map(midia => (
-                    <Card
-                      key={midia.id}
-                      className={`cursor-pointer transition-colors ${
-                        midiasSelecionadas.includes(midia.id)
-                          ? 'border-primary bg-accent'
-                          : 'hover:bg-accent/50'
-                      }`}
-                      onClick={() => {
-                        setMidiasSelecionadas(prev =>
-                          prev.includes(midia.id)
-                            ? prev.filter(id => id !== midia.id)
-                            : [...prev, midia.id]
+                <Label className="text-sm font-medium">Mídias Disponíveis</Label>
+                <ScrollArea className="h-[400px] pr-4">
+                  <div className="space-y-2">
+                    {midias.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        Nenhuma mídia disponível
+                      </p>
+                    ) : (
+                      midias.map(midia => {
+                        const isSelected = midiasSelecionadas.includes(midia.id);
+                        const isImage = midia.tipo === 'Imagem' || midia.tipo === 'imagem' || midia.url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                        const isVideo = midia.tipo === 'Vídeo' || midia.tipo === 'video' || midia.url.match(/\.(mp4|webm|ogg)$/i);
+                        
+                        return (
+                          <Card
+                            key={midia.id}
+                            className={`cursor-pointer transition-all ${
+                              isSelected
+                                ? 'border-primary bg-accent ring-2 ring-primary/20'
+                                : 'hover:bg-accent/50'
+                            }`}
+                            onClick={() => toggleMidiaSelecao(midia.id)}
+                          >
+                            <CardContent className="p-3">
+                              <div className="flex items-center gap-3">
+                                {/* Thumbnail */}
+                                <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                                  {isImage ? (
+                                    <img 
+                                      src={midia.url} 
+                                      alt={midia.titulo}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const parent = e.currentTarget.parentElement;
+                                        if (parent) {
+                                          parent.classList.add('flex', 'items-center', 'justify-center');
+                                          parent.innerHTML = '<svg class="w-8 h-8 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                                        }
+                                      }}
+                                    />
+                                  ) : isVideo ? (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <Video className="w-8 h-8 text-muted-foreground" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <FileText className="w-8 h-8 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-sm truncate">{midia.titulo}</h4>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {midia.tipo}
+                                    </Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {midia.canal}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => {}}
+                                />
+                              </div>
+                            </CardContent>
+                          </Card>
                         );
-                      }}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm truncate">{midia.titulo}</h4>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className="text-xs">
-                                {midia.tipo}
-                              </Badge>
-                              <Badge variant="secondary" className="text-xs">
-                                {midia.canal}
-                              </Badge>
-                            </div>
-                          </div>
-                          <Checkbox
-                            checked={midiasSelecionadas.includes(midia.id)}
-                            onCheckedChange={() => {}}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
-            </ScrollArea>
-            <div className="flex justify-end gap-2 pt-4">
+              
+              {/* Mídias selecionadas com drag and drop */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Mídias Selecionadas ({midiasSelecionadas.length})
+                </Label>
+                <ScrollArea className="h-[400px] pr-4">
+                  {midiasSelecionadas.length === 0 ? (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        Nenhuma mídia selecionada
+                      </p>
+                    </div>
+                  ) : (
+                    <DndContext
+                      sensors={sensorsMidias}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEndMidias}
+                    >
+                      <SortableContext
+                        items={midiasSelecionadas}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {midiasSelecionadas.map((midiaId, index) => {
+                            const midia = midias.find(m => m.id === midiaId);
+                            if (!midia) return null;
+                            
+                            return <MidiaSelecionadaItem key={midiaId} midia={midia} index={index} onRemove={removerMidiaSelecionada} />;
+                          })}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                </ScrollArea>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-4 border-t">
               <Button variant="outline" onClick={() => setShowMidiasDialog(false)}>
                 Cancelar
               </Button>
