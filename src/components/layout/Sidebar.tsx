@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 const menuItems = [{
@@ -61,6 +61,10 @@ const financasItems = [{
   icon: TrendingDown,
   label: "Saídas",
   path: "/financas/saidas"
+}, {
+  icon: BarChart3,
+  label: "Insights",
+  path: "/financas/insights"
 }, {
   icon: Building2,
   label: "Contas",
