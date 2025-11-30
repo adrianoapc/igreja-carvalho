@@ -94,6 +94,14 @@ const cultosItems = [{
   icon: Users,
   label: "Times",
   path: "/cultos/times"
+}, {
+  icon: Target,
+  label: "Categorias",
+  path: "/cultos/categorias"
+}, {
+  icon: UserCog,
+  label: "Posições",
+  path: "/cultos/posicoes"
 }];
 const modulosItems = [{
   icon: Baby,
