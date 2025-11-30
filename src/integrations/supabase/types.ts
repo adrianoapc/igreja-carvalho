@@ -855,7 +855,7 @@ export type Database = {
           ativo: boolean
           canal: string
           created_at: string
-          culto_id: string
+          culto_id: string | null
           descricao: string | null
           expires_at: string | null
           id: string
@@ -870,7 +870,7 @@ export type Database = {
           ativo?: boolean
           canal?: string
           created_at?: string
-          culto_id: string
+          culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
           id?: string
@@ -885,7 +885,7 @@ export type Database = {
           ativo?: boolean
           canal?: string
           created_at?: string
-          culto_id?: string
+          culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
           id?: string
