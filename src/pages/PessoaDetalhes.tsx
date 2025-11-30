@@ -47,6 +47,7 @@ import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDados
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
 import { AtribuirFuncaoDialog } from "@/components/membros/AtribuirFuncaoDialog";
+import { FamiliaresSection } from "@/components/pessoas/FamiliaresSection";
 import { formatarCPF, formatarTelefone, formatarCEP } from "@/lib/validators";
 
 interface PessoaDetalhesData {
@@ -762,6 +763,8 @@ export default function PessoaDetalhes() {
               </div>
             </CardContent>
           </Card>
+
+          <FamiliaresSection pessoaId={pessoa.id} pessoaNome={pessoa.nome} />
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">

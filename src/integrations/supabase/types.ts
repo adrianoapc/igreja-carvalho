@@ -249,6 +249,51 @@ export type Database = {
         }
         Relationships: []
       }
+      familias: {
+        Row: {
+          created_at: string
+          familiar_id: string | null
+          id: string
+          nome_familiar: string | null
+          pessoa_id: string
+          tipo_parentesco: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          familiar_id?: string | null
+          id?: string
+          nome_familiar?: string | null
+          pessoa_id: string
+          tipo_parentesco: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          familiar_id?: string | null
+          id?: string
+          nome_familiar?: string | null
+          pessoa_id?: string
+          tipo_parentesco?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "familias_familiar_id_fkey"
+            columns: ["familiar_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "familias_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formas_pagamento: {
         Row: {
           ativo: boolean
