@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, X, Loader2, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Upload, X, Loader2, Calendar as CalendarIcon, Clock, Tag, Plus } from "lucide-react";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { TagMidiaDialog } from "./TagMidiaDialog";
+
+interface Tag {
+  id: string;
+  nome: string;
+  cor: string;
+}
 
 interface MidiaDialogProps {
   open: boolean;
@@ -48,6 +56,51 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(
     midia?.expires_at ? new Date(midia.expires_at) : undefined
   );
+  
+  // Tags
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagsSelecionadas, setTagsSelecionadas] = useState<string[]>([]);
+  const [showTagDialog, setShowTagDialog] = useState(false);
+  
+  useEffect(() => {
+    if (open) {
+      loadTags();
+      if (midia?.id) {
+        loadTagsMidia();
+      }
+    }
+  }, [open, midia?.id]);
+  
+  const loadTags = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tags_midias')
+        .select('*')
+        .eq('ativo', true)
+        .order('nome', { ascending: true });
+      
+      if (error) throw error;
+      setTags(data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar tags:', error);
+    }
+  };
+  
+  const loadTagsMidia = async () => {
+    if (!midia?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('midia_tags')
+        .select('tag_id')
+        .eq('midia_id', midia.id);
+      
+      if (error) throw error;
+      setTagsSelecionadas(data?.map(t => t.tag_id) || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar tags da mídia:', error);
+    }
+  };
 
   const handleArquivoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -154,6 +207,8 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
       }
 
       // Salvar no banco
+      let midiaId = midia?.id;
+      
       if (midia) {
         // Editar
         const { error } = await supabase
@@ -173,6 +228,9 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
 
         if (error) throw error;
         
+        // Atualizar tags
+        await atualizarTags(midia.id);
+        
         const successMessage = scheduledAt 
           ? `Mídia atualizada! Será publicada em ${format(scheduledAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`
           : "Mídia atualizada com sucesso!";
@@ -191,7 +249,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
         const novaOrdem = (maxOrdem?.ordem || 0) + 1;
 
         // Criar
-        const { error } = await supabase
+        const { data: novaMidia, error } = await supabase
           .from('midias')
           .insert({
             titulo,
@@ -204,9 +262,15 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             culto_id: null,
             scheduled_at: scheduledAt?.toISOString() || null,
             expires_at: expiresAt?.toISOString() || null
-          });
+          })
+          .select()
+          .single();
 
         if (error) throw error;
+        midiaId = novaMidia.id;
+        
+        // Adicionar tags
+        await atualizarTags(midiaId);
         
         const successMessage = scheduledAt 
           ? `Mídia adicionada! Será publicada em ${format(scheduledAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`
@@ -227,6 +291,26 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
     }
   };
 
+  const atualizarTags = async (midiaId: string) => {
+    // Remover todas as tags atuais
+    await supabase
+      .from('midia_tags')
+      .delete()
+      .eq('midia_id', midiaId);
+    
+    // Adicionar novas tags
+    if (tagsSelecionadas.length > 0) {
+      const tagsData = tagsSelecionadas.map(tagId => ({
+        midia_id: midiaId,
+        tag_id: tagId
+      }));
+      
+      await supabase
+        .from('midia_tags')
+        .insert(tagsData);
+    }
+  };
+
   const resetForm = () => {
     setTitulo("");
     setDescricao("");
@@ -237,6 +321,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
     setPreviewUrl("");
     setScheduledAt(undefined);
     setExpiresAt(undefined);
+    setTagsSelecionadas([]);
   };
 
   return (
@@ -398,6 +483,54 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             </div>
           </div>
 
+          {/* Tags */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label>
+                <Tag className="w-4 h-4 inline mr-1" />
+                Tags/Categorias
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTagDialog(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Tag
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 p-3 border rounded-lg min-h-[60px]">
+              {tags.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma tag disponível
+                </p>
+              ) : (
+                tags.map(tag => (
+                  <Badge
+                    key={tag.id}
+                    variant={tagsSelecionadas.includes(tag.id) ? "default" : "outline"}
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                    style={{
+                      backgroundColor: tagsSelecionadas.includes(tag.id) ? tag.cor : 'transparent',
+                      borderColor: tag.cor,
+                      color: tagsSelecionadas.includes(tag.id) ? 'white' : tag.cor
+                    }}
+                    onClick={() => {
+                      setTagsSelecionadas(prev =>
+                        prev.includes(tag.id)
+                          ? prev.filter(id => id !== tag.id)
+                          : [...prev, tag.id]
+                      );
+                    }}
+                  >
+                    {tag.nome}
+                  </Badge>
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Ativo */}
           <div className="flex items-center justify-between">
             <Label htmlFor="ativo">Mídia Ativa</Label>
@@ -419,6 +552,12 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
           </Button>
         </div>
       </DialogContent>
+      
+      <TagMidiaDialog
+        open={showTagDialog}
+        onOpenChange={setShowTagDialog}
+        onSuccess={loadTags}
+      />
     </Dialog>
   );
 }

@@ -850,6 +850,42 @@ export type Database = {
           },
         ]
       }
+      midia_tags: {
+        Row: {
+          created_at: string | null
+          id: string
+          midia_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          midia_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          midia_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "midia_tags_midia_id_fkey"
+            columns: ["midia_id"]
+            isOneToOne: false
+            referencedRelation: "midias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "midia_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags_midias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       midias: {
         Row: {
           ativo: boolean
@@ -1293,6 +1329,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tags_midias: {
+        Row: {
+          ativo: boolean | null
+          cor: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       testemunhos: {
         Row: {
