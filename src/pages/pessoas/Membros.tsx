@@ -22,6 +22,12 @@ interface Membro {
     id: string;
     nome: string;
   }>;
+  times: Array<{
+    id: string;
+    nome: string;
+    cor: string | null;
+    posicao: string | null;
+  }>;
 }
 const ITEMS_PER_PAGE = 10;
 export default function Membros() {
@@ -44,8 +50,9 @@ export default function Membros() {
       } = await supabase.from("profiles").select("id, nome, email, telefone, status").eq("status", "membro").order("nome");
       if (membrosError) throw membrosError;
 
-      // Buscar funções de cada membro
+      // Buscar funções e times de cada membro
       const membrosComFuncoes = await Promise.all((membrosData || []).map(async membro => {
+        // Buscar funções
         const {
           data: funcoesData
         } = await supabase.from("membro_funcoes").select(`
@@ -55,11 +62,34 @@ export default function Membros() {
                 nome
               )
             `).eq("membro_id", membro.id).eq("ativo", true);
+        
+        // Buscar times e posições
+        const {
+          data: timesData
+        } = await supabase.from("membros_time").select(`
+              id,
+              times_culto (
+                id,
+                nome,
+                cor
+              ),
+              posicoes_time (
+                id,
+                nome
+              )
+            `).eq("pessoa_id", membro.id).eq("ativo", true);
+        
         return {
           ...membro,
           funcoes: funcoesData?.map((f: any) => ({
             id: f.funcoes_igreja.id,
             nome: f.funcoes_igreja.nome
+          })) || [],
+          times: timesData?.map((t: any) => ({
+            id: t.times_culto.id,
+            nome: t.times_culto.nome,
+            cor: t.times_culto.cor,
+            posicao: t.posicoes_time?.nome || null
           })) || []
         };
       }));
@@ -172,9 +202,13 @@ export default function Membros() {
                   </div>
                 </div>
 
-                {membro.funcoes.length > 0 && <div className="flex flex-wrap gap-2 mt-2">
-                    {membro.funcoes.map(funcao => <Badge key={funcao.id} variant="secondary">
+                {(membro.funcoes.length > 0 || membro.times.length > 0) && <div className="flex flex-wrap gap-2 mt-2">
+                    {membro.funcoes.map(funcao => <Badge key={`funcao-${funcao.id}`} variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
                         {funcao.nome}
+                      </Badge>)}
+                    {membro.times.map(time => <Badge key={`time-${time.id}`} variant="outline" style={{ borderColor: time.cor || undefined }}>
+                        {time.nome}
+                        {time.posicao && <span className="ml-1 text-muted-foreground">• {time.posicao}</span>}
                       </Badge>)}
                   </div>}
               </div>)}
