@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings } from "lucide-react";
+import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, ChevronDown, ChevronUp, TrendingUp, TrendingDown, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,12 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { ContaDialog } from "@/components/financas/ContaDialog";
 import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function Contas() {
   const navigate = useNavigate();
   const [contaDialogOpen, setContaDialogOpen] = useState(false);
   const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<any>(null);
+  const [expandedContaId, setExpandedContaId] = useState<string | null>(null);
 
   const { data: contas, isLoading } = useQuery({
     queryKey: ['contas'],
@@ -23,6 +27,29 @@ export default function Contas() {
         .select('*')
         .eq('ativo', true)
         .order('nome');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: transacoes, isLoading: isLoadingTransacoes } = useQuery({
+    queryKey: ['transacoes-conta', expandedContaId],
+    enabled: !!expandedContaId,
+    queryFn: async () => {
+      if (!expandedContaId) return [];
+      
+      const { data, error } = await supabase
+        .from('transacoes_financeiras')
+        .select(`
+          *,
+          categorias_financeiras(nome, cor),
+          fornecedores(nome)
+        `)
+        .eq('conta_id', expandedContaId)
+        .eq('status', 'pago')
+        .order('data_pagamento', { ascending: false })
+        .limit(50);
       
       if (error) throw error;
       return data;
@@ -52,6 +79,10 @@ export default function Contas() {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
+  };
+
+  const toggleExpanded = (contaId: string) => {
+    setExpandedContaId(expandedContaId === contaId ? null : contaId);
   };
 
   return (
@@ -92,19 +123,19 @@ export default function Contas() {
           </CardContent>
         </Card>
       ) : contas && contas.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {contas.map((conta) => (
-            <Card key={conta.id} className="shadow-soft hover:shadow-md transition-shadow">
+            <Card key={conta.id} className="shadow-soft">
               <CardHeader className="p-4 md:p-6 pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
                     {getTipoIcon(conta.tipo)}
                     <CardTitle className="text-base md:text-lg">{conta.nome}</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-1">
                     <Badge variant="secondary" className="text-xs">
                       {getTipoLabel(conta.tipo)}
                     </Badge>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -127,23 +158,150 @@ export default function Contas() {
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleExpanded(conta.id)}
+                    >
+                      {expandedContaId === conta.id ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Saldo Atual</p>
-                    <p className="text-xl md:text-2xl font-bold text-foreground">
-                      {formatCurrency(conta.saldo_atual)}
-                    </p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Saldo Atual</p>
+                      <p className="text-xl md:text-2xl font-bold text-foreground">
+                        {formatCurrency(conta.saldo_atual)}
+                      </p>
+                    </div>
+                    {conta.banco && (
+                      <div className="text-xs text-muted-foreground text-right">
+                        <p>{conta.banco}</p>
+                        {conta.agencia && conta.conta_numero && (
+                          <p>Ag: {conta.agencia} | CC: {conta.conta_numero}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {conta.banco && (
-                    <div className="text-xs text-muted-foreground pt-2 border-t">
-                      <p>{conta.banco}</p>
-                      {conta.agencia && conta.conta_numero && (
-                        <p>Ag: {conta.agencia} | CC: {conta.conta_numero}</p>
-                      )}
+
+                  {expandedContaId === conta.id && (
+                    <div className="border-t pt-4 mt-4">
+                      <Tabs defaultValue="todos" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3 mb-4">
+                          <TabsTrigger value="todos" className="text-xs">
+                            <List className="w-3 h-3 mr-1" />
+                            Todos
+                          </TabsTrigger>
+                          <TabsTrigger value="entradas" className="text-xs">
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            Entradas
+                          </TabsTrigger>
+                          <TabsTrigger value="saidas" className="text-xs">
+                            <TrendingDown className="w-3 h-3 mr-1" />
+                            Saídas
+                          </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="todos" className="space-y-2 max-h-96 overflow-y-auto">
+                          {isLoadingTransacoes ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+                          ) : transacoes && transacoes.length > 0 ? (
+                            transacoes.map((t) => (
+                              <div key={t.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{t.descricao}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-xs text-muted-foreground">
+                                      {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
+                                    </p>
+                                    {t.categorias_financeiras && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {t.categorias_financeiras.nome}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right ml-2">
+                                  <p className={`text-sm font-bold ${t.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {t.tipo === 'entrada' ? '+' : '-'} {formatCurrency(Number(t.valor))}
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">Nenhum lançamento encontrado</p>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="entradas" className="space-y-2 max-h-96 overflow-y-auto">
+                          {isLoadingTransacoes ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+                          ) : transacoes && transacoes.filter(t => t.tipo === 'entrada').length > 0 ? (
+                            transacoes.filter(t => t.tipo === 'entrada').map((t) => (
+                              <div key={t.id} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{t.descricao}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-xs text-muted-foreground">
+                                      {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
+                                    </p>
+                                    {t.categorias_financeiras && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {t.categorias_financeiras.nome}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right ml-2">
+                                  <p className="text-sm font-bold text-green-600">
+                                    + {formatCurrency(Number(t.valor))}
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">Nenhuma entrada encontrada</p>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="saidas" className="space-y-2 max-h-96 overflow-y-auto">
+                          {isLoadingTransacoes ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+                          ) : transacoes && transacoes.filter(t => t.tipo === 'saida').length > 0 ? (
+                            transacoes.filter(t => t.tipo === 'saida').map((t) => (
+                              <div key={t.id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{t.descricao}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-xs text-muted-foreground">
+                                      {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
+                                    </p>
+                                    {t.categorias_financeiras && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {t.categorias_financeiras.nome}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right ml-2">
+                                  <p className="text-sm font-bold text-red-600">
+                                    - {formatCurrency(Number(t.valor))}
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">Nenhuma saída encontrada</p>
+                          )}
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   )}
                 </div>
