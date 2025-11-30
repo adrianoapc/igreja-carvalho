@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TimeDialog from "@/components/cultos/TimeDialog";
+import GerenciarTimeDialog from "@/components/cultos/GerenciarTimeDialog";
 
 interface Time {
   id: string;
@@ -31,6 +32,8 @@ export default function Times() {
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [timeEditando, setTimeEditando] = useState<Time | null>(null);
+  const [gerenciarDialogOpen, setGerenciarDialogOpen] = useState(false);
+  const [timeGerenciando, setTimeGerenciando] = useState<Time | null>(null);
 
   useEffect(() => {
     loadTimes();
@@ -80,6 +83,11 @@ export default function Times() {
 
   const handleDialogSuccess = () => {
     loadTimes();
+  };
+
+  const handleGerenciarTime = (time: Time) => {
+    setTimeGerenciando(time);
+    setGerenciarDialogOpen(true);
   };
 
   if (loading) {
@@ -194,7 +202,12 @@ export default function Times() {
                     <Edit className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                     Editar
                   </Button>
-                  <Button variant="outline" size="sm" className="text-xs md:text-sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-xs md:text-sm"
+                    onClick={() => handleGerenciarTime(time)}
+                  >
                     <Settings className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                     Gerenciar
                   </Button>
@@ -228,6 +241,12 @@ export default function Times() {
         onOpenChange={setDialogOpen}
         time={timeEditando}
         onSuccess={handleDialogSuccess}
+      />
+
+      <GerenciarTimeDialog
+        open={gerenciarDialogOpen}
+        onOpenChange={setGerenciarDialogOpen}
+        time={timeGerenciando}
       />
     </div>
   );
