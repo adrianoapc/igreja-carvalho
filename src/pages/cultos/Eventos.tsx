@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, Clock, MapPin, User, Users as UsersIcon, List, CalendarDays } from "lucide-react";
+import { Plus, Calendar, Clock, MapPin, User, Users as UsersIcon, List, CalendarDays, Edit } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import EscalasDialog from "@/components/cultos/EscalasDialog";
 import CalendarioMensal from "@/components/cultos/CalendarioMensal";
+import CultoDialog from "@/components/cultos/CultoDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Culto {
@@ -37,6 +38,8 @@ export default function Eventos() {
   const [escalasDialogOpen, setEscalasDialogOpen] = useState(false);
   const [cultoSelecionado, setCultoSelecionado] = useState<Culto | null>(null);
   const [escalasCount, setEscalasCount] = useState<Record<string, number>>({});
+  const [cultoDialogOpen, setCultoDialogOpen] = useState(false);
+  const [cultoEditando, setCultoEditando] = useState<Culto | null>(null);
 
   useEffect(() => {
     loadCultos();
@@ -80,6 +83,16 @@ export default function Eventos() {
     setEscalasDialogOpen(true);
   };
 
+  const handleNovoCulto = () => {
+    setCultoEditando(null);
+    setCultoDialogOpen(true);
+  };
+
+  const handleEditarCulto = (culto: Culto) => {
+    setCultoEditando(culto);
+    setCultoDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 md:space-y-6">
@@ -102,7 +115,10 @@ export default function Eventos() {
             Gerencie cultos e eventos programados
           </p>
         </div>
-        <Button className="bg-gradient-primary shadow-soft w-full sm:w-auto">
+        <Button 
+          className="bg-gradient-primary shadow-soft w-full sm:w-auto"
+          onClick={handleNovoCulto}
+        >
           <Plus className="w-4 h-4 mr-2" />
           <span className="hidden sm:inline">Novo Evento</span>
           <span className="sm:hidden">Adicionar</span>
@@ -198,6 +214,15 @@ export default function Eventos() {
                     variant="outline" 
                     size="sm" 
                     className="w-full sm:w-auto text-xs md:text-sm"
+                    onClick={() => handleEditarCulto(culto)}
+                  >
+                    <Edit className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full sm:w-auto text-xs md:text-sm"
                     onClick={() => handleGerenciarEscalas(culto)}
                   >
                     <UsersIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
@@ -220,13 +245,13 @@ export default function Eventos() {
                 <CardContent className="p-8 text-center">
                   <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Nenhum evento cadastrado</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Comece criando seu primeiro culto ou evento.
-                  </p>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Novo Evento
-                  </Button>
+              <p className="text-sm text-muted-foreground mb-4">
+                Comece criando seu primeiro culto ou evento.
+              </p>
+              <Button onClick={handleNovoCulto}>
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Evento
+              </Button>
                 </CardContent>
               </Card>
             )}
@@ -246,6 +271,13 @@ export default function Eventos() {
         open={escalasDialogOpen}
         onOpenChange={setEscalasDialogOpen}
         culto={cultoSelecionado}
+      />
+
+      <CultoDialog
+        open={cultoDialogOpen}
+        onOpenChange={setCultoDialogOpen}
+        culto={cultoEditando}
+        onSuccess={loadCultos}
       />
     </div>
   );
