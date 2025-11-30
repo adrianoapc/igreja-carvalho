@@ -1,10 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar as CalendarIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   LineChart,
   Line,
@@ -20,7 +25,19 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { format, parseISO, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { 
+  format, 
+  parseISO, 
+  startOfMonth, 
+  endOfMonth, 
+  subMonths, 
+  startOfWeek, 
+  endOfWeek, 
+  startOfYear, 
+  endOfYear, 
+  startOfDay, 
+  endOfDay 
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const COLORS = {
@@ -32,31 +49,79 @@ const COLORS = {
   "Transferência": "#06b6d4",
 };
 
+type PeriodoType = "hoje" | "semana" | "mes" | "ano" | "customizado";
+
 export default function DashboardOfertas() {
   const navigate = useNavigate();
+  const [periodo, setPeriodo] = useState<PeriodoType>("mes");
+  const [dataInicio, setDataInicio] = useState<Date>();
+  const [dataFim, setDataFim] = useState<Date>();
+
+  const getDatasIntervalo = () => {
+    const hoje = new Date();
+    
+    switch (periodo) {
+      case "hoje":
+        return {
+          inicio: format(startOfDay(hoje), "yyyy-MM-dd"),
+          fim: format(endOfDay(hoje), "yyyy-MM-dd")
+        };
+      case "semana":
+        return {
+          inicio: format(startOfWeek(hoje, { locale: ptBR }), "yyyy-MM-dd"),
+          fim: format(endOfWeek(hoje, { locale: ptBR }), "yyyy-MM-dd")
+        };
+      case "mes":
+        return {
+          inicio: format(startOfMonth(hoje), "yyyy-MM-dd"),
+          fim: format(endOfMonth(hoje), "yyyy-MM-dd")
+        };
+      case "ano":
+        return {
+          inicio: format(startOfYear(hoje), "yyyy-MM-dd"),
+          fim: format(endOfYear(hoje), "yyyy-MM-dd")
+        };
+      case "customizado":
+        if (!dataInicio || !dataFim) return null;
+        return {
+          inicio: format(dataInicio, "yyyy-MM-dd"),
+          fim: format(dataFim, "yyyy-MM-dd")
+        };
+      default:
+        return null;
+    }
+  };
+
+  const datas = getDatasIntervalo();
 
   const { data: transacoes, isLoading } = useQuery({
-    queryKey: ["ofertas-dashboard"],
+    queryKey: ["ofertas-dashboard", periodo, dataInicio, dataFim],
     queryFn: async () => {
-      const { data: categorias } = await supabase
+      if (!datas) return [];
+
+      // Buscar categoria de Oferta
+      const { data: categoriaOferta } = await supabase
         .from("categorias_financeiras")
         .select("id")
-        .eq("nome", "Oferta")
         .eq("tipo", "entrada")
+        .ilike("nome", "%oferta%")
         .maybeSingle();
 
-      if (!categorias) return [];
+      if (!categoriaOferta) return [];
 
       const { data, error } = await supabase
         .from("transacoes_financeiras")
         .select("*")
         .eq("tipo", "entrada")
-        .eq("categoria_id", categorias.id)
+        .eq("categoria_id", categoriaOferta.id)
+        .gte("data_vencimento", datas.inicio)
+        .lte("data_vencimento", datas.fim)
         .order("data_vencimento", { ascending: false });
 
       if (error) throw error;
       return data || [];
     },
+    enabled: !!datas,
   });
 
   const processarDados = () => {
@@ -85,31 +150,43 @@ export default function DashboardOfertas() {
       value,
     }));
 
-    // Evolução mensal (últimos 6 meses)
-    const mesesMap: Record<string, Record<string, number>> = {};
-    const hoje = new Date();
-
-    for (let i = 5; i >= 0; i--) {
-      const mes = subMonths(hoje, i);
-      const mesKey = format(mes, "MMM/yy", { locale: ptBR });
-      mesesMap[mesKey] = {};
-    }
-
+    // Evolução temporal (ajustado conforme período)
+    const evolucaoMap: Record<string, Record<string, number>> = {};
+    
+    // Agrupar por forma de pagamento ao longo do tempo
     transacoes.forEach((t) => {
       const data = parseISO(t.data_vencimento);
-      const mesKey = format(data, "MMM/yy", { locale: ptBR });
+      let chave: string;
       
-      if (mesesMap[mesKey]) {
-        const forma = t.forma_pagamento || "Não especificado";
-        mesesMap[mesKey][forma] = (mesesMap[mesKey][forma] || 0) + Number(t.valor);
+      // Definir granularidade baseada no período selecionado
+      if (periodo === "hoje" || periodo === "semana") {
+        chave = format(data, "dd/MM", { locale: ptBR }); // Dia
+      } else if (periodo === "mes") {
+        chave = format(data, "dd/MM", { locale: ptBR }); // Dia do mês
+      } else {
+        chave = format(data, "MMM/yy", { locale: ptBR }); // Mês
       }
+      
+      if (!evolucaoMap[chave]) {
+        evolucaoMap[chave] = {};
+      }
+      
+      const forma = t.forma_pagamento || "Não especificado";
+      evolucaoMap[chave][forma] = (evolucaoMap[chave][forma] || 0) + Number(t.valor);
     });
 
-    const evolucaoMensal = Object.entries(mesesMap).map(([mes, formas]) => ({
-      mes,
-      ...formas,
-      total: Object.values(formas).reduce((acc, v) => acc + v, 0),
-    }));
+    const evolucaoMensal = Object.entries(evolucaoMap)
+      .sort((a, b) => {
+        // Ordenar cronologicamente
+        const [diaA, mesA] = a[0].split('/').map(Number);
+        const [diaB, mesB] = b[0].split('/').map(Number);
+        return (mesA || 0) - (mesB || 0) || (diaA || 0) - (diaB || 0);
+      })
+      .map(([chave, formas]) => ({
+        mes: chave,
+        ...formas,
+        total: Object.values(formas).reduce((acc, v) => acc + v, 0),
+      }));
 
     // Comparativo mensal (total por mês)
     const comparativoMensal = evolucaoMensal.map(({ mes, total }) => ({
@@ -164,16 +241,99 @@ export default function DashboardOfertas() {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={() => navigate("/financas")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard de Ofertas</h1>
-          <p className="text-sm text-muted-foreground">
-            Análise detalhada das ofertas por forma de pagamento
-          </p>
+      <div className="space-y-4 mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={() => navigate("/financas")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">Dashboard de Ofertas</h1>
+            <p className="text-sm text-muted-foreground">
+              Análise detalhada das ofertas por forma de pagamento
+            </p>
+          </div>
         </div>
+
+        {/* Filtros de Período */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Período</label>
+                <Select value={periodo} onValueChange={(value) => setPeriodo(value as PeriodoType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hoje">Hoje</SelectItem>
+                    <SelectItem value="semana">Esta Semana</SelectItem>
+                    <SelectItem value="mes">Este Mês</SelectItem>
+                    <SelectItem value="ano">Este Ano</SelectItem>
+                    <SelectItem value="customizado">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {periodo === "customizado" && (
+                <>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-2 block">Data Início</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dataInicio && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dataInicio ? format(dataInicio, "PPP", { locale: ptBR }) : "Selecione"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dataInicio}
+                          onSelect={setDataInicio}
+                          locale={ptBR}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-2 block">Data Fim</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dataFim && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dataFim ? format(dataFim, "PPP", { locale: ptBR }) : "Selecione"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dataFim}
+                          onSelect={setDataFim}
+                          locale={ptBR}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Cards de Resumo */}
@@ -276,10 +436,10 @@ export default function DashboardOfertas() {
           </CardContent>
         </Card>
 
-        {/* Evolução Mensal */}
+        {/* Evolução Temporal */}
         <Card>
           <CardHeader>
-            <CardTitle>Evolução Mensal</CardTitle>
+            <CardTitle>Evolução no Período</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -308,10 +468,10 @@ export default function DashboardOfertas() {
           </CardContent>
         </Card>
 
-        {/* Evolução por Forma de Pagamento */}
+        {/* Detalhamento por Forma de Pagamento */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Evolução por Forma de Pagamento</CardTitle>
+            <CardTitle>Detalhamento por Forma de Pagamento</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={400}>
