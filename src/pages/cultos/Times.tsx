@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -43,6 +44,7 @@ export default function Times() {
   const [gerenciarDialogOpen, setGerenciarDialogOpen] = useState(false);
   const [timeGerenciando, setTimeGerenciando] = useState<Time | null>(null);
   const [expandedTimes, setExpandedTimes] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     loadTimes();
@@ -109,9 +111,16 @@ export default function Times() {
     }
   };
 
-  const timesFiltrados = categoriaFiltro === "todos"
-    ? times
-    : times.filter(t => t.categoria === categoriaFiltro);
+  const timesFiltrados = times
+    .filter(t => categoriaFiltro === "todos" || t.categoria === categoriaFiltro)
+    .filter(t => {
+      if (!searchTerm) return true;
+      const search = searchTerm.toLowerCase();
+      // Busca pelo nome do time
+      if (t.nome.toLowerCase().includes(search)) return true;
+      // Busca pelos nomes dos membros
+      return t.membros.some(m => m.nome.toLowerCase().includes(search));
+    });
 
   const handleNovoTime = () => {
     setTimeEditando(null);
@@ -176,6 +185,18 @@ export default function Times() {
           <span className="hidden sm:inline">Novo Time</span>
           <span className="sm:hidden">Adicionar</span>
         </Button>
+      </div>
+
+      {/* Campo de Busca */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Buscar por time ou membro..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {/* Filtros por Categoria */}
