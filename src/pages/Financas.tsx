@@ -187,6 +187,12 @@ export default function Financas() {
 
   const quickActions = [
     {
+      title: "Relatório de Oferta",
+      description: "Registro rápido de culto",
+      icon: DollarSign,
+      action: () => navigate("/financas/relatorio-oferta"),
+    },
+    {
       title: "Nova Entrada",
       description: "Registrar receita",
       icon: Plus,
