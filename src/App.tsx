@@ -47,7 +47,6 @@ import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
 import Announcements from "./pages/Announcements";
-import FirstAdmin from "./pages/FirstAdmin";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
@@ -85,7 +84,6 @@ function App() {
           <Route path="/public" element={<Public />} />
           <Route path="/announcements" element={<Announcements />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/first-admin" element={<FirstAdmin />} />
           
           {/* Rotas protegidas para membros */}
           <Route
