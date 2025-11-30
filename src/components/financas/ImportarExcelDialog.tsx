@@ -1,12 +1,15 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { useState } from "react";
 import { read, utils } from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ImportarExcelDialogProps {
   open: boolean;
@@ -14,14 +17,33 @@ interface ImportarExcelDialogProps {
   tipo: "entrada" | "saida";
 }
 
+type ColumnMapping = {
+  descricao?: string;
+  valor?: string;
+  data_vencimento?: string;
+  data_pagamento?: string;
+  status?: string;
+  conta?: string;
+  categoria?: string;
+  fornecedor?: string;
+  observacoes?: string;
+};
+
 export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelDialogProps) {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any[]>([]);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<ColumnMapping>({});
+  const [fileName, setFileName] = useState<string>("");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setFileName(file.name);
+    setValidationErrors([]);
 
     try {
       const data = await file.arrayBuffer();
@@ -29,12 +51,85 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = utils.sheet_to_json(worksheet);
       
-      setPreview(jsonData.slice(0, 5)); // Mostrar apenas 5 primeiras linhas
-      console.log("Dados do Excel:", jsonData);
+      if (jsonData.length === 0) {
+        toast.error("Arquivo vazio ou sem dados válidos");
+        return;
+      }
+
+      // Extrair nomes das colunas
+      const firstRow: any = jsonData[0];
+      const columnNames = Object.keys(firstRow);
+      setColumns(columnNames);
+      
+      // Tentar mapear automaticamente baseado em nomes comuns
+      const autoMapping: ColumnMapping = {};
+      columnNames.forEach(col => {
+        const colLower = col.toLowerCase().trim();
+        if (colLower.includes('descri')) autoMapping.descricao = col;
+        if (colLower.includes('valor') && !colLower.includes('liquido')) autoMapping.valor = col;
+        if (colLower.includes('vencimento') || colLower.includes('data_venc')) autoMapping.data_vencimento = col;
+        if (colLower.includes('pagamento') || colLower.includes('data_pag')) autoMapping.data_pagamento = col;
+        if (colLower.includes('status') || colLower.includes('situacao')) autoMapping.status = col;
+        if (colLower.includes('conta')) autoMapping.conta = col;
+        if (colLower.includes('categoria')) autoMapping.categoria = col;
+        if (colLower.includes('fornecedor') || colLower.includes('beneficiario')) autoMapping.fornecedor = col;
+        if (colLower.includes('observ') || colLower.includes('obs')) autoMapping.observacoes = col;
+      });
+      
+      setMapping(autoMapping);
+      setPreview(jsonData.slice(0, 10));
+      
+      toast.success(`${jsonData.length} linhas encontradas no arquivo`);
     } catch (error) {
       console.error("Erro ao ler arquivo:", error);
-      toast.error("Erro ao ler arquivo Excel");
+      toast.error("Erro ao ler arquivo Excel/CSV");
     }
+  };
+
+  const parseValor = (valor: any): number => {
+    if (!valor) return 0;
+    const valorStr = String(valor).replace(/[^\d,.-]/g, "").replace(",", ".");
+    return parseFloat(valorStr) || 0;
+  };
+
+  const parseData = (data: any): string | null => {
+    if (!data) return null;
+    try {
+      // Tentar diferentes formatos de data
+      const dataStr = String(data).trim();
+      
+      // dd/mm/yyyy
+      if (dataStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+        const [dia, mes, ano] = dataStr.split('/');
+        return `${ano}-${mes}-${dia}`;
+      }
+      
+      // yyyy-mm-dd
+      if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dataStr;
+      }
+      
+      // Tentar parse como data
+      const date = new Date(data);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+      
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const validateMapping = (): boolean => {
+    const errors: string[] = [];
+    
+    if (!mapping.descricao) errors.push("Campo 'Descrição' não mapeado");
+    if (!mapping.valor) errors.push("Campo 'Valor' não mapeado");
+    if (!mapping.data_vencimento) errors.push("Campo 'Data Vencimento' não mapeado");
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
   };
 
   const processarImportacao = async () => {
@@ -43,14 +138,29 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
       return;
     }
 
+    if (!validateMapping()) {
+      toast.error("Mapeamento incompleto. Verifique os campos obrigatórios.");
+      return;
+    }
+
     setLoading(true);
     try {
-      // Buscar primeira conta disponível como padrão
+      // Buscar contas, categorias e fornecedores existentes
       const { data: contas } = await supabase
         .from("contas")
-        .select("id")
+        .select("id, nome")
+        .eq("ativo", true);
+
+      const { data: categorias } = await supabase
+        .from("categorias_financeiras")
+        .select("id, nome")
         .eq("ativo", true)
-        .limit(1);
+        .eq("tipo", tipo);
+
+      const { data: fornecedores } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true);
 
       if (!contas || contas.length === 0) {
         toast.error("Nenhuma conta ativa encontrada. Crie uma conta primeiro.");
@@ -58,18 +168,93 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
         return;
       }
 
-      // Aqui você precisará mapear os campos do Excel para os campos do banco
-      // Este é um exemplo básico - ajuste conforme a estrutura do seu Excel
-      const transacoes = preview.map((row: any) => ({
-        tipo,
-        descricao: row.Descrição || row.descricao || "",
-        valor: parseFloat(String(row.Valor || row.valor || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
-        data_vencimento: row["Data Vencimento"] || row.data_vencimento || new Date().toISOString().split('T')[0],
-        status: row.Status || row.status || "pendente",
-        tipo_lancamento: "unico",
-        conta_id: contas[0].id, // Usar primeira conta ativa como padrão
-        // Adicione mais campos conforme necessário
-      }));
+      const transacoes = [];
+      const erros = [];
+
+      for (let i = 0; i < preview.length; i++) {
+        const row = preview[i];
+        
+        try {
+          const descricao = mapping.descricao ? row[mapping.descricao] : null;
+          const valor = mapping.valor ? parseValor(row[mapping.valor]) : 0;
+          const dataVencimento = mapping.data_vencimento ? parseData(row[mapping.data_vencimento]) : null;
+          
+          if (!descricao || !valor || !dataVencimento) {
+            erros.push(`Linha ${i + 1}: Dados obrigatórios faltando`);
+            continue;
+          }
+
+          // Buscar conta
+          let contaId = contas[0].id; // Padrão
+          if (mapping.conta) {
+            const nomeConta = row[mapping.conta];
+            const contaEncontrada = contas.find(c => 
+              c.nome.toLowerCase() === String(nomeConta).toLowerCase().trim()
+            );
+            if (contaEncontrada) contaId = contaEncontrada.id;
+          }
+
+          // Buscar categoria
+          let categoriaId = null;
+          if (mapping.categoria && categorias) {
+            const nomeCategoria = row[mapping.categoria];
+            const categoriaEncontrada = categorias.find(c => 
+              c.nome.toLowerCase() === String(nomeCategoria).toLowerCase().trim()
+            );
+            if (categoriaEncontrada) categoriaId = categoriaEncontrada.id;
+          }
+
+          // Buscar fornecedor
+          let fornecedorId = null;
+          if (mapping.fornecedor && fornecedores) {
+            const nomeFornecedor = row[mapping.fornecedor];
+            const fornecedorEncontrado = fornecedores.find(f => 
+              f.nome.toLowerCase() === String(nomeFornecedor).toLowerCase().trim()
+            );
+            if (fornecedorEncontrado) fornecedorId = fornecedorEncontrado.id;
+          }
+
+          // Status
+          let status = "pendente";
+          if (mapping.status) {
+            const statusValue = String(row[mapping.status]).toLowerCase();
+            if (statusValue.includes("pago") || statusValue.includes("recebido")) {
+              status = "pago";
+            }
+          }
+
+          // Data pagamento
+          let dataPagamento = null;
+          if (mapping.data_pagamento) {
+            dataPagamento = parseData(row[mapping.data_pagamento]);
+          }
+
+          // Observações
+          const observacoes = mapping.observacoes ? row[mapping.observacoes] : null;
+
+          transacoes.push({
+            tipo,
+            descricao,
+            valor,
+            data_vencimento: dataVencimento,
+            data_pagamento: dataPagamento,
+            status,
+            tipo_lancamento: "unico",
+            conta_id: contaId,
+            categoria_id: categoriaId,
+            fornecedor_id: fornecedorId,
+            observacoes,
+          });
+        } catch (error) {
+          erros.push(`Linha ${i + 1}: ${error}`);
+        }
+      }
+
+      if (transacoes.length === 0) {
+        toast.error("Nenhuma transação válida para importar");
+        setLoading(false);
+        return;
+      }
 
       // Inserir no banco
       const { error } = await supabase
@@ -78,11 +263,19 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
 
       if (error) throw error;
 
-      toast.success(`${transacoes.length} transações importadas com sucesso!`);
+      if (erros.length > 0) {
+        toast.warning(`${transacoes.length} transações importadas com ${erros.length} erros`);
+        console.log("Erros:", erros);
+      } else {
+        toast.success(`${transacoes.length} transações importadas com sucesso!`);
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['entradas'] });
       queryClient.invalidateQueries({ queryKey: ['saidas'] });
+      queryClient.invalidateQueries({ queryKey: ['contas'] });
+      
       onOpenChange(false);
-      setPreview([]);
+      resetForm();
     } catch (error) {
       console.error("Erro ao importar:", error);
       toast.error("Erro ao importar transações");
@@ -91,66 +284,272 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
     }
   };
 
+  const resetForm = () => {
+    setPreview([]);
+    setColumns([]);
+    setMapping({});
+    setFileName("");
+    setValidationErrors([]);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(open) => {
+      onOpenChange(open);
+      if (!open) resetForm();
+    }}>
+      <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Importar {tipo === "entrada" ? "Entradas" : "Saídas"} via Excel</DialogTitle>
+          <DialogTitle>Importar {tipo === "entrada" ? "Entradas" : "Saídas"} via Excel/CSV</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              O arquivo Excel deve conter as colunas: Descrição, Valor, Data Vencimento, Status, Conta, Categoria.
-            </AlertDescription>
-          </Alert>
+        <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
+          <div className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Faça upload de um arquivo Excel (.xlsx, .xls) ou CSV com os dados das transações.
+                <br />
+                Campos obrigatórios: Descrição, Valor, Data de Vencimento
+              </AlertDescription>
+            </Alert>
 
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-            <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <label htmlFor="excel-upload" className="cursor-pointer">
-              <Button type="button" variant="outline" asChild>
-                <span>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Selecionar arquivo Excel
-                </span>
-              </Button>
+            {/* Upload Area */}
+            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+              <FileSpreadsheet className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+              {fileName ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-sm font-medium">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    {fileName}
+                  </div>
+                  <label htmlFor="excel-upload" className="cursor-pointer">
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <span>Selecionar outro arquivo</span>
+                    </Button>
+                  </label>
+                </div>
+              ) : (
+                <label htmlFor="excel-upload" className="cursor-pointer">
+                  <Button type="button" variant="outline" asChild>
+                    <span>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Selecionar arquivo Excel/CSV
+                    </span>
+                  </Button>
+                </label>
+              )}
               <input
                 id="excel-upload"
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 className="hidden"
                 onChange={handleFileUpload}
               />
-            </label>
-          </div>
-
-          {preview.length > 0 && (
-            <div>
-              <h3 className="font-semibold mb-2">Prévia (primeiras 5 linhas):</h3>
-              <div className="border rounded-lg p-4 bg-muted/50 max-h-64 overflow-auto">
-                <pre className="text-xs">{JSON.stringify(preview, null, 2)}</pre>
-              </div>
             </div>
-          )}
 
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-                setPreview([]);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={processarImportacao}
-              disabled={loading || preview.length === 0}
-            >
-              {loading ? "Importando..." : "Importar"}
-            </Button>
+            {/* Validation Errors */}
+            {validationErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <ul className="list-disc list-inside text-xs">
+                    {validationErrors.map((error, i) => (
+                      <li key={i}>{error}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Column Mapping */}
+            {columns.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm">Mapeamento de Colunas</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Descrição *</Label>
+                    <Select value={mapping.descricao} onValueChange={(v) => setMapping({...mapping, descricao: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Valor *</Label>
+                    <Select value={mapping.valor} onValueChange={(v) => setMapping({...mapping, valor: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Data de Vencimento *</Label>
+                    <Select value={mapping.data_vencimento} onValueChange={(v) => setMapping({...mapping, data_vencimento: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Data de Pagamento</Label>
+                    <Select value={mapping.data_pagamento} onValueChange={(v) => setMapping({...mapping, data_pagamento: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Status</Label>
+                    <Select value={mapping.status} onValueChange={(v) => setMapping({...mapping, status: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Conta</Label>
+                    <Select value={mapping.conta} onValueChange={(v) => setMapping({...mapping, conta: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Categoria</Label>
+                    <Select value={mapping.categoria} onValueChange={(v) => setMapping({...mapping, categoria: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Fornecedor</Label>
+                    <Select value={mapping.fornecedor} onValueChange={(v) => setMapping({...mapping, fornecedor: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Observações</Label>
+                    <Select value={mapping.observacoes} onValueChange={(v) => setMapping({...mapping, observacoes: v})}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {columns.map(col => (
+                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Preview */}
+            {preview.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm">Prévia ({preview.length} linhas)</h3>
+                <div className="border rounded-lg overflow-auto max-h-60">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        {columns.map(col => (
+                          <th key={col} className="px-3 py-2 text-left font-medium whitespace-nowrap">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.map((row, i) => (
+                        <tr key={i} className="border-t">
+                          {columns.map(col => (
+                            <td key={col} className="px-3 py-2 whitespace-nowrap">
+                              {String(row[col] || "")}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
+        </ScrollArea>
+
+        <div className="flex gap-2 justify-end border-t pt-4">
+          <Button
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
+              resetForm();
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={processarImportacao}
+            disabled={loading || preview.length === 0}
+          >
+            {loading ? "Importando..." : `Importar ${preview.length} transações`}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
