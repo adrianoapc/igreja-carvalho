@@ -1,12 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, Clock, MapPin, User } from "lucide-react";
+import { Plus, Calendar, Clock, MapPin, User, Users as UsersIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import EscalasDialog from "@/components/cultos/EscalasDialog";
 
 interface Culto {
   id: string;
@@ -31,6 +32,8 @@ const STATUS_CONFIG = {
 export default function Eventos() {
   const [cultos, setCultos] = useState<Culto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [escalasDialogOpen, setEscalasDialogOpen] = useState(false);
+  const [cultoSelecionado, setCultoSelecionado] = useState<Culto | null>(null);
 
   useEffect(() => {
     loadCultos();
@@ -52,6 +55,11 @@ export default function Eventos() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGerenciarEscalas = (culto: Culto) => {
+    setCultoSelecionado(culto);
+    setEscalasDialogOpen(true);
   };
 
   if (loading) {
@@ -154,7 +162,13 @@ export default function Eventos() {
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full sm:w-auto text-xs md:text-sm"
+                    onClick={() => handleGerenciarEscalas(culto)}
+                  >
+                    <UsersIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                     Ver Escalas
                   </Button>
                   <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
@@ -185,6 +199,12 @@ export default function Eventos() {
           </Card>
         )}
       </div>
+
+      <EscalasDialog
+        open={escalasDialogOpen}
+        onOpenChange={setEscalasDialogOpen}
+        culto={cultoSelecionado}
+      />
     </div>
   );
 }
