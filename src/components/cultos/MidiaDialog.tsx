@@ -62,11 +62,31 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   const [tagsSelecionadas, setTagsSelecionadas] = useState<string[]>([]);
   const [showTagDialog, setShowTagDialog] = useState(false);
   
+  // Sincronizar dados quando midia mudar
+  useEffect(() => {
+    if (open && midia) {
+      setTitulo(midia.titulo || "");
+      setDescricao(midia.descricao || "");
+      setTipo(midia.tipo || "imagem");
+      setCanal(midia.canal || "telao");
+      setAtivo(midia.ativo ?? true);
+      setPreviewUrl(midia.url || "");
+      setScheduledAt(midia.scheduled_at ? new Date(midia.scheduled_at) : undefined);
+      setExpiresAt(midia.expires_at ? new Date(midia.expires_at) : undefined);
+      setArquivo(null);
+    } else if (open && !midia) {
+      // Resetar para nova mídia
+      resetForm();
+    }
+  }, [open, midia]);
+  
   useEffect(() => {
     if (open) {
       loadTags();
       if (midia?.id) {
         loadTagsMidia();
+      } else {
+        setTagsSelecionadas([]);
       }
     }
   }, [open, midia?.id]);
