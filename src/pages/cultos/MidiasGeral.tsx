@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Plus, Image, Video, FileText, Pencil, Trash2, GripVertical, Eye, EyeOff, Calendar, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -37,6 +38,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface Tag {
+  id: string;
+  nome: string;
+  cor: string;
+}
+
 interface Midia {
   id: string;
   titulo: string;
@@ -50,6 +57,7 @@ interface Midia {
   created_at: string;
   scheduled_at?: string | null;
   expires_at?: string | null;
+  tags?: Tag[];
 }
 
 function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
@@ -158,6 +166,22 @@ function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
                   </p>
                 )}
                 
+                {/* Tags */}
+                {midia.tags && midia.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {midia.tags.map(tag => (
+                      <Badge
+                        key={tag.id}
+                        variant="outline"
+                        className="text-xs"
+                        style={{ borderColor: tag.cor, color: tag.cor }}
+                      >
+                        {tag.nome}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                
                 {/* Datas */}
                 <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
                   {midia.scheduled_at && (
@@ -215,6 +239,8 @@ export default function MidiasGeral() {
   const [midiaEditando, setMidiaEditando] = useState<Midia | undefined>();
   const [canalAtivo, setCanalAtivo] = useState("telao");
   const [midiaParaDeletar, setMidiaParaDeletar] = useState<string | null>(null);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagFiltro, setTagFiltro] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -240,19 +266,49 @@ export default function MidiasGeral() {
 
   useEffect(() => {
     loadMidias();
+    loadTags();
   }, [canalAtivo]);
+  
+  const loadTags = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tags_midias')
+        .select('*')
+        .eq('ativo', true)
+        .order('nome', { ascending: true });
+      
+      if (error) throw error;
+      setTags(data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar tags:', error);
+    }
+  };
 
   const loadMidias = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: midiasData, error } = await supabase
         .from('midias')
         .select('*')
         .eq('canal', canalAtivo)
         .order('ordem', { ascending: true });
 
       if (error) throw error;
-      setMidias(data || []);
+      
+      // Carregar tags de cada mídia
+      const midiasComTags = await Promise.all(
+        (midiasData || []).map(async (midia) => {
+          const { data: tagsData } = await supabase
+            .from('midia_tags')
+            .select('tag_id, tags_midias(id, nome, cor)')
+            .eq('midia_id', midia.id);
+          
+          const tags = tagsData?.map(t => (t as any).tags_midias).filter(Boolean) || [];
+          return { ...midia, tags };
+        })
+      );
+      
+      setMidias(midiasComTags);
     } catch (error: any) {
       console.error('Erro ao carregar mídias:', error);
       toast.error("Erro ao carregar mídias");
@@ -358,6 +414,11 @@ export default function MidiasGeral() {
     };
     return labels[canal] || canal;
   };
+  
+  // Filtrar mídias por tag
+  const midiasFiltradas = tagFiltro
+    ? midias.filter(midia => midia.tags?.some(tag => tag.id === tagFiltro))
+    : midias;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -382,23 +443,66 @@ export default function MidiasGeral() {
           <TabsTrigger value="site">Site</TabsTrigger>
         </TabsList>
 
-        <TabsContent value={canalAtivo} className="mt-6">
+        <TabsContent value={canalAtivo} className="mt-6 space-y-4">
+          {/* Filtro por Tags */}
+          {tags.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Label className="text-sm font-medium">Filtrar por tag:</Label>
+                  <Badge
+                    variant={!tagFiltro ? "default" : "outline"}
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setTagFiltro(null)}
+                  >
+                    Todas ({midias.length})
+                  </Badge>
+                  {tags.map(tag => {
+                    const count = midias.filter(m => m.tags?.some(t => t.id === tag.id)).length;
+                    return (
+                      <Badge
+                        key={tag.id}
+                        variant={tagFiltro === tag.id ? "default" : "outline"}
+                        className="cursor-pointer hover:scale-105 transition-transform"
+                        style={{
+                          backgroundColor: tagFiltro === tag.id ? tag.cor : 'transparent',
+                          borderColor: tag.cor,
+                          color: tagFiltro === tag.id ? 'white' : tag.cor
+                        }}
+                        onClick={() => setTagFiltro(tag.id)}
+                      >
+                        {tag.nome} ({count})
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">
               Carregando mídias...
             </div>
-          ) : midias.length === 0 ? (
+          ) : midiasFiltradas.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
                 <Image className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="font-semibold mb-2">Nenhuma mídia encontrada</h3>
+                <h3 className="font-semibold mb-2">
+                  {tagFiltro ? "Nenhuma mídia com esta tag" : "Nenhuma mídia encontrada"}
+                </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Adicione mídias para {getCanalLabel(canalAtivo)}
+                  {tagFiltro 
+                    ? "Tente selecionar outra tag ou limpar o filtro" 
+                    : `Adicione mídias para ${getCanalLabel(canalAtivo)}`
+                  }
                 </p>
-                <Button onClick={handleNovaMidia}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar Primeira Mídia
-                </Button>
+                {!tagFiltro && (
+                  <Button onClick={handleNovaMidia}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar Primeira Mídia
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -409,10 +513,10 @@ export default function MidiasGeral() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={midias.map(m => m.id)}
+                  items={midiasFiltradas.map(m => m.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {midias.map((midia) => (
+                  {midiasFiltradas.map((midia) => (
                     <SortableMidiaCard
                       key={midia.id}
                       midia={midia}
