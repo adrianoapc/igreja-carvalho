@@ -9,13 +9,7 @@ import { toast } from "sonner";
 import { Users, UserPlus, Check, X, CheckCircle2, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Culto {
@@ -105,7 +99,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
       }
     } catch (error: any) {
       toast.error("Erro ao carregar times", {
-        description: error.message
+        description: error.message,
       });
     }
   };
@@ -116,11 +110,13 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
     try {
       const { data, error } = await supabase
         .from("membros_time")
-        .select(`
+        .select(
+          `
           *,
           profiles:pessoa_id(nome, email),
           posicoes_time:posicao_id(nome)
-        `)
+        `,
+        )
         .eq("time_id", timeSelecionado)
         .eq("ativo", true)
         .order("profiles(nome)", { ascending: true });
@@ -129,7 +125,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
       setMembrosTime(data || []);
     } catch (error: any) {
       toast.error("Erro ao carregar membros do time", {
-        description: error.message
+        description: error.message,
       });
     }
   };
@@ -140,18 +136,20 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
     try {
       const { data, error } = await supabase
         .from("escalas_culto")
-        .select(`
+        .select(
+          `
           *,
           profiles:pessoa_id(nome),
           posicoes_time:posicao_id(nome)
-        `)
+        `,
+        )
         .eq("culto_id", culto.id);
 
       if (error) throw error;
       setEscalas(data || []);
     } catch (error: any) {
       toast.error("Erro ao carregar escalas", {
-        description: error.message
+        description: error.message,
       });
     }
   };
@@ -161,18 +159,16 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("escalas_culto")
-        .insert({
-          culto_id: culto.id,
-          time_id: timeSelecionado,
-          pessoa_id: membro.pessoa_id,
-          posicao_id: membro.posicao_id,
-          confirmado: false
-        });
+      const { error } = await supabase.from("escalas_culto").insert({
+        culto_id: culto.id,
+        time_id: timeSelecionado,
+        pessoa_id: membro.pessoa_id,
+        posicao_id: membro.posicao_id,
+        confirmado: false,
+      });
 
       if (error) throw error;
-      
+
       toast.success("Membro escalado com sucesso!");
       loadEscalas();
     } catch (error: any) {
@@ -180,7 +176,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
         toast.error("Este membro já está escalado nesta posição");
       } else {
         toast.error("Erro ao escalar membro", {
-          description: error.message
+          description: error.message,
         });
       }
     } finally {
@@ -191,18 +187,15 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
   const handleRemoverEscala = async (escalaId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("escalas_culto")
-        .delete()
-        .eq("id", escalaId);
+      const { error } = await supabase.from("escalas_culto").delete().eq("id", escalaId);
 
       if (error) throw error;
-      
+
       toast.success("Membro removido da escala!");
       loadEscalas();
     } catch (error: any) {
       toast.error("Erro ao remover da escala", {
-        description: error.message
+        description: error.message,
       });
     } finally {
       setLoading(false);
@@ -218,25 +211,27 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
         .eq("id", escala.id);
 
       if (error) throw error;
-      
+
       toast.success(escala.confirmado ? "Presença desmarcada" : "Presença confirmada!");
       loadEscalas();
     } catch (error: any) {
       toast.error("Erro ao atualizar confirmação", {
-        description: error.message
+        description: error.message,
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const escalasDoTime = escalas.filter(e => e.time_id === timeSelecionado);
+  const escalasDoTime = escalas.filter((e) => e.time_id === timeSelecionado);
   const membrosDisponiveis = membrosTime.filter(
-    m => !escalasDoTime.some(e => e.pessoa_id === m.pessoa_id && e.posicao_id === m.posicao_id)
+    (m) => !escalasDoTime.some((e) => e.pessoa_id === m.pessoa_id && e.posicao_id === m.posicao_id),
   );
 
-  const timeAtual = times.find(t => t.id === timeSelecionado);
-  const isAdmin = profile?.user_id; // Simplificado - em produção, verificar se é admin
+  const timeAtual = times.find((t) => t.id === timeSelecionado);
+  //const isAdmin = profile?.user_id; // Simplificado - em produção, verificar se é admin
+  const { hasAccess } = useAuth();
+  const isAdmin = hasAccess("cultos", "aprovar_gerenciar");
 
   if (!culto) return null;
 
@@ -262,10 +257,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
                 {times.map((time) => (
                   <SelectItem key={time.id} value={time.id}>
                     <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: time.cor || '#8B5CF6' }}
-                      />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: time.cor || "#8B5CF6" }} />
                       {time.nome}
                     </div>
                   </SelectItem>
@@ -283,7 +275,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
                   {timeAtual && (
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: timeAtual.cor || '#8B5CF6' }}
+                      style={{ backgroundColor: timeAtual.cor || "#8B5CF6" }}
                     >
                       <Users className="w-4 h-4 text-white" />
                     </div>
@@ -300,9 +292,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="font-medium text-sm">{escala.profiles.nome}</p>
-                                {escala.confirmado && (
-                                  <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                                )}
+                                {escala.confirmado && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
                               </div>
                               {escala.posicoes_time && (
                                 <Badge variant="outline" className="text-xs mt-1">
@@ -343,9 +333,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
                     {escalasDoTime.length === 0 && (
                       <div className="text-center p-8">
                         <Users className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">
-                          Nenhum membro escalado neste time
-                        </p>
+                        <p className="text-sm text-muted-foreground">Nenhum membro escalado neste time</p>
                       </div>
                     )}
                   </div>
@@ -392,9 +380,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
                       {membrosDisponiveis.length === 0 && (
                         <div className="text-center p-8">
                           <Check className="w-12 h-12 mx-auto text-green-500 mb-2" />
-                          <p className="text-sm text-muted-foreground">
-                            Todos os membros já estão escalados
-                          </p>
+                          <p className="text-sm text-muted-foreground">Todos os membros já estão escalados</p>
                         </div>
                       )}
                     </div>
@@ -411,20 +397,14 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-sm">
-                      {escalas.filter(e => e.confirmado).length} confirmados
-                    </span>
+                    <span className="text-sm">{escalas.filter((e) => e.confirmado).length} confirmados</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <XCircle className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">
-                      {escalas.filter(e => !e.confirmado).length} pendentes
-                    </span>
+                    <span className="text-sm">{escalas.filter((e) => !e.confirmado).length} pendentes</span>
                   </div>
                 </div>
-                <Badge variant="outline">
-                  Total: {escalas.length} escalados
-                </Badge>
+                <Badge variant="outline">Total: {escalas.length} escalados</Badge>
               </div>
             </CardContent>
           </Card>
