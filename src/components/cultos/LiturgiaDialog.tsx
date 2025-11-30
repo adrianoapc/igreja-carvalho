@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus } from "lucide-react";
 
 interface Culto {
   id: string;
@@ -31,6 +32,7 @@ interface ItemLiturgia {
   ordem: number;
   duracao_minutos: number | null;
   responsavel_id: string | null;
+  responsavel_externo: string | null;
   responsavel?: {
     nome: string;
   };
@@ -69,6 +71,8 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
   const [descricao, setDescricao] = useState("");
   const [duracaoMinutos, setDuracaoMinutos] = useState<number | undefined>(undefined);
   const [responsavelId, setResponsavelId] = useState<string>("");
+  const [isConvidadoExterno, setIsConvidadoExterno] = useState(false);
+  const [nomeConvidadoExterno, setNomeConvidadoExterno] = useState("");
 
   useEffect(() => {
     if (open && culto) {
@@ -125,6 +129,8 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setDescricao("");
     setDuracaoMinutos(undefined);
     setResponsavelId("");
+    setIsConvidadoExterno(false);
+    setNomeConvidadoExterno("");
     setEditando(null);
     setShowForm(false);
   };
@@ -140,7 +146,18 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setTitulo(item.titulo);
     setDescricao(item.descricao || "");
     setDuracaoMinutos(item.duracao_minutos || undefined);
-    setResponsavelId(item.responsavel_id || "");
+    
+    // Verificar se é convidado externo ou membro
+    if (item.responsavel_externo) {
+      setIsConvidadoExterno(true);
+      setNomeConvidadoExterno(item.responsavel_externo);
+      setResponsavelId("");
+    } else {
+      setIsConvidadoExterno(false);
+      setNomeConvidadoExterno("");
+      setResponsavelId(item.responsavel_id || "");
+    }
+    
     setShowForm(true);
   };
 
@@ -150,19 +167,28 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
       return;
     }
 
+    // Validar responsável
+    if (isConvidadoExterno && !nomeConvidadoExterno.trim()) {
+      toast.error("Informe o nome do convidado externo");
+      return;
+    }
+
     setLoading(true);
     try {
+      const dadosLiturgia = {
+        tipo,
+        titulo,
+        descricao: descricao || null,
+        duracao_minutos: duracaoMinutos || null,
+        responsavel_id: isConvidadoExterno ? null : (responsavelId || null),
+        responsavel_externo: isConvidadoExterno ? nomeConvidadoExterno.trim() : null,
+      };
+
       if (editando) {
         // Atualizar item existente
         const { error } = await supabase
           .from("liturgia_culto")
-          .update({
-            tipo,
-            titulo,
-            descricao: descricao || null,
-            duracao_minutos: duracaoMinutos || null,
-            responsavel_id: responsavelId || null,
-          })
+          .update(dadosLiturgia)
           .eq("id", editando.id);
 
         if (error) throw error;
@@ -175,12 +201,8 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
           .from("liturgia_culto")
           .insert([{
             culto_id: culto.id,
-            tipo,
-            titulo,
-            descricao: descricao || null,
+            ...dadosLiturgia,
             ordem: novaOrdem,
-            duracao_minutos: duracaoMinutos || null,
-            responsavel_id: responsavelId || null,
           }]);
 
         if (error) throw error;
@@ -319,20 +341,51 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
                 </div>
 
                 <div>
-                  <Label>Responsável</Label>
-                  <Select value={responsavelId || "none"} onValueChange={(value) => setResponsavelId(value === "none" ? "" : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o responsável" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {membros.map((membro) => (
-                        <SelectItem key={membro.id} value={membro.id}>
-                          {membro.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Responsável</Label>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="convidado-externo"
+                        checked={isConvidadoExterno}
+                        onCheckedChange={(checked) => {
+                          setIsConvidadoExterno(checked as boolean);
+                          if (checked) {
+                            setResponsavelId("");
+                          } else {
+                            setNomeConvidadoExterno("");
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="convidado-externo"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        Convidado externo
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {isConvidadoExterno ? (
+                    <Input
+                      placeholder="Nome do convidado externo"
+                      value={nomeConvidadoExterno}
+                      onChange={(e) => setNomeConvidadoExterno(e.target.value)}
+                    />
+                  ) : (
+                    <Select value={responsavelId || "none"} onValueChange={(value) => setResponsavelId(value === "none" ? "" : value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o responsável" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {membros.map((membro) => (
+                          <SelectItem key={membro.id} value={membro.id}>
+                            {membro.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div>
@@ -384,12 +437,17 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
                                 {item.duracao_minutos} min
                               </Badge>
                             )}
-                            {item.responsavel && (
+                            {item.responsavel_externo ? (
+                              <Badge variant="secondary" className="text-xs">
+                                <UserPlus className="w-3 h-3 mr-1" />
+                                {item.responsavel_externo}
+                              </Badge>
+                            ) : item.responsavel ? (
                               <Badge variant="secondary" className="text-xs">
                                 <User className="w-3 h-3 mr-1" />
                                 {item.responsavel.nome}
                               </Badge>
-                            )}
+                            ) : null}
                           </div>
                           <h4 className="font-medium text-sm">{item.titulo}</h4>
                           {item.descricao && (

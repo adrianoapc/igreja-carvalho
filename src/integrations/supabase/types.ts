@@ -672,6 +672,7 @@ export type Database = {
           duracao_minutos: number | null
           id: string
           ordem: number
+          responsavel_externo: string | null
           responsavel_id: string | null
           tipo: string
           titulo: string
@@ -684,6 +685,7 @@ export type Database = {
           duracao_minutos?: number | null
           id?: string
           ordem: number
+          responsavel_externo?: string | null
           responsavel_id?: string | null
           tipo: string
           titulo: string
@@ -696,6 +698,7 @@ export type Database = {
           duracao_minutos?: number | null
           id?: string
           ordem?: number
+          responsavel_externo?: string | null
           responsavel_id?: string | null
           tipo?: string
           titulo?: string
