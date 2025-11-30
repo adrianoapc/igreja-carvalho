@@ -269,7 +269,24 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
         if (error) throw error;
         midiaId = novaMidia.id;
         
-        // Adicionar tags
+        // Sugerir tags automaticamente se não houver tags selecionadas
+        let tagsFinais = tagsSelecionadas;
+        if (tagsSelecionadas.length === 0) {
+          const tagsSugeridas = sugerirTagsPorTipoCanal(tipo, canal);
+          if (tagsSugeridas.length > 0) {
+            tagsFinais = tagsSugeridas;
+            setTagsSelecionadas(tagsSugeridas);
+            const nomesTags = tagsSugeridas
+              .map(id => tags.find(t => t.id === id)?.nome)
+              .filter(Boolean)
+              .join(', ');
+            toast.info("Tags sugeridas aplicadas!", {
+              description: nomesTags,
+            });
+          }
+        }
+        
+        // Adicionar tags (incluindo as sugeridas)
         await atualizarTags(midiaId);
         
         const successMessage = scheduledAt 
@@ -309,6 +326,47 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
         .from('midia_tags')
         .insert(tagsData);
     }
+  };
+
+  // Função para sugerir tags automaticamente baseada em tipo e canal
+  const sugerirTagsPorTipoCanal = (tipoMidia: string, canalMidia: string): string[] => {
+    const sugestoes: string[] = [];
+    
+    // Mapeamento de tipos de mídia para nomes de tags
+    const mapaTipoParaTag: Record<string, string[]> = {
+      "imagem": ["Abertura", "Louvor", "Adoração", "Anúncio"],
+      "video": ["Pregação", "Testemunho", "Evento Especial"],
+      "documento": ["Pregação", "Ensino", "Leitura Bíblica"],
+    };
+
+    // Mapeamento de canais para tags
+    const mapaCanalParaTag: Record<string, string[]> = {
+      "telao": ["Abertura", "Louvor", "Adoração", "Pregação"],
+      "app": ["Anúncio", "Evento Especial"],
+      "redes_sociais": ["Evento Especial", "Anúncio", "Testemunho"],
+      "site": ["Anúncio", "Evento Especial"],
+    };
+
+    // Coletar sugestões baseadas no tipo
+    const sugestoesTipo = mapaTipoParaTag[tipoMidia] || [];
+    
+    // Coletar sugestões baseadas no canal
+    const sugestoesCanal = mapaCanalParaTag[canalMidia] || [];
+    
+    // Combinar sugestões únicas (priorizar interseção)
+    const todasSugestoes = [...new Set([...sugestoesTipo, ...sugestoesCanal])];
+    
+    // Encontrar IDs das tags sugeridas (máximo 3 tags)
+    todasSugestoes.slice(0, 3).forEach(nomeSugestao => {
+      const tagEncontrada = tags.find(
+        t => t.nome.toLowerCase() === nomeSugestao.toLowerCase()
+      );
+      if (tagEncontrada) {
+        sugestoes.push(tagEncontrada.id);
+      }
+    });
+
+    return sugestoes;
   };
 
   const resetForm = () => {
