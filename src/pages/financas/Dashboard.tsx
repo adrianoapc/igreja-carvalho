@@ -241,9 +241,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Reconciliação Bancária */}
-      <ReconciliacaoBancaria />
-
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         <Card className="shadow-soft">
@@ -388,6 +385,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Reconciliação Bancária */}
+      <ReconciliacaoBancaria />
     </div>
   );
 }
