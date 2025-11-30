@@ -42,7 +42,7 @@ export function AplicarTemplateDialog({
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from("templates_liturgia")
+        .from("templates_culto")
         .select("*")
         .eq("ativo", true)
         .order("nome");
@@ -53,7 +53,7 @@ export function AplicarTemplateDialog({
       const templatesWithCount = await Promise.all(
         (data || []).map(async (template) => {
           const { count } = await supabase
-            .from("itens_template_liturgia")
+            .from("itens_template_culto")
             .select("*", { count: "exact", head: true })
             .eq("template_id", template.id);
 
@@ -76,7 +76,7 @@ export function AplicarTemplateDialog({
     try {
       // Buscar itens do template
       const { data: itensTemplate, error: itensError } = await supabase
-        .from("itens_template_liturgia")
+        .from("itens_template_culto")
         .select("*")
         .eq("template_id", templateId)
         .order("ordem");

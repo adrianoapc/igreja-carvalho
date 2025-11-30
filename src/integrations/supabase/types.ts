@@ -504,6 +504,68 @@ export type Database = {
           },
         ]
       }
+      escalas_template: {
+        Row: {
+          created_at: string
+          id: string
+          observacoes: string | null
+          pessoa_id: string | null
+          posicao_id: string | null
+          template_id: string
+          time_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          pessoa_id?: string | null
+          posicao_id?: string | null
+          template_id: string
+          time_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          pessoa_id?: string | null
+          posicao_id?: string | null
+          template_id?: string
+          time_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalas_template_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_template_posicao_id_fkey"
+            columns: ["posicao_id"]
+            isOneToOne: false
+            referencedRelation: "posicoes_time"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_template_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates_culto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_template_time_id_fkey"
+            columns: ["time_id"]
+            isOneToOne: false
+            referencedRelation: "times_culto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       familias: {
         Row: {
           created_at: string
@@ -687,7 +749,7 @@ export type Database = {
         }
         Relationships: []
       }
-      itens_template_liturgia: {
+      itens_template_culto: {
         Row: {
           created_at: string
           descricao: string | null
@@ -729,10 +791,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "itens_template_liturgia_template_id_fkey"
+            foreignKeyName: "itens_template_culto_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
-            referencedRelation: "templates_liturgia"
+            referencedRelation: "templates_culto"
             referencedColumns: ["id"]
           },
         ]
@@ -1407,29 +1469,50 @@ export type Database = {
         }
         Relationships: []
       }
-      templates_liturgia: {
+      templates_culto: {
         Row: {
           ativo: boolean
           created_at: string
           descricao: string | null
+          duracao_padrao: number | null
           id: string
+          incluir_escalas: boolean | null
+          local_padrao: string | null
           nome: string
+          observacoes_padrao: string | null
+          pregador_padrao: string | null
+          tema_padrao: string | null
+          tipo_culto: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          duracao_padrao?: number | null
           id?: string
+          incluir_escalas?: boolean | null
+          local_padrao?: string | null
           nome: string
+          observacoes_padrao?: string | null
+          pregador_padrao?: string | null
+          tema_padrao?: string | null
+          tipo_culto?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          duracao_padrao?: number | null
           id?: string
+          incluir_escalas?: boolean | null
+          local_padrao?: string | null
           nome?: string
+          observacoes_padrao?: string | null
+          pregador_padrao?: string | null
+          tema_padrao?: string | null
+          tipo_culto?: string | null
           updated_at?: string
         }
         Relationships: []

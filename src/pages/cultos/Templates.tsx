@@ -43,7 +43,7 @@ export default function Templates() {
   const loadTemplates = async () => {
     try {
       const { data, error } = await supabase
-        .from("templates_liturgia")
+        .from("templates_culto")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -53,7 +53,7 @@ export default function Templates() {
       const templatesWithCount = await Promise.all(
         (data || []).map(async (template) => {
           const { count } = await supabase
-            .from("itens_template_liturgia")
+            .from("itens_template_culto")
             .select("*", { count: "exact", head: true })
             .eq("template_id", template.id);
 
@@ -80,7 +80,7 @@ export default function Templates() {
 
     try {
       const { error } = await supabase
-        .from("templates_liturgia")
+        .from("templates_culto")
         .delete()
         .eq("id", templateToDelete);
 
@@ -100,7 +100,7 @@ export default function Templates() {
   const handleToggleAtivo = async (template: Template) => {
     try {
       const { error } = await supabase
-        .from("templates_liturgia")
+        .from("templates_culto")
         .update({ ativo: !template.ativo })
         .eq("id", template.id);
 
@@ -118,7 +118,7 @@ export default function Templates() {
     try {
       // Buscar itens do template original
       const { data: itens, error: itensError } = await supabase
-        .from("itens_template_liturgia")
+        .from("itens_template_culto")
         .select("*")
         .eq("template_id", template.id)
         .order("ordem");
@@ -127,7 +127,7 @@ export default function Templates() {
 
       // Criar novo template
       const { data: novoTemplate, error: templateError } = await supabase
-        .from("templates_liturgia")
+        .from("templates_culto")
         .insert({
           nome: `${template.nome} (Cópia)`,
           descricao: template.descricao,
@@ -152,7 +152,7 @@ export default function Templates() {
         }));
 
         const { error: itensInsertError } = await supabase
-          .from("itens_template_liturgia")
+          .from("itens_template_culto")
           .insert(novosItens);
 
         if (itensInsertError) throw itensInsertError;
