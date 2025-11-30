@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, UserCog, ArrowRight, Plus, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, UserCog, ArrowRight, Plus, BarChart3, PieChart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -191,6 +191,12 @@ export default function Financas() {
       description: "Registro rápido de culto",
       icon: DollarSign,
       action: () => navigate("/financas/relatorio-oferta"),
+    },
+    {
+      title: "Dashboard de Ofertas",
+      description: "Análises de ofertas",
+      icon: PieChart,
+      action: () => navigate("/financas/dashboard-ofertas"),
     },
     {
       title: "Nova Entrada",
