@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3, Settings } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3, Settings, Image } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEffect, useState } from "react";
@@ -108,6 +108,20 @@ const cultosItems = [{
   icon: UserCog,
   label: "Posições",
   path: "/cultos/posicoes"
+}, {
+  icon: Image,
+  label: "Mídias",
+  path: "/cultos/midias"
+}];
+
+const midiasItems = [{
+  icon: Image,
+  label: "Geral",
+  path: "/midias"
+}, {
+  icon: Image,
+  label: "Gerenciar",
+  path: "/midias/geral"
 }];
 const modulosItems = [{
   icon: Baby,
@@ -343,6 +357,42 @@ export function AppSidebar() {
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {cultosItems.map(item => {
+                      const Icon = item.icon;
+                      return <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink to={item.path} end className="hover:bg-sidebar-accent" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
+                                <Icon className="w-4 h-4 text-white" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>;
+                    })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Mídias</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Mídias">
+                      <Image className="w-5 h-5" />
+                      {!isCollapsed && <>
+                          <span>Mídias</span>
+                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {midiasItems.map(item => {
                       const Icon = item.icon;
                       return <SidebarMenuSubItem key={item.path}>
                             <SidebarMenuSubButton asChild>
