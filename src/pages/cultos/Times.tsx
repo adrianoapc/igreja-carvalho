@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
@@ -153,6 +153,13 @@ export default function Times() {
     });
   };
 
+  const limparFiltros = () => {
+    setSearchTerm("");
+    setCategoriaFiltro("todos");
+  };
+
+  const hasActiveFilters = searchTerm !== "" || categoriaFiltro !== "todos";
+
   if (loading) {
     return (
       <div className="space-y-4 md:space-y-6">
@@ -188,15 +195,28 @@ export default function Times() {
       </div>
 
       {/* Campo de Busca */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Buscar por time ou membro..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Buscar por time ou membro..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            size="default"
+            onClick={limparFiltros}
+            className="whitespace-nowrap"
+          >
+            <X className="w-4 h-4 mr-2" />
+            Limpar filtros
+          </Button>
+        )}
       </div>
 
       {/* Filtros por Categoria */}
