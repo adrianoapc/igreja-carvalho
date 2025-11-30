@@ -106,8 +106,10 @@ export type Database = {
           letra: string | null
           link_spotify: string | null
           link_youtube: string | null
+          ministro_id: string | null
           observacoes: string | null
           ordem: number
+          solista_id: string | null
           titulo: string
           tom: string | null
           updated_at: string
@@ -123,8 +125,10 @@ export type Database = {
           letra?: string | null
           link_spotify?: string | null
           link_youtube?: string | null
+          ministro_id?: string | null
           observacoes?: string | null
           ordem: number
+          solista_id?: string | null
           titulo: string
           tom?: string | null
           updated_at?: string
@@ -140,8 +144,10 @@ export type Database = {
           letra?: string | null
           link_spotify?: string | null
           link_youtube?: string | null
+          ministro_id?: string | null
           observacoes?: string | null
           ordem?: number
+          solista_id?: string | null
           titulo?: string
           tom?: string | null
           updated_at?: string
@@ -152,6 +158,20 @@ export type Database = {
             columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancoes_culto_ministro_id_fkey"
+            columns: ["ministro_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancoes_culto_solista_id_fkey"
+            columns: ["solista_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

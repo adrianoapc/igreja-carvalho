@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, Clock, MapPin, User, Users as UsersIcon, List, CalendarDays, Edit } from "lucide-react";
+import { Plus, Calendar, Clock, MapPin, User, Users as UsersIcon, List, CalendarDays, Edit, Music2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import EscalasDialog from "@/components/cultos/EscalasDialog";
 import CalendarioMensal from "@/components/cultos/CalendarioMensal";
 import CultoDialog from "@/components/cultos/CultoDialog";
 import LiturgiaDialog from "@/components/cultos/LiturgiaDialog";
+import CancoesDialog from "@/components/cultos/CancoesDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Culto {
@@ -42,6 +43,7 @@ export default function Eventos() {
   const [cultoDialogOpen, setCultoDialogOpen] = useState(false);
   const [cultoEditando, setCultoEditando] = useState<Culto | null>(null);
   const [liturgiaDialogOpen, setLiturgiaDialogOpen] = useState(false);
+  const [cancoesDialogOpen, setCancoesDialogOpen] = useState(false);
 
   useEffect(() => {
     loadCultos();
@@ -98,6 +100,11 @@ export default function Eventos() {
   const handleGerenciarLiturgia = (culto: Culto) => {
     setCultoSelecionado(culto);
     setLiturgiaDialogOpen(true);
+  };
+
+  const handleGerenciarCancoes = (culto: Culto) => {
+    setCultoSelecionado(culto);
+    setCancoesDialogOpen(true);
   };
 
   if (loading) {
@@ -243,7 +250,13 @@ export default function Eventos() {
                   >
                     Liturgia
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full sm:w-auto text-xs md:text-sm"
+                    onClick={() => handleGerenciarCancoes(culto)}
+                  >
+                    <Music2 className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                     Canções
                   </Button>
                 </div>
@@ -295,6 +308,12 @@ export default function Eventos() {
       <LiturgiaDialog
         open={liturgiaDialogOpen}
         onOpenChange={setLiturgiaDialogOpen}
+        culto={cultoSelecionado}
+      />
+
+      <CancoesDialog
+        open={cancoesDialogOpen}
+        onOpenChange={setCancoesDialogOpen}
         culto={cultoSelecionado}
       />
     </div>
