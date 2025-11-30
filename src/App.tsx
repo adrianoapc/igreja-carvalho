@@ -38,6 +38,7 @@ import Categorias from "./pages/financas/Categorias";
 import Fornecedores from "./pages/financas/Fornecedores";
 import FormasPagamento from "./pages/financas/FormasPagamento";
 import Ensinamentos from "./pages/Ensinamentos";
+import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
 import Announcements from "./pages/Announcements";
@@ -374,6 +375,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Admin />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuracoes-igreja"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ConfiguracoesIgreja />
                 </MainLayout>
               </ProtectedRoute>
             }

@@ -1,7 +1,9 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3 } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3, Settings } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 const menuItems = [{
   icon: Home,
   label: "Dashboard",
@@ -116,6 +118,10 @@ const modulosItems = [{
   label: "Ensinamentos",
   path: "/ensinamentos"
 }, {
+  icon: Settings,
+  label: "Configurações",
+  path: "/configuracoes-igreja"
+}, {
   icon: Shield,
   label: "Administração",
   path: "/admin"
@@ -125,14 +131,71 @@ export function AppSidebar() {
     state
   } = useSidebar();
   const isCollapsed = state === "collapsed";
+  
+  const [igrejaConfig, setIgrejaConfig] = useState({
+    nome: "Igreja App",
+    subtitulo: "Gestão Completa",
+    logoUrl: null as string | null
+  });
+
+  useEffect(() => {
+    loadIgrejaConfig();
+  }, []);
+
+  const loadIgrejaConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("configuracoes_igreja")
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setIgrejaConfig({
+          nome: data.nome_igreja,
+          subtitulo: data.subtitulo || "Gestão Completa",
+          logoUrl: data.logo_url
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao carregar configurações:", error);
+    }
+  };
+  
   return <Sidebar collapsible="icon">
       <SidebarContent>
         <div className="p-6 border-b border-sidebar-border">
-          {!isCollapsed && <>
-              <h1 className="text-2xl font-bold text-sidebar-foreground">Igreja App</h1>
-              <p className="text-sm text-sidebar-foreground/70 mt-1">Gestão Completa</p>
-            </>}
-          {isCollapsed && <h1 className="text-xl font-bold text-sidebar-foreground text-center">IA</h1>}
+          {!isCollapsed && (
+            <div className="flex items-center gap-3">
+              {igrejaConfig.logoUrl && (
+                <img 
+                  src={igrejaConfig.logoUrl} 
+                  alt="Logo da Igreja" 
+                  className="w-12 h-12 object-contain rounded-lg"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-bold text-sidebar-foreground truncate">
+                  {igrejaConfig.nome}
+                </h1>
+                <p className="text-sm text-sidebar-foreground/70 mt-1 truncate">
+                  {igrejaConfig.subtitulo}
+                </p>
+              </div>
+            </div>
+          )}
+          {isCollapsed && (
+            igrejaConfig.logoUrl ? (
+              <img 
+                src={igrejaConfig.logoUrl} 
+                alt="Logo" 
+                className="w-8 h-8 mx-auto object-contain"
+              />
+            ) : (
+              <h1 className="text-xl font-bold text-sidebar-foreground text-center">IA</h1>
+            )
+          )}
         </div>
 
         <SidebarGroup>
