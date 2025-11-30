@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink, FileText, Video, Image as ImageIcon, GripVertical } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink, FileText, Video, Image as ImageIcon, GripVertical, Save, Download } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -29,6 +29,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { AplicarTemplateDialog } from "./AplicarTemplateDialog";
+import { SalvarComoTemplateDialog } from "./SalvarComoTemplateDialog";
 
 interface Culto {
   id: string;
@@ -181,6 +183,8 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
   const [editando, setEditando] = useState<ItemLiturgia | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showMidiasDialog, setShowMidiasDialog] = useState(false);
+  const [showAplicarTemplate, setShowAplicarTemplate] = useState(false);
+  const [showSalvarTemplate, setShowSalvarTemplate] = useState(false);
 
   // Form state
   const [tipo, setTipo] = useState("");
@@ -700,6 +704,28 @@ Qualquer dúvida, entre em contato conosco.`;
             </Card>
           )}
 
+          {/* Botões de Template */}
+          {!showForm && itens.length > 0 && (
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAplicarTemplate(true)}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Aplicar Template
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSalvarTemplate(true)}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Salvar como Template
+              </Button>
+            </div>
+          )}
+
           {/* Lista de itens */}
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-2">
@@ -1033,6 +1059,23 @@ Qualquer dúvida, entre em contato conosco.`;
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Diálogos de Template */}
+        {culto && (
+          <>
+            <AplicarTemplateDialog
+              open={showAplicarTemplate}
+              onOpenChange={setShowAplicarTemplate}
+              cultoId={culto.id}
+              onSuccess={loadItens}
+            />
+            <SalvarComoTemplateDialog
+              open={showSalvarTemplate}
+              onOpenChange={setShowSalvarTemplate}
+              cultoId={culto.id}
+            />
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

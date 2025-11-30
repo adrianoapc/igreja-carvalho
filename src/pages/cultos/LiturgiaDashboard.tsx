@@ -4,8 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Users, Clock, Calendar, Award, TrendingUp } from "lucide-react";
+import { Users, Clock, Calendar, Award, TrendingUp, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 interface ResponsavelStats {
   nome: string;
@@ -28,6 +30,7 @@ interface DashboardStats {
 const COLORS = ['#8B5CF6', '#EC4899', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#14B8A6'];
 
 export default function LiturgiaDashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     total_cultos: 0,
@@ -155,11 +158,17 @@ export default function LiturgiaDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard de Liturgia</h1>
-        <p className="text-muted-foreground mt-1">
-          Estatísticas e análise de participação na liturgia
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard de Liturgia</h1>
+          <p className="text-muted-foreground mt-1">
+            Estatísticas e análise de participação na liturgia
+          </p>
+        </div>
+        <Button onClick={() => navigate("/cultos/templates")} variant="outline">
+          <FileText className="mr-2 h-4 w-4" />
+          Templates
+        </Button>
       </div>
 
       {/* Cards de estatísticas */}
