@@ -4,28 +4,124 @@ import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, PieChart } from "lucid
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, format, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsePieChart, Pie, Cell } from "recharts";
+import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
+import { ReconciliacaoBancaria } from "@/components/financas/ReconciliacaoBancaria";
+import { useState } from "react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  
+  // Estados de filtros
+  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano' | 'customizado'>('mes');
+  const [dataInicio, setDataInicio] = useState<Date | undefined>();
+  const [dataFim, setDataFim] = useState<Date | undefined>();
+  const [contaId, setContaId] = useState('all');
+  const [categoriaId, setCategoriaId] = useState('all');
+  const [status, setStatus] = useState('all');
+
   const mesAtual = new Date();
   const mesAnterior = subMonths(mesAtual, 1);
 
-  // Dados do mês atual
-  const { data: transacoesMesAtual } = useQuery({
-    queryKey: ['dashboard-mes-atual'],
+  // Calcular range de datas baseado no período
+  const getDateRange = () => {
+    const hoje = new Date();
+    
+    switch (periodo) {
+      case 'hoje':
+        return {
+          inicio: startOfDay(hoje).toISOString().split('T')[0],
+          fim: endOfDay(hoje).toISOString().split('T')[0],
+        };
+      case 'semana':
+        return {
+          inicio: startOfWeek(hoje, { locale: ptBR }).toISOString().split('T')[0],
+          fim: endOfWeek(hoje, { locale: ptBR }).toISOString().split('T')[0],
+        };
+      case 'mes':
+        return {
+          inicio: startOfMonth(hoje).toISOString().split('T')[0],
+          fim: endOfMonth(hoje).toISOString().split('T')[0],
+        };
+      case 'ano':
+        return {
+          inicio: startOfYear(hoje).toISOString().split('T')[0],
+          fim: endOfYear(hoje).toISOString().split('T')[0],
+        };
+      case 'customizado':
+        if (dataInicio && dataFim) {
+          return {
+            inicio: dataInicio.toISOString().split('T')[0],
+            fim: dataFim.toISOString().split('T')[0],
+          };
+        }
+        return {
+          inicio: startOfMonth(hoje).toISOString().split('T')[0],
+          fim: endOfMonth(hoje).toISOString().split('T')[0],
+        };
+      default:
+        return {
+          inicio: startOfMonth(hoje).toISOString().split('T')[0],
+          fim: endOfMonth(hoje).toISOString().split('T')[0],
+        };
+    }
+  };
+
+  const dateRange = getDateRange();
+
+  // Buscar contas e categorias para filtros
+  const { data: contas } = useQuery({
+    queryKey: ['contas-filtro'],
     queryFn: async () => {
       const { data, error } = await supabase
+        .from('contas')
+        .select('*')
+        .eq('ativo', true)
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: categorias } = useQuery({
+    queryKey: ['categorias-filtro'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categorias_financeiras')
+        .select('*')
+        .eq('ativo', true)
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Dados do período filtrado
+  const { data: transacoesMesAtual } = useQuery({
+    queryKey: ['dashboard-mes-atual', dateRange, contaId, categoriaId, status],
+    queryFn: async () => {
+      let query = supabase
         .from('transacoes_financeiras')
         .select(`
           *,
           categoria:categoria_id(nome, cor)
         `)
-        .gte('data_vencimento', startOfMonth(mesAtual).toISOString().split('T')[0])
-        .lte('data_vencimento', endOfMonth(mesAtual).toISOString().split('T')[0]);
+        .gte('data_vencimento', dateRange.inicio)
+        .lte('data_vencimento', dateRange.fim);
       
+      if (contaId !== 'all') {
+        query = query.eq('conta_id', contaId);
+      }
+      if (categoriaId !== 'all') {
+        query = query.eq('categoria_id', categoriaId);
+      }
+      if (status !== 'all') {
+        query = query.eq('status', status);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -108,13 +204,45 @@ export default function Dashboard() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Visualize indicadores e análises financeiras
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Visualize indicadores e análises financeiras
+            </p>
+          </div>
+          <FiltrosSheet
+            periodo={periodo}
+            setPeriodo={setPeriodo}
+            dataInicio={dataInicio}
+            setDataInicio={setDataInicio}
+            dataFim={dataFim}
+            setDataFim={setDataFim}
+            busca=""
+            setBusca={() => {}}
+            contaId={contaId}
+            setContaId={setContaId}
+            categoriaId={categoriaId}
+            setCategoriaId={setCategoriaId}
+            status={status}
+            setStatus={setStatus}
+            contas={contas || []}
+            categorias={categorias || []}
+            onLimpar={() => {
+              setPeriodo('mes');
+              setDataInicio(undefined);
+              setDataFim(undefined);
+              setContaId('all');
+              setCategoriaId('all');
+              setStatus('all');
+            }}
+            onAplicar={() => {}}
+          />
         </div>
       </div>
+
+      {/* Reconciliação Bancária */}
+      <ReconciliacaoBancaria />
 
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
