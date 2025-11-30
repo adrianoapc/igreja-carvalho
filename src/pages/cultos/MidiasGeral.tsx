@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Plus, Image, Video, FileText, Pencil, Trash2, GripVertical, Eye, EyeOff, Calendar, Clock } from "lucide-react";
+import { Plus, Image, Video, FileText, Pencil, Trash2, GripVertical, Eye, EyeOff, Calendar, Clock, ListChecks } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +58,7 @@ interface Midia {
   scheduled_at?: string | null;
   expires_at?: string | null;
   tags?: Tag[];
+  liturgias_count?: number;
 }
 
 function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
@@ -164,6 +165,22 @@ function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
                   <p className="text-xs text-muted-foreground line-clamp-1">
                     {midia.descricao}
                   </p>
+                )}
+                
+                {/* Contador de uso em liturgias */}
+                {typeof midia.liturgias_count !== 'undefined' && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <Badge 
+                      variant={midia.liturgias_count > 0 ? "secondary" : "outline"} 
+                      className="text-xs"
+                    >
+                      <ListChecks className="w-3 h-3 mr-1" />
+                      {midia.liturgias_count === 0 
+                        ? "Nunca usada" 
+                        : `Usada em ${midia.liturgias_count} liturgia${midia.liturgias_count !== 1 ? 's' : ''}`
+                      }
+                    </Badge>
+                  </div>
                 )}
                 
                 {/* Tags */}
@@ -295,20 +312,32 @@ export default function MidiasGeral() {
 
       if (error) throw error;
       
-      // Carregar tags de cada mídia
-      const midiasComTags = await Promise.all(
+      // Carregar todas as liturgias para contar uso das mídias
+      const { data: liturgiasData } = await supabase
+        .from('liturgia_culto')
+        .select('midias_ids');
+      
+      // Carregar tags de cada mídia e contar uso em liturgias
+      const midiasComDados = await Promise.all(
         (midiasData || []).map(async (midia) => {
+          // Carregar tags
           const { data: tagsData } = await supabase
             .from('midia_tags')
             .select('tag_id, tags_midias(id, nome, cor)')
             .eq('midia_id', midia.id);
           
           const tags = tagsData?.map(t => (t as any).tags_midias).filter(Boolean) || [];
-          return { ...midia, tags };
+          
+          // Contar em quantas liturgias a mídia aparece
+          const liturgias_count = (liturgiasData || []).filter(
+            liturgia => liturgia.midias_ids && liturgia.midias_ids.includes(midia.id)
+          ).length;
+          
+          return { ...midia, tags, liturgias_count };
         })
       );
       
-      setMidias(midiasComTags);
+      setMidias(midiasComDados);
     } catch (error: any) {
       console.error('Erro ao carregar mídias:', error);
       toast.error("Erro ao carregar mídias");
