@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Image, Video, FileText, Pencil, Trash2, GripVertical, Eye, EyeOff } from "lucide-react";
+import { Plus, Image, Video, FileText, Pencil, Trash2, GripVertical, Eye, EyeOff, Calendar, Clock } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MidiaDialog } from "@/components/cultos/MidiaDialog";
@@ -46,6 +48,8 @@ interface Midia {
   ativo: boolean;
   culto_id?: string;
   created_at: string;
+  scheduled_at?: string | null;
+  expires_at?: string | null;
 }
 
 function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
@@ -80,8 +84,19 @@ function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
     }
   };
 
+  const getStatusInfo = () => {
+    const now = new Date();
+    const isScheduled = midia.scheduled_at && new Date(midia.scheduled_at) > now;
+    const isExpired = midia.expires_at && new Date(midia.expires_at) < now;
+    const isEffectivelyActive = midia.ativo && !isScheduled && !isExpired;
+
+    return { isScheduled, isExpired, isEffectivelyActive };
+  };
+
+  const { isScheduled, isExpired, isEffectivelyActive } = getStatusInfo();
+
   return (
-    <Card ref={setNodeRef} style={style} className={!midia.ativo ? "opacity-50" : ""}>
+    <Card ref={setNodeRef} style={style} className={!isEffectivelyActive ? "opacity-50" : ""}>
       <CardContent className="p-4">
         <div className="flex gap-3">
           {/* Drag Handle */}
@@ -112,12 +127,52 @@ function SortableMidiaCard({ midia, onEdit, onDelete, onToggleAtivo }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm truncate">{midia.titulo}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-sm truncate">{midia.titulo}</h3>
+                  {isScheduled && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      Agendada
+                    </Badge>
+                  )}
+                  {isExpired && (
+                    <Badge variant="destructive" className="text-xs">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Expirada
+                    </Badge>
+                  )}
+                  {isEffectivelyActive && (
+                    <Badge variant="default" className="text-xs bg-green-600">
+                      Ativa
+                    </Badge>
+                  )}
+                  {!midia.ativo && (
+                    <Badge variant="outline" className="text-xs">
+                      Inativa
+                    </Badge>
+                  )}
+                </div>
                 {midia.descricao && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                  <p className="text-xs text-muted-foreground line-clamp-1">
                     {midia.descricao}
                   </p>
                 )}
+                
+                {/* Datas */}
+                <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                  {midia.scheduled_at && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      Publica: {format(new Date(midia.scheduled_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </span>
+                  )}
+                  {midia.expires_at && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Expira: {format(new Date(midia.expires_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </span>
+                  )}
+                </div>
               </div>
               <Badge variant="outline" className="flex-shrink-0">
                 {getIcon()}

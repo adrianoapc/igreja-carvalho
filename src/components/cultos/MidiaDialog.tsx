@@ -8,7 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface MidiaDialogProps {
   open: boolean;
@@ -23,6 +26,8 @@ interface MidiaDialogProps {
     ordem: number;
     ativo: boolean;
     culto_id?: string;
+    scheduled_at?: string | null;
+    expires_at?: string | null;
   };
   onSuccess: () => void;
 }
@@ -37,6 +42,12 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   const [previewUrl, setPreviewUrl] = useState<string>(midia?.url || "");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<Date | undefined>(
+    midia?.scheduled_at ? new Date(midia.scheduled_at) : undefined
+  );
+  const [expiresAt, setExpiresAt] = useState<Date | undefined>(
+    midia?.expires_at ? new Date(midia.expires_at) : undefined
+  );
 
   const handleArquivoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,6 +99,12 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   const handleSave = async () => {
     if (!titulo.trim()) {
       toast.error("Título é obrigatório");
+      return;
+    }
+
+    // Validar datas
+    if (scheduledAt && expiresAt && expiresAt <= scheduledAt) {
+      toast.error("A data de expiração deve ser posterior à data de publicação");
       return;
     }
 
@@ -148,12 +165,19 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             canal,
             ativo,
             url: urlFinal,
+            scheduled_at: scheduledAt?.toISOString() || null,
+            expires_at: expiresAt?.toISOString() || null,
             updated_at: new Date().toISOString()
           })
           .eq('id', midia.id);
 
         if (error) throw error;
-        toast.success("Mídia atualizada com sucesso!");
+        
+        const successMessage = scheduledAt 
+          ? `Mídia atualizada! Será publicada em ${format(scheduledAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`
+          : "Mídia atualizada com sucesso!";
+        
+        toast.success(successMessage);
       } else {
         // Obter próxima ordem
         const { data: maxOrdem } = await supabase
@@ -177,11 +201,18 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             canal,
             ordem: novaOrdem,
             ativo,
-            culto_id: null
+            culto_id: null,
+            scheduled_at: scheduledAt?.toISOString() || null,
+            expires_at: expiresAt?.toISOString() || null
           });
 
         if (error) throw error;
-        toast.success("Mídia adicionada com sucesso!");
+        
+        const successMessage = scheduledAt 
+          ? `Mídia adicionada! Será publicada em ${format(scheduledAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`
+          : "Mídia adicionada com sucesso!";
+        
+        toast.success(successMessage);
       }
 
       onSuccess();
@@ -204,6 +235,8 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
     setAtivo(true);
     setArquivo(null);
     setPreviewUrl("");
+    setScheduledAt(undefined);
+    setExpiresAt(undefined);
   };
 
   return (
@@ -330,6 +363,39 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
                 <SelectItem value="site">Site</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Data de Publicação e Expiração */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="scheduledAt">
+                <CalendarIcon className="w-4 h-4 inline mr-1" />
+                Data de Publicação
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Se não definir, será publicado imediatamente
+              </p>
+              <DateTimePicker
+                value={scheduledAt}
+                onChange={setScheduledAt}
+                placeholder="Publicar agora"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="expiresAt">
+                <Clock className="w-4 h-4 inline mr-1" />
+                Data de Expiração
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Mídia será ocultada automaticamente
+              </p>
+              <DateTimePicker
+                value={expiresAt}
+                onChange={setExpiresAt}
+                placeholder="Sem expiração"
+              />
+            </div>
           </div>
 
           {/* Ativo */}
