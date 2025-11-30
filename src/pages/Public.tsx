@@ -54,13 +54,6 @@ export default function Public() {
               <LogIn className="w-5 h-5 mr-2" />
               Fazer Login / Cadastrar
             </Button>
-            <Button 
-              onClick={() => navigate("/first-admin")}
-              variant="outline"
-              size="lg"
-            >
-              Configurar Sistema
-            </Button>
           </div>
         </div>
 
