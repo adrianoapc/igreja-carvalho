@@ -10,12 +10,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User } from "lucide-react";
 
 interface Culto {
   id: string;
   titulo: string;
   data_culto: string;
+}
+
+interface Membro {
+  id: string;
+  nome: string;
 }
 
 interface ItemLiturgia {
@@ -25,6 +30,10 @@ interface ItemLiturgia {
   descricao: string | null;
   ordem: number;
   duracao_minutos: number | null;
+  responsavel_id: string | null;
+  responsavel?: {
+    nome: string;
+  };
 }
 
 interface LiturgiaDialogProps {
@@ -49,6 +58,7 @@ const TIPOS_LITURGIA = [
 
 export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDialogProps) {
   const [itens, setItens] = useState<ItemLiturgia[]>([]);
+  const [membros, setMembros] = useState<Membro[]>([]);
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState<ItemLiturgia | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -58,12 +68,31 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [duracaoMinutos, setDuracaoMinutos] = useState<number | undefined>(undefined);
+  const [responsavelId, setResponsavelId] = useState<string>("");
 
   useEffect(() => {
     if (open && culto) {
       loadItens();
+      loadMembros();
     }
   }, [open, culto]);
+
+  const loadMembros = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .eq("status", "membro")
+        .order("nome", { ascending: true });
+
+      if (error) throw error;
+      setMembros(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar membros", {
+        description: error.message
+      });
+    }
+  };
 
   const loadItens = async () => {
     if (!culto) return;
@@ -72,7 +101,10 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     try {
       const { data, error } = await supabase
         .from("liturgia_culto")
-        .select("*")
+        .select(`
+          *,
+          responsavel:profiles!responsavel_id(nome)
+        `)
         .eq("culto_id", culto.id)
         .order("ordem", { ascending: true });
 
@@ -92,6 +124,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setTitulo("");
     setDescricao("");
     setDuracaoMinutos(undefined);
+    setResponsavelId("");
     setEditando(null);
     setShowForm(false);
   };
@@ -107,6 +140,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setTitulo(item.titulo);
     setDescricao(item.descricao || "");
     setDuracaoMinutos(item.duracao_minutos || undefined);
+    setResponsavelId(item.responsavel_id || "");
     setShowForm(true);
   };
 
@@ -127,6 +161,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
             titulo,
             descricao: descricao || null,
             duracao_minutos: duracaoMinutos || null,
+            responsavel_id: responsavelId || null,
           })
           .eq("id", editando.id);
 
@@ -145,6 +180,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
             descricao: descricao || null,
             ordem: novaOrdem,
             duracao_minutos: duracaoMinutos || null,
+            responsavel_id: responsavelId || null,
           }]);
 
         if (error) throw error;
@@ -283,6 +319,23 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
                 </div>
 
                 <div>
+                  <Label>Responsável</Label>
+                  <Select value={responsavelId} onValueChange={setResponsavelId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Nenhum</SelectItem>
+                      {membros.map((membro) => (
+                        <SelectItem key={membro.id} value={membro.id}>
+                          {membro.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
                   <Label>Descrição</Label>
                   <Textarea
                     placeholder="Detalhes adicionais..."
@@ -320,8 +373,8 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
                   <Card key={item.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                      <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <Badge variant="outline" className="text-xs">
                               {item.tipo}
                             </Badge>
@@ -329,6 +382,12 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
                               <Badge variant="secondary" className="text-xs">
                                 <Clock className="w-3 h-3 mr-1" />
                                 {item.duracao_minutos} min
+                              </Badge>
+                            )}
+                            {item.responsavel && (
+                              <Badge variant="secondary" className="text-xs">
+                                <User className="w-3 h-3 mr-1" />
+                                {item.responsavel.nome}
                               </Badge>
                             )}
                           </div>

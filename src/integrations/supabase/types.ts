@@ -672,6 +672,7 @@ export type Database = {
           duracao_minutos: number | null
           id: string
           ordem: number
+          responsavel_id: string | null
           tipo: string
           titulo: string
           updated_at: string
@@ -683,6 +684,7 @@ export type Database = {
           duracao_minutos?: number | null
           id?: string
           ordem: number
+          responsavel_id?: string | null
           tipo: string
           titulo: string
           updated_at?: string
@@ -694,6 +696,7 @@ export type Database = {
           duracao_minutos?: number | null
           id?: string
           ordem?: number
+          responsavel_id?: string | null
           tipo?: string
           titulo?: string
           updated_at?: string
@@ -704,6 +707,13 @@ export type Database = {
             columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liturgia_culto_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
