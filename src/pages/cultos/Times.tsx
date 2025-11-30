@@ -1,9 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search, X, Trash2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,6 +55,8 @@ export default function Times() {
   const [timeGerenciando, setTimeGerenciando] = useState<Time | null>(null);
   const [expandedTimes, setExpandedTimes] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [timeDeletando, setTimeDeletando] = useState<Time | null>(null);
 
   useEffect(() => {
     loadTimes();
@@ -159,6 +171,42 @@ export default function Times() {
   };
 
   const hasActiveFilters = searchTerm !== "" || categoriaFiltro !== "todos";
+
+  const handleExcluirTime = (time: Time) => {
+    setTimeDeletando(time);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmarExclusao = async () => {
+    if (!timeDeletando) return;
+
+    try {
+      // Verificar se há membros no time
+      if (timeDeletando.membros_count > 0) {
+        toast.error("Não é possível excluir", {
+          description: "Este time possui membros associados. Remova os membros antes de excluir."
+        });
+        setDeleteDialogOpen(false);
+        return;
+      }
+
+      // Excluir o time
+      const { error } = await supabase
+        .from("times_culto")
+        .delete()
+        .eq("id", timeDeletando.id);
+
+      if (error) throw error;
+
+      toast.success("Time excluído com sucesso");
+      loadTimes();
+      setDeleteDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Erro ao excluir time", {
+        description: error.message
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -311,6 +359,17 @@ export default function Times() {
                           <Settings className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
                           <span className="hidden md:inline">Gerenciar</span>
                         </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-xs md:text-sm text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExcluirTime(time);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
+                        </Button>
                       </div>
                     </div>
 
@@ -401,6 +460,32 @@ export default function Times() {
         onOpenChange={setGerenciarDialogOpen}
         time={timeGerenciando}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o time "{timeDeletando?.nome}"?
+              {timeDeletando && timeDeletando.membros_count > 0 && (
+                <span className="block mt-2 text-destructive font-medium">
+                  Atenção: Este time possui {timeDeletando.membros_count} {timeDeletando.membros_count === 1 ? "membro" : "membros"}.
+                  Remova os membros antes de excluir.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarExclusao}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
