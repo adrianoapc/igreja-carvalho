@@ -687,6 +687,56 @@ export type Database = {
         }
         Relationships: []
       }
+      itens_template_liturgia: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          duracao_minutos: number | null
+          id: string
+          midias_ids: string[] | null
+          ordem: number
+          responsavel_externo: string | null
+          template_id: string
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          id?: string
+          midias_ids?: string[] | null
+          ordem: number
+          responsavel_externo?: string | null
+          template_id: string
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          id?: string
+          midias_ids?: string[] | null
+          ordem?: number
+          responsavel_externo?: string | null
+          template_id?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itens_template_liturgia_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates_liturgia"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       liturgia_culto: {
         Row: {
           created_at: string
@@ -1354,6 +1404,33 @@ export type Database = {
           id?: string
           nome?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      templates_liturgia: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
         }
         Relationships: []
       }
