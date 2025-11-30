@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Plus, Trash2, Loader2, UserCheck, User } from "lucide-react";
+import { Users, Plus, Trash2, Loader2, UserCheck, User, UserPlus } from "lucide-react";
 import { AdicionarFamiliarDialog } from "./AdicionarFamiliarDialog";
+import { ConverterFamiliarDialog } from "./ConverterFamiliarDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,7 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [familiarParaDeletar, setFamiliarParaDeletar] = useState<string | null>(null);
+  const [familiarParaConverter, setFamiliarParaConverter] = useState<{ id: string; nome: string } | null>(null);
   const [deletando, setDeletando] = useState(false);
   const { toast } = useToast();
 
@@ -203,14 +205,27 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFamiliarParaDeletar(familiar.id)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    {!familiar.familiar_id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFamiliarParaConverter({ id: familiar.id, nome: familiar.nome_familiar || "" })}
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        title="Converter em cadastro completo"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFamiliarParaDeletar(familiar.id)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -230,6 +245,16 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
         pessoaNome={pessoaNome}
         onSuccess={fetchFamiliares}
       />
+
+      {familiarParaConverter && (
+        <ConverterFamiliarDialog
+          open={!!familiarParaConverter}
+          onOpenChange={(open) => !open && setFamiliarParaConverter(null)}
+          familiaId={familiarParaConverter.id}
+          nomeFamiliar={familiarParaConverter.nome}
+          onSuccess={fetchFamiliares}
+        />
+      )}
 
       <AlertDialog open={!!familiarParaDeletar} onOpenChange={(open) => !open && setFamiliarParaDeletar(null)}>
         <AlertDialogContent>
