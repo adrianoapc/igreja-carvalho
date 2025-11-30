@@ -10,6 +10,7 @@ import { ptBR } from "date-fns/locale";
 import EscalasDialog from "@/components/cultos/EscalasDialog";
 import CalendarioMensal from "@/components/cultos/CalendarioMensal";
 import CultoDialog from "@/components/cultos/CultoDialog";
+import LiturgiaDialog from "@/components/cultos/LiturgiaDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Culto {
@@ -40,6 +41,7 @@ export default function Eventos() {
   const [escalasCount, setEscalasCount] = useState<Record<string, number>>({});
   const [cultoDialogOpen, setCultoDialogOpen] = useState(false);
   const [cultoEditando, setCultoEditando] = useState<Culto | null>(null);
+  const [liturgiaDialogOpen, setLiturgiaDialogOpen] = useState(false);
 
   useEffect(() => {
     loadCultos();
@@ -91,6 +93,11 @@ export default function Eventos() {
   const handleEditarCulto = (culto: Culto) => {
     setCultoEditando(culto);
     setCultoDialogOpen(true);
+  };
+
+  const handleGerenciarLiturgia = (culto: Culto) => {
+    setCultoSelecionado(culto);
+    setLiturgiaDialogOpen(true);
   };
 
   if (loading) {
@@ -228,7 +235,12 @@ export default function Eventos() {
                     <UsersIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                     Ver Escalas
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full sm:w-auto text-xs md:text-sm"
+                    onClick={() => handleGerenciarLiturgia(culto)}
+                  >
                     Liturgia
                   </Button>
                   <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs md:text-sm">
@@ -278,6 +290,12 @@ export default function Eventos() {
         onOpenChange={setCultoDialogOpen}
         culto={cultoEditando}
         onSuccess={loadCultos}
+      />
+
+      <LiturgiaDialog
+        open={liturgiaDialogOpen}
+        onOpenChange={setLiturgiaDialogOpen}
+        culto={cultoSelecionado}
       />
     </div>
   );
