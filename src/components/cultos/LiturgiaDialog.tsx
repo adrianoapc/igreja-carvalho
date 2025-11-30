@@ -320,12 +320,12 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
 
                 <div>
                   <Label>Responsável</Label>
-                  <Select value={responsavelId} onValueChange={setResponsavelId}>
+                  <Select value={responsavelId || "none"} onValueChange={(value) => setResponsavelId(value === "none" ? "" : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o responsável" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="none">Nenhum</SelectItem>
                       {membros.map((membro) => (
                         <SelectItem key={membro.id} value={membro.id}>
                           {membro.nome}
