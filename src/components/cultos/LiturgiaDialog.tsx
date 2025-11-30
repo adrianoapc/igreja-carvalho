@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send } from "lucide-react";
 
 interface Culto {
   id: string;
@@ -35,6 +35,7 @@ interface ItemLiturgia {
   responsavel_externo: string | null;
   responsavel?: {
     nome: string;
+    telefone: string | null;
   };
 }
 
@@ -107,7 +108,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
         .from("liturgia_culto")
         .select(`
           *,
-          responsavel:profiles!responsavel_id(nome)
+          responsavel:profiles!responsavel_id(nome, telefone)
         `)
         .eq("culto_id", culto.id)
         .order("ordem", { ascending: true });
@@ -242,6 +243,52 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     }
   };
 
+  const handleEnviarNotificacaoMake = async () => {
+    if (!culto) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke('notificar-liturgia-make', {
+        body: { culto_id: culto.id }
+      });
+
+      if (error) throw error;
+
+      toast.success("Notificação enviada via Make.com!");
+    } catch (error: any) {
+      toast.error("Erro ao enviar notificação", {
+        description: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAbrirWhatsApp = (item: ItemLiturgia) => {
+    const telefone = item.responsavel?.telefone?.replace(/\D/g, '');
+    const nome = item.responsavel?.nome || item.responsavel_externo;
+    
+    if (!telefone && !item.responsavel_externo) {
+      toast.error("Este responsável não possui telefone cadastrado");
+      return;
+    }
+
+    const mensagem = `Olá ${nome}! Você foi escalado para a liturgia do culto *${culto?.titulo}* em ${new Date(culto?.data_culto || '').toLocaleDateString('pt-BR')}.
+
+*Sua responsabilidade:*
+Tipo: ${item.tipo}
+Item: ${item.titulo}
+${item.duracao_minutos ? `Duração: ${item.duracao_minutos} minutos` : ''}
+
+Qualquer dúvida, entre em contato conosco.`;
+
+    const url = telefone 
+      ? `https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}`
+      : `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+    
+    window.open(url, '_blank');
+  };
+
   const handleMoverOrdem = async (item: ItemLiturgia, direcao: "up" | "down") => {
     const index = itens.findIndex(i => i.id === item.id);
     if ((direcao === "up" && index === 0) || (direcao === "down" && index === itens.length - 1)) {
@@ -283,8 +330,17 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>
-            Liturgia - {culto.titulo}
+          <DialogTitle className="flex items-center justify-between">
+            <span>Liturgia - {culto.titulo}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEnviarNotificacaoMake}
+              disabled={loading}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Enviar via Make
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -473,6 +529,15 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
                             disabled={loading || index === itens.length - 1}
                           >
                             <ChevronDown className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAbrirWhatsApp(item)}
+                            disabled={loading}
+                            title="Enviar WhatsApp"
+                          >
+                            <MessageCircle className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
