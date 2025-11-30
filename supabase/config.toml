@@ -1,5 +1,8 @@
 project_id = "mcomwaelbwvyotvudnzt"
 
+[functions.create-first-admin]
+enabled = false
+
 [functions.processar-nota-fiscal]
 verify_jwt = true
 
