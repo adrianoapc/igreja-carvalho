@@ -114,6 +114,22 @@ export default function DashboardOfertas() {
     enabled: !!datas,
   });
 
+  // Buscar histórico de rejeições
+  const { data: rejeicoes } = useQuery({
+    queryKey: ["rejeicoes-oferta", periodo, dataInicio, dataFim],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*, related_user_id")
+        .eq("type", "rejeicao_oferta")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const processarDados = () => {
     if (!transacoes || transacoes.length === 0) {
       return {
@@ -383,6 +399,57 @@ export default function DashboardOfertas() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Histórico de Rejeições */}
+      {rejeicoes && rejeicoes.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-destructive">
+              Histórico de Conferências Rejeitadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {rejeicoes.map((rejeicao) => {
+                const metadata = rejeicao.metadata as any;
+                return (
+                  <div
+                    key={rejeicao.id}
+                    className="p-3 border rounded-lg bg-destructive/5 border-destructive/20"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{metadata?.data_culto}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Lançado por: {metadata?.lancado_por}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Conferente: {metadata?.conferente}
+                        </p>
+                        <p className="text-sm font-semibold mt-2">
+                          Total: {metadata?.total?.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {metadata?.valores}
+                        </p>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {rejeicao.created_at &&
+                          format(parseISO(rejeicao.created_at), "dd/MM/yyyy HH:mm", {
+                            locale: ptBR,
+                          })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
