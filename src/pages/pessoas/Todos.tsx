@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Phone, Mail, Calendar, User, ArrowLeft } from "lucide-react";
+import { Search, Phone, Mail, Calendar, User, ArrowLeft, Download } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -103,6 +105,41 @@ export default function TodosPessoas() {
         return null;
     }
   };
+
+  const handleExportar = () => {
+    try {
+      if (!filteredPessoas || filteredPessoas.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Não há dados para exportar",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const dadosExportacao = filteredPessoas.map(p => ({
+        'Nome': p.nome,
+        'Status': p.status,
+        'Email': p.email || '',
+        'Telefone': formatarTelefone(p.telefone || ''),
+        'Número de Visitas': p.numero_visitas,
+        'Data Primeira Visita': formatDateForExport(p.data_primeira_visita),
+      }));
+
+      exportToExcel(dadosExportacao, 'Pessoas', 'Pessoas');
+      toast({
+        title: "Sucesso",
+        description: "Dados exportados com sucesso!"
+      });
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao exportar dados",
+        variant: "destructive"
+      });
+    }
+  };
   return <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div className="flex items-center gap-2 md:gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate("/pessoas")}>
@@ -112,6 +149,14 @@ export default function TodosPessoas() {
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Todas as Pessoas</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">Visualize todas as pessoas cadastradas</p>
         </div>
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={handleExportar}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Exportar
+        </Button>
       </div>
 
       <Card className="shadow-soft">
