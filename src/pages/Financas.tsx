@@ -1,7 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, UserCog, ArrowRight, BarChart3, PieChart, LineChart, TrendingUpIcon } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Building2,
+  Target,
+  FolderTree,
+  UserCog,
+  ArrowRight,
+  BarChart3,
+  PieChart,
+  LineChart,
+  TrendingUpIcon,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,13 +23,10 @@ export default function Financas() {
   const navigate = useNavigate();
 
   const { data: contas } = useQuery({
-    queryKey: ['contas-resumo'],
+    queryKey: ["contas-resumo"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contas')
-        .select('saldo_atual')
-        .eq('ativo', true);
-      
+      const { data, error } = await supabase.from("contas").select("saldo_atual").eq("ativo", true);
+
       if (error) throw error;
       return data;
     },
@@ -24,66 +34,60 @@ export default function Financas() {
 
   // Calcular entradas e saídas do mês atual
   const { data: transacoesEntrada } = useQuery({
-    queryKey: ['entradas-mes-atual'],
+    queryKey: ["entradas-mes-atual"],
     queryFn: async () => {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       const { data, error } = await supabase
-        .from('transacoes_financeiras')
-        .select('valor')
-        .eq('tipo', 'entrada')
-        .eq('status', 'pago')
-        .gte('data_pagamento', firstDay.toISOString().split('T')[0])
-        .lte('data_pagamento', lastDay.toISOString().split('T')[0]);
-      
+        .from("transacoes_financeiras")
+        .select("valor")
+        .eq("tipo", "entrada")
+        .eq("status", "pago")
+        .gte("data_pagamento", firstDay.toISOString().split("T")[0])
+        .lte("data_pagamento", lastDay.toISOString().split("T")[0]);
+
       if (error) throw error;
       return data;
     },
   });
 
   const { data: transacoesSaida } = useQuery({
-    queryKey: ['saidas-mes-atual'],
+    queryKey: ["saidas-mes-atual"],
     queryFn: async () => {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       const { data, error } = await supabase
-        .from('transacoes_financeiras')
-        .select('valor')
-        .eq('tipo', 'saida')
-        .eq('status', 'pago')
-        .gte('data_pagamento', firstDay.toISOString().split('T')[0])
-        .lte('data_pagamento', lastDay.toISOString().split('T')[0]);
-      
+        .from("transacoes_financeiras")
+        .select("valor")
+        .eq("tipo", "saida")
+        .eq("status", "pago")
+        .gte("data_pagamento", firstDay.toISOString().split("T")[0])
+        .lte("data_pagamento", lastDay.toISOString().split("T")[0]);
+
       if (error) throw error;
       return data;
     },
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ['categorias-count'],
+    queryKey: ["categorias-count"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categorias_financeiras')
-        .select('id')
-        .eq('ativo', true);
-      
+      const { data, error } = await supabase.from("categorias_financeiras").select("id").eq("ativo", true);
+
       if (error) throw error;
       return data;
     },
   });
 
   const { data: fornecedores } = useQuery({
-    queryKey: ['fornecedores-count'],
+    queryKey: ["fornecedores-count"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fornecedores')
-        .select('id')
-        .eq('ativo', true);
-      
+      const { data, error } = await supabase.from("fornecedores").select("id").eq("ativo", true);
+
       if (error) throw error;
       return data;
     },
@@ -94,9 +98,9 @@ export default function Financas() {
   const totalSaidasMes = transacoesSaida?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
@@ -106,9 +110,7 @@ export default function Financas() {
       description: "Gerencie receitas e dízimos",
       icon: TrendingUp,
       path: "/financas/entradas",
-      stats: [
-        { label: "Este mês", value: formatCurrency(totalEntradasMes), color: "text-green-600" },
-      ],
+      stats: [{ label: "Este mês", value: formatCurrency(totalEntradasMes), color: "text-green-600" }],
       color: "bg-green-100 dark:bg-green-900/20",
       iconColor: "text-green-600",
     },
@@ -117,9 +119,7 @@ export default function Financas() {
       description: "Controle despesas e pagamentos",
       icon: TrendingDown,
       path: "/financas/saidas",
-      stats: [
-        { label: "Este mês", value: formatCurrency(totalSaidasMes), color: "text-red-600" },
-      ],
+      stats: [{ label: "Este mês", value: formatCurrency(totalSaidasMes), color: "text-red-600" }],
       color: "bg-red-100 dark:bg-red-900/20",
       iconColor: "text-red-600",
     },
@@ -128,9 +128,7 @@ export default function Financas() {
       description: "Gestão de contas bancárias",
       icon: Building2,
       path: "/financas/contas",
-      stats: [
-        { label: "Total", value: formatCurrency(totalEmCaixa), color: "text-primary" },
-      ],
+      stats: [{ label: "Total", value: formatCurrency(totalEmCaixa), color: "text-primary" }],
       color: "bg-primary/10",
       iconColor: "text-primary",
     },
@@ -158,9 +156,7 @@ export default function Financas() {
       description: "Classificação de transações",
       icon: FolderTree,
       path: "/financas/categorias",
-      stats: [
-        { label: "Total", value: categorias?.length || 0, color: "text-accent-foreground" },
-      ],
+      stats: [{ label: "Total", value: categorias?.length || 0, color: "text-accent-foreground" }],
       color: "bg-accent/10",
       iconColor: "text-accent-foreground",
     },
@@ -169,9 +165,7 @@ export default function Financas() {
       description: "Cadastro de fornecedores e beneficiários",
       icon: UserCog,
       path: "/financas/fornecedores",
-      stats: [
-        { label: "Ativos", value: fornecedores?.length || 0, color: "text-orange-600" },
-      ],
+      stats: [{ label: "Ativos", value: fornecedores?.length || 0, color: "text-orange-600" }],
       color: "bg-orange-100 dark:bg-orange-900/20",
       iconColor: "text-orange-600",
     },
@@ -229,17 +223,8 @@ export default function Financas() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Finanças</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Gestão completa do módulo financeiro
-          </p>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Gestão completa do módulo financeiro</p>
         </div>
-        <Button
-          onClick={() => navigate("/financas/dashboard")}
-          className="flex items-center gap-2"
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span className="hidden sm:inline">Dashboard</span>
-        </Button>
       </div>
 
       {/* Card de Total em Caixa */}
@@ -277,9 +262,7 @@ export default function Financas() {
                     <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   </div>
                   <h3 className="font-semibold text-base md:text-lg mb-1">{module.title}</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground mb-3">
-                    {module.description}
-                  </p>
+                  <p className="text-xs md:text-sm text-muted-foreground mb-3">{module.description}</p>
                   <div className="flex flex-wrap gap-2">
                     {module.stats.map((stat) => (
                       <div key={stat.label} className="flex items-center gap-2">
@@ -314,9 +297,7 @@ export default function Financas() {
                     <Icon className={`w-6 h-6 ${module.iconColor}`} />
                   </div>
                   <h3 className="font-semibold text-sm mb-1">{module.title}</h3>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {module.description}
-                  </p>
+                  <p className="text-xs text-muted-foreground mb-2">{module.description}</p>
                   {module.stats && (
                     <div className="flex flex-wrap gap-2">
                       {module.stats.map((stat) => (
@@ -346,7 +327,7 @@ export default function Financas() {
               <Card
                 key={painel.path}
                 className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${
-                  painel.destacado ? 'border-2 border-primary/20' : ''
+                  painel.destacado ? "border-2 border-primary/20" : ""
                 }`}
                 onClick={() => navigate(painel.path)}
               >
@@ -358,9 +339,7 @@ export default function Financas() {
                     <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
                   </div>
                   <h3 className="font-semibold text-lg mb-2">{painel.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {painel.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{painel.description}</p>
                 </CardContent>
               </Card>
             );
