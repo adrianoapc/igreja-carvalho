@@ -14,6 +14,7 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TagMidiaDialog } from "./TagMidiaDialog";
+import { ImageCaptureInput } from "@/components/ui/image-capture-input";
 
 interface Tag {
   id: string;
@@ -122,28 +123,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
     }
   };
 
-  const handleArquivoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validar tamanho (20MB)
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error("Arquivo muito grande. Máximo 20MB");
-      return;
-    }
-
-    // Validar tipo
-    const allowedTypes = [
-      'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-      'video/mp4', 'video/webm', 'video/quicktime',
-      'application/pdf'
-    ];
-    
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Tipo de arquivo não suportado");
-      return;
-    }
-
+  const handleArquivoChange = (file: File) => {
     setArquivo(file);
 
     // Detectar tipo automaticamente
@@ -413,63 +393,64 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
           {/* Upload de Arquivo */}
           <div>
             <Label>Arquivo</Label>
-            <div className="mt-2 space-y-2">
-              {!arquivo && !previewUrl && (
-                <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                  <input
-                    type="file"
-                    id="file-upload"
-                    className="hidden"
-                    onChange={handleArquivoChange}
-                    accept="image/*,video/*,application/pdf"
-                  />
-                  <label htmlFor="file-upload" className="cursor-pointer">
-                    <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Clique para selecionar ou arraste um arquivo
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Imagens, vídeos ou PDFs (máx. 20MB)
-                    </p>
-                  </label>
-                </div>
-              )}
-
-              {(arquivo || previewUrl) && (
-                <div className="relative rounded-lg overflow-hidden border">
-                  {tipo === 'imagem' && previewUrl && (
-                    <img src={previewUrl} alt="Preview" className="w-full h-48 object-cover" />
-                  )}
-                  {tipo === 'video' && previewUrl && (
-                    <video src={previewUrl} controls className="w-full h-48" />
-                  )}
-                  {tipo === 'documento' && (
-                    <div className="h-48 flex items-center justify-center bg-muted">
-                      <p className="text-sm text-muted-foreground">
-                        {arquivo?.name || "Documento PDF"}
-                      </p>
+            <div className="mt-2">
+              {tipo === 'imagem' ? (
+                <ImageCaptureInput
+                  onFileSelected={handleArquivoChange}
+                  accept="image/*"
+                  maxSizeMB={20}
+                  previewUrl={previewUrl}
+                  onClear={handleRemoverArquivo}
+                />
+              ) : (
+                <>
+                  {!arquivo && !previewUrl && (
+                    <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
+                      <input
+                        type="file"
+                        id="file-upload"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleArquivoChange(file);
+                        }}
+                        accept="image/*,video/*,application/pdf"
+                      />
+                      <label htmlFor="file-upload" className="cursor-pointer">
+                        <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          Clique para selecionar
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Vídeos ou PDFs (máx. 20MB)
+                        </p>
+                      </label>
                     </div>
                   )}
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2"
-                    onClick={handleRemoverArquivo}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
 
-              {!arquivo && !previewUrl && midia && (
-                <Button
-                  variant="outline"
-                  onClick={() => document.getElementById('file-upload')?.click()}
-                  className="w-full"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Alterar Arquivo
-                </Button>
+                  {(arquivo || previewUrl) && (
+                    <div className="relative rounded-lg overflow-hidden border">
+                      {tipo === 'video' && previewUrl && (
+                        <video src={previewUrl} controls className="w-full h-48" />
+                      )}
+                      {tipo === 'documento' && (
+                        <div className="h-48 flex items-center justify-center bg-muted">
+                          <p className="text-sm text-muted-foreground">
+                            {arquivo?.name || "Documento PDF"}
+                          </p>
+                        </div>
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={handleRemoverArquivo}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

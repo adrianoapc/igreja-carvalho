@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Upload, FileText, Image as ImageIcon, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ImageCaptureInput } from "@/components/ui/image-capture-input";
 
 interface NotaFiscalData {
   fornecedor_cnpj_cpf?: string;
@@ -32,42 +33,30 @@ export default function ProcessarNotaFiscalDialog({
 }: ProcessarNotaFiscalDialogProps) {
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validar tipo de arquivo
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Tipo de arquivo não suportado', {
-        description: 'Envie uma imagem (JPG, PNG, WEBP) ou PDF'
-      });
-      return;
+  const handleFileSelected = (file: File) => {
+    setSelectedFile(file);
+    
+    // Criar preview se for imagem
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewUrl(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl(null);
     }
+    
+    // Processar automaticamente
+    processarArquivo(file);
+  };
 
-    // Validar tamanho (máximo 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Arquivo muito grande', {
-        description: 'O arquivo deve ter no máximo 10MB'
-      });
-      return;
-    }
-
-    setFileName(file.name);
+  const processarArquivo = async (file: File) => {
     setLoading(true);
 
     try {
-      // Criar preview se for imagem
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setPreviewUrl(e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-      }
-
       // Converter para base64
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -121,7 +110,7 @@ export default function ProcessarNotaFiscalDialog({
         
         // Limpar estado
         setPreviewUrl(null);
-        setFileName("");
+        setSelectedFile(null);
       };
 
       reader.readAsDataURL(file);
@@ -138,7 +127,7 @@ export default function ProcessarNotaFiscalDialog({
 
   const handleClear = () => {
     setPreviewUrl(null);
-    setFileName("");
+    setSelectedFile(null);
   };
 
   return (
@@ -152,77 +141,21 @@ export default function ProcessarNotaFiscalDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Upload Area */}
-          {!previewUrl && !fileName && (
-            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-accent/50 transition-colors">
-              <input
-                type="file"
-                id="nota-fiscal-upload"
-                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-                disabled={loading}
-              />
-              <label htmlFor="nota-fiscal-upload" className="cursor-pointer">
-                <div className="flex flex-col items-center gap-3">
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-12 h-12 text-muted-foreground animate-spin" />
-                      <p className="text-sm text-muted-foreground">Processando...</p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex gap-2">
-                        <Upload className="w-12 h-12 text-muted-foreground" />
-                        <ImageIcon className="w-12 h-12 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-base font-medium">Clique para enviar</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Imagem (JPG, PNG, WEBP) ou PDF - máx. 10MB
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </label>
+          {loading && (
+            <div className="flex items-center justify-center gap-2 p-4">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <p className="text-sm text-muted-foreground">Processando com IA...</p>
             </div>
           )}
 
-          {/* Preview */}
-          {(previewUrl || fileName) && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  {previewUrl ? (
-                    <img 
-                      src={previewUrl} 
-                      alt="Preview" 
-                      className="w-32 h-32 object-cover rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-32 h-32 flex items-center justify-center bg-muted rounded-lg">
-                      <FileText className="w-12 h-12 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{fileName}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {loading ? 'Processando com IA...' : 'Pronto para processar'}
-                    </p>
-                  </div>
-                  {!loading && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleClear}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          {!loading && (
+            <ImageCaptureInput
+              onFileSelected={handleFileSelected}
+              accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+              maxSizeMB={10}
+              previewUrl={previewUrl || undefined}
+              onClear={handleClear}
+            />
           )}
 
           {/* Instruções */}
