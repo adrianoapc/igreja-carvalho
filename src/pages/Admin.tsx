@@ -4,21 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,12 +13,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Search, UserCog, Shield, ArrowUpCircle, Trash2, Heart, Calendar as CalendarIcon, AlertTriangle, Settings } from "lucide-react";
 import { z } from "zod";
 import EdgeFunctionCard from "@/components/admin/EdgeFunctionCard";
-
 const updateUserSchema = z.object({
   status: z.enum(["visitante", "frequentador", "membro"]),
-  observacoes: z.string().max(500, "Observações devem ter no máximo 500 caracteres").optional(),
+  observacoes: z.string().max(500, "Observações devem ter no máximo 500 caracteres").optional()
 });
-
 interface UserProfile {
   id: string;
   user_id: string;
@@ -43,48 +28,43 @@ interface UserProfile {
   data_cadastro_membro: string | null;
   observacoes: string | null;
 }
-
 interface UserRole {
   role: string;
 }
-
 export default function Admin() {
-  const { toast } = useToast();
-  const { hasAccess } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const {
+    hasAccess
+  } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
   useEffect(() => {
     if (!hasAccess("membros", "acesso_completo")) {
       toast({
         title: "Acesso negado",
         description: "Você não tem permissão para acessar esta página",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
     loadUsers();
   }, []);
-
   useEffect(() => {
-    const filtered = users.filter(user =>
-      user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = users.filter(user => user.nome.toLowerCase().includes(searchTerm.toLowerCase()) || user.email?.toLowerCase().includes(searchTerm.toLowerCase()));
     setFilteredUsers(filtered);
   }, [searchTerm, users]);
-
   const loadUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("nome");
-
+      const {
+        data,
+        error
+      } = await supabase.from("profiles").select("*").order("nome");
       if (error) throw error;
       setUsers(data || []);
       setFilteredUsers(data || []);
@@ -92,130 +72,113 @@ export default function Admin() {
       toast({
         title: "Erro",
         description: "Não foi possível carregar os usuários",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const loadUserRoles = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId);
-
+      const {
+        data,
+        error
+      } = await supabase.from("user_roles").select("role").eq("user_id", userId);
       if (error) throw error;
       setUserRoles(data?.map((r: UserRole) => r.role) || []);
     } catch (error: any) {
       console.error("Error loading roles:", error);
     }
   };
-
   const handlePromoteUser = async (userId: string, newStatus: "visitante" | "frequentador" | "membro") => {
     setIsLoading(true);
     try {
-      const validation = updateUserSchema.safeParse({ status: newStatus });
+      const validation = updateUserSchema.safeParse({
+        status: newStatus
+      });
       if (!validation.success) {
         throw new Error(validation.error.issues[0].message);
       }
-
-      const updateData: any = { status: newStatus };
-      
+      const updateData: any = {
+        status: newStatus
+      };
       if (newStatus === "membro") {
         updateData.data_cadastro_membro = new Date().toISOString();
       }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update(updateData)
-        .eq("user_id", userId);
-
+      const {
+        error
+      } = await supabase.from("profiles").update(updateData).eq("user_id", userId);
       if (error) throw error;
-
       toast({
         title: "Sucesso!",
-        description: `Usuário promovido para ${newStatus}`,
+        description: `Usuário promovido para ${newStatus}`
       });
-
       loadUsers();
     } catch (error: any) {
       toast({
         title: "Erro",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleAddRole = async (userId: string, role: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from("user_roles")
-        .insert([{ user_id: userId, role: role as any }]);
-
+      const {
+        error
+      } = await supabase.from("user_roles").insert([{
+        user_id: userId,
+        role: role as any
+      }]);
       if (error) throw error;
-
       toast({
         title: "Sucesso!",
-        description: `Cargo ${role} atribuído`,
+        description: `Cargo ${role} atribuído`
       });
-
       loadUserRoles(userId);
     } catch (error: any) {
       toast({
         title: "Erro",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleRemoveRole = async (userId: string, role: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId)
-        .eq("role", role as any);
-
+      const {
+        error
+      } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role as any);
       if (error) throw error;
-
       toast({
         title: "Sucesso!",
-        description: `Cargo ${role} removido`,
+        description: `Cargo ${role} removido`
       });
-
       loadUserRoles(userId);
     } catch (error: any) {
       toast({
         title: "Erro",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
-
   const getStatusBadge = (status: string) => {
     const colors = {
       visitante: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
       frequentador: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-      membro: "bg-green-500/10 text-green-500 border-green-500/20",
+      membro: "bg-green-500/10 text-green-500 border-green-500/20"
     };
     return colors[status as keyof typeof colors] || "";
   };
-
   const availableRoles = ["admin", "pastor", "lider", "secretario", "tesoureiro", "professor", "membro"];
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Administração</h1>
@@ -239,21 +202,12 @@ export default function Admin() {
             <CardHeader>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome ou email..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+                <Input placeholder="Buscar por nome ou email..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
-                  >
+                {filteredUsers.map(user => <div key={user.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold text-lg">
                         {user.nome.charAt(0).toUpperCase()}
@@ -268,14 +222,10 @@ export default function Admin() {
                     </div>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedUser(user);
-                            loadUserRoles(user.user_id);
-                          }}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => {
+                      setSelectedUser(user);
+                      loadUserRoles(user.user_id);
+                    }}>
                           <UserCog className="w-4 h-4 mr-2" />
                           Gerenciar
                         </Button>
@@ -287,8 +237,7 @@ export default function Admin() {
                             {selectedUser?.nome} - {selectedUser?.email}
                           </DialogDescription>
                         </DialogHeader>
-                        {selectedUser && (
-                          <div className="space-y-6">
+                        {selectedUser && <div className="space-y-6">
                             {/* Status */}
                             <div className="space-y-2">
                               <Label>Status Atual</Label>
@@ -296,66 +245,36 @@ export default function Admin() {
                                 <Badge className={getStatusBadge(selectedUser.status)}>
                                   {selectedUser.status}
                                 </Badge>
-                                {selectedUser.status !== "membro" && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() =>
-                                      handlePromoteUser(
-                                        selectedUser.user_id,
-                                        selectedUser.status === "visitante"
-                                          ? "frequentador"
-                                          : "membro"
-                                      )
-                                    }
-                                    disabled={isLoading}
-                                  >
+                                {selectedUser.status !== "membro" && <Button size="sm" onClick={() => handlePromoteUser(selectedUser.user_id, selectedUser.status === "visitante" ? "frequentador" : "membro")} disabled={isLoading}>
                                     <ArrowUpCircle className="w-4 h-4 mr-2" />
                                     Promover para {selectedUser.status === "visitante" ? "Frequentador" : "Membro"}
-                                  </Button>
-                                )}
+                                  </Button>}
                               </div>
                             </div>
 
                             {/* Roles (apenas para membros) */}
-                            {selectedUser.status === "membro" && (
-                              <div className="space-y-2">
+                            {selectedUser.status === "membro" && <div className="space-y-2">
                                 <Label>Cargos</Label>
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                  {userRoles.map((role) => (
-                                    <Badge key={role} variant="secondary" className="gap-2">
+                                  {userRoles.map(role => <Badge key={role} variant="secondary" className="gap-2">
                                       {role}
-                                      <button
-                                        onClick={() => handleRemoveRole(selectedUser.user_id, role)}
-                                        className="hover:text-destructive"
-                                        disabled={isLoading}
-                                      >
+                                      <button onClick={() => handleRemoveRole(selectedUser.user_id, role)} className="hover:text-destructive" disabled={isLoading}>
                                         <Trash2 className="w-3 h-3" />
                                       </button>
-                                    </Badge>
-                                  ))}
-                                  {userRoles.length === 0 && (
-                                    <p className="text-sm text-muted-foreground">Nenhum cargo atribuído</p>
-                                  )}
+                                    </Badge>)}
+                                  {userRoles.length === 0 && <p className="text-sm text-muted-foreground">Nenhum cargo atribuído</p>}
                                 </div>
-                                <Select
-                                  onValueChange={(role: string) => handleAddRole(selectedUser.user_id, role)}
-                                  disabled={isLoading}
-                                >
+                                <Select onValueChange={(role: string) => handleAddRole(selectedUser.user_id, role)} disabled={isLoading}>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Adicionar cargo" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {availableRoles
-                                      .filter((role) => !userRoles.includes(role))
-                                      .map((role) => (
-                                        <SelectItem key={role} value={role}>
+                                    {availableRoles.filter(role => !userRoles.includes(role)).map(role => <SelectItem key={role} value={role}>
                                           {role}
-                                        </SelectItem>
-                                      ))}
+                                        </SelectItem>)}
                                   </SelectContent>
                                 </Select>
-                              </div>
-                            )}
+                              </div>}
 
                             {/* Info */}
                             <div className="space-y-2">
@@ -365,20 +284,16 @@ export default function Admin() {
                                   <span className="text-muted-foreground">Primeira visita:</span>{" "}
                                   {new Date(selectedUser.data_primeira_visita).toLocaleDateString("pt-BR")}
                                 </p>
-                                {selectedUser.data_cadastro_membro && (
-                                  <p>
+                                {selectedUser.data_cadastro_membro && <p>
                                     <span className="text-muted-foreground">Membro desde:</span>{" "}
                                     {new Date(selectedUser.data_cadastro_membro).toLocaleDateString("pt-BR")}
-                                  </p>
-                                )}
+                                  </p>}
                               </div>
                             </div>
-                          </div>
-                        )}
+                          </div>}
                       </DialogContent>
                     </Dialog>
-                  </div>
-                ))}
+                  </div>)}
               </div>
             </CardContent>
           </Card>
@@ -396,14 +311,12 @@ export default function Admin() {
                   Para modificar permissões, acesse o backend.
                 </p>
                 <div className="grid gap-4">
-                  {availableRoles.map((role) => (
-                    <div key={role} className="p-4 rounded-lg bg-secondary">
+                  {availableRoles.map(role => <div key={role} className="p-4 rounded-lg bg-[#eff0cf]">
                       <h3 className="font-medium text-foreground mb-2 capitalize">{role}</h3>
                       <p className="text-sm text-muted-foreground">
                         Permissões configuradas no backend
                       </p>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
               </div>
             </CardContent>
@@ -420,26 +333,11 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <EdgeFunctionCard
-                  title="Sentimentos Diários"
-                  description="Notificação diária perguntando aos membros como estão se sentindo"
-                  functionName="notificar-sentimentos-diario"
-                  icon={<Heart className="w-5 h-5" />}
-                />
+                <EdgeFunctionCard title="Sentimentos Diários" description="Notificação diária perguntando aos membros como estão se sentindo" functionName="notificar-sentimentos-diario" icon={<Heart className="w-5 h-5" />} />
                 
-                <EdgeFunctionCard
-                  title="Alertas Críticos"
-                  description="Verifica membros com sentimentos negativos repetidos e notifica líderes"
-                  functionName="verificar-sentimentos-criticos"
-                  icon={<AlertTriangle className="w-5 h-5" />}
-                />
+                <EdgeFunctionCard title="Alertas Críticos" description="Verifica membros com sentimentos negativos repetidos e notifica líderes" functionName="verificar-sentimentos-criticos" icon={<AlertTriangle className="w-5 h-5" />} />
                 
-                <EdgeFunctionCard
-                  title="Aniversários"
-                  description="Notifica sobre aniversários, casamentos e batismos do dia seguinte"
-                  functionName="notificar-aniversarios"
-                  icon={<CalendarIcon className="w-5 h-5" />}
-                />
+                <EdgeFunctionCard title="Aniversários" description="Notifica sobre aniversários, casamentos e batismos do dia seguinte" functionName="notificar-aniversarios" icon={<CalendarIcon className="w-5 h-5" />} />
               </div>
 
               <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
@@ -464,6 +362,5 @@ export default function Admin() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
+    </div>;
 }
