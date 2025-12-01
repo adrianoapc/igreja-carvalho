@@ -57,7 +57,7 @@ All colors MUST be HSL.
     --sidebar-foreground: 0 0% 98%; /* texto quase branco */
 
     --sidebar-primary: 62, 55%, 88%; /* item ativo #39b54b */
-    --sidebar-primary-foreground: 151, 80%, 95%; /* texto do item ativo */
+    --sidebar-primary-foreground: 113, 28%, 22%; /* texto do item ativo */
 
     --sidebar-accent: 128, 52%, 47%; /* hover background #eff0cf */
 
