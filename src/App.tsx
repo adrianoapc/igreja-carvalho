@@ -50,6 +50,7 @@ import Auth from "./pages/Auth";
 import Public from "./pages/Public";
 import Announcements from "./pages/Announcements";
 import Admin from "./pages/Admin";
+import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./hooks/useAuth";
 
@@ -433,6 +434,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Admin />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/perfil"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Perfil />
                 </MainLayout>
               </ProtectedRoute>
             }
