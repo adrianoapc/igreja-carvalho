@@ -44,14 +44,25 @@ export default function RelatorioOferta() {
     },
   });
 
-  // Buscar membros/pessoas para conferente (excluindo quem está lançando)
+  // Buscar membros com permissão financeira para conferente
   const { data: pessoas } = useQuery({
     queryKey: ['pessoas-conferente', profile?.id],
     queryFn: async () => {
+      // Buscar usuários com role de admin ou tesoureiro
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['admin', 'tesoureiro']);
+      
+      if (rolesError) throw rolesError;
+      
+      const userIds = userRoles?.map(r => r.user_id) || [];
+      
+      // Buscar profiles desses usuários, excluindo quem está lançando
       const { data, error } = await supabase
         .from('profiles')
         .select('id, nome, user_id')
-        .in('status', ['membro', 'frequentador'])
+        .in('user_id', userIds)
         .neq('id', profile?.id || '') // Excluir quem está lançando
         .order('nome');
       
@@ -98,9 +109,11 @@ export default function RelatorioOferta() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     
     if (!conferenteId) {
       toast.error('Selecione o conferente');
+      setLoading(false);
       return;
     }
 
@@ -108,12 +121,11 @@ export default function RelatorioOferta() {
     const temValores = Object.values(valores).some(v => parseFloat(v.replace(',', '.')) > 0);
     if (!temValores) {
       toast.error('Preencha ao menos um valor');
+      setLoading(false);
       return;
     }
 
-    // Criar notificação para o conferente
-    const conferente = pessoas?.find(p => p.id === conferenteId);
-    if (conferente) {
+    try {
       const valoresFormatados = Object.entries(valores)
         .filter(([_, v]) => parseFloat(v.replace(',', '.')) > 0)
         .map(([id, v]) => {
@@ -122,25 +134,46 @@ export default function RelatorioOferta() {
         })
         .join(', ');
 
-      await supabase.from('notifications').insert({
-        user_id: conferente.user_id,
-        title: 'Novo Relatório de Oferta Aguardando Conferência',
-        message: `${profile?.nome} criou um relatório de oferta do culto de ${format(dataCulto, 'dd/MM/yyyy')} aguardando sua validação. Total: ${formatCurrency(calcularTotal())}`,
-        type: 'conferencia_oferta',
-        metadata: {
-          data_culto: format(dataCulto, 'dd/MM/yyyy'),
-          lancado_por: profile?.nome,
-          valores: valoresFormatados,
-          total: calcularTotal()
-        }
-      });
-    }
+      // Criar notificação para o conferente com dados completos no metadata
+      const conferente = pessoas?.find(p => p.id === conferenteId);
+      if (conferente) {
+        await supabase.from('notifications').insert({
+          user_id: conferente.user_id,
+          title: 'Novo Relatório de Oferta Aguardando Conferência',
+          message: `${profile?.nome} criou um relatório de oferta do culto de ${format(dataCulto, 'dd/MM/yyyy')} aguardando sua validação. Total: ${formatCurrency(calcularTotal())}`,
+          type: 'conferencia_oferta',
+          metadata: {
+            data_culto: format(dataCulto, 'yyyy-MM-dd'),
+            lancado_por: profile?.nome,
+            lancado_por_id: profile?.id,
+            conferente_id: conferenteId,
+            valores: valores,
+            valores_formatados: valoresFormatados,
+            total: calcularTotal(),
+            taxa_cartao_credito: taxaCartaoCredito,
+            taxa_cartao_debito: taxaCartaoDebito
+          }
+        });
+      }
 
-    // Abrir dialog de conferência
-    setShowConferirDialog(true);
+      toast.success('Relatório enviado para conferência!');
+      
+      // Resetar form
+      setValores({});
+      setDataCulto(new Date());
+      setConferenteId("");
+      
+    } catch (error: any) {
+      console.error('Erro ao enviar relatório:', error);
+      toast.error('Erro ao enviar relatório', {
+        description: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleConfirmarOferta = async () => {
+  const handleConfirmarOferta = async (notificationId: string, metadata: any) => {
     setLoading(true);
 
     try {
@@ -155,7 +188,10 @@ export default function RelatorioOferta() {
       }
 
       const { data: userData } = await supabase.auth.getUser();
-      const dataFormatada = format(dataCulto, 'yyyy-MM-dd');
+      const dataFormatada = metadata.data_culto;
+      const valoresMetadata = metadata.valores;
+      const taxaCredito = metadata.taxa_cartao_credito;
+      const taxaDebito = metadata.taxa_cartao_debito;
 
       // Buscar categoria padrão de Ofertas (tipo entrada)
       const { data: categoriaOferta } = await supabase
@@ -168,8 +204,8 @@ export default function RelatorioOferta() {
 
       // Criar transações para cada forma de pagamento com valor
       const transacoes = [];
-      for (const [formaId, valorStr] of Object.entries(valores)) {
-        const valorNumerico = parseFloat(valorStr.replace(',', '.'));
+      for (const [formaId, valorStr] of Object.entries(valoresMetadata)) {
+        const valorNumerico = parseFloat(String(valorStr).replace(',', '.'));
         if (valorNumerico <= 0) continue;
 
         const forma = formasPagamento?.find(f => f.id === formaId);
@@ -199,17 +235,17 @@ export default function RelatorioOferta() {
 
         // Calcular taxa administrativa para cartões
         if (isCartaoCredito) {
-          const taxa = parseFloat(taxaCartaoCredito) / 100;
+          const taxa = parseFloat(taxaCredito) / 100;
           taxasAdministrativas = valorNumerico * taxa;
         } else if (isCartaoDebito) {
-          const taxa = parseFloat(taxaCartaoDebito) / 100;
+          const taxa = parseFloat(taxaDebito) / 100;
           taxasAdministrativas = valorNumerico * taxa;
         }
 
         const transacao = {
           tipo: 'entrada',
           tipo_lancamento: 'unico',
-          descricao: `Oferta - Culto ${format(dataCulto, 'dd/MM/yyyy')}`,
+          descricao: `Oferta - Culto ${format(new Date(metadata.data_culto), 'dd/MM/yyyy')}`,
           valor: valorNumerico,
           data_vencimento: dataFormatada,
           data_competencia: dataFormatada,
@@ -219,7 +255,7 @@ export default function RelatorioOferta() {
           forma_pagamento: formaId,
           status: status,
           taxas_administrativas: taxasAdministrativas,
-          observacoes: `Conferente: ${pessoas?.find(p => p.id === conferenteId)?.nome}\nForma: ${forma.nome}`,
+          observacoes: `Lançado por: ${metadata.lancado_por}\nConferido por: ${profile?.nome}\nForma: ${forma.nome}`,
           lancado_por: userData.user?.id
         };
 
@@ -233,15 +269,16 @@ export default function RelatorioOferta() {
 
       if (error) throw error;
 
+      // Marcar notificação como lida
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+
       toast.success(`${transacoes.length} lançamento(s) criado(s) com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ['entradas'] });
       queryClient.invalidateQueries({ queryKey: ['contas-resumo'] });
-      
-      // Resetar form
-      setValores({});
-      setDataCulto(new Date());
-      setConferenteId("");
-      setShowConferirDialog(false);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
     } catch (error: any) {
       console.error('Erro ao criar lançamentos:', error);
@@ -253,58 +290,67 @@ export default function RelatorioOferta() {
     }
   };
 
-  const handleRejeitarOferta = async () => {
-    setShowConferirDialog(false);
-    
-    // Registrar rejeição como notificação
-    const conferente = pessoas?.find(p => p.id === conferenteId);
-    const valoresFormatados = Object.entries(valores)
-      .filter(([_, v]) => parseFloat(v.replace(',', '.')) > 0)
-      .map(([id, v]) => {
-        const forma = formasPagamento?.find(f => f.id === id);
-        return `${forma?.nome}: R$ ${v}`;
-      })
-      .join(', ');
+  const handleRejeitarOferta = async (notificationId: string, metadata: any) => {
+    try {
+      // Buscar perfil do lançador usando lancado_por_id do metadata
+      const { data: lancadorProfile } = await supabase
+        .from('profiles')
+        .select('user_id, nome')
+        .eq('id', metadata.lancado_por_id)
+        .single();
 
-    // Criar notificação para o lançador informando rejeição
-    await supabase.from('notifications').insert({
-      user_id: profile?.user_id,
-      title: 'Relatório de Oferta Rejeitado',
-      message: `O conferente ${conferente?.nome} rejeitou o relatório de oferta do culto de ${format(dataCulto, 'dd/MM/yyyy')}. Total: ${formatCurrency(calcularTotal())}`,
-      type: 'rejeicao_oferta',
-      metadata: {
-        data_culto: format(dataCulto, 'dd/MM/yyyy'),
-        conferente: conferente?.nome,
-        lancado_por: profile?.nome,
-        valores: valoresFormatados,
-        total: calcularTotal(),
-        data_rejeicao: new Date().toISOString()
+      if (!lancadorProfile?.user_id) {
+        toast.error('Erro ao encontrar usuário lançador');
+        return;
       }
-    });
 
-    toast.info('Conferência rejeitada. Revise os valores e tente novamente.');
-  };
-
-  // Preparar dados para o dialog de conferência
-  const dadosConferencia = {
-    dataCulto,
-    valores: Object.entries(valores).reduce((acc, [id, valorStr]) => {
-      const valorNumerico = parseFloat(valorStr.replace(',', '.'));
-      if (valorNumerico > 0) {
-        const forma = formasPagamento?.find(f => f.id === id);
-        if (forma) {
-          acc[id] = {
-            nome: forma.nome,
-            valor: valorNumerico
-          };
+      // Criar notificação para o lançador informando rejeição
+      await supabase.from('notifications').insert({
+        user_id: lancadorProfile.user_id,
+        title: 'Relatório de Oferta Rejeitado',
+        message: `O conferente ${profile?.nome} rejeitou o relatório de oferta do culto de ${format(new Date(metadata.data_culto), 'dd/MM/yyyy')}. Total: ${formatCurrency(metadata.total)}`,
+        type: 'rejeicao_oferta',
+        metadata: {
+          data_culto: format(new Date(metadata.data_culto), 'dd/MM/yyyy'),
+          conferente: profile?.nome,
+          lancado_por: metadata.lancado_por,
+          valores: metadata.valores_formatados,
+          total: metadata.total,
+          data_rejeicao: new Date().toISOString()
         }
-      }
-      return acc;
-    }, {} as Record<string, { nome: string; valor: number }>),
-    total: calcularTotal(),
-    lancadoPor: profile?.nome || 'Usuário não identificado',
-    conferente: pessoas?.find(p => p.id === conferenteId)?.nome || 'Não selecionado'
+      });
+
+      // Marcar notificação original como lida
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.info('Conferência rejeitada.');
+    } catch (error: any) {
+      console.error('Erro ao rejeitar oferta:', error);
+      toast.error('Erro ao rejeitar oferta');
+    }
   };
+
+  // Buscar notificações pendentes de conferência para o usuário atual
+  const { data: notificacoesPendentes } = useQuery({
+    queryKey: ['notifications-conferencia', profile?.user_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', profile?.user_id)
+        .eq('type', 'conferencia_oferta')
+        .eq('read', false)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.user_id,
+  });
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -487,14 +533,67 @@ export default function RelatorioOferta() {
         </Card>
       </form>
 
-      <ConferirOfertaDialog
-        open={showConferirDialog}
-        onOpenChange={setShowConferirDialog}
-        dados={dadosConferencia}
-        onConfirmar={handleConfirmarOferta}
-        onRejeitar={handleRejeitarOferta}
-        loading={loading}
-      />
+      {/* Notificações Pendentes de Conferência */}
+      {notificacoesPendentes && notificacoesPendentes.length > 0 && (
+        <Card className="shadow-soft border-primary/20">
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-lg">Relatórios Aguardando Conferência</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0 space-y-3">
+            {notificacoesPendentes.map((notif) => {
+              const metadata = notif.metadata as any;
+              const valoresObj = metadata.valores || {};
+              const total = metadata.total || 0;
+              
+              const dadosConferencia = {
+                dataCulto: new Date(metadata.data_culto),
+                valores: Object.entries(valoresObj).reduce((acc, [id, valorStr]: [string, any]) => {
+                  const valorNumerico = parseFloat(String(valorStr).replace(',', '.'));
+                  if (valorNumerico > 0) {
+                    const forma = formasPagamento?.find(f => f.id === id);
+                    if (forma) {
+                      acc[id] = {
+                        nome: forma.nome,
+                        valor: valorNumerico
+                      };
+                    }
+                  }
+                  return acc;
+                }, {} as Record<string, { nome: string; valor: number }>),
+                total: total,
+                lancadoPor: metadata.lancado_por || 'Não identificado',
+                conferente: profile?.nome || 'Você'
+              };
+
+              return (
+                <div key={notif.id} className="p-4 border rounded-lg space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="font-medium">{notif.title}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{notif.message}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRejeitarOferta(notif.id, metadata)}
+                    >
+                      Rejeitar
+                    </Button>
+                    <ConferirOfertaDialog
+                      dados={dadosConferencia}
+                      onConfirmar={() => handleConfirmarOferta(notif.id, metadata)}
+                      onRejeitar={() => handleRejeitarOferta(notif.id, metadata)}
+                      loading={loading}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
