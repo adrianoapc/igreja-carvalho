@@ -14,16 +14,20 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { ConferirOfertaDialog } from "@/components/financas/ConferirOfertaDialog";
 
 export default function RelatorioOferta() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [dataCulto, setDataCulto] = useState<Date>(new Date());
   const [conferenteId, setConferenteId] = useState("");
   const [valores, setValores] = useState<Record<string, string>>({});
   const [taxaCartaoCredito, setTaxaCartaoCredito] = useState("3.5");
   const [taxaCartaoDebito, setTaxaCartaoDebito] = useState("2.0");
+  const [showConferirDialog, setShowConferirDialog] = useState(false);
 
   // Buscar formas de pagamento
   const { data: formasPagamento } = useQuery({
@@ -40,19 +44,21 @@ export default function RelatorioOferta() {
     },
   });
 
-  // Buscar membros/pessoas para conferente
+  // Buscar membros/pessoas para conferente (excluindo quem está lançando)
   const { data: pessoas } = useQuery({
-    queryKey: ['pessoas-conferente'],
+    queryKey: ['pessoas-conferente', profile?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, nome')
         .in('status', ['membro', 'frequentador'])
+        .neq('id', profile?.id || '') // Excluir quem está lançando
         .order('nome');
       
       if (error) throw error;
       return data;
     },
+    enabled: !!profile?.id,
   });
 
   // Buscar contas
@@ -105,6 +111,11 @@ export default function RelatorioOferta() {
       return;
     }
 
+    // Abrir dialog de conferência
+    setShowConferirDialog(true);
+  };
+
+  const handleConfirmarOferta = async () => {
     setLoading(true);
 
     try {
@@ -205,6 +216,7 @@ export default function RelatorioOferta() {
       setValores({});
       setDataCulto(new Date());
       setConferenteId("");
+      setShowConferirDialog(false);
 
     } catch (error: any) {
       console.error('Erro ao criar lançamentos:', error);
@@ -214,6 +226,32 @@ export default function RelatorioOferta() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRejeitarOferta = () => {
+    setShowConferirDialog(false);
+    toast.info('Conferência cancelada. Revise os valores e tente novamente.');
+  };
+
+  // Preparar dados para o dialog de conferência
+  const dadosConferencia = {
+    dataCulto,
+    valores: Object.entries(valores).reduce((acc, [id, valorStr]) => {
+      const valorNumerico = parseFloat(valorStr.replace(',', '.'));
+      if (valorNumerico > 0) {
+        const forma = formasPagamento?.find(f => f.id === id);
+        if (forma) {
+          acc[id] = {
+            nome: forma.nome,
+            valor: valorNumerico
+          };
+        }
+      }
+      return acc;
+    }, {} as Record<string, { nome: string; valor: number }>),
+    total: calcularTotal(),
+    lancadoPor: profile?.nome || 'Usuário não identificado',
+    conferente: pessoas?.find(p => p.id === conferenteId)?.nome || 'Não selecionado'
   };
 
   return (
@@ -280,20 +318,34 @@ export default function RelatorioOferta() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="conferente">Conferente *</Label>
-                <Select value={conferenteId} onValueChange={setConferenteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o conferente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pessoas?.map((pessoa) => (
-                      <SelectItem key={pessoa.id} value={pessoa.id}>
-                        {pessoa.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="lancado-por">Lançado por</Label>
+                <Input
+                  id="lancado-por"
+                  type="text"
+                  value={profile?.nome || 'Carregando...'}
+                  disabled
+                  className="bg-muted"
+                />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="conferente">Conferente (quem validará) *</Label>
+              <Select value={conferenteId} onValueChange={setConferenteId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione outra pessoa para conferir" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pessoas?.map((pessoa) => (
+                    <SelectItem key={pessoa.id} value={pessoa.id}>
+                      {pessoa.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                O conferente irá validar os valores antes de salvar
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -382,6 +434,15 @@ export default function RelatorioOferta() {
           </CardContent>
         </Card>
       </form>
+
+      <ConferirOfertaDialog
+        open={showConferirDialog}
+        onOpenChange={setShowConferirDialog}
+        dados={dadosConferencia}
+        onConfirmar={handleConfirmarOferta}
+        onRejeitar={handleRejeitarOferta}
+        loading={loading}
+      />
     </div>
   );
 }
