@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, UserCog, ArrowRight, Plus, BarChart3, PieChart } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Building2, Target, FolderTree, UserCog, ArrowRight, BarChart3, PieChart, LineChart, TrendingUpIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -185,42 +185,42 @@ export default function Financas() {
     },
   ];
 
-  const quickActions = [
+  const paineis = [
     {
-      title: "Relatório de Oferta",
-      description: "Registro rápido de culto",
-      icon: DollarSign,
-      action: () => navigate("/financas/relatorio-oferta"),
+      title: "Dashboard Geral",
+      description: "Visão completa das finanças com análises e indicadores",
+      icon: BarChart3,
+      path: "/financas/dashboard",
+      color: "bg-blue-100 dark:bg-blue-900/20",
+      iconColor: "text-blue-600",
+      destacado: true,
     },
     {
       title: "Dashboard de Ofertas",
-      description: "Análises de ofertas",
+      description: "Análises detalhadas das ofertas e contribuições",
       icon: PieChart,
-      action: () => navigate("/financas/dashboard-ofertas"),
+      path: "/financas/dashboard-ofertas",
+      color: "bg-green-100 dark:bg-green-900/20",
+      iconColor: "text-green-600",
+      destacado: true,
     },
     {
-      title: "Nova Entrada",
-      description: "Registrar receita",
-      icon: Plus,
-      action: () => navigate("/financas/entradas"),
+      title: "Projeção Financeira",
+      description: "Previsões e planejamento financeiro futuro",
+      icon: LineChart,
+      path: "/financas/projecao",
+      color: "bg-purple-100 dark:bg-purple-900/20",
+      iconColor: "text-purple-600",
+      destacado: false,
     },
     {
-      title: "Nova Saída",
-      description: "Registrar despesa",
-      icon: Plus,
-      action: () => navigate("/financas/saidas"),
-    },
-    {
-      title: "Dashboard",
-      description: "Análises e indicadores",
-      icon: BarChart3,
-      action: () => navigate("/financas/dashboard"),
-    },
-    {
-      title: "Projeção",
-      description: "Projeção financeira",
-      icon: TrendingUp,
-      action: () => navigate("/financas/projecao"),
+      title: "Insights",
+      description: "Análises avançadas e recomendações inteligentes",
+      icon: TrendingUpIcon,
+      path: "/financas/insights",
+      color: "bg-orange-100 dark:bg-orange-900/20",
+      iconColor: "text-orange-600",
+      destacado: false,
     },
   ];
 
@@ -336,37 +336,37 @@ export default function Financas() {
         </div>
       </div>
 
-      {/* Ações Rápidas */}
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-base md:text-lg">Ações Rápidas</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 md:p-6 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Button
-                  key={action.title}
-                  variant="outline"
-                  className="h-auto p-4 flex items-start gap-3 text-left"
-                  onClick={action.action}
-                >
-                  <div className="p-2 rounded bg-primary/10 flex-shrink-0">
-                    <Icon className="w-4 h-4 text-primary" />
+      {/* Painéis e Dashboards */}
+      <div>
+        <h2 className="text-lg md:text-xl font-semibold mb-3">Painéis</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+          {paineis.map((painel) => {
+            const Icon = painel.icon;
+            return (
+              <Card
+                key={painel.path}
+                className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${
+                  painel.destacado ? 'border-2 border-primary/20' : ''
+                }`}
+                onClick={() => navigate(painel.path)}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className={`p-4 rounded-lg ${painel.color}`}>
+                      <Icon className={`w-8 h-8 ${painel.iconColor}`} />
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{action.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {action.description}
-                    </p>
-                  </div>
-                </Button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                  <h3 className="font-semibold text-lg mb-2">{painel.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {painel.description}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

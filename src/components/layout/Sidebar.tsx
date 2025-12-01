@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3, Settings, Image } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3, Settings, Image, PieChart, LineChart, TrendingUpIcon } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEffect, useState } from "react";
@@ -51,6 +51,24 @@ const intercessaoItems = [{
   label: "Sentimentos",
   path: "/intercessao/sentimentos"
 }];
+const financasPaineisItems = [{
+  icon: BarChart3,
+  label: "Dashboard Geral",
+  path: "/financas/dashboard"
+}, {
+  icon: PieChart,
+  label: "Dashboard de Ofertas",
+  path: "/financas/dashboard-ofertas"
+}, {
+  icon: LineChart,
+  label: "Projeção",
+  path: "/financas/projecao"
+}, {
+  icon: TrendingUpIcon,
+  label: "Insights",
+  path: "/financas/insights"
+}];
+
 const financasItems = [{
   icon: DollarSign,
   label: "Geral",
@@ -63,10 +81,6 @@ const financasItems = [{
   icon: TrendingDown,
   label: "Saídas",
   path: "/financas/saidas"
-}, {
-  icon: BarChart3,
-  label: "Insights",
-  path: "/financas/insights"
 }, {
   icon: Building2,
   label: "Contas",
@@ -320,6 +334,37 @@ export function AppSidebar() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
+                      {/* Painéis submenu */}
+                      <Collapsible defaultOpen className="group/paineis">
+                        <SidebarMenuSubItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuSubButton>
+                              <BarChart3 className="w-4 h-4 text-white" />
+                              {!isCollapsed && <>
+                                  <span>Painéis</span>
+                                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/paineis:rotate-180" />
+                                </>}
+                            </SidebarMenuSubButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {financasPaineisItems.map(item => {
+                              const Icon = item.icon;
+                              return <SidebarMenuSubItem key={item.path}>
+                                    <SidebarMenuSubButton asChild>
+                                      <NavLink to={item.path} end className="hover:bg-sidebar-accent pl-8" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
+                                        <Icon className="w-3 h-3 text-white" />
+                                        {!isCollapsed && <span className="text-xs">{item.label}</span>}
+                                      </NavLink>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>;
+                            })}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuSubItem>
+                      </Collapsible>
+
+                      {/* Outros itens de finanças */}
                       {financasItems.map(item => {
                       const Icon = item.icon;
                       return <SidebarMenuSubItem key={item.path}>
