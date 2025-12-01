@@ -50,7 +50,7 @@ export default function RelatorioOferta() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, nome')
+        .select('id, nome, user_id')
         .in('status', ['membro', 'frequentador'])
         .neq('id', profile?.id || '') // Excluir quem está lançando
         .order('nome');
@@ -109,6 +109,31 @@ export default function RelatorioOferta() {
     if (!temValores) {
       toast.error('Preencha ao menos um valor');
       return;
+    }
+
+    // Criar notificação para o conferente
+    const conferente = pessoas?.find(p => p.id === conferenteId);
+    if (conferente) {
+      const valoresFormatados = Object.entries(valores)
+        .filter(([_, v]) => parseFloat(v.replace(',', '.')) > 0)
+        .map(([id, v]) => {
+          const forma = formasPagamento?.find(f => f.id === id);
+          return `${forma?.nome}: R$ ${v}`;
+        })
+        .join(', ');
+
+      await supabase.from('notifications').insert({
+        user_id: conferente.user_id,
+        title: 'Novo Relatório de Oferta Aguardando Conferência',
+        message: `${profile?.nome} criou um relatório de oferta do culto de ${format(dataCulto, 'dd/MM/yyyy')} aguardando sua validação. Total: ${formatCurrency(calcularTotal())}`,
+        type: 'conferencia_oferta',
+        metadata: {
+          data_culto: format(dataCulto, 'dd/MM/yyyy'),
+          lancado_por: profile?.nome,
+          valores: valoresFormatados,
+          total: calcularTotal()
+        }
+      });
     }
 
     // Abrir dialog de conferência
@@ -228,9 +253,36 @@ export default function RelatorioOferta() {
     }
   };
 
-  const handleRejeitarOferta = () => {
+  const handleRejeitarOferta = async () => {
     setShowConferirDialog(false);
-    toast.info('Conferência cancelada. Revise os valores e tente novamente.');
+    
+    // Registrar rejeição como notificação
+    const conferente = pessoas?.find(p => p.id === conferenteId);
+    const valoresFormatados = Object.entries(valores)
+      .filter(([_, v]) => parseFloat(v.replace(',', '.')) > 0)
+      .map(([id, v]) => {
+        const forma = formasPagamento?.find(f => f.id === id);
+        return `${forma?.nome}: R$ ${v}`;
+      })
+      .join(', ');
+
+    // Criar notificação para o lançador informando rejeição
+    await supabase.from('notifications').insert({
+      user_id: profile?.user_id,
+      title: 'Relatório de Oferta Rejeitado',
+      message: `O conferente ${conferente?.nome} rejeitou o relatório de oferta do culto de ${format(dataCulto, 'dd/MM/yyyy')}. Total: ${formatCurrency(calcularTotal())}`,
+      type: 'rejeicao_oferta',
+      metadata: {
+        data_culto: format(dataCulto, 'dd/MM/yyyy'),
+        conferente: conferente?.nome,
+        lancado_por: profile?.nome,
+        valores: valoresFormatados,
+        total: calcularTotal(),
+        data_rejeicao: new Date().toISOString()
+      }
+    });
+
+    toast.info('Conferência rejeitada. Revise os valores e tente novamente.');
   };
 
   // Preparar dados para o dialog de conferência
