@@ -12,6 +12,7 @@ interface Profile {
   data_primeira_visita: string;
   data_cadastro_membro: string | null;
   observacoes: string | null;
+  avatar_url: string | null;
 }
 
 interface ModulePermission {

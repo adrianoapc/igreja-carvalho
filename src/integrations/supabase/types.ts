@@ -1234,6 +1234,7 @@ export type Database = {
       profiles: {
         Row: {
           aceitou_jesus: boolean | null
+          avatar_url: string | null
           bairro: string | null
           batizado: boolean | null
           cadastrado_por: string | null
@@ -1279,6 +1280,7 @@ export type Database = {
         }
         Insert: {
           aceitou_jesus?: boolean | null
+          avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null
           cadastrado_por?: string | null
@@ -1324,6 +1326,7 @@ export type Database = {
         }
         Update: {
           aceitou_jesus?: boolean | null
+          avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null
           cadastrado_por?: string | null
