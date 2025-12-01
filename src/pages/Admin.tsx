@@ -27,6 +27,7 @@ interface UserProfile {
   data_primeira_visita: string;
   data_cadastro_membro: string | null;
   observacoes: string | null;
+  roles?: string[];
 }
 interface UserRole {
   role: string;
@@ -41,6 +42,7 @@ export default function Admin() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,18 +58,47 @@ export default function Admin() {
     loadUsers();
   }, []);
   useEffect(() => {
-    const filtered = users.filter(user => user.nome.toLowerCase().includes(searchTerm.toLowerCase()) || user.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+    let filtered = users.filter(user => 
+      user.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Filtrar por role
+    if (roleFilter !== "all") {
+      filtered = filtered.filter(user => 
+        user.roles?.includes(roleFilter)
+      );
+    }
+
     setFilteredUsers(filtered);
-  }, [searchTerm, users]);
+  }, [searchTerm, users, roleFilter]);
   const loadUsers = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.from("profiles").select("*").order("nome");
-      if (error) throw error;
-      setUsers(data || []);
-      setFilteredUsers(data || []);
+      // Buscar perfis com suas roles
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("nome");
+      
+      if (profilesError) throw profilesError;
+
+      // Buscar roles para cada perfil
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, role");
+      
+      if (rolesError) throw rolesError;
+
+      // Combinar dados
+      const usersWithRoles = profiles?.map(profile => ({
+        ...profile,
+        roles: rolesData
+          ?.filter(r => r.user_id === profile.user_id)
+          .map(r => r.role) || []
+      })) || [];
+
+      setUsers(usersWithRoles);
+      setFilteredUsers(usersWithRoles);
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -125,18 +156,30 @@ export default function Admin() {
   const handleAddRole = async (userId: string, role: string) => {
     setIsLoading(true);
     try {
-      const {
-        error
-      } = await supabase.from("user_roles").insert([{
+      const { error } = await supabase.from("user_roles").insert([{
         user_id: userId,
         role: role as any
       }]);
+      
       if (error) throw error;
+
+      // Registrar no histórico
+      const timestamp = new Date().toLocaleString("pt-BR");
+      const currentObs = selectedUser?.observacoes || "";
+      const newObs = `${currentObs}\n[${timestamp}] Cargo "${role}" atribuído pelo admin`.trim();
+      
+      await supabase
+        .from("profiles")
+        .update({ observacoes: newObs })
+        .eq("user_id", userId);
+
       toast({
         title: "Sucesso!",
         description: `Cargo ${role} atribuído`
       });
+      
       loadUserRoles(userId);
+      loadUsers();
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -150,15 +193,76 @@ export default function Admin() {
   const handleRemoveRole = async (userId: string, role: string) => {
     setIsLoading(true);
     try {
-      const {
-        error
-      } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role as any);
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId)
+        .eq("role", role as any);
+      
       if (error) throw error;
+
+      // Registrar no histórico
+      const timestamp = new Date().toLocaleString("pt-BR");
+      const currentObs = selectedUser?.observacoes || "";
+      const newObs = `${currentObs}\n[${timestamp}] Cargo "${role}" removido pelo admin`.trim();
+      
+      await supabase
+        .from("profiles")
+        .update({ observacoes: newObs })
+        .eq("user_id", userId);
+
       toast({
         title: "Sucesso!",
         description: `Cargo ${role} removido`
       });
+      
       loadUserRoles(userId);
+      loadUsers();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePromoteBasicoToMembro = async (userId: string) => {
+    setIsLoading(true);
+    try {
+      // Remover role basico
+      await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId)
+        .eq("role", "basico");
+
+      // Adicionar role membro
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert([{ user_id: userId, role: "membro" }]);
+      
+      if (roleError) throw roleError;
+
+      // Registrar no histórico
+      const timestamp = new Date().toLocaleString("pt-BR");
+      const currentObs = selectedUser?.observacoes || "";
+      const newObs = `${currentObs}\n[${timestamp}] Promovido de "básico" para "membro" pelo admin`.trim();
+      
+      await supabase
+        .from("profiles")
+        .update({ observacoes: newObs })
+        .eq("user_id", userId);
+
+      toast({
+        title: "Usuário promovido!",
+        description: "Usuário agora tem acesso completo como membro"
+      });
+      
+      loadUserRoles(userId);
+      loadUsers();
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -178,6 +282,21 @@ export default function Admin() {
     return colors[status as keyof typeof colors] || "";
   };
   const availableRoles = ["admin", "pastor", "lider", "secretario", "tesoureiro", "professor", "membro"];
+  
+  const getRoleBadgeColor = (role: string) => {
+    const colors: Record<string, string> = {
+      admin: "bg-red-500/10 text-red-500 border-red-500/20",
+      pastor: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+      lider: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+      tesoureiro: "bg-green-500/10 text-green-500 border-green-500/20",
+      secretario: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+      professor: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+      membro: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+      basico: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+    };
+    return colors[role] || "bg-muted";
+  };
+
   return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -200,24 +319,73 @@ export default function Admin() {
         <TabsContent value="users" className="space-y-4">
           <Card className="shadow-soft">
             <CardHeader>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Buscar por nome ou email..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar por nome ou email..." 
+                    className="pl-10" 
+                    value={searchTerm} 
+                    onChange={e => setSearchTerm(e.target.value)} 
+                  />
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={roleFilter === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRoleFilter("all")}
+                  >
+                    Todos ({users.length})
+                  </Button>
+                  <Button
+                    variant={roleFilter === "basico" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRoleFilter("basico")}
+                  >
+                    Básico ({users.filter(u => u.roles?.includes("basico")).length})
+                  </Button>
+                  <Button
+                    variant={roleFilter === "membro" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRoleFilter("membro")}
+                  >
+                    Membro ({users.filter(u => u.roles?.includes("membro")).length})
+                  </Button>
+                  <Button
+                    variant={roleFilter === "admin" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRoleFilter("admin")}
+                  >
+                    Admin ({users.filter(u => u.roles?.includes("admin")).length})
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {filteredUsers.map(user => <div key={user.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-1">
                       <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold text-lg">
                         {user.nome.charAt(0).toUpperCase()}
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-foreground">{user.nome}</p>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <Badge className={getStatusBadge(user.status)}>
-                          {user.status}
-                        </Badge>
+                        <div className="flex gap-2 mt-1 flex-wrap">
+                          <Badge className={getStatusBadge(user.status)}>
+                            {user.status}
+                          </Badge>
+                          {user.roles?.map(role => (
+                            <Badge key={role} className={getRoleBadgeColor(role)}>
+                              {role}
+                            </Badge>
+                          ))}
+                          {(!user.roles || user.roles.length === 0) && (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Sem cargo
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <Dialog>
@@ -252,29 +420,80 @@ export default function Admin() {
                               </div>
                             </div>
 
-                            {/* Roles (apenas para membros) */}
-                            {selectedUser.status === "membro" && <div className="space-y-2">
-                                <Label>Cargos</Label>
+                            {/* Promoção de Básico para Membro */}
+                            {userRoles.includes("basico") && !userRoles.includes("membro") && (
+                              <div className="space-y-2 p-4 rounded-lg bg-primary/5 border border-primary/20">
+                                <Label className="flex items-center gap-2">
+                                  <ArrowUpCircle className="w-4 h-4 text-primary" />
+                                  Promoção de Acesso
+                                </Label>
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  Este usuário tem acesso básico. Promova para membro para liberar acesso completo ao sistema.
+                                </p>
+                                <Button 
+                                  onClick={() => handlePromoteBasicoToMembro(selectedUser.user_id)}
+                                  disabled={isLoading}
+                                  className="w-full"
+                                >
+                                  <ArrowUpCircle className="w-4 h-4 mr-2" />
+                                  Promover para Membro
+                                </Button>
+                              </div>
+                            )}
+
+                            {/* Roles */}
+                            <div className="space-y-2">
+                                <Label>Cargos Atuais</Label>
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                  {userRoles.map(role => <Badge key={role} variant="secondary" className="gap-2">
+                                  {userRoles.map(role => (
+                                    <Badge key={role} className={`${getRoleBadgeColor(role)} gap-2`}>
                                       {role}
-                                      <button onClick={() => handleRemoveRole(selectedUser.user_id, role)} className="hover:text-destructive" disabled={isLoading}>
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    </Badge>)}
-                                  {userRoles.length === 0 && <p className="text-sm text-muted-foreground">Nenhum cargo atribuído</p>}
+                                      {role !== "basico" && (
+                                        <button 
+                                          onClick={() => handleRemoveRole(selectedUser.user_id, role)} 
+                                          className="hover:text-destructive" 
+                                          disabled={isLoading}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </Badge>
+                                  ))}
+                                  {userRoles.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">Nenhum cargo atribuído</p>
+                                  )}
                                 </div>
-                                <Select onValueChange={(role: string) => handleAddRole(selectedUser.user_id, role)} disabled={isLoading}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Adicionar cargo" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableRoles.filter(role => !userRoles.includes(role)).map(role => <SelectItem key={role} value={role}>
+                                
+                                {!userRoles.includes("basico") && (
+                                  <Select 
+                                    onValueChange={(role: string) => handleAddRole(selectedUser.user_id, role)} 
+                                    disabled={isLoading}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Adicionar cargo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {availableRoles.filter(role => !userRoles.includes(role)).map(role => (
+                                        <SelectItem key={role} value={role}>
                                           {role}
-                                        </SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              </div>}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              </div>
+
+                            {/* Histórico */}
+                            {selectedUser.observacoes && (
+                              <div className="space-y-2">
+                                <Label>Histórico de Promoções</Label>
+                                <div className="p-3 rounded-lg bg-muted/50 border border-border max-h-40 overflow-y-auto">
+                                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                                    {selectedUser.observacoes}
+                                  </pre>
+                                </div>
+                              </div>
+                            )}
 
                             {/* Info */}
                             <div className="space-y-2">
