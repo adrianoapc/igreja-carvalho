@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload, Paperclip, X } from "lucide-react";
+import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload, Paperclip, X, Download } from "lucide-react";
+import { toast } from "sonner";
+import { exportToExcel, formatDateForExport, formatCurrencyForExport, formatBooleanForExport } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
@@ -188,6 +190,36 @@ export default function Entradas() {
     return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400';
   };
 
+  const handleExportar = () => {
+    try {
+      if (!transacoesFiltradas || transacoesFiltradas.length === 0) {
+        toast.error("Não há dados para exportar");
+        return;
+      }
+
+      const dadosExportacao = transacoesFiltradas.map(t => ({
+        'Descrição': t.descricao,
+        'Valor': formatCurrencyForExport(t.valor),
+        'Status': getStatusDisplay(t),
+        'Data Vencimento': formatDateForExport(t.data_vencimento),
+        'Data Recebimento': formatDateForExport(t.data_pagamento),
+        'Conta': t.conta?.nome || '',
+        'Categoria': t.categoria?.nome || '',
+        'Subcategoria': t.subcategoria?.nome || '',
+        'Base Ministerial': t.base_ministerial?.titulo || '',
+        'Centro de Custo': t.centro_custo?.nome || '',
+        'Forma Pagamento': t.forma_pagamento || '',
+        'Observações': t.observacoes || '',
+      }));
+
+      exportToExcel(dadosExportacao, 'Entradas', 'Entradas');
+      toast.success("Dados exportados com sucesso!");
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      toast.error("Erro ao exportar dados");
+    }
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col gap-3">
@@ -234,6 +266,13 @@ export default function Entradas() {
               }}
               onAplicar={() => refetch()}
             />
+            <Button 
+              variant="outline"
+              onClick={handleExportar}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Exportar</span>
+            </Button>
             <Button 
               variant="outline"
               onClick={() => setImportDialogOpen(true)}

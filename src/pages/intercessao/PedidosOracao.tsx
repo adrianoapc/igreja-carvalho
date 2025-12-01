@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Clock, User, Search, ArrowLeft, Filter } from "lucide-react";
+import { Plus, Clock, User, Search, ArrowLeft, Filter, Download } from "lucide-react";
+import { toast } from "sonner";
+import { exportToExcel, formatDateTimeForExport } from "@/lib/exportUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -148,10 +150,45 @@ export default function PedidosOracao() {
         pedido.profiles?.nome.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesTipo = tipoFilter === "todos" || pedido.tipo === tipoFilter;
-      
+
       return matchesSearch && matchesTipo;
     });
   }, [pedidos, searchTerm, tipoFilter]);
+
+  const handleExportar = () => {
+    try {
+      if (!filteredPedidos || filteredPedidos.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Não há dados para exportar",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const dadosExportacao = filteredPedidos.map(p => ({
+        'Solicitante': p.anonimo ? 'Anônimo' : (p.profiles?.nome || p.nome_solicitante || 'Não identificado'),
+        'Tipo': getTipoLabel(p.tipo),
+        'Status': getStatusLabel(p.status),
+        'Pedido': p.pedido,
+        'Intercessor': p.intercessores?.nome || 'Não alocado',
+        'Data Criação': formatDateTimeForExport(p.data_criacao),
+      }));
+
+      exportToExcel(dadosExportacao, 'Pedidos_Oracao', 'Pedidos de Oração');
+      toast({
+        title: "Sucesso",
+        description: "Dados exportados com sucesso!"
+      });
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao exportar dados",
+        variant: "destructive"
+      });
+    }
+  };
 
   const renderPedidoCard = (pedido: Pedido) => {
     const solicitante = pedido.anonimo 
@@ -249,14 +286,24 @@ export default function PedidosOracao() {
             Gerencie e acompanhe os pedidos de oração
           </p>
         </div>
-        <Button 
-          className="bg-gradient-primary shadow-soft"
-          onClick={() => setNovoPedidoOpen(true)}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          <span className="hidden sm:inline">Novo Pedido</span>
-          <span className="sm:hidden">Novo</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={handleExportar}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar
+          </Button>
+          <Button 
+            className="bg-gradient-primary shadow-soft"
+            onClick={() => setNovoPedidoOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Novo Pedido</span>
+            <span className="sm:hidden">Novo</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}

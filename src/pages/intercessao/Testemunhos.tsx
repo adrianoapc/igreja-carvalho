@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Heart, Clock, ArrowLeft, Search, Filter } from "lucide-react";
+import { Plus, Heart, Clock, ArrowLeft, Search, Filter, Download } from "lucide-react";
+import { toast } from "sonner";
+import { exportToExcel, formatDateTimeForExport } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -111,6 +113,43 @@ export default function Testemunhos() {
     arquivado: testemunhos.filter(t => t.status === "arquivado").length,
   };
 
+  const handleExportar = () => {
+    try {
+      if (!filteredTestemunhos || filteredTestemunhos.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Não há dados para exportar",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const dadosExportacao = filteredTestemunhos.map(t => ({
+        'Autor': getNomeExibicao(t),
+        'Título': t.titulo,
+        'Mensagem': t.mensagem,
+        'Categoria': getCategoriaLabel(t.categoria),
+        'Status': t.status,
+        'Publicar': t.publicar ? 'Sim' : 'Não',
+        'Data Criação': formatDateTimeForExport(t.created_at),
+        'Data Publicação': formatDateTimeForExport(t.data_publicacao),
+      }));
+
+      exportToExcel(dadosExportacao, 'Testemunhos', 'Testemunhos');
+      toast({
+        title: "Sucesso",
+        description: "Dados exportados com sucesso!"
+      });
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao exportar dados",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
@@ -144,14 +183,24 @@ export default function Testemunhos() {
             Compartilhe as bênçãos e milagres
           </p>
         </div>
-        <Button 
-          className="bg-gradient-primary shadow-soft"
-          onClick={() => setNovoDialogOpen(true)}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          <span className="hidden sm:inline">Novo Testemunho</span>
-          <span className="sm:hidden">Novo</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={handleExportar}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar
+          </Button>
+          <Button 
+            className="bg-gradient-primary shadow-soft"
+            onClick={() => setNovoDialogOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Novo Testemunho</span>
+            <span className="sm:hidden">Novo</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
