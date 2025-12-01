@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ImageCaptureInput } from "@/components/ui/image-capture-input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface AvatarUploadProps {
   userId: string;
@@ -14,23 +22,30 @@ interface AvatarUploadProps {
 
 export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarUpdated }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = (file: File) => {
+    setSelectedFile(file);
+    
+    // Criar preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearPreview = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+  };
+
+  const handleUploadConfirm = async () => {
+    if (!selectedFile) return;
+
     try {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      // Validar tipo de arquivo
-      if (!file.type.startsWith("image/")) {
-        toast.error("Por favor, selecione uma imagem válida");
-        return;
-      }
-
-      // Validar tamanho (máximo 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error("A imagem deve ter no máximo 2MB");
-        return;
-      }
 
       setUploading(true);
 
@@ -42,7 +57,7 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarUpdat
       }
 
       // Gerar nome único para o arquivo
-      const fileExt = file.name.split(".").pop();
+      const fileExt = selectedFile.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       // Deletar avatar antigo se existir
@@ -54,9 +69,9 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarUpdat
       // Upload do novo arquivo
       const { error: uploadError, data } = await supabase.storage
         .from("avatars")
-        .upload(fileName, file, {
+        .upload(fileName, selectedFile, {
           upsert: true,
-          contentType: file.type,
+          contentType: selectedFile.type,
         });
 
       if (uploadError) throw uploadError;
@@ -76,6 +91,8 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarUpdat
 
       toast.success("Foto de perfil atualizada com sucesso!");
       onAvatarUpdated();
+      setShowUploadDialog(false);
+      handleClearPreview();
     } catch (error: any) {
       console.error("Erro ao fazer upload:", error);
       toast.error("Erro ao atualizar foto de perfil");
@@ -85,31 +102,71 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarUpdat
   };
 
   return (
-    <div className="relative group">
-      <Avatar className="h-24 w-24 md:h-32 md:w-32">
-        <AvatarImage src={currentAvatarUrl || undefined} alt={userName} />
-        <AvatarFallback className="text-2xl md:text-4xl bg-gradient-accent text-primary">
-          {userName.charAt(0).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-      
-      <label htmlFor="avatar-upload">
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+    <>
+      <div className="relative group">
+        <Avatar className="h-24 w-24 md:h-32 md:w-32">
+          <AvatarImage src={currentAvatarUrl || undefined} alt={userName} />
+          <AvatarFallback className="text-2xl md:text-4xl bg-gradient-accent text-primary">
+            {userName.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        
+        <button
+          type="button"
+          onClick={() => setShowUploadDialog(true)}
+          disabled={uploading}
+          className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+        >
           {uploading ? (
             <Loader2 className="h-8 w-8 text-white animate-spin" />
           ) : (
             <Camera className="h-8 w-8 text-white" />
           )}
-        </div>
-        <input
-          id="avatar-upload"
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-          disabled={uploading}
-        />
-      </label>
-    </div>
+        </button>
+      </div>
+
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Atualizar Foto de Perfil</DialogTitle>
+            <DialogDescription>
+              Escolha um arquivo ou tire uma foto para atualizar seu avatar
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <ImageCaptureInput
+              onFileSelected={handleFileSelected}
+              accept="image/*"
+              maxSizeMB={2}
+              previewUrl={previewUrl || undefined}
+              onClear={handleClearPreview}
+            />
+
+            {selectedFile && (
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowUploadDialog(false)}
+                  disabled={uploading}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleUploadConfirm} disabled={uploading}>
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    "Confirmar"
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
