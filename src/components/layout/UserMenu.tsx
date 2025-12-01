@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { LogOut, User, Moon, Sun } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -25,10 +26,13 @@ export default function UserMenu() {
   if (!profile) return null;
   return <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2 bg-[#eff0cf]">
-          <div className="w-8 h-8 rounded-full bg-gradient-accent flex items-center justify-center font-bold bg-[#eff0cf] text-[#010f0d]">
-            {profile.nome.charAt(0).toUpperCase()}
-          </div>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Avatar className="w-8 h-8">
+            <AvatarImage src={profile.avatar_url || undefined} alt={profile.nome} />
+            <AvatarFallback className="bg-gradient-accent text-primary font-bold">
+              {profile.nome.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           <span className="hidden md:inline">{profile.nome}</span>
         </Button>
       </DropdownMenuTrigger>

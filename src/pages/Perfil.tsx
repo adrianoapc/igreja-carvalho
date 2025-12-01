@@ -6,12 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { User, Phone, Mail, MapPin, Calendar, Briefcase, Church, Edit } from "lucide-react";
+import { User, Phone, Mail, MapPin, Calendar, Briefcase, Church, Edit, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPessoaisDialog";
 import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
+import { AvatarUpload } from "@/components/perfil/AvatarUpload";
+import { AlterarSenhaDialog } from "@/components/perfil/AlterarSenhaDialog";
 
 interface ProfileData {
   id: string;
@@ -44,6 +46,7 @@ interface ProfileData {
   entrou_por: string | null;
   data_entrada: string | null;
   status_igreja: string | null;
+  avatar_url: string | null;
 }
 
 interface FuncaoIgreja {
@@ -66,6 +69,7 @@ export default function Perfil() {
   const [editPessoaisOpen, setEditPessoaisOpen] = useState(false);
   const [editContatosOpen, setEditContatosOpen] = useState(false);
   const [editEclesiasticosOpen, setEditEclesiasticosOpen] = useState(false);
+  const [alterarSenhaOpen, setAlterarSenhaOpen] = useState(false);
 
   const loadProfileData = async () => {
     if (!profile?.id) return;
@@ -138,21 +142,31 @@ export default function Perfil() {
   return (
     <div className="container mx-auto p-4 max-w-5xl space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-accent flex items-center justify-center text-2xl font-bold text-primary">
-            {profileData.nome.charAt(0).toUpperCase()}
+      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+        <AvatarUpload
+          userId={profileData.id}
+          currentAvatarUrl={profileData.avatar_url}
+          userName={profileData.nome}
+          onAvatarUpdated={loadProfileData}
+        />
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold">{profileData.nome}</h1>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Badge variant="outline" className="capitalize">
+              {profileData.status}
+            </Badge>
+            {profileData.e_pastor && <Badge>Pastor</Badge>}
+            {profileData.e_lider && <Badge>Líder</Badge>}
           </div>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold">{profileData.nome}</h1>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="outline" className="capitalize">
-                {profileData.status}
-              </Badge>
-              {profileData.e_pastor && <Badge>Pastor</Badge>}
-              {profileData.e_lider && <Badge>Líder</Badge>}
-            </div>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => setAlterarSenhaOpen(true)}
+          >
+            <Lock className="h-4 w-4 mr-2" />
+            Alterar Senha
+          </Button>
         </div>
       </div>
 
@@ -490,6 +504,10 @@ export default function Perfil() {
             pessoaId={profileData.id}
             dadosAtuais={profileData}
             onSuccess={handleDataUpdated}
+          />
+          <AlterarSenhaDialog
+            open={alterarSenhaOpen}
+            onOpenChange={setAlterarSenhaOpen}
           />
         </>
       )}
