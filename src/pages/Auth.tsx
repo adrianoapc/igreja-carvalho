@@ -67,15 +67,15 @@ export default function Auth() {
 
             if (updateError) throw updateError;
 
-            // Atribuir cargo padrão "membro"
+            // Atribuir cargo padrão "basico" - admin poderá promover depois
             await supabase.from("user_roles").insert({
               user_id: authData.user.id,
-              role: "membro"
+              role: "basico"
             });
 
             toast({
               title: "Cadastro vinculado!",
-              description: `Seu perfil de ${existingProfile.status} foi promovido para membro.`,
+              description: `Seu perfil de ${existingProfile.status} foi promovido para membro. Acesso básico liberado.`,
             });
           }
         } else {
@@ -92,15 +92,15 @@ export default function Auth() {
 
           if (profileError) throw profileError;
 
-          // Atribuir cargo padrão "membro"
+          // Atribuir cargo padrão "basico" - admin poderá promover depois
           await supabase.from("user_roles").insert({
             user_id: authData.user.id,
-            role: "membro"
+            role: "basico"
           });
 
           toast({
             title: "Cadastro realizado!",
-            description: "Bem-vindo à nossa igreja!",
+            description: "Bem-vindo! Você tem acesso básico ao sistema.",
           });
         }
 
