@@ -38,17 +38,59 @@ export default function Auth() {
       if (signUpError) throw signUpError;
 
       if (authData.user) {
-        // Criar perfil do usuário
-        const { error: profileError } = await supabase
+        // Verificar se já existe um perfil com este email
+        const { data: existingProfile } = await supabase
           .from("profiles")
-          .insert({
-            user_id: authData.user.id,
-            nome,
-            email,
-            status: "membro" // Novo cadastro já é membro
-          });
+          .select("id, user_id, status, observacoes")
+          .eq("email", email)
+          .single();
 
-        if (profileError) throw profileError;
+        if (existingProfile) {
+          // Se já existe um perfil
+          if (existingProfile.user_id) {
+            // Se já tem user_id associado, email já está em uso
+            throw new Error("Este email já está cadastrado no sistema.");
+          } else {
+            // Se não tem user_id, é visitante/frequentador - vamos associar
+            const { error: updateError } = await supabase
+              .from("profiles")
+              .update({
+                user_id: authData.user.id,
+                nome, // Atualizar nome também
+                status: "membro", // Promover para membro
+                data_cadastro_membro: new Date().toISOString(),
+                observacoes: existingProfile.observacoes 
+                  ? `${existingProfile.observacoes}\n\n[${new Date().toLocaleString('pt-BR')}] ${existingProfile.status} → membro (login criado)`
+                  : `[${new Date().toLocaleString('pt-BR')}] ${existingProfile.status} → membro (login criado)`
+              })
+              .eq("id", existingProfile.id);
+
+            if (updateError) throw updateError;
+
+            toast({
+              title: "Cadastro vinculado!",
+              description: `Seu perfil de ${existingProfile.status} foi promovido para membro.`,
+            });
+          }
+        } else {
+          // Não existe perfil, criar novo
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert({
+              user_id: authData.user.id,
+              nome,
+              email,
+              status: "membro",
+              data_cadastro_membro: new Date().toISOString()
+            });
+
+          if (profileError) throw profileError;
+
+          toast({
+            title: "Cadastro realizado!",
+            description: "Bem-vindo à nossa igreja!",
+          });
+        }
 
         toast({
           title: "Cadastro realizado!",
