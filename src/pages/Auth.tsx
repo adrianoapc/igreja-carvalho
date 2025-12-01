@@ -67,6 +67,12 @@ export default function Auth() {
 
             if (updateError) throw updateError;
 
+            // Atribuir cargo padrão "membro"
+            await supabase.from("user_roles").insert({
+              user_id: authData.user.id,
+              role: "membro"
+            });
+
             toast({
               title: "Cadastro vinculado!",
               description: `Seu perfil de ${existingProfile.status} foi promovido para membro.`,
@@ -85,6 +91,12 @@ export default function Auth() {
             });
 
           if (profileError) throw profileError;
+
+          // Atribuir cargo padrão "membro"
+          await supabase.from("user_roles").insert({
+            user_id: authData.user.id,
+            role: "membro"
+          });
 
           toast({
             title: "Cadastro realizado!",
