@@ -43,6 +43,21 @@ export function MonthPicker({
     { label: 'Últimos 3 meses', getValue: () => ({ from: subMonths(new Date(), 3), to: new Date() }) },
   ];
 
+  const monthPresets = [
+    { label: 'Este mês', getValue: () => new Date() },
+    { label: 'Mês passado', getValue: () => subMonths(new Date(), 1) },
+    { label: '2 meses atrás', getValue: () => subMonths(new Date(), 2) },
+    { label: '3 meses atrás', getValue: () => subMonths(new Date(), 3) },
+  ];
+
+  const handleMonthPresetClick = (preset: typeof monthPresets[0]) => {
+    const date = preset.getValue();
+    onMonthChange(date);
+    onCustomRangeChange?.(null);
+    setMode('month');
+    setOpen(false);
+  };
+
   const handleMonthSelect = (monthIndex: number) => {
     const newDate = setMonth(setYear(new Date(), viewYear), monthIndex);
     onMonthChange(newDate);
@@ -133,8 +148,26 @@ export function MonthPicker({
             </TabsList>
 
             <TabsContent value="month" className="p-3 pt-2 space-y-3">
+              {/* Atalhos rápidos */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground font-medium">Atalhos</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {monthPresets.map((preset, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleMonthPresetClick(preset)}
+                      className="text-xs h-8 justify-start"
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               {/* Seletor de Ano */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pt-2 border-t">
                 <Button
                   variant="ghost"
                   size="sm"
