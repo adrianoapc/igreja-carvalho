@@ -25,6 +25,9 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
     telefone: "",
     email: "",
     tipo: "visitante" as "visitante" | "frequentador",
+    dia_nascimento: "",
+    mes_nascimento: "",
+    entrou_por: "",
     observacoes: "",
     aceitou_jesus: false,
     batizado: false,
@@ -32,6 +35,31 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
     recebeu_brinde: false,
   });
   const { toast } = useToast();
+
+  const dias = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"));
+  const meses = [
+    { value: "01", label: "Janeiro" },
+    { value: "02", label: "Fevereiro" },
+    { value: "03", label: "Março" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Maio" },
+    { value: "06", label: "Junho" },
+    { value: "07", label: "Julho" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Setembro" },
+    { value: "10", label: "Outubro" },
+    { value: "11", label: "Novembro" },
+    { value: "12", label: "Dezembro" },
+  ];
+  const opcoesComoConheceu = [
+    { value: "indicacao", label: "Indicação de amigo/familiar" },
+    { value: "redes_sociais", label: "Redes sociais" },
+    { value: "google", label: "Pesquisa no Google" },
+    { value: "passou_na_frente", label: "Passou na frente da igreja" },
+    { value: "evento", label: "Evento da igreja" },
+    { value: "convite_membro", label: "Convite de membro" },
+    { value: "outro", label: "Outro" },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,6 +189,12 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
           description: `${visitanteData.nome} já tem ${visitanteData.numero_visitas} visita(s) registrada(s)!${mensagemPromocao}`,
         });
       } else {
+        // Construir data_nascimento parcial (ano fictício para armazenar só dia/mês)
+        let dataNascimento = null;
+        if (formData.dia_nascimento && formData.mes_nascimento) {
+          dataNascimento = `1900-${formData.mes_nascimento}-${formData.dia_nascimento}`;
+        }
+
         // Inserir novo registro
         const { data: newData, error: insertError } = await supabase
           .from("profiles")
@@ -173,6 +207,8 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
             batizado: formData.batizado,
             deseja_contato: formData.deseja_contato,
             recebeu_brinde: formData.recebeu_brinde,
+            data_nascimento: dataNascimento,
+            entrou_por: formData.entrou_por || null,
             status: formData.tipo,
             data_primeira_visita: new Date().toISOString(),
             data_ultima_visita: new Date().toISOString(),
@@ -219,6 +255,9 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         telefone: "",
         email: "",
         tipo: "visitante",
+        dia_nascimento: "",
+        mes_nascimento: "",
+        entrou_por: "",
         observacoes: "",
         aceitou_jesus: false,
         batizado: false,
@@ -310,6 +349,58 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
               placeholder="email@exemplo.com"
               disabled={loading}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Data de aniversário</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Select
+                value={formData.dia_nascimento}
+                onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Dia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dias.map((dia) => (
+                    <SelectItem key={dia} value={dia}>{dia}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={formData.mes_nascimento}
+                onValueChange={(value) => setFormData({ ...formData, mes_nascimento: value })}
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  {meses.map((mes) => (
+                    <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="entrou_por">Como conheceu a igreja?</Label>
+            <Select
+              value={formData.entrou_por}
+              onValueChange={(value) => setFormData({ ...formData, entrou_por: value })}
+              disabled={loading}
+            >
+              <SelectTrigger id="entrou_por">
+                <SelectValue placeholder="Selecione uma opção" />
+              </SelectTrigger>
+              <SelectContent>
+                {opcoesComoConheceu.map((opcao) => (
+                  <SelectItem key={opcao.value} value={opcao.value}>{opcao.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
