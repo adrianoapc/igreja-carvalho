@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { LogIn, UserPlus } from "lucide-react";
+import { PublicHeader } from "@/components/layout/PublicHeader";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -156,16 +157,19 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-soft">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-gradient-primary bg-clip-text text-transparent">
-            Sistema Igreja
-          </CardTitle>
-          <CardDescription>
-            Entre ou cadastre-se para acessar o sistema
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen bg-background flex flex-col">
+      <PublicHeader showBackButton backTo="/public" />
+      
+      <div className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-soft">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-foreground">
+              Área do Membro
+            </CardTitle>
+            <CardDescription>
+              Entre ou cadastre-se para acessar o sistema
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -252,6 +256,7 @@ export default function Auth() {
           </Tabs>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
