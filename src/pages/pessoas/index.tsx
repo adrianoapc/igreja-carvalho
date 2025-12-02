@@ -202,12 +202,16 @@ export default function Pessoas() {
       {/* Perfis Pendentes de Aprovação */}
       {pendentesCount > 0 && (
         <Card>
-          <CardHeader className="p-4 md:p-6">
+          <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between">
             <CardTitle className="text-lg md:text-xl flex items-center gap-2">
               <FileEdit className="h-5 w-5 text-primary" />
               Perfis Pendentes
               <Badge variant="destructive">{pendentesCount}</Badge>
             </CardTitle>
+            <Button variant="outline" size="sm" onClick={() => navigate('/pessoas/alteracoes-pendentes')}>
+              Ver todas
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
           </CardHeader>
           <CardContent className="p-3 md:p-6">
             <PerfisPendentes />
