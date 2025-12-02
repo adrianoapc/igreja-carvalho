@@ -37,7 +37,7 @@ export default function Agenda() {
         .select("id, titulo, tipo, data_culto, local, tema")
         .gte("data_culto", start.toISOString())
         .lte("data_culto", end.toISOString())
-        .eq("status", "agendado")
+        .in("status", ["planejado", "confirmado"])
         .order("data_culto", { ascending: true });
 
       if (error) throw error;
