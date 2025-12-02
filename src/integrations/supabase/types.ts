@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      alteracoes_perfil_pendentes: {
+        Row: {
+          aprovado_por: string | null
+          campos_aprovados: Json | null
+          created_at: string | null
+          dados_antigos: Json
+          dados_novos: Json
+          id: string
+          observacoes: string | null
+          profile_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          aprovado_por?: string | null
+          campos_aprovados?: Json | null
+          created_at?: string | null
+          dados_antigos: Json
+          dados_novos: Json
+          id?: string
+          observacoes?: string | null
+          profile_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          aprovado_por?: string | null
+          campos_aprovados?: Json | null
+          created_at?: string | null
+          dados_antigos?: Json
+          dados_novos?: Json
+          id?: string
+          observacoes?: string | null
+          profile_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alteracoes_perfil_pendentes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banners: {
         Row: {
           active: boolean | null
