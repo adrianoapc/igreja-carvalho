@@ -26,6 +26,7 @@ export default function CadastroMembro() {
     mes_nascimento: "",
     ano_nascimento: "",
     estado_civil: "",
+    necessidades_especiais: "",
     cep: "",
     cidade: "",
     bairro: "",
@@ -114,6 +115,7 @@ export default function CadastroMembro() {
         mes_nascimento: mesNasc,
         ano_nascimento: anoNasc,
         estado_civil: data.estado_civil || "",
+        necessidades_especiais: data.necessidades_especiais || "",
         cep: data.cep || "",
         cidade: data.cidade || "",
         bairro: data.bairro || "",
@@ -168,6 +170,7 @@ export default function CadastroMembro() {
             sexo: formData.sexo || null,
             data_nascimento: dataNascimento,
             estado_civil: formData.estado_civil || null,
+            necessidades_especiais: formData.necessidades_especiais.trim() || null,
             cep: formData.cep.trim() || null,
             cidade: formData.cidade.trim() || null,
             bairro: formData.bairro.trim() || null,
@@ -458,6 +461,17 @@ export default function CadastroMembro() {
                   value={formData.profissao}
                   onChange={(e) => setFormData({ ...formData, profissao: e.target.value })}
                   placeholder="Sua profissão"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="necessidades_especiais">Possui alguma necessidade especial?</Label>
+                <Input
+                  id="necessidades_especiais"
+                  value={formData.necessidades_especiais}
+                  onChange={(e) => setFormData({ ...formData, necessidades_especiais: e.target.value })}
+                  placeholder="Ex: cadeirante, deficiência auditiva, etc."
                   disabled={loading}
                 />
               </div>
