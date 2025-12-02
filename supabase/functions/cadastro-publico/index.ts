@@ -11,6 +11,7 @@ interface CadastroVisitanteData {
   email?: string
   sexo?: string
   data_nascimento?: string
+  entrou_por?: string
   observacoes?: string
   aceitou_jesus?: boolean
   deseja_contato?: boolean
@@ -141,6 +142,7 @@ Deno.serve(async (req) => {
             deseja_contato: visitanteData.deseja_contato ?? true,
             sexo: visitanteData.sexo || null,
             data_nascimento: visitanteData.data_nascimento || null,
+            entrou_por: visitanteData.entrou_por || null,
             status: 'visitante',
             data_primeira_visita: new Date().toISOString(),
             data_ultima_visita: new Date().toISOString(),

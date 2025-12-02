@@ -26,10 +26,21 @@ export default function CadastroVisitante() {
     sexo: "",
     dia_nascimento: "",
     mes_nascimento: "",
+    entrou_por: "",
     observacoes: "",
     aceitou_jesus: aceitouJesus,
     deseja_contato: true,
   });
+
+  const opcoesComoConheceu = [
+    { value: "indicacao", label: "Indicação de amigo/familiar" },
+    { value: "redes_sociais", label: "Redes sociais" },
+    { value: "google", label: "Pesquisa no Google" },
+    { value: "passou_na_frente", label: "Passou na frente da igreja" },
+    { value: "evento", label: "Evento da igreja" },
+    { value: "convite_membro", label: "Convite de membro" },
+    { value: "outro", label: "Outro" },
+  ];
   const { toast } = useToast();
 
   const dias = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"));
@@ -88,6 +99,7 @@ export default function CadastroVisitante() {
             email: formData.email.trim() || null,
             sexo: formData.sexo || null,
             data_nascimento: dataNascimento,
+            entrou_por: formData.entrou_por || null,
             observacoes: formData.observacoes.trim() || null,
             aceitou_jesus: formData.aceitou_jesus,
             deseja_contato: formData.deseja_contato,
@@ -251,6 +263,24 @@ export default function CadastroVisitante() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="entrou_por">Como conheceu a igreja?</Label>
+                <Select
+                  value={formData.entrou_por}
+                  onValueChange={(value) => setFormData({ ...formData, entrou_por: value })}
+                  disabled={loading}
+                >
+                  <SelectTrigger id="entrou_por">
+                    <SelectValue placeholder="Selecione uma opção" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcoesComoConheceu.map((opcao) => (
+                      <SelectItem key={opcao.value} value={opcao.value}>{opcao.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
