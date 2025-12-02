@@ -200,24 +200,29 @@ export default function Pessoas() {
       </Card>
 
       {/* Perfis Pendentes de Aprovação */}
-      {pendentesCount > 0 && (
-        <Card>
-          <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg md:text-xl flex items-center gap-2">
-              <FileEdit className="h-5 w-5 text-primary" />
-              Perfis Pendentes
-              <Badge variant="destructive">{pendentesCount}</Badge>
-            </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => navigate('/pessoas/alteracoes-pendentes')}>
-              Ver todas
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-3 md:p-6">
+      <Card>
+        <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between">
+          <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+            <FileEdit className="h-5 w-5 text-primary" />
+            Alterações Pendentes
+            {pendentesCount > 0 && <Badge variant="destructive">{pendentesCount}</Badge>}
+          </CardTitle>
+          <Button variant="outline" size="sm" onClick={() => navigate('/pessoas/alteracoes-pendentes')}>
+            Ver histórico
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </CardHeader>
+        <CardContent className="p-3 md:p-6">
+          {pendentesCount > 0 ? (
             <PerfisPendentes />
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="text-center py-4 text-muted-foreground">
+              <p className="text-sm">Nenhuma alteração pendente de aprovação</p>
+              <p className="text-xs mt-1">Alterações externas de perfis aparecerão aqui</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Links Externos de Cadastro */}
       <LinksExternosCard />
