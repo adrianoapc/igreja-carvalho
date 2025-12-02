@@ -5,12 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Filter, Search, CalendarIcon, X } from "lucide-react";
+import { Filter, Search, CalendarIcon, X, ArrowRight } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
+import { format, subDays, subMonths, startOfMonth, endOfMonth, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { DateRange } from "react-day-picker";
 
 interface FiltrosSheetProps {
   // Período
@@ -40,6 +40,9 @@ interface FiltrosSheetProps {
   categorias: any[];
   fornecedores?: any[];
   
+  // Tipo (para terminologia correta)
+  tipoTransacao?: 'entrada' | 'saida';
+  
   // Actions
   onLimpar: () => void;
   onAplicar: () => void;
@@ -65,6 +68,7 @@ export function FiltrosSheet({
   contas,
   categorias,
   fornecedores,
+  tipoTransacao = 'saida',
   onLimpar,
   onAplicar,
 }: FiltrosSheetProps) {
@@ -78,6 +82,29 @@ export function FiltrosSheet({
   const handleLimpar = () => {
     onLimpar();
   };
+
+  // Presets de período rápido
+  const presets = [
+    { label: 'Últimos 7 dias', getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
+    { label: 'Últimos 15 dias', getValue: () => ({ from: subDays(new Date(), 15), to: new Date() }) },
+    { label: 'Últimos 30 dias', getValue: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
+    { label: 'Este mês', getValue: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
+    { label: 'Mês passado', getValue: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
+    { label: 'Últimos 3 meses', getValue: () => ({ from: subMonths(new Date(), 3), to: new Date() }) },
+  ];
+
+  const handlePresetClick = (preset: typeof presets[0]) => {
+    const range = preset.getValue();
+    setDataInicio(range.from);
+    setDataFim(range.to);
+  };
+
+  const handleRangeSelect = (range: DateRange | undefined) => {
+    setDataInicio(range?.from);
+    setDataFim(range?.to);
+  };
+
+  const statusPagoLabel = tipoTransacao === 'entrada' ? 'Recebido' : 'Pago';
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -109,80 +136,80 @@ export function FiltrosSheet({
 
           {/* Range de Data Customizado */}
           {periodo === 'customizado' && (
-            <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
-              <Label className="text-sm font-semibold">Período Customizado</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="data-inicio" className="text-xs">Data Início</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="data-inicio"
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dataInicio && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dataInicio ? format(dataInicio, "dd/MM/yy", { locale: ptBR }) : "Início"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dataInicio}
-                        onSelect={setDataInicio}
-                        locale={ptBR}
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Período Customizado</Label>
+                {(dataInicio || dataFim) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setDataInicio(undefined);
+                      setDataFim(undefined);
+                    }}
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Limpar
+                  </Button>
+                )}
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="data-fim" className="text-xs">Data Fim</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="data-fim"
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dataFim && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dataFim ? format(dataFim, "dd/MM/yy", { locale: ptBR }) : "Fim"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dataFim}
-                        onSelect={setDataFim}
-                        locale={ptBR}
-                        disabled={(date) => dataInicio ? date < dataInicio : false}
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+              {/* Período selecionado */}
+              <div className={cn(
+                "flex items-center justify-center gap-2 p-3 rounded-lg border-2 border-dashed transition-colors",
+                dataInicio && dataFim ? "border-primary/50 bg-primary/5" : "border-muted-foreground/20"
+              )}>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">De</p>
+                  <p className={cn(
+                    "font-medium text-sm",
+                    dataInicio ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {dataInicio ? format(dataInicio, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                  </p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Até</p>
+                  <p className={cn(
+                    "font-medium text-sm",
+                    dataFim ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {dataFim ? format(dataFim, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                  </p>
                 </div>
               </div>
-              {dataInicio && dataFim && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setDataInicio(undefined);
-                    setDataFim(undefined);
-                  }}
-                  className="w-full"
-                >
-                  <X className="w-3 h-3 mr-2" />
-                  Limpar datas
-                </Button>
-              )}
+
+              {/* Presets rápidos */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Atalhos rápidos</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {presets.map((preset, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetClick(preset)}
+                      className="text-xs h-8 justify-start"
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calendário Range */}
+              <div className="border rounded-lg overflow-hidden">
+                <Calendar
+                  mode="range"
+                  selected={{ from: dataInicio, to: dataFim }}
+                  onSelect={handleRangeSelect}
+                  locale={ptBR}
+                  numberOfMonths={1}
+                  className="pointer-events-auto"
+                />
+              </div>
             </div>
           )}
 
@@ -267,7 +294,7 @@ export function FiltrosSheet({
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
+                <SelectItem value="pago">{statusPagoLabel}</SelectItem>
                 <SelectItem value="atrasado">Atrasado</SelectItem>
               </SelectContent>
             </Select>
