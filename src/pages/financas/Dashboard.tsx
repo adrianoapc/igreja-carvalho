@@ -4,7 +4,7 @@ import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, PieChart } from "lucid
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth, format, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
+import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsePieChart, Pie, Cell } from "recharts";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
@@ -14,10 +14,9 @@ import { useState } from "react";
 export default function Dashboard() {
   const navigate = useNavigate();
   
-  // Estados de filtros
-  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano' | 'customizado'>('mes');
-  const [dataInicio, setDataInicio] = useState<Date | undefined>();
-  const [dataFim, setDataFim] = useState<Date | undefined>();
+  // MonthPicker states
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
   const [contaId, setContaId] = useState('all');
   const [categoriaId, setCategoriaId] = useState('all');
   const [status, setStatus] = useState('all');
@@ -27,46 +26,17 @@ export default function Dashboard() {
 
   // Calcular range de datas baseado no período
   const getDateRange = () => {
-    const hoje = new Date();
-    
-    switch (periodo) {
-      case 'hoje':
-        return {
-          inicio: startOfDay(hoje).toISOString().split('T')[0],
-          fim: endOfDay(hoje).toISOString().split('T')[0],
-        };
-      case 'semana':
-        return {
-          inicio: startOfWeek(hoje, { locale: ptBR }).toISOString().split('T')[0],
-          fim: endOfWeek(hoje, { locale: ptBR }).toISOString().split('T')[0],
-        };
-      case 'mes':
-        return {
-          inicio: startOfMonth(hoje).toISOString().split('T')[0],
-          fim: endOfMonth(hoje).toISOString().split('T')[0],
-        };
-      case 'ano':
-        return {
-          inicio: startOfYear(hoje).toISOString().split('T')[0],
-          fim: endOfYear(hoje).toISOString().split('T')[0],
-        };
-      case 'customizado':
-        if (dataInicio && dataFim) {
-          return {
-            inicio: dataInicio.toISOString().split('T')[0],
-            fim: dataFim.toISOString().split('T')[0],
-          };
-        }
-        return {
-          inicio: startOfMonth(hoje).toISOString().split('T')[0],
-          fim: endOfMonth(hoje).toISOString().split('T')[0],
-        };
-      default:
-        return {
-          inicio: startOfMonth(hoje).toISOString().split('T')[0],
-          fim: endOfMonth(hoje).toISOString().split('T')[0],
-        };
+    if (customRange) {
+      return {
+        inicio: customRange.from.toISOString().split('T')[0],
+        fim: customRange.to.toISOString().split('T')[0],
+      };
     }
+    
+    return {
+      inicio: startOfMonth(selectedMonth).toISOString().split('T')[0],
+      fim: endOfMonth(selectedMonth).toISOString().split('T')[0],
+    };
   };
 
   const dateRange = getDateRange();
@@ -212,12 +182,10 @@ export default function Dashboard() {
             </p>
           </div>
           <FiltrosSheet
-            periodo={periodo}
-            setPeriodo={setPeriodo}
-            dataInicio={dataInicio}
-            setDataInicio={setDataInicio}
-            dataFim={dataFim}
-            setDataFim={setDataFim}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
             busca=""
             setBusca={() => {}}
             contaId={contaId}
@@ -229,9 +197,8 @@ export default function Dashboard() {
             contas={contas || []}
             categorias={categorias || []}
             onLimpar={() => {
-              setPeriodo('mes');
-              setDataInicio(undefined);
-              setDataFim(undefined);
+              setSelectedMonth(new Date());
+              setCustomRange(null);
               setContaId('all');
               setCategoriaId('all');
               setStatus('all');

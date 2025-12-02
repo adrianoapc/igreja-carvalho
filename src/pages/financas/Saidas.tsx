@@ -12,7 +12,7 @@ import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function Saidas() {
@@ -20,11 +20,10 @@ export default function Saidas() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<any>(null);
-  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'ano' | 'customizado'>('mes');
   
-  // Range de data customizado
-  const [dataInicio, setDataInicio] = useState<Date | undefined>();
-  const [dataFim, setDataFim] = useState<Date | undefined>();
+  // MonthPicker states
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
   
   // Estados dos filtros
   const [busca, setBusca] = useState("");
@@ -35,30 +34,17 @@ export default function Saidas() {
 
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
-    const now = new Date();
-    
-    if (periodo === 'customizado' && dataInicio && dataFim) {
-      return { inicio: startOfDay(dataInicio), fim: endOfDay(dataFim) };
+    if (customRange) {
+      return { inicio: startOfDay(customRange.from), fim: endOfDay(customRange.to) };
     }
     
-    switch (periodo) {
-      case 'hoje':
-        return { inicio: startOfDay(now), fim: endOfDay(now) };
-      case 'semana':
-        return { inicio: startOfWeek(now, { weekStartsOn: 0 }), fim: endOfWeek(now, { weekStartsOn: 0 }) };
-      case 'mes':
-        return { inicio: startOfMonth(now), fim: endOfMonth(now) };
-      case 'ano':
-        return { inicio: startOfYear(now), fim: endOfYear(now) };
-      default:
-        return { inicio: startOfMonth(now), fim: endOfMonth(now) };
-    }
+    return { inicio: startOfMonth(selectedMonth), fim: endOfMonth(selectedMonth) };
   };
 
   const dateRange = getDateRange();
 
   const { data: transacoes, isLoading, refetch } = useQuery({
-    queryKey: ['saidas', periodo, dataInicio, dataFim],
+    queryKey: ['saidas', selectedMonth, customRange],
     queryFn: async () => {
       const dateRange = getDateRange();
       const { data, error } = await supabase
@@ -259,12 +245,10 @@ export default function Saidas() {
           </div>
           <div className="flex gap-2">
             <FiltrosSheet
-              periodo={periodo}
-              setPeriodo={setPeriodo}
-              dataInicio={dataInicio}
-              setDataInicio={setDataInicio}
-              dataFim={dataFim}
-              setDataFim={setDataFim}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
               busca={busca}
               setBusca={setBusca}
               contaId={contaFilter}
@@ -284,9 +268,8 @@ export default function Saidas() {
                 setCategoriaFilter("all");
                 setFornecedorFilter("all");
                 setStatusFilter("all");
-                setPeriodo("mes");
-                setDataInicio(undefined);
-                setDataFim(undefined);
+                setSelectedMonth(new Date());
+                setCustomRange(null);
               }}
               onAplicar={() => refetch()}
             />
@@ -316,13 +299,13 @@ export default function Saidas() {
         </div>
 
         {/* Active Filters Display */}
-        {(periodo !== 'mes' || busca || contaFilter !== 'all' || categoriaFilter !== 'all' || fornecedorFilter !== 'all' || statusFilter !== 'all') && (
+        {(customRange || busca || contaFilter !== 'all' || categoriaFilter !== 'all' || fornecedorFilter !== 'all' || statusFilter !== 'all') && (
           <div className="flex flex-wrap gap-2 mt-3">
-            {periodo !== 'mes' && (
+            {customRange && (
               <Badge variant="secondary" className="gap-1.5 pr-1">
-                Período: {periodo === 'hoje' ? 'Hoje' : periodo === 'semana' ? 'Semana' : periodo === 'ano' ? 'Ano' : 'Customizado'}
+                Período customizado
                 <button 
-                  onClick={() => setPeriodo('mes')} 
+                  onClick={() => setCustomRange(null)} 
                   className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
                 >
                   <X className="w-3 h-3" />

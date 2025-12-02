@@ -4,24 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Filter, Search, CalendarIcon, X, ArrowRight } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, subDays, subMonths, startOfMonth, endOfMonth, subWeeks } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-import { DateRange } from "react-day-picker";
+import { Filter, Search } from "lucide-react";
+import { MonthPicker } from "./MonthPicker";
 
 interface FiltrosSheetProps {
-  // Período
-  periodo: 'hoje' | 'semana' | 'mes' | 'ano' | 'customizado';
-  setPeriodo: (value: 'hoje' | 'semana' | 'mes' | 'ano' | 'customizado') => void;
+  // Mês selecionado
+  selectedMonth: Date;
+  onMonthChange: (date: Date) => void;
   
   // Range customizado
-  dataInicio?: Date;
-  setDataInicio: (date: Date | undefined) => void;
-  dataFim?: Date;
-  setDataFim: (date: Date | undefined) => void;
+  customRange?: { from: Date; to: Date } | null;
+  onCustomRangeChange?: (range: { from: Date; to: Date } | null) => void;
   
   // Filtros
   busca: string;
@@ -49,12 +42,10 @@ interface FiltrosSheetProps {
 }
 
 export function FiltrosSheet({
-  periodo,
-  setPeriodo,
-  dataInicio,
-  setDataInicio,
-  dataFim,
-  setDataFim,
+  selectedMonth,
+  onMonthChange,
+  customRange,
+  onCustomRangeChange,
   busca,
   setBusca,
   contaId,
@@ -83,27 +74,6 @@ export function FiltrosSheet({
     onLimpar();
   };
 
-  // Presets de período rápido
-  const presets = [
-    { label: 'Últimos 7 dias', getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
-    { label: 'Últimos 15 dias', getValue: () => ({ from: subDays(new Date(), 15), to: new Date() }) },
-    { label: 'Últimos 30 dias', getValue: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
-    { label: 'Este mês', getValue: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
-    { label: 'Mês passado', getValue: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
-    { label: 'Últimos 3 meses', getValue: () => ({ from: subMonths(new Date(), 3), to: new Date() }) },
-  ];
-
-  const handlePresetClick = (preset: typeof presets[0]) => {
-    const range = preset.getValue();
-    setDataInicio(range.from);
-    setDataFim(range.to);
-  };
-
-  const handleRangeSelect = (range: DateRange | undefined) => {
-    setDataInicio(range?.from);
-    setDataFim(range?.to);
-  };
-
   const statusPagoLabel = tipoTransacao === 'entrada' ? 'Recebido' : 'Pago';
 
   return (
@@ -120,98 +90,17 @@ export function FiltrosSheet({
         </SheetHeader>
 
         <div className="space-y-6 py-6">
-          {/* Período */}
+          {/* Período com MonthPicker */}
           <div className="space-y-3">
             <Label className="text-sm font-semibold">Período</Label>
-            <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as any)}>
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="hoje" className="text-xs">Hoje</TabsTrigger>
-                <TabsTrigger value="semana" className="text-xs">Semana</TabsTrigger>
-                <TabsTrigger value="mes" className="text-xs">Mês</TabsTrigger>
-                <TabsTrigger value="ano" className="text-xs">Ano</TabsTrigger>
-                <TabsTrigger value="customizado" className="text-xs">Custom</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <MonthPicker
+              selectedMonth={selectedMonth}
+              onMonthChange={onMonthChange}
+              customRange={customRange}
+              onCustomRangeChange={onCustomRangeChange}
+              className="w-full"
+            />
           </div>
-
-          {/* Range de Data Customizado */}
-          {periodo === 'customizado' && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold">Período Customizado</Label>
-                {(dataInicio || dataFim) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDataInicio(undefined);
-                      setDataFim(undefined);
-                    }}
-                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="w-3 h-3 mr-1" />
-                    Limpar
-                  </Button>
-                )}
-              </div>
-
-              {/* Período selecionado */}
-              <div className={cn(
-                "flex items-center justify-center gap-2 p-3 rounded-lg border-2 border-dashed transition-colors",
-                dataInicio && dataFim ? "border-primary/50 bg-primary/5" : "border-muted-foreground/20"
-              )}>
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-1">De</p>
-                  <p className={cn(
-                    "font-medium text-sm",
-                    dataInicio ? "text-foreground" : "text-muted-foreground"
-                  )}>
-                    {dataInicio ? format(dataInicio, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
-                  </p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Até</p>
-                  <p className={cn(
-                    "font-medium text-sm",
-                    dataFim ? "text-foreground" : "text-muted-foreground"
-                  )}>
-                    {dataFim ? format(dataFim, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Presets rápidos */}
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Atalhos rápidos</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {presets.map((preset, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePresetClick(preset)}
-                      className="text-xs h-8 justify-start"
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Calendário Range */}
-              <div className="border rounded-lg overflow-hidden">
-                <Calendar
-                  mode="range"
-                  selected={{ from: dataInicio, to: dataFim }}
-                  onSelect={handleRangeSelect}
-                  locale={ptBR}
-                  numberOfMonths={1}
-                  className="pointer-events-auto"
-                />
-              </div>
-            </div>
-          )}
 
           {/* Busca por Descrição */}
           <div className="space-y-2">
