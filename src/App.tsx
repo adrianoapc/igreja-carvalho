@@ -14,6 +14,7 @@ import Frequentadores from "./pages/pessoas/Frequentadores";
 import Membros from "./pages/pessoas/Membros";
 import Visitantes from "./pages/pessoas/Visitantes";
 import ContatosDashboard from "./pages/pessoas/Contatos";
+import AlteracoesPendentes from "./pages/pessoas/AlteracoesPendentes";
 import Kids from "./pages/Kids";
 import Intercessao from "./pages/Intercessao";
 import PedidosOracao from "./pages/intercessao/PedidosOracao";
@@ -189,6 +190,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ContatosDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pessoas/alteracoes-pendentes"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AlteracoesPendentes />
                 </MainLayout>
               </ProtectedRoute>
             }
