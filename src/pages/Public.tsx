@@ -35,7 +35,7 @@ export default function Public() {
         .from("cultos")
         .select("id, titulo, tipo, data_culto, local, tema")
         .gte("data_culto", now)
-        .in("status", ["planejado", "confirmado"])
+        .eq("status", "confirmado")
         .order("data_culto", { ascending: true })
         .limit(4);
 
