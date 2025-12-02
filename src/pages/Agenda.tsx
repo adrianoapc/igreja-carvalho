@@ -21,6 +21,7 @@ interface Culto {
   tema: string | null;
   descricao: string | null;
   pregador: string | null;
+  exibir_preletor: boolean;
 }
 
 interface CultosGrouped {
@@ -136,7 +137,7 @@ export default function Agenda() {
       
       const { data, error } = await supabase
         .from("cultos")
-        .select("id, titulo, tipo, data_culto, local, endereco, tema, descricao, pregador")
+        .select("id, titulo, tipo, data_culto, local, endereco, tema, descricao, pregador, exibir_preletor")
         .gte("data_culto", today.toISOString())
         .lte("data_culto", threeMonthsLater.toISOString())
         .eq("status", "confirmado")

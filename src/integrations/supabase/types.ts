@@ -404,6 +404,7 @@ export type Database = {
           descricao: string | null
           duracao_minutos: number | null
           endereco: string | null
+          exibir_preletor: boolean
           id: string
           local: string | null
           observacoes: string | null
@@ -421,6 +422,7 @@ export type Database = {
           descricao?: string | null
           duracao_minutos?: number | null
           endereco?: string | null
+          exibir_preletor?: boolean
           id?: string
           local?: string | null
           observacoes?: string | null
@@ -438,6 +440,7 @@ export type Database = {
           descricao?: string | null
           duracao_minutos?: number | null
           endereco?: string | null
+          exibir_preletor?: boolean
           id?: string
           local?: string | null
           observacoes?: string | null

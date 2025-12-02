@@ -16,6 +16,7 @@ interface Culto {
   tema: string | null;
   descricao: string | null;
   pregador: string | null;
+  exibir_preletor: boolean;
 }
 
 interface EventoDetailsDialogProps {
@@ -67,7 +68,7 @@ export function EventoDetailsDialog({ evento, open, onOpenChange }: EventoDetail
     const locationText = evento.local ? `📍 ${evento.local}` : "";
     const addressText = evento.endereco ? `\n${evento.endereco}` : "";
     const themeText = evento.tema ? `\n🎯 Tema: ${evento.tema}` : "";
-    const preacherText = evento.pregador ? `\n🎤 Preletor: ${evento.pregador}` : "";
+    const preacherText = evento.pregador && evento.exibir_preletor ? `\n🎤 Preletor: ${evento.pregador}` : "";
     
     const message = `🙏 *${evento.titulo}*
 
@@ -155,7 +156,7 @@ ${locationText}${addressText}${themeText}${preacherText}
           )}
 
           {/* Preletor */}
-          {evento.pregador && (
+          {evento.pregador && evento.exibir_preletor && (
             <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
               <User className="w-5 h-5 text-primary mt-0.5" />
               <div>
