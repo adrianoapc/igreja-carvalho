@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Clock, MapPin, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO, isSameMonth, isSameDay, startOfWeek, endOfWeek, addDays, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -66,6 +66,10 @@ export default function Agenda() {
       case "celebracao": return "Celebração";
       default: return tipo;
     }
+  };
+
+  const getGoogleMapsUrl = (location: string) => {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
   };
 
   const getCultosForDate = (date: Date) => {
@@ -173,10 +177,17 @@ export default function Agenda() {
                           {format(parseISO(culto.data_culto), "HH:mm")}
                         </div>
                         {culto.local && (
-                          <div className="flex items-center gap-1">
+                          <a 
+                            href={getGoogleMapsUrl(culto.local)} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
                             <MapPin className="w-3 h-3" />
                             {culto.local}
-                          </div>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
                         )}
                       </div>
                     </CardContent>
@@ -238,10 +249,17 @@ export default function Agenda() {
                             {format(parseISO(culto.data_culto), "HH:mm")}
                           </div>
                           {culto.local && (
-                            <div className="flex items-center gap-1 truncate">
+                            <a 
+                              href={getGoogleMapsUrl(culto.local)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1 truncate text-primary hover:underline"
+                            >
                               <MapPin className="w-3 h-3 shrink-0" />
                               <span className="truncate">{culto.local}</span>
-                            </div>
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
                           )}
                         </div>
                       </div>
