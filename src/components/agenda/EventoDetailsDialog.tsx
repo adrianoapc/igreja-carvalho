@@ -67,7 +67,7 @@ export function EventoDetailsDialog({ evento, open, onOpenChange }: EventoDetail
     const locationText = evento.local ? `📍 ${evento.local}` : "";
     const addressText = evento.endereco ? `\n${evento.endereco}` : "";
     const themeText = evento.tema ? `\n🎯 Tema: ${evento.tema}` : "";
-    const preacherText = evento.pregador ? `\n🎤 ${evento.pregador}` : "";
+    const preacherText = evento.pregador ? `\n🎤 Preletor: ${evento.pregador}` : "";
     
     const message = `🙏 *${evento.titulo}*
 
@@ -154,12 +154,12 @@ ${locationText}${addressText}${themeText}${preacherText}
             </div>
           )}
 
-          {/* Preacher */}
+          {/* Preletor */}
           {evento.pregador && (
             <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
               <User className="w-5 h-5 text-primary mt-0.5" />
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Pregador</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Preletor</p>
                 <p className="font-medium">{evento.pregador}</p>
               </div>
             </div>
