@@ -1,6 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, ChevronDown, ChevronUp, TrendingUp, TrendingDown, List } from "lucide-react";
+import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, TrendingUp, TrendingDown, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,7 @@ export default function Contas() {
   const [contaDialogOpen, setContaDialogOpen] = useState(false);
   const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<any>(null);
-  const [expandedContaId, setExpandedContaId] = useState<string | null>(null);
+  const [selectedContaId, setSelectedContaId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
@@ -38,11 +38,8 @@ export default function Contas() {
   });
 
   const { data: transacoes, isLoading: isLoadingTransacoes } = useQuery({
-    queryKey: ['transacoes-conta', expandedContaId, selectedMonth, customRange],
-    enabled: !!expandedContaId,
+    queryKey: ['transacoes-contas', selectedContaId, selectedMonth, customRange],
     queryFn: async () => {
-      if (!expandedContaId) return [];
-      
       const startDate = customRange 
         ? format(customRange.from, 'yyyy-MM-dd')
         : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
@@ -50,19 +47,24 @@ export default function Contas() {
         ? format(customRange.to, 'yyyy-MM-dd')
         : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('transacoes_financeiras')
         .select(`
           *,
           categorias_financeiras(nome, cor),
-          fornecedores(nome)
+          fornecedores(nome),
+          contas(nome)
         `)
-        .eq('conta_id', expandedContaId)
         .eq('status', 'pago')
         .gte('data_pagamento', startDate)
         .lte('data_pagamento', endDate)
         .order('data_pagamento', { ascending: false });
       
+      if (selectedContaId) {
+        query = query.eq('conta_id', selectedContaId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -70,10 +72,10 @@ export default function Contas() {
 
   const getTipoIcon = (tipo: string) => {
     switch (tipo) {
-      case 'bancaria': return <Landmark className="w-5 h-5" />;
-      case 'fisica': return <Wallet className="w-5 h-5" />;
-      case 'virtual': return <Building2 className="w-5 h-5" />;
-      default: return <Wallet className="w-5 h-5" />;
+      case 'bancaria': return <Landmark className="w-4 h-4" />;
+      case 'fisica': return <Wallet className="w-4 h-4" />;
+      case 'virtual': return <Building2 className="w-4 h-4" />;
+      default: return <Wallet className="w-4 h-4" />;
     }
   };
 
@@ -93,12 +95,57 @@ export default function Contas() {
     }).format(value);
   };
 
-  const toggleExpanded = (contaId: string) => {
-    setExpandedContaId(expandedContaId === contaId ? null : contaId);
-  };
+  const totalEntradas = transacoes?.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalSaidas = transacoes?.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const saldoPeriodo = totalEntradas - totalSaidas;
+
+  const renderTransactionList = (filteredTransacoes: any[]) => (
+    <div className="space-y-2">
+      {isLoadingTransacoes ? (
+        <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+      ) : filteredTransacoes && filteredTransacoes.length > 0 ? (
+        filteredTransacoes.map((t) => (
+          <div 
+            key={t.id} 
+            className={cn(
+              "flex items-center justify-between p-3 rounded-lg",
+              t.tipo === 'entrada' ? "bg-green-50 dark:bg-green-950/20" : "bg-red-50 dark:bg-red-950/20"
+            )}
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{t.descricao}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                  {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
+                </p>
+                {!selectedContaId && t.contas && (
+                  <Badge variant="secondary" className="text-xs">
+                    {t.contas.nome}
+                  </Badge>
+                )}
+                {t.categorias_financeiras && (
+                  <Badge variant="outline" className="text-xs">
+                    {t.categorias_financeiras.nome}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="text-right ml-2">
+              <p className={`text-sm font-bold ${t.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
+                {t.tipo === 'entrada' ? '+' : '-'} {formatCurrency(Number(t.valor))}
+              </p>
+            </div>
+          </div>
+        ))
+      ) : (
+        <p className="text-sm text-muted-foreground text-center py-4">Nenhum lançamento encontrado</p>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-3">
         <Button
           variant="ghost"
@@ -128,6 +175,7 @@ export default function Contas() {
         </div>
       </div>
 
+      {/* Cards de Contas */}
       {isLoading ? (
         <Card className="shadow-soft">
           <CardContent className="p-6">
@@ -135,243 +183,70 @@ export default function Contas() {
           </CardContent>
         </Card>
       ) : contas && contas.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {contas.map((conta) => (
-            <Card key={conta.id} className="shadow-soft">
-              <CardHeader className="p-4 md:p-6 pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1">
+            <Card 
+              key={conta.id} 
+              className={cn(
+                "shadow-soft cursor-pointer transition-all hover:shadow-md",
+                selectedContaId === conta.id && "ring-2 ring-primary"
+              )}
+              onClick={() => setSelectedContaId(selectedContaId === conta.id ? null : conta.id)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {getTipoIcon(conta.tipo)}
-                    <CardTitle className="text-base md:text-lg">{conta.nome}</CardTitle>
-                    <Badge variant="secondary" className="text-xs">
-                      {getTipoLabel(conta.tipo)}
-                    </Badge>
+                    <span className="text-sm font-medium truncate">{conta.nome}</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => {
+                      className="h-7 w-7 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedConta(conta);
                         setAjusteSaldoDialogOpen(true);
                       }}
                     >
-                      <Settings className="w-4 h-4" />
+                      <Settings className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => {
+                      className="h-7 w-7 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedConta(conta);
                         setContaDialogOpen(true);
                       }}
                     >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleExpanded(conta.id)}
-                    >
-                      {expandedContaId === conta.id ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
+                      <Edit className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-4 md:p-6 pt-0">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Saldo Atual</p>
-                      <p className="text-xl md:text-2xl font-bold text-foreground">
-                        {formatCurrency(conta.saldo_atual)}
-                      </p>
-                    </div>
-                    {conta.banco && (
-                      <div className="text-xs text-muted-foreground text-right">
-                        <p>{conta.banco}</p>
-                        {conta.agencia && conta.conta_numero && (
-                          <p>Ag: {conta.agencia} | CC: {conta.conta_numero}</p>
-                        )}
-                      </div>
-                    )}
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Saldo Atual</p>
+                    <p className={cn(
+                      "text-lg font-bold",
+                      conta.saldo_atual >= 0 ? "text-foreground" : "text-destructive"
+                    )}>
+                      {formatCurrency(conta.saldo_atual)}
+                    </p>
                   </div>
-
-                  {expandedContaId === conta.id && (
-                    <div className="border-t pt-4 mt-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold">Lançamentos</h3>
-                        <MonthPicker
-                          selectedMonth={selectedMonth}
-                          onMonthChange={setSelectedMonth}
-                          customRange={customRange}
-                          onCustomRangeChange={setCustomRange}
-                        />
-                      </div>
-
-                      {/* Totalizador */}
-                      {transacoes && transacoes.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Entradas</p>
-                            <p className="text-sm font-bold text-green-600">
-                              {formatCurrency(
-                                transacoes
-                                  .filter(t => t.tipo === 'entrada')
-                                  .reduce((sum, t) => sum + Number(t.valor), 0)
-                              )}
-                            </p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Saídas</p>
-                            <p className="text-sm font-bold text-red-600">
-                              {formatCurrency(
-                                transacoes
-                                  .filter(t => t.tipo === 'saida')
-                                  .reduce((sum, t) => sum + Number(t.valor), 0)
-                              )}
-                            </p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Saldo</p>
-                            <p className={cn(
-                              "text-sm font-bold",
-                              (transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0) -
-                               transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0)) >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                            )}>
-                              {formatCurrency(
-                                transacoes
-                                  .filter(t => t.tipo === 'entrada')
-                                  .reduce((sum, t) => sum + Number(t.valor), 0) -
-                                transacoes
-                                  .filter(t => t.tipo === 'saida')
-                                  .reduce((sum, t) => sum + Number(t.valor), 0)
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      <Tabs defaultValue="todos" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 mb-4">
-                          <TabsTrigger value="todos" className="text-xs">
-                            <List className="w-3 h-3 mr-1" />
-                            Todos
-                          </TabsTrigger>
-                          <TabsTrigger value="entradas" className="text-xs">
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            Entradas
-                          </TabsTrigger>
-                          <TabsTrigger value="saidas" className="text-xs">
-                            <TrendingDown className="w-3 h-3 mr-1" />
-                            Saídas
-                          </TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="todos" className="space-y-2 max-h-96 overflow-y-auto">
-                          {isLoadingTransacoes ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
-                          ) : transacoes && transacoes.length > 0 ? (
-                            transacoes.map((t) => (
-                              <div key={t.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{t.descricao}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <p className="text-xs text-muted-foreground">
-                                      {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
-                                    </p>
-                                    {t.categorias_financeiras && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {t.categorias_financeiras.nome}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-right ml-2">
-                                  <p className={`text-sm font-bold ${t.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {t.tipo === 'entrada' ? '+' : '-'} {formatCurrency(Number(t.valor))}
-                                  </p>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">Nenhum lançamento encontrado</p>
-                          )}
-                        </TabsContent>
-
-                        <TabsContent value="entradas" className="space-y-2 max-h-96 overflow-y-auto">
-                          {isLoadingTransacoes ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
-                          ) : transacoes && transacoes.filter(t => t.tipo === 'entrada').length > 0 ? (
-                            transacoes.filter(t => t.tipo === 'entrada').map((t) => (
-                              <div key={t.id} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{t.descricao}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <p className="text-xs text-muted-foreground">
-                                      {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
-                                    </p>
-                                    {t.categorias_financeiras && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {t.categorias_financeiras.nome}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-right ml-2">
-                                  <p className="text-sm font-bold text-green-600">
-                                    + {formatCurrency(Number(t.valor))}
-                                  </p>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">Nenhuma entrada encontrada</p>
-                          )}
-                        </TabsContent>
-
-                        <TabsContent value="saidas" className="space-y-2 max-h-96 overflow-y-auto">
-                          {isLoadingTransacoes ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
-                          ) : transacoes && transacoes.filter(t => t.tipo === 'saida').length > 0 ? (
-                            transacoes.filter(t => t.tipo === 'saida').map((t) => (
-                              <div key={t.id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{t.descricao}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <p className="text-xs text-muted-foreground">
-                                      {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
-                                    </p>
-                                    {t.categorias_financeiras && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {t.categorias_financeiras.nome}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-right ml-2">
-                                  <p className="text-sm font-bold text-red-600">
-                                    - {formatCurrency(Number(t.valor))}
-                                  </p>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">Nenhuma saída encontrada</p>
-                          )}
-                        </TabsContent>
-                      </Tabs>
-                    </div>
-                  )}
+                  <Badge variant="outline" className="text-xs">
+                    {getTipoLabel(conta.tipo)}
+                  </Badge>
                 </div>
+
+                {conta.banco && (
+                  <p className="text-xs text-muted-foreground mt-2 truncate">
+                    {conta.banco} {conta.agencia && `| Ag: ${conta.agencia}`}
+                  </p>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -379,26 +254,109 @@ export default function Contas() {
       ) : (
         <Card className="shadow-soft">
           <CardContent className="p-6">
-            <p className="text-sm md:text-base text-muted-foreground text-center">
-              Nenhuma conta cadastrada ainda. Configure contas bancárias, caixas físicos ou virtuais.
-            </p>
+            <p className="text-center text-muted-foreground">Nenhuma conta cadastrada</p>
           </CardContent>
         </Card>
       )}
 
-      <ContaDialog
+      {/* Seção de Lançamentos */}
+      <Card className="shadow-soft">
+        <CardContent className="p-4 md:p-6">
+          {/* Filtros */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">Lançamentos</h2>
+              {selectedContaId && (
+                <Badge variant="secondary" className="text-xs">
+                  {contas?.find(c => c.id === selectedContaId)?.nome}
+                  <button 
+                    className="ml-1 hover:text-destructive"
+                    onClick={() => setSelectedContaId(null)}
+                  >
+                    ×
+                  </button>
+                </Badge>
+              )}
+            </div>
+            <MonthPicker
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+            />
+          </div>
+
+          {/* Totalizador */}
+          {transacoes && transacoes.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-1">Entradas</p>
+                <p className="text-sm font-bold text-green-600">
+                  {formatCurrency(totalEntradas)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-1">Saídas</p>
+                <p className="text-sm font-bold text-red-600">
+                  {formatCurrency(totalSaidas)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-1">Saldo</p>
+                <p className={cn(
+                  "text-sm font-bold",
+                  saldoPeriodo >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {formatCurrency(saldoPeriodo)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Tabs de Lançamentos */}
+          <Tabs defaultValue="todos" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="todos" className="text-xs">
+                <List className="w-3 h-3 mr-1" />
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="entradas" className="text-xs">
+                <TrendingUp className="w-3 h-3 mr-1" />
+                Entradas
+              </TabsTrigger>
+              <TabsTrigger value="saidas" className="text-xs">
+                <TrendingDown className="w-3 h-3 mr-1" />
+                Saídas
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="todos" className="max-h-[500px] overflow-y-auto">
+              {renderTransactionList(transacoes || [])}
+            </TabsContent>
+
+            <TabsContent value="entradas" className="max-h-[500px] overflow-y-auto">
+              {renderTransactionList(transacoes?.filter(t => t.tipo === 'entrada') || [])}
+            </TabsContent>
+
+            <TabsContent value="saidas" className="max-h-[500px] overflow-y-auto">
+              {renderTransactionList(transacoes?.filter(t => t.tipo === 'saida') || [])}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Dialogs */}
+      <ContaDialog 
         open={contaDialogOpen}
         onOpenChange={setContaDialogOpen}
         conta={selectedConta}
       />
 
-      {selectedConta && (
-        <AjusteSaldoDialog
-          open={ajusteSaldoDialogOpen}
-          onOpenChange={setAjusteSaldoDialogOpen}
-          conta={selectedConta}
-        />
-      )}
+      <AjusteSaldoDialog
+        open={ajusteSaldoDialogOpen}
+        onOpenChange={setAjusteSaldoDialogOpen}
+        conta={selectedConta}
+      />
     </div>
   );
 }
