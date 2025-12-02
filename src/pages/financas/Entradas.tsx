@@ -255,6 +255,7 @@ export default function Entradas() {
               setStatus={setStatusFilter}
               contas={contas || []}
               categorias={categorias || []}
+              tipoTransacao="entrada"
               onLimpar={() => {
                 setBusca("");
                 setContaFilter("all");
