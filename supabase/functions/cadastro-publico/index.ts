@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
       
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, bairro, estado, endereco, profissao')
+        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, bairro, estado, endereco, profissao, cpf, rg, data_batismo')
         .eq('email', email.trim().toLowerCase())
         .eq('status', 'membro')
         .single()
@@ -205,37 +205,104 @@ Deno.serve(async (req) => {
         )
       }
       
+      // Buscar dados atuais do perfil
+      const { data: currentProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', membroData.id)
+        .eq('status', 'membro')
+        .single()
+      
+      if (fetchError || !currentProfile) {
+        return new Response(
+          JSON.stringify({ error: 'Membro não encontrado' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
       // Normalizar telefone e CEP
       const telefoneNormalizado = membroData.telefone?.replace(/\D/g, '') || null
       const cepNormalizado = membroData.cep?.replace(/\D/g, '') || null
       
-      const { data: updated, error } = await supabase
-        .from('profiles')
-        .update({
-          nome: membroData.nome.trim(),
-          telefone: telefoneNormalizado,
-          sexo: membroData.sexo || null,
-          data_nascimento: membroData.data_nascimento || null,
-          estado_civil: membroData.estado_civil || null,
-          cep: cepNormalizado,
-          cidade: membroData.cidade?.trim() || null,
-          bairro: membroData.bairro?.trim() || null,
-          estado: membroData.estado || null,
-          endereco: membroData.endereco?.trim() || null,
-          profissao: membroData.profissao?.trim() || null,
-          updated_at: new Date().toISOString(),
+      // Preparar dados novos
+      const dadosNovos = {
+        nome: membroData.nome.trim(),
+        telefone: telefoneNormalizado,
+        sexo: membroData.sexo || null,
+        data_nascimento: membroData.data_nascimento || null,
+        estado_civil: membroData.estado_civil || null,
+        cep: cepNormalizado,
+        cidade: membroData.cidade?.trim() || null,
+        bairro: membroData.bairro?.trim() || null,
+        estado: membroData.estado || null,
+        endereco: membroData.endereco?.trim() || null,
+        profissao: membroData.profissao?.trim() || null,
+      }
+      
+      // Preparar dados antigos (apenas os campos que serão comparados)
+      const dadosAntigos = {
+        nome: currentProfile.nome,
+        telefone: currentProfile.telefone,
+        sexo: currentProfile.sexo,
+        data_nascimento: currentProfile.data_nascimento,
+        estado_civil: currentProfile.estado_civil,
+        cep: currentProfile.cep,
+        cidade: currentProfile.cidade,
+        bairro: currentProfile.bairro,
+        estado: currentProfile.estado,
+        endereco: currentProfile.endereco,
+        profissao: currentProfile.profissao,
+      }
+      
+      // Verificar se há alterações reais
+      const hasChanges = Object.keys(dadosNovos).some(key => {
+        const novoValor = dadosNovos[key as keyof typeof dadosNovos]
+        const antigoValor = dadosAntigos[key as keyof typeof dadosAntigos]
+        return novoValor !== antigoValor
+      })
+      
+      if (!hasChanges) {
+        return new Response(
+          JSON.stringify({ success: true, message: 'Nenhuma alteração detectada', pending: false }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      // Inserir na tabela de alterações pendentes
+      const { data: pendingChange, error: insertError } = await supabase
+        .from('alteracoes_perfil_pendentes')
+        .insert({
+          profile_id: membroData.id,
+          dados_novos: dadosNovos,
+          dados_antigos: dadosAntigos,
+          status: 'pendente',
         })
-        .eq('id', membroData.id)
-        .eq('status', 'membro')
         .select()
         .single()
       
-      if (error) throw error
+      if (insertError) throw insertError
       
-      console.log(`[cadastro-publico] Membro atualizado: ${updated.nome}`)
+      console.log(`[cadastro-publico] Alteração pendente criada para: ${currentProfile.nome}`)
+      
+      // Notificar admins sobre nova alteração pendente
+      await supabase.rpc('notify_admins', {
+        p_title: 'Nova Alteração de Perfil Pendente',
+        p_message: `${currentProfile.nome} enviou uma atualização de cadastro via link externo que precisa ser aprovada.`,
+        p_type: 'alteracao_perfil_pendente',
+        p_related_user_id: currentProfile.user_id,
+        p_metadata: {
+          profile_id: membroData.id,
+          profile_name: currentProfile.nome,
+          pending_change_id: pendingChange.id
+        }
+      })
       
       return new Response(
-        JSON.stringify({ success: true, data: updated }),
+        JSON.stringify({ 
+          success: true, 
+          message: 'Sua solicitação foi enviada e será analisada pela secretaria da igreja.',
+          pending: true
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

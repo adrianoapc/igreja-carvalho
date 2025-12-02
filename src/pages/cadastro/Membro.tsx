@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CheckCircle, Search, ArrowLeft } from "lucide-react";
 import InputMask from "react-input-mask";
 
-type Step = "search" | "form" | "success";
+type Step = "search" | "form" | "success" | "pending";
 
 export default function CadastroMembro() {
   const [step, setStep] = useState<Step>("search");
@@ -174,11 +174,20 @@ export default function CadastroMembro() {
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
 
-      setStep("success");
-      toast({
-        title: "Cadastro atualizado!",
-        description: "Seus dados foram atualizados com sucesso.",
-      });
+      // Verificar se é uma alteração pendente ou atualização direta
+      if (result?.pending) {
+        setStep("pending");
+        toast({
+          title: "Solicitação enviada!",
+          description: "Sua atualização será analisada pela secretaria.",
+        });
+      } else {
+        setStep("success");
+        toast({
+          title: "Sem alterações",
+          description: result?.message || "Nenhuma alteração detectada.",
+        });
+      }
     } catch (error) {
       console.error("Erro ao atualizar perfil:", error);
       toast({
@@ -191,6 +200,32 @@ export default function CadastroMembro() {
     }
   };
 
+  if (step === "pending") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <PublicHeader showBackButton backTo="/cadastro" />
+        
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md shadow-soft text-center">
+            <CardContent className="pt-8 pb-8">
+              <CheckCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Solicitação enviada!
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                Sua atualização foi enviada e será analisada pela secretaria da igreja. 
+                Você será notificado quando suas alterações forem aprovadas.
+              </p>
+              <Button onClick={() => window.location.href = "/public"}>
+                Voltar para o início
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (step === "success") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -201,10 +236,10 @@ export default function CadastroMembro() {
             <CardContent className="pt-8 pb-8">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                Cadastro atualizado!
+                Tudo certo!
               </h2>
               <p className="text-muted-foreground mb-6">
-                Seus dados foram atualizados com sucesso. Obrigado por manter seu cadastro em dia!
+                Seu cadastro está atualizado. Obrigado por manter seus dados em dia!
               </p>
               <Button onClick={() => window.location.href = "/public"}>
                 Voltar para o início

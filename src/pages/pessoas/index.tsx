@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight } from "lucide-react";
+import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight, FileEdit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboard";
 import { LinksExternosCard } from "@/components/pessoas/LinksExternosCard";
+import { PerfisPendentes } from "@/components/pessoas/PerfisPendentes";
 
 export default function Pessoas() {
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ export default function Pessoas() {
   ]);
 
   const [contatosCount, setContatosCount] = useState(0);
+  const [pendentesCount, setPendentesCount] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -77,6 +79,14 @@ export default function Pessoas() {
           .in("status", ["agendado", "pendente"]);
 
         setContatosCount(count || 0);
+
+        // Buscar alterações pendentes
+        const { count: pendentes } = await supabase
+          .from("alteracoes_perfil_pendentes")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pendente");
+
+        setPendentesCount(pendentes || 0);
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
       }
@@ -188,6 +198,22 @@ export default function Pessoas() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Perfis Pendentes de Aprovação */}
+      {pendentesCount > 0 && (
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+              <FileEdit className="h-5 w-5 text-primary" />
+              Perfis Pendentes
+              <Badge variant="destructive">{pendentesCount}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 md:p-6">
+            <PerfisPendentes />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Links Externos de Cadastro */}
       <LinksExternosCard />
