@@ -1,149 +1,319 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Calendar, MessageSquare, BookOpen, Image, LogIn, Download } from "lucide-react";
+import { Calendar, BookOpen, LogIn, Download, ChevronRight, Clock, MapPin, Users } from "lucide-react";
 import BannerCarousel from "@/components/BannerCarousel";
+import { supabase } from "@/integrations/supabase/client";
+import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import logoCarvalho from "@/assets/logo-carvalho.png";
+
+interface Culto {
+  id: string;
+  titulo: string;
+  tipo: string;
+  data_culto: string;
+  local: string | null;
+  tema: string | null;
+}
 
 export default function Public() {
   const navigate = useNavigate();
+  const [proximosCultos, setProximosCultos] = useState<Culto[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const publicFeatures = [
-    {
-      icon: <Calendar className="w-8 h-8" />,
-      title: "Agenda",
-      description: "Veja os próximos cultos e eventos",
-      available: true,
-      path: "/agenda"
-    },
-    {
-      icon: <MessageSquare className="w-8 h-8" />,
-      title: "Mensagens",
-      description: "Ouça as últimas mensagens e pregações",
-      available: false,
-      path: ""
-    },
-    {
-      icon: <Image className="w-8 h-8" />,
-      title: "Anúncios",
-      description: "Fique por dentro dos avisos e novidades",
-      available: true,
-      path: "/announcements"
-    },
-    {
-      icon: <BookOpen className="w-8 h-8" />,
-      title: "Bíblia",
-      description: "Leia e estude a palavra de Deus",
-      available: true,
-      path: "/biblia"
+  useEffect(() => {
+    fetchProximosCultos();
+  }, []);
+
+  const fetchProximosCultos = async () => {
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("cultos")
+        .select("id, titulo, tipo, data_culto, local, tema")
+        .gte("data_culto", now)
+        .eq("status", "agendado")
+        .order("data_culto", { ascending: true })
+        .limit(4);
+
+      if (error) throw error;
+      setProximosCultos(data || []);
+    } catch (error) {
+      console.error("Error fetching cultos:", error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const formatCultoDate = (dateString: string) => {
+    const date = parseISO(dateString);
+    if (isToday(date)) return "Hoje";
+    if (isTomorrow(date)) return "Amanhã";
+    if (isThisWeek(date)) return format(date, "EEEE", { locale: ptBR });
+    return format(date, "dd 'de' MMMM", { locale: ptBR });
+  };
+
+  const formatCultoTime = (dateString: string) => {
+    return format(parseISO(dateString), "HH:mm");
+  };
+
+  const getTipoColor = (tipo: string) => {
+    switch (tipo) {
+      case "culto_domingo": return "bg-primary/10 text-primary";
+      case "culto_semana": return "bg-accent text-accent-foreground";
+      case "evento_especial": return "bg-destructive/10 text-destructive";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getTipoLabel = (tipo: string) => {
+    switch (tipo) {
+      case "culto_domingo": return "Culto Dominical";
+      case "culto_semana": return "Culto de Semana";
+      case "evento_especial": return "Evento Especial";
+      case "celebracao": return "Celebração";
+      default: return tipo;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-foreground mb-4">
-            Bem-vindo à Nossa Igreja
-          </h1>
-          <p className="text-muted-foreground text-lg mb-6">
-            Explore nossos recursos públicos ou faça login para acessar mais funcionalidades
-          </p>
-          <div className="flex gap-4 justify-center">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/20">
+      {/* Header discreto com login */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={logoCarvalho} alt="Igreja Carvalho" className="h-10 w-auto" />
+            <span className="font-semibold text-foreground hidden sm:block">Igreja Carvalho</span>
+          </div>
+          <div className="flex items-center gap-2">
             <Button 
-              onClick={() => navigate("/auth")}
-              className="bg-gradient-primary shadow-soft"
-              size="lg"
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate("/install")}
+              className="text-muted-foreground hover:text-foreground"
             >
-              <LogIn className="w-5 h-5 mr-2" />
-              Fazer Login / Cadastrar
+              <Download className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline">Instalar</span>
             </Button>
             <Button 
-              onClick={() => navigate("/install")}
-              variant="outline"
-              size="lg"
+              onClick={() => navigate("/auth")}
+              size="sm"
+              className="bg-primary hover:bg-primary/90"
             >
-              <Download className="w-5 h-5 mr-2" />
-              Instalar App
+              <LogIn className="w-4 h-4 mr-1" />
+              Entrar
             </Button>
           </div>
         </div>
+      </header>
 
-        {/* Banner Carousel */}
-        <div className="mb-12">
-          <BannerCarousel />
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {publicFeatures.map((feature, index) => (
-            <Card key={index} className="shadow-soft hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="w-16 h-16 rounded-full bg-gradient-accent flex items-center justify-center mb-4 text-accent-foreground">
-                  {feature.icon}
-                </div>
-                <CardTitle className="text-xl">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">{feature.description}</p>
-                {feature.available ? (
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => navigate(feature.path)}
-                  >
-                    Acessar
-                  </Button>
-                ) : (
-                  <span className="text-sm text-muted-foreground italic">
-                    Em breve
-                  </span>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Info Section */}
-        <Card className="shadow-soft bg-secondary">
-          <CardHeader>
-            <CardTitle className="text-2xl">Seja um Membro</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              Como membro, você terá acesso a recursos exclusivos como:
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/10" />
+        <div className="container mx-auto px-4 py-12 md:py-16 relative">
+          <div className="text-center max-w-2xl mx-auto">
+            <div className="mb-6 animate-fade-in">
+              <img 
+                src={logoCarvalho} 
+                alt="Igreja Carvalho" 
+                className="h-24 md:h-32 w-auto mx-auto drop-shadow-lg"
+              />
+            </div>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 animate-fade-in" style={{ animationDelay: "0.1s" }}>
+              Bem-vindo à <span className="text-primary">Igreja Carvalho</span>
+            </h1>
+            <p className="text-lg text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: "0.2s" }}>
+              Um lugar de fé, comunhão e propósito. Venha fazer parte da nossa família!
             </p>
-            <ul className="space-y-2 mb-6">
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Gestão de membros e visitantes</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Controle de kids e famílias</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Envio de pedidos de oração e testemunhos</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Acesso a ensinamentos exclusivos</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>E muito mais!</span>
-              </li>
-            </ul>
-            <Button 
-              onClick={() => navigate("/auth")}
-              className="bg-gradient-primary"
-            >
-              Cadastrar como Membro
-            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Banner Carousel */}
+      <section className="pb-8">
+        <BannerCarousel />
+      </section>
+
+      {/* Quick Actions */}
+      <section className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2 bg-card hover:bg-accent/50 border-border/50 shadow-sm hover:shadow-md transition-all"
+            onClick={() => navigate("/agenda")}
+          >
+            <Calendar className="w-6 h-6 text-primary" />
+            <span className="font-medium">Agenda</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2 bg-card hover:bg-accent/50 border-border/50 shadow-sm hover:shadow-md transition-all"
+            onClick={() => navigate("/announcements")}
+          >
+            <Users className="w-6 h-6 text-primary" />
+            <span className="font-medium">Anúncios</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2 bg-card hover:bg-accent/50 border-border/50 shadow-sm hover:shadow-md transition-all"
+            onClick={() => navigate("/biblia")}
+          >
+            <BookOpen className="w-6 h-6 text-primary" />
+            <span className="font-medium">Bíblia</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2 bg-card hover:bg-accent/50 border-border/50 shadow-sm hover:shadow-md transition-all"
+            onClick={() => navigate("/auth")}
+          >
+            <LogIn className="w-6 h-6 text-primary" />
+            <span className="font-medium">Área do Membro</span>
+          </Button>
+        </div>
+      </section>
+
+      {/* Próximos Cultos */}
+      <section className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Próximos Cultos</h2>
+            <p className="text-muted-foreground text-sm">Venha celebrar conosco</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/agenda")} className="text-primary">
+            Ver todos
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-4">
+                  <div className="h-4 bg-muted rounded w-1/3 mb-3" />
+                  <div className="h-6 bg-muted rounded w-2/3 mb-2" />
+                  <div className="h-4 bg-muted rounded w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : proximosCultos.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {proximosCultos.map((culto, index) => (
+              <Card 
+                key={culto.id} 
+                className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50 animate-fade-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-2 ${getTipoColor(culto.tipo)}`}>
+                        {getTipoLabel(culto.tipo)}
+                      </span>
+                      <h3 className="font-semibold text-foreground text-lg truncate">
+                        {culto.titulo}
+                      </h3>
+                      {culto.tema && (
+                        <p className="text-muted-foreground text-sm truncate mt-1">
+                          {culto.tema}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-primary font-bold text-lg">
+                        {formatCultoDate(culto.data_culto)}
+                      </p>
+                      <div className="flex items-center justify-end gap-1 text-muted-foreground text-sm">
+                        <Clock className="w-3 h-3" />
+                        {formatCultoTime(culto.data_culto)}
+                      </div>
+                    </div>
+                  </div>
+                  {culto.local && (
+                    <div className="flex items-center gap-1 text-muted-foreground text-sm mt-3 pt-3 border-t border-border/50">
+                      <MapPin className="w-3 h-3" />
+                      <span className="truncate">{culto.local}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="p-8 text-center">
+              <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">Nenhum culto agendado no momento</p>
+              <p className="text-sm text-muted-foreground mt-1">Em breve novos eventos serão adicionados</p>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {/* Bíblia CTA */}
+      <section className="container mx-auto px-4 py-8">
+        <Card 
+          className="overflow-hidden bg-gradient-to-br from-primary/10 via-card to-accent/10 border-primary/20 cursor-pointer hover:shadow-lg transition-all"
+          onClick={() => navigate("/biblia")}
+        >
+          <CardContent className="p-6 md:p-8 flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <BookOpen className="w-8 h-8 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold text-foreground mb-1">Leia a Palavra</h3>
+              <p className="text-muted-foreground text-sm">
+                Acesse a Bíblia online e fortaleça sua fé através da Palavra de Deus
+              </p>
+            </div>
+            <ChevronRight className="w-6 h-6 text-muted-foreground shrink-0" />
           </CardContent>
         </Card>
-      </div>
+      </section>
+
+      {/* Seja um Membro CTA */}
+      <section className="container mx-auto px-4 py-8 pb-16">
+        <Card className="bg-card border-border/50 overflow-hidden">
+          <CardContent className="p-6 md:p-8">
+            <div className="text-center max-w-md mx-auto">
+              <h3 className="text-2xl font-bold text-foreground mb-3">Faça parte da nossa família</h3>
+              <p className="text-muted-foreground mb-6">
+                Como membro, você terá acesso a recursos exclusivos, poderá participar de grupos e muito mais.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  onClick={() => navigate("/auth")}
+                  className="bg-primary hover:bg-primary/90"
+                  size="lg"
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Criar minha conta
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate("/auth")}
+                  size="lg"
+                >
+                  Já tenho conta
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-card border-t border-border/50 py-6">
+        <div className="container mx-auto px-4 text-center">
+          <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto mx-auto mb-3 opacity-60" />
+          <p className="text-sm text-muted-foreground">
+            © {new Date().getFullYear()} Igreja Carvalho. Todos os direitos reservados.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
