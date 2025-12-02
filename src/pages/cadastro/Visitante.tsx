@@ -27,6 +27,7 @@ export default function CadastroVisitante() {
     dia_nascimento: "",
     mes_nascimento: "",
     entrou_por: "",
+    necessidades_especiais: "",
     observacoes: "",
     aceitou_jesus: aceitouJesus,
     deseja_contato: true,
@@ -100,6 +101,7 @@ export default function CadastroVisitante() {
             sexo: formData.sexo || null,
             data_nascimento: dataNascimento,
             entrou_por: formData.entrou_por || null,
+            necessidades_especiais: formData.necessidades_especiais.trim() || null,
             observacoes: formData.observacoes.trim() || null,
             aceitou_jesus: formData.aceitou_jesus,
             deseja_contato: formData.deseja_contato,
@@ -296,6 +298,17 @@ export default function CadastroVisitante() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="necessidades_especiais">Possui alguma necessidade especial?</Label>
+                <Input
+                  id="necessidades_especiais"
+                  value={formData.necessidades_especiais}
+                  onChange={(e) => setFormData({ ...formData, necessidades_especiais: e.target.value })}
+                  placeholder="Ex: cadeirante, deficiência auditiva, etc."
+                  disabled={loading}
+                />
               </div>
 
               <div className="space-y-2">

@@ -12,6 +12,7 @@ interface CadastroVisitanteData {
   sexo?: string
   data_nascimento?: string
   entrou_por?: string
+  necessidades_especiais?: string
   observacoes?: string
   aceitou_jesus?: boolean
   deseja_contato?: boolean
@@ -24,6 +25,7 @@ interface AtualizarMembroData {
   sexo?: string
   data_nascimento?: string
   estado_civil?: string
+  necessidades_especiais?: string
   cep?: string
   cidade?: string
   bairro?: string
@@ -137,6 +139,7 @@ Deno.serve(async (req) => {
             nome: visitanteData.nome.trim(),
             telefone: telefoneNormalizado,
             email: visitanteData.email?.trim().toLowerCase() || null,
+            necessidades_especiais: visitanteData.necessidades_especiais?.trim() || null,
             observacoes: visitanteData.observacoes?.trim() || null,
             aceitou_jesus: visitanteData.aceitou_jesus || false,
             deseja_contato: visitanteData.deseja_contato ?? true,
@@ -175,7 +178,7 @@ Deno.serve(async (req) => {
       
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, bairro, estado, endereco, profissao, cpf, rg, data_batismo')
+        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, necessidades_especiais, cep, cidade, bairro, estado, endereco, profissao, cpf, rg, data_batismo')
         .eq('email', email.trim().toLowerCase())
         .eq('status', 'membro')
         .single()
@@ -231,6 +234,7 @@ Deno.serve(async (req) => {
         sexo: membroData.sexo || null,
         data_nascimento: membroData.data_nascimento || null,
         estado_civil: membroData.estado_civil || null,
+        necessidades_especiais: membroData.necessidades_especiais?.trim() || null,
         cep: cepNormalizado,
         cidade: membroData.cidade?.trim() || null,
         bairro: membroData.bairro?.trim() || null,
@@ -246,6 +250,7 @@ Deno.serve(async (req) => {
         sexo: currentProfile.sexo,
         data_nascimento: currentProfile.data_nascimento,
         estado_civil: currentProfile.estado_civil,
+        necessidades_especiais: currentProfile.necessidades_especiais,
         cep: currentProfile.cep,
         cidade: currentProfile.cidade,
         bairro: currentProfile.bairro,
