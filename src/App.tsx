@@ -49,6 +49,9 @@ import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
 import Announcements from "./pages/Announcements";
+import Agenda from "./pages/Agenda";
+import Biblia from "./pages/Biblia";
+import Install from "./pages/Install";
 import Admin from "./pages/Admin";
 import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
@@ -86,6 +89,9 @@ function App() {
           {/* Rotas públicas */}
           <Route path="/public" element={<Public />} />
           <Route path="/announcements" element={<Announcements />} />
+          <Route path="/agenda" element={<Agenda />} />
+          <Route path="/biblia" element={<Biblia />} />
+          <Route path="/install" element={<Install />} />
           <Route path="/auth" element={<Auth />} />
           
           {/* Rotas protegidas para membros */}

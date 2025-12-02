@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Calendar, MessageSquare, BookOpen, Image, LogIn } from "lucide-react";
+import { Calendar, MessageSquare, BookOpen, Image, LogIn, Download } from "lucide-react";
 import BannerCarousel from "@/components/BannerCarousel";
 
 export default function Public() {
@@ -12,25 +12,29 @@ export default function Public() {
       icon: <Calendar className="w-8 h-8" />,
       title: "Agenda",
       description: "Veja os próximos cultos e eventos",
-      available: false
+      available: true,
+      path: "/agenda"
     },
     {
       icon: <MessageSquare className="w-8 h-8" />,
       title: "Mensagens",
       description: "Ouça as últimas mensagens e pregações",
-      available: false
+      available: false,
+      path: ""
     },
     {
       icon: <Image className="w-8 h-8" />,
       title: "Anúncios",
       description: "Fique por dentro dos avisos e novidades",
-      available: true
+      available: true,
+      path: "/announcements"
     },
     {
       icon: <BookOpen className="w-8 h-8" />,
       title: "Bíblia",
       description: "Leia e estude a palavra de Deus",
-      available: false
+      available: true,
+      path: "/biblia"
     }
   ];
 
@@ -53,6 +57,14 @@ export default function Public() {
             >
               <LogIn className="w-5 h-5 mr-2" />
               Fazer Login / Cadastrar
+            </Button>
+            <Button 
+              onClick={() => navigate("/install")}
+              variant="outline"
+              size="lg"
+            >
+              <Download className="w-5 h-5 mr-2" />
+              Instalar App
             </Button>
           </div>
         </div>
@@ -78,7 +90,7 @@ export default function Public() {
                   <Button 
                     variant="outline" 
                     className="w-full"
-                    onClick={() => navigate("/announcements")}
+                    onClick={() => navigate(feature.path)}
                   >
                     Acessar
                   </Button>
