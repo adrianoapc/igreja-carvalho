@@ -9,6 +9,7 @@ import { PublicHeader } from "@/components/layout/PublicHeader";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { EventoDetailsDialog } from "@/components/agenda/EventoDetailsDialog";
 
 interface Culto {
   id: string;
@@ -18,6 +19,8 @@ interface Culto {
   local: string | null;
   endereco: string | null;
   tema: string | null;
+  descricao: string | null;
+  pregador: string | null;
 }
 
 interface CultosGrouped {
@@ -119,6 +122,7 @@ export default function Agenda() {
   const navigate = useNavigate();
   const [cultos, setCultos] = useState<Culto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedEvento, setSelectedEvento] = useState<Culto | null>(null);
 
   useEffect(() => {
     fetchCultos();
@@ -132,7 +136,7 @@ export default function Agenda() {
       
       const { data, error } = await supabase
         .from("cultos")
-        .select("id, titulo, tipo, data_culto, local, endereco, tema")
+        .select("id, titulo, tipo, data_culto, local, endereco, tema, descricao, pregador")
         .gte("data_culto", today.toISOString())
         .lte("data_culto", threeMonthsLater.toISOString())
         .eq("status", "confirmado")
@@ -385,11 +389,14 @@ export default function Agenda() {
                           </div>
 
                           {/* Event Card */}
-                          <Card className={cn(
-                            "flex-1 overflow-hidden cursor-pointer relative",
-                            "border-l-4",
-                            getBorderColor(culto.tipo)
-                          )}>
+                          <Card 
+                            className={cn(
+                              "flex-1 overflow-hidden cursor-pointer relative",
+                              "border-l-4",
+                              getBorderColor(culto.tipo)
+                            )}
+                            onClick={() => setSelectedEvento(culto)}
+                          >
                             <CardContent className="p-4">
                               {/* Event Title */}
                               <motion.h3 
@@ -479,6 +486,13 @@ export default function Agenda() {
             </p>
           </motion.div>
         )}
+
+        {/* Event Details Dialog */}
+        <EventoDetailsDialog 
+          evento={selectedEvento}
+          open={!!selectedEvento}
+          onOpenChange={(open) => !open && setSelectedEvento(null)}
+        />
       </main>
     </div>
   );
