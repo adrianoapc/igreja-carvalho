@@ -21,6 +21,7 @@ export default function Contas() {
   const [selectedConta, setSelectedConta] = useState<any>(null);
   const [expandedContaId, setExpandedContaId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
   const { data: contas, isLoading } = useQuery({
     queryKey: ['contas'],
@@ -37,13 +38,17 @@ export default function Contas() {
   });
 
   const { data: transacoes, isLoading: isLoadingTransacoes } = useQuery({
-    queryKey: ['transacoes-conta', expandedContaId, selectedMonth],
+    queryKey: ['transacoes-conta', expandedContaId, selectedMonth, customRange],
     enabled: !!expandedContaId,
     queryFn: async () => {
       if (!expandedContaId) return [];
       
-      const startDate = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-      const endDate = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+      const startDate = customRange 
+        ? format(customRange.from, 'yyyy-MM-dd')
+        : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+      const endDate = customRange 
+        ? format(customRange.to, 'yyyy-MM-dd')
+        : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
       
       const { data, error } = await supabase
         .from('transacoes_financeiras')
@@ -205,6 +210,8 @@ export default function Contas() {
                         <MonthPicker
                           selectedMonth={selectedMonth}
                           onMonthChange={setSelectedMonth}
+                          customRange={customRange}
+                          onCustomRangeChange={setCustomRange}
                         />
                       </div>
 
