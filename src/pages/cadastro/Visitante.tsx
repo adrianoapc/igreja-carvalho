@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle, Sparkles, Heart } from "lucide-react";
 import InputMask from "react-input-mask";
 import { useSearchParams } from "react-router-dom";
 
@@ -161,12 +161,27 @@ export default function CadastroVisitante() {
       
       <div className="flex-1 flex items-center justify-center p-4 py-8">
         <Card className="w-full max-w-md shadow-soft">
-          <CardHeader className="text-center">
+          <CardHeader className="text-center pb-2">
+            {aceitouJesus ? (
+              <div className="flex justify-center mb-3">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center animate-pulse">
+                  <Heart className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center mb-3">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-primary-foreground" />
+                </div>
+              </div>
+            )}
             <CardTitle className="text-xl font-bold text-foreground">
-              Cadastro de Visitante
+              {aceitouJesus ? "Parabéns pela sua decisão!" : "Seja bem-vindo!"}
             </CardTitle>
-            <CardDescription>
-              Preencha seus dados para nos conhecermos melhor
+            <CardDescription className="text-base">
+              {aceitouJesus 
+                ? "Que alegria ter você conosco! Sua vida nunca mais será a mesma. Preencha seus dados para que possamos caminhar juntos."
+                : "É uma alegria receber você! Preencha seus dados para nos conhecermos melhor e podermos te acompanhar nessa jornada."}
             </CardDescription>
           </CardHeader>
           

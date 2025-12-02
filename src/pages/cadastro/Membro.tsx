@@ -24,6 +24,7 @@ export default function CadastroMembro() {
     sexo: "",
     dia_nascimento: "",
     mes_nascimento: "",
+    ano_nascimento: "",
     estado_civil: "",
     cep: "",
     cidade: "",
@@ -32,6 +33,9 @@ export default function CadastroMembro() {
     endereco: "",
     profissao: "",
   });
+
+  const currentYear = new Date().getFullYear();
+  const anos = Array.from({ length: 100 }, (_, i) => (currentYear - i).toString());
   const { toast } = useToast();
 
   const dias = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"));
@@ -88,12 +92,14 @@ export default function CadastroMembro() {
       const data = result.data;
       setProfile(data);
       
-      // Extrair dia e mês da data de nascimento se existir
+      // Extrair dia, mês e ano da data de nascimento se existir
       let diaNasc = "";
       let mesNasc = "";
+      let anoNasc = "";
       if (data.data_nascimento) {
         const parts = data.data_nascimento.split("-");
         if (parts.length >= 3) {
+          anoNasc = parts[0] !== "1900" ? parts[0] : "";
           mesNasc = parts[1];
           diaNasc = parts[2];
         }
@@ -106,6 +112,7 @@ export default function CadastroMembro() {
         sexo: data.sexo || "",
         dia_nascimento: diaNasc,
         mes_nascimento: mesNasc,
+        ano_nascimento: anoNasc,
         estado_civil: data.estado_civil || "",
         cep: data.cep || "",
         cidade: data.cidade || "",
@@ -143,11 +150,11 @@ export default function CadastroMembro() {
     setLoading(true);
 
     try {
-      // Construir data_nascimento
+      // Construir data_nascimento com ano
       let dataNascimento = profile?.data_nascimento;
       if (formData.dia_nascimento && formData.mes_nascimento) {
-        const anoOriginal = profile?.data_nascimento?.split("-")[0] || "1900";
-        dataNascimento = `${anoOriginal}-${formData.mes_nascimento}-${formData.dia_nascimento}`;
+        const ano = formData.ano_nascimento || "1900";
+        dataNascimento = `${ano}-${formData.mes_nascimento}-${formData.dia_nascimento}`;
       }
 
       // Usar edge function para atualização pública
@@ -397,8 +404,8 @@ export default function CadastroMembro() {
               </div>
 
               <div className="space-y-2">
-                <Label>Data de aniversário</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <Label>Data de nascimento</Label>
+                <div className="grid grid-cols-3 gap-2">
                   <Select
                     value={formData.dia_nascimento}
                     onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
@@ -424,6 +431,20 @@ export default function CadastroMembro() {
                     <SelectContent>
                       {meses.map((mes) => (
                         <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={formData.ano_nascimento}
+                    onValueChange={(value) => setFormData({ ...formData, ano_nascimento: value })}
+                    disabled={loading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {anos.map((ano) => (
+                        <SelectItem key={ano} value={ano}>{ano}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
