@@ -54,6 +54,8 @@ export default function Pessoas() {
     nome: string;
     avatar_url: string | null;
     telefone: string | null;
+    email: string | null;
+    sexo: string | null;
     data_primeira_visita: string | null;
     status: string;
   }>>([]);
@@ -100,7 +102,7 @@ export default function Pessoas() {
         // Buscar pessoas que aceitaram Jesus recentemente
         const { data: aceitaram } = await supabase
           .from("profiles")
-          .select("id, nome, avatar_url, telefone, data_primeira_visita, status")
+          .select("id, nome, avatar_url, telefone, email, sexo, data_primeira_visita, status")
           .eq("aceitou_jesus", true)
           .order("data_primeira_visita", { ascending: false })
           .limit(5);
@@ -276,11 +278,21 @@ export default function Pessoas() {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{pessoa.nome}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {pessoa.telefone || "Sem telefone"}
+                    <p className="text-xs text-muted-foreground truncate">
+                      {pessoa.telefone || pessoa.email || "Sem contato"}
                     </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {pessoa.sexo && (
+                        <span className="text-xs text-muted-foreground capitalize">{pessoa.sexo}</span>
+                      )}
+                      {pessoa.data_primeira_visita && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(pessoa.data_primeira_visita).toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-xs capitalize">
+                  <Badge variant="outline" className="text-xs capitalize shrink-0">
                     {pessoa.status}
                   </Badge>
                 </div>

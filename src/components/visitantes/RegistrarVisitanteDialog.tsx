@@ -24,6 +24,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
     nome: "",
     telefone: "",
     email: "",
+    sexo: "",
     tipo: "visitante" as "visitante" | "frequentador",
     dia_nascimento: "",
     mes_nascimento: "",
@@ -202,6 +203,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
             nome: formData.nome.trim(),
             telefone: telefoneNormalizado,
             email: formData.email.trim() || null,
+            sexo: formData.sexo || null,
             observacoes: formData.observacoes.trim() || null,
             aceitou_jesus: formData.aceitou_jesus,
             batizado: formData.batizado,
@@ -254,6 +256,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
         nome: "",
         telefone: "",
         email: "",
+        sexo: "",
         tipo: "visitante",
         dia_nascimento: "",
         mes_nascimento: "",
@@ -349,6 +352,23 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
               placeholder="email@exemplo.com"
               disabled={loading}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sexo">Sexo</Label>
+            <Select
+              value={formData.sexo}
+              onValueChange={(value) => setFormData({ ...formData, sexo: value })}
+              disabled={loading}
+            >
+              <SelectTrigger id="sexo">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="masculino">Masculino</SelectItem>
+                <SelectItem value="feminino">Feminino</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
