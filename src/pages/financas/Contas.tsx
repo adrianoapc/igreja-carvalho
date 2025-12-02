@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, ChevronDown, ChevronUp, TrendingUp, TrendingDown, List, CalendarIcon } from "lucide-react";
+import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, ChevronDown, ChevronUp, TrendingUp, TrendingDown, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,9 +11,8 @@ import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { MonthPicker } from "@/components/financas/MonthPicker";
 
 export default function Contas() {
   const navigate = useNavigate();
@@ -203,31 +202,10 @@ export default function Contas() {
                     <div className="border-t pt-4 mt-4">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-semibold">Lançamentos</h3>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={cn(
-                                "justify-start text-left font-normal",
-                                !selectedMonth && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {selectedMonth ? format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR }) : <span>Selecionar mês</span>}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar
-                              mode="single"
-                              selected={selectedMonth}
-                              onSelect={(date) => date && setSelectedMonth(date)}
-                              initialFocus
-                              className={cn("p-3 pointer-events-auto")}
-                              locale={ptBR}
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <MonthPicker
+                          selectedMonth={selectedMonth}
+                          onMonthChange={setSelectedMonth}
+                        />
                       </div>
 
                       {/* Totalizador */}
