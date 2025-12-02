@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.receber-testemunho-make]
 verify_jwt = false
+
+[functions.cadastro-publico]
+verify_jwt = false

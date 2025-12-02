@@ -55,6 +55,9 @@ import Install from "./pages/Install";
 import Admin from "./pages/Admin";
 import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
+import CadastroIndex from "./pages/cadastro/Index";
+import CadastroVisitante from "./pages/cadastro/Visitante";
+import CadastroMembro from "./pages/cadastro/Membro";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -93,6 +96,11 @@ function App() {
           <Route path="/biblia" element={<Biblia />} />
           <Route path="/install" element={<Install />} />
           <Route path="/auth" element={<Auth />} />
+          
+          {/* Rotas públicas de cadastro externo */}
+          <Route path="/cadastro" element={<CadastroIndex />} />
+          <Route path="/cadastro/visitante" element={<CadastroVisitante />} />
+          <Route path="/cadastro/membro" element={<CadastroMembro />} />
           
           {/* Rotas protegidas para membros */}
           <Route
