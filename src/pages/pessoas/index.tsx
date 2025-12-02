@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight, FileEdit } from "lucide-react";
+import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight, FileEdit, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboard";
 import { LinksExternosCard } from "@/components/pessoas/LinksExternosCard";
 import { PerfisPendentes } from "@/components/pessoas/PerfisPendentes";
@@ -48,6 +49,14 @@ export default function Pessoas() {
 
   const [contatosCount, setContatosCount] = useState(0);
   const [pendentesCount, setPendentesCount] = useState(0);
+  const [aceitaramJesus, setAceitaramJesus] = useState<Array<{
+    id: string;
+    nome: string;
+    avatar_url: string | null;
+    telefone: string | null;
+    data_primeira_visita: string | null;
+    status: string;
+  }>>([]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -87,6 +96,16 @@ export default function Pessoas() {
           .eq("status", "pendente");
 
         setPendentesCount(pendentes || 0);
+
+        // Buscar pessoas que aceitaram Jesus recentemente
+        const { data: aceitaram } = await supabase
+          .from("profiles")
+          .select("id, nome, avatar_url, telefone, data_primeira_visita, status")
+          .eq("aceitou_jesus", true)
+          .order("data_primeira_visita", { ascending: false })
+          .limit(5);
+
+        setAceitaramJesus(aceitaram || []);
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
       }
@@ -226,6 +245,50 @@ export default function Pessoas() {
 
       {/* Links Externos de Cadastro */}
       <LinksExternosCard />
+
+      {/* Pessoas que Aceitaram Jesus */}
+      {aceitaramJesus.length > 0 && (
+        <Card>
+          <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between">
+            <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+              <Heart className="h-5 w-5 text-red-500" />
+              Aceitaram Jesus
+              <Badge variant="secondary">{aceitaramJesus.length}</Badge>
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={() => navigate('/pessoas/todos?aceitou_jesus=true')}>
+              Ver todos
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-3 md:p-6">
+            <div className="space-y-3">
+              {aceitaramJesus.map((pessoa) => (
+                <div
+                  key={pessoa.id}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/pessoas/${pessoa.id}`)}
+                >
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={pessoa.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                      {pessoa.nome?.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{pessoa.nome}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {pessoa.telefone || "Sem telefone"}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {pessoa.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Aniversários Dashboard */}
       <AniversariosDashboard />
