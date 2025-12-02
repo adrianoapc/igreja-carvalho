@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Calendar, BookOpen, LogIn, ChevronRight, Clock, MapPin, Users } from "lucide-react";
+import { Calendar, BookOpen, LogIn, ChevronRight, Clock, MapPin, Users, ExternalLink } from "lucide-react";
 import BannerCarousel from "@/components/BannerCarousel";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns";
@@ -16,6 +16,7 @@ interface Culto {
   tipo: string;
   data_culto: string;
   local: string | null;
+  endereco: string | null;
   tema: string | null;
 }
 
@@ -33,7 +34,7 @@ export default function Public() {
       const now = new Date().toISOString();
       const { data, error } = await supabase
         .from("cultos")
-        .select("id, titulo, tipo, data_culto, local, tema")
+        .select("id, titulo, tipo, data_culto, local, endereco, tema")
         .gte("data_culto", now)
         .eq("status", "confirmado")
         .order("data_culto", { ascending: true })
@@ -46,6 +47,11 @@ export default function Public() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getGoogleMapsUrl = (endereco: string | null, local: string | null) => {
+    const searchQuery = endereco || local || "";
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
   };
 
   const formatCultoDate = (dateString: string) => {
@@ -206,11 +212,25 @@ export default function Public() {
                       </div>
                     </div>
                   </div>
-                  {culto.local && (
-                    <div className="flex items-center gap-1 text-muted-foreground text-sm mt-3 pt-3 border-t border-border/50">
-                      <MapPin className="w-3 h-3" />
-                      <span className="truncate">{culto.local}</span>
-                    </div>
+                  {(culto.local || culto.endereco) && (
+                    <a
+                      href={getGoogleMapsUrl(culto.endereco, culto.local)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-2 text-sm mt-3 pt-3 border-t border-border/50 hover:text-primary transition-colors group"
+                    >
+                      <MapPin className="w-4 h-4 text-primary shrink-0" />
+                      <span className="flex flex-col min-w-0 flex-1">
+                        {culto.local && (
+                          <span className="font-medium text-foreground/80 truncate">{culto.local}</span>
+                        )}
+                        {culto.endereco && (
+                          <span className="text-xs text-muted-foreground truncate">{culto.endereco}</span>
+                        )}
+                      </span>
+                      <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </a>
                   )}
                 </CardContent>
               </Card>

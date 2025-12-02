@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { Calendar, Clock, MapPin, ExternalLink, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO, isSameMonth, isSameDay, startOfWeek, endOfWeek, addDays, isToday } from "date-fns";
+import { format, parseISO, isSameMonth, addMonths, startOfToday, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PublicHeader } from "@/components/layout/PublicHeader";
+import { cn } from "@/lib/utils";
 
 interface Culto {
   id: string;
@@ -17,27 +17,31 @@ interface Culto {
   tema: string | null;
 }
 
+interface CultosGrouped {
+  month: Date;
+  monthLabel: string;
+  cultos: Culto[];
+}
+
 export default function Agenda() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [cultos, setCultos] = useState<Culto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchCultos();
-  }, [currentMonth]);
+  }, []);
 
   const fetchCultos = async () => {
     setLoading(true);
     try {
-      const start = startOfMonth(currentMonth);
-      const end = endOfMonth(currentMonth);
+      const today = startOfToday();
+      const threeMonthsLater = endOfMonth(addMonths(today, 3));
       
       const { data, error } = await supabase
         .from("cultos")
         .select("id, titulo, tipo, data_culto, local, endereco, tema")
-        .gte("data_culto", start.toISOString())
-        .lte("data_culto", end.toISOString())
+        .gte("data_culto", today.toISOString())
+        .lte("data_culto", threeMonthsLater.toISOString())
         .eq("status", "confirmado")
         .order("data_culto", { ascending: true });
 
@@ -51,21 +55,27 @@ export default function Agenda() {
   };
 
   const getTipoColor = (tipo: string) => {
-    switch (tipo) {
-      case "culto_domingo": return "bg-primary text-primary-foreground";
-      case "culto_semana": return "bg-accent text-accent-foreground";
-      case "evento_especial": return "bg-destructive/80 text-destructive-foreground";
-      default: return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const getTipoLabel = (tipo: string) => {
-    switch (tipo) {
-      case "culto_domingo": return "Dominical";
-      case "culto_semana": return "Semana";
-      case "evento_especial": return "Especial";
-      case "celebracao": return "Celebração";
-      default: return tipo;
+    switch (tipo.toLowerCase()) {
+      case "culto de celebração":
+      case "culto_domingo":
+        return "bg-primary text-primary-foreground";
+      case "culto de oração":
+      case "culto_oracao":
+        return "bg-amber-500 text-white";
+      case "culto de ensino":
+      case "culto_ensino":
+        return "bg-emerald-500 text-white";
+      case "culto de jovens":
+      case "culto_jovens":
+        return "bg-violet-500 text-white";
+      case "santa ceia":
+        return "bg-rose-500 text-white";
+      case "batismo":
+        return "bg-sky-500 text-white";
+      case "evento especial":
+        return "bg-orange-500 text-white";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -74,212 +84,195 @@ export default function Agenda() {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
   };
 
-  const getCultosForDate = (date: Date) => {
-    return cultos.filter(culto => isSameDay(parseISO(culto.data_culto), date));
-  };
-
-  const renderCalendarDays = () => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
-
-    const days = [];
-    let day = startDate;
-
-    while (day <= endDate) {
-      const currentDay = day;
-      const cultosOfDay = getCultosForDate(currentDay);
-      const isCurrentMonth = isSameMonth(currentDay, currentMonth);
-      const isSelected = selectedDate && isSameDay(currentDay, selectedDate);
-      const isTodayDate = isToday(currentDay);
-
-      days.push(
-        <button
-          key={currentDay.toISOString()}
-          onClick={() => setSelectedDate(currentDay)}
-          className={`
-            aspect-square p-1 rounded-lg text-sm font-medium transition-all relative
-            ${!isCurrentMonth ? "text-muted-foreground/40" : "text-foreground"}
-            ${isSelected ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2" : "hover:bg-muted"}
-            ${isTodayDate && !isSelected ? "bg-accent text-accent-foreground font-bold" : ""}
-          `}
-        >
-          <span>{format(currentDay, "d")}</span>
-          {cultosOfDay.length > 0 && (
-            <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
-              {cultosOfDay.slice(0, 3).map((_, i) => (
-                <div key={i} className={`w-1 h-1 rounded-full ${isSelected ? "bg-primary-foreground" : "bg-primary"}`} />
-              ))}
-            </div>
-          )}
-        </button>
-      );
-      day = addDays(day, 1);
+  // Group cultos by month
+  const groupedCultos: CultosGrouped[] = cultos.reduce((acc: CultosGrouped[], culto) => {
+    const cultoDate = parseISO(culto.data_culto);
+    const existingGroup = acc.find(group => isSameMonth(group.month, cultoDate));
+    
+    if (existingGroup) {
+      existingGroup.cultos.push(culto);
+    } else {
+      acc.push({
+        month: cultoDate,
+        monthLabel: format(cultoDate, "MMMM 'de' yyyy", { locale: ptBR }),
+        cultos: [culto]
+      });
     }
+    return acc;
+  }, []);
 
-    return days;
-  };
-
-  const selectedCultos = selectedDate ? getCultosForDate(selectedDate) : [];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <PublicHeader />
+        <main className="container max-w-2xl mx-auto px-4 py-8">
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-6 bg-muted rounded w-48 mb-4"></div>
+                <div className="flex gap-4">
+                  <div className="w-14 h-14 bg-muted rounded-full"></div>
+                  <div className="flex-1 h-24 bg-muted rounded-lg"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <PublicHeader showBackButton title="Agenda" subtitle="Cultos e eventos" />
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
+      <PublicHeader />
+      
+      <main className="container max-w-2xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+            Agenda de Eventos
+          </h1>
+          <p className="text-muted-foreground flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Próximos eventos dos próximos 3 meses
+          </p>
+        </div>
 
-      <div className="container mx-auto px-4 py-6">
-        {/* Calendar */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-              <h2 className="text-lg font-semibold capitalize">
-                {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
-              </h2>
-              <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                <ChevronRight className="w-5 h-5" />
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
-                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-                  {day}
+        {cultos.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Nenhum evento agendado</h3>
+              <p className="text-muted-foreground text-sm">
+                Não há eventos confirmados para os próximos dias.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-8">
+            {groupedCultos.map((group, groupIndex) => (
+              <div key={group.monthLabel}>
+                {/* Month Header */}
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-px flex-1 bg-border"></div>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-primary px-3 py-1 bg-primary/10 rounded-full">
+                    {group.monthLabel}
+                  </h2>
+                  <div className="h-px flex-1 bg-border"></div>
                 </div>
-              ))}
-            </div>
 
-            <div className="grid grid-cols-7 gap-1">
-              {renderCalendarDays()}
-            </div>
-          </CardContent>
-        </Card>
+                {/* Events Timeline */}
+                <div className="space-y-4">
+                  {group.cultos.map((culto, index) => {
+                    const cultoDate = parseISO(culto.data_culto);
+                    const day = format(cultoDate, "d");
+                    const weekDay = format(cultoDate, "EEEE", { locale: ptBR });
+                    const time = format(cultoDate, "HH:mm");
 
-        {/* Selected Date Events */}
-        {selectedDate && (
-          <div className="mb-6">
-            <h3 className="font-semibold text-foreground mb-3 capitalize">
-              {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
-            </h3>
-            {selectedCultos.length > 0 ? (
-              <div className="space-y-3">
-                {selectedCultos.map(culto => (
-                  <Card key={culto.id}>
-                    <CardContent className="p-4">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-2 ${getTipoColor(culto.tipo)}`}>
-                        {getTipoLabel(culto.tipo)}
-                      </span>
-                      <h4 className="font-semibold text-foreground">{culto.titulo}</h4>
-                      {culto.tema && <p className="text-sm text-muted-foreground">{culto.tema}</p>}
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {format(parseISO(culto.data_culto), "HH:mm")}
+                    return (
+                      <div 
+                        key={culto.id} 
+                        className="flex gap-4 group"
+                      >
+                        {/* Date Circle */}
+                        <div className="flex flex-col items-center">
+                          <div className={cn(
+                            "w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl transition-all duration-300",
+                            "bg-primary/10 text-primary border-2 border-primary/20",
+                            "group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-110"
+                          )}>
+                            {day}
+                          </div>
+                          {/* Timeline connector */}
+                          {index < group.cultos.length - 1 && (
+                            <div className="w-0.5 h-full min-h-[1rem] bg-border mt-2"></div>
+                          )}
                         </div>
-                        {culto.local && (
-                          <a 
-                            href={getGoogleMapsUrl(culto.endereco, culto.local)} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-1 text-primary hover:underline"
-                          >
-                            <MapPin className="w-3 h-3" />
-                            {culto.local}
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
+
+                        {/* Event Card */}
+                        <Card className={cn(
+                          "flex-1 overflow-hidden transition-all duration-300",
+                          "hover:shadow-lg hover:-translate-y-1 cursor-pointer",
+                          "border-l-4",
+                          getTipoColor(culto.tipo).includes("primary") ? "border-l-primary" :
+                          getTipoColor(culto.tipo).includes("amber") ? "border-l-amber-500" :
+                          getTipoColor(culto.tipo).includes("emerald") ? "border-l-emerald-500" :
+                          getTipoColor(culto.tipo).includes("violet") ? "border-l-violet-500" :
+                          getTipoColor(culto.tipo).includes("rose") ? "border-l-rose-500" :
+                          getTipoColor(culto.tipo).includes("sky") ? "border-l-sky-500" :
+                          getTipoColor(culto.tipo).includes("orange") ? "border-l-orange-500" :
+                          "border-l-muted-foreground"
+                        )}>
+                          <CardContent className="p-4">
+                            {/* Event Title */}
+                            <h3 className="font-bold text-lg text-primary mb-1 uppercase tracking-wide">
+                              {culto.titulo}
+                            </h3>
+                            
+                            {/* Date and Time */}
+                            <p className="text-sm text-muted-foreground mb-3 capitalize">
+                              {weekDay}, {format(cultoDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                              <span className="mx-2">•</span>
+                              <Clock className="w-3 h-3 inline-block mr-1" />
+                              {time}
+                            </p>
+
+                            {/* Location */}
+                            {(culto.local || culto.endereco) && (
+                              <a
+                                href={getGoogleMapsUrl(culto.endereco, culto.local)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-2 text-sm font-medium text-foreground/80 hover:text-primary transition-colors group/link"
+                              >
+                                <MapPin className="w-4 h-4 text-primary" />
+                                <span className="flex flex-col">
+                                  {culto.local && (
+                                    <span className="font-semibold">{culto.local}</span>
+                                  )}
+                                  {culto.endereco && (
+                                    <span className="text-xs text-muted-foreground group-hover/link:text-primary">
+                                      {culto.endereco}
+                                    </span>
+                                  )}
+                                </span>
+                                <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                              </a>
+                            )}
+
+                            {/* Theme badge if exists */}
+                            {culto.tema && (
+                              <div className="mt-3 pt-3 border-t border-border">
+                                <span className="text-xs text-muted-foreground">Tema: </span>
+                                <span className="text-sm font-medium">{culto.tema}</span>
+                              </div>
+                            )}
+
+                            {/* Arrow indicator */}
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ChevronRight className="w-5 h-5 text-primary" />
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
-            ) : (
-              <Card className="bg-muted/30 border-dashed">
-                <CardContent className="p-6 text-center">
-                  <Calendar className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground text-sm">Nenhum evento neste dia</p>
-                </CardContent>
-              </Card>
-            )}
+            ))}
           </div>
         )}
 
-        {/* All Month Events */}
-        <div>
-          <h3 className="font-semibold text-foreground mb-3">Eventos do mês</h3>
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <Card key={i} className="animate-pulse">
-                  <CardContent className="p-4">
-                    <div className="h-4 bg-muted rounded w-1/4 mb-2" />
-                    <div className="h-5 bg-muted rounded w-1/2 mb-2" />
-                    <div className="h-4 bg-muted rounded w-1/3" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : cultos.length > 0 ? (
-            <div className="space-y-3">
-              {cultos.map(culto => (
-                <Card 
-                  key={culto.id} 
-                  className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
-                  onClick={() => setSelectedDate(parseISO(culto.data_culto))}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="text-center shrink-0 w-14">
-                        <p className="text-2xl font-bold text-primary">
-                          {format(parseISO(culto.data_culto), "dd")}
-                        </p>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {format(parseISO(culto.data_culto), "EEE", { locale: ptBR })}
-                        </p>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-1 ${getTipoColor(culto.tipo)}`}>
-                          {getTipoLabel(culto.tipo)}
-                        </span>
-                        <h4 className="font-semibold text-foreground truncate">{culto.titulo}</h4>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {format(parseISO(culto.data_culto), "HH:mm")}
-                          </div>
-                          {culto.local && (
-                            <a 
-                              href={getGoogleMapsUrl(culto.endereco, culto.local)} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 truncate text-primary hover:underline"
-                            >
-                              <MapPin className="w-3 h-3 shrink-0" />
-                              <span className="truncate">{culto.local}</span>
-                              <ExternalLink className="w-3 h-3 shrink-0" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="bg-muted/30 border-dashed">
-              <CardContent className="p-8 text-center">
-                <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">Nenhum evento programado para este mês</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+        {/* Footer info */}
+        {cultos.length > 0 && (
+          <div className="mt-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              {cultos.length} evento{cultos.length !== 1 ? 's' : ''} nos próximos 3 meses
+            </p>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
