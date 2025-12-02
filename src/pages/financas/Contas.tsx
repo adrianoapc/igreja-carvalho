@@ -1,11 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, TrendingUp, TrendingDown, List } from "lucide-react";
+import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, TrendingUp, TrendingDown, List, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ContaDialog } from "@/components/financas/ContaDialog";
 import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ export default function Contas() {
   const [contaDialogOpen, setContaDialogOpen] = useState(false);
   const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<any>(null);
-  const [selectedContaId, setSelectedContaId] = useState<string | null>(null);
+  const [selectedContaIds, setSelectedContaIds] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
@@ -37,16 +37,16 @@ export default function Contas() {
     },
   });
 
+  const startDate = customRange 
+    ? format(customRange.from, 'yyyy-MM-dd')
+    : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+  const endDate = customRange 
+    ? format(customRange.to, 'yyyy-MM-dd')
+    : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+
   const { data: transacoes, isLoading: isLoadingTransacoes } = useQuery({
-    queryKey: ['transacoes-contas', selectedContaId, selectedMonth, customRange],
+    queryKey: ['transacoes-contas', selectedContaIds, selectedMonth, customRange],
     queryFn: async () => {
-      const startDate = customRange 
-        ? format(customRange.from, 'yyyy-MM-dd')
-        : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-      const endDate = customRange 
-        ? format(customRange.to, 'yyyy-MM-dd')
-        : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
-      
       let query = supabase
         .from('transacoes_financeiras')
         .select(`
@@ -60,8 +60,8 @@ export default function Contas() {
         .lte('data_pagamento', endDate)
         .order('data_pagamento', { ascending: false });
       
-      if (selectedContaId) {
-        query = query.eq('conta_id', selectedContaId);
+      if (selectedContaIds.length > 0) {
+        query = query.in('conta_id', selectedContaIds);
       }
       
       const { data, error } = await query;
@@ -69,6 +69,39 @@ export default function Contas() {
       return data;
     },
   });
+
+  // Buscar todas as transações do período para calcular totais por conta
+  const { data: allTransacoesPeriodo } = useQuery({
+    queryKey: ['transacoes-periodo-all', selectedMonth, customRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transacoes_financeiras')
+        .select('conta_id, tipo, valor')
+        .eq('status', 'pago')
+        .gte('data_pagamento', startDate)
+        .lte('data_pagamento', endDate);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Calcular totais por conta no período
+  const totaisPorConta = useMemo(() => {
+    if (!allTransacoesPeriodo) return {};
+    
+    return allTransacoesPeriodo.reduce((acc, t) => {
+      if (!acc[t.conta_id]) {
+        acc[t.conta_id] = { entradas: 0, saidas: 0 };
+      }
+      if (t.tipo === 'entrada') {
+        acc[t.conta_id].entradas += Number(t.valor);
+      } else {
+        acc[t.conta_id].saidas += Number(t.valor);
+      }
+      return acc;
+    }, {} as Record<string, { entradas: number; saidas: number }>);
+  }, [allTransacoesPeriodo]);
 
   const getTipoIcon = (tipo: string) => {
     switch (tipo) {
@@ -95,6 +128,18 @@ export default function Contas() {
     }).format(value);
   };
 
+  const toggleContaSelection = (contaId: string) => {
+    setSelectedContaIds(prev => 
+      prev.includes(contaId) 
+        ? prev.filter(id => id !== contaId)
+        : [...prev, contaId]
+    );
+  };
+
+  const clearSelection = () => {
+    setSelectedContaIds([]);
+  };
+
   const totalEntradas = transacoes?.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const totalSaidas = transacoes?.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const saldoPeriodo = totalEntradas - totalSaidas;
@@ -118,7 +163,7 @@ export default function Contas() {
                 <p className="text-xs text-muted-foreground">
                   {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
                 </p>
-                {!selectedContaId && t.contas && (
+                {(selectedContaIds.length === 0 || selectedContaIds.length > 1) && t.contas && (
                   <Badge variant="secondary" className="text-xs">
                     {t.contas.nome}
                   </Badge>
@@ -175,6 +220,21 @@ export default function Contas() {
         </div>
       </div>
 
+      {/* Filtro de Período Global */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Período: {customRange 
+            ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
+            : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
+        </p>
+        <MonthPicker
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+        />
+      </div>
+
       {/* Cards de Contas */}
       {isLoading ? (
         <Card className="shadow-soft">
@@ -184,72 +244,110 @@ export default function Contas() {
         </Card>
       ) : contas && contas.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {contas.map((conta) => (
-            <Card 
-              key={conta.id} 
-              className={cn(
-                "shadow-soft cursor-pointer transition-all hover:shadow-md",
-                selectedContaId === conta.id && "ring-2 ring-primary"
-              )}
-              onClick={() => setSelectedContaId(selectedContaId === conta.id ? null : conta.id)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {getTipoIcon(conta.tipo)}
-                    <span className="text-sm font-medium truncate">{conta.nome}</span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedConta(conta);
-                        setAjusteSaldoDialogOpen(true);
-                      }}
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedConta(conta);
-                        setContaDialogOpen(true);
-                      }}
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Saldo Atual</p>
-                    <p className={cn(
-                      "text-lg font-bold",
-                      conta.saldo_atual >= 0 ? "text-foreground" : "text-destructive"
-                    )}>
-                      {formatCurrency(conta.saldo_atual)}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {getTipoLabel(conta.tipo)}
-                  </Badge>
-                </div>
+          {contas.map((conta) => {
+            const isSelected = selectedContaIds.includes(conta.id);
+            const contaTotais = totaisPorConta[conta.id] || { entradas: 0, saidas: 0 };
+            const saldoContaPeriodo = contaTotais.entradas - contaTotais.saidas;
 
-                {conta.banco && (
-                  <p className="text-xs text-muted-foreground mt-2 truncate">
-                    {conta.banco} {conta.agencia && `| Ag: ${conta.agencia}`}
-                  </p>
+            return (
+              <Card 
+                key={conta.id} 
+                className={cn(
+                  "shadow-soft cursor-pointer transition-all hover:shadow-md relative",
+                  isSelected && "ring-2 ring-primary bg-primary/5"
                 )}
-              </CardContent>
-            </Card>
-          ))}
+                onClick={() => toggleContaSelection(conta.id)}
+              >
+                {isSelected && (
+                  <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                    <Check className="w-3 h-3 text-primary-foreground" />
+                  </div>
+                )}
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getTipoIcon(conta.tipo)}
+                      <span className="text-sm font-medium truncate">{conta.nome}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedConta(conta);
+                          setAjusteSaldoDialogOpen(true);
+                        }}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedConta(conta);
+                          setContaDialogOpen(true);
+                        }}
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Saldo Atual</p>
+                        <p className={cn(
+                          "text-lg font-bold",
+                          conta.saldo_atual >= 0 ? "text-foreground" : "text-destructive"
+                        )}>
+                          {formatCurrency(conta.saldo_atual)}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {getTipoLabel(conta.tipo)}
+                      </Badge>
+                    </div>
+
+                    {/* Totais do período */}
+                    <div className="grid grid-cols-3 gap-1 pt-2 border-t">
+                      <div className="text-center">
+                        <p className="text-[10px] text-muted-foreground">Entradas</p>
+                        <p className="text-xs font-semibold text-green-600">
+                          {formatCurrency(contaTotais.entradas)}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] text-muted-foreground">Saídas</p>
+                        <p className="text-xs font-semibold text-red-600">
+                          {formatCurrency(contaTotais.saidas)}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] text-muted-foreground">Saldo</p>
+                        <p className={cn(
+                          "text-xs font-semibold",
+                          saldoContaPeriodo >= 0 ? "text-green-600" : "text-red-600"
+                        )}>
+                          {formatCurrency(saldoContaPeriodo)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {conta.banco && (
+                    <p className="text-xs text-muted-foreground mt-2 truncate">
+                      {conta.banco} {conta.agencia && `| Ag: ${conta.agencia}`}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card className="shadow-soft">
@@ -262,28 +360,26 @@ export default function Contas() {
       {/* Seção de Lançamentos */}
       <Card className="shadow-soft">
         <CardContent className="p-4 md:p-6">
-          {/* Filtros */}
+          {/* Header com filtros ativos */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-semibold">Lançamentos</h2>
-              {selectedContaId && (
-                <Badge variant="secondary" className="text-xs">
-                  {contas?.find(c => c.id === selectedContaId)?.nome}
-                  <button 
-                    className="ml-1 hover:text-destructive"
-                    onClick={() => setSelectedContaId(null)}
+              {selectedContaIds.length > 0 && (
+                <>
+                  <Badge variant="secondary" className="text-xs">
+                    {selectedContaIds.length} conta{selectedContaIds.length > 1 ? 's' : ''} selecionada{selectedContaIds.length > 1 ? 's' : ''}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={clearSelection}
                   >
-                    ×
-                  </button>
-                </Badge>
+                    Limpar
+                  </Button>
+                </>
               )}
             </div>
-            <MonthPicker
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-              customRange={customRange}
-              onCustomRangeChange={setCustomRange}
-            />
           </div>
 
           {/* Totalizador */}
