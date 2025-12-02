@@ -6,6 +6,7 @@ import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboard";
+import { LinksExternosCard } from "@/components/pessoas/LinksExternosCard";
 
 export default function Pessoas() {
   const navigate = useNavigate();
@@ -187,6 +188,9 @@ export default function Pessoas() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Links Externos de Cadastro */}
+      <LinksExternosCard />
 
       {/* Aniversários Dashboard */}
       <AniversariosDashboard />
