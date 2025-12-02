@@ -64,7 +64,7 @@ All colors MUST be HSL.
     /* Para manter a leitura no hover: verde escuro (melhor contraste) */
     --sidebar-accent-foreground: 62, 55%, 88%; /* texto no hover */
 
-    //--sidebar-accent-foreground: 113, 28%, 22%;
+    /* --sidebar-accent-foreground: 113, 28%, 22%; */
     --sidebar-border: 0 0% 83%;
     --sidebar-ring: 161 93% 30%;
     --font-sans:
