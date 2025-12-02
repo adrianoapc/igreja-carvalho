@@ -403,6 +403,7 @@ export type Database = {
           data_culto: string
           descricao: string | null
           duracao_minutos: number | null
+          endereco: string | null
           id: string
           local: string | null
           observacoes: string | null
@@ -419,6 +420,7 @@ export type Database = {
           data_culto: string
           descricao?: string | null
           duracao_minutos?: number | null
+          endereco?: string | null
           id?: string
           local?: string | null
           observacoes?: string | null
@@ -435,6 +437,7 @@ export type Database = {
           data_culto?: string
           descricao?: string | null
           duracao_minutos?: number | null
+          endereco?: string | null
           id?: string
           local?: string | null
           observacoes?: string | null

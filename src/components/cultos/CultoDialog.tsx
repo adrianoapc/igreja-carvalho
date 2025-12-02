@@ -28,6 +28,7 @@ interface Culto {
   data_culto: string;
   duracao_minutos: number | null;
   local: string | null;
+  endereco: string | null;
   pregador: string | null;
   tema: string | null;
   status: string;
@@ -48,6 +49,7 @@ const cultoSchema = z.object({
   hora: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Hora inválida (use HH:MM)"),
   duracao_minutos: z.number().int().min(0).max(600).optional(),
   local: z.string().max(200, "Local muito longo").optional(),
+  endereco: z.string().max(500, "Endereço muito longo").optional(),
   pregador: z.string().max(200, "Nome muito longo").optional(),
   tema: z.string().max(300, "Tema muito longo").optional(),
   status: z.enum(["planejado", "confirmado", "realizado", "cancelado"]),
@@ -72,6 +74,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
       hora: "19:00",
       duracao_minutos: 120,
       local: "",
+      endereco: "",
       pregador: "",
       tema: "",
       status: "planejado",
@@ -93,6 +96,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         hora: format(dataCulto, "HH:mm"),
         duracao_minutos: culto.duracao_minutos || undefined,
         local: culto.local || "",
+        endereco: culto.endereco || "",
         pregador: culto.pregador || "",
         tema: culto.tema || "",
         status: culto.status as "planejado" | "confirmado" | "realizado" | "cancelado",
@@ -105,6 +109,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         hora: "19:00",
         duracao_minutos: 120,
         local: "",
+        endereco: "",
         pregador: "",
         tema: "",
         status: "planejado",
@@ -155,6 +160,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         data_culto: dataHoraCompleta.toISOString(),
         duracao_minutos: data.duracao_minutos || null,
         local: data.local || null,
+        endereco: data.endereco || null,
         pregador: data.pregador || null,
         tema: data.tema || null,
         status: data.status,
@@ -475,6 +481,24 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Endereço completo */}
+            <FormField
+              control={form.control}
+              name="endereco"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Endereço completo (para Google Maps)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Rua das Flores, 123 - Centro, São Paulo - SP" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

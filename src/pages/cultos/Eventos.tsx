@@ -22,6 +22,7 @@ interface Culto {
   data_culto: string;
   duracao_minutos: number | null;
   local: string | null;
+  endereco: string | null;
   pregador: string | null;
   tema: string | null;
   status: string;

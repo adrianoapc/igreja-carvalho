@@ -13,6 +13,7 @@ interface Culto {
   tipo: string;
   data_culto: string;
   local: string | null;
+  endereco: string | null;
   tema: string | null;
 }
 
@@ -34,7 +35,7 @@ export default function Agenda() {
       
       const { data, error } = await supabase
         .from("cultos")
-        .select("id, titulo, tipo, data_culto, local, tema")
+        .select("id, titulo, tipo, data_culto, local, endereco, tema")
         .gte("data_culto", start.toISOString())
         .lte("data_culto", end.toISOString())
         .eq("status", "confirmado")
@@ -68,8 +69,9 @@ export default function Agenda() {
     }
   };
 
-  const getGoogleMapsUrl = (location: string) => {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+  const getGoogleMapsUrl = (endereco: string | null, local: string | null) => {
+    const searchQuery = endereco || local || "";
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
   };
 
   const getCultosForDate = (date: Date) => {
@@ -178,7 +180,7 @@ export default function Agenda() {
                         </div>
                         {culto.local && (
                           <a 
-                            href={getGoogleMapsUrl(culto.local)} 
+                            href={getGoogleMapsUrl(culto.endereco, culto.local)} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
@@ -250,7 +252,7 @@ export default function Agenda() {
                           </div>
                           {culto.local && (
                             <a 
-                              href={getGoogleMapsUrl(culto.local)} 
+                              href={getGoogleMapsUrl(culto.endereco, culto.local)} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
