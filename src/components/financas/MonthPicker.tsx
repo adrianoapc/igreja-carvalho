@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, ChevronLeft, ChevronRight, X, ArrowRight } from "lucide-react";
-import { format, subMonths, addMonths, startOfMonth, endOfMonth, subDays } from "date-fns";
+import { format, subMonths, addMonths, setMonth, setYear, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
@@ -12,11 +12,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 interface MonthPickerProps {
   selectedMonth: Date;
   onMonthChange: (date: Date) => void;
-  // Modo range customizado
   customRange?: { from: Date; to: Date } | null;
   onCustomRangeChange?: (range: { from: Date; to: Date } | null) => void;
   className?: string;
 }
+
+const MONTHS = [
+  'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+  'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+];
 
 export function MonthPicker({ 
   selectedMonth, 
@@ -30,13 +34,7 @@ export function MonthPicker({
   const [tempRange, setTempRange] = useState<DateRange | undefined>(
     customRange ? { from: customRange.from, to: customRange.to } : undefined
   );
-
-  const monthPresets = [
-    { label: 'Este mês', getValue: () => startOfMonth(new Date()) },
-    { label: 'Mês passado', getValue: () => startOfMonth(subMonths(new Date(), 1)) },
-    { label: '2 meses atrás', getValue: () => startOfMonth(subMonths(new Date(), 2)) },
-    { label: '3 meses atrás', getValue: () => startOfMonth(subMonths(new Date(), 3)) },
-  ];
+  const [viewYear, setViewYear] = useState(selectedMonth.getFullYear());
 
   const rangePresets = [
     { label: 'Últimos 7 dias', getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
@@ -45,9 +43,9 @@ export function MonthPicker({
     { label: 'Últimos 3 meses', getValue: () => ({ from: subMonths(new Date(), 3), to: new Date() }) },
   ];
 
-  const handleMonthPresetClick = (preset: typeof monthPresets[0]) => {
-    const date = preset.getValue();
-    onMonthChange(date);
+  const handleMonthSelect = (monthIndex: number) => {
+    const newDate = setMonth(setYear(new Date(), viewYear), monthIndex);
+    onMonthChange(newDate);
     onCustomRangeChange?.(null);
     setMode('month');
     setOpen(false);
@@ -70,15 +68,6 @@ export function MonthPicker({
   const handleNextMonth = () => {
     if (mode === 'month') {
       onMonthChange(addMonths(selectedMonth, 1));
-    }
-  };
-
-  const handleCalendarSelect = (date: Date | undefined) => {
-    if (date) {
-      onMonthChange(startOfMonth(date));
-      onCustomRangeChange?.(null);
-      setMode('month');
-      setOpen(false);
     }
   };
 
@@ -109,6 +98,9 @@ export function MonthPicker({
     }
     return format(selectedMonth, "MMM yyyy", { locale: ptBR });
   };
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
@@ -141,33 +133,64 @@ export function MonthPicker({
             </TabsList>
 
             <TabsContent value="month" className="p-3 pt-2 space-y-3">
-              {/* Atalhos de mês */}
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">Atalhos</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {monthPresets.map((preset, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleMonthPresetClick(preset)}
-                      className="text-xs h-8 justify-start"
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
+              {/* Seletor de Ano */}
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setViewYear(viewYear - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-semibold text-sm">{viewYear}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setViewYear(viewYear + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
 
-              {/* Calendário mensal */}
-              <div className="border-t pt-3">
-                <Calendar
-                  mode="single"
-                  selected={selectedMonth}
-                  onSelect={handleCalendarSelect}
-                  locale={ptBR}
-                  className="pointer-events-auto"
-                />
+              {/* Grid de Meses */}
+              <div className="grid grid-cols-4 gap-2">
+                {MONTHS.map((month, index) => {
+                  const isSelected = selectedMonth.getMonth() === index && selectedMonth.getFullYear() === viewYear;
+                  const isCurrent = new Date().getMonth() === index && new Date().getFullYear() === viewYear;
+                  
+                  return (
+                    <Button
+                      key={month}
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleMonthSelect(index)}
+                      className={cn(
+                        "h-9 text-xs",
+                        isSelected && "bg-gradient-primary",
+                        !isSelected && isCurrent && "border-primary text-primary"
+                      )}
+                    >
+                      {month}
+                    </Button>
+                  );
+                })}
+              </div>
+
+              {/* Anos rápidos */}
+              <div className="flex justify-center gap-1 pt-2 border-t">
+                {years.map((year) => (
+                  <Button
+                    key={year}
+                    variant={viewYear === year ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewYear(year)}
+                    className="text-xs h-7 px-2"
+                  >
+                    {year}
+                  </Button>
+                ))}
               </div>
             </TabsContent>
 
