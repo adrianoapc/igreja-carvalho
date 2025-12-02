@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Calendar, BookOpen, LogIn, Download, ChevronRight, Clock, MapPin, Users } from "lucide-react";
+import { Calendar, BookOpen, LogIn, ChevronRight, Clock, MapPin, Users } from "lucide-react";
 import BannerCarousel from "@/components/BannerCarousel";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import logoCarvalho from "@/assets/logo-carvalho.png";
+import { PublicHeader } from "@/components/layout/PublicHeader";
 
 interface Culto {
   id: string;
@@ -80,34 +81,7 @@ export default function Public() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/20">
-      {/* Header discreto com login */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={logoCarvalho} alt="Igreja Carvalho" className="h-10 w-auto" />
-            <span className="font-semibold text-foreground hidden sm:block">Igreja Carvalho</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => navigate("/install")}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Download className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">Instalar</span>
-            </Button>
-            <Button 
-              onClick={() => navigate("/auth")}
-              size="sm"
-              className="bg-primary hover:bg-primary/90"
-            >
-              <LogIn className="w-4 h-4 mr-1" />
-              Entrar
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden">

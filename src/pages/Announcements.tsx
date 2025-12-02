@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { PublicHeader } from "@/components/layout/PublicHeader";
 
 interface Banner {
   id: string;
@@ -54,7 +55,7 @@ const Announcements = () => {
       case "urgent":
         return "bg-red-500/10 text-red-600 border-red-200";
       default:
-        return "bg-gray-500/10 text-gray-600 border-gray-200";
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -71,29 +72,25 @@ const Announcements = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando anúncios...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Bell className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold text-foreground">Anúncios</h1>
-          </div>
-          <p className="text-muted-foreground">
-            Fique por dentro das últimas novidades e comunicados
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      <PublicHeader showBackButton title="Anúncios" subtitle="Fique por dentro das novidades" />
 
-        {banners.length === 0 ? (
-          <Card className="text-center py-12">
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-6">
+                  <div className="h-6 bg-muted rounded w-1/3 mb-3" />
+                  <div className="h-4 bg-muted rounded w-full mb-2" />
+                  <div className="h-4 bg-muted rounded w-2/3" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : banners.length === 0 ? (
+          <Card className="text-center py-12 border-dashed">
             <CardContent>
               <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
@@ -102,7 +99,7 @@ const Announcements = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {banners.map((banner) => (
               <Card key={banner.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 {banner.image_url && (
@@ -114,16 +111,16 @@ const Announcements = () => {
                     />
                   </div>
                 )}
-                <CardHeader>
+                <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-4">
-                    <CardTitle className="text-2xl">{banner.title}</CardTitle>
+                    <CardTitle className="text-xl">{banner.title}</CardTitle>
                     <Badge className={getBannerTypeColor(banner.type)}>
                       {getBannerTypeLabel(banner.type)}
                     </Badge>
                   </div>
                   {banner.created_at && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
+                      <Calendar className="h-3 w-3" />
                       <span>
                         {format(new Date(banner.created_at), "dd/MM/yyyy 'às' HH:mm")}
                       </span>
@@ -135,7 +132,7 @@ const Announcements = () => {
                     {banner.message}
                   </p>
                   {banner.expires_at && (
-                    <p className="text-sm text-muted-foreground mt-4 border-t pt-4">
+                    <p className="text-sm text-muted-foreground mt-4 pt-4 border-t border-border/50">
                       Válido até: {format(new Date(banner.expires_at), "dd/MM/yyyy 'às' HH:mm")}
                     </p>
                   )}
