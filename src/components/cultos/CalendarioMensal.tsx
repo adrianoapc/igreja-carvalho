@@ -18,6 +18,13 @@ import {
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+const STATUS_COLORS: Record<string, string> = {
+  planejado: "bg-yellow-500 hover:bg-yellow-600",
+  confirmado: "bg-green-500 hover:bg-green-600",
+  realizado: "bg-blue-500 hover:bg-blue-600",
+  cancelado: "bg-red-400 hover:bg-red-500 opacity-60"
+};
+
 interface Culto {
   id: string;
   tipo: string;
@@ -140,19 +147,21 @@ export default function CalendarioMensal({ cultos, escalasCount, onCultoClick }:
                   <div className="space-y-1">
                     {dayCultos.map((culto) => {
                       const count = escalasCount[culto.id] || 0;
+                      const statusColor = STATUS_COLORS[culto.status] || "bg-gray-500";
                       return (
                         <button
                           key={culto.id}
                           onClick={() => onCultoClick(culto)}
                           className={cn(
                             "w-full text-left p-1 rounded text-xs",
-                            "bg-gradient-primary text-primary-foreground",
-                            "hover:opacity-90 transition-opacity",
+                            "text-white",
+                            statusColor,
+                            "transition-all",
                             "shadow-sm"
                           )}
                         >
                           <div className="font-medium truncate text-[10px] sm:text-xs">
-                            {culto.tipo}
+                            {culto.titulo || culto.tipo}
                           </div>
                           <div className="flex items-center gap-1 mt-0.5">
                             <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -176,8 +185,20 @@ export default function CalendarioMensal({ cultos, escalasCount, onCultoClick }:
           <span>Hoje</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-gradient-primary" />
-          <span>Evento programado</span>
+          <div className="w-3 h-3 rounded bg-yellow-500" />
+          <span>Planejado</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-green-500" />
+          <span>Confirmado</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-blue-500" />
+          <span>Realizado</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-red-400 opacity-60" />
+          <span>Cancelado</span>
         </div>
         <div className="flex items-center gap-2">
           <Users className="w-3 h-3" />
