@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Camera, Upload, Eye, X, Loader2, ZoomIn, ZoomOut, FileText } from "lucide-react";
+import { CalendarIcon, Camera, Upload, Eye, X, Loader2, ZoomIn, ZoomOut, FileText, Download, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -1172,60 +1172,102 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     </div>
   );
 
-  // Modal de Visualização do Documento (Imagem ou PDF)
+  // Modal Universal de Visualização de Documentos (Imagem ou PDF)
   const DocumentViewerModal = () => {
-    const documentUrl = anexoUrl || anexoPreview;
-    
+    if (!imagePreviewOpen) return null;
+
+    const currentUrl = anexoUrl || anexoPreview;
+    if (!currentUrl) return null;
+
+    // Detecção robusta de PDF
+    const isPdf = currentUrl?.toLowerCase().includes('.pdf') || 
+                  anexoIsPdf || 
+                  (anexoFile?.type === 'application/pdf');
+
+    const handleDownload = () => {
+      if (!currentUrl) return;
+      const link = document.createElement('a');
+      link.href = currentUrl;
+      link.download = anexoFile?.name || 'documento';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
     return (
       <Dialog open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-4 py-3 border-b shrink-0">
-            <DialogTitle className="flex items-center justify-between">
-              <span>{anexoIsPdf ? 'Documento PDF' : 'Visualização do Anexo'}</span>
-              {!anexoIsPdf && (
-                <div className="flex items-center gap-2">
+        <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 outline-none overflow-hidden">
+          
+          {/* Header do Visualizador */}
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-background z-10 shrink-0">
+            <div className="flex items-center gap-2">
+              {isPdf ? <FileText className="w-5 h-5 text-destructive" /> : <ImageIcon className="w-5 h-5 text-primary" />}
+              <h3 className="font-semibold text-lg">
+                {isPdf ? 'Visualizar Documento PDF' : 'Visualizar Imagem'}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Zoom controls apenas para imagens */}
+              {!isPdf && (
+                <div className="flex items-center gap-1 mr-2">
                   <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setImageZoom(Math.max(0.5, imageZoom - 0.25))}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setImageZoom(prev => Math.max(0.5, prev - 0.25))}
                   >
                     <ZoomOut className="w-4 h-4" />
                   </Button>
-                  <span className="text-sm w-12 text-center">{Math.round(imageZoom * 100)}%</span>
+                  <span className="text-sm text-muted-foreground min-w-[3rem] text-center">
+                    {Math.round(imageZoom * 100)}%
+                  </span>
                   <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setImageZoom(Math.min(3, imageZoom + 0.25))}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setImageZoom(prev => Math.min(3, prev + 0.25))}
                   >
                     <ZoomIn className="w-4 h-4" />
                   </Button>
                 </div>
               )}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex-1 bg-slate-100 dark:bg-slate-900 p-4 overflow-hidden relative">
-            {anexoIsPdf && documentUrl ? (
-              <iframe
-                src={`${documentUrl}#toolbar=0`}
-                className="w-full h-full rounded shadow-sm border"
-                title="Documento PDF"
-              />
-            ) : documentUrl ? (
-              <div className="flex items-center justify-center h-full overflow-auto">
-                <img
-                  src={documentUrl}
-                  alt="Anexo"
+              <Button variant="outline" size="sm" onClick={handleDownload}>
+                <Download className="w-4 h-4 mr-2" />
+                Baixar
+              </Button>
+            </div>
+          </div>
+
+          {/* Área de Conteúdo (Viewer) */}
+          <div className="flex-1 bg-muted/50 relative w-full h-full flex items-center justify-center p-4 overflow-hidden">
+            {isPdf ? (
+              // Usa <object> para PDFs - melhor compatibilidade que iframe
+              <object
+                data={currentUrl}
+                type="application/pdf"
+                className="w-full h-full rounded shadow-sm bg-card"
+              >
+                {/* Fallback se o browser não suportar */}
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                  <FileText className="w-16 h-16 opacity-50" />
+                  <p className="text-center">Não foi possível visualizar o PDF aqui.</p>
+                  <Button variant="secondary" onClick={handleDownload}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Baixar documento
+                  </Button>
+                </div>
+              </object>
+            ) : (
+              // Imagens com zoom
+              <div className="flex items-center justify-center h-full w-full overflow-auto">
+                <img 
+                  src={currentUrl} 
+                  alt="Documento" 
                   className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{ transform: `scale(${imageZoom})` }}
                 />
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Nenhum documento para visualizar
-              </div>
             )}
           </div>
+
         </DialogContent>
       </Dialog>
     );
