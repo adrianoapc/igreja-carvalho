@@ -355,6 +355,7 @@ export type Database = {
           categoria_midia: string | null
           created_at: string | null
           created_by: string | null
+          culto_id: string | null
           data_fim: string | null
           data_inicio: string | null
           descricao: string | null
@@ -366,6 +367,7 @@ export type Database = {
           link_acao: string | null
           nivel_urgencia: string | null
           ordem_telao: number | null
+          tags: string[] | null
           tipo: Database["public"]["Enums"]["tipo_comunicado"]
           titulo: string
           updated_at: string | null
@@ -376,6 +378,7 @@ export type Database = {
           categoria_midia?: string | null
           created_at?: string | null
           created_by?: string | null
+          culto_id?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
@@ -387,6 +390,7 @@ export type Database = {
           link_acao?: string | null
           nivel_urgencia?: string | null
           ordem_telao?: number | null
+          tags?: string[] | null
           tipo?: Database["public"]["Enums"]["tipo_comunicado"]
           titulo: string
           updated_at?: string | null
@@ -397,6 +401,7 @@ export type Database = {
           categoria_midia?: string | null
           created_at?: string | null
           created_by?: string | null
+          culto_id?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
@@ -408,12 +413,21 @@ export type Database = {
           link_acao?: string | null
           nivel_urgencia?: string | null
           ordem_telao?: number | null
+          tags?: string[] | null
           tipo?: Database["public"]["Enums"]["tipo_comunicado"]
           titulo?: string
           updated_at?: string | null
           url_arquivo_telao?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "comunicados_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       configuracoes_igreja: {
         Row: {
