@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthPicker } from "@/components/financas/MonthPicker";
@@ -216,6 +217,17 @@ export default function DashboardOfertas() {
             customRange={customRange}
             onCustomRangeChange={setCustomRange}
           />
+        </div>
+        
+        {/* Period Badge */}
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="gap-1.5">
+            <Calendar className="w-3 h-3" />
+            {customRange 
+              ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
+              : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })
+            }
+          </Badge>
         </div>
       </div>
 
