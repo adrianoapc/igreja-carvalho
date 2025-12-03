@@ -59,6 +59,7 @@ import NotFound from "./pages/NotFound";
 import CadastroIndex from "./pages/cadastro/Index";
 import CadastroVisitante from "./pages/cadastro/Visitante";
 import CadastroMembro from "./pages/cadastro/Membro";
+import Chamada from "./pages/Chamada";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -479,6 +480,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ConfiguracoesIgreja />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chamada"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Chamada />
                 </MainLayout>
               </ProtectedRoute>
             }

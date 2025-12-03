@@ -2110,6 +2110,17 @@ export type Database = {
         Args: { p_lat: number; p_long: number; p_telefone: string }
         Returns: Json
       }
+      get_minha_lista_chamada: {
+        Args: { p_culto_id: string }
+        Returns: {
+          avatar_url: string
+          ja_marcado: boolean
+          nome: string
+          nome_grupo: string
+          pessoa_id: string
+          tipo_grupo: string
+        }[]
+      }
       get_user_module_access: {
         Args: { _module_name: string; _user_id: string }
         Returns: Database["public"]["Enums"]["access_level"]
