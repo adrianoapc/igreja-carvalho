@@ -26,6 +26,7 @@ import {
   ClipboardList,
   Save
 } from "lucide-react";
+import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
 
 interface Culto {
   id: string;
@@ -347,17 +348,9 @@ export default function CultoDetalhes() {
           </Card>
         </TabsContent>
 
-        {/* Tab: Liturgia (placeholder) */}
+        {/* Tab: Liturgia */}
         <TabsContent value="liturgia" className="mt-6">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Gestão de Liturgia</h3>
-              <p className="text-sm text-muted-foreground">
-                Gerencie a ordem de liturgia do culto aqui. (Em desenvolvimento)
-              </p>
-            </CardContent>
-          </Card>
+          <LiturgiaTabContent cultoId={culto.id} />
         </TabsContent>
 
         {/* Tab: Música (placeholder) */}
