@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import MainLayout from "./components/layout/MainLayout";
+import { AuthGate } from "./components/auth/AuthGate";
 import Dashboard from "./pages/Dashboard";
 import Comunicados from "./pages/Comunicados";
 import Publicacao from "./pages/Publicacao";
@@ -98,6 +99,7 @@ function App() {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+        <AuthGate>
         <Routes>
           {/* Rotas públicas */}
           <Route path="/public" element={<Public />} />
@@ -568,6 +570,7 @@ function App() {
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </AuthGate>
       </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +9,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { LogIn, UserPlus } from "lucide-react";
 import { PublicHeader } from "@/components/layout/PublicHeader";
+import { EnableBiometricDialog } from "@/components/auth/EnableBiometricDialog";
+import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [showBiometricDialog, setShowBiometricDialog] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const { isSupported, isEnabled } = useBiometricAuth();
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -105,12 +110,13 @@ export default function Auth() {
           });
         }
 
-        toast({
-          title: "Cadastro realizado!",
-          description: "Bem-vindo à nossa igreja!",
-        });
-
-        navigate("/");
+        // Oferecer biometria após cadastro bem-sucedido
+        if (isSupported && !isEnabled) {
+          setPendingUserId(authData.user.id);
+          setShowBiometricDialog(true);
+        } else {
+          navigate("/");
+        }
       }
     } catch (error: any) {
       toast({
@@ -132,7 +138,7 @@ export default function Auth() {
     const password = formData.get("password") as string;
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -144,7 +150,13 @@ export default function Auth() {
         description: "Bem-vindo de volta!",
       });
 
-      navigate("/");
+      // Oferecer biometria após login bem-sucedido se ainda não estiver ativada
+      if (isSupported && !isEnabled && data.user) {
+        setPendingUserId(data.user.id);
+        setShowBiometricDialog(true);
+      } else {
+        navigate("/");
+      }
     } catch (error: any) {
       toast({
         title: "Erro no login",
@@ -154,6 +166,10 @@ export default function Auth() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBiometricComplete = () => {
+    navigate("/");
   };
 
   return (
@@ -257,6 +273,13 @@ export default function Auth() {
         </CardContent>
       </Card>
       </div>
+
+      <EnableBiometricDialog
+        open={showBiometricDialog}
+        onOpenChange={setShowBiometricDialog}
+        userId={pendingUserId || ''}
+        onComplete={handleBiometricComplete}
+      />
     </div>
   );
 }

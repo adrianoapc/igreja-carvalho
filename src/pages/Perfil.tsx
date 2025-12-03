@@ -6,7 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { User, Phone, Mail, MapPin, Calendar, Briefcase, Church, Edit, Lock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { User, Phone, Mail, MapPin, Calendar, Briefcase, Church, Edit, Lock, Fingerprint } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPessoaisDialog";
@@ -14,6 +15,7 @@ import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog"
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
 import { AvatarUpload } from "@/components/perfil/AvatarUpload";
 import { AlterarSenhaDialog } from "@/components/perfil/AlterarSenhaDialog";
+import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 
 interface ProfileData {
   id: string;
@@ -62,7 +64,8 @@ interface FuncaoIgreja {
 }
 
 export default function Perfil() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { isSupported, isEnabled, enableBiometric, disableBiometric } = useBiometricAuth();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [funcoes, setFuncoes] = useState<FuncaoIgreja[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +73,30 @@ export default function Perfil() {
   const [editContatosOpen, setEditContatosOpen] = useState(false);
   const [editEclesiasticosOpen, setEditEclesiasticosOpen] = useState(false);
   const [alterarSenhaOpen, setAlterarSenhaOpen] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  const handleBiometricToggle = async (enabled: boolean) => {
+    if (!user?.id) return;
+    
+    setBiometricLoading(true);
+    try {
+      if (enabled) {
+        const success = await enableBiometric(user.id);
+        if (success) {
+          toast.success("Biometria ativada com sucesso!");
+        } else {
+          toast.error("Não foi possível ativar a biometria.");
+        }
+      } else {
+        disableBiometric();
+        toast.success("Biometria desativada.");
+      }
+    } catch (error) {
+      toast.error("Erro ao alterar configuração de biometria.");
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const loadProfileData = async () => {
     if (!profile?.id) return;
@@ -158,15 +185,28 @@ export default function Perfil() {
             {profileData.e_pastor && <Badge>Pastor</Badge>}
             {profileData.e_lider && <Badge>Líder</Badge>}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-3"
-            onClick={() => setAlterarSenhaOpen(true)}
-          >
-            <Lock className="h-4 w-4 mr-2" />
-            Alterar Senha
-          </Button>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAlterarSenhaOpen(true)}
+            >
+              <Lock className="h-4 w-4 mr-2" />
+              Alterar Senha
+            </Button>
+            
+            {isSupported && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border bg-muted/30">
+                <Fingerprint className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Biometria</span>
+                <Switch
+                  checked={isEnabled}
+                  onCheckedChange={handleBiometricToggle}
+                  disabled={biometricLoading}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
