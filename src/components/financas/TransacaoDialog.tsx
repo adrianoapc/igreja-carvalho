@@ -225,10 +225,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   });
 
   // Buscar sugestões baseadas em transações anteriores do fornecedor
-  const buscarSugestoesFornecedor = async (fornecedorIdParam: string) => {
+  const buscarSugestoesFornecedor = async (fornecedorIdParam: string, forceApply: boolean = false) => {
     if (!fornecedorIdParam || fornecedorIdParam === 'none') return;
 
     try {
+      console.log('Buscando sugestões para fornecedor:', fornecedorIdParam, 'forceApply:', forceApply);
+      
       const { data: transacoes, error } = await supabase
         .from('transacoes_financeiras')
         .select('categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento')
@@ -238,7 +240,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         .limit(20);
 
       if (error) throw error;
-      if (!transacoes || transacoes.length === 0) return;
+      
+      console.log('Transações encontradas:', transacoes?.length || 0);
+      
+      if (!transacoes || transacoes.length === 0) {
+        console.log('Nenhuma transação anterior encontrada para sugestões');
+        return;
+      }
 
       const categoriaFreq: Record<string, number> = {};
       const subcategoriaFreq: Record<string, number> = {};
@@ -269,20 +277,35 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const contaSugerida = getMaisFrequente(contaFreq);
       const formaPagamentoSugerida = getMaisFrequente(formaPagamentoFreq);
 
-      if (categoriaSugerida && (categoriaId === 'none' || categoriaId === '')) setCategoriaId(categoriaSugerida);
-      if (subcategoriaSugerida && (subcategoriaId === 'none' || subcategoriaId === '')) setSubcategoriaId(subcategoriaSugerida);
-      if (centroCustoSugerido && (centroCustoId === 'none' || centroCustoId === '')) setCentroCustoId(centroCustoSugerido);
-      if (baseMinisterialSugerida && (baseMinisterialId === 'none' || baseMinisterialId === '')) setBaseMinisterialId(baseMinisterialSugerida);
-      if (contaSugerida && (contaId === '' || !contaId)) setContaId(contaSugerida);
-      if (formaPagamentoSugerida && (formaPagamento === '' || !formaPagamento)) setFormaPagamento(formaPagamentoSugerida);
+      console.log('Sugestões encontradas:', { categoriaSugerida, subcategoriaSugerida, centroCustoSugerido, baseMinisterialSugerida, contaSugerida, formaPagamentoSugerida });
 
-      const sugestoesAplicadas = [];
-      if (categoriaSugerida) sugestoesAplicadas.push('categoria');
-      if (subcategoriaSugerida) sugestoesAplicadas.push('subcategoria');
-      if (centroCustoSugerido) sugestoesAplicadas.push('centro de custo');
-      if (baseMinisterialSugerida) sugestoesAplicadas.push('base ministerial');
-      if (contaSugerida) sugestoesAplicadas.push('conta');
-      if (formaPagamentoSugerida) sugestoesAplicadas.push('forma de pagamento');
+      const sugestoesAplicadas: string[] = [];
+
+      // Quando forceApply é true (chamado do processamento de nota), sempre aplicar
+      if (categoriaSugerida && (forceApply || categoriaId === 'none' || categoriaId === '')) {
+        setCategoriaId(categoriaSugerida);
+        sugestoesAplicadas.push('categoria');
+      }
+      if (subcategoriaSugerida && (forceApply || subcategoriaId === 'none' || subcategoriaId === '')) {
+        setSubcategoriaId(subcategoriaSugerida);
+        sugestoesAplicadas.push('subcategoria');
+      }
+      if (centroCustoSugerido && (forceApply || centroCustoId === 'none' || centroCustoId === '')) {
+        setCentroCustoId(centroCustoSugerido);
+        sugestoesAplicadas.push('centro de custo');
+      }
+      if (baseMinisterialSugerida && (forceApply || baseMinisterialId === 'none' || baseMinisterialId === '')) {
+        setBaseMinisterialId(baseMinisterialSugerida);
+        sugestoesAplicadas.push('base ministerial');
+      }
+      if (contaSugerida && (forceApply || contaId === '' || !contaId)) {
+        setContaId(contaSugerida);
+        sugestoesAplicadas.push('conta');
+      }
+      if (formaPagamentoSugerida && (forceApply || formaPagamento === '' || !formaPagamento)) {
+        setFormaPagamento(formaPagamentoSugerida);
+        sugestoesAplicadas.push('forma de pagamento');
+      }
 
       if (sugestoesAplicadas.length > 0) {
         toast.success('💡 Sugestões aplicadas', {
@@ -360,6 +383,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         .getPublicUrl(filePath);
 
       setAnexoUrl(publicUrl);
+      // Também atualizar preview para garantir que a imagem seja exibida
+      if (file.type.startsWith('image/')) {
+        setAnexoPreview(publicUrl);
+      }
 
       // Preencher campos
       await handleDadosNotaFiscal({ ...data.dados, anexo_url: publicUrl });
@@ -405,6 +432,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       if (dados.anexo_url) {
         setAnexoUrl(dados.anexo_url);
+        setAnexoPreview(dados.anexo_url);
       }
 
       // Buscar fornecedor existente - priorizar CNPJ/CPF
@@ -437,8 +465,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         }
 
         if (fornecedorEncontrado) {
+          console.log('Fornecedor encontrado, buscando sugestões:', fornecedorEncontrado.id);
           setFornecedorId(fornecedorEncontrado.id);
-          await buscarSugestoesFornecedor(fornecedorEncontrado.id);
+          // Chamar sugestões com forceApply para garantir aplicação
+          setTimeout(async () => {
+            await buscarSugestoesFornecedor(fornecedorEncontrado.id, true);
+          }, 100);
         } else if (dados.fornecedor_nome) {
           // Criar novo fornecedor
           const { data: novoFornecedor, error: fornecedorError } = await supabase
