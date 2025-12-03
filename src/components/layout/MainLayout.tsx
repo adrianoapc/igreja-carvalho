@@ -32,9 +32,13 @@ function MainLayoutContent({ children }: MainLayoutProps) {
 
   return (
     <>
-      <AppSidebar />
+      {/* Sidebar com z-index alto para ficar sempre acima */}
+      <div className="relative z-50">
+        <AppSidebar />
+      </div>
       
-      <SidebarInset className="flex-1">
+      {/* Conteúdo principal com z-index inferior e overflow isolado */}
+      <SidebarInset className="flex-1 min-w-0 relative z-0">
         <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex h-14 md:h-16 items-center justify-between gap-4 px-4 md:px-8">
             <SidebarTrigger>
@@ -48,7 +52,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
           </div>
         </header>
         
-        <main ref={mainRef} className="p-4 md:p-8">
+        <main ref={mainRef} className="p-4 md:p-8 min-w-0 overflow-x-hidden">
           {children}
         </main>
       </SidebarInset>
