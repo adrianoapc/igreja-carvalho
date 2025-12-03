@@ -20,6 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { generatePdfThumbnail } from "@/lib/pdfUtils";
 
 interface TransacaoDialogProps {
   open: boolean;
@@ -85,8 +86,22 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setObservacoes(transacao.observacoes || "");
       setTipoLancamento(transacao.tipo_lancamento || "unico");
       setAnexoUrl(transacao.anexo_url || "");
-      setAnexoPreview(transacao.anexo_url || "");
-      setAnexoIsPdf(transacao.anexo_url?.toLowerCase().endsWith('.pdf') || false);
+      
+      const isPdf = transacao.anexo_url?.toLowerCase().endsWith('.pdf') || false;
+      setAnexoIsPdf(isPdf);
+      
+      // Gerar thumbnail se for PDF existente
+      if (isPdf && transacao.anexo_url) {
+        generatePdfThumbnail(transacao.anexo_url, 0.8)
+          .then(thumbnail => setAnexoPreview(thumbnail))
+          .catch(err => {
+            console.error('Erro ao gerar thumbnail do PDF:', err);
+            setAnexoPreview("");
+          });
+      } else {
+        setAnexoPreview(transacao.anexo_url || "");
+      }
+      
       setFoiPago(transacao.status === 'pago');
       setDataPagamento(transacao.data_pagamento ? new Date(transacao.data_pagamento) : undefined);
       setJuros(transacao.juros ? String(transacao.juros) : "");
@@ -333,13 +348,22 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     setAnexoIsPdf(isPdf);
     
-    // Criar preview se for imagem
+    // Criar preview
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
         setAnexoPreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+    } else if (isPdf) {
+      // Gerar thumbnail do PDF
+      try {
+        const thumbnail = await generatePdfThumbnail(file, 0.8);
+        setAnexoPreview(thumbnail);
+      } catch (error) {
+        console.error('Erro ao gerar thumbnail do PDF:', error);
+        setAnexoPreview("");
+      }
     } else {
       setAnexoPreview("");
     }
@@ -440,7 +464,16 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         setAnexoUrl(dados.anexo_url);
         const isPdf = dados.anexo_url.toLowerCase().endsWith('.pdf');
         setAnexoIsPdf(isPdf);
-        if (!isPdf) {
+        // Só gerar thumbnail se não tivermos um preview ainda (evita regenerar após upload)
+        if (isPdf && !anexoPreview) {
+          // Gerar thumbnail do PDF
+          generatePdfThumbnail(dados.anexo_url, 0.8)
+            .then(thumbnail => setAnexoPreview(thumbnail))
+            .catch(err => {
+              console.error('Erro ao gerar thumbnail do PDF:', err);
+              // Mantém vazio para mostrar fallback
+            });
+        } else if (!isPdf) {
           setAnexoPreview(dados.anexo_url);
         }
       }
@@ -662,16 +695,34 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             )}
             onClick={handleViewDocument}
           >
-            {anexoIsPdf ? (
+            {/* Mostrar thumbnail/preview se disponível (inclui PDFs com thumbnail gerado) */}
+            {anexoPreview ? (
+              <>
+                <img
+                  src={anexoPreview}
+                  alt={anexoIsPdf ? "Preview do PDF" : "Nota fiscal"}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Eye className="w-8 h-8 text-white" />
+                </div>
+                {anexoIsPdf && (
+                  <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    PDF
+                  </div>
+                )}
+              </>
+            ) : anexoIsPdf ? (
               <div className="w-full h-full flex flex-col items-center justify-center bg-muted gap-2">
                 <FileText className="w-12 h-12 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">PDF anexado</p>
                 <p className="text-xs text-muted-foreground/70">Clique para abrir em nova aba</p>
               </div>
-            ) : (anexoPreview || anexoUrl) ? (
+            ) : anexoUrl ? (
               <>
                 <img
-                  src={anexoPreview || anexoUrl}
+                  src={anexoUrl}
                   alt="Nota fiscal"
                   className="w-full h-full object-cover"
                 />
