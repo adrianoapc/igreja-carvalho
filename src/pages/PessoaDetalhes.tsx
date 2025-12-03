@@ -36,6 +36,9 @@ import {
   Minimize2,
   Plus,
   Trash2,
+  CalendarDays,
+  MessageCircle,
+  Activity,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -48,6 +51,9 @@ import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdi
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
 import { AtribuirFuncaoDialog } from "@/components/membros/AtribuirFuncaoDialog";
 import { FamiliaresSection } from "@/components/pessoas/FamiliaresSection";
+import { VidaIgrejaFrequencia } from "@/components/pessoas/VidaIgrejaFrequencia";
+import { VidaIgrejaIntercessao } from "@/components/pessoas/VidaIgrejaIntercessao";
+import { VidaIgrejaEnvolvimento } from "@/components/pessoas/VidaIgrejaEnvolvimento";
 import { formatarCPF, formatarTelefone, formatarCEP } from "@/lib/validators";
 
 interface PessoaDetalhesData {
@@ -284,10 +290,22 @@ export default function PessoaDetalhes() {
 
       {/* Tabs */}
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 h-auto">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 h-auto gap-1">
           <TabsTrigger value="perfil" className="flex-col gap-1 py-2 px-1 text-xs">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Perfil</span>
+          </TabsTrigger>
+          <TabsTrigger value="frequencia" className="flex-col gap-1 py-2 px-1 text-xs">
+            <CalendarDays className="w-4 h-4" />
+            <span className="hidden sm:inline">Frequência</span>
+          </TabsTrigger>
+          <TabsTrigger value="intercessao" className="flex-col gap-1 py-2 px-1 text-xs">
+            <MessageCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Intercessão</span>
+          </TabsTrigger>
+          <TabsTrigger value="envolvimento" className="flex-col gap-1 py-2 px-1 text-xs">
+            <Activity className="w-4 h-4" />
+            <span className="hidden sm:inline">Envolvimento</span>
           </TabsTrigger>
           <TabsTrigger value="pessoais" className="flex-col gap-1 py-2 px-1 text-xs">
             <Heart className="w-4 h-4" />
@@ -442,6 +460,21 @@ export default function PessoaDetalhes() {
               </div>
             </CardHeader>
           </Card>
+        </TabsContent>
+
+        {/* Tab: Frequência */}
+        <TabsContent value="frequencia" className="space-y-4">
+          <VidaIgrejaFrequencia pessoaId={pessoa.id} />
+        </TabsContent>
+
+        {/* Tab: Intercessão & Sentimentos */}
+        <TabsContent value="intercessao" className="space-y-4">
+          <VidaIgrejaIntercessao pessoaId={pessoa.id} />
+        </TabsContent>
+
+        {/* Tab: Envolvimento */}
+        <TabsContent value="envolvimento" className="space-y-4">
+          <VidaIgrejaEnvolvimento pessoaId={pessoa.id} />
         </TabsContent>
 
         {/* Tab: Pessoais */}
