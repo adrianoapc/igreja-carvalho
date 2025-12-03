@@ -1814,6 +1814,7 @@ export type Database = {
           created_at: string
           descricao: string | null
           id: string
+          lider_id: string | null
           nome: string
           updated_at: string
         }
@@ -1824,6 +1825,7 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           id?: string
+          lider_id?: string | null
           nome: string
           updated_at?: string
         }
@@ -1834,10 +1836,26 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           id?: string
+          lider_id?: string | null
           nome?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "times_culto_lider_id_fkey"
+            columns: ["lider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "times_culto_lider_id_fkey"
+            columns: ["lider_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
       }
       transacoes_financeiras: {
         Row: {
