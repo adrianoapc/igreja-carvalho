@@ -12,38 +12,35 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { ArrowLeft, Plus, Settings, Users } from "lucide-react";
+import { ArrowLeft, Plus, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { toast } from "sonner";
 import JornadaCard from "@/components/jornadas/JornadaCard";
 import KanbanColumn from "@/components/jornadas/KanbanColumn";
 import AdicionarPessoaDialog from "@/components/jornadas/AdicionarPessoaDialog";
 import EditarJornadaDialog from "@/components/jornadas/EditarJornadaDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function JornadaBoard() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAdicionarPessoa, setShowAdicionarPessoa] = useState(false);
   const [showEditarJornada, setShowEditarJornada] = useState(false);
+  const [filtro, setFiltro] = useState<string>("todos");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   );
 
-  // Fetch jornada details
   const { data: jornada, isLoading: loadingJornada } = useQuery({
     queryKey: ["jornada", id],
     queryFn: async () => {
@@ -58,7 +55,6 @@ export default function JornadaBoard() {
     },
   });
 
-  // Fetch etapas
   const { data: etapas, isLoading: loadingEtapas } = useQuery({
     queryKey: ["etapas-jornada", id],
     queryFn: async () => {
@@ -73,8 +69,7 @@ export default function JornadaBoard() {
     },
   });
 
-  // Fetch inscricoes with pessoa and responsavel
-  const { data: inscricoes, isLoading: loadingInscricoes, refetch: refetchInscricoes } = useQuery({
+  const { data: inscricoes, refetch: refetchInscricoes } = useQuery({
     queryKey: ["inscricoes-jornada", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -91,7 +86,6 @@ export default function JornadaBoard() {
     },
   });
 
-  // Mutation to update inscription
   const updateInscricaoMutation = useMutation({
     mutationFn: async ({
       inscricaoId,
@@ -115,21 +109,26 @@ export default function JornadaBoard() {
     },
   });
 
-  // Group inscricoes by etapa
-  const inscricoesByEtapa = useMemo(() => {
-    if (!inscricoes || !etapas) return {};
+  const inscricoesFiltradas = useMemo(() => {
+    if (!inscricoes) return [];
+    if (filtro === "minhas" && profile?.id) {
+      return inscricoes.filter((i) => i.responsavel_id === profile.id);
+    }
+    return inscricoes;
+  }, [inscricoes, filtro, profile?.id]);
 
-    const grouped: Record<string, typeof inscricoes> = {};
+  const inscricoesByEtapa = useMemo(() => {
+    if (!inscricoesFiltradas || !etapas) return {};
+
+    const grouped: Record<string, typeof inscricoesFiltradas> = {};
     
-    // Initialize all etapas
     etapas.forEach((etapa) => {
       grouped[etapa.id] = [];
     });
     
-    // Add "sem_etapa" for inscricoes without etapa
     grouped["sem_etapa"] = [];
 
-    inscricoes.forEach((inscricao) => {
+    inscricoesFiltradas.forEach((inscricao) => {
       const etapaId = inscricao.etapa_atual_id || "sem_etapa";
       if (grouped[etapaId]) {
         grouped[etapaId].push(inscricao);
@@ -139,9 +138,8 @@ export default function JornadaBoard() {
     });
 
     return grouped;
-  }, [inscricoes, etapas]);
+  }, [inscricoesFiltradas, etapas]);
 
-  // Find active inscricao for drag overlay
   const activeInscricao = useMemo(() => {
     if (!activeId || !inscricoes) return null;
     return inscricoes.find((i) => i.id === activeId);
@@ -160,42 +158,38 @@ export default function JornadaBoard() {
     const inscricaoId = active.id as string;
     const overId = over.id as string;
 
-    // Determine target etapa
     let targetEtapaId: string | null = null;
 
     if (overId.startsWith("column-")) {
-      // Dropped on column
       targetEtapaId = overId.replace("column-", "");
       if (targetEtapaId === "sem_etapa") targetEtapaId = null;
     } else {
-      // Dropped on another card - find its etapa
       const targetInscricao = inscricoes?.find((i) => i.id === overId);
       targetEtapaId = targetInscricao?.etapa_atual_id || null;
     }
 
-    // Find current etapa
     const currentInscricao = inscricoes?.find((i) => i.id === inscricaoId);
     if (!currentInscricao) return;
 
-    // Only update if etapa changed
     if (currentInscricao.etapa_atual_id !== targetEtapaId) {
       updateInscricaoMutation.mutate({
         inscricaoId,
         etapaId: targetEtapaId,
       });
-      toast.success("Etapa atualizada!");
+      toast.success("Etapa atualizada");
     }
   };
 
   const totalEtapas = etapas?.length || 1;
+  const totalInscritos = inscricoes?.length || 0;
 
   if (loadingJornada || loadingEtapas) {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="min-h-screen bg-muted/30 p-6">
         <Skeleton className="h-10 w-64 mb-6" />
         <div className="flex gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-96 w-72 flex-shrink-0" />
+            <Skeleton key={i} className="h-96 w-80 flex-shrink-0" />
           ))}
         </div>
       </div>
@@ -203,46 +197,57 @@ export default function JornadaBoard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-muted/30 flex flex-col">
       {/* Header */}
-      <div className="border-b bg-card sticky top-0 z-10">
+      <div className="bg-background border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate("/jornadas")}
+                className="rounded-full"
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-4 h-4 rounded"
+                  className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: jornada?.cor_tema || "#3b82f6" }}
                 />
                 <div>
-                  <h1 className="text-xl font-bold">{jornada?.titulo}</h1>
-                  {jornada?.descricao && (
-                    <p className="text-sm text-muted-foreground">
-                      {jornada.descricao}
-                    </p>
-                  )}
+                  <h1 className="text-lg font-semibold">{jornada?.titulo}</h1>
+                  <p className="text-xs text-muted-foreground">
+                    {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1">
-                <Users className="w-3 h-3" />
-                {inscricoes?.length || 0} inscritos
-              </Badge>
+
+            <div className="flex items-center gap-3">
+              <ToggleGroup
+                type="single"
+                value={filtro}
+                onValueChange={(v) => v && setFiltro(v)}
+                size="sm"
+                className="bg-muted rounded-lg p-0.5"
+              >
+                <ToggleGroupItem value="todos" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+                  Todos
+                </ToggleGroupItem>
+                <ToggleGroupItem value="minhas" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+                  Minhas
+                </ToggleGroupItem>
+              </ToggleGroup>
+
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => setShowEditarJornada(true)}
               >
                 <Settings className="w-4 h-4 mr-2" />
-                Editar
+                Configurar
               </Button>
               <Button size="sm" onClick={() => setShowAdicionarPessoa(true)}>
                 <Plus className="w-4 h-4 mr-2" />
@@ -254,8 +259,8 @@ export default function JornadaBoard() {
       </div>
 
       {/* Kanban Board */}
-      <ScrollArea className="w-full">
-        <div className="p-4 min-w-max">
+      <ScrollArea className="flex-1">
+        <div className="p-6 min-w-max">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
@@ -263,12 +268,10 @@ export default function JornadaBoard() {
             onDragEnd={handleDragEnd}
           >
             <div className="flex gap-4">
-              {/* Coluna "Sem Etapa" se houver inscricoes sem etapa */}
               {inscricoesByEtapa["sem_etapa"]?.length > 0 && (
                 <KanbanColumn
                   id="sem_etapa"
                   title="Aguardando"
-                  color="#6b7280"
                   items={inscricoesByEtapa["sem_etapa"]}
                   totalEtapas={totalEtapas}
                   etapaIndex={0}
@@ -276,13 +279,11 @@ export default function JornadaBoard() {
                 />
               )}
 
-              {/* Colunas das etapas */}
               {etapas?.map((etapa, index) => (
                 <KanbanColumn
                   key={etapa.id}
                   id={etapa.id}
                   title={etapa.titulo}
-                  color={jornada?.cor_tema || "#3b82f6"}
                   items={inscricoesByEtapa[etapa.id] || []}
                   totalEtapas={totalEtapas}
                   etapaIndex={index + 1}

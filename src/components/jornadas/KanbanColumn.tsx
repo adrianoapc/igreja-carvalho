@@ -3,14 +3,12 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Users } from "lucide-react";
 import JornadaCard from "./JornadaCard";
 
 interface KanbanColumnProps {
   id: string;
   title: string;
-  color: string;
   items: any[];
   totalEtapas: number;
   etapaIndex: number;
@@ -20,7 +18,6 @@ interface KanbanColumnProps {
 export default function KanbanColumn({
   id,
   title,
-  color,
   items,
   totalEtapas,
   etapaIndex,
@@ -31,44 +28,52 @@ export default function KanbanColumn({
   });
 
   return (
-    <Card
-      ref={setNodeRef}
-      className={`w-72 flex-shrink-0 transition-colors ${
-        isOver ? "bg-muted/50 ring-2 ring-primary" : ""
-      }`}
-    >
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: color }}
-            />
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-          </div>
-          <Badge variant="secondary" className="text-xs">
+    <div className="w-80 flex-shrink-0">
+      {/* Column Header */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            {title}
+          </h3>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
             {items.length}
-          </Badge>
+          </span>
         </div>
-      </CardHeader>
-      <CardContent className="min-h-[400px]">
+      </div>
+
+      {/* Column Content */}
+      <div
+        ref={setNodeRef}
+        className={`min-h-[500px] rounded-xl p-2 transition-colors ${
+          isOver 
+            ? "bg-primary/5 ring-2 ring-primary/20" 
+            : "bg-muted/40"
+        }`}
+      >
         <SortableContext
           items={items.map((i) => i.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-2">
-            {items.map((inscricao) => (
-              <JornadaCard
-                key={inscricao.id}
-                inscricao={inscricao}
-                totalEtapas={totalEtapas}
-                etapaIndex={etapaIndex}
-                onRefetch={onRefetch}
-              />
-            ))}
-          </div>
+          {items.length > 0 ? (
+            <div className="space-y-2">
+              {items.map((inscricao) => (
+                <JornadaCard
+                  key={inscricao.id}
+                  inscricao={inscricao}
+                  totalEtapas={totalEtapas}
+                  etapaIndex={etapaIndex}
+                  onRefetch={onRefetch}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="h-32 border-2 border-dashed border-muted-foreground/20 rounded-lg flex flex-col items-center justify-center text-muted-foreground/50">
+              <Users className="w-6 h-6 mb-2" />
+              <span className="text-xs">Arraste aqui</span>
+            </div>
+          )}
         </SortableContext>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
