@@ -35,6 +35,13 @@ interface Publicacao {
   culto_id: string | null;
   ordem_telao: number | null;
   categoria_midia: string | null;
+  midia_id: string | null;
+  midias?: {
+    id: string;
+    titulo: string;
+    url: string;
+    tipo: string;
+  } | null;
 }
 
 const TAGS_MOMENTO = [
@@ -67,7 +74,10 @@ export default function Publicacao() {
     try {
       const { data, error } = await supabase
         .from("comunicados")
-        .select("*")
+        .select(`
+          *,
+          midias (id, titulo, url, tipo)
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -312,8 +322,8 @@ export default function Publicacao() {
                           <TableRow key={item.id}>
                             <TableCell className="font-medium max-w-[200px]">
                               <div className="flex items-center gap-2">
-                                {item.imagem_url && (
-                                  <img src={item.imagem_url} alt="" className="w-10 h-10 rounded object-cover" />
+                                {(item.midias?.url || item.imagem_url) && (
+                                  <img src={item.midias?.url || item.imagem_url || ""} alt="" className="w-10 h-10 rounded object-cover" />
                                 )}
                                 <span className="truncate">{item.titulo}</span>
                               </div>
