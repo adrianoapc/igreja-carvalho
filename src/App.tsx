@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Banners from "./pages/Banners";
+import Comunicados from "./pages/Comunicados";
 import Pessoas from "./pages/pessoas";
 import PessoaDetalhes from "./pages/PessoaDetalhes";
 import TodosPessoas from "./pages/pessoas/Todos";
@@ -124,6 +125,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Banners />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comunicados"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Comunicados />
                 </MainLayout>
               </ProtectedRoute>
             }
