@@ -67,6 +67,7 @@ import JornadaBoard from "./pages/JornadaBoard";
 import Projetos from "./pages/Projetos";
 import ProjetoDetalhes from "./pages/ProjetoDetalhes";
 import Telao from "./pages/Telao";
+import TelaoLiturgia from "./pages/TelaoLiturgia";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -111,8 +112,9 @@ function App() {
           <Route path="/cadastro/visitante" element={<CadastroVisitante />} />
           <Route path="/cadastro/membro" element={<CadastroMembro />} />
           
-          {/* Rota pública do Telão */}
+          {/* Rotas públicas do Telão */}
           <Route path="/telao" element={<Telao />} />
+          <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
           
           {/* Rotas protegidas para membros */}
           <Route
