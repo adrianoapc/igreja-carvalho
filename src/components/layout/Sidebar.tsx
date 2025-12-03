@@ -374,8 +374,34 @@ export function AppSidebar() {
                         </SidebarMenuSubItem>
                       </Collapsible>
 
-                      {/* Outros itens de finanças */}
+                      {/* Geral */}
                       {financasItems.map(item => {
+                      const Icon = item.icon;
+                      return <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink to={item.path} end className="hover:bg-sidebar-accent" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
+                                <Icon className="w-4 h-4 text-white" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>;
+                    })}
+
+                      {/* Movimentações */}
+                      {financasMovimentaItems.map(item => {
+                      const Icon = item.icon;
+                      return <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink to={item.path} end className="hover:bg-sidebar-accent" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
+                                <Icon className="w-4 h-4 text-white" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>;
+                    })}
+
+                      {/* Configurações */}
+                      {financasConfigItems.map(item => {
                       const Icon = item.icon;
                       return <SidebarMenuSubItem key={item.path}>
                             <SidebarMenuSubButton asChild>
