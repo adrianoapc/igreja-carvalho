@@ -8,6 +8,7 @@ import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Banners from "./pages/Banners";
 import Comunicados from "./pages/Comunicados";
+import Publicacao from "./pages/Publicacao";
 import Pessoas from "./pages/pessoas";
 import PessoaDetalhes from "./pages/PessoaDetalhes";
 import TodosPessoas from "./pages/pessoas/Todos";
@@ -135,6 +136,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Comunicados />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/publicacao"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Publicacao />
                 </MainLayout>
               </ProtectedRoute>
             }
