@@ -352,48 +352,66 @@ export type Database = {
       comunicados: {
         Row: {
           ativo: boolean | null
+          categoria_midia: string | null
           created_at: string | null
           created_by: string | null
           data_fim: string | null
           data_inicio: string | null
           descricao: string | null
+          exibir_app: boolean | null
+          exibir_site: boolean | null
+          exibir_telao: boolean | null
           id: string
           imagem_url: string | null
           link_acao: string | null
           nivel_urgencia: string | null
+          ordem_telao: number | null
           tipo: Database["public"]["Enums"]["tipo_comunicado"]
           titulo: string
           updated_at: string | null
+          url_arquivo_telao: string | null
         }
         Insert: {
           ativo?: boolean | null
+          categoria_midia?: string | null
           created_at?: string | null
           created_by?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          exibir_app?: boolean | null
+          exibir_site?: boolean | null
+          exibir_telao?: boolean | null
           id?: string
           imagem_url?: string | null
           link_acao?: string | null
           nivel_urgencia?: string | null
+          ordem_telao?: number | null
           tipo?: Database["public"]["Enums"]["tipo_comunicado"]
           titulo: string
           updated_at?: string | null
+          url_arquivo_telao?: string | null
         }
         Update: {
           ativo?: boolean | null
+          categoria_midia?: string | null
           created_at?: string | null
           created_by?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          exibir_app?: boolean | null
+          exibir_site?: boolean | null
+          exibir_telao?: boolean | null
           id?: string
           imagem_url?: string | null
           link_acao?: string | null
           nivel_urgencia?: string | null
+          ordem_telao?: number | null
           tipo?: Database["public"]["Enums"]["tipo_comunicado"]
           titulo?: string
           updated_at?: string | null
+          url_arquivo_telao?: string | null
         }
         Relationships: []
       }
