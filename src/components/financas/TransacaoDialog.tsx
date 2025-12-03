@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1058,9 +1059,9 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   // Conteúdo do Dialog/Drawer
   const DialogContentInner = () => (
-    <form onSubmit={handleSubmit} className="flex flex-col h-full">
+    <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
       {/* Desktop: Split View */}
-      <div className="hidden md:grid md:grid-cols-2 md:gap-6 flex-1 overflow-hidden">
+      <div className="hidden md:grid md:grid-cols-2 md:gap-6 flex-1 min-h-0 overflow-hidden">
         {/* Coluna esquerda: Imagem */}
         <div className="space-y-4 overflow-y-auto pr-2">
           <h3 className="font-semibold text-sm">Documento</h3>
@@ -1079,13 +1080,15 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         </div>
 
         {/* Coluna direita: Formulário */}
-        <div className="overflow-y-auto pl-2 border-l">
-          <FormContent />
-        </div>
+        <ScrollArea className="h-full pl-2 border-l">
+          <div className="pr-4">
+            <FormContent />
+          </div>
+        </ScrollArea>
       </div>
 
       {/* Mobile: Coluna única */}
-      <div className="md:hidden flex-1 overflow-y-auto space-y-4 pb-20">
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 pb-20">
         {/* Upload em destaque no topo */}
         {tipo === 'saida' && !transacao && (
           <UploadSection />
@@ -1096,7 +1099,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       {/* Botões de ação - Sticky no mobile */}
       <div className={cn(
-        "flex gap-2 pt-4 border-t bg-background",
+        "flex gap-2 pt-4 border-t bg-background shrink-0",
         isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg"
       )}>
         <Button
