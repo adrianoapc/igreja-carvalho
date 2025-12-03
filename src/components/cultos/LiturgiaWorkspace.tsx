@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -21,7 +22,9 @@ import {
   Image as ImageIcon,
   Video,
   FileText,
-  Play
+  Play,
+  ChevronDown,
+  Monitor
 } from "lucide-react";
 import {
   DndContext,
@@ -213,6 +216,8 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
   const [recursos, setRecursos] = useState<RecursoLiturgia[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [showMediaEditor, setShowMediaEditor] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const permiteMultiplo = item 
     ? (item.permite_multiplo ?? TIPOS_MULTIPLOS.includes(item.tipo?.toLowerCase() || ''))
@@ -241,10 +246,21 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
         setResponsavelId(item.responsavel_id || "");
       }
       
+      // Reset media editor state when item changes
+      setShowMediaEditor(false);
+      setRecursos([]);
+      
       loadMidias();
       loadRecursos();
     }
   }, [item?.id]);
+
+  // Automatically open media editor if recursos exist
+  useEffect(() => {
+    if (recursos.length > 0) {
+      setShowMediaEditor(true);
+    }
+  }, [recursos.length]);
 
   const loadMidias = async () => {
     const { data, error } = await supabase
@@ -274,6 +290,10 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
         midia: Array.isArray(r.midia) ? r.midia[0] : r.midia
       }));
       setRecursos(recursosFormatados);
+      // Auto-open editor if resources exist
+      if (recursosFormatados.length > 0) {
+        setShowMediaEditor(true);
+      }
     }
   };
 
@@ -329,7 +349,7 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
         });
 
       if (error) throw error;
-      toast.success(permiteMultiplo ? "Mídia adicionada!" : "Mídia substituída!");
+      toast.success(permiteMultiplo ? "Mídia adicionada!" : "Mídia vinculada!");
       await loadRecursos();
       onSave();
     } catch (error: any) {
@@ -400,7 +420,6 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
   );
 
   const midiasSelecionadasIds = new Set(recursos.map(r => r.midia_id));
-  const showMediaEditor = item && (permiteMultiplo || TIPOS_MULTIPLOS.some(t => item.tipo.toLowerCase().includes(t.toLowerCase())));
 
   if (!item) {
     return (
@@ -416,6 +435,7 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
 
   return (
     <div className="h-full flex flex-col">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold">Editando: {item.titulo}</h3>
         <div className="flex gap-2">
@@ -431,196 +451,18 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
       </div>
 
       <ScrollArea className="flex-1">
-        {showMediaEditor ? (
-          // Split View: Form + Media Editor
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Form Column */}
-            <Card>
-              <CardHeader className="py-3">
-                <CardTitle className="text-sm">Detalhes do Item</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tipo</Label>
-                    <Select value={tipo} onValueChange={setTipo}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIPOS_LITURGIA.map(t => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Duração (min)</Label>
-                    <Input
-                      type="number"
-                      value={duracaoMinutos}
-                      onChange={(e) => setDuracaoMinutos(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Título</Label>
-                  <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="h-9" />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Descrição</Label>
-                  <Textarea 
-                    value={descricao} 
-                    onChange={(e) => setDescricao(e.target.value)} 
-                    rows={2}
-                    className="resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="convidado"
-                    checked={isConvidadoExterno}
-                    onCheckedChange={(checked) => setIsConvidadoExterno(!!checked)}
-                  />
-                  <Label htmlFor="convidado" className="text-xs">Convidado externo</Label>
-                </div>
-
-                {isConvidadoExterno ? (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nome do Convidado</Label>
-                    <Input
-                      value={nomeConvidadoExterno}
-                      onChange={(e) => setNomeConvidadoExterno(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Responsável</Label>
-                    <Select value={responsavelId} onValueChange={setResponsavelId}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {membros.map(m => (
-                          <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Media Editor Column */}
-            <div className="space-y-4">
-              {/* Playlist */}
-              <Card>
-                <CardHeader className="py-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Film className="w-4 h-4" />
-                      Playlist ({recursos.length})
-                    </CardTitle>
-                    {recursos.length > 0 && (
-                      <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
-                        <Play className="w-4 h-4 mr-1" />
-                        Preview
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={recursos.map(r => r.id)} strategy={verticalListSortingStrategy}>
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {recursos.length === 0 ? (
-                          <p className="text-xs text-muted-foreground text-center py-4">
-                            Arraste mídias do acervo abaixo
-                          </p>
-                        ) : (
-                          recursos.map(recurso => (
-                            <SortableRecursoCard
-                              key={recurso.id}
-                              recurso={recurso}
-                              onRemove={handleRemoveMidia}
-                              onDurationChange={handleDurationChange}
-                            />
-                          ))
-                        )}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
-                </CardContent>
-              </Card>
-
-              {/* Acervo */}
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm">Acervo de Mídias</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="relative mb-3">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 h-8"
-                    />
-                  </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {filteredMidias.map(midia => {
-                      const isSelected = midiasSelecionadasIds.has(midia.id);
-                      const isImage = midia.tipo?.toLowerCase() === 'imagem' || midia.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-                      
-                      return (
-                        <Card 
-                          key={midia.id}
-                          className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${isSelected ? 'opacity-50' : ''}`}
-                          onClick={() => !isSelected && handleAddMidia(midia)}
-                        >
-                          <CardContent className="p-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-10 h-10 rounded overflow-hidden bg-muted shrink-0">
-                                {isImage ? (
-                                  <img src={midia.url} alt={midia.titulo} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <Video className="w-5 h-5 text-muted-foreground" />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium truncate">{midia.titulo}</p>
-                                <Badge variant="secondary" className="text-xs mt-0.5">{midia.tipo}</Badge>
-                              </div>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isSelected}>
-                                <Plus className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        ) : (
-          // Simple Form (no media)
+        <div className="space-y-4 pr-2">
+          {/* Seção 1: Detalhes do Item */}
           <Card>
-            <CardContent className="pt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">Detalhes do Item</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo</Label>
                   <Select value={tipo} onValueChange={setTipo}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -630,52 +472,45 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Duração (min)</Label>
+                <div className="space-y-1">
+                  <Label className="text-xs">Duração (min)</Label>
                   <Input
                     type="number"
                     value={duracaoMinutos}
                     onChange={(e) => setDuracaoMinutos(e.target.value)}
+                    className="h-9"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Título</Label>
-                <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Descrição</Label>
-                <Textarea 
-                  value={descricao} 
-                  onChange={(e) => setDescricao(e.target.value)} 
-                  rows={3}
-                />
+              <div className="space-y-1">
+                <Label className="text-xs">Título</Label>
+                <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="h-9" />
               </div>
 
               <div className="flex items-center gap-2">
                 <Checkbox
-                  id="convidado-simple"
+                  id="convidado"
                   checked={isConvidadoExterno}
                   onCheckedChange={(checked) => setIsConvidadoExterno(!!checked)}
                 />
-                <Label htmlFor="convidado-simple">Convidado externo</Label>
+                <Label htmlFor="convidado" className="text-xs">Convidado externo</Label>
               </div>
 
               {isConvidadoExterno ? (
-                <div className="space-y-2">
-                  <Label>Nome do Convidado</Label>
+                <div className="space-y-1">
+                  <Label className="text-xs">Nome do Convidado</Label>
                   <Input
                     value={nomeConvidadoExterno}
                     onChange={(e) => setNomeConvidadoExterno(e.target.value)}
+                    className="h-9"
                   />
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <Label>Responsável</Label>
+                <div className="space-y-1">
+                  <Label className="text-xs">Responsável</Label>
                   <Select value={responsavelId} onValueChange={setResponsavelId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -686,9 +521,174 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
                   </Select>
                 </div>
               )}
+
+              {/* Collapsible Detalhes Adicionais */}
+              <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs text-muted-foreground hover:text-foreground">
+                    Detalhes Adicionais
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${detailsOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2 animate-in slide-in-from-top-1 duration-200">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Descrição</Label>
+                    <Textarea 
+                      value={descricao} 
+                      onChange={(e) => setDescricao(e.target.value)} 
+                      rows={3}
+                      placeholder="Observações ou instruções adicionais..."
+                      className="resize-none text-sm"
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
           </Card>
-        )}
+
+          {/* Seção 2: Mídia e Projeção */}
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Monitor className="w-4 h-4" />
+                Mídia e Projeção
+                {recursos.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">{recursos.length} slide{recursos.length !== 1 ? 's' : ''}</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!showMediaEditor ? (
+                /* Estado A: Botão para adicionar mídia */
+                <button
+                  onClick={() => setShowMediaEditor(true)}
+                  className="w-full border-2 border-dashed border-muted-foreground/30 rounded-lg p-6 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 group"
+                >
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
+                    <Plus className="w-8 h-8" />
+                    <span className="text-sm font-medium">Adicionar Mídia / Slides</span>
+                    <span className="text-xs">Clique para vincular imagens ou vídeos</span>
+                  </div>
+                </button>
+              ) : (
+                /* Estado B: Editor de Mídia completo */
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {/* Playlist */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium flex items-center gap-1.5">
+                        <Film className="w-3.5 h-3.5" />
+                        Playlist ({recursos.length})
+                      </Label>
+                      <div className="flex gap-1">
+                        {recursos.length > 0 && (
+                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowPreview(true)}>
+                            <Play className="w-3 h-3 mr-1" />
+                            Preview
+                          </Button>
+                        )}
+                        {recursos.length === 0 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 text-xs text-muted-foreground"
+                            onClick={() => setShowMediaEditor(false)}
+                          >
+                            Fechar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={recursos.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {recursos.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-3 bg-muted/30 rounded-md">
+                              Selecione mídias do acervo abaixo
+                            </p>
+                          ) : (
+                            recursos.map(recurso => (
+                              <SortableRecursoCard
+                                key={recurso.id}
+                                recurso={recurso}
+                                onRemove={handleRemoveMidia}
+                                onDurationChange={handleDurationChange}
+                              />
+                            ))
+                          )}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                    
+                    {!permiteMultiplo && recursos.length > 0 && (
+                      <p className="text-xs text-muted-foreground italic">
+                        Este tipo permite apenas 1 mídia. Adicionar outra substituirá a atual.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Acervo */}
+                  <div className="space-y-2 border-t pt-3">
+                    <Label className="text-xs font-medium">Acervo de Mídias</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar mídia..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 h-8 text-sm"
+                      />
+                    </div>
+                    <ScrollArea className="h-48">
+                      <div className="space-y-2 pr-2">
+                        {filteredMidias.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            Nenhuma mídia encontrada
+                          </p>
+                        ) : (
+                          filteredMidias.map(midia => {
+                            const isSelected = midiasSelecionadasIds.has(midia.id);
+                            const isImage = midia.tipo?.toLowerCase() === 'imagem' || midia.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                            
+                            return (
+                              <Card 
+                                key={midia.id}
+                                className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${isSelected ? 'opacity-50 bg-primary/5' : ''}`}
+                                onClick={() => handleAddMidia(midia)}
+                              >
+                                <CardContent className="p-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded overflow-hidden bg-muted shrink-0">
+                                      {isImage ? (
+                                        <img src={midia.url} alt={midia.titulo} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <Video className="w-5 h-5 text-muted-foreground" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium truncate">{midia.titulo}</p>
+                                      <Badge variant="secondary" className="text-xs mt-0.5">{midia.tipo}</Badge>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                                      <Plus className={`w-4 h-4 ${isSelected ? 'text-muted-foreground' : 'text-primary'}`} />
+                                    </Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </ScrollArea>
 
       {/* Preview Dialog */}
