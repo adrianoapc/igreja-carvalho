@@ -2292,6 +2292,16 @@ export type Database = {
         Args: { p_lat: number; p_long: number; p_telefone: string }
         Returns: Json
       }
+      get_dre_anual: {
+        Args: { p_ano: number }
+        Returns: {
+          categoria_id: string
+          categoria_nome: string
+          mes: number
+          secao_dre: string
+          total: number
+        }[]
+      }
       get_minha_lista_chamada: {
         Args: { p_culto_id: string }
         Returns: {
