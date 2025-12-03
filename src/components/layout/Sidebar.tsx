@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3, Settings, Image, PieChart, LineChart, TrendingUpIcon, ClipboardCheck } from "lucide-react";
+import { Home, Users, MessageCircle, Heart, Calendar, DollarSign, BookOpen, UserPlus, Megaphone, Baby, Shield, PhoneCall, UsersRound, HandHeart, ChevronDown, TrendingUp, TrendingDown, Building2, Target, FolderTree, UserCog, Church, LayoutDashboard, BarChart3, Settings, Image, PieChart, LineChart, TrendingUpIcon, ClipboardCheck, Route } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEffect, useState } from "react";
@@ -33,6 +33,10 @@ const pessoasItems = [{
   icon: PhoneCall,
   label: "Contatos Agendados",
   path: "/pessoas/contatos"
+}, {
+  icon: Route,
+  label: "Jornadas",
+  path: "/jornadas"
 }];
 const intercessaoItems = [{
   icon: HandHeart,
