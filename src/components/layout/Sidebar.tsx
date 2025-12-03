@@ -226,6 +226,11 @@ const cultosItems = [
     label: "Mídias",
     path: "/cultos/midias",
   },
+  {
+    icon: ClipboardCheck,
+    label: "Escalas Mensais",
+    path: "/escalas",
+  },
 ];
 
 const midiasItems = [

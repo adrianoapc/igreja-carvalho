@@ -70,6 +70,7 @@ import Projetos from "./pages/Projetos";
 import ProjetoDetalhes from "./pages/ProjetoDetalhes";
 import Telao from "./pages/Telao";
 import TelaoLiturgia from "./pages/TelaoLiturgia";
+import Escalas from "./pages/Escalas";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -315,6 +316,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <CultoDetalhes />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/escalas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Escalas />
                 </MainLayout>
               </ProtectedRoute>
             }
