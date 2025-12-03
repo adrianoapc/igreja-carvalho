@@ -493,7 +493,7 @@ export function AppSidebar() {
                                         className="hover:bg-sidebar-accent pl-8"
                                         activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
                                       >
-                                        <Icon className="w-3 h-3 text-white" />
+                                        <Icon className="w-4 h-4 text-white" />
                                         {!isCollapsed && <span className="text-xs">{item.label}</span>}
                                       </NavLink>
                                     </SidebarMenuSubButton>
