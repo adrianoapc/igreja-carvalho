@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Camera, Upload, Eye, X, Loader2, ZoomIn, ZoomOut } from "lucide-react";
+import { CalendarIcon, Camera, Upload, Eye, X, Loader2, ZoomIn, ZoomOut, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +58,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const [anexoFile, setAnexoFile] = useState<File | null>(null);
   const [anexoUrl, setAnexoUrl] = useState<string>("");
   const [anexoPreview, setAnexoPreview] = useState<string>("");
+  const [anexoIsPdf, setAnexoIsPdf] = useState(false);
   
   // Campos de confirmação de pagamento/recebimento
   const [foiPago, setFoiPago] = useState(false);
@@ -85,6 +86,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setTipoLancamento(transacao.tipo_lancamento || "unico");
       setAnexoUrl(transacao.anexo_url || "");
       setAnexoPreview(transacao.anexo_url || "");
+      setAnexoIsPdf(transacao.anexo_url?.toLowerCase().endsWith('.pdf') || false);
       setFoiPago(transacao.status === 'pago');
       setDataPagamento(transacao.data_pagamento ? new Date(transacao.data_pagamento) : undefined);
       setJuros(transacao.juros ? String(transacao.juros) : "");
@@ -119,6 +121,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setAnexoFile(null);
     setAnexoUrl("");
     setAnexoPreview("");
+    setAnexoIsPdf(false);
     setFoiPago(false);
     setDataPagamento(undefined);
     setJuros("");
@@ -327,6 +330,9 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const handleFileSelected = async (file: File) => {
     setAnexoFile(file);
     
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    setAnexoIsPdf(isPdf);
+    
     // Criar preview se for imagem
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
@@ -432,7 +438,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       if (dados.anexo_url) {
         setAnexoUrl(dados.anexo_url);
-        setAnexoPreview(dados.anexo_url);
+        const isPdf = dados.anexo_url.toLowerCase().endsWith('.pdf');
+        setAnexoIsPdf(isPdf);
+        if (!isPdf) {
+          setAnexoPreview(dados.anexo_url);
+        }
       }
 
       // Buscar fornecedor existente - priorizar CNPJ/CPF
@@ -596,6 +606,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setAnexoFile(null);
     setAnexoUrl("");
     setAnexoPreview("");
+    setAnexoIsPdf(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -649,9 +660,15 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               "relative rounded-lg overflow-hidden border cursor-pointer group",
               isMobile ? "h-[120px]" : "h-[200px] md:h-full md:min-h-[300px]"
             )}
-            onClick={() => setImagePreviewOpen(true)}
+            onClick={() => anexoIsPdf && anexoUrl ? window.open(anexoUrl, '_blank') : setImagePreviewOpen(true)}
           >
-            {anexoPreview || anexoUrl ? (
+            {anexoIsPdf ? (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-muted gap-2">
+                <FileText className="w-12 h-12 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">PDF anexado</p>
+                <p className="text-xs text-muted-foreground/70">Clique para visualizar</p>
+              </div>
+            ) : (anexoPreview || anexoUrl) ? (
               <>
                 <img
                   src={anexoPreview || anexoUrl}
@@ -664,7 +681,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </>
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted">
-                <p className="text-muted-foreground">PDF anexado</p>
+                <p className="text-muted-foreground">Arquivo anexado</p>
               </div>
             )}
           </div>
@@ -690,7 +707,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               variant="secondary"
               size="sm"
               className="absolute bottom-2 right-2 gap-1 shadow-lg"
-              onClick={() => setImagePreviewOpen(true)}
+              onClick={() => anexoIsPdf && anexoUrl ? window.open(anexoUrl, '_blank') : setImagePreviewOpen(true)}
             >
               <Eye className="w-4 h-4" />
               Ver Nota
@@ -1113,12 +1130,20 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         </SheetHeader>
         <div className="flex-1 overflow-auto p-4">
           <div className="flex items-center justify-center min-h-full">
-            <img
-              src={anexoPreview || anexoUrl}
-              alt="Nota fiscal"
-              className="max-w-full transition-transform duration-200"
-              style={{ transform: `scale(${imageZoom})` }}
-            />
+            {anexoIsPdf ? (
+              <iframe
+                src={anexoUrl}
+                className="w-full h-full min-h-[500px] border-0"
+                title="Visualização do PDF"
+              />
+            ) : (
+              <img
+                src={anexoPreview || anexoUrl}
+                alt="Nota fiscal"
+                className="max-w-full transition-transform duration-200"
+                style={{ transform: `scale(${imageZoom})` }}
+              />
+            )}
           </div>
         </div>
       </SheetContent>
