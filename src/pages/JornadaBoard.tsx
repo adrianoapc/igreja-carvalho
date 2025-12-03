@@ -16,7 +16,6 @@ import { ArrowLeft, Plus, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { toast } from "sonner";
 import JornadaCard from "@/components/jornadas/JornadaCard";
@@ -259,15 +258,15 @@ export default function JornadaBoard() {
       </div>
 
       {/* Kanban Board */}
-      <ScrollArea className="flex-1">
-        <div className="p-6 min-w-max">
+      <div className="flex-1 overflow-x-auto">
+        <div className="h-[calc(100vh-120px)] p-6">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="flex gap-4">
+            <div className="flex gap-4 h-full items-start">
               {inscricoesByEtapa["sem_etapa"]?.length > 0 && (
                 <KanbanColumn
                   id="sem_etapa"
@@ -308,8 +307,7 @@ export default function JornadaBoard() {
             </DragOverlay>
           </DndContext>
         </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+      </div>
 
       <AdicionarPessoaDialog
         open={showAdicionarPessoa}

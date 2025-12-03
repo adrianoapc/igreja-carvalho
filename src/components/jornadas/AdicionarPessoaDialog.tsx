@@ -131,36 +131,38 @@ export default function AdicionarPessoaDialog({
           </div>
 
           {/* Lista de pessoas */}
-          <ScrollArea className="h-[300px] border rounded-lg">
+          <ScrollArea className="h-[300px]">
             {isLoading ? (
               <div className="p-4 text-center text-muted-foreground">
                 Carregando...
               </div>
             ) : pessoas && pessoas.length > 0 ? (
-              <div className="p-2 space-y-1">
+              <div className="space-y-2 pr-3">
                 {pessoas.map((pessoa) => (
                   <button
                     key={pessoa.id}
                     onClick={() => setSelectedPessoa(pessoa)}
-                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
+                    className={`w-full flex items-center justify-between p-3 border rounded-lg transition-colors ${
                       selectedPessoa?.id === pessoa.id
-                        ? "bg-primary/10 ring-1 ring-primary"
-                        : "hover:bg-muted"
+                        ? "bg-primary/5 border-primary ring-1 ring-primary/20"
+                        : "hover:bg-muted/50 border-border"
                     }`}
                   >
-                    <Avatar className="h-10 w-10 shrink-0">
-                      <AvatarImage src={pessoa.avatar_url} />
-                      <AvatarFallback>
-                        {getInitials(pessoa.nome)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <p className="font-medium truncate">{pessoa.nome}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {pessoa.telefone || "Sem telefone"}
-                      </p>
+                    <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                      <Avatar className="h-9 w-9 shrink-0">
+                        <AvatarImage src={pessoa.avatar_url} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(pessoa.nome)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0 text-left">
+                        <span className="text-sm font-medium truncate">{pessoa.nome}</span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {pessoa.telefone || "Sem telefone"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 ml-2">
                       {getStatusBadge(pessoa.status)}
                     </div>
                   </button>
@@ -179,11 +181,12 @@ export default function AdicionarPessoaDialog({
           </ScrollArea>
 
           {/* Actions */}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button
+              size="sm"
               onClick={() => selectedPessoa && addMutation.mutate(selectedPessoa.id)}
               disabled={!selectedPessoa || addMutation.isPending}
             >

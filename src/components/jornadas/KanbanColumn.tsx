@@ -4,6 +4,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { Users } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import JornadaCard from "./JornadaCard";
 
 interface KanbanColumnProps {
@@ -28,7 +29,7 @@ export default function KanbanColumn({
   });
 
   return (
-    <div className="w-80 flex-shrink-0">
+    <div className="w-[320px] shrink-0 flex flex-col max-h-full">
       {/* Column Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
@@ -44,35 +45,39 @@ export default function KanbanColumn({
       {/* Column Content */}
       <div
         ref={setNodeRef}
-        className={`min-h-[500px] rounded-xl p-2 transition-colors ${
+        className={`flex-1 rounded-xl border transition-colors overflow-hidden ${
           isOver 
-            ? "bg-primary/5 ring-2 ring-primary/20" 
-            : "bg-muted/40"
+            ? "bg-primary/5 border-primary/30" 
+            : "bg-muted/30 border-border/50"
         }`}
       >
-        <SortableContext
-          items={items.map((i) => i.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {items.length > 0 ? (
-            <div className="space-y-2">
-              {items.map((inscricao) => (
-                <JornadaCard
-                  key={inscricao.id}
-                  inscricao={inscricao}
-                  totalEtapas={totalEtapas}
-                  etapaIndex={etapaIndex}
-                  onRefetch={onRefetch}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="h-32 border-2 border-dashed border-muted-foreground/20 rounded-lg flex flex-col items-center justify-center text-muted-foreground/50">
-              <Users className="w-6 h-6 mb-2" />
-              <span className="text-xs">Arraste aqui</span>
-            </div>
-          )}
-        </SortableContext>
+        <ScrollArea className="h-full max-h-[calc(100vh-220px)]">
+          <div className="p-3">
+            <SortableContext
+              items={items.map((i) => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {items.length > 0 ? (
+                <div className="space-y-2">
+                  {items.map((inscricao) => (
+                    <JornadaCard
+                      key={inscricao.id}
+                      inscricao={inscricao}
+                      totalEtapas={totalEtapas}
+                      etapaIndex={etapaIndex}
+                      onRefetch={onRefetch}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="h-24 border-2 border-dashed border-muted-foreground/20 rounded-lg flex flex-col items-center justify-center text-muted-foreground/50">
+                  <Users className="w-5 h-5 mb-1" />
+                  <span className="text-xs">Arraste aqui</span>
+                </div>
+              )}
+            </SortableContext>
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

@@ -99,27 +99,27 @@ export default function Jornadas() {
               return (
                 <Card
                   key={jornada.id}
-                  className="group cursor-pointer hover:shadow-md transition-all duration-200 bg-card border"
+                  className="group cursor-pointer hover:shadow-md transition-all duration-200 bg-card border h-full flex flex-col"
                   onClick={() => navigate(`/jornadas/${jornada.id}`)}
                 >
-                  <CardContent className="p-5">
+                  <CardContent className="p-5 flex flex-col flex-1">
                     {/* Header */}
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 min-w-0">
                           <div
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: jornada.cor_tema || "#3b82f6" }}
                           />
-                          <h3 className="font-semibold text-base truncate">
+                          <h3 className="font-semibold text-base truncate leading-tight">
                             {jornada.titulo}
                           </h3>
                         </div>
-                        <Badge variant="secondary" className="text-xs font-normal">
+                        <Badge variant="secondary" className="text-xs font-normal shrink-0">
                           {etapas} etapas
                         </Badge>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </div>
 
                     {/* Descrição */}
@@ -130,10 +130,10 @@ export default function Jornadas() {
                     )}
 
                     {/* Footer */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 mt-auto">
                       {/* Avatar Group */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center shrink-0">
                           {pessoas.length > 0 ? (
                             <div className="flex -space-x-2">
                               {pessoas.map((pessoa: any, idx: number) => (
@@ -163,7 +163,7 @@ export default function Jornadas() {
                           )}
                         </div>
                         {concluidos > 0 && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground shrink-0">
                             {concluidos} concluídos
                           </span>
                         )}
