@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink, FileText, Video, Image as ImageIcon, GripVertical, Save, Download } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Clock, User, UserPlus, MessageCircle, Send, Film, ExternalLink, FileText, Video, Image as ImageIcon, GripVertical, Save, Download, Layers } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -31,6 +31,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { AplicarTemplateDialog } from "./AplicarTemplateDialog";
 import { SalvarComoTemplateDialog } from "./SalvarComoTemplateDialog";
+import RecursosLiturgiaSheet from "./RecursosLiturgiaSheet";
 
 interface Culto {
   id: string;
@@ -179,12 +180,15 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
   const [membros, setMembros] = useState<Membro[]>([]);
   const [midias, setMidias] = useState<Midia[]>([]);
   const [midiasVinculadas, setMidiasVinculadas] = useState<Map<string, Midia[]>>(new Map());
+  const [recursosCount, setRecursosCount] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState<ItemLiturgia | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showMidiasDialog, setShowMidiasDialog] = useState(false);
   const [showAplicarTemplate, setShowAplicarTemplate] = useState(false);
   const [showSalvarTemplate, setShowSalvarTemplate] = useState(false);
+  const [showRecursosSheet, setShowRecursosSheet] = useState(false);
+  const [itemParaRecursos, setItemParaRecursos] = useState<ItemLiturgia | null>(null);
 
   // Form state
   const [tipo, setTipo] = useState("");
@@ -208,8 +212,48 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
       loadItens();
       loadMembros();
       loadMidias();
+      loadRecursosCount();
     }
   }, [open, culto]);
+
+  const loadRecursosCount = async () => {
+    if (!culto) return;
+    
+    try {
+      // Primeiro buscar todos os itens de liturgia deste culto
+      const { data: itensData } = await supabase
+        .from("liturgia_culto")
+        .select("id")
+        .eq("culto_id", culto.id);
+
+      if (!itensData || itensData.length === 0) return;
+
+      const itensIds = itensData.map(i => i.id);
+
+      // Buscar contagem de recursos para cada item
+      const { data, error } = await supabase
+        .from("liturgia_recursos")
+        .select("liturgia_item_id")
+        .in("liturgia_item_id", itensIds);
+
+      if (error) throw error;
+
+      // Contar recursos por item
+      const countMap = new Map<string, number>();
+      (data || []).forEach(r => {
+        countMap.set(r.liturgia_item_id, (countMap.get(r.liturgia_item_id) || 0) + 1);
+      });
+      
+      setRecursosCount(countMap);
+    } catch (error: any) {
+      console.error("Erro ao carregar contagem de recursos:", error.message);
+    }
+  };
+
+  const handleAbrirRecursos = (item: ItemLiturgia) => {
+    setItemParaRecursos(item);
+    setShowRecursosSheet(true);
+  };
 
   const loadMembros = async () => {
     try {
@@ -764,6 +808,16 @@ Qualquer dúvida, entre em contato conosco.`;
                                 {item.responsavel.nome}
                               </Badge>
                             ) : null}
+                            {recursosCount.get(item.id) ? (
+                              <Badge 
+                                variant="default" 
+                                className="text-xs cursor-pointer hover:bg-primary/80"
+                                onClick={() => handleAbrirRecursos(item)}
+                              >
+                                <Layers className="w-3 h-3 mr-1" />
+                                {recursosCount.get(item.id)} slides
+                              </Badge>
+                            ) : null}
                           </div>
                           <h4 className="font-medium text-sm">{item.titulo}</h4>
                            {item.descricao && (
@@ -898,6 +952,15 @@ Qualquer dúvida, entre em contato conosco.`;
                             title="Enviar WhatsApp"
                           >
                             <MessageCircle className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAbrirRecursos(item)}
+                            disabled={loading}
+                            title="Gerenciar Slides"
+                          >
+                            <Layers className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -1076,6 +1139,14 @@ Qualquer dúvida, entre em contato conosco.`;
             />
           </>
         )}
+
+        {/* Editor de Recursos */}
+        <RecursosLiturgiaSheet
+          open={showRecursosSheet}
+          onOpenChange={setShowRecursosSheet}
+          item={itemParaRecursos}
+          onResourcesUpdate={loadRecursosCount}
+        />
       </DialogContent>
     </Dialog>
   );
