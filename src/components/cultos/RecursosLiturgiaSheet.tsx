@@ -18,7 +18,8 @@ import {
   Film,
   Replace,
   Play,
-  Clock
+  Clock,
+  ExternalLink
 } from "lucide-react";
 import {
   DndContext,
@@ -558,15 +559,26 @@ export default function RecursosLiturgiaSheet({
                   </h3>
                   
                   {recursos.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowPreview(true)}
-                      className="gap-1"
-                    >
-                      <Play className="w-3 h-3" />
-                      Preview
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPreview(true)}
+                        className="gap-1"
+                      >
+                        <Play className="w-3 h-3" />
+                        Preview
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/telao/liturgia/${item.id}`, '_blank')}
+                        className="gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Telão
+                      </Button>
+                    </div>
                   )}
                 </div>
                 
