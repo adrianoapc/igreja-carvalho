@@ -1247,18 +1247,33 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           {/* Área de Conteúdo (Viewer) */}
           <div className="flex-1 bg-muted/50 relative w-full h-full flex items-center justify-center p-4 overflow-hidden">
             {isPdf ? (
-              // Usa <object> para PDFs - melhor compatibilidade que iframe
-              <object data={currentUrl} type="application/pdf" className="w-full h-full rounded shadow-sm bg-card">
-                {/* Fallback se o browser não suportar */}
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-                  <FileText className="w-16 h-16 opacity-50" />
-                  <p className="text-center">Não foi possível visualizar o PDF aqui.</p>
-                  <Button variant="secondary" onClick={handleDownload}>
+              // Google Docs Viewer - funciona com qualquer URL pública/assinada
+              <div className="w-full h-full relative bg-card rounded shadow-sm overflow-hidden">
+                <iframe
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(currentUrl)}&embedded=true`}
+                  className="w-full h-full border-0"
+                  frameBorder={0}
+                  title="Visualizador de PDF"
+                />
+                {/* Botão de Fallback flutuante caso o Google falhe */}
+                <div className="absolute bottom-4 right-4 flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.href = currentUrl;
+                      link.target = "_blank";
+                      link.rel = "noopener noreferrer";
+                      link.click();
+                    }}
+                    className="shadow-lg"
+                  >
                     <Download className="w-4 h-4 mr-2" />
-                    Baixar documento
+                    Abrir Externamente
                   </Button>
                 </div>
-              </object>
+              </div>
             ) : (
               // Imagens com zoom
               <div className="flex items-center justify-center h-full w-full overflow-auto">
