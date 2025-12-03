@@ -175,6 +175,45 @@ Deno.serve(async (req) => {
           console.log(`Notificação criada com sucesso para ${pessoa.nome}`);
         }
       }
+
+      // Disparar webhook para o Make (Ação Urgente)
+      const webhookUrl = Deno.env.get('WEBHOOK_MAKE_ALERTA_EMOCIONAL');
+      
+      if (webhookUrl) {
+        console.log('Disparando webhook para Make...');
+        
+        const membrosAlerta = pessoas?.map(p => ({
+          id: p.id,
+          nome: p.nome,
+          email: p.email,
+          telefone: p.telefone
+        })) || [];
+
+        try {
+          const webhookResponse = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              tipo: 'ALERTA_EMOCIONAL',
+              dataAlerta: new Date().toISOString(),
+              totalMembros: membrosAlerta.length,
+              membros: membrosAlerta
+            })
+          });
+
+          if (webhookResponse.ok) {
+            console.log('Webhook Make disparado com sucesso');
+          } else {
+            console.error('Erro ao disparar webhook Make:', webhookResponse.status, await webhookResponse.text());
+          }
+        } catch (webhookError) {
+          console.error('Erro ao conectar com webhook Make:', webhookError);
+        }
+      } else {
+        console.log('Webhook Make não configurado (WEBHOOK_MAKE_ALERTA_EMOCIONAL)');
+      }
     }
 
     // Registrar execução bem-sucedida
