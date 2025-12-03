@@ -527,6 +527,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         anexoPath = urlData.publicUrl;
       }
 
+      // Validar conta obrigatória
+      if (!contaId || contaId === 'none' || contaId === '') {
+        toast.error('Selecione uma conta');
+        setLoading(false);
+        return;
+      }
+
       const transacaoData = {
         tipo,
         tipo_lancamento: tipoLancamento,
