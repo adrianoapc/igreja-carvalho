@@ -8,8 +8,8 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { QRCodeSVG } from "qrcode.react";
 import { 
-  QrCode,
   DollarSign,
   HeartHandshake,
   Play,
@@ -171,8 +171,13 @@ export default function DashboardMember() {
             <p className="font-semibold text-foreground truncate">{profile?.nome}</p>
             <p className="text-sm text-muted-foreground capitalize">{profile?.status}</p>
           </div>
-          <div className="p-2 bg-background rounded-lg border">
-            <QrCode className="w-12 h-12 text-muted-foreground" />
+          <div className="p-1.5 bg-white rounded-lg border">
+            <QRCodeSVG 
+              value={`checkin:${profile?.id || ''}`}
+              size={52}
+              level="M"
+              includeMargin={false}
+            />
           </div>
         </CardContent>
       </Card>
