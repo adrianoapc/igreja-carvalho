@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search, X, Trash2 } from "lucide-react";
+import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search, X, Trash2, Crown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,11 +19,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TimeDialog from "@/components/cultos/TimeDialog";
 import GerenciarTimeDialog from "@/components/cultos/GerenciarTimeDialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Membro {
   id: string;
   nome: string;
   posicao: string | null;
+}
+
+interface Lider {
+  id: string;
+  nome: string;
+  avatar_url: string | null;
 }
 
 interface Time {
@@ -33,6 +40,8 @@ interface Time {
   descricao: string | null;
   cor: string | null;
   ativo: boolean;
+  lider_id: string | null;
+  lider: Lider | null;
   membros_count: number;
   membros: Membro[];
 }
@@ -84,6 +93,7 @@ export default function Times() {
         .from("times_culto")
         .select(`
           *,
+          lider:lider_id(id, nome, avatar_url),
           membros_time(
             pessoa_id,
             posicao_id,
@@ -108,6 +118,7 @@ export default function Times() {
 
         return {
           ...time,
+          lider: time.lider || null,
           membros_count: membros.length,
           membros: membros
         };
@@ -378,6 +389,21 @@ export default function Times() {
                       <p className="text-xs md:text-sm text-muted-foreground">
                         {time.descricao}
                       </p>
+                    )}
+
+                    {/* Líder */}
+                    {time.lider && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Crown className="w-4 h-4 text-amber-500" />
+                        <span className="text-muted-foreground">Líder:</span>
+                        <Avatar className="w-5 h-5">
+                          <AvatarImage src={time.lider.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs">
+                            {time.lider.nome.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{time.lider.nome}</span>
+                      </div>
                     )}
 
                     {/* Contador de membros e botão expandir */}
