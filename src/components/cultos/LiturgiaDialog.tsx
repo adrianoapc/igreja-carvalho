@@ -63,6 +63,7 @@ interface ItemLiturgia {
   responsavel_id: string | null;
   responsavel_externo: string | null;
   midias_ids: string[] | null;
+  permite_multiplo?: boolean;
   responsavel?: {
     nome: string;
     telefone: string | null;
