@@ -1215,21 +1215,29 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           {/* Header do Visualizador */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-background z-10 shrink-0">
             <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setImagePreviewOpen(false)}
+                className="h-10 w-10 shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </Button>
               {isPdf ? (
                 <FileText className="w-5 h-5 text-destructive" />
               ) : (
                 <ImageIcon className="w-5 h-5 text-primary" />
               )}
-              <h3 className="font-semibold text-lg">{isPdf ? "Visualizar Documento PDF" : "Visualizar Imagem"}</h3>
+              <h3 className="font-semibold text-base md:text-lg truncate">{isPdf ? "Documento PDF" : "Imagem"}</h3>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2">
               {/* Zoom controls apenas para imagens */}
               {!isPdf && (
-                <div className="flex items-center gap-1 mr-2">
+                <div className="flex items-center gap-1 mr-1 md:mr-2">
                   <Button variant="ghost" size="sm" onClick={() => setImageZoom((prev) => Math.max(0.5, prev - 0.25))}>
                     <ZoomOut className="w-4 h-4" />
                   </Button>
-                  <span className="text-sm text-muted-foreground min-w-[3rem] text-center">
+                  <span className="text-xs md:text-sm text-muted-foreground min-w-[2.5rem] md:min-w-[3rem] text-center">
                     {Math.round(imageZoom * 100)}%
                   </span>
                   <Button variant="ghost" size="sm" onClick={() => setImageZoom((prev) => Math.min(3, prev + 0.25))}>
@@ -1237,9 +1245,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   </Button>
                 </div>
               )}
-              <Button variant="outline" size="sm" onClick={handleDownload}>
+              <Button variant="outline" size="sm" onClick={handleDownload} className="hidden md:flex">
                 <Download className="w-4 h-4 mr-2" />
                 Baixar
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleDownload} className="md:hidden h-9 w-9">
+                <Download className="w-4 h-4" />
               </Button>
             </div>
           </div>
