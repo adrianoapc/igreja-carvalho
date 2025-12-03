@@ -27,7 +27,7 @@ interface Membro {
   posicao: string | null;
 }
 
-interface Lider {
+interface LiderInfo {
   id: string;
   nome: string;
   avatar_url: string | null;
@@ -41,7 +41,9 @@ interface Time {
   cor: string | null;
   ativo: boolean;
   lider_id: string | null;
-  lider: Lider | null;
+  sublider_id: string | null;
+  lider: LiderInfo | null;
+  sublider: LiderInfo | null;
   membros_count: number;
   membros: Membro[];
 }
@@ -93,7 +95,8 @@ export default function Times() {
         .from("times_culto")
         .select(`
           *,
-          lider:lider_id(id, nome, avatar_url),
+          lider:profiles!times_culto_lider_id_fkey(id, nome, avatar_url),
+          sublider:profiles!times_culto_sublider_id_fkey(id, nome, avatar_url),
           membros_time(
             pessoa_id,
             posicao_id,
@@ -119,12 +122,13 @@ export default function Times() {
         return {
           ...time,
           lider: time.lider || null,
+          sublider: time.sublider || null,
           membros_count: membros.length,
           membros: membros
         };
       }) || [];
 
-      setTimes(timesWithCount);
+      setTimes(timesWithCount as Time[]);
     } catch (error: any) {
       toast.error("Erro ao carregar times", {
         description: error.message
@@ -391,18 +395,35 @@ export default function Times() {
                       </p>
                     )}
 
-                    {/* Líder */}
-                    {time.lider && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Crown className="w-4 h-4 text-amber-500" />
-                        <span className="text-muted-foreground">Líder:</span>
-                        <Avatar className="w-5 h-5">
-                          <AvatarImage src={time.lider.avatar_url || undefined} />
-                          <AvatarFallback className="text-xs">
-                            {time.lider.nome.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{time.lider.nome}</span>
+                    {/* Líder e Sub-líder */}
+                    {(time.lider || time.sublider) && (
+                      <div className="flex flex-col gap-1 text-sm">
+                        {time.lider && (
+                          <div className="flex items-center gap-2">
+                            <Crown className="w-4 h-4 text-amber-500" />
+                            <span className="text-muted-foreground">Líder:</span>
+                            <Avatar className="w-5 h-5">
+                              <AvatarImage src={time.lider.avatar_url || undefined} />
+                              <AvatarFallback className="text-xs">
+                                {time.lider.nome.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{time.lider.nome}</span>
+                          </div>
+                        )}
+                        {time.sublider && (
+                          <div className="flex items-center gap-2">
+                            <Crown className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">Sub-líder:</span>
+                            <Avatar className="w-5 h-5">
+                              <AvatarImage src={time.sublider.avatar_url || undefined} />
+                              <AvatarFallback className="text-xs">
+                                {time.sublider.nome.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{time.sublider.nome}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 

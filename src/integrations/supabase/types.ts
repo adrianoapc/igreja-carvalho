@@ -1816,6 +1816,7 @@ export type Database = {
           id: string
           lider_id: string | null
           nome: string
+          sublider_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1827,6 +1828,7 @@ export type Database = {
           id?: string
           lider_id?: string | null
           nome: string
+          sublider_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1838,6 +1840,7 @@ export type Database = {
           id?: string
           lider_id?: string | null
           nome?: string
+          sublider_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1851,6 +1854,20 @@ export type Database = {
           {
             foreignKeyName: "times_culto_lider_id_fkey"
             columns: ["lider_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "times_culto_sublider_id_fkey"
+            columns: ["sublider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "times_culto_sublider_id_fkey"
+            columns: ["sublider_id"]
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]

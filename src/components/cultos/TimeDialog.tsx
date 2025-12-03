@@ -20,6 +20,7 @@ interface Time {
   cor: string | null;
   ativo: boolean;
   lider_id?: string | null;
+  sublider_id?: string | null;
 }
 
 interface TimeDialogProps {
@@ -35,7 +36,8 @@ const timeSchema = z.object({
   descricao: z.string().max(500, "Descrição deve ter no máximo 500 caracteres").optional(),
   cor: z.string().regex(/^#[0-9A-F]{6}$/i, "Cor inválida"),
   ativo: z.boolean(),
-  lider_id: z.string().uuid().optional().nullable()
+  lider_id: z.string().uuid().optional().nullable(),
+  sublider_id: z.string().uuid().optional().nullable()
 });
 
 interface Categoria {
@@ -72,7 +74,8 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
     descricao: "",
     cor: "#8B5CF6",
     ativo: true,
-    lider_id: "" as string | null
+    lider_id: "" as string | null,
+    sublider_id: "" as string | null
   });
 
   useEffect(() => {
@@ -120,7 +123,8 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
         descricao: time.descricao || "",
         cor: time.cor || "#8B5CF6",
         ativo: time.ativo,
-        lider_id: time.lider_id || null
+        lider_id: time.lider_id || null,
+        sublider_id: time.sublider_id || null
       });
     } else {
       setFormData({
@@ -129,7 +133,8 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
         descricao: "",
         cor: "#8B5CF6",
         ativo: true,
-        lider_id: null
+        lider_id: null,
+        sublider_id: null
       });
     }
   }, [time, open]);
@@ -154,7 +159,8 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
         descricao: formData.descricao.trim() || null,
         cor: formData.cor,
         ativo: formData.ativo,
-        lider_id: formData.lider_id || null
+        lider_id: formData.lider_id || null,
+        sublider_id: formData.sublider_id || null
       };
 
       if (time) {
@@ -263,7 +269,41 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
                     Sem líder definido
                   </div>
                 </SelectItem>
-                {membros.map((membro) => (
+                {membros.filter(m => m.id !== formData.sublider_id).map((membro) => (
+                  <SelectItem key={membro.id} value={membro.id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarImage src={membro.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(membro.nome)}
+                        </AvatarFallback>
+                      </Avatar>
+                      {membro.nome}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Sub-líder */}
+          <div className="space-y-2">
+            <Label htmlFor="sublider">Sub-líder do Time</Label>
+            <Select
+              value={formData.sublider_id || "none"}
+              onValueChange={(value) => setFormData({ ...formData, sublider_id: value === "none" ? null : value })}
+            >
+              <SelectTrigger id="sublider">
+                <SelectValue placeholder="Selecione um sub-líder (opcional)" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50 max-h-60">
+                <SelectItem value="none">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <User className="w-4 h-4" />
+                    Sem sub-líder definido
+                  </div>
+                </SelectItem>
+                {membros.filter(m => m.id !== formData.lider_id).map((membro) => (
                   <SelectItem key={membro.id} value={membro.id}>
                     <div className="flex items-center gap-2">
                       <Avatar className="w-6 h-6">
@@ -279,7 +319,7 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              O líder pode fazer chamada rápida dos membros deste time
+              Líder e sub-líder podem fazer chamada rápida dos membros
             </p>
           </div>
 
