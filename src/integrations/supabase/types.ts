@@ -661,6 +661,41 @@ export type Database = {
           },
         ]
       }
+      etapas_jornada: {
+        Row: {
+          created_at: string | null
+          id: string
+          jornada_id: string
+          ordem: number
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          jornada_id: string
+          ordem: number
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          jornada_id?: string
+          ordem?: number
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "etapas_jornada_jornada_id_fkey"
+            columns: ["jornada_id"]
+            isOneToOne: false
+            referencedRelation: "jornadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       familias: {
         Row: {
           created_at: string
@@ -822,6 +857,88 @@ export type Database = {
         }
         Relationships: []
       }
+      inscricoes_jornada: {
+        Row: {
+          concluido: boolean | null
+          created_at: string | null
+          data_entrada: string | null
+          data_mudanca_fase: string | null
+          etapa_atual_id: string | null
+          id: string
+          jornada_id: string
+          pessoa_id: string
+          responsavel_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          concluido?: boolean | null
+          created_at?: string | null
+          data_entrada?: string | null
+          data_mudanca_fase?: string | null
+          etapa_atual_id?: string | null
+          id?: string
+          jornada_id: string
+          pessoa_id: string
+          responsavel_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          concluido?: boolean | null
+          created_at?: string | null
+          data_entrada?: string | null
+          data_mudanca_fase?: string | null
+          etapa_atual_id?: string | null
+          id?: string
+          jornada_id?: string
+          pessoa_id?: string
+          responsavel_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inscricoes_jornada_etapa_atual_id_fkey"
+            columns: ["etapa_atual_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_jornada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_jornada_id_fkey"
+            columns: ["jornada_id"]
+            isOneToOne: false
+            referencedRelation: "jornadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       intercessores: {
         Row: {
           ativo: boolean | null
@@ -907,6 +1024,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      jornadas: {
+        Row: {
+          ativo: boolean | null
+          cor_tema: string | null
+          created_at: string | null
+          descricao: string | null
+          id: string
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cor_tema?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cor_tema?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       liturgia_culto: {
         Row: {
