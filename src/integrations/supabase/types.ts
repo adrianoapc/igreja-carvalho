@@ -1373,25 +1373,25 @@ export type Database = {
           created_at: string | null
           culto_id: string
           id: string
-          metodo_checkin: string | null
+          metodo: string | null
           pessoa_id: string
-          tipo_registro: string | null
+          validado_por: string | null
         }
         Insert: {
           created_at?: string | null
           culto_id: string
           id?: string
-          metodo_checkin?: string | null
+          metodo?: string | null
           pessoa_id: string
-          tipo_registro?: string | null
+          validado_por?: string | null
         }
         Update: {
           created_at?: string | null
           culto_id?: string
           id?: string
-          metodo_checkin?: string | null
+          metodo?: string | null
           pessoa_id?: string
-          tipo_registro?: string | null
+          validado_por?: string | null
         }
         Relationships: [
           {
@@ -1414,6 +1414,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_validado_por_fkey"
+            columns: ["validado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
