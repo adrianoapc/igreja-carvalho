@@ -82,7 +82,7 @@ const financasConfigItems = [{
   label: "Fornecedores",
   path: "/financas/fornecedores"
 }];
-const financasMovimentaItems = [{                      {
+const financasMovimentaItems = [{
   icon: TrendingUp,
   label: "Entradas",
   path: "/financas/entradas"
