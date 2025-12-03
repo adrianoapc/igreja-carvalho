@@ -6,21 +6,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertTriangle, MessageCircle, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { subDays, differenceInDays } from "date-fns";
 
-interface MemberAlert {
+interface OvelhaEmRisco {
   id: string;
   nome: string;
   avatar_url: string | null;
   telefone: string | null;
-  alertType: "ausencia" | "sentimento";
-  alertReason: string;
-  daysAbsent?: number;
-  sentimento?: string;
+  tipo_risco: "ausencia" | "sentimento";
+  detalhe: string;
+  gravidade: number;
 }
 
 export default function AtencaoPastoralWidget() {
-  const [alerts, setAlerts] = useState<MemberAlert[]>([]);
+  const [alerts, setAlerts] = useState<OvelhaEmRisco[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -30,84 +28,19 @@ export default function AtencaoPastoralWidget() {
 
   const loadAlerts = async () => {
     try {
-      const today = new Date();
-      const twentyOneDaysAgo = subDays(today, 21);
-      const sevenDaysAgo = subDays(today, 7);
+      const { data, error } = await supabase.rpc("get_ovelhas_em_risco");
 
-      // Get members with negative feelings in last 7 days
-      const { data: sentimentosData } = await supabase
-        .from("sentimentos_membros")
-        .select(`
-          pessoa_id,
-          sentimento,
-          data_registro,
-          profiles:pessoa_id (
-            id,
-            nome,
-            avatar_url,
-            telefone
-          )
-        `)
-        .in("sentimento", ["triste", "angustiado", "sozinho"])
-        .gte("data_registro", sevenDaysAgo.toISOString())
-        .order("data_registro", { ascending: false });
+      if (error) {
+        console.error("Erro ao carregar ovelhas em risco:", error);
+        return;
+      }
 
-      // Get all active members
-      const { data: membrosData } = await supabase
-        .from("profiles")
-        .select("id, nome, avatar_url, telefone")
-        .eq("status", "membro");
+      // Sort by gravidade (critical first) and limit to 5
+      const sorted = (data as OvelhaEmRisco[] || [])
+        .sort((a, b) => b.gravidade - a.gravidade)
+        .slice(0, 5);
 
-      // Get attendance in last 21 days
-      const { data: presencasData } = await supabase
-        .from("presencas_culto")
-        .select("pessoa_id, created_at")
-        .gte("created_at", twentyOneDaysAgo.toISOString());
-
-      const alertsList: MemberAlert[] = [];
-      const addedIds = new Set<string>();
-
-      // Add members with negative feelings
-      sentimentosData?.forEach((s) => {
-        const profile = s.profiles as any;
-        if (profile && !addedIds.has(profile.id)) {
-          const sentimentoLabel = 
-            s.sentimento === "triste" ? "Triste" :
-            s.sentimento === "angustiado" ? "Angustiado" :
-            s.sentimento === "sozinho" ? "Sozinho" : s.sentimento;
-          
-          alertsList.push({
-            id: profile.id,
-            nome: profile.nome,
-            avatar_url: profile.avatar_url,
-            telefone: profile.telefone,
-            alertType: "sentimento",
-            alertReason: `Sentimento: ${sentimentoLabel}`,
-            sentimento: s.sentimento,
-          });
-          addedIds.add(profile.id);
-        }
-      });
-
-      // Find members absent for 21+ days
-      const pessoasComPresenca = new Set(presencasData?.map((p) => p.pessoa_id) || []);
-      
-      membrosData?.forEach((membro) => {
-        if (!pessoasComPresenca.has(membro.id) && !addedIds.has(membro.id)) {
-          alertsList.push({
-            id: membro.id,
-            nome: membro.nome,
-            avatar_url: membro.avatar_url,
-            telefone: membro.telefone,
-            alertType: "ausencia",
-            alertReason: "Ausente há 21+ dias",
-            daysAbsent: 21,
-          });
-          addedIds.add(membro.id);
-        }
-      });
-
-      setAlerts(alertsList.slice(0, 5));
+      setAlerts(sorted);
     } catch (error) {
       console.error("Erro ao carregar alertas:", error);
     } finally {
@@ -191,14 +124,14 @@ export default function AtencaoPastoralWidget() {
                     {alert.nome}
                   </p>
                   <Badge
-                    variant={alert.alertType === "ausencia" ? "destructive" : "secondary"}
+                    variant={alert.gravidade === 2 ? "destructive" : "secondary"}
                     className={`text-xs mt-1 ${
-                      alert.alertType === "sentimento"
+                      alert.tipo_risco === "sentimento"
                         ? "bg-amber-100 text-amber-800 hover:bg-amber-100"
                         : ""
                     }`}
                   >
-                    {alert.alertReason}
+                    {alert.detalhe}
                   </Badge>
                 </div>
 
