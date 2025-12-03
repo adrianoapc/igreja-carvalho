@@ -13,16 +13,24 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  Upload, X, Image as ImageIcon, Video, Megaphone, 
+  X, Image as ImageIcon, Video, Megaphone, 
   Smartphone, Monitor, Globe, Check, ChevronRight, ChevronLeft,
-  Users, Bell
+  Users, Bell, FolderOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MediaPickerDialog } from "./MediaPickerDialog";
 
 interface Culto {
   id: string;
   titulo: string;
   data_culto: string;
+}
+
+interface MidiaSelecionada {
+  id: string;
+  titulo: string;
+  url: string;
+  tipo: string;
 }
 
 interface PublicacaoStepperProps {
@@ -56,12 +64,12 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [cultos, setCultos] = useState<Culto[]>([]);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<"main" | "telao">("main");
   
-  // Arquivos
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageTelaoFile, setImageTelaoFile] = useState<File | null>(null);
-  const [imageTelaoPreview, setImageTelaoPreview] = useState<string | null>(null);
+  // Mídia selecionada do acervo
+  const [midiaSelecionada, setMidiaSelecionada] = useState<MidiaSelecionada | null>(null);
+  const [midiaTelaoSelecionada, setMidiaTelaoSelecionada] = useState<MidiaSelecionada | null>(null);
 
   // Step 1: Conteúdo
   const [formData, setFormData] = useState({
@@ -113,13 +121,34 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
           culto_id: publicacao.culto_id || "",
           ordem_telao: publicacao.ordem_telao || 0,
         });
-        setImagePreview(publicacao.imagem_url || null);
-        setImageTelaoPreview(publicacao.url_arquivo_telao || null);
+        // Carregar mídia vinculada
+        if (publicacao.midia_id) {
+          loadMidia(publicacao.midia_id, "main");
+        }
       } else {
         resetForm();
       }
     }
   }, [publicacao, open]);
+
+  const loadMidia = async (midiaId: string, target: "main" | "telao") => {
+    try {
+      const { data } = await supabase
+        .from("midias")
+        .select("id, titulo, url, tipo")
+        .eq("id", midiaId)
+        .single();
+      if (data) {
+        if (target === "main") {
+          setMidiaSelecionada(data);
+        } else {
+          setMidiaTelaoSelecionada(data);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao carregar mídia:", error);
+    }
+  };
 
   const resetForm = () => {
     setCurrentStep(1);
@@ -142,10 +171,8 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
       ordem_telao: 0,
     });
     setSegmentacao({ publico_alvo: "todos" });
-    setImageFile(null);
-    setImagePreview(null);
-    setImageTelaoFile(null);
-    setImageTelaoPreview(null);
+    setMidiaSelecionada(null);
+    setMidiaTelaoSelecionada(null);
   };
 
   const loadCultos = async () => {
@@ -162,39 +189,16 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: "main" | "telao") => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Arquivo muito grande", description: "Máximo: 5MB", variant: "destructive" });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (type === "main") {
-        setImageFile(file);
-        setImagePreview(reader.result as string);
-      } else {
-        setImageTelaoFile(file);
-        setImageTelaoPreview(reader.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+  const openMediaPicker = (target: "main" | "telao") => {
+    setMediaPickerTarget(target);
+    setMediaPickerOpen(true);
   };
 
-  const uploadImage = async (file: File, prefix: string): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const { error } = await supabase.storage.from("comunicados").upload(fileName, file);
-      if (error) throw error;
-      const { data } = supabase.storage.from("comunicados").getPublicUrl(fileName);
-      return data.publicUrl;
-    } catch (error) {
-      console.error("Upload error:", error);
-      return null;
+  const handleMediaSelect = (midia: any) => {
+    if (mediaPickerTarget === "main") {
+      setMidiaSelecionada(midia);
+    } else {
+      setMidiaTelaoSelecionada(midia);
     }
   };
 
@@ -213,8 +217,12 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
         toast({ title: "Título obrigatório", variant: "destructive" });
         return false;
       }
-      if (formData.tipo === "banner" && !imagePreview) {
-        toast({ title: "Imagem obrigatória para banner", variant: "destructive" });
+      if (formData.tipo === "banner" && !midiaSelecionada) {
+        toast({ title: "Selecione uma imagem do acervo", variant: "destructive" });
+        return false;
+      }
+      if (formData.tipo === "video" && !midiaSelecionada) {
+        toast({ title: "Selecione um vídeo do acervo", variant: "destructive" });
         return false;
       }
       if (formData.tipo === "alerta" && !formData.descricao.trim()) {
@@ -244,16 +252,6 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
 
     setIsLoading(true);
     try {
-      let imageUrl = publicacao?.imagem_url || null;
-      let imageTelaoUrl = publicacao?.url_arquivo_telao || null;
-
-      if (imageFile) {
-        imageUrl = await uploadImage(imageFile, "pub");
-      }
-      if (imageTelaoFile) {
-        imageTelaoUrl = await uploadImage(imageTelaoFile, "telao");
-      }
-
       const tipoDb: "alerta" | "banner" = formData.tipo === "alerta" ? "alerta" : "banner";
       
       const payload = {
@@ -261,14 +259,15 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
         descricao: formData.descricao || null,
         tipo: tipoDb,
         nivel_urgencia: formData.tipo === "alerta" ? formData.nivel_urgencia : null,
-        imagem_url: formData.tipo !== "alerta" ? imageUrl : null,
+        midia_id: formData.tipo !== "alerta" ? midiaSelecionada?.id : null,
+        imagem_url: formData.tipo !== "alerta" ? midiaSelecionada?.url : null,
         ativo: formData.ativo,
         data_inicio: formData.data_inicio?.toISOString() || new Date().toISOString(),
         data_fim: formData.data_fim?.toISOString() || null,
         exibir_app: distribuicao.exibir_app,
         exibir_telao: distribuicao.exibir_telao,
         exibir_site: distribuicao.exibir_site,
-        url_arquivo_telao: distribuicao.exibir_telao ? imageTelaoUrl : null,
+        url_arquivo_telao: distribuicao.exibir_telao && midiaTelaoSelecionada ? midiaTelaoSelecionada.url : null,
         ordem_telao: distribuicao.exibir_telao ? distribuicao.ordem_telao : 0,
         tags: distribuicao.exibir_telao ? distribuicao.tags : [],
         culto_id: distribuicao.exibir_telao && distribuicao.culto_id ? distribuicao.culto_id : null,
@@ -378,41 +377,46 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
               />
             </div>
 
-            {/* Upload - Banner/Video */}
+            {/* Seletor de Mídia - Banner/Video */}
             {formData.tipo !== "alerta" && (
               <div className="space-y-2">
-                <Label>Arquivo Principal (Mobile) *</Label>
-                {imagePreview ? (
+                <Label>Mídia do Acervo *</Label>
+                {midiaSelecionada ? (
                   <div className="relative">
-                    {formData.tipo === "video" ? (
-                      <video src={imagePreview} className="w-full h-40 object-cover rounded-lg" controls />
+                    {formData.tipo === "video" || midiaSelecionada.tipo === "video" ? (
+                      <div className="w-full h-40 bg-muted rounded-lg flex items-center justify-center">
+                        <Video className="h-10 w-10 text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">{midiaSelecionada.titulo}</span>
+                      </div>
                     ) : (
-                      <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
+                      <img src={midiaSelecionada.url} alt={midiaSelecionada.titulo} className="w-full h-40 object-cover rounded-lg" />
                     )}
+                    <div className="absolute bottom-2 left-2 right-10">
+                      <Badge variant="secondary" className="text-xs truncate max-w-full">
+                        {midiaSelecionada.titulo}
+                      </Badge>
+                    </div>
                     <Button
                       variant="destructive"
                       size="icon"
                       className="absolute top-2 right-2 h-7 w-7"
-                      onClick={() => { setImageFile(null); setImagePreview(null); }}
+                      onClick={() => setMidiaSelecionada(null)}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
-                    <input
-                      type="file"
-                      accept={formData.tipo === "video" ? "video/*" : "image/*"}
-                      onChange={e => handleImageChange(e, "main")}
-                      className="hidden"
-                      id="main-file"
-                    />
-                    <label htmlFor="main-file" className="cursor-pointer">
-                      <Upload className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                      <p className="text-sm text-primary font-medium">Clique para upload</p>
-                      <p className="text-xs text-muted-foreground">Formato vertical recomendado (9:16)</p>
-                    </label>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openMediaPicker("main")}
+                    className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors"
+                  >
+                    <FolderOpen className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-primary font-medium">Selecionar Mídia do Acervo</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.tipo === "video" ? "Selecione um vídeo" : "Selecione uma imagem"}
+                    </p>
+                  </button>
                 )}
               </div>
             )}
@@ -603,31 +607,26 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
                         {formData.tipo !== "alerta" && (
                           <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground">ARTE ALTERNATIVA PARA TELÃO (16:9)</Label>
-                            {imageTelaoPreview ? (
+                            {midiaTelaoSelecionada ? (
                               <div className="relative">
-                                <img src={imageTelaoPreview} alt="Telão" className="w-full h-24 object-cover rounded-lg" />
+                                <img src={midiaTelaoSelecionada.url} alt={midiaTelaoSelecionada.titulo} className="w-full h-24 object-cover rounded-lg" />
                                 <Button
                                   variant="destructive"
                                   size="icon"
                                   className="absolute top-1 right-1 h-6 w-6"
-                                  onClick={() => { setImageTelaoFile(null); setImageTelaoPreview(null); }}
+                                  onClick={(e) => { e.stopPropagation(); setMidiaTelaoSelecionada(null); }}
                                 >
                                   <X className="h-3 w-3" />
                                 </Button>
                               </div>
                             ) : (
-                              <div className="border border-dashed rounded-lg p-3 text-center">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={e => handleImageChange(e, "telao")}
-                                  className="hidden"
-                                  id="telao-file"
-                                />
-                                <label htmlFor="telao-file" className="cursor-pointer text-xs text-muted-foreground">
-                                  Upload opcional (16:9)
-                                </label>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); openMediaPicker("telao"); }}
+                                className="w-full border border-dashed rounded-lg p-3 text-center hover:border-primary/50 transition-colors"
+                              >
+                                <span className="text-xs text-muted-foreground">Selecionar do acervo (16:9)</span>
+                              </button>
                             )}
                           </div>
                         )}
@@ -747,6 +746,15 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
           )}
         </div>
       </DialogContent>
+
+      {/* Media Picker Dialog */}
+      <MediaPickerDialog
+        open={mediaPickerOpen}
+        onOpenChange={setMediaPickerOpen}
+        onSelect={handleMediaSelect}
+        selectedId={mediaPickerTarget === "main" ? midiaSelecionada?.id : midiaTelaoSelecionada?.id}
+        tipoFiltro={formData.tipo === "video" ? "video" : "imagem"}
+      />
     </Dialog>
   );
 }
