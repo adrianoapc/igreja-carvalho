@@ -2156,6 +2156,18 @@ export type Database = {
           tipo_grupo: string
         }[]
       }
+      get_ovelhas_em_risco: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          detalhe: string
+          gravidade: number
+          id: string
+          nome: string
+          telefone: string
+          tipo_risco: string
+        }[]
+      }
       get_user_module_access: {
         Args: { _module_name: string; _user_id: string }
         Returns: Database["public"]["Enums"]["access_level"]
