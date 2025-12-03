@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.cadastro-publico]
 verify_jwt = false
+
+[functions.checkin-whatsapp-geo]
+verify_jwt = false
