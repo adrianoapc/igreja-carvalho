@@ -1212,6 +1212,48 @@ export type Database = {
           },
         ]
       }
+      liturgia_recursos: {
+        Row: {
+          created_at: string | null
+          duracao_segundos: number | null
+          id: string
+          liturgia_item_id: string
+          midia_id: string
+          ordem: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          duracao_segundos?: number | null
+          id?: string
+          liturgia_item_id: string
+          midia_id: string
+          ordem?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          duracao_segundos?: number | null
+          id?: string
+          liturgia_item_id?: string
+          midia_id?: string
+          ordem?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liturgia_recursos_liturgia_item_id_fkey"
+            columns: ["liturgia_item_id"]
+            isOneToOne: false
+            referencedRelation: "liturgia_culto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liturgia_recursos_midia_id_fkey"
+            columns: ["midia_id"]
+            isOneToOne: false
+            referencedRelation: "midias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membro_funcoes: {
         Row: {
           ativo: boolean | null
