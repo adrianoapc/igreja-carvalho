@@ -292,6 +292,16 @@ function App() {
             }
           />
           <Route
+            path="/cultos/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <CultoDetalhes />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/cultos"
             element={
               <ProtectedRoute>
@@ -310,16 +320,6 @@ function App() {
             <Route path="midias" element={<MidiasGeral />} />
             <Route path="templates" element={<Templates />} />
           </Route>
-          <Route
-            path="/cultos/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <CultoDetalhes />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="/escalas"
             element={
