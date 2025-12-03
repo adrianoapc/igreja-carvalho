@@ -660,13 +660,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               "relative rounded-lg overflow-hidden border cursor-pointer group",
               isMobile ? "h-[120px]" : "h-[200px] md:h-full md:min-h-[300px]"
             )}
-            onClick={() => anexoIsPdf && anexoUrl ? window.open(anexoUrl, '_blank') : setImagePreviewOpen(true)}
+            onClick={handleViewDocument}
           >
             {anexoIsPdf ? (
               <div className="w-full h-full flex flex-col items-center justify-center bg-muted gap-2">
                 <FileText className="w-12 h-12 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">PDF anexado</p>
-                <p className="text-xs text-muted-foreground/70">Clique para visualizar</p>
+                <p className="text-xs text-muted-foreground/70">Clique para abrir em nova aba</p>
               </div>
             ) : (anexoPreview || anexoUrl) ? (
               <>
@@ -707,10 +707,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               variant="secondary"
               size="sm"
               className="absolute bottom-2 right-2 gap-1 shadow-lg"
-              onClick={() => anexoIsPdf && anexoUrl ? window.open(anexoUrl, '_blank') : setImagePreviewOpen(true)}
+              onClick={handleViewDocument}
             >
               <Eye className="w-4 h-4" />
-              Ver Nota
+              {anexoIsPdf ? 'Abrir PDF' : 'Ver Nota'}
             </Button>
           )}
         </div>
@@ -1102,7 +1102,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     </div>
   );
 
-  // Sheet para visualizar imagem em tela cheia
+  // Sheet para visualizar imagem em tela cheia (apenas para imagens, PDFs abrem em nova aba)
   const ImagePreviewSheet = () => (
     <Sheet open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
       <SheetContent side="bottom" className="h-[90vh] p-0">
@@ -1130,25 +1130,26 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         </SheetHeader>
         <div className="flex-1 overflow-auto p-4">
           <div className="flex items-center justify-center min-h-full">
-            {anexoIsPdf ? (
-              <iframe
-                src={anexoUrl}
-                className="w-full h-full min-h-[500px] border-0"
-                title="Visualização do PDF"
-              />
-            ) : (
-              <img
-                src={anexoPreview || anexoUrl}
-                alt="Nota fiscal"
-                className="max-w-full transition-transform duration-200"
-                style={{ transform: `scale(${imageZoom})` }}
-              />
-            )}
+            <img
+              src={anexoPreview || anexoUrl}
+              alt="Nota fiscal"
+              className="max-w-full transition-transform duration-200"
+              style={{ transform: `scale(${imageZoom})` }}
+            />
           </div>
         </div>
       </SheetContent>
     </Sheet>
   );
+
+  // Handler para abrir visualização - PDFs abrem em nova aba
+  const handleViewDocument = () => {
+    if (anexoIsPdf && anexoUrl) {
+      window.open(anexoUrl, '_blank');
+    } else {
+      setImagePreviewOpen(true);
+    }
+  };
 
   // Conteúdo do Dialog/Drawer
   const DialogContentInner = () => (
