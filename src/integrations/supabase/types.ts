@@ -1373,6 +1373,7 @@ export type Database = {
           created_at: string | null
           culto_id: string
           id: string
+          metodo_checkin: string | null
           pessoa_id: string
           tipo_registro: string | null
         }
@@ -1380,6 +1381,7 @@ export type Database = {
           created_at?: string | null
           culto_id: string
           id?: string
+          metodo_checkin?: string | null
           pessoa_id: string
           tipo_registro?: string | null
         }
@@ -1387,6 +1389,7 @@ export type Database = {
           created_at?: string | null
           culto_id?: string
           id?: string
+          metodo_checkin?: string | null
           pessoa_id?: string
           tipo_registro?: string | null
         }
@@ -2095,6 +2098,10 @@ export type Database = {
       buscar_pessoa_por_contato: {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
         Returns: string
+      }
+      checkin_por_localizacao: {
+        Args: { p_lat: number; p_long: number; p_telefone: string }
+        Returns: Json
       }
       get_user_module_access: {
         Args: { _module_name: string; _user_id: string }
