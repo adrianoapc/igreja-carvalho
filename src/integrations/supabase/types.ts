@@ -1154,6 +1154,7 @@ export type Database = {
           id: string
           midias_ids: string[] | null
           ordem: number
+          permite_multiplo: boolean
           responsavel_externo: string | null
           responsavel_id: string | null
           tipo: string
@@ -1168,6 +1169,7 @@ export type Database = {
           id?: string
           midias_ids?: string[] | null
           ordem: number
+          permite_multiplo?: boolean
           responsavel_externo?: string | null
           responsavel_id?: string | null
           tipo: string
@@ -1182,6 +1184,7 @@ export type Database = {
           id?: string
           midias_ids?: string[] | null
           ordem?: number
+          permite_multiplo?: boolean
           responsavel_externo?: string | null
           responsavel_id?: string | null
           tipo?: string

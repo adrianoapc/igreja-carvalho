@@ -42,6 +42,7 @@ interface ItemLiturgia {
   id: string;
   tipo: string;
   titulo: string;
+  permite_multiplo?: boolean;
 }
 
 interface Midia {
@@ -68,8 +69,8 @@ interface RecursosLiturgiaSheetProps {
   onResourcesUpdate: () => void;
 }
 
-// Tipos que permitem múltiplas mídias
-const TIPOS_MULTIPLOS = ["Anúncios", "Avisos", "Outro"];
+// Tipos que permitem múltiplas mídias (fallback se permite_multiplo não estiver definido)
+const TIPOS_MULTIPLOS = ["Anúncios", "Avisos", "Outro", "anúncios", "avisos", "comunicados"];
 
 // Componente sortable para recurso selecionado
 function SortableRecursoCard({ 
@@ -234,7 +235,10 @@ export default function RecursosLiturgiaSheet({
   const [loading, setLoading] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const permiteMultiplo = item ? TIPOS_MULTIPLOS.includes(item.tipo) : false;
+  // Usa campo permite_multiplo do banco, com fallback para tipos conhecidos
+  const permiteMultiplo = item 
+    ? (item.permite_multiplo ?? TIPOS_MULTIPLOS.includes(item.tipo?.toLowerCase() || ''))
+    : false;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
