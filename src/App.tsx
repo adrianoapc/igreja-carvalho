@@ -32,6 +32,7 @@ import MidiasGeral from "./pages/cultos/MidiasGeral";
 import Templates from "./pages/cultos/Templates";
 import Midias from "./pages/Midias";
 import Financas from "./pages/Financas";
+import DRE from "./pages/financas/DRE";
 import FinancasDashboard from "./pages/financas/Dashboard";
 import FinancasProjecao from "./pages/financas/Projecao";
 import Entradas from "./pages/financas/Entradas";
@@ -442,6 +443,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <FormasPagamento />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/dre"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <DRE />
                 </MainLayout>
               </ProtectedRoute>
             }
