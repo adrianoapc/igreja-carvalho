@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Autoplay from "embla-carousel-autoplay";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import MinhasTarefasWidget from "@/components/dashboard/MinhasTarefasWidget";
 
 interface Banner {
   id: string;
@@ -236,6 +237,9 @@ export default function DashboardMember() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Minhas Tarefas Widget */}
+      <MinhasTarefasWidget />
     </div>
   );
 }

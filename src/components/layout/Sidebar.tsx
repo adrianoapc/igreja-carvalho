@@ -31,6 +31,7 @@ import {
   TrendingUpIcon,
   ClipboardCheck,
   Route,
+  FolderKanban,
 } from "lucide-react";
 import {
   Sidebar,
@@ -64,6 +65,11 @@ const menuItems = [
     icon: Megaphone,
     label: "Comunicação",
     path: "/publicacao",
+  },
+  {
+    icon: FolderKanban,
+    label: "Projetos",
+    path: "/projetos",
   },
 ];
 const pessoasItems = [
