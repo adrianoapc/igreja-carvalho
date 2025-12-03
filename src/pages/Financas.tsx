@@ -14,6 +14,7 @@ import {
   PieChart,
   LineChart,
   TrendingUpIcon,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -196,6 +197,15 @@ export default function Financas() {
       path: "/financas/dashboard-ofertas",
       color: "bg-green-100 dark:bg-green-900/20",
       iconColor: "text-green-600",
+      destacado: true,
+    },
+    {
+      title: "DRE Gerencial",
+      description: "Demonstrativo de Resultado do Exercício anual",
+      icon: FileSpreadsheet,
+      path: "/financas/dre",
+      color: "bg-amber-100 dark:bg-amber-900/20",
+      iconColor: "text-amber-600",
       destacado: true,
     },
     {
