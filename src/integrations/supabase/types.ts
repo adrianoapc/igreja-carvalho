@@ -1284,6 +1284,45 @@ export type Database = {
           },
         ]
       }
+      presencas_culto: {
+        Row: {
+          created_at: string | null
+          culto_id: string
+          id: string
+          pessoa_id: string
+          tipo_registro: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          culto_id: string
+          id?: string
+          pessoa_id: string
+          tipo_registro?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          culto_id?: string
+          id?: string
+          pessoa_id?: string
+          tipo_registro?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presencas_culto_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           aceitou_jesus: boolean | null
