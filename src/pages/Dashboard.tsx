@@ -42,7 +42,6 @@ interface FinancialStats {
   entradas: number;
   saidas: number;
   saldo: number;
-  dizimos: number;
   entradasVariacao: number;
   saidasVariacao: number;
 }
@@ -78,7 +77,6 @@ export default function Dashboard() {
     entradas: 0,
     saidas: 0,
     saldo: 0,
-    dizimos: 0,
     entradasVariacao: 0,
     saidasVariacao: 0
   });
@@ -143,7 +141,6 @@ export default function Dashboard() {
     if (currentData) {
       const entradas = currentData.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + Number(t.valor), 0);
       const saidas = currentData.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + Number(t.valor), 0);
-      const dizimos = currentData.filter(t => t.tipo === 'entrada' && t.categoria?.nome?.toLowerCase().includes('dízimo')).reduce((acc, t) => acc + Number(t.valor), 0);
 
       const lastEntradas = lastMonthData?.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + Number(t.valor), 0) || 0;
       const lastSaidas = lastMonthData?.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + Number(t.valor), 0) || 0;
@@ -155,7 +152,6 @@ export default function Dashboard() {
         entradas,
         saidas,
         saldo: entradas - saidas,
-        dizimos,
         entradasVariacao,
         saidasVariacao
       });
@@ -380,13 +376,18 @@ export default function Dashboard() {
 
       {/* Section: Financial Management */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-primary" />
-          Financeiro
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-primary" />
+            Financeiro
+          </h2>
+          <Badge variant="secondary" className="text-xs">
+            {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
+          </Badge>
+        </div>
         
         {/* Financial KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
           <Card className="shadow-soft">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -420,19 +421,10 @@ export default function Dashboard() {
           <Card className="shadow-soft">
             <CardContent className="p-4">
               <div>
-                <p className="text-xs text-muted-foreground">Saldo</p>
+                <p className="text-xs text-muted-foreground">Saldo do Mês</p>
                 <p className={`text-lg md:text-xl font-bold ${financialStats.saldo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {formatCurrency(financialStats.saldo)}
                 </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-soft">
-            <CardContent className="p-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Dízimos</p>
-                <p className="text-lg md:text-xl font-bold text-primary">{formatCurrency(financialStats.dizimos)}</p>
               </div>
             </CardContent>
           </Card>
