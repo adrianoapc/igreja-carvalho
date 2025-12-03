@@ -60,6 +60,8 @@ import CadastroIndex from "./pages/cadastro/Index";
 import CadastroVisitante from "./pages/cadastro/Visitante";
 import CadastroMembro from "./pages/cadastro/Membro";
 import Chamada from "./pages/Chamada";
+import Jornadas from "./pages/Jornadas";
+import JornadaBoard from "./pages/JornadaBoard";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -490,6 +492,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Chamada />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/jornadas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Jornadas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/jornadas/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <JornadaBoard />
                 </MainLayout>
               </ProtectedRoute>
             }
