@@ -349,6 +349,54 @@ export type Database = {
           },
         ]
       }
+      comunicados: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          created_by: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          descricao: string | null
+          id: string
+          imagem_url: string | null
+          link_acao: string | null
+          nivel_urgencia: string | null
+          tipo: Database["public"]["Enums"]["tipo_comunicado"]
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          id?: string
+          imagem_url?: string | null
+          link_acao?: string | null
+          nivel_urgencia?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_comunicado"]
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          id?: string
+          imagem_url?: string | null
+          link_acao?: string | null
+          nivel_urgencia?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_comunicado"]
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       configuracoes_igreja: {
         Row: {
           created_at: string | null
@@ -2401,6 +2449,7 @@ export type Database = {
         | "com_pouca_fe"
       status_pedido: "pendente" | "em_oracao" | "respondido" | "arquivado"
       status_testemunho: "aberto" | "publico" | "arquivado"
+      tipo_comunicado: "banner" | "alerta"
       tipo_pedido:
         | "saude"
         | "familia"
@@ -2576,6 +2625,7 @@ export const Constants = {
       ],
       status_pedido: ["pendente", "em_oracao", "respondido", "arquivado"],
       status_testemunho: ["aberto", "publico", "arquivado"],
+      tipo_comunicado: ["banner", "alerta"],
       tipo_pedido: [
         "saude",
         "familia",
