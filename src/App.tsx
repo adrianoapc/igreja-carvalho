@@ -64,6 +64,8 @@ import CadastroMembro from "./pages/cadastro/Membro";
 import Chamada from "./pages/Chamada";
 import Jornadas from "./pages/Jornadas";
 import JornadaBoard from "./pages/JornadaBoard";
+import Projetos from "./pages/Projetos";
+import ProjetoDetalhes from "./pages/ProjetoDetalhes";
 import Telao from "./pages/Telao";
 import { useAuth } from "./hooks/useAuth";
 
@@ -538,6 +540,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <JornadaBoard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projetos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Projetos />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projetos/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ProjetoDetalhes />
                 </MainLayout>
               </ProtectedRoute>
             }
