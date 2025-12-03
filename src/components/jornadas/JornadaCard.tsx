@@ -4,7 +4,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Clock, MoreHorizontal, Trash2, CheckCircle2, UserPlus } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -111,31 +111,31 @@ export default function JornadaCard({
       <Card
         ref={setNodeRef}
         style={style}
-        className={`group cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md ${
+        className={`group cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 ${
           isDragging || isSortableDragging
-            ? "opacity-50 shadow-lg ring-2 ring-primary rotate-2"
+            ? "opacity-50 shadow-lg ring-2 ring-primary rotate-1"
             : ""
         } ${inscricao.concluido ? "bg-green-50/50 dark:bg-green-950/10 border-green-200/50" : ""}`}
         {...attributes}
         {...listeners}
       >
-        <CardContent className="p-3">
+        <div className="p-3">
           {/* Top: Avatar + Nome + Menu */}
-          <div className="flex items-start gap-3">
-            <Avatar className="w-9 h-9 flex-shrink-0">
+          <div className="flex items-start gap-2">
+            <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={pessoa?.avatar_url} />
-              <AvatarFallback className="text-xs bg-muted">
+              <AvatarFallback className="text-[10px] bg-muted">
                 {pessoa?.nome ? getInitials(pessoa.nome) : "?"}
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="flex items-center gap-1">
                 <p className="font-medium text-sm truncate">
                   {pessoa?.nome || "Pessoa"}
                 </p>
                 {inscricao.concluido && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
                 )}
               </div>
               
@@ -143,7 +143,7 @@ export default function JornadaCard({
               {tempoNaFase && (
                 <Badge 
                   variant={isStagnant ? "destructive" : "secondary"} 
-                  className="mt-1 text-[10px] font-normal px-1.5 py-0"
+                  className="mt-1 text-[10px] font-normal h-5 px-1.5"
                 >
                   <Clock className="w-2.5 h-2.5 mr-1" />
                   {tempoNaFase}
@@ -157,13 +157,13 @@ export default function JornadaCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreHorizontal className="w-4 h-4" />
+                  <MoreHorizontal className="w-3.5 h-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuContent align="end" className="w-36">
                 <DropdownMenuItem onClick={handleConcluir}>
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   {inscricao.concluido ? "Reabrir" : "Concluir"}
@@ -180,25 +180,25 @@ export default function JornadaCard({
           </div>
 
           {/* Bottom: Responsável + Progress */}
-          <div className="flex items-center justify-between mt-3 pt-2">
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
             {/* Responsável */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowResponsavelSelector(true);
               }}
-              className="flex items-center gap-1.5 hover:bg-muted rounded-full transition-colors"
+              className="flex items-center hover:opacity-80 transition-opacity"
             >
               {responsavel ? (
-                <Avatar className="w-6 h-6 border border-background">
+                <Avatar className="h-5 w-5 border border-background">
                   <AvatarImage src={responsavel.avatar_url} />
-                  <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                  <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
                     {getInitials(responsavel.nome)}
                   </AvatarFallback>
                 </Avatar>
               ) : (
-                <div className="w-6 h-6 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50 hover:bg-primary/5 transition-colors">
-                  <UserPlus className="w-3 h-3 text-muted-foreground/50" />
+                <div className="h-5 w-5 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary/50 transition-colors">
+                  <UserPlus className="w-2.5 h-2.5 text-muted-foreground/50" />
                 </div>
               )}
             </button>
@@ -208,7 +208,7 @@ export default function JornadaCard({
               <Progress value={progress} className="h-1" />
             </div>
           </div>
-        </CardContent>
+        </div>
       </Card>
 
       <ResponsavelSelector
