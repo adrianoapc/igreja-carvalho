@@ -9,7 +9,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, User } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Time {
   id: string;
@@ -18,6 +19,7 @@ interface Time {
   descricao: string | null;
   cor: string | null;
   ativo: boolean;
+  lider_id?: string | null;
 }
 
 interface TimeDialogProps {
@@ -32,7 +34,8 @@ const timeSchema = z.object({
   categoria: z.string().min(1, "Categoria é obrigatória"),
   descricao: z.string().max(500, "Descrição deve ter no máximo 500 caracteres").optional(),
   cor: z.string().regex(/^#[0-9A-F]{6}$/i, "Cor inválida"),
-  ativo: z.boolean()
+  ativo: z.boolean(),
+  lider_id: z.string().uuid().optional().nullable()
 });
 
 interface Categoria {
@@ -40,6 +43,12 @@ interface Categoria {
   nome: string;
   cor: string;
   ativo: boolean;
+}
+
+interface Membro {
+  id: string;
+  nome: string;
+  avatar_url: string | null;
 }
 
 const CORES_SUGERIDAS = [
@@ -56,17 +65,20 @@ const CORES_SUGERIDAS = [
 export default function TimeDialog({ open, onOpenChange, time, onSuccess }: TimeDialogProps) {
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [membros, setMembros] = useState<Membro[]>([]);
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "",
     descricao: "",
     cor: "#8B5CF6",
-    ativo: true
+    ativo: true,
+    lider_id: "" as string | null
   });
 
   useEffect(() => {
     if (open) {
       loadCategorias();
+      loadMembros();
     }
   }, [open]);
 
@@ -85,6 +97,21 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
     }
   };
 
+  const loadMembros = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, nome, avatar_url")
+        .in("status", ["membro", "frequentador"])
+        .order("nome", { ascending: true });
+
+      if (error) throw error;
+      setMembros(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar membros");
+    }
+  };
+
   useEffect(() => {
     if (time) {
       setFormData({
@@ -92,7 +119,8 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
         categoria: time.categoria,
         descricao: time.descricao || "",
         cor: time.cor || "#8B5CF6",
-        ativo: time.ativo
+        ativo: time.ativo,
+        lider_id: time.lider_id || null
       });
     } else {
       setFormData({
@@ -100,7 +128,8 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
         categoria: "",
         descricao: "",
         cor: "#8B5CF6",
-        ativo: true
+        ativo: true,
+        lider_id: null
       });
     }
   }, [time, open]);
@@ -124,7 +153,8 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
         categoria: formData.categoria,
         descricao: formData.descricao.trim() || null,
         cor: formData.cor,
-        ativo: formData.ativo
+        ativo: formData.ativo,
+        lider_id: formData.lider_id || null
       };
 
       if (time) {
@@ -155,6 +185,15 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
     } finally {
       setLoading(false);
     }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
   };
 
   return (
@@ -205,6 +244,43 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Líder */}
+          <div className="space-y-2">
+            <Label htmlFor="lider">Líder do Time</Label>
+            <Select
+              value={formData.lider_id || "none"}
+              onValueChange={(value) => setFormData({ ...formData, lider_id: value === "none" ? null : value })}
+            >
+              <SelectTrigger id="lider">
+                <SelectValue placeholder="Selecione um líder (opcional)" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50 max-h-60">
+                <SelectItem value="none">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <User className="w-4 h-4" />
+                    Sem líder definido
+                  </div>
+                </SelectItem>
+                {membros.map((membro) => (
+                  <SelectItem key={membro.id} value={membro.id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarImage src={membro.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(membro.nome)}
+                        </AvatarFallback>
+                      </Avatar>
+                      {membro.nome}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              O líder pode fazer chamada rápida dos membros deste time
+            </p>
           </div>
 
           {/* Cor */}
