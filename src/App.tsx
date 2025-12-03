@@ -65,6 +65,7 @@ import CadastroMembro from "./pages/cadastro/Membro";
 import Chamada from "./pages/Chamada";
 import Jornadas from "./pages/Jornadas";
 import JornadaBoard from "./pages/JornadaBoard";
+import Telao from "./pages/Telao";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -108,6 +109,9 @@ function App() {
           <Route path="/cadastro" element={<CadastroIndex />} />
           <Route path="/cadastro/visitante" element={<CadastroVisitante />} />
           <Route path="/cadastro/membro" element={<CadastroMembro />} />
+          
+          {/* Rota pública do Telão */}
+          <Route path="/telao" element={<Telao />} />
           
           {/* Rotas protegidas para membros */}
           <Route
