@@ -544,10 +544,31 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Submit disparado", { valor, contaId, descricao });
+    
+    // Validações antes de processar
+    if (!contaId || contaId === 'none' || contaId === '') {
+      toast.error('Selecione a Conta Bancária para salvar');
+      return;
+    }
+    
+    // Parse do valor tratando formato brasileiro (1.234,56 -> 1234.56)
+    const valorLimpo = valor.replace(/\./g, '').replace(',', '.');
+    const valorNumerico = parseFloat(valorLimpo) || 0;
+    
+    if (valorNumerico <= 0) {
+      toast.error('Informe um valor válido');
+      return;
+    }
+    
+    if (!descricao.trim()) {
+      toast.error('Informe uma descrição');
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      const valorNumerico = parseFloat(valor.replace(',', '.')) || 0;
       const { data: userData } = await supabase.auth.getUser();
 
       // Upload do anexo se não foi processado ainda
@@ -568,13 +589,6 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           .getPublicUrl(filePath);
 
         anexoPath = urlData.publicUrl;
-      }
-
-      // Validar conta obrigatória
-      if (!contaId || contaId === 'none' || contaId === '') {
-        toast.error('Selecione uma conta');
-        setLoading(false);
-        return;
       }
 
       const transacaoData = {
@@ -646,7 +660,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   // Upload/Capture Section
   const UploadSection = () => (
     <div className="space-y-3">
-      {!anexoPreview && !anexoUrl ? (
+      {!anexoPreview && !anexoUrl && !anexoFile ? (
         <div className="border-2 border-dashed border-primary/30 rounded-xl p-4 md:p-6 bg-primary/5 hover:bg-primary/10 transition-colors">
           {aiProcessing ? (
             <div className="flex flex-col items-center justify-center gap-3 py-4">
@@ -687,21 +701,21 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         </div>
       ) : (
         <div className="relative">
-          {/* Miniatura clicável */}
+          {/* Container com aspect ratio fixo para garantir visibilidade */}
           <div 
             className={cn(
-              "relative rounded-lg overflow-hidden border cursor-pointer group",
-              isMobile ? "h-[120px]" : "h-[200px] md:h-full md:min-h-[300px]"
+              "relative rounded-lg overflow-hidden border cursor-pointer group bg-muted/20",
+              isMobile ? "h-[120px]" : "aspect-[3/4] w-full"
             )}
             onClick={handleViewDocument}
           >
-            {/* Mostrar thumbnail/preview se disponível (inclui PDFs com thumbnail gerado) */}
+            {/* Mostrar thumbnail/preview se disponível */}
             {anexoPreview ? (
               <>
                 <img
                   src={anexoPreview}
                   alt={anexoIsPdf ? "Preview do PDF" : "Nota fiscal"}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Eye className="w-8 h-8 text-white" />
@@ -713,25 +727,30 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   </div>
                 )}
               </>
-            ) : anexoIsPdf ? (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-muted gap-2">
-                <FileText className="w-12 h-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">PDF anexado</p>
-                <p className="text-xs text-muted-foreground/70">Clique para abrir em nova aba</p>
-              </div>
-            ) : anexoUrl ? (
+            ) : anexoUrl && !anexoIsPdf ? (
               <>
                 <img
                   src={anexoUrl}
                   alt="Nota fiscal"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Eye className="w-8 h-8 text-white" />
                 </div>
               </>
+            ) : anexoIsPdf || (anexoFile && !anexoPreview) ? (
+              // Fallback genérico para arquivo sem preview
+              <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
+                <FileText className="w-16 h-16 text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground text-center truncate max-w-full">
+                  {anexoFile?.name || 'Documento anexado'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {anexoIsPdf ? 'Clique para abrir em nova aba' : 'Clique para visualizar'}
+                </p>
+              </div>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
+              <div className="w-full h-full flex items-center justify-center">
                 <p className="text-muted-foreground">Arquivo anexado</p>
               </div>
             )}
@@ -742,7 +761,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             type="button"
             variant="destructive"
             size="icon"
-            className="absolute top-2 right-2 h-8 w-8"
+            className="absolute top-2 right-2 h-8 w-8 z-10"
             onClick={(e) => {
               e.stopPropagation();
               clearAnexo();
@@ -1206,13 +1225,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const DialogContentInner = () => (
     <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
       {/* Desktop: Split View */}
-      <div className="hidden md:grid md:grid-cols-2 md:gap-6 flex-1 min-h-0 overflow-hidden">
-        {/* Coluna esquerda: Imagem */}
-        <div className="space-y-4 overflow-y-auto pr-2">
+      <div className="hidden md:flex md:gap-6 flex-1 min-h-0 overflow-hidden">
+        {/* Coluna esquerda: Imagem - Sticky */}
+        <div className="w-[320px] shrink-0 flex flex-col gap-4 sticky top-0 self-start">
           <h3 className="font-semibold text-sm">Documento</h3>
           <UploadSection />
           
-          {!anexoPreview && !anexoUrl && (
+          {!anexoPreview && !anexoUrl && !anexoFile && (
             <div className="bg-muted/50 p-3 rounded-lg">
               <p className="text-xs font-medium mb-1">Dicas:</p>
               <ul className="text-xs text-muted-foreground space-y-0.5">
@@ -1224,8 +1243,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           )}
         </div>
 
-        {/* Coluna direita: Formulário */}
-        <ScrollArea className="h-full pl-2 border-l">
+        {/* Coluna direita: Formulário com scroll */}
+        <ScrollArea className="flex-1 pl-4 border-l">
           <div className="pr-4">
             <FormContent />
           </div>
