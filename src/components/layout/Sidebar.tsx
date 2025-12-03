@@ -56,14 +56,14 @@ const menuItems = [
     path: "/",
   },
   {
-    icon: Megaphone,
-    label: "Banners",
-    path: "/banners",
-  },
-  {
     icon: ClipboardCheck,
     label: "Chamada Rápida",
     path: "/chamada",
+  },
+  {
+    icon: Megaphone,
+    label: "Comunicação",
+    path: "/publicacao",
   },
 ];
 const pessoasItems = [

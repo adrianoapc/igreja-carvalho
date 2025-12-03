@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
-import Banners from "./pages/Banners";
 import Comunicados from "./pages/Comunicados";
 import Publicacao from "./pages/Publicacao";
 import Pessoas from "./pages/pessoas";
@@ -120,16 +119,6 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Dashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/banners"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Banners />
                 </MainLayout>
               </ProtectedRoute>
             }
