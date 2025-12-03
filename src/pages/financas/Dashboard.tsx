@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, PieChart } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, PieChart, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -205,6 +206,17 @@ export default function Dashboard() {
             }}
             onAplicar={() => {}}
           />
+        </div>
+        
+        {/* Period Badge */}
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Badge variant="outline" className="gap-1.5">
+            <Calendar className="w-3 h-3" />
+            {customRange 
+              ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
+              : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })
+            }
+          </Badge>
         </div>
       </div>
 

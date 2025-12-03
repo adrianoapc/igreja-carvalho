@@ -276,19 +276,25 @@ export default function Entradas() {
         </div>
 
         {/* Active Filters Display */}
-        {(customRange || busca || contaFilter !== 'all' || categoriaFilter !== 'all' || statusFilter !== 'all') && (
-          <div className="flex flex-wrap gap-2 mt-3">
-            {customRange && (
-              <Badge variant="secondary" className="gap-1.5 pr-1">
-                Período customizado
-                <button 
-                  onClick={() => setCustomRange(null)} 
-                  className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </Badge>
-            )}
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Badge variant="outline" className="gap-1.5">
+            <Calendar className="w-3 h-3" />
+            {customRange 
+              ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
+              : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })
+            }
+          </Badge>
+          {customRange && (
+            <Badge variant="secondary" className="gap-1.5 pr-1">
+              Período customizado
+              <button 
+                onClick={() => setCustomRange(null)} 
+                className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
             {busca && (
               <Badge variant="secondary" className="gap-1.5 pr-1">
                 Busca: {busca}
@@ -333,8 +339,7 @@ export default function Entradas() {
                 </button>
               </Badge>
             )}
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Resumo */}

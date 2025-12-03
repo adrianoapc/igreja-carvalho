@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, TrendingUp, TrendingDown, List, Check } from "lucide-react";
+import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, TrendingUp, TrendingDown, List, Check, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -222,11 +222,12 @@ export default function Contas() {
 
       {/* Filtro de Período Global */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Período: {customRange 
+        <Badge variant="outline" className="gap-1.5">
+          <Calendar className="w-3 h-3" />
+          {customRange 
             ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
             : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
-        </p>
+        </Badge>
         <MonthPicker
           selectedMonth={selectedMonth}
           onMonthChange={setSelectedMonth}

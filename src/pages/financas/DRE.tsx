@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Download, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, Calendar } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { exportToExcel } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -170,6 +171,14 @@ export default function DRE() {
             Exportar
           </Button>
         </div>
+      </div>
+
+      {/* Period Badge */}
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline" className="gap-1.5">
+          <Calendar className="w-3 h-3" />
+          Exercício {anoSelecionado}
+        </Badge>
       </div>
 
       {/* Tabela DRE */}
