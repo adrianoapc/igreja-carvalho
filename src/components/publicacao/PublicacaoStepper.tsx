@@ -581,15 +581,15 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
                         {/* Vincular Culto */}
                         <div className="space-y-2">
                           <Label className="text-xs font-medium text-muted-foreground">VINCULAR A CULTO (OPCIONAL)</Label>
-                          <Select
-                            value={distribuicao.culto_id}
-                            onValueChange={v => setDistribuicao({ ...distribuicao, culto_id: v })}
+                        <Select
+                            value={distribuicao.culto_id || "none"}
+                            onValueChange={v => setDistribuicao({ ...distribuicao, culto_id: v === "none" ? "" : v })}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione um culto..." />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Nenhum (Geral)</SelectItem>
+                              <SelectItem value="none">Nenhum (Geral)</SelectItem>
                               {cultos.map(culto => (
                                 <SelectItem key={culto.id} value={culto.id}>
                                   {culto.titulo} - {new Date(culto.data_culto).toLocaleDateString("pt-BR")}
