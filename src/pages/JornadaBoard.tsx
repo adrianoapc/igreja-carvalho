@@ -184,11 +184,11 @@ export default function JornadaBoard() {
 
   if (loadingJornada || loadingEtapas) {
     return (
-      <div className="min-h-screen bg-muted/30 p-6">
+      <div className="flex flex-col h-[calc(100vh-theme(spacing.16)-theme(spacing.8))] w-full -m-4 md:-m-8 p-6">
         <Skeleton className="h-10 w-64 mb-6" />
-        <div className="flex gap-4">
+        <div className="flex gap-4 overflow-hidden">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-96 w-80 flex-shrink-0" />
+            <Skeleton key={i} className="h-96 w-80 shrink-0" />
           ))}
         </div>
       </div>
@@ -196,77 +196,84 @@ export default function JornadaBoard() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col">
+    <div className="flex flex-col h-[calc(100vh-theme(spacing.16)-theme(spacing.8))] w-full overflow-hidden -m-4 md:-m-8">
       {/* Header */}
-      <div className="bg-background border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/jornadas")}
-                className="rounded-full"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: jornada?.cor_tema || "#3b82f6" }}
-                />
-                <div>
-                  <h1 className="text-lg font-semibold">{jornada?.titulo}</h1>
-                  <p className="text-xs text-muted-foreground">
-                    {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
-                  </p>
-                </div>
+      <header className="flex-none bg-background border-b z-10 px-4 md:px-6 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/jornadas")}
+              className="rounded-full shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ backgroundColor: jornada?.cor_tema || "#3b82f6" }}
+              />
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold truncate">{jornada?.titulo}</h1>
+                <p className="text-xs text-muted-foreground">
+                  {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
+                </p>
               </div>
             </div>
+          </div>
 
-            <div className="flex items-center gap-3">
-              <ToggleGroup
-                type="single"
-                value={filtro}
-                onValueChange={(v) => v && setFiltro(v)}
-                size="sm"
-                className="bg-muted rounded-lg p-0.5"
-              >
-                <ToggleGroupItem value="todos" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
-                  Todos
-                </ToggleGroupItem>
-                <ToggleGroupItem value="minhas" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
-                  Minhas
-                </ToggleGroupItem>
-              </ToggleGroup>
+          <div className="flex items-center gap-2 shrink-0">
+            <ToggleGroup
+              type="single"
+              value={filtro}
+              onValueChange={(v) => v && setFiltro(v)}
+              size="sm"
+              className="bg-muted rounded-lg p-0.5"
+            >
+              <ToggleGroupItem value="todos" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+                Todos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="minhas" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+                Minhas
+              </ToggleGroupItem>
+            </ToggleGroup>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowEditarJornada(true)}
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Configurar
-              </Button>
-              <Button size="sm" onClick={() => setShowAdicionarPessoa(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Pessoa
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEditarJornada(true)}
+              className="hidden sm:flex"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Configurar
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowEditarJornada(true)}
+              className="sm:hidden"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+            <Button size="sm" onClick={() => setShowAdicionarPessoa(true)}>
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Adicionar</span>
+            </Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto">
-        <div className="h-[calc(100vh-120px)] p-6">
+      {/* Kanban Board - Scrollable Area */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-muted/20">
+        <div className="flex h-full gap-4 px-4 md:px-6 py-4 min-w-max">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="flex gap-4 h-full items-start">
+            <div className="flex gap-4 h-full">
               {inscricoesByEtapa["sem_etapa"]?.length > 0 && (
                 <KanbanColumn
                   id="sem_etapa"
