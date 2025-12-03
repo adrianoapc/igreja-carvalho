@@ -4,21 +4,27 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import { 
   Heart, 
   TrendingUp, 
-  TrendingDown, 
   DollarSign, 
   ArrowUpRight, 
   ArrowDownRight,
   Camera,
   UserPlus,
   HeartHandshake,
-  MessageCircle,
   Sparkles,
   AlertTriangle,
   Info,
-  CheckCircle,
-  X
+  AlertCircle,
+  X,
+  ExternalLink
 } from "lucide-react";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import AtencaoPastoralWidget from "@/components/dashboard/AtencaoPastoralWidget";
@@ -30,12 +36,17 @@ import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import Autoplay from "embla-carousel-autoplay";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
-interface Banner {
+interface Comunicado {
   id: string;
-  title: string;
-  message: string;
-  type: string;
+  titulo: string;
+  descricao: string | null;
+  tipo: 'banner' | 'alerta';
+  nivel_urgencia: string | null;
+  imagem_url: string | null;
+  link_acao: string | null;
 }
 
 interface FinancialStats {
@@ -68,11 +79,21 @@ interface ConsolidationData {
   color: string;
 }
 
+const DISMISSED_ALERTS_KEY = 'dashboard_dismissed_alerts';
+
 export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [dismissedBanners, setDismissedBanners] = useState<string[]>([]);
+  const [alertas, setAlertas] = useState<Comunicado[]>([]);
+  const [banners, setBanners] = useState<Comunicado[]>([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(DISMISSED_ALERTS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [financialStats, setFinancialStats] = useState<FinancialStats>({
     entradas: 0,
     saidas: 0,
@@ -97,23 +118,29 @@ export default function Dashboard() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    fetchBanners();
+    fetchComunicados();
     fetchFinancialData();
     fetchConsolidationData();
     fetchPedidosOracao();
     fetchTestemunhos();
   }, []);
 
-  const fetchBanners = async () => {
+  const fetchComunicados = async () => {
+    const now = new Date().toISOString();
     const { data } = await supabase
-      .from('banners')
-      .select('id, title, message, type')
-      .eq('active', true)
-      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-      .order('created_at', { ascending: false })
-      .limit(5);
+      .from('comunicados')
+      .select('id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao')
+      .eq('ativo', true)
+      .lte('data_inicio', now)
+      .or(`data_fim.is.null,data_fim.gte.${now}`)
+      .order('created_at', { ascending: false });
     
-    if (data) setBanners(data);
+    if (data) {
+      const alertasList = data.filter(c => c.tipo === 'alerta') as Comunicado[];
+      const bannersList = data.filter(c => c.tipo === 'banner') as Comunicado[];
+      setAlertas(alertasList);
+      setBanners(bannersList);
+    }
   };
 
   const fetchFinancialData = async () => {
@@ -232,7 +259,6 @@ export default function Dashboard() {
       .limit(5);
 
     if (data) {
-      // Fetch pessoa data separately for each pedido that has pessoa_id
       const pedidosWithPessoa = await Promise.all(
         data.map(async (pedido) => {
           return {
@@ -278,34 +304,44 @@ export default function Dashboard() {
     return name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
   };
 
-  const getBannerVariant = (type: string) => {
-    switch (type) {
-      case 'warning': return 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-200';
-      case 'success': return 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-200';
-      case 'urgent': return 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/50 dark:border-red-800 dark:text-red-200';
-      default: return 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-200';
+  const getAlertStyles = (nivel: string | null) => {
+    switch (nivel) {
+      case 'warning':
+        return {
+          className: 'bg-yellow-50 border-yellow-200 text-yellow-900 dark:bg-yellow-950/50 dark:border-yellow-800 dark:text-yellow-200',
+          Icon: AlertTriangle
+        };
+      case 'destructive':
+        return {
+          className: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800 dark:text-red-200',
+          Icon: AlertCircle
+        };
+      default: // info
+        return {
+          className: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-200',
+          Icon: Info
+        };
     }
   };
 
-  const getBannerIcon = (type: string) => {
-    switch (type) {
-      case 'warning': return AlertTriangle;
-      case 'success': return CheckCircle;
-      case 'urgent': return AlertTriangle;
-      default: return Info;
-    }
+  const dismissAlert = (id: string) => {
+    const newDismissed = [...dismissedAlerts, id];
+    setDismissedAlerts(newDismissed);
+    localStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(newDismissed));
   };
 
-  const dismissBanner = (id: string) => {
-    setDismissedBanners(prev => [...prev, id]);
-  };
-
-  const activeBanners = banners.filter(b => !dismissedBanners.includes(b.id));
+  const activeAlertas = alertas.filter(a => !dismissedAlerts.includes(a.id));
   const firstName = profile?.nome?.split(' ')[0] || 'Usuário';
 
   const chartConfig = {
     entradas: { label: "Entradas", color: "hsl(var(--chart-1))" },
     saidas: { label: "Saídas", color: "hsl(var(--chart-2))" },
+  };
+
+  const handleBannerClick = (banner: Comunicado) => {
+    if (banner.link_acao) {
+      window.open(banner.link_acao, '_blank', 'noopener,noreferrer');
+    }
   };
 
   return (
@@ -331,27 +367,109 @@ export default function Dashboard() {
 
       <RegistrarSentimentoDialog open={sentimentoDialogOpen} onOpenChange={setSentimentoDialogOpen} />
 
-      {/* Alerts/Banners Area */}
-      {activeBanners.length > 0 && (
+      {/* Alertas Section */}
+      {activeAlertas.length > 0 && (
         <div className="space-y-2">
-          {activeBanners.map(banner => {
-            const Icon = getBannerIcon(banner.type);
+          {activeAlertas.map(alerta => {
+            const { className, Icon } = getAlertStyles(alerta.nivel_urgencia);
             return (
-              <Alert key={banner.id} className={`${getBannerVariant(banner.type)} relative`}>
+              <Alert key={alerta.id} className={`${className} relative`}>
                 <Icon className="h-4 w-4" />
-                <AlertTitle className="font-semibold">{banner.title}</AlertTitle>
-                <AlertDescription className="text-sm opacity-90">{banner.message}</AlertDescription>
+                <AlertTitle className="font-semibold">{alerta.titulo}</AlertTitle>
+                {alerta.descricao && (
+                  <AlertDescription className="text-sm opacity-90">{alerta.descricao}</AlertDescription>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
                   className="absolute top-2 right-2 h-6 w-6 opacity-70 hover:opacity-100"
-                  onClick={() => dismissBanner(banner.id)}
+                  onClick={() => dismissAlert(alerta.id)}
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </Alert>
             );
           })}
+        </div>
+      )}
+
+      {/* Banners Carousel */}
+      {banners.length > 0 && (
+        <div className="relative">
+          <Carousel
+            opts={{
+              align: "start",
+              loop: true,
+            }}
+            plugins={[
+              Autoplay({
+                delay: 5000,
+                stopOnInteraction: true,
+              }),
+            ]}
+            className="w-full"
+          >
+            <CarouselContent>
+              {banners.map((banner) => (
+                <CarouselItem key={banner.id}>
+                  <Card 
+                    className={`overflow-hidden ${banner.link_acao ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
+                    onClick={() => handleBannerClick(banner)}
+                  >
+                    {banner.imagem_url ? (
+                      <div className="relative aspect-[21/9]">
+                        <OptimizedImage
+                          src={banner.imagem_url}
+                          alt={banner.titulo}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+                          <h3 className="text-lg md:text-xl font-bold text-white drop-shadow-lg">
+                            {banner.titulo}
+                          </h3>
+                          {banner.descricao && (
+                            <p className="text-sm text-white/90 mt-1 line-clamp-2 drop-shadow">
+                              {banner.descricao}
+                            </p>
+                          )}
+                          {banner.link_acao && (
+                            <div className="flex items-center gap-1 mt-2 text-white/80 text-xs">
+                              <ExternalLink className="w-3 h-3" />
+                              <span>Clique para saber mais</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <CardContent className="p-4 md:p-6 aspect-[21/9] flex flex-col justify-center bg-gradient-to-r from-primary/10 to-primary/5">
+                        <h3 className="text-lg md:text-xl font-bold text-foreground">
+                          {banner.titulo}
+                        </h3>
+                        {banner.descricao && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
+                            {banner.descricao}
+                          </p>
+                        )}
+                        {banner.link_acao && (
+                          <div className="flex items-center gap-1 mt-2 text-primary text-xs">
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Clique para saber mais</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            {banners.length > 1 && (
+              <>
+                <CarouselPrevious className="left-2" />
+                <CarouselNext className="right-2" />
+              </>
+            )}
+          </Carousel>
         </div>
       )}
 
@@ -526,7 +644,7 @@ export default function Dashboard() {
           <Card className="shadow-soft">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
-                <MessageCircle className="w-4 h-4 text-blue-500" />
+                <HeartHandshake className="w-4 h-4 text-blue-500" />
                 Pedidos de Oração
               </CardTitle>
             </CardHeader>
