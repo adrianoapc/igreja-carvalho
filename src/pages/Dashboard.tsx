@@ -80,6 +80,7 @@ export default function Dashboard() {
     entradasVariacao: 0,
     saidasVariacao: 0
   });
+  const [saldoTotalContas, setSaldoTotalContas] = useState<number>(0);
   const [cashFlowData, setCashFlowData] = useState<{ mes: string; entradas: number; saidas: number }[]>([]);
   const [consolidationData, setConsolidationData] = useState<ConsolidationData[]>([]);
   const [pedidosOracao, setPedidosOracao] = useState<PedidoOracao[]>([]);
@@ -121,6 +122,17 @@ export default function Dashboard() {
     const currentMonthEnd = endOfMonth(now);
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
+
+    // Total account balance
+    const { data: contasData } = await supabase
+      .from('contas')
+      .select('saldo_atual')
+      .eq('ativo', true);
+
+    if (contasData) {
+      const total = contasData.reduce((acc, c) => acc + Number(c.saldo_atual), 0);
+      setSaldoTotalContas(total);
+    }
 
     // Current month transactions
     const { data: currentData } = await supabase
@@ -387,7 +399,7 @@ export default function Dashboard() {
         </div>
         
         {/* Financial KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
           <Card className="shadow-soft">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -424,6 +436,17 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Saldo do Mês</p>
                 <p className={`text-lg md:text-xl font-bold ${financialStats.saldo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {formatCurrency(financialStats.saldo)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-soft border-primary/20 bg-primary/5">
+            <CardContent className="p-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Saldo Total (Contas)</p>
+                <p className={`text-lg md:text-xl font-bold ${saldoTotalContas >= 0 ? 'text-primary' : 'text-red-600'}`}>
+                  {formatCurrency(saldoTotalContas)}
                 </p>
               </div>
             </CardContent>
