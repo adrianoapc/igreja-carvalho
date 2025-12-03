@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1172,16 +1172,16 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     </div>
   );
 
-  // Visualizador de documento (Imagem ou PDF)
-  const ImagePreviewSheet = () => {
+  // Modal de Visualização do Documento (Imagem ou PDF)
+  const DocumentViewerModal = () => {
     const documentUrl = anexoUrl || anexoPreview;
     
     return (
-      <Sheet open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
-          <SheetHeader className="p-4 border-b shrink-0">
-            <SheetTitle className="flex items-center justify-between">
-              <span>{anexoIsPdf ? 'Documento PDF' : 'Nota Fiscal'}</span>
+      <Dialog open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-4 py-3 border-b shrink-0">
+            <DialogTitle className="flex items-center justify-between">
+              <span>{anexoIsPdf ? 'Documento PDF' : 'Visualização do Anexo'}</span>
               {!anexoIsPdf && (
                 <div className="flex items-center gap-2">
                   <Button
@@ -1201,26 +1201,22 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   </Button>
                 </div>
               )}
-            </SheetTitle>
-          </SheetHeader>
+            </DialogTitle>
+          </DialogHeader>
           
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 bg-slate-100 dark:bg-slate-900 p-4 overflow-hidden relative">
             {anexoIsPdf && documentUrl ? (
-              // Renderização de PDF usando iframe
-              <div className="w-full h-full min-h-[60vh]">
-                <iframe
-                  src={`${documentUrl}#toolbar=1&navpanes=0`}
-                  className="w-full h-full rounded-lg border"
-                  title="Visualização do PDF"
-                />
-              </div>
+              <iframe
+                src={`${documentUrl}#toolbar=0`}
+                className="w-full h-full rounded shadow-sm border"
+                title="Documento PDF"
+              />
             ) : documentUrl ? (
-              // Renderização de Imagem
-              <div className="flex items-center justify-center min-h-full">
+              <div className="flex items-center justify-center h-full overflow-auto">
                 <img
                   src={documentUrl}
-                  alt="Nota fiscal"
-                  className="max-w-full transition-transform duration-200"
+                  alt="Anexo"
+                  className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{ transform: `scale(${imageZoom})` }}
                 />
               </div>
@@ -1230,30 +1226,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </div>
             )}
           </div>
-          
-          {/* Botão para abrir em nova aba (fallback) */}
-          {anexoIsPdf && anexoUrl && (
-            <div className="p-4 border-t shrink-0">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = anexoUrl;
-                  link.target = '_blank';
-                  link.rel = 'noopener noreferrer';
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Abrir PDF em nova aba
-              </Button>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     );
   };
 
@@ -1349,7 +1323,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             </div>
           </DrawerContent>
         </Drawer>
-        <ImagePreviewSheet />
+        <DocumentViewerModal />
       </>
     );
   }
@@ -1366,7 +1340,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           <DialogContentInner />
         </DialogContent>
       </Dialog>
-      <ImagePreviewSheet />
+      <DocumentViewerModal />
     </>
   );
 }
