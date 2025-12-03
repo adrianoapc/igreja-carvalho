@@ -935,9 +935,84 @@ CREATE POLICY "only_admins_can_delete_suppliers" ON public.fornecedores
   FOR DELETE USING (has_role(auth.uid(), 'admin'::app_role) AND auth.uid() IS NOT NULL);
 
 -- -----------------------------------------------------
--- Tabela: transacoes_financeiras (não listada explicitamente, mas referenciada)
+-- Tabela: transacoes_financeiras
 -- -----------------------------------------------------
--- Nota: Esta tabela provavelmente existe mas não está no schema fornecido
+CREATE TABLE public.transacoes_financeiras (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  descricao TEXT NOT NULL,
+  valor NUMERIC NOT NULL,
+  valor_liquido NUMERIC,
+  tipo TEXT NOT NULL, -- 'entrada' ou 'saida'
+  tipo_lancamento TEXT NOT NULL, -- 'avulso', 'parcelado', 'recorrente'
+  status TEXT NOT NULL DEFAULT 'pendente', -- 'pendente', 'pago'
+  data_vencimento DATE NOT NULL,
+  data_pagamento DATE,
+  data_competencia DATE,
+  conta_id UUID NOT NULL REFERENCES public.contas(id),
+  categoria_id UUID REFERENCES public.categorias_financeiras(id),
+  subcategoria_id UUID REFERENCES public.subcategorias_financeiras(id),
+  centro_custo_id UUID REFERENCES public.centros_custo(id),
+  base_ministerial_id UUID REFERENCES public.bases_ministeriais(id),
+  fornecedor_id UUID REFERENCES public.fornecedores(id),
+  forma_pagamento TEXT,
+  numero_parcela INTEGER,
+  total_parcelas INTEGER,
+  recorrencia TEXT, -- 'mensal', 'semanal', 'quinzenal', 'anual'
+  data_fim_recorrencia DATE,
+  juros NUMERIC,
+  multas NUMERIC,
+  desconto NUMERIC,
+  taxas_administrativas NUMERIC,
+  anexo_url TEXT,
+  observacoes TEXT,
+  lancado_por UUID REFERENCES public.profiles(user_id),
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.transacoes_financeiras ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins e tesoureiros podem gerenciar transações" ON public.transacoes_financeiras
+  FOR ALL USING (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'tesoureiro'::app_role));
+
+-- Trigger para atualizar saldo da conta
+CREATE OR REPLACE FUNCTION public.atualizar_saldo_conta()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NEW.status = 'pago' AND OLD.status != 'pago' THEN
+    IF NEW.tipo = 'entrada' THEN
+      UPDATE public.contas 
+      SET saldo_atual = saldo_atual + NEW.valor
+      WHERE id = NEW.conta_id;
+    ELSIF NEW.tipo = 'saida' THEN
+      UPDATE public.contas 
+      SET saldo_atual = saldo_atual - NEW.valor
+      WHERE id = NEW.conta_id;
+    END IF;
+  ELSIF OLD.status = 'pago' AND NEW.status != 'pago' THEN
+    IF NEW.tipo = 'entrada' THEN
+      UPDATE public.contas 
+      SET saldo_atual = saldo_atual - OLD.valor
+      WHERE id = OLD.conta_id;
+    ELSIF NEW.tipo = 'saida' THEN
+      UPDATE public.contas 
+      SET saldo_atual = saldo_atual + OLD.valor
+      WHERE id = OLD.conta_id;
+    END IF;
+  END IF;
+  
+  RETURN NEW;
+END;
+$function$;
+
+CREATE TRIGGER trigger_atualizar_saldo_conta
+  AFTER UPDATE ON public.transacoes_financeiras
+  FOR EACH ROW
+  EXECUTE FUNCTION public.atualizar_saldo_conta();
 
 -- -----------------------------------------------------
 -- Tabela: edge_function_config
