@@ -59,6 +59,42 @@ const intercessaoItems = [{
   label: "Sentimentos",
   path: "/intercessao/sentimentos"
 }];
+
+const financasItems = [{
+  icon: DollarSign,
+  label: "Geral",
+  path: "/financas"
+}]; 
+const financasConfigItems = [{
+  icon: Target,
+  label: "Bases Ministeriais",
+  path: "/financas/bases-ministeriais"
+}, {
+  icon: Target,
+  label: "Centros de Custo",
+  path: "/financas/centros-custo"
+}, {
+  icon: FolderTree,
+  label: "Categorias",
+  path: "/financas/categorias"
+}, {
+  icon: UserCog,
+  label: "Fornecedores",
+  path: "/financas/fornecedores"
+}];
+const financasMovimentaItems = [{                      {
+  icon: TrendingUp,
+  label: "Entradas",
+  path: "/financas/entradas"
+}, {
+  icon: TrendingDown,
+  label: "Saídas",
+  path: "/financas/saidas"
+}, {
+  icon: Building2,
+  label: "Contas",
+  path: "/financas/contas"
+}];
 const financasPaineisItems = [{
   icon: BarChart3,
   label: "Dashboard Geral",
@@ -75,40 +111,6 @@ const financasPaineisItems = [{
   icon: TrendingUpIcon,
   label: "Insights",
   path: "/financas/insights"
-}];
-
-const financasItems = [{
-  icon: DollarSign,
-  label: "Geral",
-  path: "/financas"
-}, {
-  icon: TrendingUp,
-  label: "Entradas",
-  path: "/financas/entradas"
-}, {
-  icon: TrendingDown,
-  label: "Saídas",
-  path: "/financas/saidas"
-}, {
-  icon: Building2,
-  label: "Contas",
-  path: "/financas/contas"
-}, {
-  icon: Target,
-  label: "Bases Ministeriais",
-  path: "/financas/bases-ministeriais"
-}, {
-  icon: Target,
-  label: "Centros de Custo",
-  path: "/financas/centros-custo"
-}, {
-  icon: FolderTree,
-  label: "Categorias",
-  path: "/financas/categorias"
-}, {
-  icon: UserCog,
-  label: "Fornecedores",
-  path: "/financas/fornecedores"
 }];
 const cultosItems = [{
   icon: LayoutDashboard,
