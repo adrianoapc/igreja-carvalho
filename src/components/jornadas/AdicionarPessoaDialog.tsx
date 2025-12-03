@@ -148,19 +148,21 @@ export default function AdicionarPessoaDialog({
                         : "hover:bg-muted"
                     }`}
                   >
-                    <Avatar className="w-10 h-10">
+                    <Avatar className="h-10 w-10 shrink-0">
                       <AvatarImage src={pessoa.avatar_url} />
                       <AvatarFallback>
                         {getInitials(pessoa.nome)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <p className="font-medium truncate">{pessoa.nome}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground truncate">
                         {pessoa.telefone || "Sem telefone"}
                       </p>
                     </div>
-                    {getStatusBadge(pessoa.status)}
+                    <div className="shrink-0">
+                      {getStatusBadge(pessoa.status)}
+                    </div>
                   </button>
                 ))}
               </div>
