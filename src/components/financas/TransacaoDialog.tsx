@@ -324,45 +324,46 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setAiProcessing(true);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64 = (e.target?.result as string).split(',')[1];
-        
-        toast.loading('Processando nota fiscal com IA...', { id: 'processing' });
-        
-        const { data, error } = await supabase.functions.invoke('processar-nota-fiscal', {
-          body: { imageBase64: base64, mimeType: file.type }
-        });
+      // Converter para base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      toast.loading('Processando nota fiscal com IA...', { id: 'processing' });
+      
+      const { data, error } = await supabase.functions.invoke('processar-nota-fiscal', {
+        body: { imageBase64: base64, mimeType: file.type }
+      });
 
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-        // Upload do arquivo
-        toast.loading('Salvando arquivo...', { id: 'processing' });
-        
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `notas-fiscais/${fileName}`;
+      // Upload do arquivo
+      toast.loading('Salvando arquivo...', { id: 'processing' });
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `notas-fiscais/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('transaction-attachments')
-          .upload(filePath, file, { cacheControl: '3600', upsert: false });
+      const { error: uploadError } = await supabase.storage
+        .from('transaction-attachments')
+        .upload(filePath, file, { cacheControl: '3600', upsert: false });
 
-        if (uploadError) throw uploadError;
+      if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('transaction-attachments')
-          .getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage
+        .from('transaction-attachments')
+        .getPublicUrl(filePath);
 
-        setAnexoUrl(publicUrl);
+      setAnexoUrl(publicUrl);
 
-        // Preencher campos
-        await handleDadosNotaFiscal({ ...data.dados, anexo_url: publicUrl });
-        
-        toast.success('Nota fiscal processada!', { id: 'processing' });
-      };
-
-      reader.readAsDataURL(file);
+      // Preencher campos
+      await handleDadosNotaFiscal({ ...data.dados, anexo_url: publicUrl });
+      
+      toast.success('Nota fiscal processada!', { id: 'processing' });
     } catch (error: any) {
       console.error('Erro ao processar nota fiscal:', error);
       toast.error('Erro ao processar', { description: error.message, id: 'processing' });
