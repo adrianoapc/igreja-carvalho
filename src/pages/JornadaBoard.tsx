@@ -196,9 +196,9 @@ export default function JornadaBoard() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-theme(spacing.16)-theme(spacing.8))] w-full overflow-hidden -m-4 md:-m-8">
-      {/* Header */}
-      <header className="flex-none bg-background border-b z-10 px-4 md:px-6 py-3">
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full max-w-full overflow-hidden relative -m-4 md:-m-8">
+      {/* Header Fixo */}
+      <div className="shrink-0 bg-background border-b z-10 relative px-4 md:px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <Button
@@ -262,11 +262,11 @@ export default function JornadaBoard() {
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Kanban Board - Scrollable Area */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-muted/20">
-        <div className="flex h-full gap-4 px-4 md:px-6 py-4 min-w-max">
+      {/* Área de Scroll do Board */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden w-full relative bg-muted/20">
+        <div className="flex h-full min-w-max px-4 md:px-6 pb-6 pt-4 gap-4">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
