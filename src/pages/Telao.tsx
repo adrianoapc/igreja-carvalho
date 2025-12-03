@@ -24,7 +24,7 @@ const Telao = () => {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
   });
 
   const nextSlide = useCallback(() => {
