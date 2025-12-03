@@ -220,6 +220,7 @@ export default function DRE() {
                               key={idx}
                               className={cn(
                                 "text-right text-sm tabular-nums",
+                                valor === 0 && "text-muted-foreground/40",
                                 valor < 0 && "text-destructive",
                                 valor > 0 && "text-green-600"
                               )}
@@ -249,6 +250,7 @@ export default function DRE() {
                             key={idx}
                             className={cn(
                               "text-right font-medium text-sm tabular-nums",
+                              valor === 0 && "text-muted-foreground/40",
                               valor < 0 && "text-destructive",
                               valor > 0 && "text-green-600"
                             )}
@@ -279,6 +281,7 @@ export default function DRE() {
                         key={idx}
                         className={cn(
                           "text-right font-bold text-lg tabular-nums py-4",
+                          valor === 0 && "text-muted-foreground/40",
                           valor < 0 && "text-destructive",
                           valor > 0 && "text-green-600"
                         )}
