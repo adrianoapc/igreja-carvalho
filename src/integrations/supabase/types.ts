@@ -59,6 +59,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "alteracoes_perfil_pendentes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
         ]
       }
       banners: {
@@ -139,6 +146,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bases_ministeriais_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
         ]
       }
       cancoes_culto: {
@@ -215,11 +229,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cancoes_culto_ministro_id_fkey"
+            columns: ["ministro_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
             foreignKeyName: "cancoes_culto_solista_id_fkey"
             columns: ["solista_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancoes_culto_solista_id_fkey"
+            columns: ["solista_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
         ]
       }
@@ -542,6 +570,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "escalas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
             foreignKeyName: "escalas_culto_posicao_id_fkey"
             columns: ["posicao_id"]
             isOneToOne: false
@@ -595,6 +630,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_template_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
           {
             foreignKeyName: "escalas_template_posicao_id_fkey"
@@ -656,11 +698,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "familias_familiar_id_fkey"
+            columns: ["familiar_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
             foreignKeyName: "familias_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "familias_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
         ]
       }
@@ -910,6 +966,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "liturgia_culto_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
         ]
       }
       membro_funcoes: {
@@ -958,6 +1021,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "membro_funcoes_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
         ]
       }
       membros_time: {
@@ -998,6 +1068,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membros_time_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
           {
             foreignKeyName: "membros_time_posicao_id_fkey"
@@ -1244,6 +1321,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pedidos_oracao_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
         ]
       }
       posicoes_time: {
@@ -1320,6 +1404,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
         ]
       }
@@ -1500,6 +1591,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sentimentos_membros_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
         ]
       }
       subcategorias_financeiras: {
@@ -1676,11 +1774,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "testemunhos_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
             foreignKeyName: "testemunhos_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "testemunhos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
         ]
       }
@@ -1933,11 +2045,47 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_visitante"
+            columns: ["visitante_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      view_health_score: {
+        Row: {
+          avatar_url: string | null
+          nome: string | null
+          pessoa_id: string | null
+          score_presenca: number | null
+          score_sentimento: number | null
+          score_servico: number | null
+          status: Database["public"]["Enums"]["user_status"] | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          nome?: string | null
+          pessoa_id?: string | null
+          score_presenca?: never
+          score_sentimento?: never
+          score_servico?: never
+          status?: Database["public"]["Enums"]["user_status"] | null
+        }
+        Update: {
+          avatar_url?: string | null
+          nome?: string | null
+          pessoa_id?: string | null
+          score_presenca?: never
+          score_sentimento?: never
+          score_servico?: never
+          status?: Database["public"]["Enums"]["user_status"] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       alocar_pedido_balanceado: {
