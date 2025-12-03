@@ -387,31 +387,65 @@ export function AppSidebar() {
                           </SidebarMenuSubItem>;
                     })}
 
-                      {/* Movimentações */}
-                      {financasMovimentaItems.map(item => {
-                      const Icon = item.icon;
-                      return <SidebarMenuSubItem key={item.path}>
-                            <SidebarMenuSubButton asChild>
-                              <NavLink to={item.path} end className="hover:bg-sidebar-accent" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
-                                <Icon className="w-4 h-4 text-white" />
-                                {!isCollapsed && <span>{item.label}</span>}
-                              </NavLink>
+                      {/* Movimentações submenu */}
+                      <Collapsible defaultOpen className="group/movimenta">
+                        <SidebarMenuSubItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuSubButton>
+                              <TrendingUp className="w-4 h-4 text-white" />
+                              {!isCollapsed && <>
+                                  <span>Movimentações</span>
+                                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/movimenta:rotate-180" />
+                                </>}
                             </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>;
-                    })}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {financasMovimentaItems.map(item => {
+                              const Icon = item.icon;
+                              return <SidebarMenuSubItem key={item.path}>
+                                    <SidebarMenuSubButton asChild>
+                                      <NavLink to={item.path} end className="hover:bg-sidebar-accent pl-8" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
+                                        <Icon className="w-3 h-3 text-white" />
+                                        {!isCollapsed && <span className="text-xs">{item.label}</span>}
+                                      </NavLink>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>;
+                            })}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuSubItem>
+                      </Collapsible>
 
-                      {/* Configurações */}
-                      {financasConfigItems.map(item => {
-                      const Icon = item.icon;
-                      return <SidebarMenuSubItem key={item.path}>
-                            <SidebarMenuSubButton asChild>
-                              <NavLink to={item.path} end className="hover:bg-sidebar-accent" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
-                                <Icon className="w-4 h-4 text-white" />
-                                {!isCollapsed && <span>{item.label}</span>}
-                              </NavLink>
+                      {/* Configurações submenu */}
+                      <Collapsible defaultOpen className="group/config">
+                        <SidebarMenuSubItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuSubButton>
+                              <Settings className="w-4 h-4 text-white" />
+                              {!isCollapsed && <>
+                                  <span>Configurações</span>
+                                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/config:rotate-180" />
+                                </>}
                             </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>;
-                    })}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {financasConfigItems.map(item => {
+                              const Icon = item.icon;
+                              return <SidebarMenuSubItem key={item.path}>
+                                    <SidebarMenuSubButton asChild>
+                                      <NavLink to={item.path} end className="hover:bg-sidebar-accent pl-8" activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium">
+                                        <Icon className="w-3 h-3 text-white" />
+                                        {!isCollapsed && <span className="text-xs">{item.label}</span>}
+                                      </NavLink>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>;
+                            })}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuSubItem>
+                      </Collapsible>
                     </SidebarMenuSub>
                   </CollapsibleContent>
                 </SidebarMenuItem>
