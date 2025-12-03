@@ -32,6 +32,7 @@ import CultosPosicoes from "./pages/cultos/Posicoes";
 import LiturgiaDashboard from "./pages/cultos/LiturgiaDashboard";
 import MidiasGeral from "./pages/cultos/MidiasGeral";
 import Templates from "./pages/cultos/Templates";
+import CultoDetalhes from "./pages/CultoDetalhes";
 import Midias from "./pages/Midias";
 import Financas from "./pages/Financas";
 import DRE from "./pages/financas/DRE";
@@ -308,6 +309,16 @@ function App() {
             <Route path="midias" element={<MidiasGeral />} />
             <Route path="templates" element={<Templates />} />
           </Route>
+          <Route
+            path="/cultos/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <CultoDetalhes />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/midias"
             element={
