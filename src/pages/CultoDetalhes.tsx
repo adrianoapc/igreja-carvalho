@@ -27,6 +27,8 @@ import {
   Save
 } from "lucide-react";
 import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
+import MusicaTabContent from "@/components/cultos/MusicaTabContent";
+import EscalasTabContent from "@/components/cultos/EscalasTabContent";
 
 interface Culto {
   id: string;
@@ -353,30 +355,14 @@ export default function CultoDetalhes() {
           <LiturgiaTabContent cultoId={culto.id} />
         </TabsContent>
 
-        {/* Tab: Música (placeholder) */}
+        {/* Tab: Música */}
         <TabsContent value="musica" className="mt-6">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <ListMusic className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Gestão de Músicas</h3>
-              <p className="text-sm text-muted-foreground">
-                Gerencie as músicas e canções do culto aqui. (Em desenvolvimento)
-              </p>
-            </CardContent>
-          </Card>
+          <MusicaTabContent cultoId={culto.id} />
         </TabsContent>
 
-        {/* Tab: Escalas (placeholder) */}
+        {/* Tab: Escalas */}
         <TabsContent value="escalas" className="mt-6">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Gestão de Escalas</h3>
-              <p className="text-sm text-muted-foreground">
-                Gerencie as escalas de voluntários do culto aqui. (Em desenvolvimento)
-              </p>
-            </CardContent>
-          </Card>
+          <EscalasTabContent cultoId={culto.id} />
         </TabsContent>
       </Tabs>
     </div>
