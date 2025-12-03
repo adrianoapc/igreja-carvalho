@@ -16,7 +16,9 @@ import {
   Video, 
   FileText,
   Film,
-  Replace
+  Replace,
+  Play,
+  Clock
 } from "lucide-react";
 import {
   DndContext,
@@ -27,7 +29,6 @@ import {
   useSensors,
   DragEndEvent,
   DragStartEvent,
-  DragOverlay,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -37,6 +38,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import SlideshowPreview from "./SlideshowPreview";
 
 interface ItemLiturgia {
   id: string;
@@ -75,11 +77,16 @@ const TIPOS_MULTIPLOS = ["Anúncios", "Avisos", "Outro", "anúncios", "avisos", 
 // Componente sortable para recurso selecionado
 function SortableRecursoCard({ 
   recurso, 
-  onRemove 
+  onRemove,
+  onDurationChange 
 }: { 
   recurso: RecursoLiturgia; 
   onRemove: (id: string) => void;
+  onDurationChange: (id: string, duration: number) => void;
 }) {
+  const [editingDuration, setEditingDuration] = useState(false);
+  const [tempDuration, setTempDuration] = useState(recurso.duracao_segundos.toString());
+
   const {
     attributes,
     listeners,
@@ -100,6 +107,12 @@ function SortableRecursoCard({
 
   const isImage = midia.tipo?.toLowerCase() === 'imagem' || midia.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
   const isVideo = midia.tipo?.toLowerCase() === 'vídeo' || midia.url?.match(/\.(mp4|webm|ogg)$/i);
+
+  const handleDurationSave = () => {
+    const newDuration = parseInt(tempDuration) || 10;
+    onDurationChange(recurso.id, Math.max(1, Math.min(300, newDuration)));
+    setEditingDuration(false);
+  };
 
   return (
     <Card 
@@ -144,7 +157,38 @@ function SortableRecursoCard({
           
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium truncate">{midia.titulo}</p>
-            <p className="text-xs text-muted-foreground">{recurso.duracao_segundos}s</p>
+            
+            {/* Duração editável */}
+            {editingDuration ? (
+              <div className="flex items-center gap-1 mt-1">
+                <Input
+                  type="number"
+                  min={1}
+                  max={300}
+                  value={tempDuration}
+                  onChange={(e) => setTempDuration(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleDurationSave();
+                    if (e.key === 'Escape') setEditingDuration(false);
+                  }}
+                  onBlur={handleDurationSave}
+                  autoFocus
+                  className="h-5 w-14 text-xs px-1"
+                />
+                <span className="text-xs text-muted-foreground">s</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setTempDuration(recurso.duracao_segundos.toString());
+                  setEditingDuration(true);
+                }}
+                className="flex items-center gap-1 mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Clock className="w-3 h-3" />
+                {recurso.duracao_segundos}s
+              </button>
+            )}
           </div>
           
           <Button
@@ -234,6 +278,7 @@ export default function RecursosLiturgiaSheet({
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Usa campo permite_multiplo do banco, com fallback para tipos conhecidos
   const permiteMultiplo = item 
@@ -368,6 +413,26 @@ export default function RecursosLiturgiaSheet({
     }
   };
 
+  const handleDurationChange = async (recursoId: string, newDuration: number) => {
+    // Update local state immediately
+    setRecursos(prev => prev.map(r => 
+      r.id === recursoId ? { ...r, duracao_segundos: newDuration } : r
+    ));
+
+    try {
+      const { error } = await supabase
+        .from("liturgia_recursos")
+        .update({ duracao_segundos: newDuration })
+        .eq("id", recursoId);
+
+      if (error) throw error;
+      toast.success("Duração atualizada!");
+    } catch (error: any) {
+      toast.error("Erro ao atualizar duração", { description: error.message });
+      await loadRecursos(); // Revert on error
+    }
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
@@ -418,119 +483,154 @@ export default function RecursosLiturgiaSheet({
   // IDs das mídias já selecionadas
   const midiasSelecionadasIds = new Set(recursos.map(r => r.midia_id));
 
+  // Calcular duração total
+  const totalDuration = recursos.reduce((acc, r) => acc + (r.duracao_segundos || 10), 0);
+
   if (!item) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
-        <SheetHeader className="p-4 border-b">
-          <SheetTitle className="flex items-center gap-2">
-            <Film className="w-5 h-5" />
-            Recursos: {item.titulo}
-          </SheetTitle>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="outline">{item.tipo}</Badge>
-            {permiteMultiplo ? (
-              <span className="text-xs">• Permite múltiplas mídias</span>
-            ) : (
-              <span className="text-xs flex items-center gap-1">
-                <Replace className="w-3 h-3" />
-                Uma mídia (substitui)
-              </span>
-            )}
-          </div>
-        </SheetHeader>
-
-        <div className="flex h-[calc(100vh-120px)]">
-          {/* Lado Esquerdo - Acervo */}
-          <div className="flex-1 border-r flex flex-col">
-            <div className="p-3 border-b">
-              <h3 className="font-medium text-sm mb-2">Acervo de Mídias</h3>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar mídia..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="flex items-center gap-2">
+              <Film className="w-5 h-5" />
+              Recursos: {item.titulo}
+            </SheetTitle>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Badge variant="outline">{item.tipo}</Badge>
+              {permiteMultiplo ? (
+                <span className="text-xs">• Permite múltiplas mídias</span>
+              ) : (
+                <span className="text-xs flex items-center gap-1">
+                  <Replace className="w-3 h-3" />
+                  Uma mídia (substitui)
+                </span>
+              )}
             </div>
-            
-            <ScrollArea className="flex-1 p-3">
-              <div className="space-y-2">
-                {filteredMidias.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhuma mídia encontrada
+          </SheetHeader>
+
+          <div className="flex h-[calc(100vh-120px)]">
+            {/* Lado Esquerdo - Acervo */}
+            <div className="flex-1 border-r flex flex-col">
+              <div className="p-3 border-b">
+                <h3 className="font-medium text-sm mb-2">Acervo de Mídias</h3>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar mídia..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              
+              <ScrollArea className="flex-1 p-3">
+                <div className="space-y-2">
+                  {filteredMidias.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhuma mídia encontrada
+                    </p>
+                  ) : (
+                    filteredMidias.map(midia => (
+                      <MidiaAcervoCard
+                        key={midia.id}
+                        midia={midia}
+                        onAdd={handleAddMidia}
+                        disabled={loading || (!permiteMultiplo && midiasSelecionadasIds.has(midia.id))}
+                      />
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Lado Direito - Selecionados */}
+            <div className="flex-1 flex flex-col bg-muted/30">
+              <div className="p-3 border-b bg-background">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-sm flex items-center gap-2">
+                    Playlist
+                    <Badge variant="default">
+                      {recursos.length} {recursos.length === 1 ? 'slide' : 'slides'}
+                    </Badge>
+                  </h3>
+                  
+                  {recursos.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPreview(true)}
+                      className="gap-1"
+                    >
+                      <Play className="w-3 h-3" />
+                      Preview
+                    </Button>
+                  )}
+                </div>
+                
+                {recursos.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Duração total: {totalDuration}s • Clique na duração para editar
                   </p>
-                ) : (
-                  filteredMidias.map(midia => (
-                    <MidiaAcervoCard
-                      key={midia.id}
-                      midia={midia}
-                      onAdd={handleAddMidia}
-                      disabled={loading || (!permiteMultiplo && midiasSelecionadasIds.has(midia.id))}
-                    />
-                  ))
+                )}
+                
+                {permiteMultiplo && recursos.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    Arraste para reordenar
+                  </p>
                 )}
               </div>
-            </ScrollArea>
-          </div>
-
-          {/* Lado Direito - Selecionados */}
-          <div className="flex-1 flex flex-col bg-muted/30">
-            <div className="p-3 border-b bg-background">
-              <h3 className="font-medium text-sm flex items-center gap-2">
-                Playlist
-                <Badge variant="default" className="ml-auto">
-                  {recursos.length} {recursos.length === 1 ? 'slide' : 'slides'}
-                </Badge>
-              </h3>
-              {permiteMultiplo && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Arraste para reordenar
-                </p>
-              )}
-            </div>
-            
-            <ScrollArea className="flex-1 p-3">
-              {recursos.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                  <ImageIcon className="w-12 h-12 text-muted-foreground/50 mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    Nenhuma mídia vinculada
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Clique em uma mídia do acervo para adicionar
-                  </p>
-                </div>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={recursos.map(r => r.id)}
-                    strategy={verticalListSortingStrategy}
+              
+              <ScrollArea className="flex-1 p-3">
+                {recursos.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                    <ImageIcon className="w-12 h-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma mídia vinculada
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Clique em uma mídia do acervo para adicionar
+                    </p>
+                  </div>
+                ) : (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
                   >
-                    <div className="space-y-2">
-                      {recursos.map(recurso => (
-                        <SortableRecursoCard
-                          key={recurso.id}
-                          recurso={recurso}
-                          onRemove={handleRemoveMidia}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              )}
-            </ScrollArea>
+                    <SortableContext
+                      items={recursos.map(r => r.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {recursos.map(recurso => (
+                          <SortableRecursoCard
+                            key={recurso.id}
+                            recurso={recurso}
+                            onRemove={handleRemoveMidia}
+                            onDurationChange={handleDurationChange}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </ScrollArea>
+            </div>
           </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </SheetContent>
+      </Sheet>
+
+      {/* Slideshow Preview Modal */}
+      <SlideshowPreview
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        recursos={recursos}
+        titulo={item.titulo}
+      />
+    </>
   );
 }
