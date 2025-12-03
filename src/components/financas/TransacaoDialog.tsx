@@ -375,47 +375,72 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   const handleDadosNotaFiscal = async (dados: any) => {
     try {
-      setDescricao(dados.descricao || "");
-      setValor(String(dados.valor_total || ""));
+      console.log('Processando dados da nota fiscal:', dados);
+      
+      if (dados.descricao) setDescricao(dados.descricao);
+      if (dados.valor_total) setValor(String(dados.valor_total).replace('.', ','));
       
       if (dados.data_emissao) {
-        setDataVencimento(new Date(dados.data_emissao));
-        setDataCompetencia(new Date(dados.data_emissao));
+        try {
+          const dataEmissao = new Date(dados.data_emissao + 'T12:00:00');
+          setDataCompetencia(dataEmissao);
+          if (!dados.data_vencimento) setDataVencimento(dataEmissao);
+        } catch (e) {
+          console.error('Erro ao parsear data_emissao:', e);
+        }
       }
       
       if (dados.data_vencimento) {
-        setDataVencimento(new Date(dados.data_vencimento));
+        try {
+          setDataVencimento(new Date(dados.data_vencimento + 'T12:00:00'));
+        } catch (e) {
+          console.error('Erro ao parsear data_vencimento:', e);
+        }
       }
 
       if (dados.numero_nota) {
-        setObservacoes(`Nota Fiscal: ${dados.numero_nota}\n${dados.tipo_documento ? `Tipo: ${dados.tipo_documento}\n` : ''}${observacoes}`);
+        const novaObs = `Nota Fiscal: ${dados.numero_nota}${dados.tipo_documento ? `\nTipo: ${dados.tipo_documento}` : ''}`;
+        setObservacoes(prev => prev ? `${novaObs}\n${prev}` : novaObs);
       }
 
       if (dados.anexo_url) {
         setAnexoUrl(dados.anexo_url);
       }
 
-      // Buscar ou criar fornecedor
-      if (dados.fornecedor_nome) {
+      // Buscar fornecedor existente - priorizar CNPJ/CPF
+      if (dados.fornecedor_nome || dados.fornecedor_cnpj_cpf) {
         const cnpjCpfLimpo = dados.fornecedor_cnpj_cpf?.replace(/\D/g, '') || null;
+        let fornecedorEncontrado: any = null;
 
-        let fornecedorQuery = supabase
-          .from('fornecedores')
-          .select('id')
-          .eq('nome', dados.fornecedor_nome)
-          .eq('ativo', true)
-          .limit(1);
-
+        // Primeiro: tentar encontrar por CNPJ/CPF (mais preciso)
         if (cnpjCpfLimpo) {
-          fornecedorQuery = fornecedorQuery.or(`cpf_cnpj.eq.${cnpjCpfLimpo}`);
+          const { data } = await supabase
+            .from('fornecedores')
+            .select('id')
+            .eq('cpf_cnpj', cnpjCpfLimpo)
+            .eq('ativo', true)
+            .limit(1)
+            .maybeSingle();
+          fornecedorEncontrado = data;
         }
 
-        const { data: fornecedorExistente } = await fornecedorQuery.single();
+        // Segundo: buscar por nome case-insensitive
+        if (!fornecedorEncontrado && dados.fornecedor_nome) {
+          const { data } = await supabase
+            .from('fornecedores')
+            .select('id')
+            .ilike('nome', dados.fornecedor_nome)
+            .eq('ativo', true)
+            .limit(1)
+            .maybeSingle();
+          fornecedorEncontrado = data;
+        }
 
-        if (fornecedorExistente) {
-          setFornecedorId(fornecedorExistente.id);
-          await buscarSugestoesFornecedor(fornecedorExistente.id);
-        } else {
+        if (fornecedorEncontrado) {
+          setFornecedorId(fornecedorEncontrado.id);
+          await buscarSugestoesFornecedor(fornecedorEncontrado.id);
+        } else if (dados.fornecedor_nome) {
+          // Criar novo fornecedor
           const { data: novoFornecedor, error: fornecedorError } = await supabase
             .from('fornecedores')
             .insert({
@@ -427,12 +452,16 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             .select('id')
             .single();
 
-          if (fornecedorError) throw fornecedorError;
-
-          setFornecedorId(novoFornecedor.id);
-          queryClient.invalidateQueries({ queryKey: ['fornecedores-select'] });
+          if (fornecedorError) {
+            console.error('Erro ao criar fornecedor:', fornecedorError);
+          } else if (novoFornecedor) {
+            setFornecedorId(novoFornecedor.id);
+            queryClient.invalidateQueries({ queryKey: ['fornecedores-select'] });
+          }
         }
       }
+      
+      console.log('Dados da nota fiscal processados com sucesso');
     } catch (error: any) {
       console.error('Erro ao processar dados da nota fiscal:', error);
     }
