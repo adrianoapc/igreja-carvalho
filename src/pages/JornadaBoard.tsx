@@ -24,6 +24,7 @@ import KanbanColumn from "@/components/jornadas/KanbanColumn";
 import AdicionarPessoaDialog from "@/components/jornadas/AdicionarPessoaDialog";
 import EditarJornadaDialog from "@/components/jornadas/EditarJornadaDialog";
 import { useAuth } from "@/hooks/useAuth";
+import MainLayout from "@/components/layout/MainLayout";
 
 export default function JornadaBoard() {
   const { id } = useParams<{ id: string }>();
@@ -185,155 +186,157 @@ export default function JornadaBoard() {
 
   if (loadingJornada || loadingEtapas) {
     return (
-      <div className="min-h-screen bg-muted/30 p-6">
-        <Skeleton className="h-10 w-64 mb-6" />
-        <div className="flex gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-96 w-80 flex-shrink-0" />
-          ))}
+      <MainLayout>
+        <div className="space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <div className="flex gap-4 overflow-x-auto">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-96 w-80 flex-shrink-0" />
+            ))}
+          </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col">
-      {/* Header */}
-      <div className="bg-background border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/jornadas")}
-                className="rounded-full"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: jornada?.cor_tema || "#3b82f6" }}
-                />
-                <div>
-                  <h1 className="text-lg font-semibold">{jornada?.titulo}</h1>
-                  <p className="text-xs text-muted-foreground">
-                    {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
-                  </p>
-                </div>
+    <MainLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/jornadas")}
+              className="rounded-full"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: jornada?.cor_tema || "#3b82f6" }}
+              />
+              <div>
+                <h1 className="text-lg font-semibold">{jornada?.titulo}</h1>
+                <p className="text-xs text-muted-foreground">
+                  {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
+                </p>
               </div>
             </div>
+          </div>
 
-            <div className="flex items-center gap-3">
-              <ToggleGroup
-                type="single"
-                value={filtro}
-                onValueChange={(v) => v && setFiltro(v)}
-                size="sm"
-                className="bg-muted rounded-lg p-0.5"
-              >
-                <ToggleGroupItem value="todos" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
-                  Todos
-                </ToggleGroupItem>
-                <ToggleGroupItem value="minhas" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
-                  Minhas
-                </ToggleGroupItem>
-              </ToggleGroup>
+          <div className="flex items-center gap-3 flex-wrap">
+            <ToggleGroup
+              type="single"
+              value={filtro}
+              onValueChange={(v) => v && setFiltro(v)}
+              size="sm"
+              className="bg-muted rounded-lg p-0.5"
+            >
+              <ToggleGroupItem value="todos" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+                Todos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="minhas" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+                Minhas
+              </ToggleGroupItem>
+            </ToggleGroup>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowEditarJornada(true)}
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Configurar
-              </Button>
-              <Button size="sm" onClick={() => setShowAdicionarPessoa(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Pessoa
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEditarJornada(true)}
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Configurar
+            </Button>
+            <Button size="sm" onClick={() => setShowAdicionarPessoa(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar Pessoa
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Kanban Board */}
-      <ScrollArea className="flex-1">
-        <div className="p-6 min-w-max">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4">
-              {inscricoesByEtapa["sem_etapa"]?.length > 0 && (
-                <KanbanColumn
-                  id="sem_etapa"
-                  title="Aguardando"
-                  items={inscricoesByEtapa["sem_etapa"]}
-                  totalEtapas={totalEtapas}
-                  etapaIndex={0}
-                  onRefetch={refetchInscricoes}
-                />
-              )}
+        {/* Kanban Board */}
+        <div className="bg-muted/30 rounded-lg -mx-4 md:-mx-8 px-4 md:px-8 py-6">
+          <ScrollArea className="w-full">
+            <div className="min-w-max">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex gap-4">
+                  {inscricoesByEtapa["sem_etapa"]?.length > 0 && (
+                    <KanbanColumn
+                      id="sem_etapa"
+                      title="Aguardando"
+                      items={inscricoesByEtapa["sem_etapa"]}
+                      totalEtapas={totalEtapas}
+                      etapaIndex={0}
+                      onRefetch={refetchInscricoes}
+                    />
+                  )}
 
-              {etapas?.map((etapa, index) => (
-                <KanbanColumn
-                  key={etapa.id}
-                  id={etapa.id}
-                  title={etapa.titulo}
-                  items={inscricoesByEtapa[etapa.id] || []}
-                  totalEtapas={totalEtapas}
-                  etapaIndex={index + 1}
-                  onRefetch={refetchInscricoes}
-                />
-              ))}
+                  {etapas?.map((etapa, index) => (
+                    <KanbanColumn
+                      key={etapa.id}
+                      id={etapa.id}
+                      title={etapa.titulo}
+                      items={inscricoesByEtapa[etapa.id] || []}
+                      totalEtapas={totalEtapas}
+                      etapaIndex={index + 1}
+                      onRefetch={refetchInscricoes}
+                    />
+                  ))}
+                </div>
+
+                <DragOverlay>
+                  {activeInscricao && (
+                    <JornadaCard
+                      inscricao={activeInscricao}
+                      totalEtapas={totalEtapas}
+                      etapaIndex={
+                        etapas?.findIndex(
+                          (e) => e.id === activeInscricao.etapa_atual_id
+                        ) ?? 0
+                      }
+                      isDragging
+                    />
+                  )}
+                </DragOverlay>
+              </DndContext>
             </div>
-
-            <DragOverlay>
-              {activeInscricao && (
-                <JornadaCard
-                  inscricao={activeInscricao}
-                  totalEtapas={totalEtapas}
-                  etapaIndex={
-                    etapas?.findIndex(
-                      (e) => e.id === activeInscricao.etapa_atual_id
-                    ) ?? 0
-                  }
-                  isDragging
-                />
-              )}
-            </DragOverlay>
-          </DndContext>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
 
-      <AdicionarPessoaDialog
-        open={showAdicionarPessoa}
-        onOpenChange={setShowAdicionarPessoa}
-        jornadaId={id!}
-        primeiraEtapaId={etapas?.[0]?.id}
-        onSuccess={() => {
-          refetchInscricoes();
-          setShowAdicionarPessoa(false);
-        }}
-      />
-
-      {jornada && (
-        <EditarJornadaDialog
-          open={showEditarJornada}
-          onOpenChange={setShowEditarJornada}
-          jornada={jornada}
+        <AdicionarPessoaDialog
+          open={showAdicionarPessoa}
+          onOpenChange={setShowAdicionarPessoa}
+          jornadaId={id!}
+          primeiraEtapaId={etapas?.[0]?.id}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["jornada", id] });
-            queryClient.invalidateQueries({ queryKey: ["etapas-jornada", id] });
-            setShowEditarJornada(false);
+            refetchInscricoes();
+            setShowAdicionarPessoa(false);
           }}
         />
-      )}
-    </div>
+
+        {jornada && (
+          <EditarJornadaDialog
+            open={showEditarJornada}
+            onOpenChange={setShowEditarJornada}
+            jornada={jornada}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["jornada", id] });
+              queryClient.invalidateQueries({ queryKey: ["etapas-jornada", id] });
+              setShowEditarJornada(false);
+            }}
+          />
+        )}
+      </div>
+    </MainLayout>
   );
 }
