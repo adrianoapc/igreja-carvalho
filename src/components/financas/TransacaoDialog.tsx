@@ -12,7 +12,19 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Camera, Upload, Eye, X, Loader2, ZoomIn, ZoomOut, FileText, Download, ImageIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  Camera,
+  Upload,
+  Eye,
+  X,
+  Loader2,
+  ZoomIn,
+  ZoomOut,
+  FileText,
+  Download,
+  ImageIcon,
+} from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,12 +45,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
-  
+
   // Estados do formulário
   const [tipoLancamento, setTipoLancamento] = useState<"unico" | "recorrente" | "parcelado">("unico");
   const [descricao, setDescricao] = useState("");
@@ -60,7 +72,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const [anexoUrl, setAnexoUrl] = useState<string>("");
   const [anexoPreview, setAnexoPreview] = useState<string>("");
   const [anexoIsPdf, setAnexoIsPdf] = useState(false);
-  
+
   // Campos de confirmação de pagamento/recebimento
   const [foiPago, setFoiPago] = useState(false);
   const [dataPagamento, setDataPagamento] = useState<Date | undefined>();
@@ -86,23 +98,23 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setObservacoes(transacao.observacoes || "");
       setTipoLancamento(transacao.tipo_lancamento || "unico");
       setAnexoUrl(transacao.anexo_url || "");
-      
-      const isPdf = transacao.anexo_url?.toLowerCase().endsWith('.pdf') || false;
+
+      const isPdf = transacao.anexo_url?.toLowerCase().endsWith(".pdf") || false;
       setAnexoIsPdf(isPdf);
-      
+
       // Gerar thumbnail se for PDF existente
       if (isPdf && transacao.anexo_url) {
         generatePdfThumbnail(transacao.anexo_url, 0.8)
-          .then(thumbnail => setAnexoPreview(thumbnail))
-          .catch(err => {
-            console.error('Erro ao gerar thumbnail do PDF:', err);
+          .then((thumbnail) => setAnexoPreview(thumbnail))
+          .catch((err) => {
+            console.error("Erro ao gerar thumbnail do PDF:", err);
             setAnexoPreview("");
           });
       } else {
         setAnexoPreview(transacao.anexo_url || "");
       }
-      
-      setFoiPago(transacao.status === 'pago');
+
+      setFoiPago(transacao.status === "pago");
       setDataPagamento(transacao.data_pagamento ? new Date(transacao.data_pagamento) : undefined);
       setJuros(transacao.juros ? String(transacao.juros) : "");
       setMultas(transacao.multas ? String(transacao.multas) : "");
@@ -148,95 +160,83 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   // Queries para selects
   const { data: contas } = useQuery({
-    queryKey: ['contas-select'],
+    queryKey: ["contas-select"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contas')
-        .select('id, nome')
-        .eq('ativo', true)
-        .order('nome');
+      const { data, error } = await supabase.from("contas").select("id, nome").eq("ativo", true).order("nome");
       if (error) throw error;
       return data;
     },
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ['categorias-select', tipo],
+    queryKey: ["categorias-select", tipo],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('categorias_financeiras')
-        .select('id, nome')
-        .eq('tipo', tipo)
-        .eq('ativo', true)
-        .order('nome');
+        .from("categorias_financeiras")
+        .select("id, nome")
+        .eq("tipo", tipo)
+        .eq("ativo", true)
+        .order("nome");
       if (error) throw error;
       return data;
     },
   });
 
   const { data: subcategorias } = useQuery({
-    queryKey: ['subcategorias-select', categoriaId],
+    queryKey: ["subcategorias-select", categoriaId],
     queryFn: async () => {
-      if (!categoriaId || categoriaId === 'none') return [];
+      if (!categoriaId || categoriaId === "none") return [];
       const { data, error } = await supabase
-        .from('subcategorias_financeiras')
-        .select('id, nome')
-        .eq('categoria_id', categoriaId)
-        .eq('ativo', true)
-        .order('nome');
+        .from("subcategorias_financeiras")
+        .select("id, nome")
+        .eq("categoria_id", categoriaId)
+        .eq("ativo", true)
+        .order("nome");
       if (error) throw error;
       return data;
     },
-    enabled: !!categoriaId && categoriaId !== 'none',
+    enabled: !!categoriaId && categoriaId !== "none",
   });
 
   const { data: centros } = useQuery({
-    queryKey: ['centros-select'],
+    queryKey: ["centros-select"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('centros_custo')
-        .select('id, nome')
-        .eq('ativo', true)
-        .order('nome');
+      const { data, error } = await supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome");
       if (error) throw error;
       return data;
     },
   });
 
   const { data: bases } = useQuery({
-    queryKey: ['bases-select'],
+    queryKey: ["bases-select"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('bases_ministeriais')
-        .select('id, titulo')
-        .eq('ativo', true)
-        .order('titulo');
+        .from("bases_ministeriais")
+        .select("id, titulo")
+        .eq("ativo", true)
+        .order("titulo");
       if (error) throw error;
       return data;
     },
   });
 
   const { data: fornecedores } = useQuery({
-    queryKey: ['fornecedores-select'],
+    queryKey: ["fornecedores-select"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fornecedores')
-        .select('id, nome')
-        .eq('ativo', true)
-        .order('nome');
+      const { data, error } = await supabase.from("fornecedores").select("id, nome").eq("ativo", true).order("nome");
       if (error) throw error;
       return data;
     },
   });
 
   const { data: formasPagamento } = useQuery({
-    queryKey: ['formas-pagamento-select'],
+    queryKey: ["formas-pagamento-select"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('formas_pagamento')
-        .select('id, nome')
-        .eq('ativo', true)
-        .order('nome');
+        .from("formas_pagamento")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
       if (error) throw error;
       return data;
     },
@@ -244,25 +244,25 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   // Buscar sugestões baseadas em transações anteriores do fornecedor
   const buscarSugestoesFornecedor = async (fornecedorIdParam: string, forceApply: boolean = false) => {
-    if (!fornecedorIdParam || fornecedorIdParam === 'none') return;
+    if (!fornecedorIdParam || fornecedorIdParam === "none") return;
 
     try {
-      console.log('Buscando sugestões para fornecedor:', fornecedorIdParam, 'forceApply:', forceApply);
-      
+      console.log("Buscando sugestões para fornecedor:", fornecedorIdParam, "forceApply:", forceApply);
+
       const { data: transacoes, error } = await supabase
-        .from('transacoes_financeiras')
-        .select('categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento')
-        .eq('fornecedor_id', fornecedorIdParam)
-        .not('categoria_id', 'is', null)
-        .order('created_at', { ascending: false })
+        .from("transacoes_financeiras")
+        .select("categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento")
+        .eq("fornecedor_id", fornecedorIdParam)
+        .not("categoria_id", "is", null)
+        .order("created_at", { ascending: false })
         .limit(20);
 
       if (error) throw error;
-      
-      console.log('Transações encontradas:', transacoes?.length || 0);
-      
+
+      console.log("Transações encontradas:", transacoes?.length || 0);
+
       if (!transacoes || transacoes.length === 0) {
-        console.log('Nenhuma transação anterior encontrada para sugestões');
+        console.log("Nenhuma transação anterior encontrada para sugestões");
         return;
       }
 
@@ -273,11 +273,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const contaFreq: Record<string, number> = {};
       const formaPagamentoFreq: Record<string, number> = {};
 
-      transacoes.forEach(t => {
+      transacoes.forEach((t) => {
         if (t.categoria_id) categoriaFreq[t.categoria_id] = (categoriaFreq[t.categoria_id] || 0) + 1;
         if (t.subcategoria_id) subcategoriaFreq[t.subcategoria_id] = (subcategoriaFreq[t.subcategoria_id] || 0) + 1;
         if (t.centro_custo_id) centroCustoFreq[t.centro_custo_id] = (centroCustoFreq[t.centro_custo_id] || 0) + 1;
-        if (t.base_ministerial_id) baseMinisterialFreq[t.base_ministerial_id] = (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
+        if (t.base_ministerial_id)
+          baseMinisterialFreq[t.base_ministerial_id] = (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
         if (t.conta_id) contaFreq[t.conta_id] = (contaFreq[t.conta_id] || 0) + 1;
         if (t.forma_pagamento) formaPagamentoFreq[t.forma_pagamento] = (formaPagamentoFreq[t.forma_pagamento] || 0) + 1;
       });
@@ -285,7 +286,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const getMaisFrequente = (freq: Record<string, number>) => {
         const entries = Object.entries(freq);
         if (entries.length === 0) return null;
-        return entries.reduce((a, b) => a[1] > b[1] ? a : b)[0];
+        return entries.reduce((a, b) => (a[1] > b[1] ? a : b))[0];
       };
 
       const categoriaSugerida = getMaisFrequente(categoriaFreq);
@@ -295,48 +296,55 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const contaSugerida = getMaisFrequente(contaFreq);
       const formaPagamentoSugerida = getMaisFrequente(formaPagamentoFreq);
 
-      console.log('Sugestões encontradas:', { categoriaSugerida, subcategoriaSugerida, centroCustoSugerido, baseMinisterialSugerida, contaSugerida, formaPagamentoSugerida });
+      console.log("Sugestões encontradas:", {
+        categoriaSugerida,
+        subcategoriaSugerida,
+        centroCustoSugerido,
+        baseMinisterialSugerida,
+        contaSugerida,
+        formaPagamentoSugerida,
+      });
 
       const sugestoesAplicadas: string[] = [];
 
       // Quando forceApply é true (chamado do processamento de nota), sempre aplicar
-      if (categoriaSugerida && (forceApply || categoriaId === 'none' || categoriaId === '')) {
+      if (categoriaSugerida && (forceApply || categoriaId === "none" || categoriaId === "")) {
         setCategoriaId(categoriaSugerida);
-        sugestoesAplicadas.push('categoria');
+        sugestoesAplicadas.push("categoria");
       }
-      if (subcategoriaSugerida && (forceApply || subcategoriaId === 'none' || subcategoriaId === '')) {
+      if (subcategoriaSugerida && (forceApply || subcategoriaId === "none" || subcategoriaId === "")) {
         setSubcategoriaId(subcategoriaSugerida);
-        sugestoesAplicadas.push('subcategoria');
+        sugestoesAplicadas.push("subcategoria");
       }
-      if (centroCustoSugerido && (forceApply || centroCustoId === 'none' || centroCustoId === '')) {
+      if (centroCustoSugerido && (forceApply || centroCustoId === "none" || centroCustoId === "")) {
         setCentroCustoId(centroCustoSugerido);
-        sugestoesAplicadas.push('centro de custo');
+        sugestoesAplicadas.push("centro de custo");
       }
-      if (baseMinisterialSugerida && (forceApply || baseMinisterialId === 'none' || baseMinisterialId === '')) {
+      if (baseMinisterialSugerida && (forceApply || baseMinisterialId === "none" || baseMinisterialId === "")) {
         setBaseMinisterialId(baseMinisterialSugerida);
-        sugestoesAplicadas.push('base ministerial');
+        sugestoesAplicadas.push("base ministerial");
       }
-      if (contaSugerida && (forceApply || contaId === '' || !contaId)) {
+      if (contaSugerida && (forceApply || contaId === "" || !contaId)) {
         setContaId(contaSugerida);
-        sugestoesAplicadas.push('conta');
+        sugestoesAplicadas.push("conta");
       }
-      if (formaPagamentoSugerida && (forceApply || formaPagamento === '' || !formaPagamento)) {
+      if (formaPagamentoSugerida && (forceApply || formaPagamento === "" || !formaPagamento)) {
         setFormaPagamento(formaPagamentoSugerida);
-        sugestoesAplicadas.push('forma de pagamento');
+        sugestoesAplicadas.push("forma de pagamento");
       }
 
       if (sugestoesAplicadas.length > 0) {
-        toast.success('💡 Sugestões aplicadas', {
-          description: `Baseado em transações anteriores: ${sugestoesAplicadas.join(', ')}`
+        toast.success("💡 Sugestões aplicadas", {
+          description: `Baseado em transações anteriores: ${sugestoesAplicadas.join(", ")}`,
         });
       }
     } catch (error) {
-      console.error('Erro ao buscar sugestões:', error);
+      console.error("Erro ao buscar sugestões:", error);
     }
   };
 
   useEffect(() => {
-    if (fornecedorId && fornecedorId !== 'none' && open) {
+    if (fornecedorId && fornecedorId !== "none" && open) {
       buscarSugestoesFornecedor(fornecedorId);
     }
   }, [fornecedorId, open]);
@@ -344,12 +352,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   // Processar arquivo com IA
   const handleFileSelected = async (file: File) => {
     setAnexoFile(file);
-    
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
     setAnexoIsPdf(isPdf);
-    
+
     // Criar preview
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith("image/")) {
       const reader = new FileReader();
       reader.onload = (e) => {
         setAnexoPreview(e.target?.result as string);
@@ -361,7 +369,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         const thumbnail = await generatePdfThumbnail(file, 0.8);
         setAnexoPreview(thumbnail);
       } catch (error) {
-        console.error('Erro ao gerar thumbnail do PDF:', error);
+        console.error("Erro ao gerar thumbnail do PDF:", error);
         setAnexoPreview("");
       }
     } else {
@@ -369,7 +377,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     }
 
     // Processar com IA automaticamente para saídas
-    if (tipo === 'saida') {
+    if (tipo === "saida") {
       await processarComIA(file);
     }
   };
@@ -381,50 +389,52 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       // Converter para base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (e) => resolve((e.target?.result as string).split(',')[1]);
+        reader.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      
-      toast.loading('Processando nota fiscal com IA...', { id: 'processing' });
-      
-      const { data, error } = await supabase.functions.invoke('processar-nota-fiscal', {
-        body: { imageBase64: base64, mimeType: file.type }
+
+      toast.loading("Processando nota fiscal com IA...", { id: "processing" });
+
+      const { data, error } = await supabase.functions.invoke("processar-nota-fiscal", {
+        body: { imageBase64: base64, mimeType: file.type },
       });
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
       // Upload do arquivo
-      toast.loading('Salvando arquivo...', { id: 'processing' });
-      
-      const fileExt = file.name.split('.').pop();
+      toast.loading("Salvando arquivo...", { id: "processing" });
+
+      const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `notas-fiscais/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('transaction-attachments')
-        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+        .from("transaction-attachments")
+        .upload(filePath, file, { cacheControl: "3600", upsert: false });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('transaction-attachments')
-        .getPublicUrl(filePath);
+      const { data: signedData } = await supabase.storage
+        .from("transaction-attachments")
+        .createSignedUrl(filePath, 31536000); // URL válida por 1 ano
+
+      const publicUrl = signedData?.signedUrl;
 
       setAnexoUrl(publicUrl);
       // Também atualizar preview para garantir que a imagem seja exibida
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith("image/")) {
         setAnexoPreview(publicUrl);
       }
 
       // Preencher campos
       await handleDadosNotaFiscal({ ...data.dados, anexo_url: publicUrl });
-      
-      toast.success('Nota fiscal processada!', { id: 'processing' });
+
+      toast.success("Nota fiscal processada!", { id: "processing" });
     } catch (error: any) {
-      console.error('Erro ao processar nota fiscal:', error);
-      toast.error('Erro ao processar', { description: error.message, id: 'processing' });
+      console.error("Erro ao processar nota fiscal:", error);
+      toast.error("Erro ao processar", { description: error.message, id: "processing" });
     } finally {
       setAiProcessing(false);
     }
@@ -432,45 +442,45 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   const handleDadosNotaFiscal = async (dados: any) => {
     try {
-      console.log('Processando dados da nota fiscal:', dados);
-      
+      console.log("Processando dados da nota fiscal:", dados);
+
       if (dados.descricao) setDescricao(dados.descricao);
-      if (dados.valor_total) setValor(String(dados.valor_total).replace('.', ','));
-      
+      if (dados.valor_total) setValor(String(dados.valor_total).replace(".", ","));
+
       if (dados.data_emissao) {
         try {
-          const dataEmissao = new Date(dados.data_emissao + 'T12:00:00');
+          const dataEmissao = new Date(dados.data_emissao + "T12:00:00");
           setDataCompetencia(dataEmissao);
           if (!dados.data_vencimento) setDataVencimento(dataEmissao);
         } catch (e) {
-          console.error('Erro ao parsear data_emissao:', e);
+          console.error("Erro ao parsear data_emissao:", e);
         }
       }
-      
+
       if (dados.data_vencimento) {
         try {
-          setDataVencimento(new Date(dados.data_vencimento + 'T12:00:00'));
+          setDataVencimento(new Date(dados.data_vencimento + "T12:00:00"));
         } catch (e) {
-          console.error('Erro ao parsear data_vencimento:', e);
+          console.error("Erro ao parsear data_vencimento:", e);
         }
       }
 
       if (dados.numero_nota) {
-        const novaObs = `Nota Fiscal: ${dados.numero_nota}${dados.tipo_documento ? `\nTipo: ${dados.tipo_documento}` : ''}`;
-        setObservacoes(prev => prev ? `${novaObs}\n${prev}` : novaObs);
+        const novaObs = `Nota Fiscal: ${dados.numero_nota}${dados.tipo_documento ? `\nTipo: ${dados.tipo_documento}` : ""}`;
+        setObservacoes((prev) => (prev ? `${novaObs}\n${prev}` : novaObs));
       }
 
       if (dados.anexo_url) {
         setAnexoUrl(dados.anexo_url);
-        const isPdf = dados.anexo_url.toLowerCase().endsWith('.pdf');
+        const isPdf = dados.anexo_url.toLowerCase().endsWith(".pdf");
         setAnexoIsPdf(isPdf);
         // Só gerar thumbnail se não tivermos um preview ainda (evita regenerar após upload)
         if (isPdf && !anexoPreview) {
           // Gerar thumbnail do PDF
           generatePdfThumbnail(dados.anexo_url, 0.8)
-            .then(thumbnail => setAnexoPreview(thumbnail))
-            .catch(err => {
-              console.error('Erro ao gerar thumbnail do PDF:', err);
+            .then((thumbnail) => setAnexoPreview(thumbnail))
+            .catch((err) => {
+              console.error("Erro ao gerar thumbnail do PDF:", err);
               // Mantém vazio para mostrar fallback
             });
         } else if (!isPdf) {
@@ -480,16 +490,16 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       // Buscar fornecedor existente - priorizar CNPJ/CPF
       if (dados.fornecedor_nome || dados.fornecedor_cnpj_cpf) {
-        const cnpjCpfLimpo = dados.fornecedor_cnpj_cpf?.replace(/\D/g, '') || null;
+        const cnpjCpfLimpo = dados.fornecedor_cnpj_cpf?.replace(/\D/g, "") || null;
         let fornecedorEncontrado: any = null;
 
         // Primeiro: tentar encontrar por CNPJ/CPF (mais preciso)
         if (cnpjCpfLimpo) {
           const { data } = await supabase
-            .from('fornecedores')
-            .select('id')
-            .eq('cpf_cnpj', cnpjCpfLimpo)
-            .eq('ativo', true)
+            .from("fornecedores")
+            .select("id")
+            .eq("cpf_cnpj", cnpjCpfLimpo)
+            .eq("ativo", true)
             .limit(1)
             .maybeSingle();
           fornecedorEncontrado = data;
@@ -498,17 +508,17 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         // Segundo: buscar por nome case-insensitive
         if (!fornecedorEncontrado && dados.fornecedor_nome) {
           const { data } = await supabase
-            .from('fornecedores')
-            .select('id')
-            .ilike('nome', dados.fornecedor_nome)
-            .eq('ativo', true)
+            .from("fornecedores")
+            .select("id")
+            .ilike("nome", dados.fornecedor_nome)
+            .eq("ativo", true)
             .limit(1)
             .maybeSingle();
           fornecedorEncontrado = data;
         }
 
         if (fornecedorEncontrado) {
-          console.log('Fornecedor encontrado, buscando sugestões:', fornecedorEncontrado.id);
+          console.log("Fornecedor encontrado, buscando sugestões:", fornecedorEncontrado.id);
           setFornecedorId(fornecedorEncontrado.id);
           // Chamar sugestões com forceApply para garantir aplicação
           setTimeout(async () => {
@@ -517,55 +527,56 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         } else if (dados.fornecedor_nome) {
           // Criar novo fornecedor
           const { data: novoFornecedor, error: fornecedorError } = await supabase
-            .from('fornecedores')
+            .from("fornecedores")
             .insert({
               nome: dados.fornecedor_nome,
               cpf_cnpj: cnpjCpfLimpo,
-              tipo_pessoa: cnpjCpfLimpo?.length === 14 ? 'juridica' : cnpjCpfLimpo?.length === 11 ? 'fisica' : 'juridica',
-              ativo: true
+              tipo_pessoa:
+                cnpjCpfLimpo?.length === 14 ? "juridica" : cnpjCpfLimpo?.length === 11 ? "fisica" : "juridica",
+              ativo: true,
             })
-            .select('id')
+            .select("id")
             .single();
 
           if (fornecedorError) {
-            console.error('Erro ao criar fornecedor:', fornecedorError);
+            console.error("Erro ao criar fornecedor:", fornecedorError);
           } else if (novoFornecedor) {
             setFornecedorId(novoFornecedor.id);
-            queryClient.invalidateQueries({ queryKey: ['fornecedores-select'] });
+            queryClient.invalidateQueries({ queryKey: ["fornecedores-select"] });
           }
         }
       }
-      
-      console.log('Dados da nota fiscal processados com sucesso');
+
+      console.log("Dados da nota fiscal processados com sucesso");
     } catch (error: any) {
-      console.error('Erro ao processar dados da nota fiscal:', error);
+      console.error("Erro ao processar dados da nota fiscal:", error);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Submit disparado", { valor, contaId, descricao });
-    
+
     // Validações antes de processar
-    if (!contaId || contaId === 'none' || contaId === '') {
-      toast.error('Selecione a Conta Bancária para salvar');
+    if (!contaId || contaId === "none" || contaId === "") {
+      toast.error("Selecione a Conta Bancária para salvar");
       return;
     }
-    
+
     // Parse do valor tratando formato brasileiro (1.234,56 -> 1234.56)
-    const valorLimpo = valor.replace(/\./g, '').replace(',', '.');
+    const valorLimpo = valor.replace(/\./g, "").replace(",", ".");
     const valorNumerico = parseFloat(valorLimpo) || 0;
-    
+
     if (valorNumerico <= 0) {
-      toast.error('Informe um valor válido');
+      toast.error("Informe um valor válido");
       return;
     }
-    
+
     if (!descricao.trim()) {
-      toast.error('Informe uma descrição');
+      toast.error("Informe uma descrição");
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -574,19 +585,15 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       // Upload do anexo se não foi processado ainda
       let anexoPath = anexoUrl;
       if (anexoFile && !anexoUrl) {
-        const fileExt = anexoFile.name.split('.').pop();
+        const fileExt = anexoFile.name.split(".").pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${tipo}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('transacoes-anexos')
-          .upload(filePath, anexoFile);
+        const { error: uploadError } = await supabase.storage.from("transacoes-anexos").upload(filePath, anexoFile);
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage
-          .from('transacoes-anexos')
-          .getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage.from("transacoes-anexos").getPublicUrl(filePath);
 
         anexoPath = urlData.publicUrl;
       }
@@ -596,54 +603,49 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         tipo_lancamento: tipoLancamento,
         descricao,
         valor: valorNumerico,
-        data_vencimento: format(dataVencimento, 'yyyy-MM-dd'),
-        data_competencia: format(dataCompetencia, 'yyyy-MM-dd'),
-        data_pagamento: foiPago && dataPagamento ? format(dataPagamento, 'yyyy-MM-dd') : null,
+        data_vencimento: format(dataVencimento, "yyyy-MM-dd"),
+        data_competencia: format(dataCompetencia, "yyyy-MM-dd"),
+        data_pagamento: foiPago && dataPagamento ? format(dataPagamento, "yyyy-MM-dd") : null,
         conta_id: contaId,
-        categoria_id: categoriaId && categoriaId !== 'none' ? categoriaId : null,
-        subcategoria_id: subcategoriaId && subcategoriaId !== 'none' ? subcategoriaId : null,
-        centro_custo_id: centroCustoId && centroCustoId !== 'none' ? centroCustoId : null,
-        base_ministerial_id: baseMinisterialId && baseMinisterialId !== 'none' ? baseMinisterialId : null,
-        fornecedor_id: fornecedorId && fornecedorId !== 'none' ? fornecedorId : null,
-        forma_pagamento: formaPagamento && formaPagamento !== 'none' ? formaPagamento : null,
-        total_parcelas: tipoLancamento === 'parcelado' ? parseInt(totalParcelas) : null,
-        numero_parcela: tipoLancamento === 'parcelado' ? 1 : null,
-        recorrencia: tipoLancamento === 'recorrente' ? recorrencia : null,
-        data_fim_recorrencia: tipoLancamento === 'recorrente' && dataFimRecorrencia 
-          ? format(dataFimRecorrencia, 'yyyy-MM-dd') : null,
+        categoria_id: categoriaId && categoriaId !== "none" ? categoriaId : null,
+        subcategoria_id: subcategoriaId && subcategoriaId !== "none" ? subcategoriaId : null,
+        centro_custo_id: centroCustoId && centroCustoId !== "none" ? centroCustoId : null,
+        base_ministerial_id: baseMinisterialId && baseMinisterialId !== "none" ? baseMinisterialId : null,
+        fornecedor_id: fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
+        forma_pagamento: formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
+        total_parcelas: tipoLancamento === "parcelado" ? parseInt(totalParcelas) : null,
+        numero_parcela: tipoLancamento === "parcelado" ? 1 : null,
+        recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
+        data_fim_recorrencia:
+          tipoLancamento === "recorrente" && dataFimRecorrencia ? format(dataFimRecorrencia, "yyyy-MM-dd") : null,
         observacoes: observacoes || null,
         anexo_url: anexoPath || null,
         lancado_por: userData.user?.id,
-        status: foiPago ? 'pago' : 'pendente',
-        juros: foiPago && juros ? parseFloat(juros.replace(',', '.')) : 0,
-        multas: foiPago && multas ? parseFloat(multas.replace(',', '.')) : 0,
-        desconto: foiPago && desconto ? parseFloat(desconto.replace(',', '.')) : 0,
-        taxas_administrativas: foiPago && taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(',', '.')) : 0,
+        status: foiPago ? "pago" : "pendente",
+        juros: foiPago && juros ? parseFloat(juros.replace(",", ".")) : 0,
+        multas: foiPago && multas ? parseFloat(multas.replace(",", ".")) : 0,
+        desconto: foiPago && desconto ? parseFloat(desconto.replace(",", ".")) : 0,
+        taxas_administrativas: foiPago && taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(",", ".")) : 0,
       };
 
       let error;
       if (transacao) {
-        const result = await supabase
-          .from('transacoes_financeiras')
-          .update(transacaoData)
-          .eq('id', transacao.id);
+        const result = await supabase.from("transacoes_financeiras").update(transacaoData).eq("id", transacao.id);
         error = result.error;
       } else {
-        const result = await supabase
-          .from('transacoes_financeiras')
-          .insert(transacaoData);
+        const result = await supabase.from("transacoes_financeiras").insert(transacaoData);
         error = result.error;
       }
 
       if (error) throw error;
 
-      toast.success(`${tipo === 'entrada' ? 'Entrada' : 'Saída'} ${transacao ? 'atualizada' : 'cadastrada'}!`);
-      queryClient.invalidateQueries({ queryKey: ['entradas'] });
-      queryClient.invalidateQueries({ queryKey: ['saidas'] });
+      toast.success(`${tipo === "entrada" ? "Entrada" : "Saída"} ${transacao ? "atualizada" : "cadastrada"}!`);
+      queryClient.invalidateQueries({ queryKey: ["entradas"] });
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
       onOpenChange(false);
       resetForm();
     } catch (error: any) {
-      toast.error(error.message || `Erro ao ${transacao ? 'atualizar' : 'cadastrar'} transação`);
+      toast.error(error.message || `Erro ao ${transacao ? "atualizar" : "cadastrar"} transação`);
     } finally {
       setLoading(false);
     }
@@ -680,9 +682,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   <Camera className="w-5 h-5" />
                   {isMobile ? "Tirar Foto da Nota" : "Fotografar ou Enviar Nota"}
                 </Button>
-                <p className="text-xs text-center text-muted-foreground">
-                  A IA irá extrair os dados automaticamente
-                </p>
+                <p className="text-xs text-center text-muted-foreground">A IA irá extrair os dados automaticamente</p>
               </div>
 
               <input
@@ -702,10 +702,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       ) : (
         <div className="relative">
           {/* Container com aspect ratio fixo para garantir visibilidade */}
-          <div 
+          <div
             className={cn(
               "relative rounded-lg overflow-hidden border cursor-pointer group bg-muted/20",
-              isMobile ? "h-[120px]" : "aspect-[3/4] w-full"
+              isMobile ? "h-[120px]" : "aspect-[3/4] w-full",
             )}
             onClick={handleViewDocument}
           >
@@ -729,11 +729,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </>
             ) : anexoUrl && !anexoIsPdf ? (
               <>
-                <img
-                  src={anexoUrl}
-                  alt="Nota fiscal"
-                  className="w-full h-full object-contain"
-                />
+                <img src={anexoUrl} alt="Nota fiscal" className="w-full h-full object-contain" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Eye className="w-8 h-8 text-white" />
                 </div>
@@ -743,10 +739,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
                 <FileText className="w-16 h-16 text-muted-foreground" />
                 <p className="text-sm font-medium text-foreground text-center truncate max-w-full">
-                  {anexoFile?.name || 'Documento anexado'}
+                  {anexoFile?.name || "Documento anexado"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {anexoIsPdf ? 'Clique para abrir em nova aba' : 'Clique para visualizar'}
+                  {anexoIsPdf ? "Clique para abrir em nova aba" : "Clique para visualizar"}
                 </p>
               </div>
             ) : (
@@ -780,7 +776,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               onClick={handleViewDocument}
             >
               <Eye className="w-4 h-4" />
-              {anexoIsPdf ? 'Abrir PDF' : 'Ver Nota'}
+              {anexoIsPdf ? "Abrir PDF" : "Ver Nota"}
             </Button>
           )}
         </div>
@@ -793,9 +789,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     <div className="space-y-4">
       {/* Tipo de lançamento */}
       <div>
-        <Label className="text-sm font-medium mb-2 block">
-          Tipo de {tipo === 'entrada' ? 'entrada' : 'saída'} *
-        </Label>
+        <Label className="text-sm font-medium mb-2 block">Tipo de {tipo === "entrada" ? "entrada" : "saída"} *</Label>
         <RadioGroup value={tipoLancamento} onValueChange={(value: any) => setTipoLancamento(value)}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center space-x-2">
@@ -821,7 +815,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       </div>
 
       {/* Parcelamento */}
-      {tipoLancamento === 'parcelado' && (
+      {tipoLancamento === "parcelado" && (
         <div className="border-t pt-3">
           <Label htmlFor="parcelas">Número de parcelas *</Label>
           <Input
@@ -837,7 +831,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       )}
 
       {/* Recorrência */}
-      {tipoLancamento === 'recorrente' && (
+      {tipoLancamento === "recorrente" && (
         <div className="border-t pt-3 space-y-3">
           <div>
             <Label>Frequência *</Label>
@@ -861,19 +855,17 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={cn("w-full justify-start text-left font-normal", !dataFimRecorrencia && "text-muted-foreground")}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dataFimRecorrencia && "text-muted-foreground",
+                  )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dataFimRecorrencia ? format(dataFimRecorrencia, "dd/MM/yyyy", { locale: ptBR }) : "Opcional"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={dataFimRecorrencia}
-                  onSelect={setDataFimRecorrencia}
-                  locale={ptBR}
-                />
+                <Calendar mode="single" selected={dataFimRecorrencia} onSelect={setDataFimRecorrencia} locale={ptBR} />
               </PopoverContent>
             </Popover>
           </div>
@@ -882,7 +874,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       {/* Informações básicas */}
       <div className="border-t pt-3 space-y-3">
-        {tipo === 'saida' && (
+        {tipo === "saida" && (
           <div>
             <Label>Fornecedor</Label>
             <Select value={fornecedorId} onValueChange={setFornecedorId}>
@@ -891,9 +883,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhum</SelectItem>
-                {fornecedores?.filter(f => f.id).map((f) => (
-                  <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                ))}
+                {fornecedores
+                  ?.filter((f) => f.id)
+                  .map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.nome}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -932,9 +928,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Não especificado</SelectItem>
-                {formasPagamento?.filter(f => f.id).map((f) => (
-                  <SelectItem key={f.id} value={f.nome}>{f.nome}</SelectItem>
-                ))}
+                {formasPagamento
+                  ?.filter((f) => f.id)
+                  .map((f) => (
+                    <SelectItem key={f.id} value={f.nome}>
+                      {f.nome}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -947,9 +947,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               <SelectValue placeholder="Selecione a conta" />
             </SelectTrigger>
             <SelectContent>
-              {contas?.filter(c => c.id).map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-              ))}
+              {contas
+                ?.filter((c) => c.id)
+                .map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.nome}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
@@ -1000,41 +1004,52 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       {/* Classificação contábil */}
       <div className="border-t pt-3 space-y-3">
         <h4 className="font-medium text-sm">Classificação</h4>
-        
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Categoria</Label>
-            <Select value={categoriaId} onValueChange={(value) => {
-              setCategoriaId(value);
-              setSubcategoriaId("none");
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhuma</SelectItem>
-                {categorias?.filter(c => c.id).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>Subcategoria</Label>
-            <Select 
-              value={subcategoriaId} 
-              onValueChange={setSubcategoriaId}
-              disabled={!categoriaId || categoriaId === 'none'}
+            <Select
+              value={categoriaId}
+              onValueChange={(value) => {
+                setCategoriaId(value);
+                setSubcategoriaId("none");
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhuma</SelectItem>
-                {subcategorias?.filter(s => s.id).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                ))}
+                {categorias
+                  ?.filter((c) => c.id)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Subcategoria</Label>
+            <Select
+              value={subcategoriaId}
+              onValueChange={setSubcategoriaId}
+              disabled={!categoriaId || categoriaId === "none"}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma</SelectItem>
+                {subcategorias
+                  ?.filter((s) => s.id)
+                  .map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.nome}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -1049,9 +1064,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhuma</SelectItem>
-                {bases?.filter(b => b.id).map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.titulo}</SelectItem>
-                ))}
+                {bases
+                  ?.filter((b) => b.id)
+                  .map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.titulo}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -1064,9 +1083,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhum</SelectItem>
-                {centros?.filter(c => c.id).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                ))}
+                {centros
+                  ?.filter((c) => c.id)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -1078,37 +1101,31 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         <div className="flex items-center justify-between">
           <div>
             <Label htmlFor="foi-pago" className="font-medium">
-              Já foi {tipo === 'entrada' ? 'recebido' : 'pago'}?
+              Já foi {tipo === "entrada" ? "recebido" : "pago"}?
             </Label>
           </div>
-          <Switch
-            id="foi-pago"
-            checked={foiPago}
-            onCheckedChange={setFoiPago}
-          />
+          <Switch id="foi-pago" checked={foiPago} onCheckedChange={setFoiPago} />
         </div>
 
         {foiPago && (
           <div className="space-y-3 pt-2 border-t">
             <div>
-              <Label>Data do {tipo === 'entrada' ? 'recebimento' : 'pagamento'} *</Label>
+              <Label>Data do {tipo === "entrada" ? "recebimento" : "pagamento"} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn("w-full justify-start text-left font-normal", !dataPagamento && "text-muted-foreground")}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dataPagamento && "text-muted-foreground",
+                    )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dataPagamento ? format(dataPagamento, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dataPagamento}
-                    onSelect={setDataPagamento}
-                    locale={ptBR}
-                  />
+                  <Calendar mode="single" selected={dataPagamento} onSelect={setDataPagamento} locale={ptBR} />
                 </PopoverContent>
               </Popover>
             </div>
@@ -1180,15 +1197,13 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     if (!currentUrl) return null;
 
     // Detecção robusta de PDF
-    const isPdf = currentUrl?.toLowerCase().includes('.pdf') || 
-                  anexoIsPdf || 
-                  (anexoFile?.type === 'application/pdf');
+    const isPdf = currentUrl?.toLowerCase().includes(".pdf") || anexoIsPdf || anexoFile?.type === "application/pdf";
 
     const handleDownload = () => {
       if (!currentUrl) return;
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = currentUrl;
-      link.download = anexoFile?.name || 'documento';
+      link.download = anexoFile?.name || "documento";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1197,34 +1212,27 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     return (
       <Dialog open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
         <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 outline-none overflow-hidden">
-          
           {/* Header do Visualizador */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-background z-10 shrink-0">
             <div className="flex items-center gap-2">
-              {isPdf ? <FileText className="w-5 h-5 text-destructive" /> : <ImageIcon className="w-5 h-5 text-primary" />}
-              <h3 className="font-semibold text-lg">
-                {isPdf ? 'Visualizar Documento PDF' : 'Visualizar Imagem'}
-              </h3>
+              {isPdf ? (
+                <FileText className="w-5 h-5 text-destructive" />
+              ) : (
+                <ImageIcon className="w-5 h-5 text-primary" />
+              )}
+              <h3 className="font-semibold text-lg">{isPdf ? "Visualizar Documento PDF" : "Visualizar Imagem"}</h3>
             </div>
             <div className="flex items-center gap-2">
               {/* Zoom controls apenas para imagens */}
               {!isPdf && (
                 <div className="flex items-center gap-1 mr-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setImageZoom(prev => Math.max(0.5, prev - 0.25))}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setImageZoom((prev) => Math.max(0.5, prev - 0.25))}>
                     <ZoomOut className="w-4 h-4" />
                   </Button>
                   <span className="text-sm text-muted-foreground min-w-[3rem] text-center">
                     {Math.round(imageZoom * 100)}%
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setImageZoom(prev => Math.min(3, prev + 0.25))}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setImageZoom((prev) => Math.min(3, prev + 0.25))}>
                     <ZoomIn className="w-4 h-4" />
                   </Button>
                 </div>
@@ -1240,11 +1248,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           <div className="flex-1 bg-muted/50 relative w-full h-full flex items-center justify-center p-4 overflow-hidden">
             {isPdf ? (
               // Usa <object> para PDFs - melhor compatibilidade que iframe
-              <object
-                data={currentUrl}
-                type="application/pdf"
-                className="w-full h-full rounded shadow-sm bg-card"
-              >
+              <object data={currentUrl} type="application/pdf" className="w-full h-full rounded shadow-sm bg-card">
                 {/* Fallback se o browser não suportar */}
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
                   <FileText className="w-16 h-16 opacity-50" />
@@ -1258,16 +1262,15 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             ) : (
               // Imagens com zoom
               <div className="flex items-center justify-center h-full w-full overflow-auto">
-                <img 
-                  src={currentUrl} 
-                  alt="Documento" 
+                <img
+                  src={currentUrl}
+                  alt="Documento"
                   className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{ transform: `scale(${imageZoom})` }}
                 />
               </div>
             )}
           </div>
-
         </DialogContent>
       </Dialog>
     );
@@ -1287,7 +1290,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         <div className="w-[340px] shrink-0 flex flex-col gap-4">
           <h3 className="font-semibold text-sm">Documento</h3>
           <UploadSection />
-          
+
           {!anexoPreview && !anexoUrl && !anexoFile && (
             <div className="bg-muted/50 p-3 rounded-lg">
               <p className="text-xs font-medium mb-1">Dicas:</p>
@@ -1311,38 +1314,31 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       {/* Mobile: Coluna única */}
       <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 pb-20">
         {/* Upload em destaque no topo */}
-        {tipo === 'saida' && !transacao && (
-          <UploadSection />
-        )}
-        
+        {tipo === "saida" && !transacao && <UploadSection />}
+
         <FormContent />
       </div>
 
       {/* Botões de ação - Sticky no mobile */}
-      <div className={cn(
-        "flex gap-2 pt-4 border-t bg-background shrink-0",
-        isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg"
-      )}>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => onOpenChange(false)}
-          className="flex-1"
-        >
+      <div
+        className={cn(
+          "flex gap-2 pt-4 border-t bg-background shrink-0",
+          isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg",
+        )}
+      >
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
           Cancelar
         </Button>
-        <Button 
-          type="submit" 
-          disabled={loading || aiProcessing}
-          className="flex-1"
-        >
+        <Button type="submit" disabled={loading || aiProcessing} className="flex-1">
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Salvando...
             </>
+          ) : transacao ? (
+            "Atualizar"
           ) : (
-            transacao ? 'Atualizar' : 'Salvar'
+            "Salvar"
           )}
         </Button>
       </div>
@@ -1356,9 +1352,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         <Drawer open={open} onOpenChange={onOpenChange}>
           <DrawerContent className="max-h-[95vh]">
             <DrawerHeader className="border-b pb-3">
-              <DrawerTitle>
-                {transacao ? 'Editar' : tipo === 'entrada' ? 'Nova Entrada' : 'Nova Saída'}
-              </DrawerTitle>
+              <DrawerTitle>{transacao ? "Editar" : tipo === "entrada" ? "Nova Entrada" : "Nova Saída"}</DrawerTitle>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto px-4 py-4">
               <DialogContentInner />
@@ -1375,9 +1369,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>
-              {transacao ? 'Editar' : tipo === 'entrada' ? 'Nova Entrada' : 'Nova Saída'}
-            </DialogTitle>
+            <DialogTitle>{transacao ? "Editar" : tipo === "entrada" ? "Nova Entrada" : "Nova Saída"}</DialogTitle>
           </DialogHeader>
           <DialogContentInner />
         </DialogContent>
