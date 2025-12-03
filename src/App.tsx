@@ -118,7 +118,7 @@ function App() {
           
           {/* Rotas públicas do Telão */}
           <Route path="/telao" element={<Telao />} />
-          <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
+          <Route path="/telao/:id" element={<TelaoLiturgia />} />
           
           {/* Rotas protegidas para membros */}
           <Route

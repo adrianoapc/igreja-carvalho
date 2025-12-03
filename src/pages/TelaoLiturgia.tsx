@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,72 +16,166 @@ interface Recurso {
   ordem: number;
   duracao_segundos: number;
   midia: Midia;
+  liturgia_titulo: string;
+  liturgia_tipo: string;
 }
 
+interface LiturgiaItem {
+  id: string;
+  ordem: number;
+  titulo: string;
+  tipo: string;
+}
+
+type ScreenMode = 'content' | 'black' | 'clear';
+
 const TelaoLiturgia = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: cultoId } = useParams<{ id: string }>();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [screenMode, setScreenMode] = useState<ScreenMode>('content');
 
-  const { data: itemLiturgia } = useQuery({
-    queryKey: ["liturgia-item", id],
+  // Fetch culto info
+  const { data: culto } = useQuery({
+    queryKey: ["telao-culto", cultoId],
     queryFn: async () => {
-      if (!id) return null;
+      if (!cultoId) return null;
       const { data, error } = await supabase
-        .from("liturgia_culto")
-        .select("titulo, culto_id")
-        .eq("id", id)
+        .from("cultos")
+        .select("titulo, data_culto")
+        .eq("id", cultoId)
         .single();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!id,
+    enabled: !!cultoId,
   });
 
-  const { data: recursos = [] } = useQuery({
-    queryKey: ["liturgia-recursos-telao", id],
+  // Fetch liturgia items and their recursos
+  const { data: liturgiaItems = [], refetch: refetchLiturgia } = useQuery({
+    queryKey: ["telao-liturgia", cultoId],
     queryFn: async () => {
-      if (!id) return [];
+      if (!cultoId) return [];
+      const { data, error } = await supabase
+        .from("liturgia_culto")
+        .select("id, ordem, titulo, tipo")
+        .eq("culto_id", cultoId)
+        .order("ordem", { ascending: true });
+
+      if (error) throw error;
+      return (data || []) as LiturgiaItem[];
+    },
+    enabled: !!cultoId,
+  });
+
+  // Fetch all recursos for the liturgia items
+  const { data: allRecursos = [], refetch: refetchRecursos } = useQuery({
+    queryKey: ["telao-recursos", cultoId, liturgiaItems.map(l => l.id).join(',')],
+    queryFn: async () => {
+      if (!cultoId || liturgiaItems.length === 0) return [];
+      
+      const liturgiaIds = liturgiaItems.map(l => l.id);
       const { data, error } = await supabase
         .from("liturgia_recursos")
         .select(`
           id,
           ordem,
           duracao_segundos,
+          liturgia_item_id,
           midia:midias(id, titulo, tipo, url)
         `)
-        .eq("liturgia_item_id", id)
+        .in("liturgia_item_id", liturgiaIds)
         .order("ordem", { ascending: true });
 
       if (error) throw error;
-      return (data || []).filter(r => r.midia) as Recurso[];
+      return data || [];
     },
-    enabled: !!id,
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    enabled: !!cultoId && liturgiaItems.length > 0,
   });
 
-  const currentRecurso = recursos[currentIndex];
+  // Flatten into linear playlist
+  const playlist = useMemo(() => {
+    const result: Recurso[] = [];
+    
+    for (const liturgiaItem of liturgiaItems) {
+      const itemRecursos = allRecursos
+        .filter(r => r.liturgia_item_id === liturgiaItem.id && r.midia)
+        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+      
+      for (const recurso of itemRecursos) {
+        result.push({
+          id: recurso.id,
+          ordem: recurso.ordem || 0,
+          duracao_segundos: recurso.duracao_segundos || 10,
+          midia: recurso.midia as Midia,
+          liturgia_titulo: liturgiaItem.titulo,
+          liturgia_tipo: liturgiaItem.tipo,
+        });
+      }
+    }
+    
+    return result;
+  }, [liturgiaItems, allRecursos]);
+
+  const currentRecurso = playlist[currentIndex];
   const currentDuration = currentRecurso?.duracao_segundos || 10;
 
+  // Realtime subscription
+  useEffect(() => {
+    if (!cultoId) return;
+
+    const channel = supabase
+      .channel('telao-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'liturgia_recursos',
+        },
+        () => {
+          refetchRecursos();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'liturgia_culto',
+          filter: `culto_id=eq.${cultoId}`,
+        },
+        () => {
+          refetchLiturgia();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [cultoId, refetchLiturgia, refetchRecursos]);
+
   const nextSlide = useCallback(() => {
-    if (recursos.length > 0) {
-      setCurrentIndex((prev) => (prev + 1) % recursos.length);
+    if (playlist.length > 0) {
+      setCurrentIndex((prev) => (prev + 1) % playlist.length);
       setProgress(0);
     }
-  }, [recursos.length]);
+  }, [playlist.length]);
 
   const prevSlide = useCallback(() => {
-    if (recursos.length > 0) {
-      setCurrentIndex((prev) => (prev - 1 + recursos.length) % recursos.length);
+    if (playlist.length > 0) {
+      setCurrentIndex((prev) => (prev - 1 + playlist.length) % playlist.length);
       setProgress(0);
     }
-  }, [recursos.length]);
+  }, [playlist.length]);
 
-  // Auto-advance slideshow with individual durations
+  // Auto-advance slideshow
   useEffect(() => {
-    if (isPaused || recursos.length === 0) return;
+    if (isPaused || playlist.length === 0 || screenMode !== 'content') return;
+    if (currentDuration <= 0) return; // No auto-advance if duration is 0
 
     const intervalMs = 100;
     const incrementPerInterval = 100 / (currentDuration * 10);
@@ -98,7 +192,7 @@ const TelaoLiturgia = () => {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [isPaused, recursos.length, currentDuration, nextSlide]);
+  }, [isPaused, playlist.length, currentDuration, nextSlide, screenMode]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -107,15 +201,31 @@ const TelaoLiturgia = () => {
         case "ArrowRight":
         case " ":
           e.preventDefault();
-          nextSlide();
+          if (screenMode === 'content') {
+            nextSlide();
+          } else {
+            setScreenMode('content');
+          }
           break;
         case "ArrowLeft":
           e.preventDefault();
-          prevSlide();
+          if (screenMode === 'content') {
+            prevSlide();
+          } else {
+            setScreenMode('content');
+          }
           break;
         case "p":
         case "P":
           setIsPaused((prev) => !prev);
+          break;
+        case "b":
+        case "B":
+          setScreenMode((prev) => prev === 'black' ? 'content' : 'black');
+          break;
+        case "c":
+        case "C":
+          setScreenMode((prev) => prev === 'clear' ? 'content' : 'clear');
           break;
         case "f":
         case "F":
@@ -135,28 +245,46 @@ const TelaoLiturgia = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [nextSlide, prevSlide]);
+  }, [nextSlide, prevSlide, screenMode]);
 
-  if (!id) {
+  // Black screen mode
+  if (screenMode === 'black') {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center">
-        <div className="text-white/30 text-2xl font-light">
-          ID do item não informado
+      <div className="fixed inset-0 bg-black cursor-none select-none" />
+    );
+  }
+
+  // Clear screen mode (logo/neutral)
+  if (screenMode === 'clear') {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center cursor-none select-none">
+        <div className="text-white/10 text-4xl font-light tracking-widest">
+          {culto?.titulo || "CULTO"}
         </div>
       </div>
     );
   }
 
-  if (recursos.length === 0) {
+  if (!cultoId) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="text-white/30 text-2xl font-light">
+          ID do culto não informado
+        </div>
+      </div>
+    );
+  }
+
+  if (playlist.length === 0) {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-white/30 text-2xl font-light mb-2">
             Nenhum recurso para exibir
           </div>
-          {itemLiturgia?.titulo && (
+          {culto?.titulo && (
             <div className="text-white/20 text-lg">
-              {itemLiturgia.titulo}
+              {culto.titulo}
             </div>
           )}
         </div>
@@ -232,17 +360,19 @@ const TelaoLiturgia = () => {
       </AnimatePresence>
 
       {/* Progress bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
-        <div 
-          className="h-full bg-white/50 transition-all duration-100 ease-linear"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+      {currentDuration > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+          <div 
+            className="h-full bg-white/50 transition-all duration-100 ease-linear"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
 
       {/* Slide indicators */}
-      {recursos.length > 1 && (
+      {playlist.length > 1 && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-          {recursos.map((_, index) => (
+          {playlist.map((_, index) => (
             <button
               key={index}
               onClick={(e) => {
@@ -262,7 +392,8 @@ const TelaoLiturgia = () => {
 
       {/* Info overlay (subtle) */}
       <div className="absolute top-4 left-4 text-white/30 text-sm pointer-events-none">
-        {currentIndex + 1}/{recursos.length}
+        <div>{currentIndex + 1}/{playlist.length}</div>
+        <div className="text-xs text-white/20 mt-1">{currentRecurso?.liturgia_titulo}</div>
       </div>
 
       {/* Pause indicator */}
@@ -275,7 +406,7 @@ const TelaoLiturgia = () => {
 
       {/* Controls hint (fades after 3s) */}
       <div className="absolute bottom-12 right-4 text-white/20 text-xs pointer-events-none">
-        F: Fullscreen • P: Pausar • ←→: Navegar
+        F: Fullscreen • P: Pausar • B: Black • C: Clear • ←→: Navegar
       </div>
     </div>
   );
