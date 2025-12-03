@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { GripVertical, Clock, CheckCircle2 } from "lucide-react";
+import { Clock, MoreHorizontal, Trash2, CheckCircle2, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import ResponsavelSelector from "./ResponsavelSelector";
 
 interface JornadaCardProps {
@@ -52,6 +61,12 @@ export default function JornadaCard({
       })
     : null;
 
+  const diasNaFase = inscricao.data_mudanca_fase
+    ? differenceInDays(new Date(), new Date(inscricao.data_mudanca_fase))
+    : 0;
+
+  const isStagnant = diasNaFase > 15;
+
   const getInitials = (nome: string) => {
     return nome
       .split(" ")
@@ -61,88 +76,137 @@ export default function JornadaCard({
       .toUpperCase();
   };
 
+  const handleRemover = async () => {
+    const { error } = await supabase
+      .from("inscricoes_jornada")
+      .delete()
+      .eq("id", inscricao.id);
+
+    if (error) {
+      toast.error("Erro ao remover");
+      return;
+    }
+
+    toast.success("Removido da jornada");
+    onRefetch?.();
+  };
+
+  const handleConcluir = async () => {
+    const { error } = await supabase
+      .from("inscricoes_jornada")
+      .update({ concluido: !inscricao.concluido })
+      .eq("id", inscricao.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar");
+      return;
+    }
+
+    toast.success(inscricao.concluido ? "Reaberto" : "Marcado como concluído");
+    onRefetch?.();
+  };
+
   return (
     <>
       <Card
         ref={setNodeRef}
         style={style}
-        className={`cursor-grab active:cursor-grabbing ${
+        className={`group cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md ${
           isDragging || isSortableDragging
-            ? "opacity-50 shadow-lg ring-2 ring-primary"
+            ? "opacity-50 shadow-lg ring-2 ring-primary rotate-2"
             : ""
-        } ${inscricao.concluido ? "bg-green-50 dark:bg-green-950/20" : ""}`}
+        } ${inscricao.concluido ? "bg-green-50/50 dark:bg-green-950/10 border-green-200/50" : ""}`}
+        {...attributes}
+        {...listeners}
       >
         <CardContent className="p-3">
-          {/* Handle + Avatar + Nome */}
-          <div className="flex items-start gap-2">
-            <div
-              {...attributes}
-              {...listeners}
-              className="mt-1 text-muted-foreground hover:text-foreground"
-            >
-              <GripVertical className="w-4 h-4" />
-            </div>
-
-            <Avatar className="w-10 h-10 flex-shrink-0">
+          {/* Top: Avatar + Nome + Menu */}
+          <div className="flex items-start gap-3">
+            <Avatar className="w-9 h-9 flex-shrink-0">
               <AvatarImage src={pessoa?.avatar_url} />
-              <AvatarFallback className="text-xs">
+              <AvatarFallback className="text-xs bg-muted">
                 {pessoa?.nome ? getInitials(pessoa.nome) : "?"}
               </AvatarFallback>
             </Avatar>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <p className="font-medium text-sm truncate">
                   {pessoa?.nome || "Pessoa"}
                 </p>
                 {inscricao.concluido && (
-                  <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                 )}
               </div>
-
-              {/* Progresso */}
-              <div className="mt-1">
-                <Progress value={progress} className="h-1.5" />
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {etapaIndex}/{totalEtapas} etapas
-                </p>
-              </div>
+              
+              {/* Tempo na fase */}
+              {tempoNaFase && (
+                <Badge 
+                  variant={isStagnant ? "destructive" : "secondary"} 
+                  className="mt-1 text-[10px] font-normal px-1.5 py-0"
+                >
+                  <Clock className="w-2.5 h-2.5 mr-1" />
+                  {tempoNaFase}
+                </Badge>
+              )}
             </div>
+
+            {/* Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={handleConcluir}>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {inscricao.concluido ? "Reabrir" : "Concluir"}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleRemover}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Remover
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
-          {/* Footer: Responsável + Tempo */}
-          <div className="flex items-center justify-between mt-3 pt-2 border-t">
+          {/* Bottom: Responsável + Progress */}
+          <div className="flex items-center justify-between mt-3 pt-2">
             {/* Responsável */}
             <button
-              onClick={() => setShowResponsavelSelector(true)}
-              className="flex items-center gap-1.5 hover:bg-muted rounded px-1.5 py-0.5 -ml-1.5 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowResponsavelSelector(true);
+              }}
+              className="flex items-center gap-1.5 hover:bg-muted rounded-full transition-colors"
             >
               {responsavel ? (
-                <>
-                  <Avatar className="w-5 h-5">
-                    <AvatarImage src={responsavel.avatar_url} />
-                    <AvatarFallback className="text-[10px]">
-                      {getInitials(responsavel.nome)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs text-muted-foreground truncate max-w-[80px]">
-                    {responsavel.nome.split(" ")[0]}
-                  </span>
-                </>
+                <Avatar className="w-6 h-6 border border-background">
+                  <AvatarImage src={responsavel.avatar_url} />
+                  <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                    {getInitials(responsavel.nome)}
+                  </AvatarFallback>
+                </Avatar>
               ) : (
-                <Badge variant="outline" className="text-xs py-0">
-                  + Responsável
-                </Badge>
+                <div className="w-6 h-6 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50 hover:bg-primary/5 transition-colors">
+                  <UserPlus className="w-3 h-3 text-muted-foreground/50" />
+                </div>
               )}
             </button>
 
-            {/* Tempo na fase */}
-            {tempoNaFase && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                <span>{tempoNaFase}</span>
-              </div>
-            )}
+            {/* Progress */}
+            <div className="flex-1 ml-3">
+              <Progress value={progress} className="h-1" />
+            </div>
           </div>
         </CardContent>
       </Card>
