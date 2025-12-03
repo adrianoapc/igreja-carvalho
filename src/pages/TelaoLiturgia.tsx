@@ -84,7 +84,7 @@ const TelaoLiturgia = () => {
           ordem,
           duracao_segundos,
           liturgia_item_id,
-          midias(id, titulo, tipo, url)
+          midia:midias(id, titulo, tipo, url)
         `)
         .in("liturgia_item_id", liturgiaIds)
         .order("ordem", { ascending: true });
@@ -101,15 +101,15 @@ const TelaoLiturgia = () => {
     
     for (const liturgiaItem of liturgiaItems) {
       const itemRecursos = allRecursos
-        .filter(r => r.liturgia_item_id === liturgiaItem.id && r.midias)
-        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+        .filter((r: any) => r.liturgia_item_id === liturgiaItem.id && r.midia)
+        .sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
       
       for (const recurso of itemRecursos) {
         result.push({
           id: recurso.id,
           ordem: recurso.ordem || 0,
           duracao_segundos: recurso.duracao_segundos || 10,
-          midia: recurso.midias as Midia,
+          midia: recurso.midia as Midia,
           liturgia_titulo: liturgiaItem.titulo,
           liturgia_tipo: liturgiaItem.tipo,
         });
