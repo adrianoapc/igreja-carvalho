@@ -365,6 +365,7 @@ export type Database = {
           id: string
           imagem_url: string | null
           link_acao: string | null
+          midia_id: string | null
           nivel_urgencia: string | null
           ordem_telao: number | null
           tags: string[] | null
@@ -388,6 +389,7 @@ export type Database = {
           id?: string
           imagem_url?: string | null
           link_acao?: string | null
+          midia_id?: string | null
           nivel_urgencia?: string | null
           ordem_telao?: number | null
           tags?: string[] | null
@@ -411,6 +413,7 @@ export type Database = {
           id?: string
           imagem_url?: string | null
           link_acao?: string | null
+          midia_id?: string | null
           nivel_urgencia?: string | null
           ordem_telao?: number | null
           tags?: string[] | null
@@ -425,6 +428,13 @@ export type Database = {
             columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comunicados_midia_id_fkey"
+            columns: ["midia_id"]
+            isOneToOne: false
+            referencedRelation: "midias"
             referencedColumns: ["id"]
           },
         ]
