@@ -1172,62 +1172,103 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     </div>
   );
 
-  // Sheet para visualizar imagem em tela cheia (apenas para imagens, PDFs abrem em nova aba)
-  const ImagePreviewSheet = () => (
-    <Sheet open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
-      <SheetContent side="bottom" className="h-[90vh] p-0">
-        <SheetHeader className="p-4 border-b">
-          <SheetTitle className="flex items-center justify-between">
-            <span>Nota Fiscal</span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setImageZoom(Math.max(0.5, imageZoom - 0.25))}
+  // Visualizador de documento (Imagem ou PDF)
+  const ImagePreviewSheet = () => {
+    const documentUrl = anexoUrl || anexoPreview;
+    
+    return (
+      <Sheet open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
+          <SheetHeader className="p-4 border-b shrink-0">
+            <SheetTitle className="flex items-center justify-between">
+              <span>{anexoIsPdf ? 'Documento PDF' : 'Nota Fiscal'}</span>
+              {!anexoIsPdf && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setImageZoom(Math.max(0.5, imageZoom - 0.25))}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm w-12 text-center">{Math.round(imageZoom * 100)}%</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setImageZoom(Math.min(3, imageZoom + 0.25))}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </SheetTitle>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-auto p-4">
+            {anexoIsPdf && documentUrl ? (
+              // Renderização de PDF usando iframe
+              <div className="w-full h-full min-h-[60vh]">
+                <iframe
+                  src={`${documentUrl}#toolbar=1&navpanes=0`}
+                  className="w-full h-full rounded-lg border"
+                  title="Visualização do PDF"
+                />
+              </div>
+            ) : documentUrl ? (
+              // Renderização de Imagem
+              <div className="flex items-center justify-center min-h-full">
+                <img
+                  src={documentUrl}
+                  alt="Nota fiscal"
+                  className="max-w-full transition-transform duration-200"
+                  style={{ transform: `scale(${imageZoom})` }}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Nenhum documento para visualizar
+              </div>
+            )}
+          </div>
+          
+          {/* Botão para abrir em nova aba (fallback) */}
+          {anexoIsPdf && anexoUrl && (
+            <div className="p-4 border-t shrink-0">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = anexoUrl;
+                  link.target = '_blank';
+                  link.rel = 'noopener noreferrer';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
               >
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-              <span className="text-sm w-12 text-center">{Math.round(imageZoom * 100)}%</span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setImageZoom(Math.min(3, imageZoom + 0.25))}
-              >
-                <ZoomIn className="w-4 h-4" />
+                <FileText className="w-4 h-4 mr-2" />
+                Abrir PDF em nova aba
               </Button>
             </div>
-          </SheetTitle>
-        </SheetHeader>
-        <div className="flex-1 overflow-auto p-4">
-          <div className="flex items-center justify-center min-h-full">
-            <img
-              src={anexoPreview || anexoUrl}
-              alt="Nota fiscal"
-              className="max-w-full transition-transform duration-200"
-              style={{ transform: `scale(${imageZoom})` }}
-            />
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
+          )}
+        </SheetContent>
+      </Sheet>
+    );
+  };
 
-  // Handler para abrir visualização - PDFs abrem em nova aba
+  // Handler para abrir visualização - Abre modal interno para tudo
   const handleViewDocument = () => {
-    if (anexoIsPdf && anexoUrl) {
-      window.open(anexoUrl, '_blank');
-    } else {
-      setImagePreviewOpen(true);
-    }
+    setImagePreviewOpen(true);
   };
 
   // Conteúdo do Dialog/Drawer
   const DialogContentInner = () => (
     <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
       {/* Desktop: Split View */}
-      <div className="hidden md:flex md:gap-6 flex-1 min-h-0 overflow-hidden">
-        {/* Coluna esquerda: Imagem - Sticky */}
-        <div className="w-[320px] shrink-0 flex flex-col gap-4 sticky top-0 self-start">
+      <div className="hidden md:flex md:gap-6 flex-1 min-h-0">
+        {/* Coluna esquerda: Imagem */}
+        <div className="w-[340px] shrink-0 flex flex-col gap-4">
           <h3 className="font-semibold text-sm">Documento</h3>
           <UploadSection />
           
@@ -1244,7 +1285,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         </div>
 
         {/* Coluna direita: Formulário com scroll */}
-        <ScrollArea className="flex-1 pl-4 border-l">
+        <ScrollArea className="flex-1 min-w-0 pl-4 border-l h-[calc(90vh-180px)]">
           <div className="pr-4">
             <FormContent />
           </div>
