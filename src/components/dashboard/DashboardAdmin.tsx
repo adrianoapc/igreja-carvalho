@@ -473,14 +473,6 @@ export default function DashboardAdmin() {
       {/* Quick Actions Toolbar */}
       <div className="flex flex-wrap gap-2">
         <Button 
-          size="sm" 
-          onClick={() => navigate('/financas/ofertas')}
-          className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          <DollarSign className="w-4 h-4" />
-          <span className="hidden sm:inline">Entradas</span>
-        </Button>
-        <Button 
           variant="outline" 
           size="sm" 
           onClick={() => navigate('/financas/saidas?nova=true')}
