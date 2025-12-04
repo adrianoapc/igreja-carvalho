@@ -183,8 +183,8 @@ export default function JornadaBoard() {
   const etapasOrdemMap = useMemo(() => {
     if (!etapas) return {};
     const map: Record<string, number> = {};
-    etapas.forEach((etapa, index) => {
-      map[etapa.id] = index + 1; // ordem começa em 1
+    etapas.forEach((etapa) => {
+      map[etapa.id] = etapa.ordem; // usar ordem real do banco
     });
     return map;
   }, [etapas]);
