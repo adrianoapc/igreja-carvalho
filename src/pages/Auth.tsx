@@ -18,7 +18,16 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [showBiometricDialog, setShowBiometricDialog] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
-  const { isSupported, isEnabled } = useBiometricAuth();
+  const [loginEmail, setLoginEmail] = useState("");
+  const { isSupported, isEnabled, saveLastEmail, getLastEmail } = useBiometricAuth();
+
+  // Load last used email on mount
+  useEffect(() => {
+    const lastEmail = getLastEmail();
+    if (lastEmail) {
+      setLoginEmail(lastEmail);
+    }
+  }, [getLastEmail]);
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,6 +53,9 @@ export default function Auth() {
       if (signUpError) throw signUpError;
 
       if (authData.user) {
+        // Save email for next login
+        saveLastEmail(email);
+
         // Verificar se já existe um perfil com este email
         const { data: existingProfile } = await supabase
           .from("profiles")
@@ -145,6 +157,9 @@ export default function Auth() {
 
       if (error) throw error;
 
+      // Save email for next login
+      saveLastEmail(email);
+
       toast({
         title: "Login realizado!",
         description: "Bem-vindo de volta!",
@@ -202,6 +217,8 @@ export default function Auth() {
                     name="email"
                     type="email"
                     placeholder="seu@email.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
                     required
                   />
                 </div>
