@@ -38,16 +38,27 @@ export function useBiometricAuth() {
     isLoading: true,
   });
 
-  useEffect(() => {
-    checkSupport();
-  }, []);
-
-  const checkSupport = useCallback(() => {
+  const checkSupport = useCallback(async () => {
     // Check if WebAuthn is supported
-    const isSupported = !!(
+    const hasWebAuthn = !!(
       window.PublicKeyCredential &&
       typeof window.PublicKeyCredential === 'function'
     );
+
+    // Check if running in iframe (WebAuthn doesn't work in iframes)
+    const isInIframe = window.self !== window.top;
+
+    // Check if platform authenticator (Touch ID, Face ID) is available
+    let hasPlatformAuth = false;
+    if (hasWebAuthn && !isInIframe) {
+      try {
+        hasPlatformAuth = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      } catch {
+        hasPlatformAuth = false;
+      }
+    }
+
+    const isSupported = hasWebAuthn && hasPlatformAuth && !isInIframe;
 
     const isEnabled = localStorage.getItem(BIOMETRIC_ENABLED_KEY) === 'true';
     const storedUserId = localStorage.getItem(BIOMETRIC_USER_KEY);
@@ -55,10 +66,14 @@ export function useBiometricAuth() {
 
     setState({
       isSupported,
-      isEnabled: isEnabled && !!storedUserId && !!storedCredentialId,
+      isEnabled: isEnabled && !!storedUserId && !!storedCredentialId && isSupported,
       isLoading: false,
     });
   }, []);
+
+  useEffect(() => {
+    checkSupport();
+  }, [checkSupport]);
 
   const enableBiometric = useCallback(async (userId: string): Promise<boolean> => {
     if (!state.isSupported) {
