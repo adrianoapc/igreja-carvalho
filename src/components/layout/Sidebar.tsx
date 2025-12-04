@@ -33,6 +33,8 @@ import {
   Route,
   FolderKanban,
   GraduationCap,
+  UsersIcon,
+  Book,
 } from "lucide-react";
 import {
   Sidebar,
@@ -52,38 +54,72 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarCheck } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+
+type AppRole = 'admin' | 'pastor' | 'lider' | 'secretario' | 'tesoureiro' | 'membro' | 'basico';
+
+// Roles que têm acesso administrativo completo
+const ADMIN_ROLES: AppRole[] = ['admin', 'pastor', 'lider', 'secretario', 'tesoureiro'];
+
+// Itens do menu principal - alguns são para todos, outros apenas admin
 const menuItems = [
   {
     icon: Home,
     label: "Dashboard",
     path: "/",
+    adminOnly: false,
   },
   {
     icon: CalendarCheck,
     label: "Minhas Escalas",
     path: "/minhas-escalas",
+    adminOnly: false,
   },
   {
     icon: ClipboardCheck,
     label: "Chamada Rápida",
     path: "/chamada",
+    adminOnly: true,
   },
   {
     icon: Megaphone,
     label: "Comunicação",
     path: "/publicacao",
+    adminOnly: true,
   },
   {
     icon: FolderKanban,
     label: "Projetos",
     path: "/projetos",
+    adminOnly: true,
   },
   {
     icon: BookOpen,
     label: "Meus Cursos",
     path: "/cursos",
+    adminOnly: false,
   },
 ];
+
+// Itens exclusivos para membros comuns
+const memberOnlyItems = [
+  {
+    icon: UsersIcon,
+    label: "Minha Família",
+    path: "/minha-familia",
+  },
+  {
+    icon: MessageCircle,
+    label: "Pedidos de Oração",
+    path: "/intercessao/pedidos",
+  },
+  {
+    icon: Book,
+    label: "Bíblia",
+    path: "/biblia",
+  },
+];
+
 const pessoasItems = [
   {
     icon: UsersRound,
@@ -111,6 +147,7 @@ const pessoasItems = [
     path: "/jornadas",
   },
 ];
+
 const intercessaoItems = [
   {
     icon: HandHeart,
@@ -279,19 +316,51 @@ const modulosItems = [
     path: "/admin",
   },
 ];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const { user, profile } = useAuth();
 
   const [igrejaConfig, setIgrejaConfig] = useState({
     nome: "Igreja App",
     subtitulo: "Gestão Completa",
     logoUrl: null as string | null,
   });
+  
+  const [userRoles, setUserRoles] = useState<AppRole[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
 
   useEffect(() => {
     loadIgrejaConfig();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchUserRoles();
+    } else {
+      setUserRoles([]);
+      setRolesLoading(false);
+    }
+  }, [user?.id]);
+
+  const fetchUserRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      
+      const roles = data?.map(r => r.role as AppRole) || [];
+      setUserRoles(roles);
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+    } finally {
+      setRolesLoading(false);
+    }
+  };
 
   const loadIgrejaConfig = async () => {
     try {
@@ -311,6 +380,150 @@ export function AppSidebar() {
     }
   };
 
+  // Verifica se o usuário tem alguma role administrativa
+  const isAdminUser = userRoles.some(role => ADMIN_ROLES.includes(role));
+  
+  // Filtra menu items baseado no perfil
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.adminOnly) return isAdminUser;
+    return true;
+  });
+
+  // Se não for admin, mostra apenas itens de membro
+  if (!isAdminUser && !rolesLoading) {
+    return (
+      <Sidebar collapsible="icon">
+        <SidebarContent>
+          <div className="p-6 border-b border-sidebar-border">
+            {!isCollapsed && (
+              <div className="flex items-center gap-3">
+                {igrejaConfig.logoUrl && (
+                  <img src={igrejaConfig.logoUrl} alt="Logo da Igreja" className="w-12 h-12 object-contain rounded-lg" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl font-bold text-sidebar-foreground truncate">{igrejaConfig.nome}</h1>
+                  <p className="text-sm text-sidebar-foreground/70 mt-1 truncate">{igrejaConfig.subtitulo}</p>
+                </div>
+              </div>
+            )}
+            {isCollapsed &&
+              (igrejaConfig.logoUrl ? (
+                <img src={igrejaConfig.logoUrl} alt="Logo" className="w-8 h-8 mx-auto object-contain" />
+              ) : (
+                <h1 className="text-xl font-bold text-sidebar-foreground text-center">IA</h1>
+              ))}
+          </div>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {/* Dashboard */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Dashboard">
+                    <NavLink
+                      to="/"
+                      end
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <Home className="w-5 h-5" />
+                      {!isCollapsed && <span>Dashboard</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                {/* Minha Família */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Minha Família">
+                    <NavLink
+                      to="/minha-familia"
+                      end
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <UsersIcon className="w-5 h-5" />
+                      {!isCollapsed && <span>Minha Família</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                {/* Pedidos de Oração */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Pedidos de Oração">
+                    <NavLink
+                      to="/intercessao/pedidos"
+                      end
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                      {!isCollapsed && <span>Pedidos de Oração</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                {/* Bíblia */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Bíblia">
+                    <NavLink
+                      to="/biblia"
+                      end
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <Book className="w-5 h-5" />
+                      {!isCollapsed && <span>Bíblia</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                {/* Meus Cursos */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Meus Cursos">
+                    <NavLink
+                      to="/cursos"
+                      end
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <BookOpen className="w-5 h-5" />
+                      {!isCollapsed && <span>Meus Cursos</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                {/* Minhas Escalas */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Minhas Escalas">
+                    <NavLink
+                      to="/minhas-escalas"
+                      end
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <CalendarCheck className="w-5 h-5" />
+                      {!isCollapsed && <span>Minhas Escalas</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <div className="mt-auto p-4 border-t border-sidebar-border">
+            {!isCollapsed && (
+              <div className="px-4 py-2">
+                <p className="text-xs text-sidebar-foreground/60">v1.0.0</p>
+              </div>
+            )}
+          </div>
+        </SidebarContent>
+      </Sidebar>
+    );
+  }
+
+  // Sidebar completa para admins
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
@@ -338,7 +551,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.path}>
