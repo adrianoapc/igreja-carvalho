@@ -46,7 +46,7 @@ export default function JornadaCard({ inscricao, totalEtapas, etapaIndex, isDrag
 
   const pessoa = inscricao.pessoa;
   const responsavel = inscricao.responsavel;
-  const progress = totalEtapas > 0 ? (etapaIndex / totalEtapas) * 100 : 0;
+  const progress = totalEtapas > 0 ? ((etapaIndex + 1) / totalEtapas) * 100 : 0;
 
   const tempoNaFase = inscricao.data_mudanca_fase
     ? formatDistanceToNow(new Date(inscricao.data_mudanca_fase), {
