@@ -71,7 +71,8 @@ export default function JornadaBoard() {
   const { data: inscricoes, refetch: refetchInscricoes } = useQuery({
     queryKey: ["inscricoes-jornada", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Buscar inscrições
+      const { data: inscricoesData, error: inscricoesError } = await supabase
         .from("inscricoes_jornada")
         .select(`
           *,
@@ -80,8 +81,36 @@ export default function JornadaBoard() {
         `)
         .eq("jornada_id", id);
 
-      if (error) throw error;
-      return data;
+      if (inscricoesError) throw inscricoesError;
+      if (!inscricoesData) return [];
+
+      // Buscar etapas desta jornada para saber quais etapa_ids considerar
+      const { data: etapasJornada } = await supabase
+        .from("etapas_jornada")
+        .select("id")
+        .eq("jornada_id", id!);
+      
+      const etapaIds = etapasJornada?.map(e => e.id) || [];
+
+      // Para cada inscricao, buscar quantas etapas foram concluídas
+      const inscricoesComProgresso = await Promise.all(
+        inscricoesData.map(async (inscricao) => {
+          if (etapaIds.length === 0) {
+            return { ...inscricao, etapas_concluidas: 0 };
+          }
+
+          const { count } = await supabase
+            .from("presencas_aula")
+            .select("*", { count: "exact", head: true })
+            .eq("aluno_id", inscricao.pessoa_id)
+            .in("etapa_id", etapaIds)
+            .eq("status", "concluido");
+
+          return { ...inscricao, etapas_concluidas: count || 0 };
+        })
+      );
+
+      return inscricoesComProgresso;
     },
   });
 
@@ -178,16 +207,6 @@ export default function JornadaBoard() {
       toast.success("Etapa atualizada");
     }
   };
-
-  // Criar mapa de etapas (id -> ordem) para cálculo de progresso individual
-  const etapasOrdemMap = useMemo(() => {
-    if (!etapas) return {};
-    const map: Record<string, number> = {};
-    etapas.forEach((etapa) => {
-      map[etapa.id] = etapa.ordem; // usar ordem real do banco
-    });
-    return map;
-  }, [etapas]);
 
   const totalEtapas = etapas?.length || 1;
   const totalInscritos = inscricoes?.length || 0;
@@ -290,7 +309,6 @@ export default function JornadaBoard() {
                   title="Aguardando"
                   items={inscricoesByEtapa["sem_etapa"]}
                   totalEtapas={totalEtapas}
-                  etapasOrdemMap={etapasOrdemMap}
                   onRefetch={refetchInscricoes}
                 />
               )}
@@ -302,7 +320,6 @@ export default function JornadaBoard() {
                   title={etapa.titulo}
                   items={inscricoesByEtapa[etapa.id] || []}
                   totalEtapas={totalEtapas}
-                  etapasOrdemMap={etapasOrdemMap}
                   onRefetch={refetchInscricoes}
                 />
               ))}
@@ -313,7 +330,6 @@ export default function JornadaBoard() {
                 <JornadaCard
                   inscricao={activeInscricao}
                   totalEtapas={totalEtapas}
-                  etapasOrdemMap={etapasOrdemMap}
                   isDragging
                 />
               )}

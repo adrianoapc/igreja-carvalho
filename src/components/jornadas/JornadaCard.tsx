@@ -22,12 +22,11 @@ import ResponsavelSelector from "./ResponsavelSelector";
 interface JornadaCardProps {
   inscricao: any;
   totalEtapas: number;
-  etapasOrdemMap: Record<string, number>;
   isDragging?: boolean;
   onRefetch?: () => void;
 }
 
-export default function JornadaCard({ inscricao, totalEtapas, etapasOrdemMap, isDragging, onRefetch }: JornadaCardProps) {
+export default function JornadaCard({ inscricao, totalEtapas, isDragging, onRefetch }: JornadaCardProps) {
   const [showResponsavelSelector, setShowResponsavelSelector] = useState(false);
 
   const {
@@ -47,10 +46,9 @@ export default function JornadaCard({ inscricao, totalEtapas, etapasOrdemMap, is
   const pessoa = inscricao.pessoa;
   const responsavel = inscricao.responsavel;
   
-  // Calcular progresso baseado na etapa atual da inscrição
-  const etapaAtualId = inscricao.etapa_atual_id;
-  const etapaOrdem = etapaAtualId ? (etapasOrdemMap[etapaAtualId] ?? 0) : 0;
-  const progress = totalEtapas > 0 ? (etapaOrdem / totalEtapas) * 100 : 0;
+  // Calcular progresso baseado nas etapas CONCLUÍDAS (presencas_aula com status='concluido')
+  const etapasConcluidas = inscricao.etapas_concluidas || 0;
+  const progress = totalEtapas > 0 ? (etapasConcluidas / totalEtapas) * 100 : 0;
 
   const tempoNaFase = inscricao.data_mudanca_fase
     ? formatDistanceToNow(new Date(inscricao.data_mudanca_fase), {
