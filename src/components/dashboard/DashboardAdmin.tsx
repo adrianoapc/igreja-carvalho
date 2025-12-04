@@ -593,7 +593,7 @@ export default function DashboardAdmin() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cashFlowData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -606,8 +606,14 @@ export default function DashboardAdmin() {
                   <ChartTooltip
                     content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
                   />
-                  <Bar dataKey="entradas" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="saidas" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={28}
+                    formatter={(value) => value === 'entradas' ? 'Entradas' : 'Saídas'}
+                    wrapperStyle={{ fontSize: '12px' }}
+                  />
+                  <Bar dataKey="entradas" name="Entradas" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="saidas" name="Saídas" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
