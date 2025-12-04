@@ -158,23 +158,30 @@ export default function CursoPlayer() {
         .eq("etapa_id", etapaSelecionada.id)
         .maybeSingle();
 
+      const now = new Date().toISOString();
       let error;
+      
       if (existingRecord) {
         // Atualizar registro existente
         const result = await supabase
           .from("presencas_aula")
-          .update({ status: "concluido", checkin_at: new Date().toISOString() })
+          .update({ 
+            status: "concluido", 
+            checkin_at: now,
+            checkout_at: now // Marcar checkout para evitar conflito com constraint de Kids
+          })
           .eq("id", existingRecord.id);
         error = result.error;
       } else {
-        // Inserir novo registro
+        // Inserir novo registro - checkout_at preenchido para não conflitar com idx_one_active_checkin_per_child
         const result = await supabase
           .from("presencas_aula")
           .insert({
             aluno_id: profile.id,
             etapa_id: etapaSelecionada.id,
             status: "concluido",
-            checkin_at: new Date().toISOString(),
+            checkin_at: now,
+            checkout_at: now, // Conclusão de etapa = checkin e checkout simultâneo
           });
         error = result.error;
       }
