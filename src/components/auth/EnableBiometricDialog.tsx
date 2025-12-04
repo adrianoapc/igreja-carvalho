@@ -40,15 +40,20 @@ export function EnableBiometricDialog({
         onComplete();
       } else {
         toast.error('Não foi possível ativar a biometria. Seu dispositivo pode não suportar esta funcionalidade.');
+        // Auto-skip after failed attempt
+        handleSkip();
       }
     } catch (error) {
       toast.error('Erro ao ativar biometria.');
+      // Auto-skip after error
+      handleSkip();
     } finally {
       setIsEnabling(false);
     }
   };
 
   const handleSkip = () => {
+    setIsEnabling(false);
     onOpenChange(false);
     onComplete();
   };
@@ -92,7 +97,6 @@ export function EnableBiometricDialog({
           <Button
             variant="ghost"
             onClick={handleSkip}
-            disabled={isEnabling}
             className="w-full"
           >
             Agora não
