@@ -55,6 +55,7 @@ import MeusCursos from "./pages/MeusCursos";
 import CursoPlayer from "./pages/CursoPlayer";
 import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/auth/ResetPassword";
 import Public from "./pages/Public";
 import Announcements from "./pages/Announcements";
 import Agenda from "./pages/Agenda";
@@ -115,6 +116,7 @@ function App() {
           <Route path="/biblia" element={<Biblia />} />
           <Route path="/install" element={<Install />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/reset" element={<ResetPassword />} />
           
           {/* Rotas públicas de cadastro externo */}
           <Route path="/cadastro" element={<CadastroIndex />} />
