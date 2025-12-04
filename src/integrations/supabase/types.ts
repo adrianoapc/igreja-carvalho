@@ -68,6 +68,90 @@ export type Database = {
           },
         ]
       }
+      aulas: {
+        Row: {
+          created_at: string | null
+          culto_id: string | null
+          data_inicio: string
+          duracao_minutos: number | null
+          id: string
+          jornada_id: string | null
+          link_reuniao: string | null
+          modalidade: string | null
+          professor_id: string | null
+          sala_id: string | null
+          status: string | null
+          tema: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          culto_id?: string | null
+          data_inicio: string
+          duracao_minutos?: number | null
+          id?: string
+          jornada_id?: string | null
+          link_reuniao?: string | null
+          modalidade?: string | null
+          professor_id?: string | null
+          sala_id?: string | null
+          status?: string | null
+          tema?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          culto_id?: string | null
+          data_inicio?: string
+          duracao_minutos?: number | null
+          id?: string
+          jornada_id?: string | null
+          link_reuniao?: string | null
+          modalidade?: string | null
+          professor_id?: string | null
+          sala_id?: string | null
+          status?: string | null
+          tema?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aulas_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_jornada_id_fkey"
+            columns: ["jornada_id"]
+            isOneToOne: false
+            referencedRelation: "jornadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "aulas_sala_id_fkey"
+            columns: ["sala_id"]
+            isOneToOne: false
+            referencedRelation: "salas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banners: {
         Row: {
           active: boolean | null
@@ -753,26 +837,38 @@ export type Database = {
       }
       etapas_jornada: {
         Row: {
+          aula_vinculada_id: string | null
+          conteudo_texto: string | null
+          conteudo_url: string | null
           created_at: string | null
           id: string
           jornada_id: string
           ordem: number
+          tipo_conteudo: string | null
           titulo: string
           updated_at: string | null
         }
         Insert: {
+          aula_vinculada_id?: string | null
+          conteudo_texto?: string | null
+          conteudo_url?: string | null
           created_at?: string | null
           id?: string
           jornada_id: string
           ordem: number
+          tipo_conteudo?: string | null
           titulo: string
           updated_at?: string | null
         }
         Update: {
+          aula_vinculada_id?: string | null
+          conteudo_texto?: string | null
+          conteudo_url?: string | null
           created_at?: string | null
           id?: string
           jornada_id?: string
           ordem?: number
+          tipo_conteudo?: string | null
           titulo?: string
           updated_at?: string | null
         }
@@ -1257,6 +1353,33 @@ export type Database = {
           },
         ]
       }
+      liturgia_templates: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          estrutura_json: Json | null
+          id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descricao?: string | null
+          estrutura_json?: Json | null
+          id?: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string | null
+          estrutura_json?: Json | null
+          id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       membro_funcoes: {
         Row: {
           ativo: boolean | null
@@ -1415,12 +1538,14 @@ export type Database = {
           ativo: boolean
           canal: string
           created_at: string
+          created_by: string | null
           culto_id: string | null
           descricao: string | null
           expires_at: string | null
           id: string
           ordem: number
           scheduled_at: string | null
+          tags: string[] | null
           tipo: string
           titulo: string
           updated_at: string
@@ -1430,12 +1555,14 @@ export type Database = {
           ativo?: boolean
           canal?: string
           created_at?: string
+          created_by?: string | null
           culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
           id?: string
           ordem?: number
           scheduled_at?: string | null
+          tags?: string[] | null
           tipo: string
           titulo: string
           updated_at?: string
@@ -1445,12 +1572,14 @@ export type Database = {
           ativo?: boolean
           canal?: string
           created_at?: string
+          created_by?: string | null
           culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
           id?: string
           ordem?: number
           scheduled_at?: string | null
+          tags?: string[] | null
           tipo?: string
           titulo?: string
           updated_at?: string
@@ -1650,6 +1779,88 @@ export type Database = {
           },
         ]
       }
+      presencas_aula: {
+        Row: {
+          aluno_id: string | null
+          aula_id: string | null
+          checkin_at: string | null
+          checkout_at: string | null
+          created_at: string | null
+          etapa_id: string | null
+          id: string
+          observacoes_seguranca: string | null
+          responsavel_checkout_id: string | null
+          status: string | null
+        }
+        Insert: {
+          aluno_id?: string | null
+          aula_id?: string | null
+          checkin_at?: string | null
+          checkout_at?: string | null
+          created_at?: string | null
+          etapa_id?: string | null
+          id?: string
+          observacoes_seguranca?: string | null
+          responsavel_checkout_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          aluno_id?: string | null
+          aula_id?: string | null
+          checkin_at?: string | null
+          checkout_at?: string | null
+          created_at?: string | null
+          etapa_id?: string | null
+          id?: string
+          observacoes_seguranca?: string | null
+          responsavel_checkout_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presencas_aula_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_aula_id_fkey"
+            columns: ["aula_id"]
+            isOneToOne: false
+            referencedRelation: "aulas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_etapa_id_fkey"
+            columns: ["etapa_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_jornada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_responsavel_checkout_id_fkey"
+            columns: ["responsavel_checkout_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_responsavel_checkout_id_fkey"
+            columns: ["responsavel_checkout_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       presencas_culto: {
         Row: {
           created_at: string | null
@@ -1844,6 +2055,42 @@ export type Database = {
           tipo_sanguineo?: string | null
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      salas: {
+        Row: {
+          ativo: boolean | null
+          capacidade: number | null
+          created_at: string | null
+          id: string
+          idade_max: number | null
+          idade_min: number | null
+          nome: string
+          tipo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          capacidade?: number | null
+          created_at?: string | null
+          id?: string
+          idade_max?: number | null
+          idade_min?: number | null
+          nome: string
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          capacidade?: number | null
+          created_at?: string | null
+          id?: string
+          idade_max?: number | null
+          idade_min?: number | null
+          nome?: string
+          tipo?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
