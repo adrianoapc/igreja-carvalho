@@ -15,7 +15,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  MessageCircle
 } from "lucide-react";
 
 interface Time {
@@ -201,6 +202,18 @@ export default function Escalas() {
 
   const timeAtual = times.find(t => t.id === timeSelecionado);
 
+  const handleNotificarPendentes = async () => {
+    // Mockup - futuramente chamará webhook do Make
+    const pendentesList = escalas.filter(e => !e.confirmado);
+    if (pendentesList.length === 0) {
+      toast.info("Todos os voluntários já confirmaram!");
+      return;
+    }
+    toast.success(`Enviando ${pendentesList.length} mensagens via WhatsApp...`, {
+      description: "Os voluntários pendentes serão notificados em breve."
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -212,6 +225,14 @@ export default function Escalas() {
           </h1>
           <p className="text-muted-foreground">Monte as escalas do mês inteiro</p>
         </div>
+        <Button 
+          variant="outline" 
+          onClick={handleNotificarPendentes}
+          className="gap-2"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Notificar Pendentes via WhatsApp
+        </Button>
       </div>
 
       {/* Filters */}

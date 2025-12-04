@@ -51,11 +51,17 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CalendarCheck } from "lucide-react";
 const menuItems = [
   {
     icon: Home,
     label: "Dashboard",
     path: "/",
+  },
+  {
+    icon: CalendarCheck,
+    label: "Minhas Escalas",
+    path: "/minhas-escalas",
   },
   {
     icon: ClipboardCheck,

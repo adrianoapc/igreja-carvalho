@@ -74,6 +74,7 @@ import ProjetoDetalhes from "./pages/ProjetoDetalhes";
 import Telao from "./pages/Telao";
 import TelaoLiturgia from "./pages/TelaoLiturgia";
 import Escalas from "./pages/Escalas";
+import MinhasEscalas from "./pages/MinhasEscalas";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -330,6 +331,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Escalas />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/minhas-escalas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <MinhasEscalas />
                 </MainLayout>
               </ProtectedRoute>
             }
