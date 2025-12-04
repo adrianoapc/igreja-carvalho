@@ -58,33 +58,40 @@ export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`cursor-grab active:cursor-grabbing bg-card shadow-sm hover:shadow-md transition-shadow ${
+      className={`cursor-grab active:cursor-grabbing bg-card shadow-sm hover:shadow-md transition-shadow w-full ${
         isAtrasada ? "border-destructive border-2" : ""
       }`}
       onClick={onClick}
     >
       <CardContent className="p-3 space-y-2">
+        {/* Adicionado items-start para alinhar ao topo se o texto quebrar */}
         <div className="flex items-start justify-between gap-2">
-          <h4 className="font-medium text-sm text-foreground leading-tight">{tarefa.titulo}</h4>
+          {/* CORREÇÃO AQUI: break-words, text-left e line-clamp-3 para não estourar */}
+          <h4 className="font-medium text-sm text-foreground leading-tight break-words text-left line-clamp-3">
+            {tarefa.titulo}
+          </h4>
           <Badge className={`shrink-0 text-xs ${config.className}`}>{config.label}</Badge>
         </div>
 
         {tarefa.descricao && (
-          <p className="text-xs text-muted-foreground line-clamp-2">{tarefa.descricao}</p>
+          {/* CORREÇÃO AQUI: break-words adicionado */}
+          <p className="text-xs text-muted-foreground line-clamp-2 break-words text-left">
+            {tarefa.descricao}
+          </p>
         )}
 
         <div className="flex items-center justify-between pt-1">
           {/* Responsável */}
-          {tarefa.responsavel && (
-            <Avatar className="w-6 h-6">
+          {tarefa.responsavel ? (
+            <Avatar className="w-6 h-6 shrink-0">
               <AvatarImage src={tarefa.responsavel.avatar_url || undefined} />
-              <AvatarFallback className="text-xs">{getInitials(tarefa.responsavel.nome)}</AvatarFallback>
+              <AvatarFallback className="text-[10px]">{getInitials(tarefa.responsavel.nome)}</AvatarFallback>
             </Avatar>
-          )}
+          ) : <div className="w-6 h-6" />} {/* Spacer se não tiver responsavel */}
 
           {/* Data vencimento */}
           {tarefa.data_vencimento && (
-            <div className={`flex items-center gap-1 text-xs ${
+            <div className={`flex items-center gap-1 text-xs shrink-0 ${
               isAtrasada ? "text-destructive font-medium" : isHoje ? "text-amber-600" : "text-muted-foreground"
             }`}>
               {isAtrasada && <AlertTriangle className="w-3 h-3" />}
