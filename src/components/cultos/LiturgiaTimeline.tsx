@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GripVertical, Clock, User, Film, Plus, Layers } from "lucide-react";
+import { GripVertical, Clock, User, Film, Plus, Layers, Save } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -44,6 +44,7 @@ interface LiturgiaTimelineProps {
   onReorder: (itens: ItemLiturgia[]) => void;
   onAddItem: () => void;
   onApplyTemplate: () => void;
+  onSaveTemplate: () => void;
 }
 
 function SortableItemCard({ 
@@ -140,6 +141,7 @@ export default function LiturgiaTimeline({
   onReorder,
   onAddItem,
   onApplyTemplate,
+  onSaveTemplate,
 }: LiturgiaTimelineProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -175,10 +177,20 @@ export default function LiturgiaTimeline({
       {/* Header */}
       <div className="flex items-center justify-between gap-2 mb-3">
         <h3 className="font-semibold text-sm">Timeline</h3>
-        <Button variant="outline" size="sm" onClick={onApplyTemplate}>
-          <Layers className="w-4 h-4 mr-1" />
-          Template
-        </Button>
+        <div className="flex gap-1">
+          <Button variant="outline" size="sm" onClick={onApplyTemplate} title="Aplicar Template">
+            <Layers className="w-4 h-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onSaveTemplate} 
+            title="Salvar como Template"
+            disabled={itens.length === 0}
+          >
+            <Save className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Lista Sortable */}
