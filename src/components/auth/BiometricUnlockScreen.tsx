@@ -18,7 +18,7 @@ export function BiometricUnlockScreen({
 }: BiometricUnlockScreenProps) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { verifyBiometric, authenticateWithBiometric } = useBiometricAuth();
+  const { verifyBiometric } = useBiometricAuth();
 
   // Auto-trigger biometric on mount
   useEffect(() => {
@@ -36,12 +36,7 @@ export function BiometricUnlockScreen({
     setError(null);
 
     try {
-      // Try verification first, then authentication
-      let success = await verifyBiometric();
-      
-      if (!success) {
-        success = await authenticateWithBiometric();
-      }
+      const success = await verifyBiometric();
 
       if (success) {
         onUnlocked();
@@ -49,6 +44,7 @@ export function BiometricUnlockScreen({
         setError('Autenticação biométrica falhou. Tente novamente ou use sua senha.');
       }
     } catch (err) {
+      console.error('Biometric error:', err);
       setError('Erro na autenticação biométrica.');
     } finally {
       setIsAuthenticating(false);
