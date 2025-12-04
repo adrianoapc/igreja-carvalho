@@ -50,6 +50,7 @@ import Categorias from "./pages/financas/Categorias";
 import Fornecedores from "./pages/financas/Fornecedores";
 import FormasPagamento from "./pages/financas/FormasPagamento";
 import Ensinamentos from "./pages/Ensinamentos";
+import Ensino from "./pages/Ensino";
 import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
@@ -507,6 +508,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Ensinamentos />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ensino"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Ensino />
                 </MainLayout>
               </ProtectedRoute>
             }
