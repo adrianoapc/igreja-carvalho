@@ -32,6 +32,7 @@ import {
   ClipboardCheck,
   Route,
   FolderKanban,
+  GraduationCap,
 } from "lucide-react";
 import {
   Sidebar,
@@ -246,6 +247,11 @@ const midiasItems = [
   },
 ];
 const modulosItems = [
+  {
+    icon: GraduationCap,
+    label: "Ensino",
+    path: "/ensino",
+  },
   {
     icon: Baby,
     label: "Kids",
