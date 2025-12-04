@@ -32,12 +32,14 @@ export default function AdicionarDependenteDrawer({
   const [dataNascimento, setDataNascimento] = useState<Date | undefined>();
   const [alergias, setAlergias] = useState("");
   const [sexo, setSexo] = useState("");
+  const [tipoParentesco, setTipoParentesco] = useState("filho");
 
   const resetForm = () => {
     setNome("");
     setDataNascimento(undefined);
     setAlergias("");
     setSexo("");
+    setTipoParentesco("filho");
   };
 
   const createDependentMutation = useMutation({
@@ -101,7 +103,7 @@ export default function AdicionarDependenteDrawer({
         .insert({
           pessoa_id: parentProfileId,
           familiar_id: childProfile.id,
-          tipo_parentesco: 'filho(a)',
+          tipo_parentesco: tipoParentesco,
         });
 
       return childProfile;
@@ -126,13 +128,31 @@ export default function AdicionarDependenteDrawer({
       <DrawerContent>
         <div className="mx-auto w-full max-w-lg">
           <DrawerHeader>
-            <DrawerTitle>Novo Dependente</DrawerTitle>
+            <DrawerTitle>Novo Familiar</DrawerTitle>
             <DrawerDescription>
-              Cadastre um filho para facilitar o check-in no ministério infantil
+              Cadastre um familiar ou dependente
             </DrawerDescription>
           </DrawerHeader>
 
           <form onSubmit={handleSubmit} className="px-4 space-y-4">
+            {/* Tipo de Parentesco */}
+            <div className="space-y-2">
+              <Label>Tipo de Parentesco *</Label>
+              <Select value={tipoParentesco} onValueChange={setTipoParentesco}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o parentesco" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="filho">Filho(a)</SelectItem>
+                  <SelectItem value="conjuge">Cônjuge</SelectItem>
+                  <SelectItem value="pai">Pai</SelectItem>
+                  <SelectItem value="mae">Mãe</SelectItem>
+                  <SelectItem value="irmao">Irmão(ã)</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Nome */}
             <div className="space-y-2">
               <Label htmlFor="nome">Nome Completo *</Label>
@@ -140,7 +160,7 @@ export default function AdicionarDependenteDrawer({
                 id="nome"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Nome completo da criança"
+                placeholder="Nome completo"
                 required
               />
             </div>
@@ -165,19 +185,19 @@ export default function AdicionarDependenteDrawer({
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={dataNascimento}
                     onSelect={setDataNascimento}
                     disabled={(date) =>
-                      date > new Date() || date < new Date("1990-01-01")
+                      date > new Date() || date < new Date("1920-01-01")
                     }
                     initialFocus
                     className="p-3 pointer-events-auto"
                     locale={ptBR}
                     captionLayout="dropdown-buttons"
-                    fromYear={2005}
+                    fromYear={1920}
                     toYear={new Date().getFullYear()}
                   />
                 </PopoverContent>
@@ -213,7 +233,7 @@ export default function AdicionarDependenteDrawer({
                 rows={3}
               />
               <p className="text-xs text-muted-foreground">
-                Informações importantes para segurança da criança
+                Informações importantes de saúde
               </p>
             </div>
           </form>
@@ -230,7 +250,7 @@ export default function AdicionarDependenteDrawer({
                   Salvando...
                 </>
               ) : (
-                "Salvar Dependente"
+                "Salvar Familiar"
               )}
             </Button>
             <Button

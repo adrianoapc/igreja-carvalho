@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Users, Baby, AlertTriangle, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Users, Baby, AlertTriangle, Pencil, Heart, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { differenceInYears, differenceInMonths, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -22,6 +22,7 @@ interface FamilyMember {
   alergias: string | null;
   sexo: string | null;
   responsavel_legal: boolean | null;
+  tipo_parentesco?: string;
 }
 
 function calculateAge(birthDate: string | null): string {
@@ -36,6 +37,26 @@ function calculateAge(birthDate: string | null): string {
   }
   
   return `${years} ${years === 1 ? 'ano' : 'anos'}`;
+}
+
+function getParentescoInfo(tipo: string | undefined): { label: string; icon: React.ReactNode } {
+  switch (tipo) {
+    case 'filho':
+    case 'filha':
+      return { label: 'Filho(a)', icon: <Baby className="h-4 w-4 text-primary" /> };
+    case 'conjuge':
+    case 'esposo':
+    case 'esposa':
+      return { label: 'Cônjuge', icon: <Heart className="h-4 w-4 text-pink-500" /> };
+    case 'pai':
+    case 'mae':
+      return { label: tipo === 'pai' ? 'Pai' : 'Mãe', icon: <User className="h-4 w-4 text-blue-500" /> };
+    case 'irmao':
+    case 'irma':
+      return { label: 'Irmão(ã)', icon: <Users className="h-4 w-4 text-green-500" /> };
+    default:
+      return { label: tipo || 'Familiar', icon: <User className="h-4 w-4 text-muted-foreground" /> };
+  }
 }
 
 export default function MinhaFamilia() {
@@ -73,7 +94,24 @@ export default function MinhaFamilia() {
         .order('data_nascimento', { ascending: true });
 
       if (membersError) throw membersError;
-      return members as FamilyMember[];
+
+      // Fetch relationship types from familias table
+      const { data: relationships, error: relError } = await supabase
+        .from('familias')
+        .select('familiar_id, tipo_parentesco')
+        .eq('pessoa_id', profile.id);
+
+      if (relError) throw relError;
+
+      // Map relationship types to members
+      const relationshipMap = new Map(
+        relationships?.map(r => [r.familiar_id, r.tipo_parentesco]) || []
+      );
+
+      return (members || []).map(member => ({
+        ...member,
+        tipo_parentesco: relationshipMap.get(member.id) || 'familiar'
+      })) as FamilyMember[];
     },
     enabled: !!profile?.id,
   });
@@ -106,7 +144,7 @@ export default function MinhaFamilia() {
           </div>
           <Button onClick={() => setDrawerOpen(true)} size="sm" className="gap-2">
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Adicionar Filho</span>
+            <span className="hidden sm:inline">Adicionar</span>
           </Button>
         </div>
       </div>
@@ -131,56 +169,62 @@ export default function MinhaFamilia() {
           </div>
         ) : familyMembers && familyMembers.length > 0 ? (
           <div className="space-y-3">
-            {familyMembers.map((member) => (
-              <Card 
-                key={member.id} 
-                className="cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => handleEditMember(member)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={member.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                        {member.nome.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium truncate">{member.nome}</h3>
-                        <Baby className="h-4 w-4 text-muted-foreground shrink-0" />
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {calculateAge(member.data_nascimento)}
-                      </p>
-                      {member.alergias && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <AlertTriangle className="h-3 w-3 text-destructive" />
-                          <span className="text-xs text-destructive truncate">
-                            {member.alergias}
+            {familyMembers.map((member) => {
+              const parentescoInfo = getParentescoInfo(member.tipo_parentesco);
+              return (
+                <Card 
+                  key={member.id} 
+                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => handleEditMember(member)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={member.avatar_url || undefined} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xl">
+                          {member.nome.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium truncate">{member.nome}</h3>
+                          <span className="flex items-center gap-1 text-xs bg-muted px-2 py-0.5 rounded-full shrink-0">
+                            {parentescoInfo.icon}
+                            <span className="hidden sm:inline">{parentescoInfo.label}</span>
                           </span>
                         </div>
-                      )}
+                        <p className="text-sm text-muted-foreground">
+                          {calculateAge(member.data_nascimento)}
+                        </p>
+                        {member.alergias && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <AlertTriangle className="h-3 w-3 text-destructive" />
+                            <span className="text-xs text-destructive truncate">
+                              {member.alergias}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="icon" className="shrink-0">
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="icon" className="shrink-0">
-                      <Pencil className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="font-medium text-lg mb-1">Nenhum dependente cadastrado</h3>
+              <h3 className="font-medium text-lg mb-1">Nenhum familiar cadastrado</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Adicione seus filhos para facilitar o check-in no ministério infantil
+                Adicione seus familiares e dependentes
               </p>
               <Button onClick={() => setDrawerOpen(true)} className="gap-2">
                 <Plus className="h-4 w-4" />
-                Adicionar Filho
+                Adicionar Familiar
               </Button>
             </CardContent>
           </Card>
