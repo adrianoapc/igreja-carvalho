@@ -77,6 +77,7 @@ import Telao from "./pages/Telao";
 import TelaoLiturgia from "./pages/TelaoLiturgia";
 import Escalas from "./pages/Escalas";
 import MinhasEscalas from "./pages/MinhasEscalas";
+import Checkin from "./pages/Checkin";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -127,6 +128,9 @@ function App() {
           <Route path="/telao" element={<Telao />} />
           <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
           <Route path="/telao/:id" element={<TelaoLiturgia />} />
+          
+          {/* Rota pública de Check-in por QR Code */}
+          <Route path="/checkin/:tipo/:id" element={<Checkin />} />
           
           {/* Rotas protegidas para membros */}
           <Route

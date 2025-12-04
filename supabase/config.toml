@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.checkin-whatsapp-geo]
 verify_jwt = false
+
+[functions.checkin-evento]
+verify_jwt = false

@@ -24,8 +24,17 @@ import {
   Eye,
   ListMusic,
   ClipboardList,
-  Save
+  Save,
+  QrCode
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
 import MusicaTabContent from "@/components/cultos/MusicaTabContent";
 import EscalasTabContent from "@/components/cultos/EscalasTabContent";
@@ -201,6 +210,35 @@ export default function CultoDetalhes() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <QrCode className="h-4 w-4 mr-2" />
+                QR Check-in
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="text-center">QR Code de Presença</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col items-center gap-4 py-4">
+                <div className="bg-white p-4 rounded-lg">
+                  <QRCodeSVG 
+                    value={`${window.location.origin}/checkin/culto/${culto.id}`}
+                    size={200}
+                    level="H"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground text-center">
+                  Escaneie para confirmar presença no culto
+                </p>
+                <p className="text-xs text-muted-foreground break-all text-center">
+                  {`${window.location.origin}/checkin/culto/${culto.id}`}
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <Button
             variant="outline"
             onClick={() => window.open(`/telao/liturgia/${culto.id}`, "_blank")}
