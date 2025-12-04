@@ -61,24 +61,10 @@ export default function AdicionarDependenteDrawer({
 
       let familiaId = parent.familia_id;
 
-      // 2. If parent has no familia_id, create a new family
+      // 2. If parent has no familia_id, generate a new UUID for the family group
       if (!familiaId) {
-        // Extract last name for family name
-        const nameParts = parent.nome.split(' ');
-        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
-        
-        const { data: newFamilia, error: familiaError } = await supabase
-          .from('familias')
-          .insert({
-            pessoa_id: parentProfileId,
-            tipo_parentesco: 'responsavel',
-            nome_familiar: `Família ${lastName}`
-          })
-          .select()
-          .single();
-
-        if (familiaError) throw familiaError;
-        familiaId = newFamilia.id;
+        // Generate a new UUID for the family group
+        familiaId = crypto.randomUUID();
 
         // Update parent with familia_id
         const { error: updateParentError } = await supabase
@@ -108,6 +94,15 @@ export default function AdicionarDependenteDrawer({
         .single();
 
       if (childError) throw childError;
+
+      // 4. Create family relationship record
+      await supabase
+        .from('familias')
+        .insert({
+          pessoa_id: parentProfileId,
+          familiar_id: childProfile.id,
+          tipo_parentesco: 'filho(a)',
+        });
 
       return childProfile;
     },
