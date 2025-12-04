@@ -28,6 +28,18 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Verificar se há token de recuperação no hash da URL
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get("type");
+    const accessToken = hashParams.get("access_token");
+    
+    if (type === "recovery" && accessToken) {
+      // Limpar o hash da URL e redirecionar para reset
+      window.history.replaceState(null, "", window.location.pathname);
+      window.location.href = "/auth/reset";
+      return;
+    }
+
     // Set up auth state listener
     const {
       data: { subscription },
