@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, GripVertical, Trash2 } from "lucide-react";
+import { Plus, X, GripVertical, Trash2, Play, FileText, Users, Settings2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import EtapaContentDialog from "./EtapaContentDialog";
 
 interface EditarJornadaDialogProps {
   open: boolean;
@@ -49,7 +50,23 @@ interface EtapaLocal {
   titulo: string;
   ordem: number;
   isNew?: boolean;
+  tipo_conteudo?: string | null;
+  conteudo_url?: string | null;
+  conteudo_texto?: string | null;
 }
+
+const getContentIcon = (tipo: string | null | undefined) => {
+  switch (tipo) {
+    case "video":
+      return <Play className="w-3.5 h-3.5 text-red-500" />;
+    case "texto":
+      return <FileText className="w-3.5 h-3.5 text-blue-500" />;
+    case "presencial":
+      return <Users className="w-3.5 h-3.5 text-green-500" />;
+    default:
+      return null;
+  }
+};
 
 export default function EditarJornadaDialog({
   open,
@@ -63,9 +80,11 @@ export default function EditarJornadaDialog({
   const [corTema, setCorTema] = useState(CORES_TEMA[0]);
   const [ativo, setAtivo] = useState(true);
   const [etapas, setEtapas] = useState<EtapaLocal[]>([]);
+  const [selectedEtapa, setSelectedEtapa] = useState<EtapaLocal | null>(null);
+  const [showContentDialog, setShowContentDialog] = useState(false);
 
   // Fetch etapas
-  const { data: etapasData } = useQuery({
+  const { data: etapasData, refetch: refetchEtapas } = useQuery({
     queryKey: ["etapas-jornada-edit", jornada?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -97,6 +116,9 @@ export default function EditarJornadaDialog({
           id: e.id,
           titulo: e.titulo,
           ordem: e.ordem,
+          tipo_conteudo: e.tipo_conteudo,
+          conteudo_url: e.conteudo_url,
+          conteudo_texto: e.conteudo_texto,
         }))
       );
     }
@@ -202,6 +224,15 @@ export default function EditarJornadaDialog({
     setEtapas(newEtapas);
   };
 
+  const handleEditContent = (etapa: EtapaLocal) => {
+    if (!etapa.id) {
+      toast.error("Salve a jornada primeiro para configurar o conteúdo");
+      return;
+    }
+    setSelectedEtapa(etapa);
+    setShowContentDialog(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titulo.trim()) {
@@ -212,128 +243,161 @@ export default function EditarJornadaDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Jornada</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Jornada</DialogTitle>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="titulo">Título *</Label>
-            <Input
-              id="titulo"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="descricao">Descrição</Label>
-            <Textarea
-              id="descricao"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Cor do Tema</Label>
-            <div className="flex gap-2 flex-wrap">
-              {CORES_TEMA.map((cor) => (
-                <button
-                  key={cor}
-                  type="button"
-                  className={`w-8 h-8 rounded-full transition-all ${
-                    corTema === cor
-                      ? "ring-2 ring-offset-2 ring-primary scale-110"
-                      : "hover:scale-105"
-                  }`}
-                  style={{ backgroundColor: cor }}
-                  onClick={() => setCorTema(cor)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="ativo">Jornada Ativa</Label>
-            <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Etapas</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addEtapa}>
-                <Plus className="w-4 h-4 mr-1" />
-                Adicionar
-              </Button>
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              {etapas.map((etapa, index) => (
-                <div key={etapa.id || `new-${index}`} className="flex items-center gap-2">
-                  <GripVertical className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground w-6">
-                    {index + 1}.
-                  </span>
-                  <Input
-                    value={etapa.titulo}
-                    onChange={(e) => updateEtapa(index, e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
+              <Label htmlFor="titulo">Título *</Label>
+              <Input
+                id="titulo"
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="descricao">Descrição</Label>
+              <Textarea
+                id="descricao"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cor do Tema</Label>
+              <div className="flex gap-2 flex-wrap">
+                {CORES_TEMA.map((cor) => (
+                  <button
+                    key={cor}
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeEtapa(index)}
-                    disabled={etapas.length <= 1}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+                    className={`w-8 h-8 rounded-full transition-all ${
+                      corTema === cor
+                        ? "ring-2 ring-offset-2 ring-primary scale-110"
+                        : "hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: cor }}
+                    onClick={() => setCorTema(cor)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="flex justify-between pt-4 border-t">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="destructive" size="sm">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir
+            <div className="flex items-center justify-between">
+              <Label htmlFor="ativo">Jornada Ativa</Label>
+              <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Etapas</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addEtapa}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Adicionar
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir Jornada?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. Todas as inscrições serão removidas.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => deleteMutation.mutate()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Salvando..." : "Salvar"}
-              </Button>
+              </div>
+              <div className="space-y-2">
+                {etapas.map((etapa, index) => (
+                  <div key={etapa.id || `new-${index}`} className="flex items-center gap-2">
+                    <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm text-muted-foreground w-6 shrink-0">
+                      {index + 1}.
+                    </span>
+                    <Input
+                      value={etapa.titulo}
+                      onChange={(e) => updateEtapa(index, e.target.value)}
+                      className="flex-1"
+                    />
+                    {/* Content Type Icon */}
+                    <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                      {getContentIcon(etapa.tipo_conteudo)}
+                    </div>
+                    {/* Edit Content Button */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditContent(etapa)}
+                      title="Configurar Conteúdo"
+                      className="shrink-0"
+                    >
+                      <Settings2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeEtapa(index)}
+                      disabled={etapas.length <= 1}
+                      className="shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Clique em <Settings2 className="w-3 h-3 inline" /> para adicionar vídeo ou texto à etapa
+              </p>
             </div>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+
+            <div className="flex justify-between pt-4 border-t">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="destructive" size="sm">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir Jornada?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. Todas as inscrições serão removidas.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {selectedEtapa && (
+        <EtapaContentDialog
+          open={showContentDialog}
+          onOpenChange={setShowContentDialog}
+          etapa={selectedEtapa}
+          jornadaId={jornada?.id}
+          onSuccess={() => {
+            refetchEtapas();
+          }}
+        />
+      )}
+    </>
   );
 }
