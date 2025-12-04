@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus, Mail, ArrowLeft, Loader2 } from "lucide-react";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { EnableBiometricDialog } from "@/components/auth/EnableBiometricDialog";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+
+type AuthView = "login" | "forgot-password";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -19,6 +21,8 @@ export default function Auth() {
   const [showBiometricDialog, setShowBiometricDialog] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [authView, setAuthView] = useState<AuthView>("login");
   const { isSupported, isEnabled, saveLastEmail, getLastEmail } = useBiometricAuth();
 
   // Load last used email on mount
@@ -183,9 +187,105 @@ export default function Auth() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
+        redirectTo: `${window.location.origin}/auth/reset`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Email enviado!",
+        description: "Verifique sua caixa de entrada para redefinir sua senha.",
+      });
+      
+      // Voltar para a tela de login
+      setAuthView("login");
+      setRecoveryEmail("");
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar email",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleBiometricComplete = () => {
     navigate("/");
   };
+
+  // Tela de recuperação de senha
+  if (authView === "forgot-password") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <PublicHeader showBackButton backTo="/public" />
+        
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md shadow-soft">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Mail className="w-6 h-6 text-primary" />
+              </div>
+              <CardTitle className="text-2xl font-bold text-foreground">
+                Recuperar Senha
+              </CardTitle>
+              <CardDescription>
+                Digite seu email para receber o link de recuperação
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="recovery-email">Email</Label>
+                  <Input
+                    id="recovery-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={recoveryEmail}
+                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-primary"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Enviar link de recuperação
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setAuthView("login")}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Voltar ao login
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -232,6 +332,16 @@ export default function Auth() {
                     required
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecoveryEmail(loginEmail);
+                    setAuthView("forgot-password");
+                  }}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Esqueci minha senha
+                </button>
                 <Button
                   type="submit"
                   className="w-full bg-gradient-primary"

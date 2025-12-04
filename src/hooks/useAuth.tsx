@@ -35,6 +35,13 @@ export function useAuth() {
       setSession(session);
       setUser(session?.user ?? null);
 
+      // Detectar evento de recuperação de senha
+      if (event === "PASSWORD_RECOVERY") {
+        // Redirecionar para a página de reset de senha
+        window.location.href = "/auth/reset";
+        return;
+      }
+
       if (session?.user) {
         // Defer Supabase calls
         setTimeout(() => {
