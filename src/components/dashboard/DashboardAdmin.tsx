@@ -475,6 +475,15 @@ export default function DashboardAdmin() {
         <Button 
           variant="outline" 
           size="sm" 
+          onClick={() => navigate('/financas/entradas')}
+          className="gap-2"
+        >
+          <DollarSign className="w-4 h-4" />
+          <span className="hidden sm:inline">Entradas</span>
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm" 
           onClick={() => navigate('/financas/saidas?nova=true')}
           className="gap-2"
         >
