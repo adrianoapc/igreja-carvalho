@@ -1,105 +1,212 @@
+import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, AlertTriangle } from "lucide-react";
-import { format, isPast, isToday } from "date-fns";
+import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Clock, MoreHorizontal, Trash2, CheckCircle2, UserPlus } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import ResponsavelSelector from "./ResponsavelSelector";
 
-interface Tarefa {
-  id: string;
-  titulo: string;
-  descricao: string | null;
-  status: string;
-  prioridade: string;
-  data_vencimento: string | null;
-  responsavel?: { id: string; nome: string; avatar_url: string | null };
+interface JornadaCardProps {
+  inscricao: any;
+  totalEtapas: number;
+  etapaIndex: number;
+  isDragging?: boolean;
+  onRefetch?: () => void;
 }
 
-interface TarefaCardProps {
-  tarefa: Tarefa;
-  onClick: () => void;
-}
+export default function JornadaCard({ inscricao, totalEtapas, etapaIndex, isDragging, onRefetch }: JornadaCardProps) {
+  const [showResponsavelSelector, setShowResponsavelSelector] = useState(false);
 
-const prioridadeConfig: Record<string, { label: string; className: string }> = {
-  baixa: { label: "Baixa", className: "bg-slate-100 text-slate-700" },
-  media: { label: "Média", className: "bg-amber-100 text-amber-700" },
-  alta: { label: "Alta", className: "bg-red-100 text-red-700" },
-};
-
-export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: tarefa.id,
-  });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortableDragging,
+  } = useSortable({ id: inscricao.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   };
 
-  const getInitials = (name: string) => {
-    return name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+  const pessoa = inscricao.pessoa;
+  const responsavel = inscricao.responsavel;
+  const progress = totalEtapas > 0 ? (etapaIndex / totalEtapas) * 100 : 0;
+
+  const tempoNaFase = inscricao.data_mudanca_fase
+    ? formatDistanceToNow(new Date(inscricao.data_mudanca_fase), {
+        addSuffix: false,
+        locale: ptBR,
+      })
+    : null;
+
+  const diasNaFase = inscricao.data_mudanca_fase
+    ? differenceInDays(new Date(), new Date(inscricao.data_mudanca_fase))
+    : 0;
+
+  const isStagnant = diasNaFase > 15;
+
+  const getInitials = (nome: string) => {
+    return nome
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
   };
 
-  const isAtrasada = tarefa.data_vencimento && 
-    isPast(new Date(tarefa.data_vencimento)) && 
-    !isToday(new Date(tarefa.data_vencimento)) &&
-    tarefa.status !== "done";
+  const handleRemover = async () => {
+    const { error } = await supabase.from("inscricoes_jornada").delete().eq("id", inscricao.id);
 
-  const isHoje = tarefa.data_vencimento && isToday(new Date(tarefa.data_vencimento));
+    if (error) {
+      toast.error("Erro ao remover");
+      return;
+    }
 
-  const config = prioridadeConfig[tarefa.prioridade] || prioridadeConfig.media;
+    toast.success("Removido da jornada");
+    onRefetch?.();
+  };
+
+  const handleConcluir = async () => {
+    const { error } = await supabase
+      .from("inscricoes_jornada")
+      .update({ concluido: !inscricao.concluido })
+      .eq("id", inscricao.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar");
+      return;
+    }
+
+    toast.success(inscricao.concluido ? "Reaberto" : "Marcado como concluído");
+    onRefetch?.();
+  };
 
   return (
-    <Card
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`cursor-grab active:cursor-grabbing bg-card shadow-sm hover:shadow-md transition-shadow w-full ${
-        isAtrasada ? "border-destructive border-2" : ""
-      }`}
-      onClick={onClick}
-    >
-      <CardContent className="p-3 space-y-2">
-        {/* Adicionado items-start para alinhar ao topo se o texto quebrar */}
-        <div className="flex items-start justify-between gap-2">
-          {/* CORREÇÃO AQUI: break-words, text-left e line-clamp-3 para não estourar */}
-          <h4 className="font-medium text-sm text-foreground leading-tight break-words text-left line-clamp-3">
-            {tarefa.titulo}
-          </h4>
-          <Badge className={`shrink-0 text-xs ${config.className}`}>{config.label}</Badge>
-        </div>
-
-        {tarefa.descricao && (
-          <p className="text-xs text-muted-foreground line-clamp-2 break-words text-left">
-            {tarefa.descricao}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between pt-1">
-          {/* Responsável */}
-          {tarefa.responsavel ? (
-            <Avatar className="w-6 h-6 shrink-0">
-              <AvatarImage src={tarefa.responsavel.avatar_url || undefined} />
-              <AvatarFallback className="text-[10px]">{getInitials(tarefa.responsavel.nome)}</AvatarFallback>
+    <>
+      <Card
+        ref={setNodeRef}
+        style={style}
+        // REMOVIDO: overflow-hidden (causava o corte de bordas e sombras)
+        className={`group w-full cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 relative ${
+          isDragging || isSortableDragging ? "opacity-50 shadow-lg ring-2 ring-primary rotate-1 z-10" : ""
+        } ${inscricao.concluido ? "bg-green-50/50 dark:bg-green-950/10 border-green-200/50" : ""}`}
+        {...attributes}
+        {...listeners}
+      >
+        <div className="p-3">
+          {/* Top: Avatar + Nome + Menu */}
+          <div className="flex items-start gap-3">
+            <Avatar className="h-8 w-8 shrink-0 border border-border/50">
+              <AvatarImage src={pessoa?.avatar_url} />
+              <AvatarFallback className="text-[10px] bg-muted font-medium">
+                {pessoa?.nome ? getInitials(pessoa.nome) : "?"}
+              </AvatarFallback>
             </Avatar>
-          ) : <div className="w-6 h-6" />} {/* Spacer se não tiver responsavel */}
 
-          {/* Data vencimento */}
-          {tarefa.data_vencimento && (
-            <div className={`flex items-center gap-1 text-xs shrink-0 ${
-              isAtrasada ? "text-destructive font-medium" : isHoje ? "text-amber-600" : "text-muted-foreground"
-            }`}>
-              {isAtrasada && <AlertTriangle className="w-3 h-3" />}
-              <Calendar className="w-3 h-3" />
-              <span>{format(new Date(tarefa.data_vencimento), "dd/MM", { locale: ptBR })}</span>
+            {/* Container de texto com min-w-0 para forçar quebra de linha */}
+            <div className="flex-1 min-w-0 flex flex-col justify-start">
+              <div className="flex items-start justify-between gap-1 w-full">
+                {/* Texto com break-words para não estourar lateralmente */}
+                <p className="font-medium text-sm leading-tight break-words text-left line-clamp-2">
+                  {pessoa?.nome || "Pessoa"}
+                </p>
+                {inscricao.concluido && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />}
+              </div>
+
+              {/* Tempo na fase */}
+              {tempoNaFase && (
+                <div className="flex mt-1">
+                  <Badge
+                    variant={isStagnant ? "destructive" : "secondary"}
+                    className="text-[10px] font-normal h-5 px-1.5 whitespace-nowrap"
+                  >
+                    <Clock className="w-2.5 h-2.5 mr-1" />
+                    {tempoNaFase}
+                  </Badge>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Menu - shrink-0 garante que ele nunca será esmagado/cortado */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1" // -mr-1 ajusta alinhamento visual à direita
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={handleConcluir}>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {inscricao.concluido ? "Reabrir" : "Concluir"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleRemover} className="text-destructive focus:text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Remover
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Bottom: Responsável + Progress */}
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
+            {/* Responsável */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowResponsavelSelector(true);
+              }}
+              className="flex items-center hover:opacity-80 transition-opacity shrink-0"
+            >
+              {responsavel ? (
+                <Avatar className="h-5 w-5 border border-background ring-1 ring-border/20">
+                  <AvatarImage src={responsavel.avatar_url} />
+                  <AvatarFallback className="text-[8px] bg-primary/10 text-primary font-bold">
+                    {getInitials(responsavel.nome)}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <div className="h-5 w-5 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary/50 transition-colors bg-muted/20">
+                  <UserPlus className="w-2.5 h-2.5 text-muted-foreground/60" />
+                </div>
+              )}
+            </button>
+
+            {/* Progress */}
+            <div className="flex-1 ml-3">
+              <Progress value={progress} className="h-1.5" />
+            </div>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </Card>
+
+      <ResponsavelSelector
+        open={showResponsavelSelector}
+        onOpenChange={setShowResponsavelSelector}
+        inscricaoId={inscricao.id}
+        currentResponsavelId={responsavel?.id}
+        onSuccess={onRefetch}
+      />
+    </>
   );
 }
