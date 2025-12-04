@@ -13,6 +13,7 @@ interface KanbanColumnProps {
   items: any[];
   totalEtapas: number;
   onRefetch: () => void;
+  etapasOrdenadas: Array<{ id: string; ordem: number; titulo: string }>;
 }
 
 export default function KanbanColumn({
@@ -21,6 +22,7 @@ export default function KanbanColumn({
   items,
   totalEtapas,
   onRefetch,
+  etapasOrdenadas,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${id}`,
@@ -63,6 +65,7 @@ export default function KanbanColumn({
                       inscricao={inscricao}
                       totalEtapas={totalEtapas}
                       onRefetch={onRefetch}
+                      etapasOrdenadas={etapasOrdenadas}
                     />
                   ))}
                 </div>
