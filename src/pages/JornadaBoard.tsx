@@ -179,6 +179,16 @@ export default function JornadaBoard() {
     }
   };
 
+  // Criar mapa de etapas (id -> ordem) para cálculo de progresso individual
+  const etapasOrdemMap = useMemo(() => {
+    if (!etapas) return {};
+    const map: Record<string, number> = {};
+    etapas.forEach((etapa, index) => {
+      map[etapa.id] = index + 1; // ordem começa em 1
+    });
+    return map;
+  }, [etapas]);
+
   const totalEtapas = etapas?.length || 1;
   const totalInscritos = inscricoes?.length || 0;
 
@@ -280,19 +290,19 @@ export default function JornadaBoard() {
                   title="Aguardando"
                   items={inscricoesByEtapa["sem_etapa"]}
                   totalEtapas={totalEtapas}
-                  etapaIndex={0}
+                  etapasOrdemMap={etapasOrdemMap}
                   onRefetch={refetchInscricoes}
                 />
               )}
 
-              {etapas?.map((etapa, index) => (
+              {etapas?.map((etapa) => (
                 <KanbanColumn
                   key={etapa.id}
                   id={etapa.id}
                   title={etapa.titulo}
                   items={inscricoesByEtapa[etapa.id] || []}
                   totalEtapas={totalEtapas}
-                  etapaIndex={index + 1}
+                  etapasOrdemMap={etapasOrdemMap}
                   onRefetch={refetchInscricoes}
                 />
               ))}
@@ -303,11 +313,7 @@ export default function JornadaBoard() {
                 <JornadaCard
                   inscricao={activeInscricao}
                   totalEtapas={totalEtapas}
-                  etapaIndex={
-                    etapas?.findIndex(
-                      (e) => e.id === activeInscricao.etapa_atual_id
-                    ) ?? 0
-                  }
+                  etapasOrdemMap={etapasOrdemMap}
                   isDragging
                 />
               )}
