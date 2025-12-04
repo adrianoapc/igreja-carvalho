@@ -74,7 +74,6 @@ export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
         </div>
 
         {tarefa.descricao && (
-          {/* CORREÇÃO AQUI: break-words adicionado */}
           <p className="text-xs text-muted-foreground line-clamp-2 break-words text-left">
             {tarefa.descricao}
           </p>
