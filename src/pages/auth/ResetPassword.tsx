@@ -19,8 +19,44 @@ export default function ResetPassword() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Verificar se há uma sessão de recuperação válida
-    const checkSession = async () => {
+    // Verificar se há token de recuperação no hash da URL
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get("type");
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    
+    const processRecovery = async () => {
+      // Se temos tokens no hash, processar primeiro
+      if (type === "recovery" && accessToken && refreshToken) {
+        try {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          
+          if (error) {
+            console.error("Error setting session:", error);
+            throw error;
+          }
+          
+          // Limpar o hash da URL
+          window.history.replaceState(null, "", window.location.pathname);
+          setIsValidSession(true);
+          setIsChecking(false);
+          return;
+        } catch (error) {
+          console.error("Recovery error:", error);
+          toast({
+            title: "Sessão inválida",
+            description: "O link de recuperação expirou ou é inválido. Solicite um novo link.",
+            variant: "destructive",
+          });
+          navigate("/auth");
+          return;
+        }
+      }
+      
+      // Verificar se já há uma sessão válida
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
@@ -36,7 +72,7 @@ export default function ResetPassword() {
       setIsChecking(false);
     };
 
-    checkSession();
+    processRecovery();
   }, [navigate, toast]);
 
   const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
