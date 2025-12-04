@@ -9,48 +9,51 @@ import { PublicHeader } from "@/components/layout/PublicHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
-interface Banner {
+interface Comunicado {
   id: string;
-  title: string;
-  message: string;
-  type: string;
-  image_url: string | null;
+  titulo: string;
+  descricao: string | null;
+  tipo: string;
+  nivel_urgencia: string | null;
+  imagem_url: string | null;
+  link_acao: string | null;
   created_at: string | null;
-  scheduled_at: string | null;
-  expires_at: string | null;
+  data_inicio: string | null;
+  data_fim: string | null;
 }
 
 const Announcements = () => {
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchActiveBanners();
+    fetchComunicados();
   }, []);
 
-  const fetchActiveBanners = async () => {
+  const fetchComunicados = async () => {
     try {
       const now = new Date().toISOString();
       
       const { data, error } = await supabase
-        .from("banners")
+        .from("comunicados")
         .select("*")
-        .eq("active", true)
-        .or(`scheduled_at.is.null,scheduled_at.lte.${now}`)
-        .or(`expires_at.is.null,expires_at.gte.${now}`)
+        .eq("ativo", true)
+        .eq("exibir_site", true)
+        .or(`data_inicio.is.null,data_inicio.lte.${now}`)
+        .or(`data_fim.is.null,data_fim.gte.${now}`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setBanners(data || []);
+      setComunicados(data || []);
     } catch (error) {
-      console.error("Error fetching banners:", error);
+      console.error("Error fetching comunicados:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getBannerTypeConfig = (type: string) => {
-    switch (type) {
+  const getUrgenciaConfig = (nivel: string | null) => {
+    switch (nivel) {
       case "info":
         return {
           color: "bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400",
@@ -92,13 +95,13 @@ const Announcements = () => {
 
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         {/* Header com contador */}
-        {!loading && banners.length > 0 && (
+        {!loading && comunicados.length > 0 && (
           <div className="flex items-center gap-2 mb-6 animate-fade-in">
             <div className="p-2 rounded-full bg-primary/10">
               <Megaphone className="w-5 h-5 text-primary" />
             </div>
             <span className="text-sm text-muted-foreground">
-              {banners.length} {banners.length === 1 ? 'anúncio ativo' : 'anúncios ativos'}
+              {comunicados.length} {comunicados.length === 1 ? 'comunicado ativo' : 'comunicados ativos'}
             </span>
           </div>
         )}
@@ -120,16 +123,16 @@ const Announcements = () => {
               </Card>
             ))}
           </div>
-        ) : banners.length === 0 ? (
+        ) : comunicados.length === 0 ? (
           <Card className="text-center py-16 border-dashed bg-card/50 backdrop-blur-sm animate-fade-in">
             <CardContent className="space-y-4">
               <div className="mx-auto w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center">
                 <Bell className="h-10 w-10 text-muted-foreground/50" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg text-foreground mb-1">Nenhum anúncio</h3>
+                <h3 className="font-semibold text-lg text-foreground mb-1">Nenhum comunicado</h3>
                 <p className="text-muted-foreground text-sm">
-                  Não há anúncios ativos no momento.<br />
+                  Não há comunicados ativos no momento.<br />
                   Volte mais tarde para novidades!
                 </p>
               </div>
@@ -137,22 +140,22 @@ const Announcements = () => {
           </Card>
         ) : (
           <div className="space-y-4">
-            {banners.map((banner, index) => {
-              const config = getBannerTypeConfig(banner.type);
+            {comunicados.map((comunicado, index) => {
+              const config = getUrgenciaConfig(comunicado.nivel_urgencia);
               const TypeIcon = config.icon;
               
               return (
                 <Card 
-                  key={banner.id} 
+                  key={comunicado.id} 
                   className={`overflow-hidden border-l-4 ${config.accent} hover:shadow-lg transition-all duration-300 animate-fade-in bg-card/80 backdrop-blur-sm`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  {/* Imagem do banner */}
-                  {banner.image_url && (
+                  {/* Imagem do comunicado */}
+                  {comunicado.imagem_url && (
                     <div className="relative w-full aspect-video overflow-hidden bg-muted">
                       <OptimizedImage
-                        src={banner.image_url}
-                        alt={banner.title}
+                        src={comunicado.imagem_url}
+                        alt={comunicado.titulo}
                         className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
@@ -166,7 +169,7 @@ const Announcements = () => {
                   <CardContent className="p-4">
                     {/* Header do card */}
                     <div className="flex items-start gap-3 mb-3">
-                      {!banner.image_url && (
+                      {!comunicado.imagem_url && (
                         <div className={`p-2.5 rounded-full ${config.color} flex-shrink-0`}>
                           <TypeIcon className="w-5 h-5" />
                         </div>
@@ -174,34 +177,36 @@ const Announcements = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="font-semibold text-base md:text-lg text-foreground leading-tight">
-                            {banner.title}
+                            {comunicado.titulo}
                           </h3>
-                          {!banner.image_url && (
+                          {!comunicado.imagem_url && (
                             <Badge variant="outline" className={`${config.color} flex-shrink-0 text-xs`}>
                               {config.label}
                             </Badge>
                           )}
                         </div>
-                        {banner.created_at && (
+                        {comunicado.created_at && (
                           <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
                             <Clock className="w-3 h-3" />
-                            <span>{getTimeAgo(banner.created_at)}</span>
+                            <span>{getTimeAgo(comunicado.created_at)}</span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Mensagem */}
-                    <p className="text-sm md:text-base text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                      {banner.message}
-                    </p>
+                    {/* Descrição */}
+                    {comunicado.descricao && (
+                      <p className="text-sm md:text-base text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                        {comunicado.descricao}
+                      </p>
+                    )}
 
                     {/* Footer com validade */}
-                    {banner.expires_at && (
+                    {comunicado.data_fim && (
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50 text-xs text-muted-foreground">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>
-                          Válido até {format(new Date(banner.expires_at), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                          Válido até {format(new Date(comunicado.data_fim), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
                         </span>
                       </div>
                     )}
