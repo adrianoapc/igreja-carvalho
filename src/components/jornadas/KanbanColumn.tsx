@@ -52,7 +52,7 @@ export default function KanbanColumn({
         }`}
       >
         <ScrollArea className="h-full max-h-[calc(100vh-220px)]">
-          <div className="p-3">
+          <div className="p-3 w-full">
             <SortableContext
               items={items.map((i) => i.id)}
               strategy={verticalListSortingStrategy}
