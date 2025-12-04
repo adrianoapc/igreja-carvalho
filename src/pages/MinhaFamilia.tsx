@@ -73,45 +73,50 @@ export default function MinhaFamilia() {
     queryFn: async () => {
       if (!profile?.id) return [];
 
-      // First get the current user's familia_id
-      const { data: currentUser, error: userError } = await supabase
-        .from('profiles')
-        .select('familia_id')
-        .eq('id', profile.id)
-        .single();
-
-      if (userError) throw userError;
-
-      // If no familia_id, return empty array
-      if (!currentUser?.familia_id) return [];
-
-      // Fetch all family members with same familia_id (excluding the current user)
-      const { data: members, error: membersError } = await supabase
-        .from('profiles')
-        .select('id, nome, data_nascimento, avatar_url, alergias, sexo, responsavel_legal')
-        .eq('familia_id', currentUser.familia_id)
-        .neq('id', profile.id)
-        .order('data_nascimento', { ascending: true });
-
-      if (membersError) throw membersError;
-
-      // Fetch relationship types from familias table
+      // Query familias table directly to get relationships
       const { data: relationships, error: relError } = await supabase
         .from('familias')
-        .select('familiar_id, tipo_parentesco')
+        .select('id, tipo_parentesco, familiar_id')
         .eq('pessoa_id', profile.id);
 
       if (relError) throw relError;
 
-      // Map relationship types to members
-      const relationshipMap = new Map(
-        relationships?.map(r => [r.familiar_id, r.tipo_parentesco]) || []
-      );
+      if (!relationships || relationships.length === 0) return [];
 
-      return (members || []).map(member => ({
-        ...member,
-        tipo_parentesco: relationshipMap.get(member.id) || 'familiar'
-      })) as FamilyMember[];
+      // Get familiar IDs
+      const familiarIds = relationships.map(r => r.familiar_id).filter(Boolean);
+      
+      if (familiarIds.length === 0) return [];
+
+      // Fetch profiles for those familiars
+      const { data: familiarProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, nome, data_nascimento, avatar_url, alergias, sexo, responsavel_legal, status')
+        .in('id', familiarIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map for quick lookup
+      const profileMap = new Map(familiarProfiles?.map(p => [p.id, p]) || []);
+
+      // Transform to FamilyMember format
+      const members: FamilyMember[] = relationships
+        .filter(r => r.familiar_id && profileMap.has(r.familiar_id))
+        .map(r => {
+          const familiar = profileMap.get(r.familiar_id)!;
+          return {
+            id: familiar.id,
+            nome: familiar.nome,
+            data_nascimento: familiar.data_nascimento,
+            avatar_url: familiar.avatar_url,
+            alergias: familiar.alergias,
+            sexo: familiar.sexo,
+            responsavel_legal: familiar.responsavel_legal,
+            tipo_parentesco: r.tipo_parentesco
+          };
+        });
+
+      return members;
     },
     enabled: !!profile?.id,
   });
