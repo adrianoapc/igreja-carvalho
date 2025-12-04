@@ -79,6 +79,7 @@ export default function EditarJornadaDialog({
   const [descricao, setDescricao] = useState("");
   const [corTema, setCorTema] = useState(CORES_TEMA[0]);
   const [ativo, setAtivo] = useState(true);
+  const [exibirPortal, setExibirPortal] = useState(true);
   const [etapas, setEtapas] = useState<EtapaLocal[]>([]);
   const [selectedEtapa, setSelectedEtapa] = useState<EtapaLocal | null>(null);
   const [showContentDialog, setShowContentDialog] = useState(false);
@@ -106,6 +107,7 @@ export default function EditarJornadaDialog({
       setDescricao(jornada.descricao || "");
       setCorTema(jornada.cor_tema || CORES_TEMA[0]);
       setAtivo(jornada.ativo);
+      setExibirPortal(jornada.exibir_portal ?? true);
     }
   }, [open, jornada]);
 
@@ -134,6 +136,7 @@ export default function EditarJornadaDialog({
           descricao: descricao || null,
           cor_tema: corTema,
           ativo,
+          exibir_portal: exibirPortal,
         })
         .eq("id", jornada.id);
 
@@ -292,6 +295,22 @@ export default function EditarJornadaDialog({
             <div className="flex items-center justify-between">
               <Label htmlFor="ativo">Jornada Ativa</Label>
               <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
+            </div>
+
+            <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="exibir_portal" className="font-medium">
+                  Disponível no Portal do Aluno?
+                </Label>
+                <Switch
+                  id="exibir_portal"
+                  checked={exibirPortal}
+                  onCheckedChange={setExibirPortal}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Se desmarcado, esta jornada será invisível para o membro, servindo apenas para controle interno da liderança.
+              </p>
             </div>
 
             <div className="space-y-2">

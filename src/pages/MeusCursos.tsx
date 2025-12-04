@@ -18,6 +18,7 @@ interface InscricaoComProgresso {
     titulo: string;
     descricao: string | null;
     cor_tema: string | null;
+    exibir_portal: boolean | null;
   };
   totalEtapas: number;
   etapasConcluidas: number;
@@ -39,7 +40,7 @@ export default function MeusCursos() {
     if (!profile?.id) return;
 
     try {
-      // Buscar inscrições do aluno
+      // Buscar inscrições do aluno (apenas jornadas visíveis no portal)
       const { data: inscricoesData, error } = await supabase
         .from("inscricoes_jornada")
         .select(`
@@ -47,10 +48,11 @@ export default function MeusCursos() {
           jornada_id,
           etapa_atual_id,
           concluido,
-          jornada:jornadas(id, titulo, descricao, cor_tema)
+          jornada:jornadas!inner(id, titulo, descricao, cor_tema, exibir_portal)
         `)
         .eq("pessoa_id", profile.id)
-        .eq("concluido", false);
+        .eq("concluido", false)
+        .eq("jornada.exibir_portal", true);
 
       if (error) throw error;
 
