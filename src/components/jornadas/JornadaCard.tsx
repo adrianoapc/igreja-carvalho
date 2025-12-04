@@ -111,7 +111,7 @@ export default function JornadaCard({
       <Card
         ref={setNodeRef}
         style={style}
-        className={`group cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 ${
+        className={`group w-full cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 overflow-hidden ${
           isDragging || isSortableDragging
             ? "opacity-50 shadow-lg ring-2 ring-primary rotate-1"
             : ""
