@@ -269,11 +269,6 @@ const modulosItems = [
     path: "/kids",
   },
   {
-    icon: BookOpen,
-    label: "Ensinamentos",
-    path: "/ensinamentos",
-  },
-  {
     icon: Settings,
     label: "Configurações",
     path: "/configuracoes-igreja",
