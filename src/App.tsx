@@ -62,6 +62,7 @@ import Biblia from "./pages/Biblia";
 import Install from "./pages/Install";
 import Admin from "./pages/Admin";
 import Perfil from "./pages/Perfil";
+import MinhaFamilia from "./pages/MinhaFamilia";
 import NotFound from "./pages/NotFound";
 import CadastroIndex from "./pages/cadastro/Index";
 import CadastroVisitante from "./pages/cadastro/Visitante";
@@ -569,6 +570,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Perfil />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/perfil/familia"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <MinhaFamilia />
                 </MainLayout>
               </ProtectedRoute>
             }
