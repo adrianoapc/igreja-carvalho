@@ -158,17 +158,19 @@ export default function LiturgiaDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Dashboard de Liturgia</h1>
           <p className="text-muted-foreground mt-1">
             Estatísticas e análise de participação na liturgia
           </p>
         </div>
-        <Button onClick={() => navigate("/cultos/templates")} variant="outline">
-          <FileText className="mr-2 h-4 w-4" />
-          Templates
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate("/cultos/templates")} variant="outline">
+            <FileText className="mr-2 h-4 w-4" />
+            Gerenciar Templates
+          </Button>
+        </div>
       </div>
 
       {/* Cards de estatísticas */}

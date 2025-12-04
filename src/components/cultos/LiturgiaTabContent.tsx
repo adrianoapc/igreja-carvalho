@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import LiturgiaTimeline from "./LiturgiaTimeline";
 import LiturgiaWorkspace from "./LiturgiaWorkspace";
-import { AplicarTemplateDialog } from "./AplicarTemplateDialog";
+import { AplicarLiturgiaTemplateDialog } from "./AplicarLiturgiaTemplateDialog";
+import { SalvarLiturgiaTemplateDialog } from "./SalvarLiturgiaTemplateDialog";
 import { LiturgiaItemDialog } from "./LiturgiaItemDialog";
 
 interface ItemLiturgia {
@@ -37,6 +38,7 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
   const [recursosCount, setRecursosCount] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   useEffect(() => {
@@ -196,6 +198,7 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
             onReorder={handleReorder}
             onAddItem={() => setShowAddDialog(true)}
             onApplyTemplate={() => setShowTemplateDialog(true)}
+            onSaveTemplate={() => setShowSaveTemplateDialog(true)}
           />
         </div>
 
@@ -211,11 +214,17 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
       </div>
 
       {/* Dialogs */}
-      <AplicarTemplateDialog
+      <AplicarLiturgiaTemplateDialog
         open={showTemplateDialog}
         onOpenChange={setShowTemplateDialog}
         cultoId={cultoId}
         onSuccess={handleTemplateApplied}
+      />
+
+      <SalvarLiturgiaTemplateDialog
+        open={showSaveTemplateDialog}
+        onOpenChange={setShowSaveTemplateDialog}
+        cultoId={cultoId}
       />
 
       <LiturgiaItemDialog
