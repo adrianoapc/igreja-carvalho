@@ -167,15 +167,15 @@ export default function DashboardAdmin() {
     const { data: currentData } = await supabase
       .from("transacoes_financeiras")
       .select("tipo, valor, categoria:categorias_financeiras(nome)")
-      .gte("data_transacao", currentMonthStart.toISOString())
-      .lte("data_transacao", currentMonthEnd.toISOString())
+      .gte("data_vencimento", currentMonthStart.toISOString())
+      .lte("data_vencimento", currentMonthEnd.toISOString())
       .eq("status", "pago");
 
     const { data: lastMonthData } = await supabase
       .from("transacoes_financeiras")
       .select("tipo, valor")
-      .gte("data_transacao", lastMonthStart.toISOString())
-      .lte("data_transacao", lastMonthEnd.toISOString())
+      .gte("data_vencimento", lastMonthStart.toISOString())
+      .lte("data_vencimento", lastMonthEnd.toISOString())
       .eq("status", "pago");
 
     if (currentData) {
@@ -208,8 +208,8 @@ export default function DashboardAdmin() {
       const { data: monthData } = await supabase
         .from("transacoes_financeiras")
         .select("tipo, valor")
-        .gte("data_transacao", monthStart.toISOString())
-        .lte("data_transacao", monthEnd.toISOString())
+        .gte("data_vencimento", monthStart.toISOString())
+        .lte("data_vencimento", monthEnd.toISOString())
         .eq("status", "pago");
 
       const monthEntradas =
