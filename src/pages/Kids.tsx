@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,97 +7,83 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Baby, Users, LogIn, LogOut, Search, Plus, Edit, Trash2 } from "lucide-react";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Baby, Users, LogIn, Search, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { KidsRoomOccupancy } from "@/components/kids/KidsRoomOccupancy";
+import { KidsAbsentAlert } from "@/components/kids/KidsAbsentAlert";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface Child {
+interface Sala {
   id: string;
   nome: string;
-  dataNascimento: string;
-  idade: number;
-  sala: string;
-  responsavel: string;
-  telefone: string;
-  observacoes?: string;
-  status: "checked-in" | "checked-out";
-  checkinTime?: string;
+  idade_min: number | null;
+  idade_max: number | null;
+  capacidade: number;
 }
 
-const salas = [
-  { id: "berçario", nome: "Berçário", faixaEtaria: "0-2 anos" },
-  { id: "maternal", nome: "Maternal", faixaEtaria: "2-4 anos" },
-  { id: "jardim", nome: "Jardim", faixaEtaria: "4-6 anos" },
-  { id: "primarios", nome: "Primários", faixaEtaria: "6-8 anos" },
-  { id: "juniores", nome: "Juniores", faixaEtaria: "8-12 anos" },
-];
-
-const mockChildren: Child[] = [
-  {
-    id: "1",
-    nome: "Maria Silva",
-    dataNascimento: "2020-05-15",
-    idade: 4,
-    sala: "maternal",
-    responsavel: "João Silva",
-    telefone: "(11) 98765-4321",
-    observacoes: "Alergia a amendoim",
-    status: "checked-out",
-  },
-  {
-    id: "2",
-    nome: "Pedro Santos",
-    dataNascimento: "2018-08-22",
-    idade: 6,
-    sala: "jardim",
-    responsavel: "Ana Santos",
-    telefone: "(11) 97654-3210",
-    status: "checked-in",
-    checkinTime: "09:30",
-  },
-  {
-    id: "3",
-    nome: "Lucas Oliveira",
-    dataNascimento: "2016-03-10",
-    idade: 8,
-    sala: "primarios",
-    responsavel: "Carlos Oliveira",
-    telefone: "(11) 96543-2109",
-    status: "checked-in",
-    checkinTime: "09:15",
-  },
-];
-
 export default function Kids() {
-  const [children, setChildren] = useState<Child[]>(mockChildren);
+  const [salas, setSalas] = useState<Sala[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSala, setSelectedSala] = useState<string>("all");
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  
+  // Stats
+  const [totalCheckinsToday, setTotalCheckinsToday] = useState(0);
+  const [activeSalasCount, setActiveSalasCount] = useState(0);
 
-  const filteredChildren = children.filter((child) => {
-    const matchesSearch = child.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          child.responsavel.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSala = selectedSala === "all" || child.sala === selectedSala;
-    return matchesSearch && matchesSala;
-  });
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const handleCheckIn = (id: string) => {
-    setChildren(children.map(child => 
-      child.id === id 
-        ? { ...child, status: "checked-in", checkinTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }
-        : child
-    ));
+  const fetchData = async () => {
+    try {
+      // Fetch salas (kids type only)
+      const { data: salasData } = await supabase
+        .from("salas")
+        .select("id, nome, idade_min, idade_max, capacidade")
+        .eq("tipo", "kids")
+        .eq("ativo", true);
+
+      setSalas(salasData || []);
+
+      // Count today's checkins
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const { count: checkinsCount } = await supabase
+        .from("presencas_aula")
+        .select("*", { count: "exact", head: true })
+        .gte("checkin_at", today.toISOString());
+
+      setTotalCheckinsToday(checkinsCount || 0);
+
+      // Count active salas (salas with at least 1 child checked in)
+      const { data: occupancyData } = await supabase
+        .from("view_room_occupancy")
+        .select("sala_id, current_count");
+
+      const activeCount = occupancyData?.filter(r => r.current_count > 0).length || 0;
+      setActiveSalasCount(activeCount);
+
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCheckOut = (id: string) => {
-    setChildren(children.map(child => 
-      child.id === id 
-        ? { ...child, status: "checked-out", checkinTime: undefined }
-        : child
-    ));
-  };
-
-  const getSalaNome = (salaId: string) => {
-    return salas.find(s => s.id === salaId)?.nome || salaId;
+  const getFaixaEtaria = (sala: Sala) => {
+    if (sala.idade_min !== null && sala.idade_max !== null) {
+      return `${sala.idade_min}-${sala.idade_max} anos`;
+    }
+    if (sala.idade_min !== null) {
+      return `${sala.idade_min}+ anos`;
+    }
+    if (sala.idade_max !== null) {
+      return `até ${sala.idade_max} anos`;
+    }
+    return "Todas as idades";
   };
 
   return (
@@ -143,7 +129,7 @@ export default function Kids() {
                   <SelectContent>
                     {salas.map((sala) => (
                       <SelectItem key={sala.id} value={sala.id}>
-                        {sala.nome} ({sala.faixaEtaria})
+                        {sala.nome} ({getFaixaEtaria(sala)})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -185,28 +171,20 @@ export default function Kids() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Crianças</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Crianças Hoje</CardTitle>
             <Baby className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{children.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Cadastradas no sistema
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Check-ins Hoje</CardTitle>
-            <LogIn className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {children.filter(c => c.status === "checked-in").length}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Crianças presentes
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{totalCheckinsToday}</div>
+                <p className="text-xs text-muted-foreground">
+                  Check-ins realizados hoje
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -215,168 +193,79 @@ export default function Kids() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{salas.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Faixas etárias diferentes
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{activeSalasCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  Com pelo menos 1 criança
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Salas</CardTitle>
+            <LogIn className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{salas.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  Salas cadastradas
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Filtros */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Label htmlFor="search" className="sr-only">Buscar</Label>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Buscar por nome da criança ou responsável..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="w-full md:w-64">
-              <Select value={selectedSala} onValueChange={setSelectedSala}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filtrar por sala" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Salas</SelectItem>
-                  {salas.map((sala) => (
-                    <SelectItem key={sala.id} value={sala.id}>
-                      {sala.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Ocupação e Alertas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <KidsRoomOccupancy />
+        <KidsAbsentAlert />
+      </div>
 
-      {/* Lista de Crianças */}
+      {/* Salas Disponíveis */}
       <Card>
         <CardHeader>
-          <CardTitle>Crianças Cadastradas</CardTitle>
-          <CardDescription>
-            {filteredChildren.length} criança(s) encontrada(s)
-          </CardDescription>
+          <CardTitle>Salas Disponíveis</CardTitle>
+          <CardDescription>Distribuição por faixa etária</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredChildren.map((child) => (
-              <Card key={child.id}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-lg">{child.nome}</h3>
-                        <Badge variant={child.status === "checked-in" ? "default" : "secondary"}>
-                          {child.status === "checked-in" ? "Presente" : "Ausente"}
-                        </Badge>
-                        <Badge variant="outline">{getSalaNome(child.sala)}</Badge>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                        <div>
-                          <span className="font-medium">Idade:</span> {child.idade} anos
-                        </div>
-                        <div>
-                          <span className="font-medium">Responsável:</span> {child.responsavel}
-                        </div>
-                        <div>
-                          <span className="font-medium">Telefone:</span> {child.telefone}
-                        </div>
-                        {child.checkinTime && (
-                          <div>
-                            <span className="font-medium">Check-in:</span> {child.checkinTime}
-                          </div>
-                        )}
-                      </div>
-                      {child.observacoes && (
-                        <div className="text-sm mt-2">
-                          <span className="font-medium text-foreground">Observações:</span>{" "}
-                          <span className="text-muted-foreground">{child.observacoes}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-2 ml-4">
-                      {child.status === "checked-out" ? (
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleCheckIn(child.id)}
-                          className="gap-2"
-                        >
-                          <LogIn className="w-4 h-4" />
-                          Check-in
-                        </Button>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleCheckOut(child.id)}
-                          className="gap-2"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          Check-out
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Salas e Faixas Etárias */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Salas e Faixas Etárias</CardTitle>
-          <CardDescription>Distribuição das crianças por sala</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {salas.map((sala) => {
-              const criancasSala = children.filter(c => c.sala === sala.id);
-              const presentes = criancasSala.filter(c => c.status === "checked-in").length;
-              
-              return (
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : salas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma sala cadastrada. Acesse Ensino → Configurações para criar salas.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {salas.map((sala) => (
                 <Card key={sala.id}>
-                  <CardHeader>
+                  <CardHeader className="pb-2">
                     <CardTitle className="text-base">{sala.nome}</CardTitle>
-                    <CardDescription>{sala.faixaEtaria}</CardDescription>
+                    <CardDescription>{getFaixaEtaria(sala)}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total:</span>
-                        <span className="font-medium">{criancasSala.length}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Presentes:</span>
-                        <span className="font-medium text-primary">{presentes}</span>
-                      </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Capacidade:</span>
+                      <span className="font-medium">{sala.capacidade}</span>
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
