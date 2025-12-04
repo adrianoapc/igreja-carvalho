@@ -340,135 +340,147 @@ export default function CursoPlayer() {
   const corTema = jornada?.cor_tema || "#3b82f6";
 
   return (
-    <div className="h-screen flex flex-col lg:flex-row">
-      {/* Sidebar - Índice */}
-      <div className={`
-        ${sidebarAberta ? 'w-full lg:w-80' : 'w-0'} 
-        border-r bg-muted/30 flex-shrink-0 transition-all overflow-hidden
-        ${sidebarAberta ? 'block' : 'hidden lg:block'}
-      `}>
-        <div className="p-4 border-b bg-background">
+    <div className="h-screen flex flex-col">
+      {/* Header Fixo - Sempre visível */}
+      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => navigate("/cursos")}
-            className="mb-3"
+            className="shrink-0"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
+            <span className="hidden sm:inline">Meus Cursos</span>
           </Button>
-          <h2 className="font-semibold line-clamp-2">{jornada?.titulo}</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {etapas.filter(e => e.concluida).length} de {etapas.length} etapas
-          </p>
+          <div className="h-4 w-px bg-border hidden sm:block" />
+          <h1 className="font-medium text-sm truncate hidden sm:block">
+            {jornada?.titulo}
+          </h1>
         </div>
-
-        <ScrollArea className="h-[calc(100vh-140px)]">
-          <div className="p-2 space-y-1">
-            {etapas.map((etapa, index) => (
-              <button
-                key={etapa.id}
-                onClick={() => {
-                  setEtapaSelecionada(etapa);
-                  setSidebarAberta(false);
-                }}
-                className={`
-                  w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors
-                  ${etapa.id === etapaSelecionada?.id 
-                    ? 'bg-primary/10 border border-primary/20' 
-                    : 'hover:bg-muted'}
-                `}
-              >
-                <div className={`
-                  w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
-                  ${etapa.concluida ? 'bg-green-500/10' : 'bg-muted'}
-                `}>
-                  {getIconeEtapa(etapa)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium line-clamp-2 ${etapa.concluida ? 'text-muted-foreground' : ''}`}>
-                    {index + 1}. {etapa.titulo}
-                  </p>
-                  {etapa.concluida && etapa.data_conclusao && (
-                    <p className="text-xs text-muted-foreground">
-                      Concluído em {format(new Date(etapa.data_conclusao), "dd/MM")}
-                    </p>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* Área Principal */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header Mobile */}
-        <div className="lg:hidden p-4 border-b flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            {etapas.filter(e => e.concluida).length}/{etapas.length} etapas
+          </span>
           <Button 
             variant="outline" 
             size="sm"
             onClick={() => setSidebarAberta(!sidebarAberta)}
+            className="lg:hidden"
           >
             {sidebarAberta ? "Ver Conteúdo" : "Ver Índice"}
           </Button>
-          <span className="text-sm text-muted-foreground">
-            {etapas.findIndex(e => e.id === etapaSelecionada?.id) + 1}/{etapas.length}
-          </span>
+        </div>
+      </header>
+
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Sidebar - Índice */}
+        <div className={`
+          ${sidebarAberta ? 'flex' : 'hidden'} 
+          lg:flex w-full lg:w-80 border-r bg-muted/30 flex-shrink-0 flex-col
+        `}>
+          <div className="p-4 border-b bg-background lg:block hidden">
+            <h2 className="font-semibold line-clamp-2">{jornada?.titulo}</h2>
+            {jornada?.descricao && (
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                {jornada.descricao}
+              </p>
+            )}
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-1">
+              {etapas.map((etapa, index) => (
+                <button
+                  key={etapa.id}
+                  onClick={() => {
+                    setEtapaSelecionada(etapa);
+                    setSidebarAberta(false);
+                  }}
+                  className={`
+                    w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors
+                    ${etapa.id === etapaSelecionada?.id 
+                      ? 'bg-primary/10 border border-primary/20' 
+                      : 'hover:bg-muted'}
+                  `}
+                >
+                  <div className={`
+                    w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
+                    ${etapa.concluida ? 'bg-green-500/10' : 'bg-muted'}
+                  `}>
+                    {getIconeEtapa(etapa)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium line-clamp-2 ${etapa.concluida ? 'text-muted-foreground' : ''}`}>
+                      {index + 1}. {etapa.titulo}
+                    </p>
+                    {etapa.concluida && etapa.data_conclusao && (
+                      <p className="text-xs text-muted-foreground">
+                        Concluído em {format(new Date(etapa.data_conclusao), "dd/MM")}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
 
-        {/* Conteúdo */}
-        <ScrollArea className="flex-1 p-4 lg:p-6">
-          <div className="max-w-4xl mx-auto">
-            {renderConteudo()}
-          </div>
-        </ScrollArea>
+        {/* Área Principal */}
+        <div className={`flex-1 flex flex-col min-w-0 ${sidebarAberta ? 'hidden lg:flex' : 'flex'}`}>
+          {/* Conteúdo */}
+          <ScrollArea className="flex-1 p-4 lg:p-6">
+            <div className="max-w-4xl mx-auto">
+              {renderConteudo()}
+            </div>
+          </ScrollArea>
 
-        {/* Barra de Ação */}
-        {etapaSelecionada && (
-          <div 
-            className="border-t p-4 bg-background"
-            style={{ borderTopColor: corTema }}
-          >
-            <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {getIconeConteudo(etapaSelecionada.tipo_conteudo)}
-                <span className="hidden sm:inline">
-                  Etapa {etapas.findIndex(e => e.id === etapaSelecionada.id) + 1} de {etapas.length}
-                </span>
-              </div>
-
-              {etapaSelecionada.concluida ? (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="text-sm font-medium">
-                    Concluído
-                    {etapaSelecionada.data_conclusao && (
-                      <span className="text-muted-foreground ml-1">
-                        em {format(new Date(etapaSelecionada.data_conclusao), "dd/MM/yyyy")}
-                      </span>
-                    )}
+          {/* Barra de Ação */}
+          {etapaSelecionada && (
+            <div 
+              className="border-t p-4 bg-background"
+              style={{ borderTopColor: corTema }}
+            >
+              <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {getIconeConteudo(etapaSelecionada.tipo_conteudo)}
+                  <span className="hidden sm:inline">
+                    Etapa {etapas.findIndex(e => e.id === etapaSelecionada.id) + 1} de {etapas.length}
                   </span>
                 </div>
-              ) : (
-                <Button 
-                  onClick={marcarConcluido}
-                  disabled={marcandoConcluido}
-                  className="gap-2"
-                >
-                  {marcandoConcluido ? (
-                    "Salvando..."
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Marcar como Concluído
-                    </>
-                  )}
-                </Button>
-              )}
+
+                {etapaSelecionada.concluida ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="text-sm font-medium">
+                      Concluído
+                      {etapaSelecionada.data_conclusao && (
+                        <span className="text-muted-foreground ml-1">
+                          em {format(new Date(etapaSelecionada.data_conclusao), "dd/MM/yyyy")}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={marcarConcluido}
+                    disabled={marcandoConcluido}
+                    className="gap-2"
+                  >
+                    {marcandoConcluido ? (
+                      "Salvando..."
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Marcar como Concluído
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
