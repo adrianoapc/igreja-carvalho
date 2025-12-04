@@ -30,8 +30,10 @@ import {
   Baby,
   Download,
   CheckCircle2,
-  Printer
+  Printer,
+  Monitor
 } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import PrintLabelDialog from "./PrintLabelDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -63,6 +65,7 @@ interface Presenca {
   checkout_at: string | null;
   status: string;
   responsavel_checkout_id: string | null;
+  attendance_mode: string | null;
   aluno?: { id: string; nome: string; avatar_url: string | null };
 }
 
@@ -111,10 +114,13 @@ export default function AulaDetailsSheet({
   const [responsaveis, setResponsaveis] = useState<{ id: string; nome: string; telefone?: string }[]>([]);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printLabelData, setPrintLabelData] = useState<PrintLabelData | null>(null);
+  const [pendingAttendanceMode, setPendingAttendanceMode] = useState<{ [alunoId: string]: "presencial" | "online" | null }>({});
 
   const isKids = aula?.sala?.nome?.toLowerCase().includes("kids") || 
                  aula?.sala?.nome?.toLowerCase().includes("berçário") ||
                  aula?.sala?.nome?.toLowerCase().includes("criança");
+  
+  const isHibrido = aula?.modalidade === "hibrido";
 
   useEffect(() => {
     if (open && aula) {
@@ -194,8 +200,14 @@ export default function AulaDetailsSheet({
     setResponsaveis(data || []);
   };
 
-  const togglePresenca = async (alunoId: string, presente: boolean, responsavelId?: string) => {
+  const togglePresenca = async (alunoId: string, presente: boolean, responsavelId?: string, attendanceMode?: "presencial" | "online") => {
     if (!aula) return;
+
+    // Para aulas híbridas, exigir a seleção do modo antes de confirmar
+    if (presente && isHibrido && !attendanceMode) {
+      setPendingAttendanceMode(prev => ({ ...prev, [alunoId]: null }));
+      return;
+    }
 
     setLoading(true);
 
@@ -207,6 +219,7 @@ export default function AulaDetailsSheet({
           aula_id: aula.id,
           aluno_id: alunoId,
           status: "presente",
+          attendance_mode: isHibrido ? attendanceMode : aula.modalidade,
         })
         .select()
         .single();
@@ -216,6 +229,13 @@ export default function AulaDetailsSheet({
         setLoading(false);
         return;
       }
+
+      // Limpar estado pendente
+      setPendingAttendanceMode(prev => {
+        const next = { ...prev };
+        delete next[alunoId];
+        return next;
+      });
 
       await fetchPresencas();
       setLoading(false);
@@ -263,6 +283,18 @@ export default function AulaDetailsSheet({
       setLoading(false);
       toast.success("Presença removida");
     }
+  };
+
+  const cancelPendingAttendance = (alunoId: string) => {
+    setPendingAttendanceMode(prev => {
+      const next = { ...prev };
+      delete next[alunoId];
+      return next;
+    });
+  };
+
+  const confirmPendingAttendance = (alunoId: string, mode: "presencial" | "online") => {
+    togglePresenca(alunoId, true, undefined, mode);
   };
 
   const handleReprintLabel = (presenca: Presenca) => {
@@ -451,6 +483,13 @@ export default function AulaDetailsSheet({
               </div>
             )}
 
+            {isHibrido && (
+              <div className="p-3 rounded-lg bg-purple-50 border border-purple-200 text-sm text-purple-700">
+                <Monitor className="w-4 h-4 inline mr-2" />
+                Aula Híbrida: Selecione se o aluno está presencial ou online
+              </div>
+            )}
+
             {alunos.length === 0 && presencas.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {aula.jornada_id 
@@ -460,52 +499,106 @@ export default function AulaDetailsSheet({
             ) : (
               <div className="space-y-2">
                 {/* Mostrar alunos inscritos */}
-                {alunos.map((aluno) => (
-                  <div
-                    key={aluno.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={aluno.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs">
-                          {aluno.nome?.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium text-sm">{aluno.nome}</span>
-                    </div>
+                {alunos.map((aluno) => {
+                  const presencaAluno = presencas.find(p => p.aluno_id === aluno.id);
+                  const hasPendingMode = pendingAttendanceMode.hasOwnProperty(aluno.id);
 
-                    {isKids ? (
-                      <div className="flex items-center gap-2">
-                        {!aluno.presente ? (
+                  return (
+                    <div
+                      key={aluno.id}
+                      className="flex flex-col p-3 rounded-lg border bg-card gap-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={aluno.avatar_url || undefined} />
+                            <AvatarFallback className="text-xs">
+                              {aluno.nome?.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{aluno.nome}</span>
+                            {presencaAluno && presencaAluno.attendance_mode && (
+                              presencaAluno.attendance_mode === "presencial" ? (
+                                <span title="Presencial"><MapPin className="w-4 h-4 text-green-600" /></span>
+                              ) : (
+                                <span title="Online"><Video className="w-4 h-4 text-blue-600" /></span>
+                              )
+                            )}
+                          </div>
+                        </div>
+
+                        {isKids ? (
+                          <div className="flex items-center gap-2">
+                            {!aluno.presente ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => togglePresenca(aluno.id, true)}
+                                disabled={loading}
+                              >
+                                <UserCheck className="w-3 h-3" />
+                                Check-in
+                              </Button>
+                            ) : (
+                              <Badge variant="default" className="gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Presente
+                              </Badge>
+                            )}
+                          </div>
+                        ) : isHibrido && !aluno.presente ? (
                           <Button
                             size="sm"
                             variant="outline"
                             className="gap-1"
                             onClick={() => togglePresenca(aluno.id, true)}
-                            disabled={loading}
+                            disabled={loading || hasPendingMode}
                           >
                             <UserCheck className="w-3 h-3" />
                             Check-in
                           </Button>
                         ) : (
-                          <Badge variant="default" className="gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Presente
-                          </Badge>
+                          <Checkbox
+                            checked={aluno.presente}
+                            onCheckedChange={(checked) => 
+                              togglePresenca(aluno.id, checked as boolean)
+                            }
+                            disabled={loading}
+                          />
                         )}
                       </div>
-                    ) : (
-                      <Checkbox
-                        checked={aluno.presente}
-                        onCheckedChange={(checked) => 
-                          togglePresenca(aluno.id, checked as boolean)
-                        }
-                        disabled={loading}
-                      />
-                    )}
-                  </div>
-                ))}
+
+                      {/* Seletor de modo para aulas híbridas */}
+                      {hasPendingMode && (
+                        <div className="flex items-center gap-2 pl-11 pt-2 border-t">
+                          <span className="text-xs text-muted-foreground">Como participou:</span>
+                          <ToggleGroup type="single" size="sm" onValueChange={(v) => {
+                            if (v) confirmPendingAttendance(aluno.id, v as "presencial" | "online");
+                          }}>
+                            <ToggleGroupItem value="presencial" className="gap-1 text-xs">
+                              <MapPin className="w-3 h-3" />
+                              Presencial
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="online" className="gap-1 text-xs">
+                              <Video className="w-3 h-3" />
+                              Online
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-6 px-2 text-xs"
+                            onClick={() => cancelPendingAttendance(aluno.id)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
                 {/* Mostrar presenças (para checkout Kids) */}
                 {isKids && presencas.filter(p => !p.checkout_at).length > 0 && (
@@ -549,9 +642,18 @@ export default function AulaDetailsSheet({
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <span className="font-medium text-sm">
-                                {presenca.aluno?.nome}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">
+                                  {presenca.aluno?.nome}
+                                </span>
+                                {presenca.attendance_mode && (
+                                  presenca.attendance_mode === "presencial" ? (
+                                    <span title="Presencial"><MapPin className="w-3 h-3 text-green-600" /></span>
+                                  ) : (
+                                    <span title="Online"><Video className="w-3 h-3 text-blue-600" /></span>
+                                  )
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">
                                 Check-in: {format(new Date(presenca.checkin_at), "HH:mm")}
                               </p>

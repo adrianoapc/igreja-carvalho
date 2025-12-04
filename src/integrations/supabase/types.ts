@@ -1903,6 +1903,7 @@ export type Database = {
       presencas_aula: {
         Row: {
           aluno_id: string | null
+          attendance_mode: string | null
           aula_id: string | null
           checkin_at: string | null
           checkout_at: string | null
@@ -1915,6 +1916,7 @@ export type Database = {
         }
         Insert: {
           aluno_id?: string | null
+          attendance_mode?: string | null
           aula_id?: string | null
           checkin_at?: string | null
           checkout_at?: string | null
@@ -1927,6 +1929,7 @@ export type Database = {
         }
         Update: {
           aluno_id?: string | null
+          attendance_mode?: string | null
           aula_id?: string | null
           checkin_at?: string | null
           checkout_at?: string | null

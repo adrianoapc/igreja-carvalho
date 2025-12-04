@@ -62,7 +62,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
   const [horaInicio, setHoraInicio] = useState("");
   const [duracao, setDuracao] = useState("60");
   
-  const [isPresencial, setIsPresencial] = useState(true);
+  const [modalidade, setModalidade] = useState<"presencial" | "online" | "hibrido">("presencial");
   const [salaId, setSalaId] = useState("");
   const [linkReuniao, setLinkReuniao] = useState("");
   
@@ -90,7 +90,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
     setDataInicio("");
     setHoraInicio("");
     setDuracao("60");
-    setIsPresencial(true);
+    setModalidade("presencial");
     setSalaId("");
     setLinkReuniao("");
     setVinculadoCulto(false);
@@ -137,13 +137,13 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
       return;
     }
 
-    if (isPresencial && !salaId) {
-      toast.error("Selecione uma sala para aulas presenciais");
+    if ((modalidade === "presencial" || modalidade === "hibrido") && !salaId) {
+      toast.error("Selecione uma sala para aulas presenciais/híbridas");
       return;
     }
 
-    if (!isPresencial && !linkReuniao) {
-      toast.error("Informe o link da reunião para aulas online");
+    if ((modalidade === "online" || modalidade === "hibrido") && !linkReuniao) {
+      toast.error("Informe o link da reunião para aulas online/híbridas");
       return;
     }
 
@@ -157,9 +157,9 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
       professor_id: professorId || null,
       data_inicio: dataHoraInicio.toISOString(),
       duracao_minutos: parseInt(duracao),
-      modalidade: isPresencial ? "presencial" : "online",
-      sala_id: isPresencial ? salaId : null,
-      link_reuniao: !isPresencial ? linkReuniao : null,
+      modalidade,
+      sala_id: (modalidade === "presencial" || modalidade === "hibrido") ? salaId : null,
+      link_reuniao: (modalidade === "online" || modalidade === "hibrido") ? linkReuniao : null,
       culto_id: vinculadoCulto ? cultoId : null,
       status: "agendada",
     });
@@ -179,8 +179,9 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
   const canProceed = () => {
     if (step === 1) return tema.length > 0;
     if (step === 2) {
-      if (isPresencial) return salaId.length > 0;
-      return linkReuniao.length > 0;
+      if (modalidade === "presencial") return salaId.length > 0;
+      if (modalidade === "online") return linkReuniao.length > 0;
+      if (modalidade === "hibrido") return salaId.length > 0 && linkReuniao.length > 0;
     }
     return true;
   };
@@ -306,31 +307,37 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
                 </p>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
-                <div className="flex items-center gap-3">
-                  {isPresencial ? (
-                    <MapPin className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <Video className="w-5 h-5 text-blue-600" />
-                  )}
-                  <div>
-                    <p className="font-medium">
-                      {isPresencial ? "Presencial" : "Online"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {isPresencial 
-                        ? "Aula em sala física" 
-                        : "Aula via videoconferência"}
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={isPresencial}
-                  onCheckedChange={setIsPresencial}
-                />
+              <div className="space-y-2">
+                <Label>Modalidade *</Label>
+                <Select value={modalidade} onValueChange={(v) => setModalidade(v as "presencial" | "online" | "hibrido")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="presencial">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-green-600" />
+                        Presencial
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="online">
+                      <div className="flex items-center gap-2">
+                        <Video className="w-4 h-4 text-blue-600" />
+                        Online
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hibrido">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-purple-600" />
+                        <Video className="w-4 h-4 text-purple-600" />
+                        Híbrido
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {isPresencial ? (
+              {(modalidade === "presencial" || modalidade === "hibrido") && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     <MapPin className="w-3 h-3" />
@@ -349,7 +356,9 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
                     </SelectContent>
                   </Select>
                 </div>
-              ) : (
+              )}
+
+              {(modalidade === "online" || modalidade === "hibrido") && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     <Link className="w-3 h-3" />
@@ -422,11 +431,11 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
                   )}
                   <p><strong>Data:</strong> {dataInicio} às {horaInicio}</p>
                   <p><strong>Duração:</strong> {duracao} minutos</p>
-                  <p><strong>Modalidade:</strong> {isPresencial ? "Presencial" : "Online"}</p>
-                  {isPresencial && salaId && (
+                  <p><strong>Modalidade:</strong> {modalidade === "presencial" ? "Presencial" : modalidade === "online" ? "Online" : "Híbrido"}</p>
+                  {(modalidade === "presencial" || modalidade === "hibrido") && salaId && (
                     <p><strong>Sala:</strong> {salas.find(s => s.id === salaId)?.nome}</p>
                   )}
-                  {!isPresencial && linkReuniao && (
+                  {(modalidade === "online" || modalidade === "hibrido") && linkReuniao && (
                     <p><strong>Link:</strong> {linkReuniao}</p>
                   )}
                   {vinculadoCulto && cultoId && (
