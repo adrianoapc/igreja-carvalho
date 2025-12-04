@@ -16,7 +16,8 @@ import {
   Copy,
   Clock,
   User,
-  BookOpen
+  BookOpen,
+  UserPlus
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,6 +26,7 @@ import { toast } from "sonner";
 import NovaAulaDrawer from "@/components/ensino/NovaAulaDrawer";
 import SalaDialog from "@/components/ensino/SalaDialog";
 import AulaDetailsSheet from "@/components/ensino/AulaDetailsSheet";
+import RegistrarVisitanteFamiliaDialog from "@/components/ensino/RegistrarVisitanteFamiliaDialog";
 
 interface Aula {
   id: string;
@@ -66,6 +68,7 @@ export default function Ensino() {
   const [selectedSala, setSelectedSala] = useState<Sala | null>(null);
   const [selectedAula, setSelectedAula] = useState<Aula | null>(null);
   const [aulaDetailsOpen, setAulaDetailsOpen] = useState(false);
+  const [visitanteFamiliaOpen, setVisitanteFamiliaOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -303,11 +306,19 @@ export default function Ensino() {
           {/* Tab B: Ministério Infantil */}
           <TabsContent value="kids" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Baby className="w-5 h-5" />
                   Salas Kids
                 </CardTitle>
+                <Button 
+                  onClick={() => setVisitanteFamiliaOpen(true)} 
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Novo Visitante (Família)
+                </Button>
               </CardHeader>
               <CardContent>
                 {salaKids.length === 0 ? (
@@ -449,6 +460,17 @@ export default function Ensino() {
         onOpenChange={setAulaDetailsOpen}
         aula={selectedAula}
         onUpdate={fetchAulas}
+      />
+
+      <RegistrarVisitanteFamiliaDialog
+        open={visitanteFamiliaOpen}
+        onOpenChange={setVisitanteFamiliaOpen}
+        onSuccess={(criancasIds) => {
+          setVisitanteFamiliaOpen(false);
+          // TODO: Open room selection for check-in
+          toast.success("Família cadastrada! Selecione a sala para check-in.");
+          fetchSalas();
+        }}
       />
     </div>
   );
