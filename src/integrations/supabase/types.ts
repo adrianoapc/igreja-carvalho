@@ -700,9 +700,11 @@ export type Database = {
           created_at: string
           culto_id: string
           id: string
+          motivo_recusa: string | null
           observacoes: string | null
           pessoa_id: string
           posicao_id: string | null
+          status_confirmacao: string | null
           time_id: string
           updated_at: string
         }
@@ -711,9 +713,11 @@ export type Database = {
           created_at?: string
           culto_id: string
           id?: string
+          motivo_recusa?: string | null
           observacoes?: string | null
           pessoa_id: string
           posicao_id?: string | null
+          status_confirmacao?: string | null
           time_id: string
           updated_at?: string
         }
@@ -722,9 +726,11 @@ export type Database = {
           created_at?: string
           culto_id?: string
           id?: string
+          motivo_recusa?: string | null
           observacoes?: string | null
           pessoa_id?: string
           posicao_id?: string | null
+          status_confirmacao?: string | null
           time_id?: string
           updated_at?: string
         }
