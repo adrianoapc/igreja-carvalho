@@ -52,35 +52,7 @@ export default function AdicionarDependenteDrawer({
         throw new Error("Data de nascimento é obrigatória");
       }
 
-      // 1. Get parent's familia_id
-      const { data: parent, error: parentError } = await supabase
-        .from('profiles')
-        .select('familia_id, nome')
-        .eq('id', parentProfileId)
-        .single();
-
-      if (parentError) throw parentError;
-
-      let familiaId = parent.familia_id;
-
-      // 2. If parent has no familia_id, generate a new UUID for the family group
-      if (!familiaId) {
-        // Generate a new UUID for the family group
-        familiaId = crypto.randomUUID();
-
-        // Update parent with familia_id
-        const { error: updateParentError } = await supabase
-          .from('profiles')
-          .update({ 
-            familia_id: familiaId,
-            responsavel_legal: true 
-          })
-          .eq('id', parentProfileId);
-
-        if (updateParentError) throw updateParentError;
-      }
-
-      // 3. Create the child profile
+      // 1. Create the child profile (without familia_id - relationships are managed via familias table)
       const { data: childProfile, error: childError } = await supabase
         .from('profiles')
         .insert({
@@ -88,8 +60,7 @@ export default function AdicionarDependenteDrawer({
           data_nascimento: format(dataNascimento, 'yyyy-MM-dd'),
           alergias: alergias.trim() || null,
           sexo: sexo || null,
-          familia_id: familiaId,
-          status: 'membro', // Children are automatically members
+          status: 'membro',
           responsavel_legal: false,
         })
         .select()
@@ -97,14 +68,16 @@ export default function AdicionarDependenteDrawer({
 
       if (childError) throw childError;
 
-      // 4. Create family relationship record
-      await supabase
+      // 2. Create family relationship record in familias table
+      const { error: relError } = await supabase
         .from('familias')
         .insert({
           pessoa_id: parentProfileId,
           familiar_id: childProfile.id,
           tipo_parentesco: tipoParentesco,
         });
+
+      if (relError) throw relError;
 
       return childProfile;
     },
