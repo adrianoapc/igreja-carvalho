@@ -3,18 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { 
-  Heart, 
-  TrendingUp, 
-  DollarSign, 
-  ArrowUpRight, 
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import {
+  Heart,
+  TrendingUp,
+  DollarSign,
+  ArrowUpRight,
   ArrowDownRight,
   Camera,
   UserPlus,
@@ -24,7 +18,7 @@ import {
   Info,
   AlertCircle,
   X,
-  ExternalLink
+  ExternalLink,
 } from "lucide-react";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import AtencaoPastoralWidget from "@/components/dashboard/AtencaoPastoralWidget";
@@ -35,7 +29,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import Autoplay from "embla-carousel-autoplay";
 import { OptimizedImage } from "@/components/OptimizedImage";
@@ -44,7 +50,7 @@ interface Comunicado {
   id: string;
   titulo: string;
   descricao: string | null;
-  tipo: 'banner' | 'alerta';
+  tipo: "banner" | "alerta";
   nivel_urgencia: string | null;
   imagem_url: string | null;
   link_acao: string | null;
@@ -80,7 +86,7 @@ interface ConsolidationData {
   color: string;
 }
 
-const DISMISSED_ALERTS_KEY = 'dashboard_dismissed_alerts';
+const DISMISSED_ALERTS_KEY = "dashboard_dismissed_alerts";
 
 export default function DashboardAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -100,7 +106,7 @@ export default function DashboardAdmin() {
     saidas: 0,
     saldo: 0,
     entradasVariacao: 0,
-    saidasVariacao: 0
+    saidasVariacao: 0,
   });
   const [saldoTotalContas, setSaldoTotalContas] = useState<number>(0);
   const [cashFlowData, setCashFlowData] = useState<{ mes: string; entradas: number; saidas: number }[]>([]);
@@ -111,9 +117,9 @@ export default function DashboardAdmin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (searchParams.get('sentimento') === 'true') {
+    if (searchParams.get("sentimento") === "true") {
       setSentimentoDialogOpen(true);
-      searchParams.delete('sentimento');
+      searchParams.delete("sentimento");
       setSearchParams(searchParams);
     }
   }, [searchParams, setSearchParams]);
@@ -129,16 +135,16 @@ export default function DashboardAdmin() {
   const fetchComunicados = async () => {
     const now = new Date().toISOString();
     const { data } = await supabase
-      .from('comunicados')
-      .select('id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao')
-      .eq('ativo', true)
-      .lte('data_inicio', now)
+      .from("comunicados")
+      .select("id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao")
+      .eq("ativo", true)
+      .lte("data_inicio", now)
       .or(`data_fim.is.null,data_fim.gte.${now}`)
-      .order('created_at', { ascending: false });
-    
+      .order("created_at", { ascending: false });
+
     if (data) {
-      const alertasList = data.filter(c => c.tipo === 'alerta') as Comunicado[];
-      const bannersList = data.filter(c => c.tipo === 'banner') as Comunicado[];
+      const alertasList = data.filter((c) => c.tipo === "alerta") as Comunicado[];
+      const bannersList = data.filter((c) => c.tipo === "banner") as Comunicado[];
       setAlertas(alertasList);
       setBanners(bannersList);
     }
@@ -151,10 +157,7 @@ export default function DashboardAdmin() {
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-    const { data: contasData } = await supabase
-      .from('contas')
-      .select('saldo_atual')
-      .eq('ativo', true);
+    const { data: contasData } = await supabase.from("contas").select("saldo_atual").eq("ativo", true);
 
     if (contasData) {
       const total = contasData.reduce((acc, c) => acc + Number(c.saldo_atual), 0);
@@ -162,25 +165,27 @@ export default function DashboardAdmin() {
     }
 
     const { data: currentData } = await supabase
-      .from('transacoes_financeiras')
-      .select('tipo, valor, categoria:categorias_financeiras(nome)')
-      .gte('data_transacao', currentMonthStart.toISOString())
-      .lte('data_transacao', currentMonthEnd.toISOString())
-      .eq('status', 'pago');
+      .from("transacoes_financeiras")
+      .select("tipo, valor, categoria:categorias_financeiras(nome)")
+      .gte("data_transacao", currentMonthStart.toISOString())
+      .lte("data_transacao", currentMonthEnd.toISOString())
+      .eq("status", "pago");
 
     const { data: lastMonthData } = await supabase
-      .from('transacoes_financeiras')
-      .select('tipo, valor')
-      .gte('data_transacao', lastMonthStart.toISOString())
-      .lte('data_transacao', lastMonthEnd.toISOString())
-      .eq('status', 'pago');
+      .from("transacoes_financeiras")
+      .select("tipo, valor")
+      .gte("data_transacao", lastMonthStart.toISOString())
+      .lte("data_transacao", lastMonthEnd.toISOString())
+      .eq("status", "pago");
 
     if (currentData) {
-      const entradas = currentData.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + Number(t.valor), 0);
-      const saidas = currentData.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + Number(t.valor), 0);
+      const entradas = currentData.filter((t) => t.tipo === "entrada").reduce((acc, t) => acc + Number(t.valor), 0);
+      const saidas = currentData.filter((t) => t.tipo === "saida").reduce((acc, t) => acc + Number(t.valor), 0);
 
-      const lastEntradas = lastMonthData?.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + Number(t.valor), 0) || 0;
-      const lastSaidas = lastMonthData?.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+      const lastEntradas =
+        lastMonthData?.filter((t) => t.tipo === "entrada").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+      const lastSaidas =
+        lastMonthData?.filter((t) => t.tipo === "saida").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
 
       const entradasVariacao = lastEntradas > 0 ? ((entradas - lastEntradas) / lastEntradas) * 100 : 0;
       const saidasVariacao = lastSaidas > 0 ? ((saidas - lastSaidas) / lastSaidas) * 100 : 0;
@@ -190,7 +195,7 @@ export default function DashboardAdmin() {
         saidas,
         saldo: entradas - saidas,
         entradasVariacao,
-        saidasVariacao
+        saidasVariacao,
       });
     }
 
@@ -201,58 +206,53 @@ export default function DashboardAdmin() {
       const monthEnd = endOfMonth(monthDate);
 
       const { data: monthData } = await supabase
-        .from('transacoes_financeiras')
-        .select('tipo, valor')
-        .gte('data_transacao', monthStart.toISOString())
-        .lte('data_transacao', monthEnd.toISOString())
-        .eq('status', 'pago');
+        .from("transacoes_financeiras")
+        .select("tipo, valor")
+        .gte("data_transacao", monthStart.toISOString())
+        .lte("data_transacao", monthEnd.toISOString())
+        .eq("status", "pago");
 
-      const monthEntradas = monthData?.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + Number(t.valor), 0) || 0;
-      const monthSaidas = monthData?.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+      const monthEntradas =
+        monthData?.filter((t) => t.tipo === "entrada").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+      const monthSaidas =
+        monthData?.filter((t) => t.tipo === "saida").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
 
       cashFlow.push({
-        mes: format(monthDate, 'MMM', { locale: ptBR }),
+        mes: format(monthDate, "MMM", { locale: ptBR }),
         entradas: monthEntradas,
-        saidas: monthSaidas
+        saidas: monthSaidas,
       });
     }
     setCashFlowData(cashFlow);
   };
 
   const fetchConsolidationData = async () => {
-    const { data: visitors } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('status', 'visitante');
+    const { data: visitors } = await supabase.from("profiles").select("id").eq("status", "visitante");
 
-    const { data: frequenters } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('status', 'frequentador');
+    const { data: frequenters } = await supabase.from("profiles").select("id").eq("status", "frequentador");
 
-    const { data: members } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('status', 'membro');
+    const { data: members } = await supabase.from("profiles").select("id").eq("status", "membro");
 
     setConsolidationData([
-      { name: 'Visitantes', value: visitors?.length || 0, color: 'hsl(var(--chart-1))' },
-      { name: 'Frequentadores', value: frequenters?.length || 0, color: 'hsl(var(--chart-2))' },
-      { name: 'Membros', value: members?.length || 0, color: 'hsl(var(--chart-3))' }
+      { name: "Visitantes", value: visitors?.length || 0, color: "hsl(var(--chart-1))" },
+      { name: "Frequentadores", value: frequenters?.length || 0, color: "hsl(var(--chart-2))" },
+      { name: "Membros", value: members?.length || 0, color: "hsl(var(--chart-3))" },
     ]);
   };
 
   const fetchPedidosOracao = async () => {
     const { data } = await supabase
-      .from('pedidos_oracao')
-      .select(`
+      .from("pedidos_oracao")
+      .select(
+        `
         id,
         pedido,
         nome_solicitante,
         created_at
-      `)
-      .in('status', ['pendente', 'em_oracao'])
-      .order('created_at', { ascending: false })
+      `,
+      )
+      .in("status", ["pendente", "em_oracao"])
+      .order("created_at", { ascending: false })
       .limit(5);
 
     if (data) {
@@ -260,9 +260,9 @@ export default function DashboardAdmin() {
         data.map(async (pedido) => {
           return {
             ...pedido,
-            pessoa: null as { nome: string; avatar_url: string | null } | null
+            pessoa: null as { nome: string; avatar_url: string | null } | null,
           };
-        })
+        }),
       );
       setPedidosOracao(pedidosWithPessoa);
     }
@@ -270,53 +270,64 @@ export default function DashboardAdmin() {
 
   const fetchTestemunhos = async () => {
     const { data } = await supabase
-      .from('testemunhos')
-      .select(`
+      .from("testemunhos")
+      .select(
+        `
         id,
         titulo,
         nome_externo,
         created_at
-      `)
-      .eq('status', 'publico')
-      .order('created_at', { ascending: false })
+      `,
+      )
+      .eq("status", "publico")
+      .order("created_at", { ascending: false })
       .limit(5);
 
     if (data) {
       const testemunhosWithPessoa = data.map((t) => ({
         ...t,
-        pessoa: null as { nome: string; avatar_url: string | null } | null
+        pessoa: null as { nome: string; avatar_url: string | null } | null,
       }));
       setTestemunhos(testemunhosWithPessoa);
     }
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
   const getInitials = (name: string) => {
-    return name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
+    return (
+      name
+        ?.split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase() || "?"
+    );
   };
 
   const getAlertStyles = (nivel: string | null) => {
     switch (nivel) {
-      case 'warning':
+      case "warning":
         return {
-          className: 'bg-yellow-50 border-yellow-200 text-yellow-900 dark:bg-yellow-950/50 dark:border-yellow-800 dark:text-yellow-200',
-          Icon: AlertTriangle
+          className:
+            "bg-yellow-50 border-yellow-200 text-yellow-900 dark:bg-yellow-950/50 dark:border-yellow-800 dark:text-yellow-200",
+          Icon: AlertTriangle,
         };
-      case 'destructive':
+      case "destructive":
         return {
-          className: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800 dark:text-red-200',
-          Icon: AlertCircle
+          className: "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800 dark:text-red-200",
+          Icon: AlertCircle,
         };
       default:
         return {
-          className: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-200',
-          Icon: Info
+          className:
+            "bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-200",
+          Icon: Info,
         };
     }
   };
@@ -327,8 +338,8 @@ export default function DashboardAdmin() {
     localStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(newDismissed));
   };
 
-  const activeAlertas = alertas.filter(a => !dismissedAlerts.includes(a.id));
-  const firstName = profile?.nome?.split(' ')[0] || 'Usuário';
+  const activeAlertas = alertas.filter((a) => !dismissedAlerts.includes(a.id));
+  const firstName = profile?.nome?.split(" ")[0] || "Usuário";
 
   const chartConfig = {
     entradas: { label: "Entradas", color: "hsl(var(--chart-1))" },
@@ -337,7 +348,7 @@ export default function DashboardAdmin() {
 
   const handleBannerClick = (banner: Comunicado) => {
     if (banner.link_acao) {
-      window.open(banner.link_acao, '_blank', 'noopener,noreferrer');
+      window.open(banner.link_acao, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -346,15 +357,13 @@ export default function DashboardAdmin() {
       {/* Header & Personal Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Olá, {firstName}!
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Olá, {firstName}!</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>
         </div>
-        <Button 
-          onClick={() => setSentimentoDialogOpen(true)} 
+        <Button
+          onClick={() => setSentimentoDialogOpen(true)}
           className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
         >
           <Heart className="w-4 h-4" />
@@ -367,7 +376,7 @@ export default function DashboardAdmin() {
       {/* Alertas Section */}
       {activeAlertas.length > 0 && (
         <div className="space-y-2">
-          {activeAlertas.map(alerta => {
+          {activeAlertas.map((alerta) => {
             const { className, Icon } = getAlertStyles(alerta.nivel_urgencia);
             return (
               <Alert key={alerta.id} className={`${className} relative`}>
@@ -409,8 +418,8 @@ export default function DashboardAdmin() {
             <CarouselContent>
               {banners.map((banner) => (
                 <CarouselItem key={banner.id}>
-                  <Card 
-                    className={`overflow-hidden ${banner.link_acao ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
+                  <Card
+                    className={`overflow-hidden ${banner.link_acao ? "cursor-pointer hover:shadow-lg transition-shadow" : ""}`}
                     onClick={() => handleBannerClick(banner)}
                   >
                     {banner.imagem_url ? (
@@ -422,13 +431,9 @@ export default function DashboardAdmin() {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                         <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                          <h3 className="text-lg md:text-xl font-bold text-white drop-shadow-lg">
-                            {banner.titulo}
-                          </h3>
+                          <h3 className="text-lg md:text-xl font-bold text-white drop-shadow-lg">{banner.titulo}</h3>
                           {banner.descricao && (
-                            <p className="text-sm text-white/90 mt-1 line-clamp-2 drop-shadow">
-                              {banner.descricao}
-                            </p>
+                            <p className="text-sm text-white/90 mt-1 line-clamp-2 drop-shadow">{banner.descricao}</p>
                           )}
                           {banner.link_acao && (
                             <div className="flex items-center gap-1 mt-2 text-white/80 text-xs">
@@ -440,13 +445,9 @@ export default function DashboardAdmin() {
                       </div>
                     ) : (
                       <CardContent className="p-4 md:p-6 aspect-[21/9] flex flex-col justify-center bg-gradient-to-r from-primary/10 to-primary/5">
-                        <h3 className="text-lg md:text-xl font-bold text-foreground">
-                          {banner.titulo}
-                        </h3>
+                        <h3 className="text-lg md:text-xl font-bold text-foreground">{banner.titulo}</h3>
                         {banner.descricao && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
-                            {banner.descricao}
-                          </p>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">{banner.descricao}</p>
                         )}
                         {banner.link_acao && (
                           <div className="flex items-center gap-1 mt-2 text-primary text-xs">
@@ -472,37 +473,22 @@ export default function DashboardAdmin() {
 
       {/* Quick Actions Toolbar */}
       <div className="flex flex-wrap gap-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate('/financas/entradas')}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={() => navigate("/financas/relatorio-oferta")} className="gap-2">
           <DollarSign className="w-4 h-4" />
           <span className="hidden sm:inline">Entradas</span>
         </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate('/financas/saidas?nova=true')}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={() => navigate("/financas/saidas?nova=true")} className="gap-2">
           <Camera className="w-4 h-4" />
           <span className="hidden sm:inline">Lançar Nota</span>
         </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate('/pessoas/visitantes?novo=true')}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={() => navigate("/pessoas/visitantes?novo=true")} className="gap-2">
           <UserPlus className="w-4 h-4" />
           <span className="hidden sm:inline">Novo Visitante</span>
         </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate('/intercessao/pedidos?novo=true')}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/intercessao/pedidos?novo=true")}
           className="gap-2"
         >
           <HeartHandshake className="w-4 h-4" />
@@ -521,7 +507,7 @@ export default function DashboardAdmin() {
             {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
           </Badge>
         </div>
-        
+
         {/* Financial KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
           <Card className="shadow-soft">
@@ -529,10 +515,18 @@ export default function DashboardAdmin() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Entradas</p>
-                  <p className="text-lg md:text-xl font-bold text-emerald-600">{formatCurrency(financialStats.entradas)}</p>
+                  <p className="text-lg md:text-xl font-bold text-emerald-600">
+                    {formatCurrency(financialStats.entradas)}
+                  </p>
                 </div>
-                <div className={`flex items-center text-xs ${financialStats.entradasVariacao >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {financialStats.entradasVariacao >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                <div
+                  className={`flex items-center text-xs ${financialStats.entradasVariacao >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                >
+                  {financialStats.entradasVariacao >= 0 ? (
+                    <ArrowUpRight className="w-3 h-3" />
+                  ) : (
+                    <ArrowDownRight className="w-3 h-3" />
+                  )}
                   {Math.abs(financialStats.entradasVariacao).toFixed(0)}%
                 </div>
               </div>
@@ -546,8 +540,14 @@ export default function DashboardAdmin() {
                   <p className="text-xs text-muted-foreground">Saídas</p>
                   <p className="text-lg md:text-xl font-bold text-red-600">{formatCurrency(financialStats.saidas)}</p>
                 </div>
-                <div className={`flex items-center text-xs ${financialStats.saidasVariacao <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {financialStats.saidasVariacao <= 0 ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                <div
+                  className={`flex items-center text-xs ${financialStats.saidasVariacao <= 0 ? "text-emerald-600" : "text-red-600"}`}
+                >
+                  {financialStats.saidasVariacao <= 0 ? (
+                    <ArrowDownRight className="w-3 h-3" />
+                  ) : (
+                    <ArrowUpRight className="w-3 h-3" />
+                  )}
                   {Math.abs(financialStats.saidasVariacao).toFixed(0)}%
                 </div>
               </div>
@@ -558,7 +558,9 @@ export default function DashboardAdmin() {
             <CardContent className="p-4">
               <div>
                 <p className="text-xs text-muted-foreground">Saldo do Mês</p>
-                <p className={`text-lg md:text-xl font-bold ${financialStats.saldo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p
+                  className={`text-lg md:text-xl font-bold ${financialStats.saldo >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                >
                   {formatCurrency(financialStats.saldo)}
                 </p>
               </div>
@@ -569,7 +571,9 @@ export default function DashboardAdmin() {
             <CardContent className="p-4">
               <div>
                 <p className="text-xs text-muted-foreground">Saldo Total (Contas)</p>
-                <p className={`text-lg md:text-xl font-bold ${saldoTotalContas >= 0 ? 'text-primary' : 'text-red-600'}`}>
+                <p
+                  className={`text-lg md:text-xl font-bold ${saldoTotalContas >= 0 ? "text-primary" : "text-red-600"}`}
+                >
                   {formatCurrency(saldoTotalContas)}
                 </p>
               </div>
@@ -593,9 +597,15 @@ export default function DashboardAdmin() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cashFlowData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="mes" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
-                  <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                  <XAxis dataKey="mes" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis
+                    className="text-xs"
+                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                  />
+                  <ChartTooltip
+                    content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
+                  />
                   <Bar dataKey="entradas" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="saidas" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -658,28 +668,28 @@ export default function DashboardAdmin() {
               {pedidosOracao.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido pendente</p>
               ) : (
-                pedidosOracao.map(pedido => (
+                pedidosOracao.map((pedido) => (
                   <div key={pedido.id} className="flex items-start gap-2 p-2 rounded-lg bg-muted/50">
                     <Avatar className="w-8 h-8">
                       <AvatarImage src={pedido.pessoa?.avatar_url || undefined} />
                       <AvatarFallback className="text-xs">
-                        {getInitials(pedido.pessoa?.nome || pedido.nome_solicitante || 'Anônimo')}
+                        {getInitials(pedido.pessoa?.nome || pedido.nome_solicitante || "Anônimo")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">
-                        {pedido.pessoa?.nome || pedido.nome_solicitante || 'Anônimo'}
+                        {pedido.pessoa?.nome || pedido.nome_solicitante || "Anônimo"}
                       </p>
                       <p className="text-xs text-muted-foreground line-clamp-2">{pedido.pedido}</p>
                     </div>
                   </div>
                 ))
               )}
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="w-full text-xs"
-                onClick={() => navigate('/intercessao/pedidos')}
+                onClick={() => navigate("/intercessao/pedidos")}
               >
                 Ver todos
               </Button>
@@ -698,28 +708,28 @@ export default function DashboardAdmin() {
               {testemunhos.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhum testemunho recente</p>
               ) : (
-                testemunhos.map(testemunho => (
+                testemunhos.map((testemunho) => (
                   <div key={testemunho.id} className="flex items-start gap-2 p-2 rounded-lg bg-muted/50">
                     <Avatar className="w-8 h-8">
                       <AvatarImage src={testemunho.pessoa?.avatar_url || undefined} />
                       <AvatarFallback className="text-xs">
-                        {getInitials(testemunho.pessoa?.nome || testemunho.nome_externo || 'Anônimo')}
+                        {getInitials(testemunho.pessoa?.nome || testemunho.nome_externo || "Anônimo")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">
-                        {testemunho.pessoa?.nome || testemunho.nome_externo || 'Anônimo'}
+                        {testemunho.pessoa?.nome || testemunho.nome_externo || "Anônimo"}
                       </p>
                       <p className="text-xs text-muted-foreground line-clamp-2">{testemunho.titulo}</p>
                     </div>
                   </div>
                 ))
               )}
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="w-full text-xs"
-                onClick={() => navigate('/intercessao/testemunhos')}
+                onClick={() => navigate("/intercessao/testemunhos")}
               >
                 Ver todos
               </Button>
