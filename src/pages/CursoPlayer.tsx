@@ -150,16 +150,34 @@ export default function CursoPlayer() {
 
     setMarcandoConcluido(true);
     try {
-      const { error } = await supabase
+      // Verificar se já existe registro
+      const { data: existingRecord } = await supabase
         .from("presencas_aula")
-        .upsert({
-          aluno_id: profile.id,
-          etapa_id: etapaSelecionada.id,
-          status: "concluido",
-          checkin_at: new Date().toISOString(),
-        }, {
-          onConflict: "etapa_id,aluno_id"
-        });
+        .select("id")
+        .eq("aluno_id", profile.id)
+        .eq("etapa_id", etapaSelecionada.id)
+        .maybeSingle();
+
+      let error;
+      if (existingRecord) {
+        // Atualizar registro existente
+        const result = await supabase
+          .from("presencas_aula")
+          .update({ status: "concluido", checkin_at: new Date().toISOString() })
+          .eq("id", existingRecord.id);
+        error = result.error;
+      } else {
+        // Inserir novo registro
+        const result = await supabase
+          .from("presencas_aula")
+          .insert({
+            aluno_id: profile.id,
+            etapa_id: etapaSelecionada.id,
+            status: "concluido",
+            checkin_at: new Date().toISOString(),
+          });
+        error = result.error;
+      }
 
       if (error) throw error;
 
