@@ -29,8 +29,10 @@ import {
   UserX,
   Baby,
   Download,
-  CheckCircle2
+  CheckCircle2,
+  Printer
 } from "lucide-react";
+import PrintLabelDialog from "./PrintLabelDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,6 +72,8 @@ interface Aluno {
   avatar_url: string | null;
   presente: boolean;
   presenca_id?: string;
+  necessidades_especiais?: string;
+  telefone?: string;
 }
 
 interface AulaDetailsSheetProps {
@@ -77,6 +81,21 @@ interface AulaDetailsSheetProps {
   onOpenChange: (open: boolean) => void;
   aula: Aula | null;
   onUpdate: () => void;
+}
+
+interface PrintLabelData {
+  crianca: {
+    id: string;
+    nome: string;
+    alergias?: string;
+    necessidades_especiais?: string;
+  };
+  responsavel: {
+    nome: string;
+    telefone?: string;
+  };
+  checkinId: string;
+  checkinTime: Date;
 }
 
 export default function AulaDetailsSheet({ 
@@ -89,7 +108,9 @@ export default function AulaDetailsSheet({
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [presencas, setPresencas] = useState<Presenca[]>([]);
   const [checkoutResponsavelId, setCheckoutResponsavelId] = useState("");
-  const [responsaveis, setResponsaveis] = useState<{ id: string; nome: string }[]>([]);
+  const [responsaveis, setResponsaveis] = useState<{ id: string; nome: string; telefone?: string }[]>([]);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printLabelData, setPrintLabelData] = useState<PrintLabelData | null>(null);
 
   const isKids = aula?.sala?.nome?.toLowerCase().includes("kids") || 
                  aula?.sala?.nome?.toLowerCase().includes("berçário") ||
@@ -113,7 +134,7 @@ export default function AulaDetailsSheet({
       .from("inscricoes_jornada")
       .select(`
         pessoa_id,
-        pessoa:profiles!inscricoes_jornada_pessoa_id_fkey(id, nome, avatar_url)
+        pessoa:profiles!inscricoes_jornada_pessoa_id_fkey(id, nome, avatar_url, necessidades_especiais, telefone)
       `)
       .eq("jornada_id", aula.jornada_id)
       .eq("concluido", false);
@@ -128,6 +149,8 @@ export default function AulaDetailsSheet({
       nome: item.pessoa?.nome || "Sem nome",
       avatar_url: item.pessoa?.avatar_url,
       presente: false,
+      necessidades_especiais: item.pessoa?.necessidades_especiais,
+      telefone: item.pessoa?.telefone,
     }));
 
     setAlunos(alunosList);
@@ -164,30 +187,63 @@ export default function AulaDetailsSheet({
   const fetchResponsaveis = async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, nome")
+      .select("id, nome, telefone")
       .eq("status", "membro")
       .order("nome");
     
     setResponsaveis(data || []);
   };
 
-  const togglePresenca = async (alunoId: string, presente: boolean) => {
+  const togglePresenca = async (alunoId: string, presente: boolean, responsavelId?: string) => {
     if (!aula) return;
 
     setLoading(true);
 
     if (presente) {
       // Adicionar presença
-      const { error } = await supabase.from("presencas_aula").insert({
-        aula_id: aula.id,
-        aluno_id: alunoId,
-        status: "presente",
-      });
+      const { data: insertedData, error } = await supabase
+        .from("presencas_aula")
+        .insert({
+          aula_id: aula.id,
+          aluno_id: alunoId,
+          status: "presente",
+        })
+        .select()
+        .single();
 
       if (error) {
         toast.error("Erro ao registrar presença");
         setLoading(false);
         return;
+      }
+
+      await fetchPresencas();
+      setLoading(false);
+      toast.success("Check-in realizado!");
+
+      // Se for modo Kids, mostrar dialog de impressão
+      if (isKids && insertedData) {
+        const aluno = alunos.find(a => a.id === alunoId);
+        const responsavel = responsavelId 
+          ? responsaveis.find(r => r.id === responsavelId) 
+          : { nome: "Responsável", telefone: undefined };
+        
+        if (aluno) {
+          setPrintLabelData({
+            crianca: {
+              id: aluno.id,
+              nome: aluno.nome,
+              necessidades_especiais: aluno.necessidades_especiais,
+            },
+            responsavel: {
+              nome: responsavel?.nome || "Responsável",
+              telefone: responsavel?.telefone,
+            },
+            checkinId: insertedData.id,
+            checkinTime: new Date(),
+          });
+          setPrintDialogOpen(true);
+        }
       }
     } else {
       // Remover presença
@@ -202,11 +258,33 @@ export default function AulaDetailsSheet({
         setLoading(false);
         return;
       }
-    }
 
-    await fetchPresencas();
-    setLoading(false);
-    toast.success(presente ? "Presença registrada" : "Presença removida");
+      await fetchPresencas();
+      setLoading(false);
+      toast.success("Presença removida");
+    }
+  };
+
+  const handleReprintLabel = (presenca: Presenca) => {
+    if (!aula) return;
+    
+    const aluno = alunos.find(a => a.id === presenca.aluno_id);
+    if (!aluno) return;
+
+    setPrintLabelData({
+      crianca: {
+        id: aluno.id,
+        nome: aluno.nome,
+        necessidades_especiais: aluno.necessidades_especiais,
+      },
+      responsavel: {
+        nome: "Responsável",
+        telefone: aluno.telefone,
+      },
+      checkinId: presenca.id,
+      checkinTime: new Date(presenca.checkin_at),
+    });
+    setPrintDialogOpen(true);
   };
 
   const handleCheckout = async (presencaId: string) => {
@@ -479,16 +557,27 @@ export default function AulaDetailsSheet({
                               </p>
                             </div>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1"
-                            onClick={() => handleCheckout(presenca.id)}
-                            disabled={loading || !checkoutResponsavelId}
-                          >
-                            <UserX className="w-3 h-3" />
-                            Checkout
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => handleReprintLabel(presenca)}
+                              title="Reimprimir etiqueta"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1"
+                              onClick={() => handleCheckout(presenca.id)}
+                              disabled={loading || !checkoutResponsavelId}
+                            >
+                              <UserX className="w-3 h-3" />
+                              Checkout
+                            </Button>
+                          </div>
                         </div>
                       ))}
                   </div>
@@ -498,6 +587,19 @@ export default function AulaDetailsSheet({
           </div>
         </div>
       </SheetContent>
+
+      {/* Dialog de impressão de etiquetas */}
+      {printLabelData && (
+        <PrintLabelDialog
+          open={printDialogOpen}
+          onOpenChange={setPrintDialogOpen}
+          crianca={printLabelData.crianca}
+          responsavel={printLabelData.responsavel}
+          sala={aula?.sala?.nome || "Sala Kids"}
+          checkinId={printLabelData.checkinId}
+          checkinTime={printLabelData.checkinTime}
+        />
+      )}
     </Sheet>
   );
 }
