@@ -1217,6 +1217,7 @@ export type Database = {
           cor_tema: string | null
           created_at: string | null
           descricao: string | null
+          exibir_portal: boolean | null
           id: string
           titulo: string
           updated_at: string | null
@@ -1226,6 +1227,7 @@ export type Database = {
           cor_tema?: string | null
           created_at?: string | null
           descricao?: string | null
+          exibir_portal?: boolean | null
           id?: string
           titulo: string
           updated_at?: string | null
@@ -1235,6 +1237,7 @@ export type Database = {
           cor_tema?: string | null
           created_at?: string | null
           descricao?: string | null
+          exibir_portal?: boolean | null
           id?: string
           titulo?: string
           updated_at?: string | null
