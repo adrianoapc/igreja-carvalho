@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import MainLayout from "@/components/layout/MainLayout";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -170,8 +170,7 @@ export default function MinhasEscalas() {
   const recusadas = escalas.filter(e => e.status_confirmacao === "recusado");
 
   return (
-    <MainLayout>
-      <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Minhas Escalas</h1>
           <p className="text-muted-foreground">Gerencie suas próximas escalas e compromissos</p>
@@ -341,8 +340,6 @@ export default function MinhasEscalas() {
             )}
           </div>
         )}
-      </div>
-
       <RecusarEscalaDialog
         open={!!recusarEscala}
         onOpenChange={(open) => !open && setRecusarEscala(null)}
@@ -355,6 +352,6 @@ export default function MinhasEscalas() {
         onOpenChange={setDetailsOpen}
         escala={selectedEscala}
       />
-    </MainLayout>
+    </div>
   );
 }
