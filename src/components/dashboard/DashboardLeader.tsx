@@ -9,14 +9,16 @@ import {
   Calendar,
   CheckCircle2,
   Cake,
-  Phone
+  Phone,
+  Heart
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { format, addDays, isSameDay, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 
 interface Aniversariante {
   id: string;
@@ -27,6 +29,7 @@ interface Aniversariante {
 
 export default function DashboardLeader() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
   const firstName = profile?.nome?.split(' ')[0] || 'Líder';
   
@@ -36,11 +39,20 @@ export default function DashboardLeader() {
     relatoriosAtrasados: 0
   });
   const [aniversariantes, setAniversariantes] = useState<Aniversariante[]>([]);
+  const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchStats();
     fetchAniversariantes();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("sentimento") === "true") {
+      setSentimentoDialogOpen(true);
+      searchParams.delete("sentimento");
+      setSearchParams(searchParams);
+    }
+  }, [searchParams, setSearchParams]);
 
   const fetchStats = async () => {
     // Membros na célula (simplified - count members in teams where user is leader)
@@ -97,15 +109,26 @@ export default function DashboardLeader() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-          Área do Líder
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Olá, {firstName}! {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
-        </p>
+      {/* Header & Personal Actions */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Área do Líder
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Olá, {firstName}! {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
+          </p>
+        </div>
+        <Button
+          onClick={() => setSentimentoDialogOpen(true)}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+        >
+          <Heart className="w-4 h-4" />
+          <span>Como você está?</span>
+        </Button>
       </div>
+
+      <RegistrarSentimentoDialog open={sentimentoDialogOpen} onOpenChange={setSentimentoDialogOpen} />
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

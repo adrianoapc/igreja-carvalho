@@ -1,11 +1,15 @@
 import * as React from "react";
-import { ReactNode, useRef } from "react";
+import { ReactNode, useRef, useEffect, useState } from "react";
 import { AppSidebar } from "./Sidebar";
 import UserMenu from "./UserMenu";
 import NotificationsBell from "./NotificationsBell";
 import { SidebarProvider, SidebarTrigger, SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import { Menu } from "lucide-react";
 import { useSwipeElement } from "@/hooks/useSwipe";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { startOfDay, endOfDay } from "date-fns";
+import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -61,11 +65,58 @@ function MainLayoutContent({ children }: MainLayoutProps) {
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
+  const { profile, isAuthenticated, loading } = useAuth();
+  const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
+  const [checkedToday, setCheckedToday] = useState(false);
+
+  useEffect(() => {
+    // Verificar se o usuário já registrou sentimento hoje
+    const checkTodaySentimento = async () => {
+      if (!isAuthenticated || !profile?.id || loading || checkedToday) return;
+
+      try {
+        const today = new Date();
+        const dayStart = startOfDay(today).toISOString();
+        const dayEnd = endOfDay(today).toISOString();
+
+        const { data, error } = await supabase
+          .from("sentimentos_membros")
+          .select("id")
+          .eq("pessoa_id", profile.id)
+          .gte("data_registro", dayStart)
+          .lte("data_registro", dayEnd)
+          .limit(1);
+
+        if (error) {
+          console.error("Erro ao verificar sentimento:", error);
+          return;
+        }
+
+        setCheckedToday(true);
+
+        // Se não votou hoje, abre o dialog
+        if (!data || data.length === 0) {
+          setSentimentoDialogOpen(true);
+        }
+      } catch (error) {
+        console.error("Erro ao verificar sentimento:", error);
+      }
+    };
+
+    checkTodaySentimento();
+  }, [isAuthenticated, profile?.id, loading, checkedToday]);
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <MainLayoutContent>{children}</MainLayoutContent>
       </div>
+      
+      {/* Dialog de verificação diária de sentimento */}
+      <RegistrarSentimentoDialog 
+        open={sentimentoDialogOpen} 
+        onOpenChange={setSentimentoDialogOpen} 
+      />
     </SidebarProvider>
   );
 }
