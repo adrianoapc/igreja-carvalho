@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 interface NovaJornadaDialogProps {
@@ -39,6 +40,7 @@ export default function NovaJornadaDialog({
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [corTema, setCorTema] = useState(CORES_TEMA[0]);
+  const [exibirPortal, setExibirPortal] = useState(true);
   const [etapas, setEtapas] = useState<string[]>(["Etapa 1", "Etapa 2", "Etapa 3"]);
 
   const createMutation = useMutation({
@@ -50,6 +52,7 @@ export default function NovaJornadaDialog({
           titulo,
           descricao: descricao || null,
           cor_tema: corTema,
+          exibir_portal: exibirPortal,
         })
         .select()
         .single();
@@ -90,6 +93,7 @@ export default function NovaJornadaDialog({
     setTitulo("");
     setDescricao("");
     setCorTema(CORES_TEMA[0]);
+    setExibirPortal(true);
     setEtapas(["Etapa 1", "Etapa 2", "Etapa 3"]);
   };
 
@@ -166,9 +170,25 @@ export default function NovaJornadaDialog({
                   style={{ backgroundColor: cor }}
                   onClick={() => setCorTema(cor)}
                 />
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+
+            <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="exibir_portal" className="font-medium">
+                  Disponível no Portal do Aluno?
+                </Label>
+                <Switch
+                  id="exibir_portal"
+                  checked={exibirPortal}
+                  onCheckedChange={setExibirPortal}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Se desmarcado, esta jornada será invisível para o membro, servindo apenas para controle interno da liderança.
+              </p>
+            </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
