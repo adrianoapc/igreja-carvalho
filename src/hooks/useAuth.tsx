@@ -33,11 +33,20 @@ export function useAuth() {
     const type = hashParams.get("type");
     const accessToken = hashParams.get("access_token");
     
+    // Domínio de produção customizado
+    const productionDomain = "app.igrejacarvalho.com.br";
+    const currentHost = window.location.host;
+    const isOnWrongDomain = currentHost.includes("lovable.app") || currentHost.includes("lovableproject.com");
+    
     if (type === "recovery" && accessToken) {
-      // Limpar o hash da URL e redirecionar para reset
-      window.history.replaceState(null, "", window.location.pathname);
-      window.location.href = "/auth/reset";
-      return;
+      // Se estamos no domínio errado (Lovable), redirecionar para o domínio de produção
+      if (isOnWrongDomain) {
+        const redirectUrl = `https://${productionDomain}/auth/reset${window.location.hash}`;
+        window.location.href = redirectUrl;
+        return;
+      }
+      // Se estamos no domínio correto, deixar o Supabase processar o token
+      // via onAuthStateChange (PASSWORD_RECOVERY event)
     }
 
     // Set up auth state listener
