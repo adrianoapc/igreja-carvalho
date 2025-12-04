@@ -51,6 +51,8 @@ import Fornecedores from "./pages/financas/Fornecedores";
 import FormasPagamento from "./pages/financas/FormasPagamento";
 import Ensinamentos from "./pages/Ensinamentos";
 import Ensino from "./pages/Ensino";
+import MeusCursos from "./pages/MeusCursos";
+import CursoPlayer from "./pages/CursoPlayer";
 import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
 import Auth from "./pages/Auth";
 import Public from "./pages/Public";
@@ -519,6 +521,24 @@ function App() {
                 <MainLayout>
                   <Ensino />
                 </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cursos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <MeusCursos />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cursos/:id"
+            element={
+              <ProtectedRoute>
+                <CursoPlayer />
               </ProtectedRoute>
             }
           />

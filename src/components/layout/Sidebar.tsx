@@ -72,6 +72,11 @@ const menuItems = [
     label: "Projetos",
     path: "/projetos",
   },
+  {
+    icon: BookOpen,
+    label: "Meus Cursos",
+    path: "/cursos",
+  },
 ];
 const pessoasItems = [
   {
