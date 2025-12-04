@@ -1929,6 +1929,7 @@ export type Database = {
       profiles: {
         Row: {
           aceitou_jesus: boolean | null
+          alergias: string | null
           avatar_url: string | null
           bairro: string | null
           batizado: boolean | null
@@ -1955,6 +1956,7 @@ export type Database = {
           escolaridade: string | null
           estado: string | null
           estado_civil: string | null
+          familia_id: string | null
           id: string
           nacionalidade: string | null
           naturalidade: string | null
@@ -1964,6 +1966,7 @@ export type Database = {
           observacoes: string | null
           profissao: string | null
           recebeu_brinde: boolean | null
+          responsavel_legal: boolean | null
           rg: string | null
           sexo: string | null
           status: Database["public"]["Enums"]["user_status"]
@@ -1975,6 +1978,7 @@ export type Database = {
         }
         Insert: {
           aceitou_jesus?: boolean | null
+          alergias?: string | null
           avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null
@@ -2001,6 +2005,7 @@ export type Database = {
           escolaridade?: string | null
           estado?: string | null
           estado_civil?: string | null
+          familia_id?: string | null
           id?: string
           nacionalidade?: string | null
           naturalidade?: string | null
@@ -2010,6 +2015,7 @@ export type Database = {
           observacoes?: string | null
           profissao?: string | null
           recebeu_brinde?: boolean | null
+          responsavel_legal?: boolean | null
           rg?: string | null
           sexo?: string | null
           status?: Database["public"]["Enums"]["user_status"]
@@ -2021,6 +2027,7 @@ export type Database = {
         }
         Update: {
           aceitou_jesus?: boolean | null
+          alergias?: string | null
           avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null
@@ -2047,6 +2054,7 @@ export type Database = {
           escolaridade?: string | null
           estado?: string | null
           estado_civil?: string | null
+          familia_id?: string | null
           id?: string
           nacionalidade?: string | null
           naturalidade?: string | null
@@ -2056,6 +2064,7 @@ export type Database = {
           observacoes?: string | null
           profissao?: string | null
           recebeu_brinde?: boolean | null
+          responsavel_legal?: boolean | null
           rg?: string | null
           sexo?: string | null
           status?: Database["public"]["Enums"]["user_status"]
@@ -2065,7 +2074,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_familia_id_fkey"
+            columns: ["familia_id"]
+            isOneToOne: false
+            referencedRelation: "familias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       salas: {
         Row: {
