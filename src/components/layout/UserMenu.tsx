@@ -3,9 +3,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import { LogOut, User, Moon, Sun } from "lucide-react";
+import { LogOut, User, Moon, Sun, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
+
 export default function UserMenu() {
   const {
     profile,
@@ -50,6 +51,10 @@ export default function UserMenu() {
         <DropdownMenuItem onClick={() => navigate("/perfil")}>
           <User className="mr-2 h-4 w-4" />
           <span>Meu Perfil</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/perfil/familia")}>
+          <Users className="mr-2 h-4 w-4" />
+          <span>Minha Família</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
