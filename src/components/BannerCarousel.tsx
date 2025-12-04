@@ -40,6 +40,7 @@ export default function BannerCarousel() {
         .select("id, titulo, descricao, tipo, nivel_urgencia, imagem_url, created_at")
         .eq("ativo", true)
         .eq("exibir_site", true)
+        .eq("tipo", "banner")
         .or(`data_inicio.is.null,data_inicio.lte.${now}`)
         .or(`data_fim.is.null,data_fim.gte.${now}`)
         .order("created_at", { ascending: false })
