@@ -158,7 +158,7 @@ export default function CursoPlayer() {
           status: "concluido",
           checkin_at: new Date().toISOString(),
         }, {
-          onConflict: "aula_id,aluno_id"
+          onConflict: "etapa_id,aluno_id"
         });
 
       if (error) throw error;
