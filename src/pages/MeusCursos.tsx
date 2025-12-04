@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -137,57 +137,69 @@ export default function MeusCursos() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-3">
           {inscricoes.map((inscricao) => {
             const progresso = calcularProgresso(inscricao);
-            const corTema = inscricao.jornada?.cor_tema || "#3b82f6";
+            const corTema = inscricao.jornada?.cor_tema || "hsl(var(--primary))";
             
             return (
               <Card 
                 key={inscricao.id} 
-                className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                className="overflow-hidden hover:shadow-md transition-all cursor-pointer group"
                 onClick={() => navigate(`/cursos/${inscricao.jornada_id}`)}
               >
-                <div 
-                  className="h-2" 
-                  style={{ backgroundColor: corTema }}
-                />
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg line-clamp-2">
-                    {inscricao.jornada?.titulo}
-                  </CardTitle>
-                  {inscricao.jornada?.descricao && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {inscricao.jornada.descricao}
-                    </p>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Progresso</span>
-                      <span className="font-medium">{progresso}%</span>
-                    </div>
-                    <Progress value={progresso} className="h-2" />
-                    <p className="text-xs text-muted-foreground">
-                      {inscricao.etapasConcluidas} de {inscricao.totalEtapas} etapas concluídas
-                    </p>
-                  </div>
+                <div className="flex items-stretch">
+                  {/* Color accent bar */}
+                  <div 
+                    className="w-1.5 shrink-0" 
+                    style={{ backgroundColor: corTema }}
+                  />
                   
-                  <Button className="w-full" size="sm">
-                    {progresso === 0 ? (
-                      <>
-                        <Play className="h-4 w-4 mr-2" />
-                        Iniciar
-                      </>
-                    ) : (
-                      <>
-                        <ChevronRight className="h-4 w-4 mr-2" />
-                        Continuar
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
+                  <div className="flex-1 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                    {/* Course info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
+                        {inscricao.jornada?.titulo}
+                      </h3>
+                      {inscricao.jornada?.descricao && (
+                        <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                          {inscricao.jornada.descricao}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Progress section */}
+                    <div className="flex items-center gap-4 sm:gap-6">
+                      <div className="flex-1 sm:w-40 space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">
+                            {inscricao.etapasConcluidas}/{inscricao.totalEtapas} etapas
+                          </span>
+                          <span className="font-medium">{progresso}%</span>
+                        </div>
+                        <Progress value={progresso} className="h-1.5" />
+                      </div>
+                      
+                      <Button 
+                        size="sm" 
+                        variant={progresso === 0 ? "default" : "outline"}
+                        className="shrink-0"
+                      >
+                        {progresso === 0 ? (
+                          <>
+                            <Play className="h-4 w-4 mr-1.5" />
+                            Iniciar
+                          </>
+                        ) : (
+                          <>
+                            <ChevronRight className="h-4 w-4 mr-1.5" />
+                            Continuar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </Card>
             );
           })}
