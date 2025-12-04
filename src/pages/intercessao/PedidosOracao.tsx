@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Clock, User, Search, ArrowLeft, Filter, Download } from "lucide-react";
+import { Plus, Clock, User, Search, ArrowLeft, Filter, Download, HandHeart } from "lucide-react";
 import { toast } from "sonner";
 import { exportToExcel, formatDateTimeForExport } from "@/lib/exportUtils";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { NovoPedidoDialog } from "@/components/pedidos/NovoPedidoDialog";
 import { PedidoDetailsDialog } from "@/components/pedidos/PedidoDetailsDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Pedido {
   id: string;
@@ -23,6 +24,7 @@ interface Pedido {
   data_criacao: string;
   intercessor_id: string | null;
   membro_id: string | null;
+  pessoa_id: string | null;
   intercessores?: {
     nome: string;
   };
@@ -30,6 +32,10 @@ interface Pedido {
     nome: string;
   };
 }
+
+type AppRole = 'admin' | 'pastor' | 'lider' | 'secretario' | 'tesoureiro' | 'membro' | 'basico';
+
+const ADMIN_ROLES: AppRole[] = ['admin', 'pastor', 'lider', 'secretario'];
 
 const TIPO_PEDIDOS = [
   { value: "todos", label: "Todos" },
@@ -74,21 +80,49 @@ const getStatusLabel = (status: string) => {
 
 export default function PedidosOracao() {
   const [pedidos, setPedidos] = React.useState<Pedido[]>([]);
+  const [meusPedidos, setMeusPedidos] = React.useState<Pedido[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [novoPedidoOpen, setNovoPedidoOpen] = React.useState(false);
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const [selectedPedido, setSelectedPedido] = React.useState<Pedido | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [tipoFilter, setTipoFilter] = React.useState("todos");
+  const [userRoles, setUserRoles] = React.useState<AppRole[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user, profile } = useAuth();
 
   React.useEffect(() => {
     if (searchParams.get("novo") === "true") {
       setNovoPedidoOpen(true);
     }
   }, [searchParams]);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      fetchUserRoles();
+    }
+  }, [user?.id]);
+
+  const fetchUserRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      
+      const roles = data?.map(r => r.role as AppRole) || [];
+      setUserRoles(roles);
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+    }
+  };
+
+  // Verifica se é admin/pastor/intercessor
+  const isAdminUser = userRoles.some(role => ADMIN_ROLES.includes(role));
 
   const fetchPedidos = async () => {
     try {
@@ -115,9 +149,37 @@ export default function PedidosOracao() {
     }
   };
 
+  // Buscar apenas os pedidos do usuário atual
+  const fetchMeusPedidos = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("pedidos_oracao")
+        .select(`
+          *,
+          intercessores(nome),
+          profiles!pedidos_oracao_membro_id_fkey(nome)
+        `)
+        .eq("pessoa_id", profile.id)
+        .order("data_criacao", { ascending: false });
+
+      if (error) throw error;
+      setMeusPedidos(data || []);
+    } catch (error) {
+      console.error("Erro ao buscar meus pedidos:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   React.useEffect(() => {
-    fetchPedidos();
-  }, []);
+    if (isAdminUser) {
+      fetchPedidos();
+    } else if (profile?.id) {
+      fetchMeusPedidos();
+    }
+  }, [isAdminUser, profile?.id]);
 
   const handleAlocarAutomaticamente = async (pedidoId: string) => {
     try {
@@ -190,7 +252,7 @@ export default function PedidosOracao() {
     }
   };
 
-  const renderPedidoCard = (pedido: Pedido) => {
+  const renderPedidoCard = (pedido: Pedido, showAdminActions: boolean = true) => {
     const solicitante = pedido.anonimo 
       ? "Anônimo"
       : pedido.profiles?.nome || pedido.nome_solicitante || "Não identificado";
@@ -243,7 +305,7 @@ export default function PedidosOracao() {
             >
               Ver Detalhes
             </Button>
-            {pedido.status === "pendente" && (
+            {showAdminActions && pedido.status === "pendente" && (
               <Button 
                 variant="outline" 
                 size="sm"
@@ -267,6 +329,81 @@ export default function PedidosOracao() {
     );
   }
 
+  // ========== VISÃO DO MEMBRO/VISITANTE ==========
+  if (!isAdminUser) {
+    return (
+      <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
+        <div className="flex items-center gap-2 md:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Pedidos de Oração</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Faça um pedido de oração e nossa equipe de intercessores estará orando por você
+            </p>
+          </div>
+        </div>
+
+        {/* Botão de destaque para novo pedido */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center">
+              <HandHeart className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Precisa de Oração?</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Compartilhe seu pedido e nossa equipe estará intercedendo por você
+              </p>
+            </div>
+            <Button 
+              size="lg"
+              className="bg-gradient-primary shadow-soft"
+              onClick={() => setNovoPedidoOpen(true)}
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Fazer Novo Pedido de Oração
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Meus Pedidos */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Meus Pedidos</h2>
+          
+          {meusPedidos.length === 0 ? (
+            <Card className="p-6 md:p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Você ainda não fez nenhum pedido de oração
+              </p>
+            </Card>
+          ) : (
+            <div className="grid gap-3 md:gap-4">
+              {meusPedidos.map(pedido => renderPedidoCard(pedido, false))}
+            </div>
+          )}
+        </div>
+
+        <NovoPedidoDialog 
+          open={novoPedidoOpen}
+          onOpenChange={setNovoPedidoOpen}
+          onSuccess={fetchMeusPedidos}
+        />
+
+        {selectedPedido && (
+          <PedidoDetailsDialog
+            open={detailsOpen}
+            onOpenChange={setDetailsOpen}
+            pedido={selectedPedido}
+            onUpdate={fetchMeusPedidos}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ========== VISÃO ADMIN/PASTOR/INTERCESSOR ==========
   const pedidosPorStatus = {
     pendente: filteredPedidos.filter(p => p.status === "pendente"),
     em_oracao: filteredPedidos.filter(p => p.status === "em_oracao"),
@@ -359,7 +496,7 @@ export default function PedidosOracao() {
             </Card>
           ) : (
             <div className="grid gap-3 md:gap-4">
-              {filteredPedidos.map(renderPedidoCard)}
+              {filteredPedidos.map(pedido => renderPedidoCard(pedido, true))}
             </div>
           )}
         </TabsContent>
@@ -371,7 +508,7 @@ export default function PedidosOracao() {
                 <p className="text-sm text-muted-foreground">Nenhum pedido pendente</p>
               </Card>
             ) : (
-              pedidosPorStatus.pendente.map(renderPedidoCard)
+              pedidosPorStatus.pendente.map(pedido => renderPedidoCard(pedido, true))
             )}
           </div>
         </TabsContent>
@@ -383,7 +520,7 @@ export default function PedidosOracao() {
                 <p className="text-sm text-muted-foreground">Nenhum pedido em oração</p>
               </Card>
             ) : (
-              pedidosPorStatus.em_oracao.map(renderPedidoCard)
+              pedidosPorStatus.em_oracao.map(pedido => renderPedidoCard(pedido, true))
             )}
           </div>
         </TabsContent>
@@ -395,7 +532,7 @@ export default function PedidosOracao() {
                 <p className="text-sm text-muted-foreground">Nenhum pedido respondido</p>
               </Card>
             ) : (
-              pedidosPorStatus.respondido.map(renderPedidoCard)
+              pedidosPorStatus.respondido.map(pedido => renderPedidoCard(pedido, true))
             )}
           </div>
         </TabsContent>
