@@ -27,13 +27,7 @@ interface JornadaCardProps {
   onRefetch?: () => void;
 }
 
-export default function JornadaCard({
-  inscricao,
-  totalEtapas,
-  etapaIndex,
-  isDragging,
-  onRefetch,
-}: JornadaCardProps) {
+export default function JornadaCard({ inscricao, totalEtapas, etapaIndex, isDragging, onRefetch }: JornadaCardProps) {
   const [showResponsavelSelector, setShowResponsavelSelector] = useState(false);
 
   const {
@@ -77,10 +71,7 @@ export default function JornadaCard({
   };
 
   const handleRemover = async () => {
-    const { error } = await supabase
-      .from("inscricoes_jornada")
-      .delete()
-      .eq("id", inscricao.id);
+    const { error } = await supabase.from("inscricoes_jornada").delete().eq("id", inscricao.id);
 
     if (error) {
       toast.error("Erro ao remover");
@@ -111,67 +102,65 @@ export default function JornadaCard({
       <Card
         ref={setNodeRef}
         style={style}
-        className={`group w-full cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 overflow-hidden ${
-          isDragging || isSortableDragging
-            ? "opacity-50 shadow-lg ring-2 ring-primary rotate-1"
-            : ""
+        // REMOVIDO: overflow-hidden (causava o corte de bordas e sombras)
+        className={`group w-full cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 relative ${
+          isDragging || isSortableDragging ? "opacity-50 shadow-lg ring-2 ring-primary rotate-1 z-10" : ""
         } ${inscricao.concluido ? "bg-green-50/50 dark:bg-green-950/10 border-green-200/50" : ""}`}
         {...attributes}
         {...listeners}
       >
         <div className="p-3">
           {/* Top: Avatar + Nome + Menu */}
-          <div className="flex items-start gap-2">
-            <Avatar className="h-8 w-8 shrink-0">
+          <div className="flex items-start gap-3">
+            <Avatar className="h-8 w-8 shrink-0 border border-border/50">
               <AvatarImage src={pessoa?.avatar_url} />
-              <AvatarFallback className="text-[10px] bg-muted">
+              <AvatarFallback className="text-[10px] bg-muted font-medium">
                 {pessoa?.nome ? getInitials(pessoa.nome) : "?"}
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <div className="flex items-center gap-1">
-                <p className="font-medium text-sm truncate">
+            {/* Container de texto com min-w-0 para forçar quebra de linha */}
+            <div className="flex-1 min-w-0 flex flex-col justify-start">
+              <div className="flex items-start justify-between gap-1 w-full">
+                {/* Texto com break-words para não estourar lateralmente */}
+                <p className="font-medium text-sm leading-tight break-words text-left line-clamp-2">
                   {pessoa?.nome || "Pessoa"}
                 </p>
-                {inscricao.concluido && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                )}
+                {inscricao.concluido && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />}
               </div>
-              
+
               {/* Tempo na fase */}
               {tempoNaFase && (
-                <Badge 
-                  variant={isStagnant ? "destructive" : "secondary"} 
-                  className="mt-1 text-[10px] font-normal h-5 px-1.5"
-                >
-                  <Clock className="w-2.5 h-2.5 mr-1" />
-                  {tempoNaFase}
-                </Badge>
+                <div className="flex mt-1">
+                  <Badge
+                    variant={isStagnant ? "destructive" : "secondary"}
+                    className="text-[10px] font-normal h-5 px-1.5 whitespace-nowrap"
+                  >
+                    <Clock className="w-2.5 h-2.5 mr-1" />
+                    {tempoNaFase}
+                  </Badge>
+                </div>
               )}
             </div>
 
-            {/* Menu */}
+            {/* Menu - shrink-0 garante que ele nunca será esmagado/cortado */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1" // -mr-1 ajusta alinhamento visual à direita
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreHorizontal className="w-3.5 h-3.5" />
+                  <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={handleConcluir}>
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   {inscricao.concluido ? "Reabrir" : "Concluir"}
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleRemover}
-                  className="text-destructive focus:text-destructive"
-                >
+                <DropdownMenuItem onClick={handleRemover} className="text-destructive focus:text-destructive">
                   <Trash2 className="w-4 h-4 mr-2" />
                   Remover
                 </DropdownMenuItem>
@@ -187,25 +176,25 @@ export default function JornadaCard({
                 e.stopPropagation();
                 setShowResponsavelSelector(true);
               }}
-              className="flex items-center hover:opacity-80 transition-opacity"
+              className="flex items-center hover:opacity-80 transition-opacity shrink-0"
             >
               {responsavel ? (
-                <Avatar className="h-5 w-5 border border-background">
+                <Avatar className="h-5 w-5 border border-background ring-1 ring-border/20">
                   <AvatarImage src={responsavel.avatar_url} />
-                  <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                  <AvatarFallback className="text-[8px] bg-primary/10 text-primary font-bold">
                     {getInitials(responsavel.nome)}
                   </AvatarFallback>
                 </Avatar>
               ) : (
-                <div className="h-5 w-5 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary/50 transition-colors">
-                  <UserPlus className="w-2.5 h-2.5 text-muted-foreground/50" />
+                <div className="h-5 w-5 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary/50 transition-colors bg-muted/20">
+                  <UserPlus className="w-2.5 h-2.5 text-muted-foreground/60" />
                 </div>
               )}
             </button>
 
             {/* Progress */}
             <div className="flex-1 ml-3">
-              <Progress value={progress} className="h-1" />
+              <Progress value={progress} className="h-1.5" />
             </div>
           </div>
         </div>
