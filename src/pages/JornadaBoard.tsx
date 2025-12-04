@@ -92,21 +92,27 @@ export default function JornadaBoard() {
       
       const etapaIds = etapasJornada?.map(e => e.id) || [];
 
-      // Para cada inscricao, buscar quantas etapas foram concluídas
+      // Para cada inscricao, buscar quais etapas foram concluídas (IDs)
       const inscricoesComProgresso = await Promise.all(
         inscricoesData.map(async (inscricao) => {
           if (etapaIds.length === 0) {
-            return { ...inscricao, etapas_concluidas: 0 };
+            return { ...inscricao, etapas_concluidas: 0, etapas_concluidas_ids: [] };
           }
 
-          const { count } = await supabase
+          const { data: presencas, count } = await supabase
             .from("presencas_aula")
-            .select("*", { count: "exact", head: true })
+            .select("etapa_id", { count: "exact" })
             .eq("aluno_id", inscricao.pessoa_id)
             .in("etapa_id", etapaIds)
             .eq("status", "concluido");
 
-          return { ...inscricao, etapas_concluidas: count || 0 };
+          const etapasConcluidasIds = presencas?.map(p => p.etapa_id).filter(Boolean) || [];
+
+          return { 
+            ...inscricao, 
+            etapas_concluidas: count || 0,
+            etapas_concluidas_ids: etapasConcluidasIds
+          };
         })
       );
 
@@ -310,6 +316,7 @@ export default function JornadaBoard() {
                   items={inscricoesByEtapa["sem_etapa"]}
                   totalEtapas={totalEtapas}
                   onRefetch={refetchInscricoes}
+                  etapasOrdenadas={etapas || []}
                 />
               )}
 
@@ -321,6 +328,7 @@ export default function JornadaBoard() {
                   items={inscricoesByEtapa[etapa.id] || []}
                   totalEtapas={totalEtapas}
                   onRefetch={refetchInscricoes}
+                  etapasOrdenadas={etapas || []}
                 />
               ))}
             </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { formatDistanceToNow, differenceInDays } from "date-fns";
@@ -24,10 +24,18 @@ interface JornadaCardProps {
   totalEtapas: number;
   isDragging?: boolean;
   onRefetch?: () => void;
+  etapasOrdenadas?: Array<{ id: string; ordem: number; titulo: string }>;
 }
 
-export default function JornadaCard({ inscricao, totalEtapas, isDragging, onRefetch }: JornadaCardProps) {
+export default function JornadaCard({ 
+  inscricao, 
+  totalEtapas, 
+  isDragging, 
+  onRefetch,
+  etapasOrdenadas = []
+}: JornadaCardProps) {
   const [showResponsavelSelector, setShowResponsavelSelector] = useState(false);
+  const isPromotingRef = useRef(false);
 
   const {
     attributes,
@@ -48,7 +56,69 @@ export default function JornadaCard({ inscricao, totalEtapas, isDragging, onRefe
   
   // Calcular progresso baseado nas etapas CONCLUÍDAS (presencas_aula com status='concluido')
   const etapasConcluidas = inscricao.etapas_concluidas || 0;
+  const etapasConcluidasIds: string[] = inscricao.etapas_concluidas_ids || [];
   const progress = totalEtapas > 0 ? (etapasConcluidas / totalEtapas) * 100 : 0;
+
+  // Promoção automática: verificar se a etapa atual já foi concluída
+  useEffect(() => {
+    if (isPromotingRef.current || !etapasOrdenadas.length || !onRefetch) return;
+    if (inscricao.concluido) return;
+
+    const etapaAtualId = inscricao.etapa_atual_id;
+    
+    // Se não tem etapa atual definida e tem etapas concluídas, definir a primeira não concluída
+    if (!etapaAtualId && etapasConcluidas > 0) {
+      const primeiraEtapaNaoConcluida = etapasOrdenadas.find(
+        e => !etapasConcluidasIds.includes(e.id)
+      );
+      if (primeiraEtapaNaoConcluida) {
+        promoverParaEtapa(primeiraEtapaNaoConcluida.id);
+      }
+      return;
+    }
+
+    // Se a etapa atual está nas etapas concluídas, avançar para próxima
+    if (etapaAtualId && etapasConcluidasIds.includes(etapaAtualId)) {
+      // Encontrar índice da etapa atual
+      const indexAtual = etapasOrdenadas.findIndex(e => e.id === etapaAtualId);
+      
+      // Encontrar próxima etapa não concluída
+      const proximaEtapa = etapasOrdenadas.slice(indexAtual + 1).find(
+        e => !etapasConcluidasIds.includes(e.id)
+      );
+
+      if (proximaEtapa) {
+        promoverParaEtapa(proximaEtapa.id);
+      }
+    }
+  }, [etapasConcluidasIds.length, inscricao.etapa_atual_id, etapasOrdenadas.length, inscricao.concluido]);
+
+  const promoverParaEtapa = async (novaEtapaId: string) => {
+    if (isPromotingRef.current) return;
+    isPromotingRef.current = true;
+
+    try {
+      const { error } = await supabase
+        .from("inscricoes_jornada")
+        .update({
+          etapa_atual_id: novaEtapaId,
+          data_mudanca_fase: new Date().toISOString(),
+        })
+        .eq("id", inscricao.id);
+
+      if (error) throw error;
+
+      toast.success("Etapa atualizada automaticamente");
+      onRefetch?.();
+    } catch (error) {
+      console.error("Erro ao promover etapa:", error);
+    } finally {
+      // Reset após um delay para evitar loops
+      setTimeout(() => {
+        isPromotingRef.current = false;
+      }, 2000);
+    }
+  };
 
   const tempoNaFase = inscricao.data_mudanca_fase
     ? formatDistanceToNow(new Date(inscricao.data_mudanca_fase), {
@@ -104,7 +174,6 @@ export default function JornadaCard({ inscricao, totalEtapas, isDragging, onRefe
       <Card
         ref={setNodeRef}
         style={style}
-        // REMOVIDO: overflow-hidden (causava o corte de bordas e sombras)
         className={`group w-full cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 relative ${
           isDragging || isSortableDragging ? "opacity-50 shadow-lg ring-2 ring-primary rotate-1 z-10" : ""
         } ${inscricao.concluido ? "bg-green-50/50 dark:bg-green-950/10 border-green-200/50" : ""}`}
@@ -151,7 +220,7 @@ export default function JornadaCard({ inscricao, totalEtapas, isDragging, onRefe
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1" // -mr-1 ajusta alinhamento visual à direita
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="w-4 h-4" />
