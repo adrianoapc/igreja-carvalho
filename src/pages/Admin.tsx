@@ -185,7 +185,7 @@ export default function Admin() {
     }
   };
 
-  const handlePromoteUser = async (userId: string, newStatus: "visitante" | "frequentador" | "membro") => {
+  const handlePromoteUser = async (profileId: string, newStatus: "visitante" | "frequentador" | "membro") => {
     setIsLoading(true);
     try {
       const validation = updateUserSchema.safeParse({ status: newStatus });
@@ -196,7 +196,8 @@ export default function Admin() {
       if (newStatus === "membro") {
         updateData.data_cadastro_membro = new Date().toISOString();
       }
-      const { error } = await supabase.from("profiles").update(updateData).eq("user_id", userId);
+      // Usar profile.id em vez de user_id pois visitantes não têm user_id
+      const { error } = await supabase.from("profiles").update(updateData).eq("id", profileId);
       if (error) throw error;
       toast({
         title: "Sucesso!",
@@ -582,7 +583,7 @@ export default function Admin() {
                                   {selectedUser.status}
                                 </Badge>
                                 {selectedUser.status !== "membro" && (
-                                  <Button size="sm" onClick={() => handlePromoteUser(selectedUser.user_id, selectedUser.status === "visitante" ? "frequentador" : "membro")} disabled={isLoading}>
+                                  <Button size="sm" onClick={() => handlePromoteUser(selectedUser.id, selectedUser.status === "visitante" ? "frequentador" : "membro")} disabled={isLoading}>
                                     <ArrowUpCircle className="w-4 h-4 mr-2" />
                                     Promover para {selectedUser.status === "visitante" ? "Frequentador" : "Membro"}
                                   </Button>
