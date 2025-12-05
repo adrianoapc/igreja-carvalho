@@ -68,7 +68,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 
 export default function Admin() {
   const { toast } = useToast();
-  const { hasAccess } = useAuth();
+  const { hasAccess, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -76,6 +76,7 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Permissions state
   const [permissions, setPermissions] = useState<ModulePermission[]>([]);
@@ -85,7 +86,11 @@ export default function Admin() {
   const [showAddPermission, setShowAddPermission] = useState(false);
 
   useEffect(() => {
+    // Aguardar o carregamento da autenticação
+    if (authLoading) return;
+    
     if (!hasAccess("membros", "acesso_completo")) {
+      setAccessDenied(true);
       toast({
         title: "Acesso negado",
         description: "Você não tem permissão para acessar esta página",
@@ -95,7 +100,7 @@ export default function Admin() {
     }
     loadUsers();
     loadPermissions();
-  }, []);
+  }, [authLoading, hasAccess]);
 
   useEffect(() => {
     let filtered = users.filter(user =>
@@ -441,6 +446,24 @@ export default function Admin() {
   const getPermissionForRoleAndModule = (role: string, module: string) => {
     return permissions.find(p => p.role === role && p.module_name === module);
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <Shield className="w-16 h-16 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold">Acesso Negado</h2>
+        <p className="text-muted-foreground mt-2">Você não tem permissão para acessar esta página.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
