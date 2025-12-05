@@ -19,8 +19,11 @@ export function AuthGate({ children }: AuthGateProps) {
   const [userName, setUserName] = useState<string | undefined>();
 
   useEffect(() => {
-    checkLockState();
-  }, []);
+    // Só verificar lock state quando biometria terminar de carregar
+    if (!biometricLoading) {
+      checkLockState();
+    }
+  }, [biometricLoading, isEnabled]);
 
   // Atualizar timestamp de atividade
   useEffect(() => {
