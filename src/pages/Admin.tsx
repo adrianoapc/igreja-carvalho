@@ -215,7 +215,16 @@ export default function Admin() {
     }
   };
 
-  const handleAddRole = async (userId: string, role: string) => {
+  const handleAddRole = async (userId: string | null, role: string) => {
+    if (!userId) {
+      toast({
+        title: "Erro",
+        description: "Este usuário não possui login no sistema. Apenas usuários autenticados podem receber cargos.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const { error } = await supabase.from("user_roles").insert([{
