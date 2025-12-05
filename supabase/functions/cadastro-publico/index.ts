@@ -5,6 +5,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Simple in-memory rate limiter
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+const RATE_LIMIT_WINDOW_MS = 60000 // 1 minute window
+const MAX_REQUESTS_PER_WINDOW = 10 // Max 10 requests per minute per IP
+
+function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now()
+  const record = rateLimitMap.get(ip)
+  
+  // Clean up old entries periodically
+  if (rateLimitMap.size > 1000) {
+    for (const [key, value] of rateLimitMap.entries()) {
+      if (value.resetTime < now) {
+        rateLimitMap.delete(key)
+      }
+    }
+  }
+  
+  if (!record || record.resetTime < now) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS })
+    return { allowed: true }
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    const retryAfter = Math.ceil((record.resetTime - now) / 1000)
+    return { allowed: false, retryAfter }
+  }
+  
+  record.count++
+  return { allowed: true }
+}
+
+function getClientIP(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+         req.headers.get('x-real-ip') ||
+         req.headers.get('cf-connecting-ip') ||
+         'unknown'
+}
+
 interface CadastroVisitanteData {
   nome: string
   telefone?: string
@@ -40,6 +79,25 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  // Rate limiting check
+  const clientIP = getClientIP(req)
+  const rateCheck = checkRateLimit(clientIP)
+  
+  if (!rateCheck.allowed) {
+    console.log(`[cadastro-publico] Rate limit exceeded for IP: ${clientIP}`)
+    return new Response(
+      JSON.stringify({ error: 'Muitas requisições. Tente novamente em alguns segundos.' }),
+      { 
+        status: 429, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateCheck.retryAfter || 60)
+        } 
+      }
+    )
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -48,7 +106,7 @@ Deno.serve(async (req) => {
     
     const { action, data } = await req.json()
     
-    console.log(`[cadastro-publico] Action: ${action}`)
+    console.log(`[cadastro-publico] Action: ${action}, IP: ${clientIP}`)
     
     if (action === 'cadastrar_visitante') {
       const visitanteData = data as CadastroVisitanteData
