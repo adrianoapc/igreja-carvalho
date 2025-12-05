@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, X, Crop, ZoomIn, ZoomOut } from "lucide-react";
+import { Camera, Upload, X, Crop, ZoomIn, ZoomOut, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import Cropper from "react-easy-crop";
 import { Area } from "react-easy-crop";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -39,13 +41,15 @@ export function ImageCaptureInput({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [processingFile, setProcessingFile] = useState<File | null>(null);
+  const [enableCrop, setEnableCrop] = useState(false);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }, // Preferir câmera traseira
+        video: { facingMode: "environment" },
         audio: false,
       });
       setStream(mediaStream);
@@ -84,14 +88,9 @@ export function ImageCaptureInput({
           toast.error("Erro ao capturar foto");
           return;
         }
-
-        const file = new File([blob], `foto-${Date.now()}.jpg`, {
-          type: "image/jpeg",
-        });
-
+        const file = new File([blob], `foto-${Date.now()}.jpg`, { type: "image/jpeg" });
         stopCamera();
         setShowCameraDialog(false);
-        
         await processImageFile(file);
       },
       "image/jpeg",
@@ -103,31 +102,31 @@ export function ImageCaptureInput({
     try {
       toast.loading("Processando imagem...", { id: "process-image" });
 
-      // Compress image if it's too large
       let processedFile = file;
-      const sizeMB = file.size / 1024 / 1024;
-      
-      if (sizeMB > 2) {
+      if (file.size / 1024 / 1024 > 2) {
         processedFile = await compressImage(file, 2, 1920);
-        toast.success("Imagem comprimida automaticamente", { id: "process-image" });
+        toast.success("Imagem otimizada", { id: "process-image" });
       } else {
         toast.dismiss("process-image");
       }
 
-      // Validate final size
       if (processedFile.size > maxSizeMB * 1024 * 1024) {
         toast.error(`Arquivo muito grande. Máximo ${maxSizeMB}MB`);
         return;
       }
 
-      // Show crop dialog
-      setProcessingFile(processedFile);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImageToCrop(reader.result as string);
-        setShowCropDialog(true);
-      };
-      reader.readAsDataURL(processedFile);
+      if (enableCrop) {
+        setProcessingFile(processedFile);
+        const reader = new FileReader();
+        reader.onload = () => {
+          setImageToCrop(reader.result as string);
+          setShowCropDialog(true);
+        };
+        reader.readAsDataURL(processedFile);
+      } else {
+        onFileSelected(processedFile);
+      }
+
     } catch (error) {
       console.error("Error processing image:", error);
       toast.error("Erro ao processar imagem");
@@ -137,11 +136,7 @@ export function ImageCaptureInput({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-
+    if (fileInputRef.current) fileInputRef.current.value = "";
     await processImageFile(file);
   };
 
@@ -151,20 +146,14 @@ export function ImageCaptureInput({
 
   const handleCropConfirm = async () => {
     if (!imageToCrop || !croppedAreaPixels || !processingFile) return;
-
     try {
-      toast.loading("Aplicando recorte...", { id: "crop-image" });
-
+      toast.loading("Recortando...", { id: "crop-image" });
       const croppedBlob = await getCroppedImg(imageToCrop, croppedAreaPixels);
-      const croppedFile = new File(
-        [croppedBlob],
-        processingFile.name,
-        { type: "image/jpeg" }
-      );
-
-      toast.success("Imagem processada com sucesso!", { id: "crop-image" });
+      const croppedFile = new File([croppedBlob], processingFile.name, { type: "image/jpeg" });
       
+      toast.success("Imagem recortada!", { id: "crop-image" });
       onFileSelected(croppedFile);
+      
       setShowCropDialog(false);
       setImageToCrop(null);
       setProcessingFile(null);
@@ -185,19 +174,29 @@ export function ImageCaptureInput({
   };
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) {
-      stopCamera();
-    }
+    if (!open) stopCamera();
     setShowCameraDialog(open);
   };
 
   return (
     <>
-      {/* Área de Upload/Preview */}
-      {!previewUrl ? (
-        <div className={`space-y-2 ${className}`}>
-          <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
-            <div className="flex flex-col sm:flex-row gap-2 justify-center items-center">
+      <div className={`space-y-4 ${className}`}>
+        {!previewUrl && (
+          <div className="flex items-center space-x-2 bg-secondary/20 p-2 rounded-md w-fit">
+            <Switch
+              id="crop-mode"
+              checked={enableCrop}
+              onCheckedChange={setEnableCrop}
+            />
+            <Label htmlFor="crop-mode" className="text-sm cursor-pointer">
+              Habilitar ferramenta de corte
+            </Label>
+          </div>
+        )}
+
+        {!previewUrl ? (
+          <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors bg-card">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
               <Button
                 type="button"
                 variant="outline"
@@ -224,85 +223,76 @@ export function ImageCaptureInput({
               Máximo {maxSizeMB}MB
             </p>
           </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept={accept}
-            onChange={handleFileSelect}
-          />
-        </div>
-      ) : (
-        <div className={`relative ${className}`}>
-          <div className="relative rounded-lg overflow-hidden border">
+        ) : (
+          <div className="relative rounded-lg overflow-hidden border group bg-black/5">
+            {/* CORREÇÃO VISUAL DE PREVIEW AQUI */}
             <img
               src={previewUrl}
               alt="Preview"
-              className="w-full h-48 object-cover"
+              className="w-full h-auto max-h-[400px] object-contain mx-auto"
             />
-            {onClear && (
+            
+            <div className="absolute top-2 right-2 flex gap-2">
               <Button
                 type="button"
-                variant="destructive"
+                variant="secondary"
                 size="icon"
-                className="absolute top-2 right-2"
-                onClick={onClear}
+                className="h-8 w-8 shadow-sm opacity-90 hover:opacity-100"
+                onClick={() => fileInputRef.current?.click()}
+                title="Trocar imagem"
               >
-                <X className="w-4 h-4" />
+                <Pencil className="w-4 h-4" />
               </Button>
-            )}
+              
+              {onClear && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="h-8 w-8 shadow-sm opacity-90 hover:opacity-100"
+                  onClick={onClear}
+                  title="Remover"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Dialog da Câmera */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept={accept}
+          onChange={handleFileSelect}
+        />
+      </div>
+
       <Dialog open={showCameraDialog} onOpenChange={handleDialogClose}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Capturar Foto</DialogTitle>
-            <DialogDescription>
-              Posicione a câmera e clique em "Capturar" quando estiver pronto
-            </DialogDescription>
+            <DialogDescription>Posicione a câmera e clique em "Capturar"</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
+              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
             </div>
-
             <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleDialogClose(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="button" onClick={capturePhoto} disabled={!stream}>
-                <Camera className="w-4 h-4 mr-2" />
-                Capturar
-              </Button>
+              <Button type="button" variant="outline" onClick={() => handleDialogClose(false)}>Cancelar</Button>
+              <Button type="button" onClick={capturePhoto} disabled={!stream}><Camera className="w-4 h-4 mr-2" /> Capturar</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Recorte */}
       <Dialog open={showCropDialog} onOpenChange={setShowCropDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Ajustar Imagem</DialogTitle>
-            <DialogDescription>
-              Recorte e ajuste o enquadramento da imagem
-            </DialogDescription>
+            <DialogDescription>Recorte e ajuste o enquadramento</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
             <div className="relative h-[400px] bg-black rounded-lg overflow-hidden">
               {imageToCrop && (
@@ -317,37 +307,16 @@ export function ImageCaptureInput({
                 />
               )}
             </div>
-
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <ZoomOut className="w-4 h-4 text-muted-foreground" />
-                <Slider
-                  value={[zoom]}
-                  onValueChange={(value) => setZoom(value[0])}
-                  min={1}
-                  max={3}
-                  step={0.1}
-                  className="flex-1"
-                />
-                <ZoomIn className="w-4 h-4 text-muted-foreground" />
+                <ZoomOut className="w-4 h-4" />
+                <Slider value={[zoom]} onValueChange={(v) => setZoom(v[0])} min={1} max={3} step={0.1} className="flex-1" />
+                <ZoomIn className="w-4 h-4" />
               </div>
-              <p className="text-xs text-muted-foreground text-center">
-                Use o controle para ajustar o zoom
-              </p>
             </div>
-
             <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCropCancel}
-              >
-                Cancelar
-              </Button>
-              <Button type="button" onClick={handleCropConfirm}>
-                <Crop className="w-4 h-4 mr-2" />
-                Aplicar Recorte
-              </Button>
+              <Button type="button" variant="outline" onClick={handleCropCancel}>Cancelar</Button>
+              <Button type="button" onClick={handleCropConfirm}><Crop className="w-4 h-4 mr-2" /> Confirmar</Button>
             </div>
           </div>
         </DialogContent>

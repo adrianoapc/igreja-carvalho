@@ -349,6 +349,8 @@ export default function DashboardAdmin() {
   const handleBannerClick = (banner: Comunicado) => {
     if (banner.link_acao) {
       window.open(banner.link_acao, "_blank", "noopener,noreferrer");
+    } else {
+      navigate(`/comunicados/announcements`);
     }
   };
 
@@ -401,42 +403,27 @@ export default function DashboardAdmin() {
 
       {/* Banners Carousel */}
       {banners.length > 0 && (
-        <div className="relative">
-          <Carousel
-            opts={{
-              align: "start",
-              loop: true,
-            }}
-            plugins={[
-              Autoplay({
-                delay: 5000,
-                stopOnInteraction: true,
-              }),
-            ]}
-            className="w-full"
-          >
+        <div>
+          <Carousel loop plugins={[Autoplay({ delay: 5000 })]}>
             <CarouselContent>
               {banners.map((banner) => (
                 <CarouselItem key={banner.id}>
                   <Card
-                    className={`overflow-hidden ${banner.link_acao ? "cursor-pointer hover:shadow-lg transition-shadow" : ""}`}
                     onClick={() => handleBannerClick(banner)}
+                    className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
                   >
                     {banner.imagem_url ? (
-                      <div className="relative aspect-[21/9]">
+                      <div className="relative w-full bg-black">
                         <OptimizedImage
                           src={banner.imagem_url}
                           alt={banner.titulo}
-                          className="w-full h-full object-cover"
+                          className="w-full h-auto max-h-[400px] md:max-h-[500px]"
+                          fit="contain"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                          <h3 className="text-lg md:text-xl font-bold text-white drop-shadow-lg">{banner.titulo}</h3>
-                          {banner.descricao && (
-                            <p className="text-sm text-white/90 mt-1 line-clamp-2 drop-shadow">{banner.descricao}</p>
-                          )}
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                          <h3 className="text-white font-bold text-lg drop-shadow-md">{banner.titulo}</h3>
                           {banner.link_acao && (
-                            <div className="flex items-center gap-1 mt-2 text-white/80 text-xs">
+                            <div className="flex items-center gap-1 mt-1 text-white/80 text-xs">
                               <ExternalLink className="w-3 h-3" />
                               <span>Clique para saber mais</span>
                             </div>
