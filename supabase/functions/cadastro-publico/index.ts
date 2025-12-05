@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
       
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, necessidades_especiais, cep, cidade, bairro, estado, endereco, profissao, cpf, rg, data_batismo')
+        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, necessidades_especiais, cep, cidade, bairro, estado, endereco, profissao, data_batismo')
         .eq('email', email.trim().toLowerCase())
         .eq('status', 'membro')
         .single()
