@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { useHideValues } from "@/hooks/useHideValues";
 import { useState } from "react";
 import {
   LineChart,
@@ -42,6 +44,7 @@ const COLORS = {
 
 export default function DashboardOfertas() {
   const navigate = useNavigate();
+  const { formatValue } = useHideValues();
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
@@ -211,12 +214,15 @@ export default function DashboardOfertas() {
               Análise detalhada das ofertas por forma de pagamento
             </p>
           </div>
-          <MonthPicker
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-          />
+          <div className="flex items-center gap-2">
+            <HideValuesToggle />
+            <MonthPicker
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+            />
+          </div>
         </div>
         
         {/* Period Badge */}
@@ -240,10 +246,7 @@ export default function DashboardOfertas() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dados.totalGeral.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
+              {formatValue(dados.totalGeral)}
             </div>
             <p className="text-xs text-muted-foreground">
               {transacoes?.length || 0} registros
@@ -315,10 +318,7 @@ export default function DashboardOfertas() {
                           Conferente: {metadata?.conferente}
                         </p>
                         <p className="text-sm font-semibold mt-2">
-                          Total: {metadata?.total?.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          })}
+                          Total: {formatValue(metadata?.total || 0)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {metadata?.valores}
@@ -369,12 +369,7 @@ export default function DashboardOfertas() {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) =>
-                    value.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })
-                  }
+                  formatter={(value: number) => formatValue(value)}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -393,12 +388,7 @@ export default function DashboardOfertas() {
                 <XAxis dataKey="mes" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) =>
-                    value.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })
-                  }
+                  formatter={(value: number) => formatValue(value)}
                 />
                 <Legend />
                 {formasPagamento.map((forma) => (
@@ -429,12 +419,7 @@ export default function DashboardOfertas() {
               <XAxis dataKey="mes" />
               <YAxis />
               <Tooltip
-                formatter={(value: number) =>
-                  value.toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                  })
-                }
+                formatter={(value: number) => formatValue(value)}
               />
               <Legend />
               {formasPagamento.map((forma) => (
