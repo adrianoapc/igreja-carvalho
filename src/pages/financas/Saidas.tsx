@@ -14,9 +14,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useHideValues } from "@/hooks/useHideValues";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 
 export default function Saidas() {
   const navigate = useNavigate();
+  const { formatValue } = useHideValues();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<any>(null);
@@ -144,10 +147,7 @@ export default function Saidas() {
   }, [transacoes, busca, contaFilter, categoriaFilter, fornecedorFilter, statusFilter]);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
+    return formatValue(value);
   };
 
   const totalSaidas = transacoesFiltradas?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
@@ -243,7 +243,8 @@ export default function Saidas() {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Saídas</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie os pagamentos da igreja</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <HideValuesToggle />
             <FiltrosSheet
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}

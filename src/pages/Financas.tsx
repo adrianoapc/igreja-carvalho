@@ -19,9 +19,12 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useHideValues } from "@/hooks/useHideValues";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 
 export default function Financas() {
   const navigate = useNavigate();
+  const { formatValue } = useHideValues();
 
   const { data: contas } = useQuery({
     queryKey: ["contas-resumo"],
@@ -99,10 +102,7 @@ export default function Financas() {
   const totalSaidasMes = transacoesSaida?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
+    return formatValue(value);
   };
 
   const modules = [
@@ -235,6 +235,7 @@ export default function Financas() {
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Finanças</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">Gestão completa do módulo financeiro</p>
         </div>
+        <HideValuesToggle />
       </div>
 
       {/* Card de Total em Caixa */}

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { HideValuesProvider } from "@/hooks/useHideValues";
 import MainLayout from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import Dashboard from "./pages/Dashboard";
@@ -104,11 +105,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} forcedTheme="light">
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-        <AuthGate>
+        <HideValuesProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AuthGate>
         <Routes>
           {/* Rotas públicas */}
           <Route path="/public" element={<Public />} />
@@ -652,9 +654,10 @@ function App() {
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
-        </AuthGate>
-      </BrowserRouter>
-        </TooltipProvider>
+              </AuthGate>
+            </BrowserRouter>
+          </TooltipProvider>
+        </HideValuesProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
