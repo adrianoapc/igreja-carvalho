@@ -3,7 +3,37 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret',
+};
+
+// Função para verificar assinatura do webhook
+const verifyWebhookSecret = (req: Request): boolean => {
+  const webhookSecret = Deno.env.get('MAKE_WEBHOOK_SECRET');
+  
+  // Se não há secret configurado, aceita (para retrocompatibilidade)
+  if (!webhookSecret) {
+    console.warn('⚠️ MAKE_WEBHOOK_SECRET não configurado - aceitando requisição sem verificação');
+    return true;
+  }
+  
+  const requestSecret = req.headers.get('x-webhook-secret');
+  
+  if (!requestSecret) {
+    console.error('❌ Header x-webhook-secret não fornecido');
+    return false;
+  }
+  
+  // Comparação segura de strings (timing-safe comparison)
+  if (webhookSecret.length !== requestSecret.length) {
+    return false;
+  }
+  
+  let result = 0;
+  for (let i = 0; i < webhookSecret.length; i++) {
+    result |= webhookSecret.charCodeAt(i) ^ requestSecret.charCodeAt(i);
+  }
+  
+  return result === 0;
 };
 
 // Schema de validação
@@ -23,6 +53,21 @@ Deno.serve(async (req) => {
 
   try {
     console.log('🔔 Webhook receber-testemunho-make chamado');
+
+    // Verificar autenticação do webhook
+    if (!verifyWebhookSecret(req)) {
+      console.error('❌ Falha na verificação do webhook secret');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Unauthorized - Invalid webhook secret',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
 
     // Inicializar cliente Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

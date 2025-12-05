@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -283,7 +284,7 @@ export default function CursoPlayer() {
             <h2 className="text-xl font-semibold mb-4">{etapaSelecionada.titulo}</h2>
             <div 
               className="whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: conteudo_texto || "" }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(conteudo_texto || "") }}
             />
           </div>
         );
