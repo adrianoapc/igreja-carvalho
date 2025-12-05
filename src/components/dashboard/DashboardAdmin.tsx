@@ -45,6 +45,8 @@ import {
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import Autoplay from "embla-carousel-autoplay";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { useHideValues } from "@/hooks/useHideValues";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 
 interface Comunicado {
   id: string;
@@ -115,6 +117,7 @@ export default function DashboardAdmin() {
   const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const { formatValue } = useHideValues();
 
   useEffect(() => {
     if (searchParams.get("sentimento") === "true") {
@@ -292,12 +295,6 @@ export default function DashboardAdmin() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
 
   const getInitials = (name: string) => {
     return (
@@ -503,9 +500,12 @@ export default function DashboardAdmin() {
             <DollarSign className="w-5 h-5 text-primary" />
             Financeiro
           </h2>
-          <Badge variant="secondary" className="text-xs">
-            {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <HideValuesToggle />
+            <Badge variant="secondary" className="text-xs">
+              {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
+            </Badge>
+          </div>
         </div>
 
         {/* Financial KPIs */}
@@ -516,7 +516,7 @@ export default function DashboardAdmin() {
                 <div>
                   <p className="text-xs text-muted-foreground">Entradas</p>
                   <p className="text-lg md:text-xl font-bold text-emerald-600">
-                    {formatCurrency(financialStats.entradas)}
+                    {formatValue(financialStats.entradas)}
                   </p>
                 </div>
                 <div
@@ -538,7 +538,7 @@ export default function DashboardAdmin() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Saídas</p>
-                  <p className="text-lg md:text-xl font-bold text-red-600">{formatCurrency(financialStats.saidas)}</p>
+                  <p className="text-lg md:text-xl font-bold text-red-600">{formatValue(financialStats.saidas)}</p>
                 </div>
                 <div
                   className={`flex items-center text-xs ${financialStats.saidasVariacao <= 0 ? "text-emerald-600" : "text-red-600"}`}
@@ -561,7 +561,7 @@ export default function DashboardAdmin() {
                 <p
                   className={`text-lg md:text-xl font-bold ${financialStats.saldo >= 0 ? "text-emerald-600" : "text-red-600"}`}
                 >
-                  {formatCurrency(financialStats.saldo)}
+                  {formatValue(financialStats.saldo)}
                 </p>
               </div>
             </CardContent>
@@ -574,7 +574,7 @@ export default function DashboardAdmin() {
                 <p
                   className={`text-lg md:text-xl font-bold ${saldoTotalContas >= 0 ? "text-primary" : "text-red-600"}`}
                 >
-                  {formatCurrency(saldoTotalContas)}
+                  {formatValue(saldoTotalContas)}
                 </p>
               </div>
             </CardContent>
@@ -604,7 +604,7 @@ export default function DashboardAdmin() {
                     tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                   />
                   <ChartTooltip
-                    content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
+                    content={<ChartTooltipContent formatter={(value) => formatValue(Number(value))} />}
                   />
                   <Legend 
                     verticalAlign="top" 
