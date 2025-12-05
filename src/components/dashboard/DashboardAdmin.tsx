@@ -401,7 +401,7 @@ export default function DashboardAdmin() {
       {/* Banners Carousel */}
       {banners.length > 0 && (
         <div>
-          <Carousel loop plugins={[Autoplay({ delay: 5000 })]}>
+          <Carousel opts={{ loop: true }} plugins={[Autoplay({ delay: 5000 })]}>
             <CarouselContent>
               {banners.map((banner) => (
                 <CarouselItem key={banner.id}>

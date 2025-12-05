@@ -7,6 +7,7 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   aspectRatio?: string;
   fallback?: string;
   priority?: boolean;
+  fit?: "cover" | "contain" | "fill" | "none" | "scale-down";
 }
 
 export function OptimizedImage({
@@ -16,6 +17,7 @@ export function OptimizedImage({
   aspectRatio = "16/9",
   fallback = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f0f0f0' width='400' height='300'/%3E%3C/svg%3E",
   priority = false,
+  fit = "cover",
   ...props
 }: OptimizedImageProps) {
   const [imgSrc, setImgSrc] = useState(fallback);
@@ -65,7 +67,12 @@ export function OptimizedImage({
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         className={cn(
-          "w-full h-full object-cover transition-opacity duration-300",
+          "w-full h-full transition-opacity duration-300",
+          fit === "cover" && "object-cover",
+          fit === "contain" && "object-contain",
+          fit === "fill" && "object-fill",
+          fit === "none" && "object-none",
+          fit === "scale-down" && "object-scale-down",
           isLoading ? "opacity-0" : "opacity-100",
           hasError && "opacity-50"
         )}
