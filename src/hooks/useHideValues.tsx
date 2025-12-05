@@ -11,7 +11,7 @@ const HideValuesContext = createContext<HideValuesContextType | undefined>(undef
 export function HideValuesProvider({ children }: { children: ReactNode }) {
   const [hideValues, setHideValues] = useState(() => {
     const saved = localStorage.getItem("hideFinancialValues");
-    return saved === "true";
+    return saved === null ? true : saved === "true";
   });
 
   useEffect(() => {
