@@ -11,9 +11,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { ReconciliacaoBancaria } from "@/components/financas/ReconciliacaoBancaria";
 import { useState } from "react";
+import { useHideValues } from "@/hooks/useHideValues";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { formatValue } = useHideValues();
   
   // MonthPicker states
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -114,10 +117,7 @@ export default function Dashboard() {
   });
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
+    return formatValue(value);
   };
 
   // Cálculos do mês atual
@@ -182,30 +182,33 @@ export default function Dashboard() {
               Visualize indicadores e análises financeiras
             </p>
           </div>
-          <FiltrosSheet
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-            busca=""
-            setBusca={() => {}}
-            contaId={contaId}
-            setContaId={setContaId}
-            categoriaId={categoriaId}
-            setCategoriaId={setCategoriaId}
-            status={status}
-            setStatus={setStatus}
-            contas={contas || []}
-            categorias={categorias || []}
-            onLimpar={() => {
-              setSelectedMonth(new Date());
-              setCustomRange(null);
-              setContaId('all');
-              setCategoriaId('all');
-              setStatus('all');
-            }}
-            onAplicar={() => {}}
-          />
+          <div className="flex items-center gap-2">
+            <HideValuesToggle />
+            <FiltrosSheet
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+              busca=""
+              setBusca={() => {}}
+              contaId={contaId}
+              setContaId={setContaId}
+              categoriaId={categoriaId}
+              setCategoriaId={setCategoriaId}
+              status={status}
+              setStatus={setStatus}
+              contas={contas || []}
+              categorias={categorias || []}
+              onLimpar={() => {
+                setSelectedMonth(new Date());
+                setCustomRange(null);
+                setContaId('all');
+                setCategoriaId('all');
+                setStatus('all');
+              }}
+              onAplicar={() => {}}
+            />
+          </div>
         </div>
         
         {/* Period Badge */}

@@ -13,9 +13,12 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import { useHideValues } from "@/hooks/useHideValues";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 
 export default function Contas() {
   const navigate = useNavigate();
+  const { formatValue } = useHideValues();
   const [contaDialogOpen, setContaDialogOpen] = useState(false);
   const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<any>(null);
@@ -122,10 +125,7 @@ export default function Contas() {
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
+    return formatValue(value);
   };
 
   const toggleContaSelection = (contaId: string) => {
@@ -206,7 +206,9 @@ export default function Contas() {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contas</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie contas bancárias e caixas</p>
           </div>
-          <Button 
+          <div className="flex items-center gap-2">
+            <HideValuesToggle />
+            <Button
             className="bg-gradient-primary shadow-soft"
             onClick={() => {
               setSelectedConta(null);
@@ -216,7 +218,8 @@ export default function Contas() {
             <Plus className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Nova Conta</span>
             <span className="sm:hidden">Nova</span>
-          </Button>
+            </Button>
+          </div>
         </div>
       </div>
 
