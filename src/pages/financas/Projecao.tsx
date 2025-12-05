@@ -7,9 +7,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { addMonths, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { useHideValues } from "@/hooks/useHideValues";
 
 export default function Projecao() {
   const navigate = useNavigate();
+  const { formatValue } = useHideValues();
 
   // Buscar transações dos últimos 12 meses para análise
   const { data: historicoTransacoes } = useQuery({
@@ -47,12 +50,7 @@ export default function Projecao() {
     },
   });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
+  const formatCurrency = (value: number) => formatValue(value);
 
   // Calcular médias mensais baseadas no histórico
   const calcularMediasMensais = () => {
@@ -155,6 +153,9 @@ export default function Projecao() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
+        <div className="flex items-center gap-2">
+          <HideValuesToggle />
+        </div>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Projeção Financeira</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">

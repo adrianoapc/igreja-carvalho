@@ -8,11 +8,14 @@ import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Cart
 import { TrendingUp, TrendingDown, AlertTriangle, Award, Loader2, Calendar } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { useHideValues } from "@/hooks/useHideValues";
 
 const COLORS = ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444'];
 
 export default function Insights() {
   const [periodo, setPeriodo] = useState<"3" | "6" | "12">("6");
+  const { formatValue } = useHideValues();
 
   // Calcular data inicial baseada no período selecionado
   const dataInicial = startOfMonth(subMonths(new Date(), parseInt(periodo)));
@@ -70,6 +73,7 @@ export default function Insights() {
         </div>
         
         <div className="flex items-center gap-2">
+          <HideValuesToggle />
           <Calendar className="w-4 h-4 text-muted-foreground" />
           <Select value={periodo} onValueChange={(v: any) => setPeriodo(v)}>
             <SelectTrigger className="w-[180px]">
@@ -90,7 +94,7 @@ export default function Insights() {
           <CardHeader className="pb-3">
             <CardDescription>Total Gasto</CardDescription>
             <CardTitle className="text-2xl">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(insights.totalGasto)}
+              {formatValue(insights.totalGasto)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -99,7 +103,7 @@ export default function Insights() {
           <CardHeader className="pb-3">
             <CardDescription>Média Mensal</CardDescription>
             <CardTitle className="text-2xl">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(insights.mediaMensal)}
+              {formatValue(insights.mediaMensal)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -145,7 +149,7 @@ export default function Insights() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="nome" angle={-45} textAnchor="end" height={100} />
                     <YAxis />
-                    <Tooltip formatter={(value: any) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
+                    <Tooltip formatter={(value: any) => formatValue(value)} />
                     <Bar dataKey="total" fill="#8B5CF6" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -168,7 +172,7 @@ export default function Insights() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">{item.transacoes} transações</span>
                         <span className="text-sm font-semibold">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.media)}
+                          {formatValue(item.media)}
                         </span>
                       </div>
                     </div>
@@ -203,7 +207,7 @@ export default function Insights() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: any) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
+                    <Tooltip formatter={(value: any) => formatValue(value)} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -221,7 +225,7 @@ export default function Insights() {
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">{cat.nome}</span>
                         <span className="font-semibold">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cat.total)}
+                          {formatValue(cat.total)}
                         </span>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -255,7 +259,7 @@ export default function Insights() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="mes" />
                   <YAxis />
-                  <Tooltip formatter={(value: any) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
+                  <Tooltip formatter={(value: any) => formatValue(value)} />
                   <Legend />
                   <Line type="monotone" dataKey="total" stroke="#8B5CF6" strokeWidth={2} name="Total" />
                   <Line type="monotone" dataKey="media" stroke="#EC4899" strokeWidth={2} strokeDasharray="5 5" name="Média" />
@@ -299,7 +303,7 @@ export default function Insights() {
               <CardContent>
                 <p className="text-lg font-semibold">{insights.mesMaiorGasto?.mes}</p>
                 <p className="text-2xl font-bold text-primary">
-                  {insights.mesMaiorGasto ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(insights.mesMaiorGasto.total) : '-'}
+                  {insights.mesMaiorGasto ? formatValue(insights.mesMaiorGasto.total) : '-'}
                 </p>
               </CardContent>
             </Card>
@@ -311,7 +315,7 @@ export default function Insights() {
               <CardContent>
                 <p className="text-lg font-semibold">{insights.mesMenorGasto?.mes}</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {insights.mesMenorGasto ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(insights.mesMenorGasto.total) : '-'}
+                  {insights.mesMenorGasto ? formatValue(insights.mesMenorGasto.total) : '-'}
                 </p>
               </CardContent>
             </Card>
@@ -322,8 +326,8 @@ export default function Insights() {
         <TabsContent value="anomalias" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Transações Anômalas Detectadas</CardTitle>
-              <CardDescription>Valores significativamente acima da média ({new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(insights.mediaTransacao)})</CardDescription>
+            <CardTitle>Transações Anômalas Detectadas</CardTitle>
+            <CardDescription>Valores significativamente acima da média ({formatValue(insights.mediaTransacao)})</CardDescription>
             </CardHeader>
             <CardContent>
               {insights.anomalias.length === 0 ? (
@@ -340,7 +344,7 @@ export default function Insights() {
                         <div className="flex justify-between items-start gap-2 mb-1">
                           <p className="font-semibold truncate">{anomalia.descricao}</p>
                           <span className="text-lg font-bold text-destructive whitespace-nowrap">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(anomalia.valor)}
+                            {formatValue(anomalia.valor)}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
