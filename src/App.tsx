@@ -59,6 +59,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/auth/ResetPassword";
 import Public from "./pages/Public";
 import Announcements from "./pages/Announcements";
+import AnnouncementsAdmin from "./pages/AnnouncementsAdmin";
 import Agenda from "./pages/Agenda";
 import Biblia from "./pages/Biblia";
 import Install from "./pages/Install";
@@ -151,6 +152,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Comunicados />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comunicados/announcements"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AnnouncementsAdmin />
                 </MainLayout>
               </ProtectedRoute>
             }
