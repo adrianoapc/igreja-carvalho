@@ -6,9 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useHideValues } from "@/hooks/useHideValues";
 
 export function ReconciliacaoBancaria() {
   const [reconciliando, setReconciliando] = useState(false);
+  const { formatValue } = useHideValues();
 
   const { data: contas, refetch } = useQuery({
     queryKey: ['reconciliacao-contas'],
@@ -36,12 +38,6 @@ export function ReconciliacaoBancaria() {
     },
   });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
 
   const calcularSaldoCalculado = (contaId: string) => {
     if (!transacoes) return 0;
@@ -177,16 +173,16 @@ export function ReconciliacaoBancaria() {
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Saldo Registrado</p>
-                  <p className="font-semibold">{formatCurrency(conta.saldoRegistrado)}</p>
+                  <p className="font-semibold">{formatValue(conta.saldoRegistrado)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Saldo Calculado</p>
-                  <p className="font-semibold">{formatCurrency(conta.saldoCalculado)}</p>
+                  <p className="font-semibold">{formatValue(conta.saldoCalculado)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Diferença</p>
                   <p className={`font-semibold ${conta.hasDiferenca ? 'text-orange-600' : 'text-green-600'}`}>
-                    {formatCurrency(conta.diferenca)}
+                    {formatValue(conta.diferenca)}
                   </p>
                 </div>
               </div>
