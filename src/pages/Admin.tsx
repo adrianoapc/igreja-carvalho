@@ -85,9 +85,13 @@ export default function Admin() {
   const [newPermission, setNewPermission] = useState({ module_name: "", role: "", access_level: "" });
   const [showAddPermission, setShowAddPermission] = useState(false);
 
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
+
   useEffect(() => {
     // Aguardar o carregamento da autenticação
-    if (authLoading) return;
+    if (authLoading || initialCheckDone) return;
+    
+    setInitialCheckDone(true);
     
     if (!hasAccess("membros", "acesso_completo")) {
       setAccessDenied(true);
@@ -100,7 +104,7 @@ export default function Admin() {
     }
     loadUsers();
     loadPermissions();
-  }, [authLoading, hasAccess]);
+  }, [authLoading]);
 
   useEffect(() => {
     let filtered = users.filter(user =>
