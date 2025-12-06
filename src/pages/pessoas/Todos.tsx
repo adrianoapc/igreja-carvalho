@@ -56,23 +56,6 @@ export default function TodosPessoas() {
   useEffect(() => {
     fetchPessoas();
   }, []);
-  const loadMore = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const nextPage = page + 1;
-      const start = nextPage * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE;
-      const newItems = allPessoas.slice(start, end);
-      if (newItems.length > 0) {
-        setDisplayedPessoas(prev => [...prev, ...newItems]);
-        setPage(nextPage);
-      }
-      if (end >= allPessoas.length) {
-        setHasMore(false);
-      }
-      setIsLoading(false);
-    }, 500);
-  }, [allPessoas]);
   const {
     loadMoreRef,
     isLoading,
@@ -81,7 +64,30 @@ export default function TodosPessoas() {
     setIsLoading,
     setHasMore,
     setPage
-  } = useInfiniteScroll(loadMore);
+  } = useInfiniteScroll();
+
+  // Load more when page changes and it's not the initial page
+  useEffect(() => {
+    if (page === 1 || allPessoas.length === 0) return;
+    
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const newItems = allPessoas.slice(start, end);
+    
+    if (newItems.length > 0) {
+      setDisplayedPessoas(prev => {
+        const existingIds = new Set(prev.map(p => p.id));
+        const uniqueNewItems = newItems.filter(item => !existingIds.has(item.id));
+        return [...prev, ...uniqueNewItems];
+      });
+    }
+    
+    if (end >= allPessoas.length) {
+      setHasMore(false);
+    }
+    setIsLoading(false);
+  }, [page, allPessoas, setHasMore, setIsLoading]);
+
   const filteredPessoas = displayedPessoas.filter(p => {
     const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.telefone?.includes(searchTerm) || p.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "todos" || p.status === statusFilter;

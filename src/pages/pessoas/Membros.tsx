@@ -107,23 +107,6 @@ export default function Membros() {
   useEffect(() => {
     fetchMembros();
   }, []);
-  const loadMore = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const nextPage = page + 1;
-      const start = nextPage * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE;
-      const newItems = allMembros.slice(start, end);
-      if (newItems.length > 0) {
-        setDisplayedMembros(prev => [...prev, ...newItems]);
-        setPage(nextPage);
-      }
-      if (end >= allMembros.length) {
-        setHasMore(false);
-      }
-      setIsLoading(false);
-    }, 500);
-  }, [allMembros]);
   const {
     loadMoreRef,
     isLoading,
@@ -132,7 +115,29 @@ export default function Membros() {
     setIsLoading,
     setHasMore,
     setPage
-  } = useInfiniteScroll(loadMore);
+  } = useInfiniteScroll();
+
+  // Load more when page changes and it's not the initial page
+  useEffect(() => {
+    if (page === 1 || allMembros.length === 0) return;
+    
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const newItems = allMembros.slice(start, end);
+    
+    if (newItems.length > 0) {
+      setDisplayedMembros(prev => {
+        const existingIds = new Set(prev.map(m => m.id));
+        const uniqueNewItems = newItems.filter(item => !existingIds.has(item.id));
+        return [...prev, ...uniqueNewItems];
+      });
+    }
+    
+    if (end >= allMembros.length) {
+      setHasMore(false);
+    }
+    setIsLoading(false);
+  }, [page, allMembros, setHasMore, setIsLoading]);
   const filteredMembros = displayedMembros.filter(m => m.nome.toLowerCase().includes(searchTerm.toLowerCase()) || m.email?.toLowerCase().includes(searchTerm.toLowerCase()) || m.telefone?.includes(searchTerm));
   const handleAtribuirFuncao = (membro: Membro) => {
     setSelectedMembro(membro);

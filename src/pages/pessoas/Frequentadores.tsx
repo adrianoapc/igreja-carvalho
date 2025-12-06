@@ -59,29 +59,29 @@ export default function Frequentadores() {
     fetchFrequentadores();
   }, []);
 
-  const loadMore = useCallback(() => {
-    setIsLoading(true);
-    
-    setTimeout(() => {
-      const nextPage = page + 1;
-      const start = nextPage * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE;
-      const newItems = allFrequentadores.slice(start, end);
-      
-      if (newItems.length > 0) {
-        setDisplayedFrequentadores(prev => [...prev, ...newItems]);
-        setPage(nextPage);
-      }
-      
-      if (end >= allFrequentadores.length) {
-        setHasMore(false);
-      }
-      
-      setIsLoading(false);
-    }, 500);
-  }, [allFrequentadores]);
+  const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll();
 
-  const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll(loadMore);
+  // Load more when page changes and it's not the initial page
+  useEffect(() => {
+    if (page === 1 || allFrequentadores.length === 0) return;
+    
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const newItems = allFrequentadores.slice(start, end);
+    
+    if (newItems.length > 0) {
+      setDisplayedFrequentadores(prev => {
+        const existingIds = new Set(prev.map(f => f.id));
+        const uniqueNewItems = newItems.filter(item => !existingIds.has(item.id));
+        return [...prev, ...uniqueNewItems];
+      });
+    }
+    
+    if (end >= allFrequentadores.length) {
+      setHasMore(false);
+    }
+    setIsLoading(false);
+  }, [page, allFrequentadores, setHasMore, setIsLoading]);
 
   const filteredFrequentadores = displayedFrequentadores.filter(f =>
     f.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
