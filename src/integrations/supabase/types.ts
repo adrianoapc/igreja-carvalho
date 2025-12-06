@@ -75,6 +75,54 @@ export type Database = {
           },
         ]
       }
+      app_permissions: {
+        Row: {
+          description: string | null
+          id: number
+          key: string
+          module: string
+          name: string
+        }
+        Insert: {
+          description?: string | null
+          id?: number
+          key: string
+          module: string
+          name: string
+        }
+        Update: {
+          description?: string | null
+          id?: number
+          key?: string
+          module?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      app_roles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: number
+          is_system: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          is_system?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          is_system?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
       aulas: {
         Row: {
           created_at: string | null
@@ -2220,6 +2268,36 @@ export type Database = {
           },
         ]
       }
+      role_permissions: {
+        Row: {
+          permission_id: number
+          role_id: number
+        }
+        Insert: {
+          permission_id: number
+          role_id: number
+        }
+        Update: {
+          permission_id?: number
+          role_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "app_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "app_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salas: {
         Row: {
           ativo: boolean | null
@@ -2745,6 +2823,29 @@ export type Database = {
             columns: ["subcategoria_id"]
             isOneToOne: false
             referencedRelation: "subcategorias_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_app_roles: {
+        Row: {
+          role_id: number
+          user_id: string
+        }
+        Insert: {
+          role_id: number
+          user_id: string
+        }
+        Update: {
+          role_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_app_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "app_roles"
             referencedColumns: ["id"]
           },
         ]
