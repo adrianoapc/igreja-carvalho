@@ -152,17 +152,13 @@ const Announcements = () => {
                 >
                   {/* Imagem do comunicado */}
                   {comunicado.imagem_url && (
-                    <div className="relative w-full aspect-video overflow-hidden bg-muted">
+                    <div className="w-full bg-muted">
                       <OptimizedImage
                         src={comunicado.imagem_url}
                         alt={comunicado.titulo}
-                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                        className="w-full h-auto object-contain"
+                        fit="contain"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                      <Badge className={`absolute top-3 right-3 ${config.color}`}>
-                        <TypeIcon className="w-3 h-3 mr-1" />
-                        {config.label}
-                      </Badge>
                     </div>
                   )}
 
