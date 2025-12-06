@@ -66,23 +66,6 @@ export default function Visitantes() {
   useEffect(() => {
     fetchVisitantes();
   }, []);
-  const loadMore = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const nextPage = page + 1;
-      const start = nextPage * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE;
-      const newItems = allVisitantes.slice(start, end);
-      if (newItems.length > 0) {
-        setDisplayedVisitantes(prev => [...prev, ...newItems]);
-        setPage(nextPage);
-      }
-      if (end >= allVisitantes.length) {
-        setHasMore(false);
-      }
-      setIsLoading(false);
-    }, 500);
-  }, [allVisitantes]);
   const {
     loadMoreRef,
     isLoading,
@@ -91,7 +74,29 @@ export default function Visitantes() {
     setIsLoading,
     setHasMore,
     setPage
-  } = useInfiniteScroll(loadMore);
+  } = useInfiniteScroll();
+
+  // Load more when page changes and it's not the initial page
+  useEffect(() => {
+    if (page === 1 || allVisitantes.length === 0) return;
+    
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const newItems = allVisitantes.slice(start, end);
+    
+    if (newItems.length > 0) {
+      setDisplayedVisitantes(prev => {
+        const existingIds = new Set(prev.map(v => v.id));
+        const uniqueNewItems = newItems.filter(item => !existingIds.has(item.id));
+        return [...prev, ...uniqueNewItems];
+      });
+    }
+    
+    if (end >= allVisitantes.length) {
+      setHasMore(false);
+    }
+    setIsLoading(false);
+  }, [page, allVisitantes, setHasMore, setIsLoading]);
   const filteredVisitantes = displayedVisitantes.filter(v => {
     const matchesSearch = v.nome.toLowerCase().includes(searchTerm.toLowerCase()) || v.telefone?.includes(searchTerm) || v.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "todos" || v.status === statusFilter;
