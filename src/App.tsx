@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { HideValuesProvider } from "@/hooks/useHideValues";
 import MainLayout from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
+import BiometricLogin from "./pages/BiometricLogin";
 import Dashboard from "./pages/Dashboard";
 import Comunicados from "./pages/Comunicados";
 import Publicacao from "./pages/Publicacao";
@@ -114,8 +115,11 @@ function App() {
             <BrowserRouter>
               <AuthGate>
         <Routes>
-          {/* Rota raiz redireciona para /auth (login) */}
-          <Route path="/" element={<Navigate to="/auth" replace />} />
+          {/* Rota raiz redireciona para /biometric-login */}
+          <Route path="/" element={<Navigate to="/biometric-login" replace />} />
+          
+          {/* Tela de login com biometria */}
+          <Route path="/biometric-login" element={<BiometricLogin />} />
           
           {/* Rota de autenticação */}
           <Route path="/auth" element={<Auth />} />
