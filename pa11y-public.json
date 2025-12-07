@@ -1,0 +1,11 @@
+TimeoutError: Navigation timeout of 180000 ms exceeded
+    at new Deferred (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:60:34)
+    at Deferred.create (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:21:16)
+    at new LifecycleWatcher (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/LifecycleWatcher.js:73:60)
+    at CdpFrame.goto (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:29)
+    at CdpFrame.<anonymous> (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/puppeteer-core/lib/cjs/puppeteer/util/decorators.js:109:27)
+    at CdpPage.goto (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:572:43)
+    at gotoUrl (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/pa11y/lib/pa11y.js:246:20)
+    at runPa11yTest (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/pa11y/lib/pa11y.js:70:8)
+    at async pa11y (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/pa11y/lib/pa11y.js:35:18)
+    at async runProgram (/Users/adriano.oliveira/Development/igreja-carvalho/node_modules/pa11y/bin/pa11y.js:136:19)

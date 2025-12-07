@@ -47,6 +47,7 @@ import Autoplay from "embla-carousel-autoplay";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader"; // <--- Novo
 
 interface Comunicado {
   id: string;
@@ -356,10 +357,12 @@ export default function DashboardAdmin() {
       {/* Header & Personal Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Olá, {firstName}!</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
+          {/* <h1 className="text-2xl md:text-3xl font-bold text-foreground">Olá, {firstName}!</h1> */}
+          {/* 1. Boas vindas pessoal ("Boa tarde, Adriano") */}
+          <WelcomeHeader />
+          {/*<p className="text-sm md:text-base text-muted-foreground mt-1">
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
-          </p>
+          </p>*/}
         </div>
         <Button
           onClick={() => setSentimentoDialogOpen(true)}

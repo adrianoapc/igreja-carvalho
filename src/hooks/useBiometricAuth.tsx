@@ -4,6 +4,7 @@ const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 const BIOMETRIC_USER_KEY = 'biometric_user_id';
 const BIOMETRIC_CREDENTIAL_KEY = 'biometric_credential_id';
 const LAST_EMAIL_KEY = 'last_login_email';
+const BIOMETRIC_TEST_MODE_KEY = 'biometric_test_mode'; // Para desenvolvimento
 
 interface BiometricAuthState {
   isSupported: boolean;
@@ -39,6 +40,9 @@ export function useBiometricAuth() {
   });
 
   const checkSupport = useCallback(async () => {
+    // Permitir modo teste via localStorage
+    const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
+
     // Check if WebAuthn is supported
     const hasWebAuthn = !!(
       window.PublicKeyCredential &&
@@ -53,12 +57,21 @@ export function useBiometricAuth() {
     if (hasWebAuthn && !isInIframe) {
       try {
         hasPlatformAuth = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      } catch {
+      } catch (error) {
+        console.warn('Error checking platform auth availability:', error);
         hasPlatformAuth = false;
       }
     }
 
-    const isSupported = hasWebAuthn && hasPlatformAuth && !isInIframe;
+    const isSupported = testMode || (hasWebAuthn && hasPlatformAuth && !isInIframe);
+
+    console.log('[BiometricAuth] Support check:', {
+      testMode,
+      hasWebAuthn,
+      hasPlatformAuth,
+      isInIframe,
+      isSupported,
+    });
 
     const isEnabled = localStorage.getItem(BIOMETRIC_ENABLED_KEY) === 'true';
     const storedUserId = localStorage.getItem(BIOMETRIC_USER_KEY);
@@ -82,6 +95,19 @@ export function useBiometricAuth() {
     }
 
     try {
+      const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
+
+      // Em modo teste, simular biometria sem WebAuthn
+      if (testMode) {
+        console.log('[BiometricAuth] Test mode: simulating biometric enrollment');
+        const credentialId = 'test-credential-' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+        localStorage.setItem(BIOMETRIC_USER_KEY, userId);
+        localStorage.setItem(BIOMETRIC_CREDENTIAL_KEY, credentialId);
+        setState(prev => ({ ...prev, isEnabled: true }));
+        return true;
+      }
+
       // Check if platform authenticator is available (fingerprint, face ID)
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       
@@ -157,6 +183,14 @@ export function useBiometricAuth() {
     }
 
     try {
+      const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
+
+      // Em modo teste, simular verificação de biometria
+      if (testMode) {
+        console.log('[BiometricAuth] Test mode: simulating biometric verification');
+        return true;
+      }
+
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
 

@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus, Mail, ArrowLeft, Loader2 } from "lucide-react";
-import { PublicHeader } from "@/components/layout/PublicHeader";
+import { LogIn, UserPlus, Mail, ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
 import { EnableBiometricDialog } from "@/components/auth/EnableBiometricDialog";
+import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 
 type AuthView = "login" | "forgot-password";
@@ -18,12 +18,33 @@ export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showBiometricDialog, setShowBiometricDialog] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [authView, setAuthView] = useState<AuthView>("login");
-  const { isSupported, isEnabled, saveLastEmail, getLastEmail } = useBiometricAuth();
+  const { isSupported, isEnabled, isLoading: isBiometricLoading, saveLastEmail, getLastEmail } = useBiometricAuth();
+
+  // Verificar se usuário já está autenticado ao montar
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Usuário já autenticado, redirecionar para dashboard
+          navigate("/dashboard", { replace: true });
+        }
+      } catch (error) {
+        console.error("Erro ao verificar autenticação:", error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+    checkAuthStatus();
+  }, [navigate]);
 
   // Load last used email on mount
   useEffect(() => {
@@ -41,6 +62,28 @@ export default function Auth() {
     const nome = formData.get("nome") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirm-password") as string;
+
+    // Validar se as senhas coincidem
+    if (password !== confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -127,11 +170,12 @@ export default function Auth() {
         }
 
         // Oferecer biometria após cadastro bem-sucedido
-        if (isSupported && !isEnabled) {
+        if (!isBiometricLoading && isSupported && !isEnabled) {
           setPendingUserId(authData.user.id);
           setShowBiometricDialog(true);
         } else {
-          navigate("/");
+          // Redirecionar para dashboard
+          setTimeout(() => navigate("/dashboard", { replace: true }), 100);
         }
       }
     } catch (error: any) {
@@ -149,9 +193,18 @@ export default function Auth() {
     e.preventDefault();
     setIsLoading(true);
 
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+    const email = loginEmail.trim();
+    const password = loginPassword;
+
+    if (!email || !password) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -170,11 +223,12 @@ export default function Auth() {
       });
 
       // Oferecer biometria após login bem-sucedido se ainda não estiver ativada
-      if (isSupported && !isEnabled && data.user) {
+      if (!isBiometricLoading && isSupported && !isEnabled && data.user) {
         setPendingUserId(data.user.id);
         setShowBiometricDialog(true);
       } else {
-        navigate("/");
+        // Redirecionar para dashboard
+        setTimeout(() => navigate("/dashboard", { replace: true }), 100);
       }
     } catch (error: any) {
       toast({
@@ -239,89 +293,103 @@ export default function Auth() {
   };
 
   const handleBiometricComplete = () => {
-    navigate("/");
+    navigate("/dashboard");
   };
+
+  // Se está verificando autenticação, mostrar loading
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
 
   // Tela de recuperação de senha
   if (authView === "forgot-password") {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo="/public" />
-        
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md shadow-soft">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                <Mail className="w-6 h-6 text-primary" />
-              </div>
-              <CardTitle className="text-2xl font-bold text-foreground">
-                Recuperar Senha
-              </CardTitle>
-              <CardDescription>
-                Digite seu email para receber o link de recuperação
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleForgotPassword} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="recovery-email">Email</Label>
-                  <Input
-                    id="recovery-email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={recoveryEmail}
-                    onChange={(e) => setRecoveryEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-primary"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="w-4 h-4 mr-2" />
-                      Enviar link de recuperação
-                    </>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setAuthView("login")}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Voltar ao login
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md mb-8">
+          <button 
+            onClick={() => setAuthView("login")}
+            className="flex items-center gap-2 text-primary hover:underline text-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
+          </button>
         </div>
+        
+        <Card className="w-full max-w-md shadow-soft">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <Mail className="w-6 h-6 text-primary" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-foreground">
+              Recuperar Senha
+            </CardTitle>
+            <CardDescription>
+              Digite seu email para receber o link de recuperação
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="recovery-email">Email</Label>
+                <Input
+                  id="recovery-email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={recoveryEmail}
+                  onChange={(e) => setRecoveryEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-primary"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Enviar link de recuperação
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <PublicHeader showBackButton backTo="/public" />
-      
-      <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-soft">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-foreground">
-              Área do Membro
-            </CardTitle>
-            <CardDescription>
-              Entre ou cadastre-se para acessar o sistema
-            </CardDescription>
-          </CardHeader>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      {/* Logo e Título */}
+      <div className="w-full max-w-md mb-8 text-center">
+        <img 
+          src={logoCarvalho} 
+          alt="Igreja Carvalho" 
+          className="h-16 w-auto mx-auto mb-4"
+        />
+        <h1 className="text-2xl font-bold text-foreground">Igreja Carvalho</h1>
+      </div>
+
+      <Card className="w-full max-w-md shadow-soft">
+        <CardHeader className="text-center">
+          <CardTitle className="text-xl font-bold text-foreground">
+            Área do Membro
+          </CardTitle>
+          <CardDescription>
+            Entre ou cadastre-se para acessar o sistema
+          </CardDescription>
+        </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -335,34 +403,49 @@ export default function Auth() {
                   <Label htmlFor="login-email">Email</Label>
                   <Input
                     id="login-email"
-                    name="email"
                     type="email"
                     placeholder="seu@email.com"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     required
+                    autoComplete="email"
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Senha</Label>
-                  <Input
-                    id="login-password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  className="px-0 text-sm"
                   onClick={() => {
                     setRecoveryEmail(loginEmail);
                     setAuthView("forgot-password");
                   }}
-                  className="text-sm text-primary hover:underline"
                 >
                   Esqueci minha senha
-                </button>
+                </Button>
                 <Button
                   type="submit"
                   className="w-full bg-gradient-primary"
@@ -409,6 +492,7 @@ export default function Auth() {
                     type="text"
                     placeholder="Seu nome completo"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -419,6 +503,8 @@ export default function Auth() {
                     type="email"
                     placeholder="seu@email.com"
                     required
+                    autoComplete="email"
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -430,6 +516,22 @@ export default function Auth() {
                     placeholder="••••••••"
                     required
                     minLength={6}
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">Mínimo 6 caracteres</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-confirm-password">Confirmar Senha</Label>
+                  <Input
+                    id="signup-confirm-password"
+                    name="confirm-password"
+                    type="password"
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    disabled={isLoading}
                   />
                 </div>
                 <Button
@@ -470,7 +572,6 @@ export default function Auth() {
           </Tabs>
         </CardContent>
       </Card>
-      </div>
 
       <EnableBiometricDialog
         open={showBiometricDialog}
