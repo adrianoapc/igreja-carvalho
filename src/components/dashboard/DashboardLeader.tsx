@@ -19,6 +19,7 @@ import { ptBR } from "date-fns/locale";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
+import { WelcomeHeader } from "./WelcomeHeader";
 
 interface Aniversariante {
   id: string;
@@ -115,9 +116,10 @@ export default function DashboardLeader() {
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Área do Líder
           </h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
+          <WelcomeHeader />
+          {/*/<p className="text-sm md:text-base text-muted-foreground mt-1">
             Olá, {firstName}! {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
-          </p>
+          </p> */}
         </div>
         <Button
           onClick={() => setSentimentoDialogOpen(true)}

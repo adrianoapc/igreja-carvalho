@@ -28,6 +28,7 @@ import Autoplay from "embla-carousel-autoplay";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import MinhasTarefasWidget from "@/components/dashboard/MinhasTarefasWidget";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
+import { WelcomeHeader } from "./WelcomeHeader";
 
 interface Banner {
   id: string;
@@ -91,10 +92,12 @@ export default function DashboardMember() {
       {/* Header & Personal Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
+            <WelcomeHeader /> 
+        {/* 
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Olá, {firstName}!</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
-          </p>
+          </p>  */}
         </div>
         <Button
           onClick={() => setSentimentoDialogOpen(true)}
@@ -195,7 +198,7 @@ export default function DashboardMember() {
           }}
         >
           <DollarSign className="w-6 h-6 text-emerald-600" />
-          <span className="text-xs">Dízimo (Pix)</span>
+          <span className="text-xs">Contribuições (Pix)</span>
         </Button>
 
         <Button
