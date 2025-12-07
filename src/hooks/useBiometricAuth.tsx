@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 const BIOMETRIC_USER_KEY = 'biometric_user_id';
 const BIOMETRIC_CREDENTIAL_KEY = 'biometric_credential_id';
+const BIOMETRIC_REFRESH_TOKEN_KEY = 'biometric_refresh_token';
 const LAST_EMAIL_KEY = 'last_login_email';
 const BIOMETRIC_TEST_MODE_KEY = 'biometric_test_mode'; // Para desenvolvimento
 
@@ -225,6 +226,19 @@ export function useBiometricAuth() {
     return localStorage.getItem(BIOMETRIC_USER_KEY);
   }, []);
 
+  // Refresh token storage functions (para login automático)
+  const saveRefreshToken = useCallback((refreshToken: string) => {
+    localStorage.setItem(BIOMETRIC_REFRESH_TOKEN_KEY, refreshToken);
+  }, []);
+
+  const getRefreshToken = useCallback((): string | null => {
+    return localStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY);
+  }, []);
+
+  const clearRefreshToken = useCallback(() => {
+    localStorage.removeItem(BIOMETRIC_REFRESH_TOKEN_KEY);
+  }, []);
+
   // Email storage functions
   const saveLastEmail = useCallback((email: string) => {
     localStorage.setItem(LAST_EMAIL_KEY, email);
@@ -246,6 +260,10 @@ export function useBiometricAuth() {
     verifyBiometric,
     getStoredUserId,
     checkSupport,
+    // Refresh token functions
+    saveRefreshToken,
+    getRefreshToken,
+    clearRefreshToken,
     // Email functions
     saveLastEmail,
     getLastEmail,
