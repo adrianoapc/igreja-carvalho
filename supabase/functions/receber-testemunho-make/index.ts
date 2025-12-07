@@ -7,25 +7,25 @@ const corsHeaders = {
 };
 
 // Função para verificar assinatura do webhook
-const verifyWebhookSecret = (req: Request): boolean => {
+const verifyWebhookSecret = (req: Request): { valid: boolean; error?: string } => {
   const webhookSecret = Deno.env.get('MAKE_WEBHOOK_SECRET');
   
-  // Se não há secret configurado, aceita (para retrocompatibilidade)
+  // SECURITY: Secret MUST be configured - no fallback allowed
   if (!webhookSecret) {
-    console.warn('⚠️ MAKE_WEBHOOK_SECRET não configurado - aceitando requisição sem verificação');
-    return true;
+    console.error('❌ MAKE_WEBHOOK_SECRET não configurado - requisição rejeitada por segurança');
+    return { valid: false, error: 'Webhook secret not configured on server' };
   }
   
   const requestSecret = req.headers.get('x-webhook-secret');
   
   if (!requestSecret) {
     console.error('❌ Header x-webhook-secret não fornecido');
-    return false;
+    return { valid: false, error: 'Missing x-webhook-secret header' };
   }
   
   // Comparação segura de strings (timing-safe comparison)
   if (webhookSecret.length !== requestSecret.length) {
-    return false;
+    return { valid: false, error: 'Invalid webhook secret' };
   }
   
   let result = 0;
@@ -33,7 +33,11 @@ const verifyWebhookSecret = (req: Request): boolean => {
     result |= webhookSecret.charCodeAt(i) ^ requestSecret.charCodeAt(i);
   }
   
-  return result === 0;
+  if (result !== 0) {
+    return { valid: false, error: 'Invalid webhook secret' };
+  }
+  
+  return { valid: true };
 };
 
 // Schema de validação
@@ -55,12 +59,14 @@ Deno.serve(async (req) => {
     console.log('🔔 Webhook receber-testemunho-make chamado');
 
     // Verificar autenticação do webhook
-    if (!verifyWebhookSecret(req)) {
-      console.error('❌ Falha na verificação do webhook secret');
+    const secretCheck = verifyWebhookSecret(req);
+    if (!secretCheck.valid) {
+      console.error('❌ Falha na verificação do webhook secret:', secretCheck.error);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Unauthorized - Invalid webhook secret',
+          error: 'Unauthorized',
+          message: secretCheck.error,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

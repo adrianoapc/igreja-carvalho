@@ -3,7 +3,41 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret',
+};
+
+// Função para verificar assinatura do webhook
+const verifyWebhookSecret = (req: Request): { valid: boolean; error?: string } => {
+  const webhookSecret = Deno.env.get('MAKE_WEBHOOK_SECRET');
+  
+  // SECURITY: Secret MUST be configured - no fallback allowed
+  if (!webhookSecret) {
+    console.error('❌ MAKE_WEBHOOK_SECRET não configurado - requisição rejeitada por segurança');
+    return { valid: false, error: 'Webhook secret not configured on server' };
+  }
+  
+  const requestSecret = req.headers.get('x-webhook-secret');
+  
+  if (!requestSecret) {
+    console.error('❌ Header x-webhook-secret não fornecido');
+    return { valid: false, error: 'Missing x-webhook-secret header' };
+  }
+  
+  // Comparação segura de strings (timing-safe comparison)
+  if (webhookSecret.length !== requestSecret.length) {
+    return { valid: false, error: 'Invalid webhook secret' };
+  }
+  
+  let result = 0;
+  for (let i = 0; i < webhookSecret.length; i++) {
+    result |= webhookSecret.charCodeAt(i) ^ requestSecret.charCodeAt(i);
+  }
+  
+  if (result !== 0) {
+    return { valid: false, error: 'Invalid webhook secret' };
+  }
+  
+  return { valid: true };
 };
 
 // Simple in-memory rate limiter
@@ -75,6 +109,23 @@ serve(async (req) => {
 
   try {
     console.log('=== Check-in WhatsApp Geolocalização ===');
+    
+    // Verificar autenticação do webhook
+    const secretCheck = verifyWebhookSecret(req);
+    if (!secretCheck.valid) {
+      console.error('❌ Falha na verificação do webhook secret:', secretCheck.error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Unauthorized',
+          message: secretCheck.error,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
