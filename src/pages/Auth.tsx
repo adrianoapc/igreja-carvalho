@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-// Tabs removed: using a single clean login card instead
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus, Mail, ArrowLeft, Loader2, Eye, EyeOff, Lock, User } from "lucide-react";
+import { LogIn, UserPlus, Mail, ArrowLeft, Loader2, Eye, EyeOff, Lock, Smartphone } from "lucide-react";
 import { EnableBiometricDialog } from "@/components/auth/EnableBiometricDialog";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import InputMask from "react-input-mask";
 
 type AuthView = "login" | "forgot-password" | "signup";
+type LoginMethod = "email" | "phone";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -22,10 +23,12 @@ export default function Auth() {
   const [showBiometricDialog, setShowBiometricDialog] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
+  const [loginPhone, setLoginPhone] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [authView, setAuthView] = useState<AuthView>("login");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const { isSupported, isEnabled, isLoading: isBiometricLoading, saveLastEmail, getLastEmail, saveRefreshToken } = useBiometricAuth();
 
   // Verificar se usuário já está autenticado ao montar
@@ -189,9 +192,10 @@ export default function Auth() {
     setIsLoading(true);
 
     const email = loginEmail.trim();
+    const phone = loginPhone.replace(/\D/g, ""); // Remove mask
     const password = loginPassword;
 
-    if (!email || !password) {
+    if (loginMethod === "email" && (!email || !password)) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos",
@@ -201,16 +205,53 @@ export default function Auth() {
       return;
     }
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+    if (loginMethod === "phone" && (!phone || !password)) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos",
+        variant: "destructive",
       });
+      setIsLoading(false);
+      return;
+    }
+
+    if (loginMethod === "phone" && phone.length < 10) {
+      toast({
+        title: "Erro",
+        description: "Telefone inválido. Use o formato (DD) 9XXXX-XXXX",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      let data, error;
+
+      if (loginMethod === "email") {
+        const result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        data = result.data;
+        error = result.error;
+      } else {
+        // Para login por telefone, usar OTP ou buscar email associado
+        const formattedPhone = `+55${phone}`;
+        const result = await supabase.auth.signInWithPassword({
+          phone: formattedPhone,
+          password,
+        });
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
       // Save email for next login
-      saveLastEmail(email);
+      if (loginMethod === "email") {
+        saveLastEmail(email);
+      }
       
       // Salvar refresh token para login automático com biometria
       if (data.session?.refresh_token) {
@@ -227,11 +268,7 @@ export default function Auth() {
         setPendingUserId(data.user.id);
         setShowBiometricDialog(true);
       } else {
-        // Não redirecionar automaticamente para o dashboard — manter na tela para validação de layout
-        toast({
-          title: "Login confirmado",
-          description: "Autenticação realizada — permaneça nesta tela para validação.",
-        });
+        navigate("/dashboard");
       }
     } catch (error: any) {
       toast({
@@ -496,30 +533,69 @@ export default function Auth() {
           />
           <div className="flex items-center justify-center gap-2 mb-1">
             <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <Lock className="w-5 h-5 text-primary" />
+              {loginMethod === "email" ? (
+                <Lock className="w-5 h-5 text-primary" />
+              ) : (
+                <Smartphone className="w-5 h-5 text-primary" />
+              )}
             </div>
             <CardTitle className="text-2xl font-bold text-foreground">
               Entrar
             </CardTitle>
           </div>
           <CardDescription>
-            Entre com seu email e senha para acessar o sistema
+            {loginMethod === "email" 
+              ? "Entre com seu email e senha para acessar o sistema"
+              : "Entre com seu telefone e senha para acessar o sistema"
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="login-email">Email</Label>
-              <Input
-                id="login-email"
-                type="email"
-                placeholder="seu@email.com"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                required
-                autoComplete="email"
-                disabled={isLoading}
-              />
+              {loginMethod === "email" ? (
+                <>
+                  <Label htmlFor="login-email">Email</Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    disabled={isLoading}
+                  />
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="login-phone">Telefone</Label>
+                  <InputMask
+                    mask="(99) 99999-9999"
+                    value={loginPhone}
+                    onChange={(e) => setLoginPhone(e.target.value)}
+                    disabled={isLoading}
+                  >
+                    {(inputProps: any) => (
+                      <Input
+                        {...inputProps}
+                        id="login-phone"
+                        type="tel"
+                        placeholder="(11) 99999-9999"
+                        required
+                        autoComplete="tel"
+                      />
+                    )}
+                  </InputMask>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setLoginMethod(loginMethod === "email" ? "phone" : "email")}
+                className="text-xs text-primary hover:underline"
+              >
+                {loginMethod === "email" ? "Entrar com telefone" : "Entrar com e-mail"}
+              </button>
             </div>
 
             <div className="space-y-2">
