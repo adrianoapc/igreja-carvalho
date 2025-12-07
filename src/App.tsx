@@ -642,6 +642,16 @@ function App() {
             }
           />
           <Route
+            path="/agenda"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Agenda />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/jornadas"
             element={
               <ProtectedRoute>

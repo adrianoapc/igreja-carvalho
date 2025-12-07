@@ -5,7 +5,6 @@ import { Calendar, Clock, MapPin, ExternalLink, ChevronRight, ArrowLeft } from "
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, isSameMonth, addMonths, startOfToday, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { PublicHeader } from "@/components/layout/PublicHeader";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -226,9 +225,8 @@ export default function Agenda() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <PublicHeader />
-        <main className="container max-w-2xl mx-auto px-4 py-8">
+      <div className="space-y-4 px-4 py-8">
+        <main className="container max-w-2xl mx-auto px-0">
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <motion.div 
@@ -251,10 +249,8 @@ export default function Agenda() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <PublicHeader />
-      
-      <main className="container max-w-2xl mx-auto px-4 py-8">
+    <div className="space-y-8 px-4 py-8">
+      <main className="container max-w-2xl mx-auto px-0">
         {/* Back Button */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
