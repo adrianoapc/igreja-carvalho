@@ -17,7 +17,7 @@ export default function UserMenu() {
   
   const handleSignOut = async () => {
     await signOut();
-    navigate("/public");
+    navigate("/auth");
   };
 
   const toggleTheme = () => {

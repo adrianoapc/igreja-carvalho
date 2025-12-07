@@ -81,6 +81,7 @@ import Escalas from "./pages/Escalas";
 import MinhasEscalas from "./pages/MinhasEscalas";
 import Checkin from "./pages/Checkin";
 import { useAuth } from "./hooks/useAuth";
+import PermissionMatrixPrototype from "./pages/AdminPermissions";
 
 const queryClient = new QueryClient();
 
@@ -96,7 +97,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isMember) {
-    return <Navigate to="/public" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   return <>{children}</>;
@@ -113,13 +114,13 @@ function App() {
             <BrowserRouter>
               <AuthGate>
         <Routes>
-          {/* Rotas públicas */}
-          <Route path="/public" element={<Public />} />
-          <Route path="/announcements" element={<Announcements />} />
-          <Route path="/agenda" element={<Agenda />} />
-          <Route path="/biblia" element={<Biblia />} />
-          <Route path="/install" element={<Install />} />
+          {/* Rota raiz redireciona para /auth (login) */}
+          <Route path="/" element={<Navigate to="/auth" replace />} />
+          
+          {/* Rota de autenticação */}
           <Route path="/auth" element={<Auth />} />
+          {/* Rotas públicas */}
+         
           <Route path="/auth/reset" element={<ResetPassword />} />
           
           {/* Rotas públicas de cadastro externo */}
@@ -134,10 +135,23 @@ function App() {
           
           {/* Rota pública de Check-in por QR Code */}
           <Route path="/checkin/:tipo/:id" element={<Checkin />} />
+
+          {/* Rota de Prototipação Novo Admin */}
+          <Route path="/teste-permissoes" element={<PermissionMatrixPrototype />} />
           
           {/* Rotas protegidas para membros */}
           <Route
             path="/"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <MainLayout>

@@ -60,7 +60,7 @@ export function AuthGate({ children }: AuthGateProps) {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      // Sem sessão, redirecionar para login
+      // Sem sessão (logout), não desabilitar biometria - deixar para próxima entrada
       setIsChecking(false);
       return;
     }
