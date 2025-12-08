@@ -12,7 +12,7 @@ export default function DashboardVisitante() {
 
   return (
     <div className="space-y-6 px-4 py-8">
-      <WelcomeHeader firstName={firstName} />
+      <WelcomeHeader />
 
       {/* Mensagem de Boas-Vindas */}
       <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
