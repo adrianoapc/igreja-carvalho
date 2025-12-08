@@ -382,12 +382,92 @@ export function AppSidebar() {
 
   // Verifica se o usuário tem alguma role administrativa
   const isAdminUser = userRoles.some(role => ADMIN_ROLES.includes(role));
+  const isVisitante = profile?.status === "visitante";
   
   // Filtra menu items baseado no perfil
   const filteredMenuItems = menuItems.filter(item => {
     if (item.adminOnly) return isAdminUser;
     return true;
   });
+
+  // Se for visitante, mostra apenas itens limitados
+  if (isVisitante && !rolesLoading) {
+    return (
+      <Sidebar collapsible="icon">
+        <SidebarContent>
+          <div className="p-6 border-b border-sidebar-border">
+            {!isCollapsed && (
+              <div className="flex items-center gap-3">
+                {igrejaConfig.logoUrl && (
+                  <img src={igrejaConfig.logoUrl} alt="Logo da Igreja" className="w-12 h-12 object-contain rounded-lg" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl font-bold text-sidebar-foreground truncate">{igrejaConfig.nome}</h1>
+                  <p className="text-sm text-sidebar-foreground/70 mt-1 truncate">{igrejaConfig.subtitulo}</p>
+                </div>
+              </div>
+            )}
+            {isCollapsed &&
+              (igrejaConfig.logoUrl ? (
+                <img src={igrejaConfig.logoUrl} alt="Logo" className="w-8 h-8 mx-auto object-contain" />
+              ) : (
+                <h1 className="text-xl font-bold text-sidebar-foreground text-center">IA</h1>
+              ))}
+          </div>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Menu Visitante</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {/* Dashboard */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Início">
+                    <NavLink
+                      to="/"
+                      end
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <Home className="w-5 h-5" />
+                      {!isCollapsed && <span>Início</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                {/* Minha Família / Kids */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Minha Família">
+                    <NavLink
+                      to="/perfil/familia"
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <Baby className="w-5 h-5" />
+                      {!isCollapsed && <span>Minha Família</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                {/* Agenda */}
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Agenda">
+                    <NavLink
+                      to="/agenda"
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    >
+                      <Calendar className="w-5 h-5" />
+                      {!isCollapsed && <span>Agenda</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+    );
+  }
 
   // Se não for admin, mostra apenas itens de membro
   if (!isAdminUser && !rolesLoading) {

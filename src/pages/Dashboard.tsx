@@ -5,11 +5,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DashboardAdmin from "@/components/dashboard/DashboardAdmin";
 import DashboardLeader from "@/components/dashboard/DashboardLeader";
 import DashboardMember from "@/components/dashboard/DashboardMember";
+import DashboardVisitante from "@/components/dashboard/DashboardVisitante";
 
 type UserRole = 'admin' | 'pastor' | 'lider' | 'secretario' | 'tesoureiro' | 'membro' | 'basico';
 
 export default function Dashboard() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -59,6 +60,12 @@ export default function Dashboard() {
   // Role-based rendering
   const isAdminOrPastor = userRoles.includes('admin') || userRoles.includes('pastor');
   const isLeader = userRoles.includes('lider');
+  const isVisitante = profile?.status === 'visitante';
+
+  // Visitante: Dashboard específico
+  if (isVisitante) {
+    return <DashboardVisitante />;
+  }
 
   if (isAdminOrPastor) {
     return <DashboardAdmin />;

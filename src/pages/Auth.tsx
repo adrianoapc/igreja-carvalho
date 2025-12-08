@@ -101,82 +101,34 @@ export default function Auth() {
         },
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        // Verificar se é erro de email já cadastrado
+        if (signUpError.message.includes("already registered") || signUpError.message.includes("already exists")) {
+          throw new Error("Este email já está cadastrado. Tente fazer login ou use outro email.");
+        }
+        throw signUpError;
+      }
 
       if (authData.user) {
         // Save email for next login
         saveLastEmail(email);
 
-        // Verificar se já existe um perfil com este email
-        const { data: existingProfile } = await supabase
-          .from("profiles")
-          .select("id, user_id, status, observacoes")
-          .eq("email", email)
-          .single();
+        // O perfil será criado automaticamente pelo trigger do banco
+        // Apenas aguardar um momento para garantir que foi criado
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        if (existingProfile) {
-          if (existingProfile.user_id) {
-            throw new Error("Este email já está cadastrado no sistema.");
-          } else {
-            // Associar perfil existente
-            const { error: updateError } = await supabase
-              .from("profiles")
-              .update({
-                user_id: authData.user.id,
-                nome,
-                status: "membro",
-                data_cadastro_membro: new Date().toISOString(),
-                observacoes: existingProfile.observacoes
-                  ? `${existingProfile.observacoes}\n\n[${new Date().toLocaleString('pt-BR')}] ${existingProfile.status} → membro (login criado)`
-                  : `[${new Date().toLocaleString('pt-BR')}] ${existingProfile.status} → membro (login criado)`,
-              })
-              .eq("id", existingProfile.id);
-
-            if (updateError) throw updateError;
-
-            await supabase.from("user_roles").insert({
-              user_id: authData.user.id,
-              role: "basico",
-            });
-
-            toast({
-              title: "Cadastro vinculado!",
-              description: `Seu perfil de ${existingProfile.status} foi promovido para membro. Acesso básico liberado.`,
-            });
-          }
-        } else {
-          // Criar novo perfil
-          const { error: profileError } = await supabase.from("profiles").insert({
-            user_id: authData.user.id,
-            nome,
-            email,
-            status: "membro",
-            data_cadastro_membro: new Date().toISOString(),
-          });
-          if (profileError) throw profileError;
-
-          await supabase.from("user_roles").insert({
-            user_id: authData.user.id,
-            role: "basico",
-          });
-
-          toast({
-            title: "Cadastro realizado!",
-            description: "Bem-vindo! Você tem acesso básico ao sistema.",
-          });
-        }
+        toast({
+          title: "Cadastro realizado!",
+          description: "Bem-vindo! Você pode acessar o sistema.",
+        });
 
         // Oferecer biometria após cadastro bem-sucedido
         if (!isBiometricLoading && isSupported && !isEnabled) {
           setPendingUserId(authData.user.id);
           setShowBiometricDialog(true);
         } else {
-          // Não redirecionar automaticamente — permanecer na tela para validação
-          toast({
-            title: "Cadastro realizado",
-            description: "Cadastro concluído. Permaneça nesta tela para validação.",
-          });
-          setAuthView("login");
+          // Redirecionar para dashboard após cadastro
+          navigate("/dashboard", { replace: true });
         }
       }
     } catch (error: unknown) {
@@ -234,7 +186,7 @@ export default function Auth() {
         setPendingUserId(data.user.id);
         setShowBiometricDialog(true);
       } else {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
@@ -424,7 +376,7 @@ export default function Auth() {
   };
 
   const handleBiometricComplete = () => {
-    navigate("/dashboard");
+    navigate("/dashboard", { replace: true });
   };
 
   // Se está verificando autenticação, mostrar loading
