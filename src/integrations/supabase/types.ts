@@ -1382,6 +1382,140 @@ export type Database = {
         }
         Relationships: []
       }
+      kids_checkins: {
+        Row: {
+          checkin_at: string | null
+          checkin_por: string | null
+          checkout_at: string | null
+          checkout_por: string | null
+          created_at: string | null
+          crianca_id: string
+          culto_id: string | null
+          id: string
+          observacoes: string | null
+          responsavel_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          checkin_at?: string | null
+          checkin_por?: string | null
+          checkout_at?: string | null
+          checkout_por?: string | null
+          created_at?: string | null
+          crianca_id: string
+          culto_id?: string | null
+          id?: string
+          observacoes?: string | null
+          responsavel_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          checkin_at?: string | null
+          checkin_por?: string | null
+          checkout_at?: string | null
+          checkout_por?: string | null
+          created_at?: string | null
+          crianca_id?: string
+          culto_id?: string | null
+          id?: string
+          observacoes?: string | null
+          responsavel_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkout_por_fkey"
+            columns: ["checkout_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkout_por_fkey"
+            columns: ["checkout_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkout_por_fkey"
+            columns: ["checkout_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       liturgia_culto: {
         Row: {
           created_at: string
@@ -2054,6 +2188,7 @@ export type Database = {
           id: string
           metodo: string | null
           pessoa_id: string
+          tipo_registro: string | null
           validado_por: string | null
         }
         Insert: {
@@ -2062,6 +2197,7 @@ export type Database = {
           id?: string
           metodo?: string | null
           pessoa_id: string
+          tipo_registro?: string | null
           validado_por?: string | null
         }
         Update: {
@@ -2070,6 +2206,7 @@ export type Database = {
           id?: string
           metodo?: string | null
           pessoa_id?: string
+          tipo_registro?: string | null
           validado_por?: string | null
         }
         Relationships: [
@@ -2977,6 +3114,95 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_status"] | null
         }
         Relationships: []
+      }
+      view_kids_checkins_ativos: {
+        Row: {
+          checkin_at: string | null
+          checkin_por: string | null
+          checkin_por_nome: string | null
+          crianca_avatar: string | null
+          crianca_data_nascimento: string | null
+          crianca_id: string | null
+          crianca_nome: string | null
+          culto_id: string | null
+          id: string | null
+          observacoes: string | null
+          responsavel_id: string | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
       }
       view_room_occupancy: {
         Row: {
