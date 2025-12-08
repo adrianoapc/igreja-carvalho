@@ -66,7 +66,6 @@ import Biblia from "./pages/Biblia";
 import Install from "./pages/Install";
 import Admin from "./pages/Admin";
 import Perfil from "./pages/Perfil";
-import MinhaFamilia from "./pages/MinhaFamilia";
 import NotFound from "./pages/NotFound";
 import CadastroIndex from "./pages/cadastro/Index";
 import CadastroVisitante from "./pages/cadastro/Visitante";
@@ -83,6 +82,11 @@ import MinhasEscalas from "./pages/MinhasEscalas";
 import Checkin from "./pages/Checkin";
 import { useAuth } from "./hooks/useAuth";
 import PermissionMatrixPrototype from "./pages/AdminPermissions";
+import FamilyWallet from "./pages/FamilyWallet";
+import KidsCheckinScanner from "./pages/kids/Scanner";
+import KidsDashboard from "./pages/kids/Dashboard";
+import EnsinoDashboard from "./pages/ensino/Dashboard";
+import TurmaAtiva from "./pages/kids/TurmaAtiva";
 
 const queryClient = new QueryClient();
 
@@ -282,6 +286,34 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Kids />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kids/dashboard"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <KidsDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kids/scanner"
+            element={
+              <ProtectedRoute>
+                <KidsCheckinScanner />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kids/turma-ativa"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <TurmaAtiva />
                 </MainLayout>
               </ProtectedRoute>
             }
@@ -576,6 +608,16 @@ function App() {
             }
           />
           <Route
+            path="/ensino/dashboard"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <EnsinoDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/cursos"
             element={
               <ProtectedRoute>
@@ -618,7 +660,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <MainLayout>
-                  <MinhaFamilia />
+                  <FamilyWallet />
                 </MainLayout>
               </ProtectedRoute>
             }

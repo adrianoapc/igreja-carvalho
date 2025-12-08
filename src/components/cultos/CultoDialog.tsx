@@ -263,7 +263,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[88vh] sm:max-h-[90vh] overflow-y-auto px-4 sm:px-6">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Editar Evento" : "Novo Evento"}
@@ -274,13 +274,11 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         {!isEditing && !templateApplied && templates.length > 0 && (
           <Alert>
             <Info className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between gap-4">
-              <span className="text-sm">
-                Deseja usar um template existente?
-              </span>
-              <div className="flex items-center gap-2">
+            <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+              <span className="text-sm">Deseja usar um template existente?</span>
+              <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:items-center">
                 <Select value={selectedTemplateId || ""} onValueChange={setSelectedTemplateId}>
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-full sm:w-[200px]">
                     <SelectValue placeholder="Selecionar template" />
                   </SelectTrigger>
                   <SelectContent>
@@ -296,6 +294,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
                   size="sm"
                   onClick={() => setShowTemplatePreview(true)}
                   disabled={!selectedTemplateId}
+                  className="w-full sm:w-auto"
                 >
                   <FileText className="w-4 h-4 mr-2" />
                   Preview
@@ -497,9 +496,6 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
                 </FormItem>
               )}
             />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Pregador */}

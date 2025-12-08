@@ -1,0 +1,419 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { differenceInYears, differenceInMonths } from "date-fns";
+import { 
+  ArrowLeft, 
+  Plus, 
+  QrCode, 
+  User, 
+  MoreVertical,
+  Baby,
+  Users,
+  Loader2,
+  X,
+  ScanLine,
+  CheckCircle,
+  Clock
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import AdicionarDependenteDrawer from "@/components/familia/AdicionarDependenteDrawer";
+import EditarDependenteDrawer from "@/components/familia/EditarDependenteDrawer";
+
+// --- Tipos e Utilitários ---
+interface FamilyMember {
+  id: string;
+  nome: string;
+  data_nascimento: string | null;
+  avatar_url: string | null;
+  alergias: string | null;
+  sexo: string | null;
+  responsavel_legal: boolean | null;
+  tipo_parentesco?: string;
+}
+
+interface KidsCheckin {
+  id: string;
+  crianca_id: string;
+  crianca_nome: string;
+  checkin_at: string;
+  responsavel_id: string;
+}
+
+function calculateAge(birthDate: string | null): string {
+  if (!birthDate) return "";
+  try {
+    const birth = new Date(birthDate);
+    if (isNaN(birth.getTime())) return "";
+    
+    const years = differenceInYears(new Date(), birth);
+    if (years < 1) {
+      const months = differenceInMonths(new Date(), birth);
+      return `${months} ${months === 1 ? 'mês' : 'meses'}`;
+    }
+    return `${years} anos`;
+  } catch (e) {
+    return "";
+  }
+}
+
+export default function FamilyWallet() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { profile, loading } = useAuth(); 
+  
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
+
+  // Query para buscar check-ins ativos das crianças da família
+  const { data: activeCheckins = [], refetch: refetchCheckins } = useQuery({
+    queryKey: ["kids-checkins-ativos", profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("view_kids_checkins_ativos")
+        .select("*")
+        .eq("responsavel_id", profile.id);
+
+      if (error) {
+        console.error("Erro ao buscar check-ins:", error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!profile?.id,
+    refetchInterval: 10000, // Atualiza a cada 10 segundos
+  });
+
+  // --- BUSCA REAL NO BANCO DE DADOS ---
+  const { data: familyMembers, isLoading: isFamilyLoading } = useQuery({
+    queryKey: ['family-members', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+
+      const { data: relationships, error: relError } = await supabase
+        .from('familias')
+        .select('id, tipo_parentesco, familiar_id')
+        .eq('pessoa_id', profile.id);
+
+      if (relError) throw relError;
+      if (!relationships || relationships.length === 0) return [];
+
+      const familiarIds = relationships.map(r => r.familiar_id).filter(Boolean);
+      if (familiarIds.length === 0) return [];
+
+      const { data: familiarProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, nome, data_nascimento, avatar_url, alergias, sexo, responsavel_legal, status')
+        .in('id', familiarIds);
+
+      if (profilesError) throw profilesError;
+
+      const profileMap = new Map(familiarProfiles?.map(p => [p.id, p]) || []);
+
+      return relationships
+        .filter(r => r.familiar_id && profileMap.has(r.familiar_id))
+        .map(r => {
+          const familiar = profileMap.get(r.familiar_id)!;
+          return {
+            id: familiar.id,
+            nome: familiar.nome,
+            data_nascimento: familiar.data_nascimento,
+            avatar_url: familiar.avatar_url,
+            alergias: familiar.alergias,
+            sexo: familiar.sexo,
+            responsavel_legal: familiar.responsavel_legal,
+            tipo_parentesco: r.tipo_parentesco
+          };
+        });
+    },
+    enabled: !!profile?.id,
+  });
+
+  const handleEditMember = (member: FamilyMember) => {
+    setSelectedMember(member);
+    setEditDrawerOpen(true);
+  };
+
+  // Mutation para fazer checkout de uma criança
+  const checkoutMutation = useMutation({
+    mutationFn: async (checkinId: string) => {
+      const { error } = await supabase
+        .from("kids_checkins")
+        .update({
+          checkout_at: new Date().toISOString(),
+          checkout_por: profile?.id,
+        })
+        .eq("id", checkinId)
+        .is("checkout_at", null);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchCheckins();
+      toast.success("Criança retirada do Kids com sucesso!");
+    },
+    onError: (error: any) => {
+      console.error("Erro ao fazer checkout:", error);
+      toast.error("Erro ao retirar criança do Kids");
+    },
+  });
+
+  const handleCheckout = (checkinId: string, childName: string) => {
+    if (confirm(`Retirar ${childName.split(' ')[0]} do Kids?`)) {
+      checkoutMutation.mutate(checkinId);
+    }
+  };
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['family-members'] });
+    setDrawerOpen(false);
+    setEditDrawerOpen(false);
+    setSelectedMember(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const firstName = profile?.nome ? profile.nome.split(' ')[0] : "Usuário";
+  // Gera URL do QR Code usando API pública e segura (apenas para visualização)
+  // O dado embutido é o ID do perfil do pai/mãe
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${profile?.id}&color=000000&bgcolor=ffffff`;
+
+  return (
+    <div className="min-h-screen bg-gray-50/50 pb-20 animate-in fade-in duration-500">
+      
+      {/* 1. HEADER */}
+      <div className="bg-white sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm border-b border-gray-100">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="-ml-2 hover:bg-gray-100 rounded-full">
+          <ArrowLeft className="h-6 w-6 text-gray-700" />
+        </Button>
+        <h1 className="text-lg font-semibold text-gray-800">Carteira da Família</h1>
+        <div className="w-8" />
+      </div>
+
+      <div className="p-4 space-y-6 max-w-lg mx-auto">
+        
+        {/* ALERTA: Crianças no Kids */}
+        {activeCheckins.length > 0 && (
+          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-green-900 mb-1">
+                    {activeCheckins.length} {activeCheckins.length === 1 ? 'Criança' : 'Crianças'} no Kids
+                  </h3>
+                  <div className="space-y-1">
+                    {activeCheckins.map(checkin => (
+                      <p key={checkin.id} className="text-sm text-green-700">
+                        • {checkin.crianca_nome.split(' ')[0]} - desde {new Date(checkin.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-xs text-green-600 mt-2">
+                    ✨ Seus filhos estão sendo bem cuidados!
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* 2. PASSAPORTE KIDS (Zero Click) */}
+        <Card className="bg-primary text-primary-foreground overflow-hidden border-0 shadow-lg relative">
+          <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none" />
+          
+          <CardContent className="p-6 flex flex-col items-center text-center gap-4 relative z-10">
+            {/* QR Code visível diretamente */}
+            <div className="bg-white p-4 rounded-xl shadow-md relative">
+              <img 
+                src={qrCodeUrl} 
+                alt="QR Code do Usuário" 
+                className="w-40 h-40 object-contain"
+              />
+              {/* Logo Watermark */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
+                <Baby className="w-12 h-12 text-black" />
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-bold flex items-center justify-center gap-2">
+                Passaporte Kids <ScanLine className="h-4 w-4 opacity-70" />
+              </h3>
+              <p className="text-primary-foreground/90 text-sm mt-1">
+                Aproxime este código do Scanner
+              </p>
+              <p className="text-primary-foreground/60 text-xs mt-2 uppercase tracking-widest">
+                {profile?.nome?.split(' ')[0]} · {profile?.id?.slice(0, 8)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. LISTA DE FAMILIARES */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800">Minha Família</h2>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2 text-primary border-primary/20 hover:bg-primary/5 rounded-full"
+              onClick={() => setDrawerOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {/* Card do Usuário Logado */}
+            {profile && (
+               <Card className="overflow-hidden border-gray-100 shadow-sm bg-white/80">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <Avatar className="h-14 w-14 border-2 border-white shadow-sm">
+                    <AvatarImage src={profile.avatar_url || ""} />
+                    <AvatarFallback className="bg-blue-100 text-blue-600">
+                      <User className="h-6 w-6" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 truncate">
+                      Eu ({firstName})
+                    </h3>
+                    <p className="text-sm text-gray-500">Responsável</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {isFamilyLoading && [1, 2].map((i) => (
+              <Card key={i}><CardContent className="p-4 flex gap-4"><Skeleton className="h-14 w-14 rounded-full" /><div className="space-y-2 flex-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20" /></div></CardContent></Card>
+            ))}
+
+            {/* Lista Real de Dependentes */}
+            {familyMembers?.map((member) => {
+              const age = calculateAge(member.data_nascimento);
+              const isChild = (age.includes('anos') && parseInt(age) < 12) || age.includes('mês') || age.includes('meses');
+              const checkinStatus = activeCheckins.find(c => c.crianca_id === member.id);
+              const isCheckedIn = !!checkinStatus;
+              
+              return (
+                <Card key={member.id} className={`overflow-hidden shadow-sm hover:shadow-md transition-all group bg-white ${isCheckedIn ? 'border-2 border-green-400' : 'border-gray-100'}`}>
+                  <CardContent className="p-4 flex items-center gap-4">
+                    
+                    <Avatar className="h-14 w-14 border-2 border-white shadow-sm relative">
+                      <AvatarImage src={member.avatar_url || ""} />
+                      <AvatarFallback className={`${isChild ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
+                        {isChild ? <Baby className="h-6 w-6" /> : <Users className="h-6 w-6" />}
+                      </AvatarFallback>
+                      {isCheckedIn && (
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                    </Avatar>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-gray-900 truncate">{member.nome}</h3>
+                        {isCheckedIn && (
+                          <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1">
+                            <Clock className="w-3 h-3" />
+                            No Kids
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <span className="capitalize">{member.tipo_parentesco || 'Familiar'}</span>
+                        {member.data_nascimento && (
+                          <>
+                            <span className="text-gray-300">•</span>
+                            <span>{age}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600">
+                          <MoreVertical className="h-5 w-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {isCheckedIn && (
+                          <DropdownMenuItem 
+                            onClick={() => handleCheckout(checkinStatus.id, member.nome)}
+                            className="text-green-600 focus:text-green-700"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Retirar do Kids
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => handleEditMember(member)}>
+                          Editar Dados
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 4. DICA VISUAL */}
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex gap-3 text-sm text-blue-800 mt-6">
+          <div className="mt-0.5">💡</div>
+          <p>
+            Mantenha as alergias das crianças atualizadas para garantir a segurança no Kids.
+          </p>
+        </div>
+
+      </div>
+
+      {/* Drawers Auxiliares */}
+      <AdicionarDependenteDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onSuccess={handleSuccess}
+        parentProfileId={profile?.id || ''}
+      />
+
+      {selectedMember && (
+        <EditarDependenteDrawer
+          open={editDrawerOpen}
+          onOpenChange={setEditDrawerOpen}
+          onSuccess={handleSuccess}
+          member={selectedMember}
+        />
+      )}
+    </div>
+  );
+}

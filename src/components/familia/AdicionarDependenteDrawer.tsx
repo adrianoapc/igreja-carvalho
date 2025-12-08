@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Loader2, AlertTriangle, Camera, X } from "lucide-react";
 import { toast } from "sonner";
+import { ImageCaptureInput } from "@/components/ui/image-capture-input";
 
 // Arrays para os selects de data
 const dias = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
@@ -49,6 +51,8 @@ export default function AdicionarDependenteDrawer({
   const [alergias, setAlergias] = useState("");
   const [sexo, setSexo] = useState("");
   const [tipoParentesco, setTipoParentesco] = useState("filho");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const resetForm = () => {
     setNome("");
@@ -58,6 +62,24 @@ export default function AdicionarDependenteDrawer({
     setAlergias("");
     setSexo("");
     setTipoParentesco("filho");
+    setSelectedFile(null);
+    setPreviewUrl(null);
+  };
+
+  const handleFileSelected = (file: File) => {
+    setSelectedFile(file);
+    
+    // Criar preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearPreview = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
   };
 
   const createDependentMutation = useMutation({
@@ -81,7 +103,37 @@ export default function AdicionarDependenteDrawer({
 
       const dataNascimento = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
 
-      // 1. Create the child profile (without familia_id - relationships are managed via familias table)
+      // Upload da foto primeiro, se houver
+      let avatarUrl: string | null = null;
+      
+      if (selectedFile) {
+        // Obter user_id do auth para criar pasta temporária
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Usuário não autenticado");
+
+        // Gerar nome único para o arquivo (será movido depois)
+        const fileExt = selectedFile.name.split(".").pop();
+        const tempFileName = `temp/${user.id}/${Date.now()}.${fileExt}`;
+
+        // Upload do arquivo
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(tempFileName, selectedFile, {
+            upsert: true,
+            contentType: selectedFile.type,
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Obter URL pública
+        const { data: { publicUrl } } = supabase.storage
+          .from("avatars")
+          .getPublicUrl(tempFileName);
+
+        avatarUrl = publicUrl;
+      }
+
+      // 1. Create the child profile
       const { data: childProfile, error: childError } = await supabase
         .from('profiles')
         .insert({
@@ -91,11 +143,37 @@ export default function AdicionarDependenteDrawer({
           sexo: sexo || null,
           status: 'membro',
           responsavel_legal: false,
+          avatar_url: avatarUrl,
         })
         .select()
         .single();
 
       if (childError) throw childError;
+
+      // Mover foto para pasta definitiva do perfil, se houver
+      if (selectedFile && avatarUrl) {
+        const fileExt = selectedFile.name.split(".").pop();
+        const { data: { user } } = await supabase.auth.getUser();
+        const tempFileName = `temp/${user!.id}/${avatarUrl.split('/').pop()}`;
+        const finalFileName = `${childProfile.id}/${Date.now()}.${fileExt}`;
+
+        // Copiar para pasta definitiva
+        const { error: moveError } = await supabase.storage
+          .from("avatars")
+          .move(tempFileName, finalFileName);
+
+        if (!moveError) {
+          // Atualizar URL no perfil
+          const { data: { publicUrl } } = supabase.storage
+            .from("avatars")
+            .getPublicUrl(finalFileName);
+
+          await supabase
+            .from('profiles')
+            .update({ avatar_url: publicUrl })
+            .eq('id', childProfile.id);
+        }
+      }
 
       // 2. Create family relationship record in familias table
       const { error: relError } = await supabase
@@ -137,6 +215,43 @@ export default function AdicionarDependenteDrawer({
           </DrawerHeader>
 
           <form onSubmit={handleSubmit} className="px-4 space-y-4">
+            {/* Avatar Upload */}
+            <div className="flex flex-col items-center space-y-4 py-4">
+              <div className="relative group">
+                <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
+                  <AvatarImage src={previewUrl || undefined} />
+                  <AvatarFallback className="bg-gradient-accent text-primary text-3xl">
+                    {nome ? nome.charAt(0).toUpperCase() : <Camera className="h-8 w-8" />}
+                  </AvatarFallback>
+                </Avatar>
+                
+                {previewUrl && (
+                  <button
+                    type="button"
+                    onClick={handleClearPreview}
+                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-md hover:bg-destructive/90 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="w-full max-w-xs">
+                <ImageCaptureInput
+                  onFileSelected={handleFileSelected}
+                  accept="image/*"
+                  maxSizeMB={2}
+                  onClear={handleClearPreview}
+                />
+              </div>
+
+              {previewUrl && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Foto selecionada com sucesso ✓
+                </p>
+              )}
+            </div>
+
             {/* Tipo de Parentesco */}
             <div className="space-y-2">
               <Label>Tipo de Parentesco *</Label>

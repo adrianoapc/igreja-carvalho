@@ -35,6 +35,11 @@ import {
   GraduationCap,
   UsersIcon,
   Book,
+  ScanLine,
+  WalletCards,
+  Presentation,
+  FileText,
+  Cog,
 } from "lucide-react";
 import {
   Sidebar,
@@ -104,9 +109,9 @@ const menuItems = [
 // Itens exclusivos para membros comuns
 const memberOnlyItems = [
   {
-    icon: UsersIcon,
-    label: "Minha Família",
-    path: "/minha-familia",
+    icon: WalletCards,
+    label: "Carteira da Família",
+    path: "/perfil/familia",
   },
   {
     icon: MessageCircle,
@@ -117,6 +122,68 @@ const memberOnlyItems = [
     icon: Book,
     label: "Bíblia",
     path: "/biblia",
+  },
+];
+
+// Itens do Ministério Kids (apenas para líderes/admin)
+const kidsItems = [
+  {
+    icon: LayoutDashboard,
+    label: "Visão Geral",
+    path: "/kids/dashboard",
+  },
+  {
+    icon: ScanLine,
+    label: "Totem de Check-in",
+    path: "/kids/scanner",
+  },
+  {
+    icon: BookOpen,
+    label: "Diário de Classe",
+    path: "/kids/turma-ativa",
+  },
+  {
+    icon: Baby,
+    label: "Salas & Turmas",
+    path: "/kids",
+  },
+  {
+    icon: Settings,
+    label: "Configurar Salas",
+    path: "/ensino?tab=config",
+  },
+];
+
+// Itens do Módulo de Ensino (apenas para líderes/admin)
+const ensinoItems = [
+  {
+    icon: LayoutDashboard,
+    label: "Visão Geral",
+    path: "/ensino/dashboard",
+  },
+  {
+    icon: Presentation,
+    label: "Aulas & Cronograma",
+    path: "/ensino",
+  },
+  {
+    icon: FileText,
+    label: "Materiais",
+    path: "/jornadas",
+  },
+];
+
+// Itens do Módulo Administrativo (apenas para admin)
+const administrativoItems = [
+  {
+    icon: Cog,
+    label: "Configurações da Igreja",
+    path: "/configuracoes-igreja",
+  },
+  {
+    icon: Shield,
+    label: "Gestão de Acesso",
+    path: "/admin",
   },
 ];
 
@@ -294,28 +361,7 @@ const midiasItems = [
     path: "/midias/geral",
   },
 ];
-const modulosItems = [
-  {
-    icon: GraduationCap,
-    label: "Ensino",
-    path: "/ensino",
-  },
-  {
-    icon: Baby,
-    label: "Kids",
-    path: "/kids",
-  },
-  {
-    icon: Settings,
-    label: "Configurações",
-    path: "/configuracoes-igreja",
-  },
-  {
-    icon: Shield,
-    label: "Administração",
-    path: "/admin",
-  },
-];
+
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -997,27 +1043,136 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Módulos</SidebarGroupLabel>
+          <SidebarGroupLabel>Ministério Kids</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {modulosItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton asChild tooltip={item.label}>
-                      <NavLink
-                        to={item.path}
-                        end
-                        className="hover:bg-sidebar-accent"
-                        activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-                      >
-                        <Icon className="w-5 h-5" />
-                        {!isCollapsed && <span>{item.label}</span>}
-                      </NavLink>
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Kids">
+                      <Baby className="w-5 h-5" />
+                      {!isCollapsed && (
+                        <>
+                          <span>Kids</span>
+                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
                     </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {kidsItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink
+                                to={item.path}
+                                end
+                                className="hover:bg-sidebar-accent"
+                                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                              >
+                                <Icon className="w-4 h-4 text-white" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Ministério de Ensino</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Ensino">
+                      <GraduationCap className="w-5 h-5" />
+                      {!isCollapsed && (
+                        <>
+                          <span>Ensino</span>
+                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {ensinoItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink
+                                to={item.path}
+                                end
+                                className="hover:bg-sidebar-accent"
+                                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                              >
+                                <Icon className="w-4 h-4 text-white" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Administrativo</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Administrativo">
+                      <Shield className="w-5 h-5" />
+                      {!isCollapsed && (
+                        <>
+                          <span>Administrativo</span>
+                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {administrativoItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <SidebarMenuSubItem key={item.path}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink
+                                to={item.path}
+                                end
+                                className="hover:bg-sidebar-accent"
+                                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                              >
+                                <Icon className="w-4 h-4 text-white" />
+                                {!isCollapsed && <span>{item.label}</span>}
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

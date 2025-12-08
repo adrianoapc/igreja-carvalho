@@ -66,7 +66,10 @@ export default function ProjetoDetalhes() {
         .select(`*, lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url)`)
         .eq("id", id)
         .single();
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao carregar projeto:", error);
+        return null;
+      }
       return data as Projeto;
     },
     enabled: !!id,

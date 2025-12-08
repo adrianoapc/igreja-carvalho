@@ -36,7 +36,10 @@ export default function Projetos() {
         `)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao carregar projetos:", error);
+        return [];
+      }
       return data as Projeto[];
     },
   });

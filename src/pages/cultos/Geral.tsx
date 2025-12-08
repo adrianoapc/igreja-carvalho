@@ -20,22 +20,29 @@ export default function CultosGeral() {
   }, []);
 
   const loadStats = async () => {
-    const now = new Date().toISOString();
-    
-    const [cultos, times, escalas, realizados, midias] = await Promise.all([
-      supabase
-        .from("cultos")
-        .select("id", { count: "exact" })
-        .gte("data_culto", now)
-        .in("status", ["planejado", "confirmado"]),
+    const today = new Date().toISOString().split("T")[0];
+    const startOfDay = `${today}T00:00:00Z`;
+
+    // Buscar cultos futuros/atuais primeiro para usar os IDs na contagem de escalas
+    const { data: cultosFuturos, count: countCultos } = await supabase
+      .from("cultos")
+      .select("id", { count: "exact" })
+      .gte("data_culto", startOfDay)
+      .in("status", ["planejado", "confirmado"]);
+
+    const cultosIds = (cultosFuturos || []).map((c) => c.id);
+
+    const [times, escalas, realizados, midias] = await Promise.all([
       supabase
         .from("times_culto")
         .select("id", { count: "exact" })
         .eq("ativo", true),
-      supabase
-        .from("escalas_culto")
-        .select("pessoa_id", { count: "exact" })
-        .gte("culto_id", now),
+      cultosIds.length === 0
+        ? Promise.resolve({ count: 0 })
+        : supabase
+            .from("escalas_culto")
+            .select("id", { count: "exact" })
+            .in("culto_id", cultosIds),
       supabase
         .from("cultos")
         .select("id", { count: "exact" })
@@ -47,7 +54,7 @@ export default function CultosGeral() {
     ]);
 
     setStats({
-      proximosCultos: cultos.count || 0,
+      proximosCultos: countCultos || 0,
       timesAtivos: times.count || 0,
       membrosEscalados: escalas.count || 0,
       cultosRealizados: realizados.count || 0,
