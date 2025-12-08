@@ -1516,6 +1516,98 @@ export type Database = {
           },
         ]
       }
+      kids_diario: {
+        Row: {
+          comportamento_tags: string[] | null
+          created_at: string | null
+          crianca_id: string
+          culto_id: string | null
+          data: string
+          humor: string | null
+          id: string
+          necessidades_tags: string[] | null
+          observacoes: string | null
+          professor_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          comportamento_tags?: string[] | null
+          created_at?: string | null
+          crianca_id: string
+          culto_id?: string | null
+          data?: string
+          humor?: string | null
+          id?: string
+          necessidades_tags?: string[] | null
+          observacoes?: string | null
+          professor_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          comportamento_tags?: string[] | null
+          created_at?: string | null
+          crianca_id?: string
+          culto_id?: string | null
+          data?: string
+          humor?: string | null
+          id?: string
+          necessidades_tags?: string[] | null
+          observacoes?: string | null
+          professor_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "kids_diario_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       liturgia_culto: {
         Row: {
           created_at: string
@@ -3198,6 +3290,78 @@ export type Database = {
           {
             foreignKeyName: "kids_checkins_responsavel_id_fkey"
             columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
+      view_kids_diario: {
+        Row: {
+          comportamento_tags: string[] | null
+          created_at: string | null
+          crianca_avatar: string | null
+          crianca_id: string | null
+          crianca_nascimento: string | null
+          crianca_nome: string | null
+          culto_data: string | null
+          culto_id: string | null
+          culto_titulo: string | null
+          data: string | null
+          humor: string | null
+          id: string | null
+          necessidades_tags: string[] | null
+          observacoes: string | null
+          professor_id: string | null
+          professor_nome: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "kids_diario_culto_id_fkey"
+            columns: ["culto_id"]
+            isOneToOne: false
+            referencedRelation: "cultos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
