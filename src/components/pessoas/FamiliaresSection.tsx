@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ interface Familiar {
     nome: string;
     status: string;
   };
+  _isReverse?: boolean; // Marcador interno para relações reversas
 }
 
 interface FamiliaresSectionProps {
@@ -35,65 +37,156 @@ interface FamiliaresSectionProps {
   pessoaNome: string;
 }
 
-const PARENTESCO_LABELS: Record<string, string> = {
-  conjuge: "Cônjuge",
-  filho: "Filho(a)",
-  pai: "Pai",
-  mae: "Mãe",
-  irmao: "Irmão(ã)",
-  avo: "Avô(ó)",
-  neto: "Neto(a)",
-  tio: "Tio(a)",
-  sobrinho: "Sobrinho(a)",
-  primo: "Primo(a)",
-  outro: "Outro",
-};
+// Mesma função de inversão de papel do Perfil e FamilyWallet
+function getDisplayRole(storedRole: string | null | undefined, isReverse: boolean, memberSex?: string | null): string {
+  if (!storedRole) return "Familiar";
+  if (!isReverse) return storedRole; // Fluxo normal: exibe como está
+
+  // Fluxo reverso: precisa inverter
+  const role = storedRole.toLowerCase();
+
+  // Se são conjuges, mantém "Cônjuge"
+  if (["marido", "esposa", "cônjuge"].includes(role)) {
+    return "Cônjuge";
+  }
+
+  // Se eu cadastrei como pai/mãe e ele me adicionou, ele é meu filho/filha
+  if (role === "pai" || role === "mãe") {
+    return memberSex === "M" ? "Filho" : "Filha";
+  }
+
+  // Se eu cadastrei como filho/filha e ele me adicionou, ele é meu responsável
+  if (role === "filho" || role === "filha") {
+    return "Responsável";
+  }
+
+  // Outros casos genéricos
+  return "Familiar";
+}
 
 export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionProps) {
   const [familiares, setFamiliares] = useState<Familiar[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [familiarParaDeletar, setFamiliarParaDeletar] = useState<string | null>(null);
   const [familiarParaConverter, setFamiliarParaConverter] = useState<{ id: string; nome: string } | null>(null);
   const [deletando, setDeletando] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchFamiliares = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("familias")
-        .select(`
-          id,
-          familiar_id,
-          nome_familiar,
-          tipo_parentesco,
-          familiar:profiles!familias_familiar_id_fkey (
-            id,
-            nome,
-            status
-          )
-        `)
-        .eq("pessoa_id", pessoaId)
-        .order("created_at", { ascending: true });
+  // Query bidirecional para familiares
+  const { data: queryFamiliares = [], isLoading } = useQuery({
+    queryKey: ['familiares-section', pessoaId],
+    queryFn: async () => {
+      if (!pessoaId) return [];
 
-      if (error) throw error;
-      setFamiliares(data || []);
-    } catch (error) {
-      console.error("Erro ao buscar familiares:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os familiares",
-        variant: "destructive",
+      // Query bidirecional: busca os dois lados da relação
+      const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
+        supabase
+          .from('familias')
+          .select('id, pessoa_id, familiar_id, tipo_parentesco')
+          .eq('pessoa_id', pessoaId),
+        supabase
+          .from('familias')
+          .select('id, pessoa_id, familiar_id, tipo_parentesco')
+          .eq('familiar_id', pessoaId)
+      ]);
+
+      if (relationshipsAsPessoa.error) throw relationshipsAsPessoa.error;
+      if (relationshipsAsFamiliar.error) throw relationshipsAsFamiliar.error;
+
+      // Combinar ambas as queries
+      const relationships = [
+        ...(relationshipsAsPessoa.data || []),
+        ...(relationshipsAsFamiliar.data || [])
+      ];
+
+      if (relationships.length === 0) return [];
+
+      // Identificação inteligente do alvo (evitar duplicatas)
+      const familiarIds = new Set<string>();
+      const familiarMap = new Map<string, {
+        familiarId: string;
+        storedRole: string;
+        isReverse: boolean;
+      }>();
+
+      relationships.forEach(item => {
+        let targetId: string;
+        let isReverse = false;
+
+        if (item.pessoa_id === pessoaId) {
+          // Fluxo normal: EU sou pessoa_id, o familiar é familiar_id
+          targetId = item.familiar_id;
+          isReverse = false;
+        } else {
+          // Fluxo reverso: EU sou familiar_id, a pessoa me adicionou
+          targetId = item.pessoa_id;
+          isReverse = true;
+        }
+
+        if (targetId) {
+          familiarIds.add(targetId);
+          
+          // Se já tem esse familiar, manter o registro anterior (preferir fluxo normal)
+          if (!familiarMap.has(targetId)) {
+            familiarMap.set(targetId, {
+              familiarId: targetId,
+              storedRole: item.tipo_parentesco,
+              isReverse,
+            });
+          }
+        }
       });
-    } finally {
-      setLoading(false);
-    }
-  };
 
+      if (familiarIds.size === 0) return [];
+
+      // Buscar dados dos familiares
+      const { data: familiarProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, nome, sexo, status')
+        .in('id', Array.from(familiarIds));
+
+      if (profilesError) throw profilesError;
+
+      const profileMap = new Map(familiarProfiles?.map(p => [p.id, p]) || []);
+
+      // Montar resultado final com inversão de papel
+      const members = Array.from(familiarIds)
+        .filter(id => profileMap.has(id))
+        .map(id => {
+          const familiar = profileMap.get(id)!;
+          const relationData = familiarMap.get(id)!;
+
+          const displayRole = getDisplayRole(
+            relationData.storedRole,
+            relationData.isReverse,
+            familiar.sexo
+          );
+
+          return {
+            id: familiar.id,
+            familiar_id: familiar.id,
+            nome_familiar: familiar.nome,
+            tipo_parentesco: displayRole,
+            familiar: {
+              id: familiar.id,
+              nome: familiar.nome,
+              status: familiar.status,
+            },
+            _isReverse: relationData.isReverse,
+          };
+        });
+
+      return members;
+    },
+    enabled: !!pessoaId,
+    staleTime: 0,
+  });
+
+  // Sincronizar com o estado local
   useEffect(() => {
-    fetchFamiliares();
-  }, [pessoaId]);
+    setFamiliares(queryFamiliares);
+  }, [queryFamiliares]);
 
   const handleDeletar = async () => {
     if (!familiarParaDeletar) return;
@@ -112,7 +205,7 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
         description: "Familiar removido com sucesso",
       });
 
-      fetchFamiliares();
+      queryClient.invalidateQueries({ queryKey: ['familiares-section', pessoaId] });
     } catch (error) {
       console.error("Erro ao deletar familiar:", error);
       toast({
@@ -165,7 +258,7 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
           </Button>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
@@ -184,15 +277,18 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
                         <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                       )}
                       <p className="font-medium truncate">
-                        {familiar.familiar_id 
-                          ? familiar.familiar?.nome 
-                          : familiar.nome_familiar}
+                        {familiar.familiar?.nome || familiar.nome_familiar}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 ml-6">
                       <Badge variant="outline" className="text-xs">
-                        {PARENTESCO_LABELS[familiar.tipo_parentesco] || familiar.tipo_parentesco}
+                        {familiar.tipo_parentesco}
                       </Badge>
+                      {familiar._isReverse && (
+                        <Badge variant="secondary" className="text-xs">
+                          Adicionou você
+                        </Badge>
+                      )}
                       {familiar.familiar_id && familiar.familiar && (
                         <Badge variant={getStatusBadgeVariant(familiar.familiar.status)} className="text-xs">
                           {getStatusLabel(familiar.familiar.status)}
@@ -243,7 +339,7 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
         onOpenChange={setDialogOpen}
         pessoaId={pessoaId}
         pessoaNome={pessoaNome}
-        onSuccess={fetchFamiliares}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['familiares-section', pessoaId] })}
       />
 
       {familiarParaConverter && (
@@ -252,7 +348,7 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
           onOpenChange={(open) => !open && setFamiliarParaConverter(null)}
           familiaId={familiarParaConverter.id}
           nomeFamiliar={familiarParaConverter.nome}
-          onSuccess={fetchFamiliares}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['familiares-section', pessoaId] })}
         />
       )}
 

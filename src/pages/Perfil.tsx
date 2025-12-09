@@ -191,8 +191,6 @@ export default function Perfil() {
     queryFn: async () => {
       if (!profile?.id) return [];
 
-      console.log('[Perfil] Carregando familiares para:', profile.id);
-
       // Query bidirecional: busca os dois lados da relação
       const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
         supabase
@@ -229,11 +227,9 @@ export default function Perfil() {
         let isReverse = false;
 
         if (item.pessoa_id === profile.id) {
-          // Fluxo normal: EU sou pessoa_id, o familiar é familiar_id
           targetId = item.familiar_id;
           isReverse = false;
         } else {
-          // Fluxo reverso: EU sou familiar_id, a pessoa me adicionou
           targetId = item.pessoa_id;
           isReverse = true;
         }
@@ -241,7 +237,6 @@ export default function Perfil() {
         if (targetId) {
           familiarIds.add(targetId);
           
-          // Se já tem esse familiar, manter o registro anterior (preferir fluxo normal)
           if (!familiarMap.has(targetId)) {
             familiarMap.set(targetId, {
               familiarId: targetId,
