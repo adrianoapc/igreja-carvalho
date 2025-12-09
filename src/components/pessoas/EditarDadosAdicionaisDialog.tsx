@@ -23,6 +23,8 @@ const dadosAdicionaisSchema = z.object({
   entrevistado_por: z.string().max(100).nullable(),
   cadastrado_por: z.string().max(100).nullable(),
   tipo_sanguineo: z.string().max(10).nullable(),
+  alergias: z.string().max(500).nullable(),
+  necessidades_especiais: z.string().max(500).nullable(),
   observacoes: z.string().max(1000).nullable(),
 });
 
@@ -38,6 +40,8 @@ interface EditarDadosAdicionaisDialogProps {
     entrevistado_por: string | null;
     cadastrado_por: string | null;
     tipo_sanguineo: string | null;
+    alergias: string | null;
+    necessidades_especiais: string | null;
     observacoes: string | null;
   };
   onSuccess: () => void;
@@ -59,6 +63,8 @@ export function EditarDadosAdicionaisDialog({
     entrevistado_por: dadosAtuais.entrevistado_por || "",
     cadastrado_por: dadosAtuais.cadastrado_por || "",
     tipo_sanguineo: dadosAtuais.tipo_sanguineo || "",
+    alergias: dadosAtuais.alergias || "",
+    necessidades_especiais: dadosAtuais.necessidades_especiais || "",
     observacoes: dadosAtuais.observacoes || "",
   });
   const { toast } = useToast();
@@ -73,6 +79,8 @@ export function EditarDadosAdicionaisDialog({
         entrevistado_por: dadosAtuais.entrevistado_por || "",
         cadastrado_por: dadosAtuais.cadastrado_por || "",
         tipo_sanguineo: dadosAtuais.tipo_sanguineo || "",
+        alergias: dadosAtuais.alergias || "",
+        necessidades_especiais: dadosAtuais.necessidades_especiais || "",
         observacoes: dadosAtuais.observacoes || "",
       });
     }
@@ -95,6 +103,8 @@ export function EditarDadosAdicionaisDialog({
           entrevistado_por: validatedData.entrevistado_por || null,
           cadastrado_por: validatedData.cadastrado_por || null,
           tipo_sanguineo: validatedData.tipo_sanguineo || null,
+          alergias: validatedData.alergias || null,
+          necessidades_especiais: validatedData.necessidades_especiais || null,
           observacoes: validatedData.observacoes || null,
         })
         .eq("id", pessoaId);
@@ -218,6 +228,34 @@ export function EditarDadosAdicionaisDialog({
                 }
                 maxLength={10}
                 placeholder="Ex: O+"
+              />
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="alergias">Alergias</Label>
+              <Textarea
+                id="alergias"
+                value={formData.alergias}
+                onChange={(e) =>
+                  setFormData({ ...formData, alergias: e.target.value })
+                }
+                maxLength={500}
+                placeholder="Descreva alergias alimentares, medicamentosas ou outras"
+                className="min-h-[80px]"
+              />
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="necessidadesEspeciais">Necessidades Especiais</Label>
+              <Textarea
+                id="necessidadesEspeciais"
+                value={formData.necessidades_especiais}
+                onChange={(e) =>
+                  setFormData({ ...formData, necessidades_especiais: e.target.value })
+                }
+                maxLength={500}
+                placeholder="Descreva necessidades especiais de acessibilidade, mobilidade ou outras"
+                className="min-h-[80px]"
               />
             </div>
 

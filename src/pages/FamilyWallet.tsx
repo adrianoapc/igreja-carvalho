@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import AdicionarDependenteDrawer from "@/components/familia/AdicionarDependenteDrawer";
 import EditarDependenteDrawer from "@/components/familia/EditarDependenteDrawer";
+import VincularResponsavelDialog from "@/components/familia/VincularResponsavelDialog";
 
 // --- Tipos e Utilitários ---
 interface FamilyMember {
@@ -47,6 +48,7 @@ interface FamilyMember {
   data_nascimento: string | null;
   avatar_url: string | null;
   alergias: string | null;
+  necessidades_especiais: string | null;
   sexo: string | null;
   responsavel_legal: boolean | null;
   tipo_parentesco?: string;
@@ -140,29 +142,8 @@ export default function FamilyWallet() {
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [vincularResponsavelOpen, setVincularResponsavelOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
-
-  // Query para buscar check-ins ativos das crianças da família
-  const { data: activeCheckins = [], refetch: refetchCheckins } = useQuery({
-    queryKey: ["kids-checkins-ativos", profile?.id],
-    queryFn: async () => {
-      if (!profile?.id) return [];
-      
-      const { data, error } = await supabase
-        .from("view_kids_checkins_ativos")
-        .select("*")
-        .eq("responsavel_id", profile.id);
-
-      if (error) {
-        console.error("Erro ao buscar check-ins:", error);
-        return [];
-      }
-
-      return data || [];
-    },
-    enabled: !!profile?.id,
-    refetchInterval: 10000, // Atualiza a cada 10 segundos
-  });
 
   // --- BUSCA REAL NO BANCO DE DADOS (BIDIRECIONAL) ---
   const { data: familyMembers, isLoading: isFamilyLoading } = useQuery({
@@ -233,7 +214,7 @@ export default function FamilyWallet() {
       // Busca dados dos familiares
       const { data: familiarProfiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, nome, data_nascimento, avatar_url, alergias, sexo, responsavel_legal, status')
+        .select('id, nome, data_nascimento, avatar_url, alergias, necessidades_especiais, sexo, responsavel_legal, status')
         .in('id', Array.from(familiarIds));
 
       if (profilesError) throw profilesError;
@@ -260,6 +241,7 @@ export default function FamilyWallet() {
             data_nascimento: familiar.data_nascimento,
             avatar_url: familiar.avatar_url,
             alergias: familiar.alergias,
+            necessidades_especiais: familiar.necessidades_especiais,
             sexo: familiar.sexo,
             responsavel_legal: familiar.responsavel_legal,
             tipo_parentesco: displayRole,
@@ -271,6 +253,91 @@ export default function FamilyWallet() {
     },
     enabled: !!profile?.id,
     staleTime: 0, // Sempre buscar dados frescos
+  });
+
+  // Query para buscar responsáveis/autorizados (pessoas que podem buscar as crianças)
+  const { data: responsaveisAutorizados = [] } = useQuery({
+    queryKey: ["responsaveis-autorizados", familyMembers],
+    queryFn: async () => {
+      if (!familyMembers || familyMembers.length === 0) return [];
+
+      // Buscar todas as pessoas que foram vinculadas às crianças da família
+      const childrenIds = familyMembers
+        .filter(m => {
+          if (!m.data_nascimento) return false;
+          const age = calculateAge(m.data_nascimento);
+          return (age.includes('anos') && parseInt(age) < 13) || age.includes('mês') || age.includes('meses');
+        })
+        .map(m => m.id);
+
+      if (childrenIds.length === 0) return [];
+
+      // Query: buscar responsáveis que foram vinculados a essas crianças
+      const { data: relationships, error } = await supabase
+        .from("familias")
+        .select("pessoa_id, tipo_parentesco")
+        .in("familiar_id", childrenIds)
+        .neq("pessoa_id", profile?.id);
+
+      if (error) {
+        console.error("Erro ao buscar responsáveis autorizados:", error);
+        return [];
+      }
+
+      if (!relationships || relationships.length === 0) return [];
+
+      // Deduplica pessoas
+      const pessoasIds = Array.from(new Set(relationships.map(r => r.pessoa_id)));
+
+      // Buscar dados das pessoas
+      const { data: pessoas, error: pessoasError } = await supabase
+        .from("profiles")
+        .select("id, nome, avatar_url, email, telefone")
+        .in("id", pessoasIds);
+
+      if (pessoasError) throw pessoasError;
+
+      // Mapear relacionamentos
+      const relationshipMap = new Map<string, string[]>();
+      relationships.forEach(r => {
+        if (!relationshipMap.has(r.pessoa_id)) {
+          relationshipMap.set(r.pessoa_id, []);
+        }
+        relationshipMap.get(r.pessoa_id)?.push(r.tipo_parentesco);
+      });
+
+      return (pessoas || []).map(p => ({
+        id: p.id,
+        nome: p.nome,
+        avatar_url: p.avatar_url,
+        email: p.email,
+        telefone: p.telefone,
+        parentescos: Array.from(new Set(relationshipMap.get(p.id) || [])),
+      }));
+    },
+    enabled: !!familyMembers,
+  });
+
+  // Query para buscar check-ins ativos das crianças da família
+  const { data: activeCheckins = [], refetch: refetchCheckins } = useQuery({
+    queryKey: ["kids-checkins-ativos", profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("view_kids_checkins_ativos")
+        .select("*")
+        .eq("responsavel_id", profile.id);
+
+      if (error) {
+        console.error("Erro ao buscar check-ins:", error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!profile?.id,
+    refetchInterval: 10000, // Atualiza a cada 10 segundos
   });
 
   // Query para buscar diários de hoje das crianças
@@ -339,6 +406,44 @@ export default function FamilyWallet() {
     }
   };
 
+  // Mutation para remover um responsável autorizado
+  const removerResponsavelMutation = useMutation({
+    mutationFn: async (responsavelId: string) => {
+      // Buscar todas as crianças da família
+      const childrenIds = familyMembers
+        .filter(m => {
+          if (!m.data_nascimento) return false;
+          const age = calculateAge(m.data_nascimento);
+          return (age.includes('anos') && parseInt(age) < 13) || age.includes('mês') || age.includes('meses');
+        })
+        .map(m => m.id);
+
+      // Deletar todos os relacionamentos entre o responsável e as crianças
+      const { error } = await supabase
+        .from("familias")
+        .delete()
+        .eq("pessoa_id", responsavelId)
+        .in("familiar_id", childrenIds);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Responsável removido com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["responsaveis-autorizados"] });
+      queryClient.invalidateQueries({ queryKey: ["family-members"] });
+    },
+    onError: (error: any) => {
+      console.error("Erro ao remover responsável:", error);
+      toast.error("Erro ao remover responsável");
+    },
+  });
+
+  const handleRemoverResponsavel = (responsavel: any) => {
+    if (confirm(`Remover acesso de ${responsavel.nome}?`)) {
+      removerResponsavelMutation.mutate(responsavel.id);
+    }
+  };
+
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['family-members'] });
     setDrawerOpen(false);
@@ -368,7 +473,15 @@ export default function FamilyWallet() {
           <ArrowLeft className="h-6 w-6 text-gray-700" />
         </Button>
         <h1 className="text-lg font-semibold text-gray-800">Carteira da Família</h1>
-        <div className="w-8" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setVincularResponsavelOpen(true)}
+          className="hover:bg-gray-100 rounded-full text-gray-700"
+          title="Gerenciar responsáveis"
+        >
+          <Users className="h-6 w-6" />
+        </Button>
       </div>
 
       <div className="p-4 space-y-6 max-w-lg mx-auto">
@@ -614,6 +727,78 @@ export default function FamilyWallet() {
           </p>
         </div>
 
+        {/* 5. RESPONSÁVEIS AUTORIZADOS */}
+        {responsaveisAutorizados.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Quem Pode Buscar</h2>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="gap-2 text-primary border-primary/20 hover:bg-primary/5 rounded-full"
+                onClick={() => setVincularResponsavelOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {responsaveisAutorizados.map((responsavel) => (
+                <Card key={responsavel.id} className="overflow-hidden border-gray-100 shadow-sm hover:shadow-md transition-all">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12 border-2 border-white shadow-sm shrink-0">
+                        <AvatarImage src={responsavel.avatar_url || ""} />
+                        <AvatarFallback className="bg-purple-100 text-purple-600">
+                          {responsavel.nome.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate">{responsavel.nome}</h3>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {responsavel.parentescos.map((parentesco) => (
+                            <Badge 
+                              key={parentesco} 
+                              variant="secondary" 
+                              className="text-xs bg-purple-50 text-purple-700 border-purple-200"
+                            >
+                              {parentesco.replace(/_/g, " ").charAt(0).toUpperCase() + parentesco.replace(/_/g, " ").slice(1)}
+                            </Badge>
+                          ))}
+                        </div>
+                        {(responsavel.email || responsavel.telefone) && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {responsavel.email || responsavel.telefone}
+                          </p>
+                        )}
+                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 shrink-0">
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => handleRemoverResponsavel(responsavel)}
+                            className="text-red-600 focus:text-red-700"
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Remover Acesso
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Drawers Auxiliares */}
@@ -632,6 +817,12 @@ export default function FamilyWallet() {
           member={selectedMember}
         />
       )}
+
+      <VincularResponsavelDialog
+        open={vincularResponsavelOpen}
+        onOpenChange={setVincularResponsavelOpen}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 }

@@ -33,6 +33,7 @@ interface Kid {
 export default function Criancas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [ageFilter, setAgeFilter] = useState<string>("todas");
+  const [inclusaoFilter, setInclusaoFilter] = useState<string>("todas");
 
   // Query para buscar crianças com responsáveis
   const { data: kids = [], isLoading } = useQuery({
@@ -195,8 +196,20 @@ export default function Criancas() {
       });
     }
 
+    // Filtro por necessidades especiais (inclusão)
+    if (inclusaoFilter !== "todas") {
+      result = result.filter((kid) => {
+        if (inclusaoFilter === "com") {
+          return kid.necessidades_especiais && kid.necessidades_especiais.trim().length > 0;
+        } else if (inclusaoFilter === "sem") {
+          return !kid.necessidades_especiais || kid.necessidades_especiais.trim().length === 0;
+        }
+        return true;
+      });
+    }
+
     return result;
-  }, [kids, searchTerm, ageFilter]);
+  }, [kids, searchTerm, ageFilter, inclusaoFilter]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-6">
@@ -248,6 +261,17 @@ export default function Criancas() {
             <SelectItem value="0-2">0-2 anos</SelectItem>
             <SelectItem value="3-5">3-5 anos</SelectItem>
             <SelectItem value="6+">6+ anos</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={inclusaoFilter} onValueChange={setInclusaoFilter}>
+          <SelectTrigger className="w-full sm:w-[200px] bg-background">
+            <SelectValue placeholder="Filtrar por inclusão" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas as crianças</SelectItem>
+            <SelectItem value="com">Com necessidades especiais</SelectItem>
+            <SelectItem value="sem">Sem necessidades especiais</SelectItem>
           </SelectContent>
         </Select>
       </div>

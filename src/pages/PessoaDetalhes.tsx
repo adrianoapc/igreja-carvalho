@@ -82,6 +82,7 @@ interface PessoaDetalhesData {
   data_casamento: string | null;
   rg: string | null;
   cpf: string | null;
+  alergias: string | null;
   necessidades_especiais: string | null;
   cep: string | null;
   cidade: string | null;
@@ -314,7 +315,7 @@ export default function PessoaDetalhes() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   variant={getStatusBadgeVariant(pessoa.status)}
-                  className="text-sm font-semibold px-3 py-1 capitalize"
+                  className="text-xs font-semibold px-3 py-1 capitalize"
                 >
                   {getStatusLabel(pessoa.status).toLowerCase()}
                 </Badge>
@@ -325,7 +326,7 @@ export default function PessoaDetalhes() {
                     <Badge
                       key={funcao.id}
                       variant="secondary"
-                      className="text-sm bg-primary/10 text-primary border-primary/20 capitalize"
+                      className="text-xs bg-primary/10 text-primary border-primary/20 capitalize"
                     >
                       <Crown className="w-3 h-3 mr-1" />
                       {funcao.nome.toLowerCase()}
@@ -333,14 +334,14 @@ export default function PessoaDetalhes() {
                   ))}
 
                 {pessoa.user_id && (
-                  <Badge variant="outline" className="text-sm border-green-500 text-green-700 capitalize">
+                  <Badge variant="outline" className="text-xs border-green-500 text-green-700 capitalize">
                     <Check className="w-3 h-3 mr-1" />
                     Usuário App
                   </Badge>
                 )}
 
                 {pessoa.status_igreja && (
-                  <Badge className="text-sm bg-green-600 hover:bg-green-700 capitalize">
+                  <Badge className="text-xs bg-green-600 hover:bg-green-700 capitalize">
                     {pessoa.status_igreja.toLowerCase()}
                   </Badge>
                 )}
@@ -669,6 +670,14 @@ export default function PessoaDetalhes() {
                         <p className="font-medium">{pessoa.cadastrado_por || "—"}</p>
                       </div>
                       <div className="col-span-2">
+                        <p className="text-muted-foreground mb-1">Alergias</p>
+                        <p className="font-medium">{pessoa.alergias || "—"}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground mb-1">Necessidades Especiais</p>
+                        <p className="font-medium">{pessoa.necessidades_especiais || "—"}</p>
+                      </div>
+                      <div className="col-span-2">
                         <p className="text-muted-foreground mb-1">Observações</p>
                         <p className="font-medium">{pessoa.observacoes || "—"}</p>
                       </div>
@@ -779,6 +788,8 @@ export default function PessoaDetalhes() {
               entrevistado_por: pessoa.entrevistado_por,
               cadastrado_por: pessoa.cadastrado_por,
               tipo_sanguineo: pessoa.tipo_sanguineo,
+              alergias: pessoa.alergias,
+              necessidades_especiais: pessoa.necessidades_especiais,
               observacoes: pessoa.observacoes,
             }}
             onSuccess={fetchPessoa}

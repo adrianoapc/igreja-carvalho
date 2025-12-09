@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, AlertTriangle, Camera } from "lucide-react";
+import { Loader2, AlertTriangle, HeartHandshake, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { AvatarUpload } from "@/components/perfil/AvatarUpload";
 
@@ -16,6 +16,7 @@ interface FamilyMember {
   data_nascimento: string | null;
   avatar_url: string | null;
   alergias: string | null;
+  necessidades_especiais: string | null;
   sexo: string | null;
   responsavel_legal: boolean | null;
 }
@@ -35,9 +36,11 @@ export default function EditarDependenteDrawer({
 }: EditarDependenteDrawerProps) {
   const queryClient = useQueryClient();
   const [alergias, setAlergias] = useState(member.alergias || "");
+  const [necessidadesEspeciais, setNecessidadesEspeciais] = useState(member.necessidades_especiais || "");
 
   useEffect(() => {
     setAlergias(member.alergias || "");
+    setNecessidadesEspeciais(member.necessidades_especiais || "");
   }, [member]);
 
   const updateMutation = useMutation({
@@ -46,6 +49,7 @@ export default function EditarDependenteDrawer({
         .from('profiles')
         .update({
           alergias: alergias.trim() || null,
+          necessidades_especiais: necessidadesEspeciais.trim() || null,
         })
         .eq('id', member.id);
 
@@ -116,6 +120,25 @@ export default function EditarDependenteDrawer({
                 />
                 <p className="text-xs text-muted-foreground">
                   Estas informações aparecerão na etiqueta de segurança do Kids
+                </p>
+              </div>
+
+              {/* Necessidades Especiais */}
+              <div className="space-y-2">
+                <Label htmlFor="necessidades" className="flex items-center gap-2">
+                  <HeartHandshake className="h-4 w-4 text-blue-600" />
+                  Necessidades Especiais (Inclusão)
+                </Label>
+                <Textarea
+                  id="necessidades"
+                  value={necessidadesEspeciais}
+                  onChange={(e) => setNecessidadesEspeciais(e.target.value)}
+                  placeholder="Ex: Deficiência visual, TDAH, transtorno do espectro autista..."
+                  className="border-blue-200 focus-visible:ring-blue-500"
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Informações para garantir inclusão e acessibilidade adequada
                 </p>
               </div>
             </form>

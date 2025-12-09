@@ -216,8 +216,8 @@ export default function KidsDashboard() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: todosProfiles, error } = await (supabase as any)
           .from("profiles")
-          .select("id, alergias, data_nascimento")
-          .not("data_nascimento", "is", null) as { data: Array<{ id: string; alergias: string | null; data_nascimento: string }> | null; error: Error | null };
+          .select("id, alergias, necessidades_especiais, data_nascimento")
+          .not("data_nascimento", "is", null) as { data: Array<{ id: string; alergias: string | null; necessidades_especiais: string | null; data_nascimento: string }> | null; error: Error | null };
 
         if (error) throw error;
 
@@ -233,14 +233,17 @@ export default function KidsDashboard() {
         });
 
         const comAlergias = criancas?.filter((c: any) => c.alergias && c.alergias.trim().length > 0).length || 0;
+        const comNecessidades = criancas?.filter((c: any) => c.necessidades_especiais && c.necessidades_especiais.trim().length > 0).length || 0;
 
         return {
           totalComAlergias: comAlergias,
           percentualAlergias: criancas && criancas.length > 0 ? Math.round((comAlergias / criancas.length) * 100) : 0,
+          totalComNecessidades: comNecessidades,
+          percentualNecessidades: criancas && criancas.length > 0 ? Math.round((comNecessidades / criancas.length) * 100) : 0,
         };
       } catch (error) {
         console.error("Erro ao carregar health stats:", error);
-        return { totalComAlergias: 0, percentualAlergias: 0 };
+        return { totalComAlergias: 0, percentualAlergias: 0, totalComNecessidades: 0, percentualNecessidades: 0 };
       }
     },
   });
@@ -482,7 +485,7 @@ export default function KidsDashboard() {
         <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-amber-900 dark:text-amber-100">Com Alergias</CardTitle>
-            <HeartPulse className="h-4 w-4 text-amber-600" />
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">
@@ -490,6 +493,21 @@ export default function KidsDashboard() {
             </div>
             <p className="text-xs text-amber-700 dark:text-amber-400">
               {healthStats?.percentualAlergias || 0}% das crianças
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Inclusão (Necessidades Especiais)</CardTitle>
+            <HeartPulse className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {healthStats?.totalComNecessidades || 0}
+            </div>
+            <p className="text-xs text-blue-700 dark:text-blue-400">
+              {healthStats?.percentualNecessidades || 0}% das crianças
             </p>
           </CardContent>
         </Card>

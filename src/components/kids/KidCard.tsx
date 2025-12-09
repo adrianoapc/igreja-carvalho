@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { differenceInYears, differenceInMonths } from "date-fns";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +12,12 @@ import {
 } from "@/components/ui/collapsible";
 import {
   AlertTriangle,
-  HeartPulse,
+  HeartHandshake,
   ChevronDown,
   ChevronUp,
   Phone,
   MessageCircle,
+  Eye,
 } from "lucide-react";
 
 interface Responsavel {
@@ -36,6 +38,7 @@ interface KidCardProps {
 }
 
 export function KidCard({
+  id,
   nome,
   data_nascimento,
   avatar_url,
@@ -44,6 +47,11 @@ export function KidCard({
   responsaveis = [],
 }: KidCardProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    navigate(`/pessoas/${id}`);
+  };
 
   const calculateAge = () => {
     if (!data_nascimento) return null;
@@ -74,7 +82,9 @@ export function KidCard({
   };
 
   return (
-    <Card className="rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border-border/50 flex flex-col h-full">
+    <Card 
+      className="rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border-border/50 flex flex-col h-full"
+    >
       <CardHeader className="pb-3 flex-1">
         <div className="space-y-2">
           {/* Topo: Avatar + Primeiro nome */}
@@ -115,9 +125,9 @@ export function KidCard({
                 </div>
               )}
               {necessidades_especiais && (
-                <div className="flex items-center gap-1 bg-purple-100 px-2 py-1 rounded text-xs">
-                  <HeartPulse className="w-3 h-3 text-purple-700 flex-shrink-0" />
-                  <span className="font-medium text-purple-700">Cuidados</span>
+                <div className="flex items-center gap-1 bg-blue-100 px-2 py-1 rounded text-xs">
+                  <HeartHandshake className="w-3 h-3 text-blue-700 flex-shrink-0" />
+                  <span className="font-medium text-blue-700">Inclusão</span>
                 </div>
               )}
             </div>
@@ -126,17 +136,18 @@ export function KidCard({
       </CardHeader>
 
       {(alergias || necessidades_especiais || responsaveis.length > 0) && (
-        <CardContent className="pt-0 flex-1 flex flex-col">
+        <CardContent className="pt-0 flex-1 flex flex-col gap-2">
           <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex flex-col flex-1">
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
                 className="w-full justify-between text-xs text-muted-foreground hover:text-foreground h-8 px-2"
+                onClick={(e) => e.stopPropagation()}
               >
                 <span>
                   {responsaveis.length > 0
-                    ? "Ver Responsáveis"
+                    ? "Ver Responsáveis e Detalhes"
                     : "Ver Detalhes"}
                 </span>
                 {isOpen ? (
@@ -163,11 +174,11 @@ export function KidCard({
 
               {necessidades_especiais && (
                 <div className="space-y-1">
-                  <p className="font-medium text-purple-700 flex items-center gap-1">
-                    <HeartPulse className="w-3 h-3" />
-                    Necessidades Especiais
+                  <p className="font-medium text-blue-700 flex items-center gap-1">
+                    <HeartHandshake className="w-3 h-3" />
+                    Necessidades Especiais (Inclusão)
                   </p>
-                  <p className="text-muted-foreground bg-purple-50 p-1.5 rounded">
+                  <p className="text-muted-foreground bg-blue-50 p-1.5 rounded">
                     {necessidades_especiais}
                   </p>
                 </div>
@@ -230,6 +241,16 @@ export function KidCard({
               )}
             </CollapsibleContent>
           </Collapsible>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 h-8 text-xs"
+            onClick={handleCardClick}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Ver Detalhes Completos
+          </Button>
         </CardContent>
       )}
     </Card>

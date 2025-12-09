@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, AlertTriangle, Camera, X } from "lucide-react";
+import { Loader2, AlertTriangle, HeartHandshake, Camera, X } from "lucide-react";
 import { toast } from "sonner";
 import { ImageCaptureInput } from "@/components/ui/image-capture-input";
 
@@ -49,6 +49,7 @@ export default function AdicionarDependenteDrawer({
   const [mes, setMes] = useState("");
   const [ano, setAno] = useState("");
   const [alergias, setAlergias] = useState("");
+  const [necessidadesEspeciais, setNecessidadesEspeciais] = useState("");
   const [sexo, setSexo] = useState("");
   const [tipoParentesco, setTipoParentesco] = useState("filho");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -60,6 +61,7 @@ export default function AdicionarDependenteDrawer({
     setMes("");
     setAno("");
     setAlergias("");
+    setNecessidadesEspeciais("");
     setSexo("");
     setTipoParentesco("filho");
     setSelectedFile(null);
@@ -140,6 +142,7 @@ export default function AdicionarDependenteDrawer({
           nome: nome.trim(),
           data_nascimento: dataNascimento,
           alergias: alergias.trim() || null,
+          necessidades_especiais: necessidadesEspeciais.trim() || null,
           sexo: sexo || null,
           status: 'membro',
           responsavel_legal: false,
@@ -357,6 +360,25 @@ export default function AdicionarDependenteDrawer({
               />
               <p className="text-xs text-muted-foreground">
                 Informações importantes de saúde
+              </p>
+            </div>
+
+            {/* Necessidades Especiais */}
+            <div className="space-y-2">
+              <Label htmlFor="necessidades" className="flex items-center gap-2">
+                <HeartHandshake className="h-4 w-4 text-blue-600" />
+                Necessidades Especiais (Inclusão)
+              </Label>
+              <Textarea
+                id="necessidades"
+                value={necessidadesEspeciais}
+                onChange={(e) => setNecessidadesEspeciais(e.target.value)}
+                placeholder="Ex: Deficiência visual, TDAH, transtorno do espectro autista..."
+                className="border-blue-200 focus-visible:ring-blue-500"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Informações para garantir inclusão e acessibilidade adequada
               </p>
             </div>
           </form>
