@@ -3,9 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Plus, Trash2, Loader2, UserCheck, User, UserPlus } from "lucide-react";
+import { Users, Plus, Trash2, Loader2, UserCheck, User, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { AdicionarFamiliarDialog } from "./AdicionarFamiliarDialog";
 import { ConverterFamiliarDialog } from "./ConverterFamiliarDialog";
 import {
@@ -27,6 +33,7 @@ interface Familiar {
   familiar?: {
     id: string;
     nome: string;
+    avatar_url?: string | null;
     status: string;
   };
   _isReverse?: boolean; // Marcador interno para relações reversas
@@ -35,6 +42,7 @@ interface Familiar {
 interface FamiliaresSectionProps {
   pessoaId: string;
   pessoaNome: string;
+  readOnly?: boolean;
 }
 
 // Mesma função de inversão de papel do Perfil e FamilyWallet
@@ -64,12 +72,13 @@ function getDisplayRole(storedRole: string | null | undefined, isReverse: boolea
   return "Familiar";
 }
 
-export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionProps) {
+export function FamiliaresSection({ pessoaId, pessoaNome, readOnly = false }: FamiliaresSectionProps) {
   const [familiares, setFamiliares] = useState<Familiar[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [familiarParaDeletar, setFamiliarParaDeletar] = useState<string | null>(null);
   const [familiarParaConverter, setFamiliarParaConverter] = useState<{ id: string; nome: string } | null>(null);
   const [deletando, setDeletando] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -143,7 +152,7 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
       // Buscar dados dos familiares
       const { data: familiarProfiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, nome, sexo, status')
+        .select('id, nome, avatar_url, sexo, status')
         .in('id', Array.from(familiarIds));
 
       if (profilesError) throw profilesError;
@@ -243,21 +252,32 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-1 bg-green-600 rounded" />
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Família
-            </CardTitle>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar Familiar
-          </Button>
-        </CardHeader>
-        <CardContent>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Card className="shadow-soft">
+          <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-green-500/5 to-transparent">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500/10 rounded-lg">
+                  <Users className="w-5 h-5 text-green-600" />
+                </div>
+                <CardTitle className="text-base md:text-lg">Família</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                {!readOnly && (
+                  <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                )}
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+            </div>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="p-4 md:p-5">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -269,59 +289,69 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
                   key={familiar.id}
                   className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      {familiar.familiar_id ? (
-                        <UserCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
-                      ) : (
-                        <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      )}
-                      <p className="font-medium truncate">
-                        {familiar.familiar?.nome || familiar.nome_familiar}
-                      </p>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <Avatar className="w-10 h-10 flex-shrink-0 mt-1">
+                      <AvatarImage src={familiar.familiar?.avatar_url || undefined} alt={familiar.familiar?.nome || familiar.nome_familiar || ""} />
+                      <AvatarFallback className="bg-gradient-to-br from-secondary to-secondary/60 text-secondary-foreground font-bold text-sm">
+                        {(familiar.familiar?.nome || familiar.nome_familiar || "?").charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {familiar.familiar_id ? (
+                          <UserCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
+                        ) : (
+                          <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <p className="font-medium truncate">
+                          {familiar.familiar?.nome || familiar.nome_familiar}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 ml-6">
+                        <Badge variant="outline" className="text-xs">
+                          {familiar.tipo_parentesco}
+                        </Badge>
+                        {familiar._isReverse && (
+                          <Badge variant="secondary" className="text-xs">
+                            Adicionou você
+                          </Badge>
+                        )}
+                        {familiar.familiar_id && familiar.familiar && (
+                          <Badge variant={getStatusBadgeVariant(familiar.familiar.status)} className="text-xs">
+                            {getStatusLabel(familiar.familiar.status)}
+                          </Badge>
+                        )}
+                        {!familiar.familiar_id && (
+                          <Badge variant="secondary" className="text-xs">
+                            Não cadastrado
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 ml-6">
-                      <Badge variant="outline" className="text-xs">
-                        {familiar.tipo_parentesco}
-                      </Badge>
-                      {familiar._isReverse && (
-                        <Badge variant="secondary" className="text-xs">
-                          Adicionou você
-                        </Badge>
-                      )}
-                      {familiar.familiar_id && familiar.familiar && (
-                        <Badge variant={getStatusBadgeVariant(familiar.familiar.status)} className="text-xs">
-                          {getStatusLabel(familiar.familiar.status)}
-                        </Badge>
-                      )}
+                  </div>
+                  {!readOnly && (
+                    <div className="flex gap-1">
                       {!familiar.familiar_id && (
-                        <Badge variant="secondary" className="text-xs">
-                          Não cadastrado
-                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFamiliarParaConverter({ id: familiar.id, nome: familiar.nome_familiar || "" })}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          title="Converter em cadastro completo"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                        </Button>
                       )}
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    {!familiar.familiar_id && (
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => setFamiliarParaConverter({ id: familiar.id, nome: familiar.nome_familiar || "" })}
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                        title="Converter em cadastro completo"
+                        onClick={() => setFamiliarParaDeletar(familiar.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
-                        <UserPlus className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setFamiliarParaDeletar(familiar.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -331,8 +361,10 @@ export function FamiliaresSection({ pessoaId, pessoaNome }: FamiliaresSectionPro
               <p>Nenhum familiar cadastrado</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <AdicionarFamiliarDialog
         open={dialogOpen}

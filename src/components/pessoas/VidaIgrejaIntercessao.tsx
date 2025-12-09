@@ -23,6 +23,7 @@ interface TimelineItem {
 export function VidaIgrejaIntercessao({ pessoaId }: Props) {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState<"pedido" | "sentimento" | "testemunho">("sentimento");
 
   useEffect(() => {
     loadData();
@@ -154,6 +155,31 @@ export function VidaIgrejaIntercessao({ pessoaId }: Props) {
     return labels[sentiment] || sentiment;
   };
 
+  const getSentimentScore = (sentiment: string) => {
+    const scores: Record<string, number> = {
+      feliz: 2,
+      grato: 2,
+      normal: 1,
+      ansioso: 0,
+      doente: -1,
+      triste: -1,
+      angustiado: -1,
+      sozinho: -1,
+      com_pouca_fe: -1,
+    };
+    return scores[sentiment] ?? 0;
+  };
+
+  const filtered = timeline.filter((t) => t.type === selectedType);
+  const sentimentoTrend = timeline
+    .filter((t) => t.type === "sentimento" && t.date)
+    .slice()
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((t) => ({
+      date: t.date,
+      score: getSentimentScore(t.sentiment || ""),
+    }));
+
   const getStatusBadge = (item: TimelineItem) => {
     if (item.type === "pedido") {
       const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -218,29 +244,29 @@ export function VidaIgrejaIntercessao({ pessoaId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Resumo */}
+      {/* Navegação por categoria */}
       <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="p-3 text-center">
-            <MessageCircle className="w-5 h-5 text-blue-500 mx-auto mb-1" />
-            <p className="text-lg font-bold">{timeline.filter(t => t.type === "pedido").length}</p>
-            <p className="text-xs text-muted-foreground">Pedidos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <Heart className="w-5 h-5 text-red-500 mx-auto mb-1" />
-            <p className="text-lg font-bold">{timeline.filter(t => t.type === "sentimento").length}</p>
-            <p className="text-xs text-muted-foreground">Sentimentos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <Award className="w-5 h-5 text-amber-500 mx-auto mb-1" />
-            <p className="text-lg font-bold">{timeline.filter(t => t.type === "testemunho").length}</p>
-            <p className="text-xs text-muted-foreground">Testemunhos</p>
-          </CardContent>
-        </Card>
+        {[{ key: "pedido", label: "Pedidos", icon: <MessageCircle className="w-4 h-4" />, color: "text-blue-600" },
+          { key: "sentimento", label: "Sentimentos", icon: <Heart className="w-4 h-4" />, color: "text-red-600" },
+          { key: "testemunho", label: "Testemunhos", icon: <Award className="w-4 h-4" />, color: "text-amber-600" },
+        ].map(btn => {
+          const count = timeline.filter(t => t.type === btn.key).length;
+          const active = selectedType === btn.key;
+          return (
+            <button
+              key={btn.key}
+              onClick={() => setSelectedType(btn.key as any)}
+              className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors ${active ? "bg-primary/10 border-primary" : "bg-card hover:bg-muted/50"}`}
+            >
+              <div className={`flex items-center gap-2 ${btn.color}`}>
+                {btn.icon}
+                <span className="text-sm font-semibold">{btn.label}</span>
+              </div>
+              <span className="text-lg font-bold text-foreground">{count}</span>
+              <span className="text-xs text-muted-foreground">registros</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Alertas críticos */}
@@ -255,35 +281,67 @@ export function VidaIgrejaIntercessao({ pessoaId }: Props) {
         </Card>
       )}
 
-      {/* Timeline */}
+      {/* Lista filtrada */}
       <Card>
-        <CardContent className="p-4">
-          <div className="relative">
-            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-muted" />
-            <div className="space-y-6">
-              {timeline.map((item) => (
-                <div key={item.id} className="relative flex gap-4 pl-2">
-                  <div className={`w-8 h-8 rounded-full ${getColor(item)} flex items-center justify-center text-white z-10`}>
+        <CardContent className="p-4 space-y-4">
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhum registro encontrado.</p>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map(item => (
+                <div key={item.id} className="flex gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${getColor(item)}`}>
                     {getIcon(item)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <p className="font-medium text-sm truncate">{item.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm truncate">{item.title}</p>
                       {getStatusBadge(item)}
                     </div>
-                    {item.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(item.date), "dd 'de' MMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(item.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </p>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Gráfico de evolução dos sentimentos */}
+      {selectedType === "sentimento" && sentimentoTrend.length > 0 && (
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Heart className="w-4 h-4 text-red-500" />
+              <p className="text-sm font-semibold">Evolução dos sentimentos</p>
+            </div>
+            <svg viewBox="0 0 100 40" className="w-full h-32">
+              <polyline
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-red-500"
+                points={sentimentoTrend
+                  .map((p, idx) => {
+                    const x = (idx / Math.max(sentimentoTrend.length - 1, 1)) * 100;
+                    const y = 20 - p.score * 8;
+                    return `${x},${y}`;
+                  })
+                  .join(" ")}
+              />
+              {sentimentoTrend.map((p, idx) => {
+                const x = (idx / Math.max(sentimentoTrend.length - 1, 1)) * 100;
+                const y = 20 - p.score * 8;
+                return <circle key={idx} cx={x} cy={y} r={1.5} className="fill-red-500" />;
+              })}
+            </svg>
+            <p className="text-xs text-muted-foreground">Linha acima representa os sentimentos registrados ao longo do tempo.</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import Comunicados from "./pages/Comunicados";
 import Publicacao from "./pages/Publicacao";
 import Pessoas from "./pages/pessoas";
 import PessoaDetalhes from "./pages/PessoaDetalhes";
+import EditarPessoa from "./pages/pessoas/EditarPessoa";
 import TodosPessoas from "./pages/pessoas/Todos";
 import Frequentadores from "./pages/pessoas/Frequentadores";
 import Membros from "./pages/pessoas/Membros";
@@ -216,6 +217,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <PessoaDetalhes />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pessoas/:id/editar"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <EditarPessoa />
                 </MainLayout>
               </ProtectedRoute>
             }

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight, FileEdit, Heart } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight, FileEdit, Heart, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,6 +13,7 @@ import { PerfisPendentes } from "@/components/pessoas/PerfisPendentes";
 
 export default function Pessoas() {
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
   const [stats, setStats] = useState([
     {
       title: "Total de Pessoas",
@@ -158,6 +160,39 @@ export default function Pessoas() {
         <p className="text-sm md:text-base text-muted-foreground mt-1">Dashboard centralizado de gestão de pessoas</p>
       </div>
 
+      {/* Search Bar */}
+      <Card>
+        <CardContent className="p-4 md:p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar pessoa por nome, email ou telefone..."
+              className="pl-10 text-sm md:text-base"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && searchTerm.trim()) {
+                  navigate(`/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`);
+                }
+              }}
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-auto p-1"
+                onClick={() => {
+                  if (searchTerm.trim()) {
+                    navigate(`/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`);
+                  }
+                }}
+              >
+                Buscar
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {stats.map((stat) => {

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Phone, Mail, Calendar, User, ArrowLeft, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -20,6 +21,7 @@ interface Pessoa {
   nome: string;
   telefone: string | null;
   email: string | null;
+  avatar_url?: string | null;
   status: "visitante" | "frequentador" | "membro";
   data_primeira_visita: string | null;
   numero_visitas: number;
@@ -40,7 +42,7 @@ export default function TodosPessoas() {
       const {
         data,
         error
-      } = await supabase.from("profiles").select("id, nome, telefone, email, status, data_primeira_visita, numero_visitas, user_id").order("nome");
+      } = await supabase.from("profiles").select("id, nome, telefone, email, status, avatar_url, data_primeira_visita, numero_visitas, user_id").order("nome");
       if (error) throw error;
       setAllPessoas(data || []);
       setDisplayedPessoas((data || []).slice(0, ITEMS_PER_PAGE));
@@ -193,9 +195,12 @@ export default function TodosPessoas() {
           <div className="space-y-3 md:space-y-4">
             {filteredPessoas.map((pessoa, index) => <div key={pessoa.id} ref={index === filteredPessoas.length - 1 ? loadMoreRef : null} onClick={() => navigate(`/pessoas/${pessoa.id}`)} className="flex flex-col gap-3 p-3 md:p-4 rounded-lg transition-colors cursor-pointer bg-[#eff0cf]">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold text-base md:text-lg flex-shrink-0">
-                    {pessoa.nome.charAt(0)}
-                  </div>
+                  <Avatar className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+                    <AvatarImage src={pessoa.avatar_url || undefined} alt={pessoa.nome} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold text-base md:text-lg">
+                      {pessoa.nome.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm md:text-base text-foreground truncate">{pessoa.nome}</p>
                     <div className="flex flex-col gap-1 mt-1">

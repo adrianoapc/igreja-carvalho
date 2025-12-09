@@ -4,8 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   ArrowLeft,
   User,
@@ -32,13 +37,13 @@ import {
   Crown,
   UserCheck,
   AlertCircle,
-  Maximize2,
-  Minimize2,
   Plus,
   Trash2,
   CalendarDays,
   MessageCircle,
   Activity,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -50,6 +55,7 @@ import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDados
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
 import { AtribuirFuncaoDialog } from "@/components/membros/AtribuirFuncaoDialog";
+import { AvatarUpload } from "@/components/perfil/AvatarUpload";
 import { FamiliaresSection } from "@/components/pessoas/FamiliaresSection";
 import { VidaIgrejaFrequencia } from "@/components/pessoas/VidaIgrejaFrequencia";
 import { VidaIgrejaIntercessao } from "@/components/pessoas/VidaIgrejaIntercessao";
@@ -61,6 +67,7 @@ interface PessoaDetalhesData {
   nome: string;
   email: string | null;
   telefone: string | null;
+  avatar_url?: string | null;
   status: "visitante" | "frequentador" | "membro";
   data_primeira_visita: string | null;
   data_ultima_visita: string | null;
@@ -120,8 +127,18 @@ export default function PessoaDetalhes() {
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
   const [editarStatusOpen, setEditarStatusOpen] = useState(false);
-  const [compactView, setCompactView] = useState(true);
   const [atribuirFuncaoOpen, setAtribuirFuncaoOpen] = useState(false);
+  const [dadosCivisOpen, setDadosCivisOpen] = useState(true);
+  const [dadosEclesiasticosOpen, setDadosEclesiasticosOpen] = useState(true);
+  const [dadosContatosOpen, setDadosContatosOpen] = useState(true);
+  const [dadosAdicionaisOpen, setDadosAdicionaisOpen] = useState(true);
+  const [documentosOpen, setDocumentosOpen] = useState(true);
+
+  const handleAvatarUpdate = (newUrl: string | null) => {
+    if (pessoa) {
+      setPessoa({ ...pessoa, avatar_url: newUrl });
+    }
+  };
 
   const fetchPessoa = async () => {
     if (!id) return;
@@ -209,91 +226,144 @@ export default function PessoaDetalhes() {
     }
   };
 
+  const calcularIdade = (dataNascimento: string | null): string => {
+    if (!dataNascimento) return "—";
+    const hoje = new Date();
+    const nascimento = new Date(dataNascimento);
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const m = hoje.getMonth() - nascimento.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade--;
+    }
+    return `${idade} anos`;
+  };
+
+  const calcularTempoDeCasa = (dataEntrada: string | null): string => {
+    if (!dataEntrada) return "—";
+    const hoje = new Date();
+    const entrada = new Date(dataEntrada);
+    const anos = hoje.getFullYear() - entrada.getFullYear();
+    const meses = hoje.getMonth() - entrada.getMonth();
+    
+    if (anos > 0) {
+      return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+    } else if (meses > 0) {
+      return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+    } else {
+      return "Recente";
+    }
+  };
+
   return (
-    <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
-      {/* Header */}
-      <div className="flex items-center gap-2 md:gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-      </div>
+    <div className="space-y-6 p-2 sm:p-0">
+      {/* Back Button */}
+      <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="mb-2">
+        <ArrowLeft className="w-5 h-5" />
+      </Button>
 
-      {/* Profile Header */}
-      <div className="flex flex-col sm:flex-row items-start gap-4">
-        <Avatar className="w-16 h-16 md:w-20 md:h-20 border-4 border-green-500 flex-shrink-0">
-          <AvatarFallback className="text-xl md:text-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
-            {pessoa.nome.charAt(0)}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1 w-full min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold truncate">{pessoa.nome}</h1>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Badge variant={getStatusBadgeVariant(pessoa.status)} className="text-xs">
-              {getStatusLabel(pessoa.status)}
-            </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setEditarStatusOpen(true)}
-              className="h-7 px-2 text-xs"
-            >
-              <Edit className="w-3 h-3 mr-1" />
-              <span className="hidden sm:inline">Alterar Status</span>
-              <span className="sm:hidden">Status</span>
-            </Button>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-2 text-xs md:text-sm text-muted-foreground">
-            {pessoa.user_id ? (
-              <span className="flex items-center gap-1">
-                <Check className="w-3 h-3 md:w-4 md:h-4 text-green-500" />
-                usuário da plataforma
-              </span>
-            ) : (
-              <span className="flex items-center gap-1">
-                <X className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground" />
-                não é usuário
-              </span>
-            )}
-            <Separator orientation="vertical" className="hidden sm:block h-4" />
-            <span className="truncate">ID: {pessoa.id.slice(0, 8)}</span>
-          </div>
-        </div>
-      </div>
+      {/* NOVO HEADER UNIFICADO PREMIUM */}
+      <Card className="shadow-lg border-0 bg-gradient-to-br from-background to-muted/20">
+        <CardContent className="p-6 md:p-8">
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Avatar interativo */}
+            <div className="flex-shrink-0">
+              <AvatarUpload
+                userId={pessoa.id}
+                currentAvatarUrl={pessoa.avatar_url}
+                userName={pessoa.nome}
+                onAvatarUpdated={fetchPessoa}
+              />
+            </div>
 
-      {/* Church Info */}
-      <Card>
-        <CardContent className="p-4 md:pt-6">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between">
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-base md:text-lg">Igreja Carvalho</h3>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="text-xs md:text-sm text-muted-foreground">Funções:</span>
-                {funcoes.length > 0 ? (
-                  funcoes
-                    .filter((f) => f.ativo)
-                    .map((funcao) => (
-                      <Badge key={funcao.id} variant="outline" className="text-xs">
-                        {funcao.nome}
-                      </Badge>
-                    ))
-                ) : (
-                  <Badge variant="outline" className="text-xs">Nenhum</Badge>
+            {/* Dados principais reorganizados */}
+            <div className="flex-1 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <h1 className="text-2xl md:text-3xl font-bold leading-tight">{pessoa.nome}</h1>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="gap-2 self-start"
+                  onClick={() => navigate(`/pessoas/${pessoa.id}/editar`)}
+                >
+                  <Edit className="w-4 h-4" />
+                  Editar perfil
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                {pessoa.email && (
+                  <span className="flex items-center gap-1 truncate">
+                    <Mail className="w-4 h-4" />
+                    {pessoa.email}
+                  </span>
+                )}
+                {pessoa.email && pessoa.telefone && <span>•</span>}
+                {pessoa.telefone && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="w-4 h-4" />
+                    {formatarTelefone(pessoa.telefone)}
+                  </span>
+                )}
+                {(pessoa.email || pessoa.telefone) && <span>•</span>}
+                <span className="flex items-center gap-1">
+                  <IdCard className="w-4 h-4" />
+                  ID: {pessoa.id.slice(0, 8)}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant={getStatusBadgeVariant(pessoa.status)}
+                  className="text-sm font-semibold px-3 py-1 capitalize"
+                >
+                  {getStatusLabel(pessoa.status).toLowerCase()}
+                </Badge>
+
+                {funcoes
+                  .filter((f) => f.ativo)
+                  .map((funcao) => (
+                    <Badge
+                      key={funcao.id}
+                      variant="secondary"
+                      className="text-sm bg-primary/10 text-primary border-primary/20 capitalize"
+                    >
+                      <Crown className="w-3 h-3 mr-1" />
+                      {funcao.nome.toLowerCase()}
+                    </Badge>
+                  ))}
+
+                {pessoa.user_id && (
+                  <Badge variant="outline" className="text-sm border-green-500 text-green-700 capitalize">
+                    <Check className="w-3 h-3 mr-1" />
+                    Usuário App
+                  </Badge>
+                )}
+
+                {pessoa.status_igreja && (
+                  <Badge className="text-sm bg-green-600 hover:bg-green-700 capitalize">
+                    {pessoa.status_igreja.toLowerCase()}
+                  </Badge>
                 )}
               </div>
             </div>
-            <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-xs w-fit">
-              {pessoa.status_igreja?.toUpperCase() || "ATIVO"}
-            </Badge>
           </div>
         </CardContent>
       </Card>
 
       {/* Tabs */}
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 h-auto gap-1">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
           <TabsTrigger value="perfil" className="flex-col gap-1 py-2 px-1 text-xs">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Perfil</span>
+          </TabsTrigger>
+          <TabsTrigger value="mais" className="flex-col gap-1 py-2 px-1 text-xs">
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">Dados Adicionais</span>
+          </TabsTrigger>
+          <TabsTrigger value="envolvimento" className="flex-col gap-1 py-2 px-1 text-xs">
+            <Activity className="w-4 h-4" />
+            <span className="hidden sm:inline">Envolvimento</span>
           </TabsTrigger>
           <TabsTrigger value="frequencia" className="flex-col gap-1 py-2 px-1 text-xs">
             <CalendarDays className="w-4 h-4" />
@@ -301,27 +371,7 @@ export default function PessoaDetalhes() {
           </TabsTrigger>
           <TabsTrigger value="intercessao" className="flex-col gap-1 py-2 px-1 text-xs">
             <MessageCircle className="w-4 h-4" />
-            <span className="hidden sm:inline">Intercessão</span>
-          </TabsTrigger>
-          <TabsTrigger value="envolvimento" className="flex-col gap-1 py-2 px-1 text-xs">
-            <Activity className="w-4 h-4" />
-            <span className="hidden sm:inline">Envolvimento</span>
-          </TabsTrigger>
-          <TabsTrigger value="pessoais" className="flex-col gap-1 py-2 px-1 text-xs">
-            <Heart className="w-4 h-4" />
-            <span className="hidden sm:inline">Pessoais</span>
-          </TabsTrigger>
-          <TabsTrigger value="contatos" className="flex-col gap-1 py-2 px-1 text-xs">
-            <Phone className="w-4 h-4" />
-            <span className="hidden sm:inline">Contatos</span>
-          </TabsTrigger>
-          <TabsTrigger value="igreja" className="flex-col gap-1 py-2 px-1 text-xs">
-            <Church className="w-4 h-4" />
-            <span className="hidden sm:inline">Igreja</span>
-          </TabsTrigger>
-          <TabsTrigger value="mais" className="flex-col gap-1 py-2 px-1 text-xs">
-            <MoreHorizontal className="w-4 h-4" />
-            <span className="hidden sm:inline">Mais</span>
+            <span className="hidden sm:inline">Sentimentos</span>
           </TabsTrigger>
         </TabsList>
 
@@ -334,132 +384,216 @@ export default function PessoaDetalhes() {
                 Visualização consolidada dos dados cadastrais. Use as outras abas para editar.
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCompactView(!compactView)}
-              className="gap-2 w-full sm:w-auto"
-            >
-              {compactView ? (
-                <>
-                  <Maximize2 className="w-4 h-4" />
-                  <span className="text-xs md:text-sm">Expandir</span>
-                </>
-              ) : (
-                <>
-                  <Minimize2 className="w-4 h-4" />
-                  <span className="text-xs md:text-sm">Compactar</span>
-                </>
-              )}
-            </Button>
           </div>
           
-          <div className={`grid gap-3 md:gap-4 ${compactView ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'}`}>
-            <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "p-3 md:pt-6" : "p-3 md:pt-4"}>
-                <div className="flex items-start justify-between mb-1 md:mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Idade</p>
-                  {compactView && <Cake className="w-3 h-3 md:w-4 md:h-4 text-primary/70" />}
-                </div>
-                <p className="text-xs md:text-sm font-semibold leading-none">
-                  {pessoa.data_nascimento
-                    ? `${new Date().getFullYear() - new Date(pessoa.data_nascimento).getFullYear()} anos`
-                    : "—"}
-                </p>
-              </CardContent>
-            </Card>
+          {/* Grid de Informações Principais - Versão Limpa */}
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {/* Card: Dados Civis */}
+            <Collapsible open={dadosCivisOpen} onOpenChange={setDadosCivisOpen}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <User className="w-5 h-5 text-primary" />
+                        Dados Civis
+                      </div>
+                      {dadosCivisOpen ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Sexo:</span>
+                      <span className="text-sm font-semibold text-right">{pessoa.sexo || "—"}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Nascimento:</span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.data_nascimento
+                          ? `${format(new Date(pessoa.data_nascimento), "dd/MM/yyyy")} (${calcularIdade(pessoa.data_nascimento)})`
+                          : "—"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Estado Civil:</span>
+                      <span className="text-sm font-semibold text-right">{pessoa.estado_civil || "—"}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">CPF:</span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.cpf ? formatarCPF(pessoa.cpf) : "—"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">RG:</span>
+                      <span className="text-sm font-semibold text-right">{pessoa.rg || "—"}</span>
+                    </div>
+                    {pessoa.necessidades_especiais && (
+                      <>
+                        <Separator />
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm text-muted-foreground">Necessidades:</span>
+                          <span className="text-sm font-semibold text-right">{pessoa.necessidades_especiais}</span>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
-            <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sexo</p>
-                  {compactView && <User className="w-4 h-4 text-primary/70" />}
-                </div>
-                <p className="text-sm font-semibold leading-none truncate">{pessoa.sexo || "—"}</p>
-              </CardContent>
-            </Card>
+            {/* Card: Dados de Contatos */}
+            <Collapsible open={dadosContatosOpen} onOpenChange={setDadosContatosOpen}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-5 h-5 text-primary" />
+                        Contatos
+                      </div>
+                      {dadosContatosOpen ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Celular:</span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "—"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">E-mail:</span>
+                      <span className="text-sm font-semibold text-right break-all">
+                        {pessoa.email || "—"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">CEP:</span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.cep ? formatarCEP(pessoa.cep) : "—"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Cidade:</span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.cidade && pessoa.estado 
+                          ? `${pessoa.cidade} - ${pessoa.estado}`
+                          : pessoa.cidade || pessoa.estado || "—"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Bairro:</span>
+                      <span className="text-sm font-semibold text-right">{pessoa.bairro || "—"}</span>
+                    </div>
+                    {pessoa.endereco && (
+                      <>
+                        <Separator />
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm text-muted-foreground">Endereço:</span>
+                          <span className="text-sm font-semibold text-right">{pessoa.endereco}</span>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
-            <Card className="border-l-4 border-l-primary/40 card-gradient-info profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Estado Civil</p>
-                  {compactView && <Heart className="w-4 h-4 text-primary/70" />}
-                </div>
-                <p className="text-sm font-semibold leading-none truncate">{pessoa.estado_civil || "—"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Batizado</p>
-                  {compactView && <Droplets className="w-4 h-4 text-primary/70" />}
-                </div>
-                <p className="text-sm font-semibold leading-none">{pessoa.batizado ? "Sim" : "Não"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pastor</p>
-                  {compactView && <BookOpen className="w-4 h-4 text-primary/70" />}
-                </div>
-                <p className="text-sm font-semibold leading-none">{pessoa.e_pastor ? "Sim" : "Não"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-primary/40 card-gradient-spiritual profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Liderança</p>
-                  {compactView && <Crown className="w-4 h-4 text-primary/70" />}
-                </div>
-                <p className="text-sm font-semibold leading-none">{pessoa.e_lider ? "Sim" : "Não"}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-primary/40 card-gradient-success profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefone</p>
-                  {compactView && <Phone className="w-4 h-4 text-primary/70" />}
-                </div>
-                <p className="text-sm font-semibold leading-none truncate">
-                  {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "—"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-primary/40 card-gradient-warning profile-card-hover overflow-hidden">
-              <CardContent className={compactView ? "pt-6" : "pt-4"}>
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Necessidades</p>
-                  {compactView && <AlertCircle className="w-4 h-4 text-primary/70" />}
-                </div>
-                <p className="text-sm font-semibold leading-none truncate">{pessoa.necessidades_especiais || "Nenhuma"}</p>
-              </CardContent>
-            </Card>
+            {/* Card: Dados Eclesiásticos */}
+            <Collapsible open={dadosEclesiasticosOpen} onOpenChange={setDadosEclesiasticosOpen}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Church className="w-5 h-5 text-primary" />
+                        Dados Eclesiásticos
+                      </div>
+                      {dadosEclesiasticosOpen ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Batizado:</span>
+                      <div className="flex items-center gap-1">
+                        {pessoa.batizado ? (
+                          <><Check className="w-4 h-4 text-green-600" /><span className="text-sm font-semibold">Sim</span></>
+                        ) : (
+                          <><X className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-semibold">Não</span></>
+                        )}
+                      </div>
+                    </div>
+                    {pessoa.data_batismo && (
+                      <>
+                        <Separator />
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm text-muted-foreground">Data Batismo:</span>
+                          <span className="text-sm font-semibold text-right">
+                            {format(new Date(pessoa.data_batismo), "dd/MM/yyyy")}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">É Líder:</span>
+                      <div className="flex items-center gap-1">
+                        {pessoa.e_lider ? (
+                          <><Crown className="w-4 h-4 text-amber-600" /><span className="text-sm font-semibold">Sim</span></>
+                        ) : (
+                          <><X className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-semibold">Não</span></>
+                        )}
+                      </div>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Conversão:</span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.data_conversao
+                          ? format(new Date(pessoa.data_conversao), "dd/MM/yyyy")
+                          : "—"}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm text-muted-foreground">Entrou por:</span>
+                      <span className="text-sm font-semibold text-right">{pessoa.entrou_por || "—"}</span>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           </div>
 
-          <Card>
-            <CardHeader className="p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-6 md:h-8 w-1 bg-green-600 rounded" />
-                  <CardTitle className="text-base md:text-lg">Células</CardTitle>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button variant="outline" size="sm" className="text-xs md:text-sm">
-                    Indicar para um líder
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs md:text-sm">
-                    Adicionar Célula
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
+          {/* Família */}
+          <FamiliaresSection pessoaId={pessoa.id} pessoaNome={pessoa.nome} readOnly />
         </TabsContent>
 
         {/* Tab: Frequência */}
@@ -477,345 +611,107 @@ export default function PessoaDetalhes() {
           <VidaIgrejaEnvolvimento pessoaId={pessoa.id} />
         </TabsContent>
 
-        {/* Tab: Pessoais */}
-        <TabsContent value="pessoais" className="space-y-4 md:space-y-6">
-          <Card>
-            <CardHeader className="p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-6 md:h-8 w-1 bg-green-600 rounded" />
-                  <CardTitle className="text-base md:text-lg">Dados pessoais</CardTitle>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setEditarPessoaisOpen(true)} className="w-full sm:w-auto">
-                  <Edit className="w-3 h-3 md:w-4 md:h-4 mr-2" />
-                  <span className="text-xs md:text-sm">Editar dados pessoais</span>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6">
-              <div className="grid grid-cols-1 gap-4 md:gap-6">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Sexo:</p>
-                  <p className="text-base font-semibold">{pessoa.sexo || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Data de nascimento:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.data_nascimento
-                      ? format(new Date(pessoa.data_nascimento), "dd/MM/yyyy", { locale: ptBR })
-                      : "Não informado"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Estado civil:</p>
-                  <p className="text-base font-semibold">{pessoa.estado_civil || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Data de casamento:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.data_casamento
-                      ? format(new Date(pessoa.data_casamento), "dd/MM/yyyy", { locale: ptBR })
-                      : "Não informado"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">RG:</p>
-                  <p className="text-base font-semibold">{pessoa.rg || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">CPF:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.cpf ? formatarCPF(pessoa.cpf) : "Não informado"}
-                  </p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Necessidades especiais:</p>
-                  <p className="text-base font-semibold">{pessoa.necessidades_especiais || "Não informado"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Família:</CardTitle>
-              </div>
-              <Button variant="outline" size="sm">
-                Adicionar familiar
-              </Button>
-            </CardHeader>
-          </Card>
-        </TabsContent>
-
-        {/* Tab: Contatos */}
-        <TabsContent value="contatos" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Contatos</CardTitle>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setEditarContatosOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Editar contato
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">CEP:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.cep ? formatarCEP(pessoa.cep) : "Não informado"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Cidade:</p>
-                  <p className="text-base font-semibold">{pessoa.cidade || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Bairro:</p>
-                  <p className="text-base font-semibold">{pessoa.bairro || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Estado:</p>
-                  <p className="text-base font-semibold">{pessoa.estado || "Não informado"}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Endereço:</p>
-                  <p className="text-base font-semibold">{pessoa.endereco || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">E-mail:</p>
-                  <p className="text-base font-semibold">{pessoa.email || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Celular:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "Não informado"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab: Igreja */}
-        <TabsContent value="igreja" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Dados eclesiásticos</CardTitle>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setEditarEclesiasticosOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Editar dados eclesiásticos
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Entrou por:</p>
-                  <p className="text-base font-semibold">{pessoa.entrou_por || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Data de entrada:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.data_entrada
-                      ? format(new Date(pessoa.data_entrada), "dd/MM/yyyy", { locale: ptBR })
-                      : "Não informado"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Qual o status dessa pessoa na igreja?</p>
-                  <p className="text-base font-semibold">{pessoa.status_igreja || "Ativo"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Data da conversão:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.data_conversao
-                      ? format(new Date(pessoa.data_conversao), "dd/MM/yyyy", { locale: ptBR })
-                      : "Não informado"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Foi batizado(a)?</p>
-                  <p className="text-base font-semibold">{pessoa.batizado ? "Sim" : "Não"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Data de batismo:</p>
-                  <p className="text-base font-semibold">
-                    {pessoa.data_batismo
-                      ? format(new Date(pessoa.data_batismo), "dd/MM/yyyy", { locale: ptBR })
-                      : "Não informado"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">É líder?</p>
-                  <p className="text-base font-semibold">{pessoa.e_lider ? "Sim" : "Não"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">É pastor?</p>
-                  <p className="text-base font-semibold">{pessoa.e_pastor ? "Sim" : "Não"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Funções na Igreja</CardTitle>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAtribuirFuncaoOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Atribuir função
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {funcoes.length > 0 ? (
-                <div className="space-y-3">
-                  {funcoes.map((funcao) => (
-                    <div
-                      key={funcao.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                    >
-                      <div>
-                        <p className="font-semibold">{funcao.nome}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Desde:{" "}
-                          {format(new Date(funcao.data_inicio), "dd/MM/yyyy", {
-                            locale: ptBR,
-                          })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={funcao.ativo ? "default" : "secondary"}>
-                          {funcao.ativo ? "Ativa" : "Inativa"}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={async () => {
-                            if (confirm("Deseja realmente remover esta função?")) {
-                              try {
-                                const { error } = await supabase
-                                  .from("membro_funcoes")
-                                  .delete()
-                                  .eq("id", funcao.id);
-                                
-                                if (error) throw error;
-                                
-                                toast({
-                                  title: "Sucesso",
-                                  description: "Função removida com sucesso",
-                                });
-                                
-                                fetchPessoa();
-                              } catch (error: any) {
-                                toast({
-                                  title: "Erro",
-                                  description: error.message || "Não foi possível remover a função",
-                                  variant: "destructive",
-                                });
-                              }
-                            }
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Shield className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                  <p>Nenhuma função atribuída</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* Tab: Mais */}
         <TabsContent value="mais" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Dados adicionais</CardTitle>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setEditarAdicionaisOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Editar dados adicionais
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Escolaridade</p>
-                  <p className="text-base font-semibold">{pessoa.escolaridade || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Profissão</p>
-                  <p className="text-base font-semibold">{pessoa.profissao || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Nacionalidade</p>
-                  <p className="text-base font-semibold">{pessoa.nacionalidade || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Naturalidade</p>
-                  <p className="text-base font-semibold">{pessoa.naturalidade || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Entrevistado por</p>
-                  <p className="text-base font-semibold">{pessoa.entrevistado_por || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Cadastrado por</p>
-                  <p className="text-base font-semibold">{pessoa.cadastrado_por || "Não informado"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Tipo sanguíneo</p>
-                  <p className="text-base font-semibold">{pessoa.tipo_sanguineo || "Não informado"}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Observações</p>
-                  <p className="text-base font-semibold">{pessoa.observacoes || "Não informado"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Card: Dados Adicionais */}
+            <Collapsible open={dadosAdicionaisOpen} onOpenChange={setDadosAdicionaisOpen}>
+              <Card className="shadow-soft">
+                <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <FileText className="w-5 h-5 text-primary" />
+                      </div>
+                      <CardTitle className="text-base md:text-lg">Dados Adicionais</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setEditarAdicionaisOpen(true)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          {dadosAdicionaisOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="p-4 md:p-5 space-y-3">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground mb-1">Escolaridade</p>
+                        <p className="font-medium">{pessoa.escolaridade || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Profissão</p>
+                        <p className="font-medium">{pessoa.profissao || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Nacionalidade</p>
+                        <p className="font-medium">{pessoa.nacionalidade || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Naturalidade</p>
+                        <p className="font-medium">{pessoa.naturalidade || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Tipo sanguíneo</p>
+                        <p className="font-medium">{pessoa.tipo_sanguineo || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Entrevistado por</p>
+                        <p className="font-medium">{pessoa.entrevistado_por || "—"}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground mb-1">Cadastrado por</p>
+                        <p className="font-medium">{pessoa.cadastrado_por || "—"}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground mb-1">Observações</p>
+                        <p className="font-medium">{pessoa.observacoes || "—"}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
-          <FamiliaresSection pessoaId={pessoa.id} pessoaNome={pessoa.nome} />
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-green-600 rounded" />
-                <CardTitle>Documentos:</CardTitle>
-              </div>
-              <Button variant="outline" size="sm">
-                Adicionar documento
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <FileText className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                <p>Nenhum documento anexado</p>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Card: Documentos */}
+            <Collapsible open={documentosOpen} onOpenChange={setDocumentosOpen}>
+              <Card className="shadow-soft">
+                <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <FileText className="w-5 h-5 text-primary" />
+                      </div>
+                      <CardTitle className="text-base md:text-lg">Documentos</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm">
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          {documentosOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="p-4 md:p-5">
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm">Nenhum documento anexado</p>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          </div>
         </TabsContent>
       </Tabs>
 

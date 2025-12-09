@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Phone, Mail, Check, X, Gift, Calendar, PhoneCall, ArrowLeft } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -20,6 +21,7 @@ interface Visitante {
   nome: string;
   telefone: string | null;
   email: string | null;
+  avatar_url?: string | null;
   data_primeira_visita: string | null;
   data_ultima_visita: string | null;
   numero_visitas: number;
@@ -155,9 +157,12 @@ export default function Visitantes() {
           <div className="space-y-3 md:space-y-4">
             {filteredVisitantes.map((visitante, index) => <div key={visitante.id} ref={index === filteredVisitantes.length - 1 ? loadMoreRef : null} className="flex flex-col gap-3 p-3 md:p-4 rounded-lg transition-colors bg-[#eff0cf]">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold text-base md:text-lg flex-shrink-0">
-                    {visitante.nome.charAt(0)}
-                  </div>
+                  <Avatar className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+                    <AvatarImage src={visitante.avatar_url || undefined} alt={visitante.nome} />
+                    <AvatarFallback className="bg-gradient-accent text-accent-foreground font-bold text-base md:text-lg">
+                      {visitante.nome.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm md:text-base text-foreground truncate">{visitante.nome}</p>
                     <div className="flex flex-col gap-1 mt-1">

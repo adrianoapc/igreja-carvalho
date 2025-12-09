@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Phone, Mail, Calendar, UserCheck, ArrowLeft } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +19,7 @@ interface Frequentador {
   nome: string;
   telefone: string | null;
   email: string | null;
+  avatar_url?: string | null;
   data_primeira_visita: string | null;
   data_ultima_visita: string | null;
   numero_visitas: number;
@@ -37,7 +39,7 @@ export default function Frequentadores() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, nome, telefone, email, data_primeira_visita, data_ultima_visita, numero_visitas, user_id")
+        .select("id, nome, telefone, email, avatar_url, data_primeira_visita, data_ultima_visita, numero_visitas, user_id")
         .eq("status", "frequentador")
         .order("nome");
 
@@ -125,9 +127,12 @@ export default function Frequentadores() {
                 onClick={() => navigate(`/pessoas/${freq.id}`)}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-secondary to-secondary/60 flex items-center justify-center text-secondary-foreground font-bold text-base md:text-lg flex-shrink-0">
-                    {freq.nome.charAt(0)}
-                  </div>
+                  <Avatar className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+                    <AvatarImage src={freq.avatar_url || undefined} alt={freq.nome} />
+                    <AvatarFallback className="bg-gradient-to-br from-secondary to-secondary/60 text-secondary-foreground font-bold text-base md:text-lg">
+                      {freq.nome.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm md:text-base text-foreground truncate">{freq.nome}</p>
                     <div className="flex flex-col gap-1 mt-1">

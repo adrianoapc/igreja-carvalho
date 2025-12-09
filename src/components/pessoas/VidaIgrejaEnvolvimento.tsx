@@ -2,10 +2,17 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Calendar, Clock, MapPin, Crown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Users, Calendar, Clock, MapPin, Crown, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   pessoaId: string;
@@ -32,10 +39,22 @@ interface Escala {
   confirmado: boolean;
 }
 
+interface Funcao {
+  id: string;
+  nome: string;
+  data_inicio: string;
+  ativo: boolean;
+}
+
 export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
   const [times, setTimes] = useState<Time[]>([]);
   const [escalas, setEscalas] = useState<Escala[]>([]);
+  const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [funcoesOpen, setFuncoesOpen] = useState(true);
+  const [timesOpen, setTimesOpen] = useState(true);
+  const [escalasOpen, setEscalasOpen] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadData();
@@ -113,6 +132,29 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
       }));
 
       setEscalas(escalasFormatted);
+
+      // Buscar funções do membro
+      const { data: funcoesData } = await supabase
+        .from("membro_funcoes")
+        .select(`
+          id,
+          data_inicio,
+          ativo,
+          funcoes_igreja!inner (
+            nome
+          )
+        `)
+        .eq("membro_id", pessoaId)
+        .order("data_inicio", { ascending: false });
+
+      const funcoesFormatted: Funcao[] = (funcoesData || []).map((f: any) => ({
+        id: f.id,
+        nome: f.funcoes_igreja.nome,
+        data_inicio: f.data_inicio,
+        ativo: f.ativo,
+      }));
+
+      setFuncoes(funcoesFormatted);
     } catch (error) {
       console.error("Erro ao carregar envolvimento:", error);
     } finally {
@@ -133,15 +175,75 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Funções */}
+      <Collapsible open={funcoesOpen} onOpenChange={setFuncoesOpen}>
+        <Card className="shadow-soft">
+          <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Crown className="w-5 h-5 text-primary" />
+                </div>
+                <CardTitle className="text-base md:text-lg">Funções na Igreja ({funcoes.length})</CardTitle>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  {funcoesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="p-4 md:p-5">
+              {funcoes.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma função atribuída
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {funcoes.map((funcao) => (
+                    <div
+                      key={funcao.id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                    >
+                      <div>
+                        <p className="font-semibold text-sm">{funcao.nome}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Desde: {format(new Date(funcao.data_inicio), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
+                      </div>
+                      <Badge variant={funcao.ativo ? "default" : "secondary"} className="text-xs">
+                        {funcao.ativo ? "Ativa" : "Inativa"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
       {/* Times */}
-      <Card>
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Times ({times.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-2">
+      <Collapsible open={timesOpen} onOpenChange={setTimesOpen}>
+        <Card className="shadow-soft">
+          <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <CardTitle className="text-base md:text-lg">Times ({times.length})</CardTitle>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  {timesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="p-4 md:p-5">
           {times.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Não participa de nenhum time
@@ -187,18 +289,31 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Escalas Futuras */}
-      <Card>
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-primary" />
-            Escalas Futuras ({escalas.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-2">
+      <Collapsible open={escalasOpen} onOpenChange={setEscalasOpen}>
+        <Card className="shadow-soft">
+          <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Calendar className="w-5 h-5 text-primary" />
+                </div>
+                <CardTitle className="text-base md:text-lg">Escalas Futuras ({escalas.length})</CardTitle>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  {escalasOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="p-4 md:p-5">
           {escalas.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Nenhuma escala futura agendada
@@ -251,8 +366,10 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </div>
   );
 }

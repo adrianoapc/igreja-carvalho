@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Plus, Mail, Phone, Settings, UserPlus, ArrowLeft } from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +19,7 @@ interface Membro {
   email: string | null;
   telefone: string | null;
   status: string;
+  avatar_url?: string | null;
   funcoes: Array<{
     id: string;
     nome: string;
@@ -47,7 +49,7 @@ export default function Membros() {
       const {
         data: membrosData,
         error: membrosError
-      } = await supabase.from("profiles").select("id, nome, email, telefone, status").eq("status", "membro").order("nome");
+      } = await supabase.from("profiles").select("id, nome, email, telefone, status, avatar_url").eq("status", "membro").order("nome");
       if (membrosError) throw membrosError;
 
       // Buscar funções e times de cada membro
@@ -177,9 +179,12 @@ export default function Membros() {
             {filteredMembros.map((membro, index) => <div key={membro.id} ref={index === filteredMembros.length - 1 ? loadMoreRef : null} className="flex flex-col gap-3 p-3 md:p-4 rounded-lg transition-colors bg-[#eff0cf]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold text-base md:text-lg flex-shrink-0">
-                      {membro.nome.charAt(0)}
-                    </div>
+                    <Avatar className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+                      <AvatarImage src={membro.avatar_url || undefined} alt={membro.nome} />
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold text-base md:text-lg">
+                        {membro.nome.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm md:text-base text-foreground truncate">
                         {membro.nome}
