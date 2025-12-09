@@ -2673,6 +2673,76 @@ export type Database = {
           },
         ]
       }
+      solicitacoes_reembolso: {
+        Row: {
+          comprovante_pagamento_url: string | null
+          created_at: string | null
+          dados_bancarios: string | null
+          data_pagamento: string | null
+          data_solicitacao: string
+          data_vencimento: string | null
+          forma_pagamento_preferida: string | null
+          id: string
+          observacoes: string | null
+          solicitante_id: string
+          status: string
+          updated_at: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          comprovante_pagamento_url?: string | null
+          created_at?: string | null
+          dados_bancarios?: string | null
+          data_pagamento?: string | null
+          data_solicitacao?: string
+          data_vencimento?: string | null
+          forma_pagamento_preferida?: string | null
+          id?: string
+          observacoes?: string | null
+          solicitante_id: string
+          status?: string
+          updated_at?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          comprovante_pagamento_url?: string | null
+          created_at?: string | null
+          dados_bancarios?: string | null
+          data_pagamento?: string | null
+          data_solicitacao?: string
+          data_vencimento?: string | null
+          forma_pagamento_preferida?: string | null
+          id?: string
+          observacoes?: string | null
+          solicitante_id?: string
+          status?: string
+          updated_at?: string | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       subcategorias_financeiras: {
         Row: {
           ativo: boolean
@@ -3080,6 +3150,7 @@ export type Database = {
           numero_parcela: number | null
           observacoes: string | null
           recorrencia: string | null
+          solicitacao_reembolso_id: string | null
           status: string
           subcategoria_id: string | null
           taxas_administrativas: number | null
@@ -3112,6 +3183,7 @@ export type Database = {
           numero_parcela?: number | null
           observacoes?: string | null
           recorrencia?: string | null
+          solicitacao_reembolso_id?: string | null
           status?: string
           subcategoria_id?: string | null
           taxas_administrativas?: number | null
@@ -3144,6 +3216,7 @@ export type Database = {
           numero_parcela?: number | null
           observacoes?: string | null
           recorrencia?: string | null
+          solicitacao_reembolso_id?: string | null
           status?: string
           subcategoria_id?: string | null
           taxas_administrativas?: number | null
@@ -3196,6 +3269,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_solicitacao_reembolso_id_fkey"
+            columns: ["solicitacao_reembolso_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_reembolso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_solicitacao_reembolso_id_fkey"
+            columns: ["solicitacao_reembolso_id"]
+            isOneToOne: false
+            referencedRelation: "view_solicitacoes_reembolso"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "transacoes_financeiras_subcategoria_id_fkey"
@@ -3529,6 +3616,51 @@ export type Database = {
           sala_id: string | null
         }
         Relationships: []
+      }
+      view_solicitacoes_reembolso: {
+        Row: {
+          comprovante_pagamento_url: string | null
+          created_at: string | null
+          dados_bancarios: string | null
+          data_pagamento: string | null
+          data_solicitacao: string | null
+          data_vencimento: string | null
+          forma_pagamento_preferida: string | null
+          id: string | null
+          observacoes: string | null
+          quantidade_itens: number | null
+          solicitante_avatar: string | null
+          solicitante_email: string | null
+          solicitante_id: string | null
+          solicitante_nome: string | null
+          solicitante_telefone: string | null
+          status: string | null
+          updated_at: string | null
+          valor_total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
       }
     }
     Functions: {

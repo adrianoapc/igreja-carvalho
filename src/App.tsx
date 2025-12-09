@@ -52,6 +52,7 @@ import CentrosCusto from "./pages/financas/CentrosCusto";
 import Categorias from "./pages/financas/Categorias";
 import Fornecedores from "./pages/financas/Fornecedores";
 import FormasPagamento from "./pages/financas/FormasPagamento";
+import Reembolsos from "./pages/financas/Reembolsos";
 import Ensinamentos from "./pages/Ensinamentos";
 import Ensino from "./pages/Ensino";
 import MeusCursos from "./pages/MeusCursos";
@@ -596,6 +597,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Fornecedores />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financas/reembolsos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Reembolsos />
                 </MainLayout>
               </ProtectedRoute>
             }

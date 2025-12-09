@@ -40,6 +40,7 @@ import {
   Presentation,
   FileText,
   Cog,
+  Receipt,
 } from "lucide-react";
 import {
   Sidebar,
@@ -275,6 +276,11 @@ const financasConfigItems = [
     icon: UserCog,
     label: "Fornecedores",
     path: "/financas/fornecedores",
+  },
+  {
+    icon: Receipt,
+    label: "Reembolsos",
+    path: "/financas/reembolsos",
   },
 ];
 const financasMovimentaItems = [
