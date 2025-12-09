@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -176,9 +177,6 @@ export default function Perfil() {
 
       if (funcoesError) throw funcoesError;
       setFuncoes(funcoesData || []);
-
-      // Carregar familiares (bidirecional)
-      await loadFamilyMembers(profile.id);
     } catch (error: any) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar dados do perfil");
@@ -187,21 +185,38 @@ export default function Perfil() {
     }
   };
 
-  const loadFamilyMembers = async (userId: string) => {
-    try {
+  // Hook para carregar familiares com React Query
+  const { data: queryFamilyMembers = [] } = useQuery({
+    queryKey: ['perfil-family-members', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+
+      console.log('[Perfil] Carregando familiares para:', profile.id);
+
       // Query bidirecional: busca os dois lados da relação
-      const { data: relationships, error: relError } = await supabase
-        .from('familias')
-        .select('id, pessoa_id, familiar_id, tipo_parentesco')
-        .or(`pessoa_id.eq.${userId},familiar_id.eq.${userId}`);
+      const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
+        supabase
+          .from('familias')
+          .select('id, pessoa_id, familiar_id, tipo_parentesco')
+          .eq('pessoa_id', profile.id),
+        supabase
+          .from('familias')
+          .select('id, pessoa_id, familiar_id, tipo_parentesco')
+          .eq('familiar_id', profile.id)
+      ]);
 
-      if (relError) throw relError;
-      if (!relationships || relationships.length === 0) {
-        setFamilyMembers([]);
-        return;
-      }
+      if (relationshipsAsPessoa.error) throw relationshipsAsPessoa.error;
+      if (relationshipsAsFamiliar.error) throw relationshipsAsFamiliar.error;
 
-      // Identificação inteligente do alvo
+      // Combinar ambas as queries
+      const relationships = [
+        ...(relationshipsAsPessoa.data || []),
+        ...(relationshipsAsFamiliar.data || [])
+      ];
+
+      if (relationships.length === 0) return [];
+
+      // Identificação inteligente do alvo (evitar duplicatas)
       const familiarIds = new Set<string>();
       const familiarMap = new Map<string, {
         familiarId: string;
@@ -213,28 +228,31 @@ export default function Perfil() {
         let targetId: string;
         let isReverse = false;
 
-        if (item.pessoa_id === userId) {
+        if (item.pessoa_id === profile.id) {
+          // Fluxo normal: EU sou pessoa_id, o familiar é familiar_id
           targetId = item.familiar_id;
           isReverse = false;
         } else {
+          // Fluxo reverso: EU sou familiar_id, a pessoa me adicionou
           targetId = item.pessoa_id;
           isReverse = true;
         }
 
         if (targetId) {
           familiarIds.add(targetId);
-          familiarMap.set(targetId, {
-            familiarId: targetId,
-            storedRole: item.tipo_parentesco,
-            isReverse,
-          });
+          
+          // Se já tem esse familiar, manter o registro anterior (preferir fluxo normal)
+          if (!familiarMap.has(targetId)) {
+            familiarMap.set(targetId, {
+              familiarId: targetId,
+              storedRole: item.tipo_parentesco,
+              isReverse,
+            });
+          }
         }
       });
 
-      if (familiarIds.size === 0) {
-        setFamilyMembers([]);
-        return;
-      }
+      if (familiarIds.size === 0) return [];
 
       // Buscar dados dos familiares
       const { data: familiarProfiles, error: profilesError } = await supabase
@@ -270,12 +288,16 @@ export default function Perfil() {
           };
         });
 
-      setFamilyMembers(members);
-    } catch (error) {
-      console.error("Erro ao carregar familiares:", error);
-      setFamilyMembers([]);
-    }
-  };
+      return members;
+    },
+    enabled: !!profile?.id,
+    staleTime: 0, // Sempre buscar dados frescos
+  });
+
+  // Sincronizar com o estado local
+  useEffect(() => {
+    setFamilyMembers(queryFamilyMembers);
+  }, [queryFamilyMembers]);
 
   useEffect(() => {
     loadProfileData();

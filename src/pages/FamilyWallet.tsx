@@ -170,18 +170,31 @@ export default function FamilyWallet() {
     queryFn: async () => {
       if (!profile?.id) return [];
 
-      // Query abrangente: busca os dois lados da relação
-      // (pessoas que EU cadastrei + pessoas que me ADICIONARAM)
-      const { data: relationships, error: relError } = await supabase
-        .from('familias')
-        .select('id, pessoa_id, familiar_id, tipo_parentesco')
-        .or(`pessoa_id.eq.${profile.id},familiar_id.eq.${profile.id}`);
+      // Query bidirecional: busca os dois lados da relação
+      // Fetch duas queries separadas e combina os resultados
+      const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
+        supabase
+          .from('familias')
+          .select('id, pessoa_id, familiar_id, tipo_parentesco')
+          .eq('pessoa_id', profile.id),
+        supabase
+          .from('familias')
+          .select('id, pessoa_id, familiar_id, tipo_parentesco')
+          .eq('familiar_id', profile.id)
+      ]);
 
-      if (relError) throw relError;
-      if (!relationships || relationships.length === 0) return [];
+      if (relationshipsAsPessoa.error) throw relationshipsAsPessoa.error;
+      if (relationshipsAsFamiliar.error) throw relationshipsAsFamiliar.error;
 
-      // Identificação inteligente do alvo:
-      // Para cada relação, determina quem é o "outro" (o familiar)
+      // Combinar ambas as queries
+      const relationships = [
+        ...(relationshipsAsPessoa.data || []),
+        ...(relationshipsAsFamiliar.data || [])
+      ];
+
+      if (relationships.length === 0) return [];
+
+      // Identificação inteligente do alvo (evitar duplicatas)
       const familiarIds = new Set<string>();
       const familiarMap = new Map<string, {
         familiarId: string;
@@ -205,15 +218,17 @@ export default function FamilyWallet() {
 
         if (targetId) {
           familiarIds.add(targetId);
-          familiarMap.set(targetId, {
-            familiarId: targetId,
-            storedRole: item.tipo_parentesco,
-            isReverse,
-          });
+          
+          // Se já tem esse familiar, manter o registro anterior (preferir fluxo normal)
+          if (!familiarMap.has(targetId)) {
+            familiarMap.set(targetId, {
+              familiarId: targetId,
+              storedRole: item.tipo_parentesco,
+              isReverse,
+            });
+          }
         }
       });
-
-      if (familiarIds.size === 0) return [];
 
       // Busca dados dos familiares
       const { data: familiarProfiles, error: profilesError } = await supabase
@@ -226,7 +241,7 @@ export default function FamilyWallet() {
       const profileMap = new Map(familiarProfiles?.map(p => [p.id, p]) || []);
 
       // Montar resultado final com inversão de papel se necessário
-      return Array.from(familiarIds)
+      const members = Array.from(familiarIds)
         .filter(id => profileMap.has(id))
         .map(id => {
           const familiar = profileMap.get(id)!;
@@ -251,8 +266,11 @@ export default function FamilyWallet() {
             _isReverse: relationData.isReverse, // Marcador interno para debug
           };
         });
+
+      return members;
     },
     enabled: !!profile?.id,
+    staleTime: 0, // Sempre buscar dados frescos
   });
 
   // Query para buscar diários de hoje das crianças
