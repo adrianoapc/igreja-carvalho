@@ -333,7 +333,7 @@ export default function KidsDashboard() {
         // Buscar diários com humor preocupante
         const { data: preocupantes, error } = await supabase
           .from("kids_diario")
-          .select("crianca_id, humor, profiles:crianca_id(nome, avatar_url)")
+          .select("crianca_id, humor, crianca:profiles!kids_diario_crianca_id_fkey(nome, avatar_url)")
           .gte("created_at", startDate.toISOString())
           .in("humor", ["choroso", "triste", "agitado"]);
 
@@ -343,10 +343,11 @@ export default function KidsDashboard() {
         const childIssues: Record<string, { nome: string; avatar_url: string | null; count: number; moods: string[] }> = {};
 
         preocupantes?.forEach(record => {
+          const crianca = record.crianca as { nome: string; avatar_url: string | null } | null;
           if (!childIssues[record.crianca_id]) {
             childIssues[record.crianca_id] = {
-              nome: record.profiles?.nome || "Desconhecido",
-              avatar_url: record.profiles?.avatar_url || null,
+              nome: crianca?.nome || "Desconhecido",
+              avatar_url: crianca?.avatar_url || null,
               count: 0,
               moods: [],
             };

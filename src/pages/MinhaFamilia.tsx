@@ -20,6 +20,7 @@ interface FamilyMember {
   data_nascimento: string | null;
   avatar_url: string | null;
   alergias: string | null;
+  necessidades_especiais: string | null;
   sexo: string | null;
   responsavel_legal: boolean | null;
   tipo_parentesco?: string;
