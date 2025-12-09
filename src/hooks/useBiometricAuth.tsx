@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 const BIOMETRIC_USER_KEY = 'biometric_user_id';
 const BIOMETRIC_CREDENTIAL_KEY = 'biometric_credential_id';
+// Security: Use sessionStorage instead of localStorage for refresh tokens
+// sessionStorage is cleared when browser/tab closes, reducing XSS token theft window
 const BIOMETRIC_REFRESH_TOKEN_KEY = 'biometric_refresh_token';
 const LAST_EMAIL_KEY = 'last_login_email';
 const BIOMETRIC_TEST_MODE_KEY = 'biometric_test_mode'; // Para desenvolvimento
@@ -227,15 +229,19 @@ export function useBiometricAuth() {
   }, []);
 
   // Refresh token storage functions (para login automático)
+  // Security: Use sessionStorage for refresh tokens - cleared on browser close
+  // This reduces the window for XSS attacks to steal persistent tokens
   const saveRefreshToken = useCallback((refreshToken: string) => {
-    localStorage.setItem(BIOMETRIC_REFRESH_TOKEN_KEY, refreshToken);
+    sessionStorage.setItem(BIOMETRIC_REFRESH_TOKEN_KEY, refreshToken);
   }, []);
 
   const getRefreshToken = useCallback((): string | null => {
-    return localStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY);
+    return sessionStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY);
   }, []);
 
   const clearRefreshToken = useCallback(() => {
+    sessionStorage.removeItem(BIOMETRIC_REFRESH_TOKEN_KEY);
+    // Also clear from localStorage if migrating from old storage
     localStorage.removeItem(BIOMETRIC_REFRESH_TOKEN_KEY);
   }, []);
 

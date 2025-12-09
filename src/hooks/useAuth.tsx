@@ -124,6 +124,10 @@ export function useAuth() {
   };
 
   const signOut = async () => {
+    // Security: Clear biometric refresh token on logout to prevent session reuse
+    sessionStorage.removeItem('biometric_refresh_token');
+    localStorage.removeItem('biometric_refresh_token');
+    
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
