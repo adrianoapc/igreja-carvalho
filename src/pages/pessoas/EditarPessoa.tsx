@@ -344,6 +344,8 @@ export default function EditarPessoa() {
           entrevistado_por: pessoa.entrevistado_por,
           cadastrado_por: pessoa.cadastrado_por,
           tipo_sanguineo: pessoa.tipo_sanguineo,
+          alergias: pessoa.alergias,
+          necessidades_especiais: pessoa.necessidades_especiais,
           observacoes: pessoa.observacoes,
         }}
         onSuccess={fetchPessoa}
