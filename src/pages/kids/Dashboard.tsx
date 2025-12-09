@@ -45,11 +45,12 @@ export default function KidsDashboard() {
             break;
         }
 
-        // Total de crianças cadastradas (sem filtro deleted_at para evitar erro em schemas sem coluna)
-        const { data: criancas, error: criancasError } = await supabase
+        // Total de crianças cadastradas
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: criancas, error: criancasError } = await (supabase as any)
           .from("profiles")
           .select("id")
-          .eq("tipo_pessoa", "dependente");
+          .eq("tipo_pessoa", "dependente") as { data: { id: string }[] | null; error: Error | null };
 
         if (criancasError) throw criancasError;
 
@@ -129,11 +130,11 @@ export default function KidsDashboard() {
     queryKey: ["kids-ultimos-checkins"],
     queryFn: async () => {
       try {
-        // Buscar crianças
-        const { data: criancas } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: criancas } = await (supabase as any)
           .from("profiles")
           .select("id")
-          .eq("tipo_pessoa", "dependente");
+          .eq("tipo_pessoa", "dependente") as { data: { id: string }[] | null };
 
         if (!criancas || criancas.length === 0) return [];
 

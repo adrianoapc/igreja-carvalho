@@ -86,7 +86,7 @@ export default function TurmaAtiva() {
       // Buscar dados das crianças
       const { data: criancas, error: criancasError } = await supabase
         .from("profiles")
-        .select("id, nome, avatar_url, data_nascimento, responsavel_id")
+        .select("id, nome, avatar_url, data_nascimento")
         .in("id", pessoaIds);
 
       if (criancasError) {
@@ -97,17 +97,32 @@ export default function TurmaAtiva() {
       if (!criancas || criancas.length === 0) {
         return [];
       }
-      // Buscar responsáveis das crianças
-      const responsavelIds = criancas.map(c => c.responsavel_id).filter(Boolean);
+
+      const criancaIds = criancas.map(c => c.id);
+
+      // Buscar responsáveis via familias table (pai/mãe das crianças)
+      const { data: familias } = await supabase
+        .from("familias")
+        .select("pessoa_id, familiar_id, tipo_parentesco")
+        .in("familiar_id", criancaIds)
+        .in("tipo_parentesco", ["pai", "mae", "responsavel"]);
+
+      // Buscar nomes dos responsáveis
+      const responsavelIds = [...new Set(familias?.map(f => f.pessoa_id) || [])];
       const { data: responsaveis } = await supabase
         .from("profiles")
         .select("id, nome")
         .in("id", responsavelIds);
 
       const responsaveisMap = new Map(responsaveis?.map(r => [r.id, r.nome]) || []);
+      const criancaResponsavelMap = new Map<string, string>();
+      familias?.forEach(f => {
+        if (f.familiar_id && !criancaResponsavelMap.has(f.familiar_id)) {
+          criancaResponsavelMap.set(f.familiar_id, responsaveisMap.get(f.pessoa_id) || "");
+        }
+      });
 
       // Buscar diários já registrados para este culto
-      const criancaIds = criancas.map(c => c.id);
       const { data: diarios } = await supabase
         .from("kids_diario")
         .select("crianca_id")
@@ -122,7 +137,7 @@ export default function TurmaAtiva() {
         nome: crianca.nome,
         avatar_url: crianca.avatar_url,
         data_nascimento: crianca.data_nascimento,
-        responsavel_nome: crianca.responsavel_id ? responsaveisMap.get(crianca.responsavel_id) : undefined,
+        responsavel_nome: criancaResponsavelMap.get(crianca.id),
         tem_diario: diariosSet.has(crianca.id),
       }));
     },
