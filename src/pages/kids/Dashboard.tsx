@@ -5,6 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Baby,
   Users,
   Clock,
@@ -20,6 +25,8 @@ import {
   Smile,
   AlertTriangle,
   Heart,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,6 +35,9 @@ import { Badge } from "@/components/ui/badge";
 
 export default function KidsDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<"hoje" | "semana" | "mes">("hoje");
+  const [termometroOpen, setTermometroOpen] = useState(true);
+  const [carinhoOpen, setCarinhoOpen] = useState(true);
+  const [checkinsOpen, setCheckinsOpen] = useState(true);
 
   // Query para estatísticas de check-ins
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -53,14 +63,26 @@ export default function KidsDashboard() {
 
         // Total de crianças cadastradas
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: criancas, error: criancasError } = await (supabase as any)
+        const { data: todosProfiles, error: criancasError } = await (supabase as any)
           .from("profiles")
-          .select("id")
-          .eq("tipo_pessoa", "dependente") as { data: { id: string }[] | null; error: Error | null };
+          .select("id, data_nascimento")
+          .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null; error: Error | null };
 
         if (criancasError) throw criancasError;
 
-        const criancaIds = criancas?.map(c => c.id) || [];
+        // Filtrar apenas crianças menores de 13 anos
+        const today = new Date();
+        const criancas = (todosProfiles || []).filter((p: any) => {
+          const birthDate = new Date(p.data_nascimento);
+          const age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
+            ? age - 1 
+            : age;
+          return actualAge < 13;
+        });
+
+        const criancaIds = criancas?.map((c: any) => c.id) || [];
         
         // Se não há crianças cadastradas, retornar valores zerados
         if (criancaIds.length === 0) {
@@ -136,11 +158,23 @@ export default function KidsDashboard() {
     queryKey: ["kids-ultimos-checkins"],
     queryFn: async () => {
       try {
+        const today = new Date();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: criancas } = await (supabase as any)
+        const { data: todosProfiles } = await (supabase as any)
           .from("profiles")
-          .select("id")
-          .eq("tipo_pessoa", "dependente") as { data: { id: string }[] | null };
+          .select("id, data_nascimento")
+          .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null };
+
+        // Filtrar apenas crianças menores de 13 anos
+        const criancas = (todosProfiles || []).filter((p: any) => {
+          const birthDate = new Date(p.data_nascimento);
+          const age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
+            ? age - 1 
+            : age;
+          return actualAge < 13;
+        });
 
         if (!criancas || criancas.length === 0) return [];
 
@@ -178,15 +212,27 @@ export default function KidsDashboard() {
     queryKey: ["kids-health-stats"],
     queryFn: async () => {
       try {
+        const today = new Date();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: criancas, error } = await (supabase as any)
+        const { data: todosProfiles, error } = await (supabase as any)
           .from("profiles")
-          .select("id, alergias")
-          .eq("tipo_pessoa", "dependente") as { data: Array<{ id: string; alergias: string | null }> | null; error: Error | null };
+          .select("id, alergias, data_nascimento")
+          .not("data_nascimento", "is", null) as { data: Array<{ id: string; alergias: string | null; data_nascimento: string }> | null; error: Error | null };
 
         if (error) throw error;
 
-        const comAlergias = criancas?.filter(c => c.alergias && c.alergias.trim().length > 0).length || 0;
+        // Filtrar apenas crianças menores de 13 anos
+        const criancas = (todosProfiles || []).filter((p: any) => {
+          const birthDate = new Date(p.data_nascimento);
+          const age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
+            ? age - 1 
+            : age;
+          return actualAge < 13;
+        });
+
+        const comAlergias = criancas?.filter((c: any) => c.alergias && c.alergias.trim().length > 0).length || 0;
 
         return {
           totalComAlergias: comAlergias,
@@ -384,15 +430,15 @@ export default function KidsDashboard() {
         </Button>
       </div>
 
-      {/* Cards de Estatísticas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Cards de Estatísticas - KPIs Principais */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Na Sala Agora</CardTitle>
             <UserCheck className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-green-600">
               {statsLoading ? "..." : stats?.checkinsAtivos || 0}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -409,7 +455,7 @@ export default function KidsDashboard() {
             <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-blue-600">
               {statsLoading ? "..." : stats?.totalCheckins || 0}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -420,168 +466,237 @@ export default function KidsDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Com Alergias</CardTitle>
-            <HeartPulse className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-sm font-medium">Total Cadastrados</CardTitle>
+            <Users className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {healthStats?.totalComAlergias || 0}
+            <div className="text-2xl font-bold text-purple-600">
+              {statsLoading ? "..." : stats?.totalCriancas || 0}
             </div>
             <p className="text-xs text-muted-foreground">
+              crianças cadastradas
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-amber-900 dark:text-amber-100">Com Alergias</CardTitle>
+            <HeartPulse className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">
+              {healthStats?.totalComAlergias || 0}
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-400">
               {healthStats?.percentualAlergias || 0}% das crianças
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Atenção Hoje</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100">Precisam Atenção</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-red-600">
               {behaviorAlerts?.length || 0}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {behaviorAlerts && behaviorAlerts.length > 0 ? "precisam de carinho" : "tudo bem com a turma"}
+            <p className="text-xs text-red-700 dark:text-red-400">
+              {behaviorAlerts && behaviorAlerts.length > 0 ? "precisam de carinho" : "tudo bem! 🎉"}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Termômetro Emocional */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Smile className="w-5 h-5 text-primary" />
-            Termômetro Emocional da Turma
-          </CardTitle>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-            Distribuição de humor no período selecionado
-          </p>
-        </CardHeader>
-        <CardContent>
-          {moodStats && Object.keys(moodStats.percentages).length > 0 ? (
-            <div className="space-y-4">
-              {[
-                { mood: "feliz", label: "Feliz", color: "bg-green-500", emoji: "😊" },
-                { mood: "neutro", label: "Neutro", color: "bg-blue-500", emoji: "😐" },
-                { mood: "agitado", label: "Agitado", color: "bg-yellow-500", emoji: "🤪" },
-                { mood: "sonolento", label: "Sonolento", color: "bg-purple-500", emoji: "😴" },
-                { mood: "triste", label: "Triste", color: "bg-indigo-500", emoji: "😔" },
-                { mood: "choroso", label: "Choroso", color: "bg-red-500", emoji: "😢" },
-              ].map(({ mood, label, color, emoji }) => {
-                const percentage = (moodStats.percentages[mood] as number) || 0;
-                return (
-                  <div key={mood} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
-                      <span className="font-medium flex items-center gap-2">
-                        <span>{emoji}</span> {label}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {percentage}% ({(moodStats.counts[mood] as number) || 0})
-                      </span>
-                    </div>
-                    <Progress value={percentage} className="h-2" />
+      {/* Termômetro Emocional + Lista de Atenção */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Coluna 1: Gráfico de Humor */}
+        <Collapsible open={termometroOpen} onOpenChange={setTermometroOpen}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardTitle className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Smile className="w-5 h-5 text-primary" />
+                    Termômetro Emocional da Turma
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Nenhum registro de humor no período.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+                  {termometroOpen ? (
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </CardTitle>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+                  Como estão se sentindo no período selecionado
+                </p>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+            {moodStats && Object.keys(moodStats.percentages).length > 0 && Object.values(moodStats.counts).some(c => c > 0) ? (
+              <div className="space-y-3">
+                {[
+                  { mood: "feliz", label: "Feliz", color: "bg-green-500", emoji: "😊" },
+                  { mood: "neutro", label: "Neutro", color: "bg-blue-500", emoji: "😐" },
+                  { mood: "agitado", label: "Agitado", color: "bg-yellow-500", emoji: "🤪" },
+                  { mood: "sonolento", label: "Sonolento", color: "bg-purple-500", emoji: "😴" },
+                  { mood: "triste", label: "Triste", color: "bg-indigo-500", emoji: "😔" },
+                  { mood: "choroso", label: "Choroso", color: "bg-red-500", emoji: "😢" },
+                ].map(({ mood, label, color, emoji }) => {
+                  const percentage = (moodStats.percentages[mood] as number) || 0;
+                  const count = (moodStats.counts[mood] as number) || 0;
+                  
+                  if (count === 0) return null;
+                  
+                  return (
+                    <div key={mood} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium flex items-center gap-2">
+                          <span className="text-base">{emoji}</span> <span className="text-sm">{label}</span>
+                        </span>
+                        <span className="text-muted-foreground text-xs">
+                          {percentage}% ({count})
+                        </span>
+                      </div>
+                      <Progress value={percentage} className="h-2" />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  Nenhum registro de humor no momento.
+                </AlertDescription>
+              </Alert>
+            )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-      {/* Precisam de Carinho */}
-      {behaviorAlerts && behaviorAlerts.length > 0 && (
-        <Card className="border-l-4 border-l-red-500">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <Heart className="w-5 h-5 fill-red-600" />
-              Precisam de Carinho Hoje
-            </CardTitle>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-              Crianças com sinais de tristeza, choro ou agitação recorrente
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {behaviorAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900"
-                >
-                  <Avatar className="w-10 h-10 shrink-0">
-                    <AvatarImage src={alert.avatar_url || undefined} />
-                    <AvatarFallback className="bg-red-100 text-red-600">
-                      <Baby className="w-5 h-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-red-900">{alert.nome}</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {alert.moods.map((mood) => (
-                        <Badge key={mood} variant="outline" className="text-xs bg-red-100 text-red-700 border-red-300">
-                          {mood === "choroso" ? "😢 Choroso" : mood === "triste" ? "😔 Triste" : "🤪 Agitado"}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-xs text-red-600 mt-1">
-                      {alert.count} {alert.count === 1 ? "ocorrência" : "ocorrências"} no período
-                    </p>
+        {/* Coluna 2: Lista de Atenção */}
+        <Collapsible open={carinhoOpen} onOpenChange={setCarinhoOpen}>
+          <Card className={behaviorAlerts && behaviorAlerts.length > 0 ? "border-l-4 border-l-red-500" : ""}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardTitle className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Heart className={behaviorAlerts && behaviorAlerts.length > 0 ? "w-5 h-5 fill-red-600 text-red-600" : "w-5 h-5 text-green-600"} />
+                    Precisam de Carinho ❤️
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  {carinhoOpen ? (
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </CardTitle>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+              {behaviorAlerts && behaviorAlerts.length > 0 
+                ? "Crianças com sinais de tristeza ou agitação" 
+                : "Acompanhamento emocional da turma"}
+              </p>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
+            {!behaviorAlerts || behaviorAlerts.length === 0 ? (
+              <Alert className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900">
+                <Smile className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
+                  <strong>Tudo tranquilo por enquanto! 🎉</strong>
+                  <p className="text-xs mt-1">Nenhuma criança apresentou sinais de desconforto emocional no período.</p>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="space-y-2">
+                {behaviorAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex items-start gap-3 p-2.5 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900"
+                  >
+                    <Avatar className="w-9 h-9 shrink-0">
+                      <AvatarImage src={alert.avatar_url || undefined} />
+                      <AvatarFallback className="bg-red-100 text-red-600">
+                        <Baby className="w-4 h-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-100">{alert.nome}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {alert.moods.map((mood) => (
+                          <Badge key={mood} variant="outline" className="text-xs bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-200">
+                            {mood === "choroso" ? "😢 Choroso" : mood === "triste" ? "😔 Triste" : "🤪 Agitado"}
+                          </Badge>
+                        ))}
+                      </div>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                        {alert.count} {alert.count === 1 ? "ocorrência" : "ocorrências"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            </CardContent>
+          </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      </div>
 
       {/* Últimos Check-ins */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Últimos Check-ins
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Collapsible open={checkinsOpen} onOpenChange={setCheckinsOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CardTitle className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Últimos Check-ins
+                </div>
+                {checkinsOpen ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
           {!ultimosCheckins || ultimosCheckins.length === 0 ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
+              <AlertDescription className="text-sm">
                 Nenhum check-in registrado no momento.
               </AlertDescription>
             </Alert>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {ultimosCheckins.map((checkin) => (
                 <div
                   key={checkin.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar className="w-10 h-10">
+                    <Avatar className="w-9 h-9">
                       <AvatarImage src={checkin.crianca_avatar || undefined} />
                       <AvatarFallback className="bg-primary/10">
-                        <Baby className="w-5 h-5 text-primary" />
+                        <Baby className="w-4 h-4 text-primary" />
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{checkin.crianca_nome}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm font-medium">{checkin.crianca_nome}</p>
+                      <p className="text-xs text-muted-foreground">
                         {checkin.culto_titulo}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium">
+                    <p className="text-xs font-medium">
                       {formatTime(checkin.checkin_at)}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -592,8 +707,10 @@ export default function KidsDashboard() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Ações Rápidas */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -611,6 +728,25 @@ export default function KidsDashboard() {
             <CardContent>
               <p className="text-xs sm:text-sm text-muted-foreground">
                 Abrir o scanner QR Code para registrar entrada e saída de crianças
+              </p>
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className="cursor-pointer hover:border-primary hover:shadow-md transition-all group">
+          <Link to="/kids/criancas" className="block">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 shrink-0" />
+                  Diretório Kids
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all shrink-0" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Ver todas as crianças cadastradas e seus responsáveis
               </p>
             </CardContent>
           </Link>
@@ -655,7 +791,7 @@ export default function KidsDashboard() {
         </Card>
 
         <Card className="cursor-pointer hover:border-primary hover:shadow-md transition-all group">
-          <Link to="/ensino?tab=config" className="block">
+          <Link to="/kids/config" className="block">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                 <div className="flex items-center gap-2">

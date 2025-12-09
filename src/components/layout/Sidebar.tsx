@@ -133,6 +133,11 @@ const kidsItems = [
     path: "/kids/dashboard",
   },
   {
+    icon: Users,
+    label: "Crianças",
+    path: "/kids/criancas",
+  },
+  {
     icon: ScanLine,
     label: "Totem de Check-in",
     path: "/kids/scanner",
