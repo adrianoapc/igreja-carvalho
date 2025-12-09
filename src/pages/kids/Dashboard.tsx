@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
   Baby,
   Users,
@@ -15,10 +16,15 @@ import {
   AlertCircle,
   Settings,
   BookOpen,
+  HeartPulse,
+  Smile,
+  AlertTriangle,
+  Heart,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 
 export default function KidsDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<"hoje" | "semana" | "mes">("hoje");
@@ -167,6 +173,153 @@ export default function KidsDashboard() {
     refetchInterval: 5000,
   });
 
+  // Query para alergias e saúde
+  const { data: healthStats } = useQuery({
+    queryKey: ["kids-health-stats"],
+    queryFn: async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: criancas, error } = await (supabase as any)
+          .from("profiles")
+          .select("id, alergias")
+          .eq("tipo_pessoa", "dependente") as { data: Array<{ id: string; alergias: string | null }> | null; error: Error | null };
+
+        if (error) throw error;
+
+        const comAlergias = criancas?.filter(c => c.alergias && c.alergias.trim().length > 0).length || 0;
+
+        return {
+          totalComAlergias: comAlergias,
+          percentualAlergias: criancas && criancas.length > 0 ? Math.round((comAlergias / criancas.length) * 100) : 0,
+        };
+      } catch (error) {
+        console.error("Erro ao carregar health stats:", error);
+        return { totalComAlergias: 0, percentualAlergias: 0 };
+      }
+    },
+  });
+
+  // Query para mood tracker (humor)
+  const { data: moodStats } = useQuery({
+    queryKey: ["kids-mood-stats", selectedPeriod],
+    queryFn: async () => {
+      try {
+        const now = new Date();
+        let startDate: Date;
+
+        switch (selectedPeriod) {
+          case "hoje":
+            startDate = new Date(now.setHours(0, 0, 0, 0));
+            break;
+          case "semana":
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - now.getDay());
+            startDate = new Date(weekStart.setHours(0, 0, 0, 0));
+            break;
+          case "mes":
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        }
+
+        const { data: diarios, error } = await supabase
+          .from("kids_diario")
+          .select("humor")
+          .gte("created_at", startDate.toISOString());
+
+        if (error) throw error;
+
+        const humorCounts: Record<string, number> = {
+          feliz: 0,
+          triste: 0,
+          agitado: 0,
+          neutro: 0,
+          choroso: 0,
+          sonolento: 0,
+        };
+
+        diarios?.forEach(d => {
+          if (d.humor && humorCounts.hasOwnProperty(d.humor)) {
+            humorCounts[d.humor]++;
+          }
+        });
+
+        const total = Object.values(humorCounts).reduce((a, b) => a + b, 0);
+        const percentages = total === 0
+          ? humorCounts
+          : Object.entries(humorCounts).reduce((acc, [key, val]) => ({
+              ...acc,
+              [key]: Math.round((val / total) * 100)
+            }), {} as Record<string, number>);
+
+        return { counts: humorCounts, percentages };
+      } catch (error) {
+        console.error("Erro ao carregar mood stats:", error);
+        return { counts: {}, percentages: {} };
+      }
+    },
+  });
+
+  // Query para alertas de comportamento (choro/agitação recorrente)
+  const { data: behaviorAlerts } = useQuery({
+    queryKey: ["kids-behavior-alerts", selectedPeriod],
+    queryFn: async () => {
+      try {
+        const now = new Date();
+        let startDate: Date;
+
+        switch (selectedPeriod) {
+          case "hoje":
+            startDate = new Date(now.setHours(0, 0, 0, 0));
+            break;
+          case "semana":
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - now.getDay());
+            startDate = new Date(weekStart.setHours(0, 0, 0, 0));
+            break;
+          case "mes":
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        }
+
+        // Buscar diários com humor preocupante
+        const { data: preocupantes, error } = await supabase
+          .from("kids_diario")
+          .select("crianca_id, humor, profiles:crianca_id(nome, avatar_url)")
+          .gte("created_at", startDate.toISOString())
+          .in("humor", ["choroso", "triste", "agitado"]);
+
+        if (error) throw error;
+
+        // Contar ocorrências por criança
+        const childIssues: Record<string, { nome: string; avatar_url: string | null; count: number; moods: string[] }> = {};
+
+        preocupantes?.forEach(record => {
+          if (!childIssues[record.crianca_id]) {
+            childIssues[record.crianca_id] = {
+              nome: record.profiles?.nome || "Desconhecido",
+              avatar_url: record.profiles?.avatar_url || null,
+              count: 0,
+              moods: [],
+            };
+          }
+          childIssues[record.crianca_id].count++;
+          if (record.humor && !childIssues[record.crianca_id].moods.includes(record.humor)) {
+            childIssues[record.crianca_id].moods.push(record.humor);
+          }
+        });
+
+        // Retornar os 5 principais
+        return Object.entries(childIssues)
+          .sort((a, b) => b[1].count - a[1].count)
+          .slice(0, 5)
+          .map(([id, data]) => ({ id, ...data }));
+      } catch (error) {
+        console.error("Erro ao carregar behavior alerts:", error);
+        return [];
+      }
+    },
+  });
+
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString("pt-BR", {
       hour: "2-digit",
@@ -267,34 +420,128 @@ export default function KidsDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Cadastrado</CardTitle>
-            <Users className="h-4 w-4 text-purple-600" />
+            <CardTitle className="text-sm font-medium">Com Alergias</CardTitle>
+            <HeartPulse className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {statsLoading ? "..." : stats?.totalCriancas || 0}
+              {healthStats?.totalComAlergias || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats?.totalCriancas === 1 ? "criança cadastrada" : "crianças cadastradas"}
+              {healthStats?.percentualAlergias || 0}% das crianças
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Frequência Média</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-sm font-medium">Atenção Hoje</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {statsLoading ? "..." : `${stats?.frequenciaMedia || 0}%`}
+              {behaviorAlerts?.length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              do total cadastrado
+              {behaviorAlerts && behaviorAlerts.length > 0 ? "precisam de carinho" : "tudo bem com a turma"}
             </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Termômetro Emocional */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smile className="w-5 h-5 text-primary" />
+            Termômetro Emocional da Turma
+          </CardTitle>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+            Distribuição de humor no período selecionado
+          </p>
+        </CardHeader>
+        <CardContent>
+          {moodStats && Object.keys(moodStats.percentages).length > 0 ? (
+            <div className="space-y-4">
+              {[
+                { mood: "feliz", label: "Feliz", color: "bg-green-500", emoji: "😊" },
+                { mood: "neutro", label: "Neutro", color: "bg-blue-500", emoji: "😐" },
+                { mood: "agitado", label: "Agitado", color: "bg-yellow-500", emoji: "🤪" },
+                { mood: "sonolento", label: "Sonolento", color: "bg-purple-500", emoji: "😴" },
+                { mood: "triste", label: "Triste", color: "bg-indigo-500", emoji: "😔" },
+                { mood: "choroso", label: "Choroso", color: "bg-red-500", emoji: "😢" },
+              ].map(({ mood, label, color, emoji }) => {
+                const percentage = (moodStats.percentages[mood] as number) || 0;
+                return (
+                  <div key={mood} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <span className="font-medium flex items-center gap-2">
+                        <span>{emoji}</span> {label}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {percentage}% ({(moodStats.counts[mood] as number) || 0})
+                      </span>
+                    </div>
+                    <Progress value={percentage} className="h-2" />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Nenhum registro de humor no período.
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Precisam de Carinho */}
+      {behaviorAlerts && behaviorAlerts.length > 0 && (
+        <Card className="border-l-4 border-l-red-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <Heart className="w-5 h-5 fill-red-600" />
+              Precisam de Carinho Hoje
+            </CardTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+              Crianças com sinais de tristeza, choro ou agitação recorrente
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {behaviorAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900"
+                >
+                  <Avatar className="w-10 h-10 shrink-0">
+                    <AvatarImage src={alert.avatar_url || undefined} />
+                    <AvatarFallback className="bg-red-100 text-red-600">
+                      <Baby className="w-5 h-5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-red-900">{alert.nome}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {alert.moods.map((mood) => (
+                        <Badge key={mood} variant="outline" className="text-xs bg-red-100 text-red-700 border-red-300">
+                          {mood === "choroso" ? "😢 Choroso" : mood === "triste" ? "😔 Triste" : "🤪 Agitado"}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-xs text-red-600 mt-1">
+                      {alert.count} {alert.count === 1 ? "ocorrência" : "ocorrências"} no período
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Últimos Check-ins */}
       <Card>
