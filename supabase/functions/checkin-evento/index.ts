@@ -5,10 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Simple in-memory rate limiter
+// Simple in-memory rate limiter by IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
 const MAX_REQUESTS_PER_WINDOW = 20; // Max 20 requests per minute per IP
+
+// Security: Per-contact cooldown to prevent attendance manipulation
+const contactCooldownMap = new Map<string, number>();
+const CONTACT_COOLDOWN_MS = 300000; // 5 minutes cooldown per contact after successful check-in
 
 function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now();
@@ -35,6 +39,32 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   
   record.count++;
   return { allowed: true };
+}
+
+// Security: Check if this contact has a recent check-in cooldown
+function checkContactCooldown(contactKey: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const lastCheckin = contactCooldownMap.get(contactKey);
+  
+  // Clean up old entries
+  if (contactCooldownMap.size > 5000) {
+    for (const [key, value] of contactCooldownMap.entries()) {
+      if (value + CONTACT_COOLDOWN_MS < now) {
+        contactCooldownMap.delete(key);
+      }
+    }
+  }
+  
+  if (lastCheckin && lastCheckin + CONTACT_COOLDOWN_MS > now) {
+    const retryAfter = Math.ceil((lastCheckin + CONTACT_COOLDOWN_MS - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  
+  return { allowed: true };
+}
+
+function setContactCooldown(contactKey: string): void {
+  contactCooldownMap.set(contactKey, Date.now());
 }
 
 function getClientIP(req: Request): string {
@@ -72,12 +102,35 @@ Deno.serve(async (req) => {
   try {
     const { tipo, evento_id, contato } = await req.json();
 
-    console.log(`[checkin-evento] Tipo: ${tipo}, Evento: ${evento_id}, Contato: ${contato}, IP: ${clientIP}`);
+    // Security: Log all check-in attempts with IP for audit
+    console.log(`[checkin-evento] Attempt - Tipo: ${tipo}, Evento: ${evento_id}, Contato: ${contato?.substring(0, 3)}***, IP: ${clientIP}`);
 
     if (!tipo || !evento_id || !contato) {
       return new Response(
         JSON.stringify({ success: false, message: "Dados incompletos" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    // Security: Per-contact cooldown to prevent manipulation
+    const contactKey = `${evento_id}:${contato.toLowerCase().trim()}`;
+    const cooldownCheck = checkContactCooldown(contactKey);
+    
+    if (!cooldownCheck.allowed) {
+      console.log(`[checkin-evento] Cooldown active for contact at evento ${evento_id}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Check-in recente detectado. Aguarde alguns minutos antes de tentar novamente." 
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Retry-After": String(cooldownCheck.retryAfter || 300)
+          } 
+        }
       );
     }
 
@@ -88,8 +141,6 @@ Deno.serve(async (req) => {
     // Limpar contato (remover formatação)
     const contatoLimpo = contato.replace(/[^\d@a-zA-Z.]/g, "");
     const isEmail = contato.includes("@");
-
-    console.log(`[checkin-evento] Buscando pessoa por ${isEmail ? "email" : "telefone"}: ${contatoLimpo}`);
 
     // Buscar pessoa por email ou telefone
     let pessoa = null;
@@ -126,14 +177,14 @@ Deno.serve(async (req) => {
     }
 
     if (!pessoa) {
-      console.log("[checkin-evento] Pessoa não encontrada");
+      console.log(`[checkin-evento] Person not found for contact, IP: ${clientIP}`);
       return new Response(
         JSON.stringify({ success: false, not_found: true, message: "Cadastro não encontrado" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[checkin-evento] Pessoa encontrada: ${pessoa.nome} (${pessoa.id})`);
+    console.log(`[checkin-evento] Person found: ${pessoa.nome} (${pessoa.id}), IP: ${clientIP}`);
 
     // Registrar presença baseado no tipo
     if (tipo === "culto") {
@@ -146,7 +197,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (existente) {
-        console.log("[checkin-evento] Presença já registrada anteriormente");
+        console.log(`[checkin-evento] Attendance already registered for person ${pessoa.id}`);
         return new Response(
           JSON.stringify({ success: true, nome: pessoa.nome, message: "Presença já registrada" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -167,7 +218,9 @@ Deno.serve(async (req) => {
         throw insertError;
       }
       
-      console.log("[checkin-evento] Presença no culto registrada com sucesso");
+      // Security: Set cooldown after successful check-in
+      setContactCooldown(contactKey);
+      console.log(`[checkin-evento] SUCCESS - Culto attendance for ${pessoa.id}, IP: ${clientIP}`);
 
     } else if (tipo === "aula") {
       // Verificar se já existe presença na aula
@@ -179,7 +232,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (existente) {
-        console.log("[checkin-evento] Presença na aula já registrada");
+        console.log(`[checkin-evento] Attendance already registered for person ${pessoa.id}`);
         return new Response(
           JSON.stringify({ success: true, nome: pessoa.nome, message: "Presença já registrada" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -201,7 +254,9 @@ Deno.serve(async (req) => {
         throw insertError;
       }
 
-      console.log("[checkin-evento] Presença na aula registrada com sucesso");
+      // Security: Set cooldown after successful check-in
+      setContactCooldown(contactKey);
+      console.log(`[checkin-evento] SUCCESS - Aula attendance for ${pessoa.id}, IP: ${clientIP}`);
     }
 
     return new Response(

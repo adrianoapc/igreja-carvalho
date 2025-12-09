@@ -234,16 +234,19 @@ Deno.serve(async (req) => {
         )
       }
       
+      // Security: Only return minimal fields, exclude sensitive PII
+      // Address fields (cep, cidade, bairro, estado, endereco) and necessidades_especiais removed for privacy
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, necessidades_especiais, cep, cidade, bairro, estado, endereco, profissao, data_batismo')
+        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, profissao, data_batismo')
         .eq('email', email.trim().toLowerCase())
         .eq('status', 'membro')
         .single()
       
       if (error || !profile) {
+        // Security: Use generic error message to prevent email enumeration
         return new Response(
-          JSON.stringify({ error: 'Membro não encontrado com esse email' }),
+          JSON.stringify({ error: 'Não foi possível processar a solicitação' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
