@@ -63,10 +63,11 @@ export default function EnsinoDashboard() {
       const alunosUnicos = new Set(presencas?.map((p) => p.aluno_id) || []).size;
 
       // Total de jornadas ativas
-      const { data: jornadas, error: jornadasError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: jornadas, error: jornadasError } = await (supabase as any)
         .from("jornadas")
         .select("id")
-        .eq("status", "ativa");
+        .eq("ativo", true) as { data: { id: string }[] | null; error: Error | null };
 
       if (jornadasError) throw jornadasError;
 
