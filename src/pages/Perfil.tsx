@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { User, Phone, Mail, MapPin, Calendar, Briefcase, Church, Edit, Lock, Fingerprint } from "lucide-react";
+import { User, Phone, Mail, MapPin, Calendar, Briefcase, Church, Edit, Lock, Fingerprint, Users } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPessoaisDialog";
@@ -63,11 +64,22 @@ interface FuncaoIgreja {
   };
 }
 
+interface FamilyMember {
+  id: string;
+  nome: string;
+  avatar_url: string | null;
+  sexo: string | null;
+  tipo_parentesco: string;
+  data_nascimento: string | null;
+  _isReverse?: boolean;
+}
+
 export default function Perfil() {
   const { profile, user } = useAuth();
   const { isSupported, isEnabled, enableBiometric, disableBiometric } = useBiometricAuth();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [funcoes, setFuncoes] = useState<FuncaoIgreja[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [editPessoaisOpen, setEditPessoaisOpen] = useState(false);
   const [editContatosOpen, setEditContatosOpen] = useState(false);
@@ -97,6 +109,36 @@ export default function Perfil() {
       setBiometricLoading(false);
     }
   };
+
+  /**
+   * Função auxiliar para inverter o papel de parentesco
+   * Quando alguém me adiciona, preciso ver o papel do ponto de vista dela
+   */
+  function getDisplayRole(storedRole: string | null | undefined, isReverse: boolean, memberSex?: string | null): string {
+    if (!storedRole) return "Familiar";
+    if (!isReverse) return storedRole; // Fluxo normal: exibe como está
+
+    // Fluxo reverso: precisa inverter
+    const role = storedRole.toLowerCase();
+
+    // Se são conjuges, mantém "Cônjuge"
+    if (["marido", "esposa", "cônjuge"].includes(role)) {
+      return "Cônjuge";
+    }
+
+    // Se eu cadastrei como pai/mãe e ele me adicionou, ele é meu filho/filha
+    if (role === "pai" || role === "mãe") {
+      return memberSex === "M" ? "Filho" : "Filha";
+    }
+
+    // Se eu cadastrei como filho/filha e ele me adicionou, ele é meu responsável
+    if (role === "filho" || role === "filha") {
+      return "Responsável";
+    }
+
+    // Outros casos genéricos
+    return "Familiar";
+  }
 
   const loadProfileData = async () => {
     if (!profile?.id) return;
@@ -134,11 +176,104 @@ export default function Perfil() {
 
       if (funcoesError) throw funcoesError;
       setFuncoes(funcoesData || []);
+
+      // Carregar familiares (bidirecional)
+      await loadFamilyMembers(profile.id);
     } catch (error: any) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar dados do perfil");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFamilyMembers = async (userId: string) => {
+    try {
+      // Query bidirecional: busca os dois lados da relação
+      const { data: relationships, error: relError } = await supabase
+        .from('familias')
+        .select('id, pessoa_id, familiar_id, tipo_parentesco')
+        .or(`pessoa_id.eq.${userId},familiar_id.eq.${userId}`);
+
+      if (relError) throw relError;
+      if (!relationships || relationships.length === 0) {
+        setFamilyMembers([]);
+        return;
+      }
+
+      // Identificação inteligente do alvo
+      const familiarIds = new Set<string>();
+      const familiarMap = new Map<string, {
+        familiarId: string;
+        storedRole: string;
+        isReverse: boolean;
+      }>();
+
+      relationships.forEach(item => {
+        let targetId: string;
+        let isReverse = false;
+
+        if (item.pessoa_id === userId) {
+          targetId = item.familiar_id;
+          isReverse = false;
+        } else {
+          targetId = item.pessoa_id;
+          isReverse = true;
+        }
+
+        if (targetId) {
+          familiarIds.add(targetId);
+          familiarMap.set(targetId, {
+            familiarId: targetId,
+            storedRole: item.tipo_parentesco,
+            isReverse,
+          });
+        }
+      });
+
+      if (familiarIds.size === 0) {
+        setFamilyMembers([]);
+        return;
+      }
+
+      // Buscar dados dos familiares
+      const { data: familiarProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, nome, avatar_url, sexo, data_nascimento')
+        .in('id', Array.from(familiarIds));
+
+      if (profilesError) throw profilesError;
+
+      const profileMap = new Map(familiarProfiles?.map(p => [p.id, p]) || []);
+
+      // Montar resultado final com inversão de papel
+      const members = Array.from(familiarIds)
+        .filter(id => profileMap.has(id))
+        .map(id => {
+          const familiar = profileMap.get(id)!;
+          const relationData = familiarMap.get(id)!;
+
+          const displayRole = getDisplayRole(
+            relationData.storedRole,
+            relationData.isReverse,
+            familiar.sexo
+          );
+
+          return {
+            id: familiar.id,
+            nome: familiar.nome,
+            avatar_url: familiar.avatar_url,
+            sexo: familiar.sexo,
+            tipo_parentesco: displayRole,
+            data_nascimento: familiar.data_nascimento,
+            _isReverse: relationData.isReverse,
+          };
+        });
+
+      setFamilyMembers(members);
+    } catch (error) {
+      console.error("Erro ao carregar familiares:", error);
+      setFamilyMembers([]);
     }
   };
 
@@ -212,11 +347,12 @@ export default function Perfil() {
 
       {/* Tabs */}
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="perfil">Perfil</TabsTrigger>
           <TabsTrigger value="pessoais">Pessoais</TabsTrigger>
           <TabsTrigger value="contatos">Contatos</TabsTrigger>
           <TabsTrigger value="igreja">Igreja</TabsTrigger>
+          <TabsTrigger value="mais">Mais</TabsTrigger>
         </TabsList>
 
         {/* Tab Perfil */}
@@ -519,7 +655,66 @@ export default function Perfil() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+
+        {/* Tab Mais */}
+        <TabsContent value="mais" className="space-y-4">
+          {/* Familiares */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Familiares
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {familyMembers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Nenhum familiar adicionado. Adicione via FamilyWallet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {familyMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={member.avatar_url || undefined} alt={member.nome} />
+                          <AvatarFallback>
+                            {member.nome
+                              .split(" ")
+                              .map(n => n[0])
+                              .join("")
+                              .toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium">{member.nome}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline">{member.tipo_parentesco}</Badge>
+                            {member._isReverse && (
+                              <Badge variant="secondary" className="text-xs">
+                                Adicionou você
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {member.data_nascimento && (
+                        <div className="text-right text-sm text-muted-foreground">
+                          <p className="text-xs">
+                            {new Date().getFullYear() - new Date(member.data_nascimento).getFullYear()} anos
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       {/* Dialogs de Edição */}
       {profileData && (
