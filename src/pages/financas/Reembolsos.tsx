@@ -104,6 +104,7 @@ export default function Reembolsos() {
   // Estado do pagamento
   const [contaSaida, setContaSaida] = useState("");
   const [dataPagamento, setDataPagamento] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [contaPadrao, setContaPadrao] = useState("");
 
   // Buscar roles do usuário
   useEffect(() => {
@@ -192,6 +193,13 @@ export default function Reembolsos() {
     },
   });
 
+  // Definir conta padrão quando contas são carregadas
+  useEffect(() => {
+    if (contas.length > 0 && !contaPadrao) {
+      setContaPadrao(contas[0].id);
+    }
+  }, [contas, contaPadrao]);
+
   // Mutation: Criar solicitação de reembolso
   const criarSolicitacaoMutation = useMutation({
     mutationFn: async () => {
@@ -213,15 +221,15 @@ export default function Reembolsos() {
 
       // 2. Criar as transações (itens)
       const transacoes = itens.map((item) => ({
-        tipo: "despesa" as const,
-        tipo_lancamento: "comum" as const,
-        valor: -Math.abs(item.valor),
+        tipo: "saida" as const,
+        tipo_lancamento: "unico" as const,
+        valor: Math.abs(item.valor),
         descricao: item.descricao,
         categoria_id: item.categoria_id || null,
         status: "pendente" as const,
         data_vencimento: item.data_item || dataVencimento || new Date().toISOString().split('T')[0],
-        data_transacao: new Date().toISOString(),
-        conta_id: "00000000-0000-0000-0000-000000000000", // Temporário até pagamento
+        data_competencia: new Date().toISOString().split('T')[0],
+        conta_id: contaPadrao,
         solicitacao_reembolso_id: solicitacao.id,
         anexo_url: item.anexo_url || null,
       }));
