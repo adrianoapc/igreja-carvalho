@@ -715,6 +715,7 @@ export default function Perfil() {
             </CardContent>
           </Card>
         </TabsContent>
+      </Tabs>
 
       {/* Dialogs de Edição */}
       {profileData && (
