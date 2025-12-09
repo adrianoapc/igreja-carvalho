@@ -31,6 +31,7 @@ interface Pessoa {
   data_casamento: string | null;
   rg: string | null;
   cpf: string | null;
+  alergias: string | null;
   necessidades_especiais: string | null;
   cep: string | null;
   cidade: string | null;
