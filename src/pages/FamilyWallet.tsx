@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { differenceInYears, differenceInMonths } from "date-fns";
+import { differenceInYears, differenceInMonths, format } from "date-fns";
 import { 
   ArrowLeft, 
   Plus, 
@@ -16,7 +16,14 @@ import {
   X,
   ScanLine,
   CheckCircle,
-  Clock
+  Clock,
+  BookOpen,
+  Smile,
+  Frown,
+  Droplets,
+  Cloud,
+  Zap,
+  Meh
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +60,15 @@ interface KidsCheckin {
   responsavel_id: string;
 }
 
+interface KidsDiary {
+  id: string;
+  crianca_id: string;
+  humor: string | null;
+  comportamento_tags: string[] | null;
+  necessidades_tags: string[] | null;
+  observacoes: string | null;
+}
+
 function calculateAge(birthDate: string | null): string {
   if (!birthDate) return "";
   try {
@@ -68,6 +84,18 @@ function calculateAge(birthDate: string | null): string {
   } catch (e) {
     return "";
   }
+}
+
+function getMoodEmoji(mood: string | null): { emoji: string; label: string } {
+  const moods: Record<string, { emoji: string; label: string }> = {
+    feliz: { emoji: "😊", label: "Feliz" },
+    triste: { emoji: "😔", label: "Triste" },
+    agitado: { emoji: "🤪", label: "Agitado" },
+    neutro: { emoji: "😐", label: "Neutro" },
+    choroso: { emoji: "😢", label: "Choroso" },
+    sonolento: { emoji: "😴", label: "Sonolento" },
+  };
+  return moods[mood || ""] || { emoji: "🙂", label: "Bem" };
 }
 
 export default function FamilyWallet() {
@@ -144,6 +172,37 @@ export default function FamilyWallet() {
         });
     },
     enabled: !!profile?.id,
+  });
+
+  // Query para buscar diários de hoje das crianças
+  const { data: todayDiaries = {} } = useQuery({
+    queryKey: ["kids-diaries-today", familyMembers],
+    queryFn: async () => {
+      if (!familyMembers || familyMembers.length === 0) return {};
+
+      const childrenIds = familyMembers.map(m => m.id);
+      const today = format(new Date(), "yyyy-MM-dd");
+
+      const { data, error } = await supabase
+        .from("kids_diario")
+        .select("*")
+        .in("crianca_id", childrenIds)
+        .eq("data", today);
+
+      if (error) {
+        console.error("Erro ao buscar diários:", error);
+        return {};
+      }
+
+      // Criar mapa de crianca_id -> diário
+      const diaryMap: Record<string, KidsDiary> = {};
+      data?.forEach(diary => {
+        diaryMap[diary.crianca_id] = diary;
+      });
+
+      return diaryMap;
+    },
+    enabled: !!familyMembers && familyMembers.length > 0,
   });
 
   const handleEditMember = (member: FamilyMember) => {
@@ -321,66 +380,126 @@ export default function FamilyWallet() {
               const isChild = (age.includes('anos') && parseInt(age) < 12) || age.includes('mês') || age.includes('meses');
               const checkinStatus = activeCheckins.find(c => c.crianca_id === member.id);
               const isCheckedIn = !!checkinStatus;
+              const diary = todayDiaries[member.id];
+              const mood = diary ? getMoodEmoji(diary.humor) : null;
               
               return (
                 <Card key={member.id} className={`overflow-hidden shadow-sm hover:shadow-md transition-all group bg-white ${isCheckedIn ? 'border-2 border-green-400' : 'border-gray-100'}`}>
-                  <CardContent className="p-4 flex items-center gap-4">
-                    
-                    <Avatar className="h-14 w-14 border-2 border-white shadow-sm relative">
-                      <AvatarImage src={member.avatar_url || ""} />
-                      <AvatarFallback className={`${isChild ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
-                        {isChild ? <Baby className="h-6 w-6" /> : <Users className="h-6 w-6" />}
-                      </AvatarFallback>
-                      {isCheckedIn && (
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
-                          <CheckCircle className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </Avatar>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-gray-900 truncate">{member.nome}</h3>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Seção de Informações Cadastrais */}
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-14 w-14 border-2 border-white shadow-sm relative shrink-0">
+                        <AvatarImage src={member.avatar_url || ""} />
+                        <AvatarFallback className={`${isChild ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
+                          {isChild ? <Baby className="h-6 w-6" /> : <Users className="h-6 w-6" />}
+                        </AvatarFallback>
                         {isCheckedIn && (
-                          <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1">
-                            <Clock className="w-3 h-3" />
-                            No Kids
-                          </Badge>
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
+                            <CheckCircle className="w-3 h-3 text-white" />
+                          </div>
                         )}
+                      </Avatar>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-gray-900 truncate">{member.nome}</h3>
+                          {isCheckedIn && (
+                            <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1">
+                              <Clock className="w-3 h-3" />
+                              No Kids
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <span className="capitalize">{member.tipo_parentesco || 'Familiar'}</span>
+                          {member.data_nascimento && (
+                            <>
+                              <span className="text-gray-300">•</span>
+                              <span>{age}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span className="capitalize">{member.tipo_parentesco || 'Familiar'}</span>
-                        {member.data_nascimento && (
-                          <>
-                            <span className="text-gray-300">•</span>
-                            <span>{age}</span>
-                          </>
-                        )}
-                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 shrink-0">
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {isCheckedIn && (
+                            <DropdownMenuItem 
+                              onClick={() => handleCheckout(checkinStatus.id, member.nome)}
+                              className="text-green-600 focus:text-green-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Retirar do Kids
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => handleEditMember(member)}>
+                            Editar Dados
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600">
-                          <MoreVertical className="h-5 w-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {isCheckedIn && (
-                          <DropdownMenuItem 
-                            onClick={() => handleCheckout(checkinStatus.id, member.nome)}
-                            className="text-green-600 focus:text-green-700"
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Retirar do Kids
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => handleEditMember(member)}>
-                          Editar Dados
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* Seção de Boletim do Dia (Diário de Classe) */}
+                    {diary && (
+                      <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4 text-primary" />
+                          <h4 className="text-sm font-semibold text-primary">Hoje no Kids:</h4>
+                        </div>
 
+                        {/* Humor */}
+                        {mood && (
+                          <div className="flex items-center gap-2 p-2 bg-white rounded-md border border-primary/20">
+                            <span className="text-2xl">{mood.emoji}</span>
+                            <div>
+                              <p className="text-xs text-gray-600">Humor</p>
+                              <p className="font-medium text-sm">{mood.label}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Comportamentos */}
+                        {diary.comportamento_tags && diary.comportamento_tags.length > 0 && (
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1 font-medium">Atividades:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {diary.comportamento_tags.map((tag) => (
+                                <Badge key={tag} variant="secondary" className="text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
+                                  ✓ {tag.replace(/_/g, " ").charAt(0).toUpperCase() + tag.replace(/_/g, " ").slice(1)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Necessidades */}
+                        {diary.necessidades_tags && diary.necessidades_tags.length > 0 && (
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1 font-medium">Atendidas:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {diary.necessidades_tags.map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                  {tag.replace(/_/g, " ").charAt(0).toUpperCase() + tag.replace(/_/g, " ").slice(1)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Recado do Professor */}
+                        {diary.observacoes && (
+                          <div className="p-2 bg-yellow-50 border-l-2 border-yellow-400 rounded text-sm italic text-yellow-900">
+                            <p className="font-semibold text-xs mb-1">📝 Recado do Professor:</p>
+                            <p>{diary.observacoes}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
