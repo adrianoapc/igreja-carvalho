@@ -86,6 +86,8 @@ import PermissionMatrixPrototype from "./pages/AdminPermissions";
 import FamilyWallet from "./pages/FamilyWallet";
 import KidsCheckinScanner from "./pages/kids/Scanner";
 import KidsDashboard from "./pages/kids/Dashboard";
+import KidsConfig from "./pages/kids/Config";
+import KidsCriancas from "./pages/kids/Criancas";
 import EnsinoDashboard from "./pages/ensino/Dashboard";
 import TurmaAtiva from "./pages/kids/TurmaAtiva";
 
@@ -307,6 +309,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <KidsDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kids/config"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <KidsConfig />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kids/criancas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <KidsCriancas />
                 </MainLayout>
               </ProtectedRoute>
             }
