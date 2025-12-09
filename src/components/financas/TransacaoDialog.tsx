@@ -589,11 +589,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${tipo}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage.from("transacoes-anexos").upload(filePath, anexoFile);
+        const { error: uploadError } = await supabase.storage.from("transaction-attachments").upload(filePath, anexoFile);
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage.from("transacoes-anexos").getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage.from("transaction-attachments").getPublicUrl(filePath);
 
         anexoPath = urlData.publicUrl;
       }

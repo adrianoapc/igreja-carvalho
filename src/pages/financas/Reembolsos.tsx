@@ -60,7 +60,8 @@ interface ItemReembolso {
   descricao: string;
   valor: number;
   categoria_id: string;
-  comprovante_url: string;
+  data_item: string;
+  anexo_url: string;
 }
 
 interface Categoria {
@@ -95,8 +96,8 @@ export default function Reembolsos() {
     descricao: "",
     valor: "",
     categoria_id: "",
-    comprovante_url: "",
     data_item: "",
+    anexo_url: "", // URL interna do arquivo processado
   });
   const [processandoIA, setProcessandoIA] = useState(false);
 
@@ -216,13 +217,13 @@ export default function Reembolsos() {
         tipo_lancamento: "comum" as const,
         valor: -Math.abs(item.valor),
         descricao: item.descricao,
-        categoria_id: item.categoria_id,
+        categoria_id: item.categoria_id || null,
         status: "pendente" as const,
-        data_vencimento: dataVencimento || new Date().toISOString().split('T')[0],
+        data_vencimento: item.data_item || dataVencimento || new Date().toISOString().split('T')[0],
         data_transacao: new Date().toISOString(),
         conta_id: "00000000-0000-0000-0000-000000000000", // Temporário até pagamento
         solicitacao_reembolso_id: solicitacao.id,
-        anexo_url: item.comprovante_url || null,
+        anexo_url: item.anexo_url || null,
       }));
 
       const { error: transacoesError } = await supabase
@@ -289,7 +290,25 @@ export default function Reembolsos() {
   const processarNotaFiscalComIA = async (file: File) => {
     setProcessandoIA(true);
     try {
-      // Converter imagem para base64
+      // 1. Upload do arquivo para storage (mesmo bucket usado em transações)
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('transaction-attachments')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Obter URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('transaction-attachments')
+        .getPublicUrl(fileName);
+
+      // 2. Converter imagem para base64
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => {
@@ -303,7 +322,7 @@ export default function Reembolsos() {
 
       const imageBase64 = await base64Promise;
 
-      // Chamar edge function
+      // 3. Chamar edge function para processar
       const { data, error } = await supabase.functions.invoke('processar-nota-fiscal', {
         body: {
           imageBase64,
@@ -314,14 +333,29 @@ export default function Reembolsos() {
       if (error) throw error;
 
       if (data?.success && data?.dados) {
-        const { valor_total, fornecedor_nome, data_emissao, descricao } = data.dados;
+        const { valor_total, fornecedor_nome, data_emissao, descricao, tipo_documento } = data.dados;
+        
+        // Gerar descrição resumida (máximo 60 caracteres)
+        let descricaoResumida = '';
+        if (fornecedor_nome) {
+          descricaoResumida = fornecedor_nome.length > 40 
+            ? fornecedor_nome.substring(0, 37) + '...' 
+            : fornecedor_nome;
+        } else if (descricao) {
+          // Pegar primeira linha ou primeiras palavras
+          const primeiraLinha = descricao.split('\n')[0];
+          descricaoResumida = primeiraLinha.length > 40
+            ? primeiraLinha.substring(0, 37) + '...'
+            : primeiraLinha;
+        }
         
         // Auto-preencher campos
         setItemAtual(prev => ({
           ...prev,
           valor: valor_total?.toString() || prev.valor,
-          descricao: descricao || fornecedor_nome || prev.descricao,
+          descricao: descricaoResumida || prev.descricao,
           data_item: data_emissao || prev.data_item,
+          anexo_url: publicUrl,
         }));
 
         toast.success('✨ Nota fiscal lida com sucesso!');
@@ -356,12 +390,12 @@ export default function Reembolsos() {
     setDadosBancarios("");
     setObservacoes("");
     setItens([]);
-    setItemAtual({ descricao: "", valor: "", categoria_id: "", comprovante_url: "", data_item: "" });
+    setItemAtual({ descricao: "", valor: "", categoria_id: "", data_item: "", anexo_url: "" });
   };
 
   const adicionarItem = () => {
-    if (!itemAtual.descricao || !itemAtual.valor || !itemAtual.categoria_id) {
-      toast.error("Preencha todos os campos do item");
+    if (!itemAtual.descricao || !itemAtual.valor) {
+      toast.error("Preencha pelo menos descrição e valor");
       return;
     }
 
@@ -372,7 +406,7 @@ export default function Reembolsos() {
         valor: parseFloat(itemAtual.valor),
       },
     ]);
-    setItemAtual({ descricao: "", valor: "", categoria_id: "", comprovante_url: "", data_item: "" });
+    setItemAtual({ descricao: "", valor: "", categoria_id: "", data_item: "", anexo_url: "" });
     toast.success("Item adicionado!");
   };
 
@@ -780,7 +814,7 @@ export default function Reembolsos() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="categoria">Categoria</Label>
+                  <Label htmlFor="categoria">Categoria (opcional)</Label>
                   <Select
                     value={itemAtual.categoria_id}
                     onValueChange={(value) =>
@@ -789,29 +823,20 @@ export default function Reembolsos() {
                     disabled={processandoIA}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
+                      <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categorias.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.nome}
-                        </SelectItem>
-                      ))}
+                      {categorias.length === 0 ? (
+                        <SelectItem value="none" disabled>Nenhuma categoria disponível</SelectItem>
+                      ) : (
+                        categorias.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.nome}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="comprovante">URL do Comprovante (opcional)</Label>
-                  <Input
-                    id="comprovante"
-                    value={itemAtual.comprovante_url}
-                    onChange={(e) =>
-                      setItemAtual({ ...itemAtual, comprovante_url: e.target.value })
-                    }
-                    placeholder="https://..."
-                    disabled={processandoIA}
-                  />
                 </div>
 
                 <Button 
