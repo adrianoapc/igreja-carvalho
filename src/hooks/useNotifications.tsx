@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useToast } from "./use-toast";
 
 interface Notification {
   id: string;
@@ -10,13 +11,24 @@ interface Notification {
   read: boolean;
   created_at: string;
   metadata?: any;
+  related_user_id?: string;
+}
+
+interface PushNotificationOptions {
+  enabled?: boolean;
+  sound?: boolean;
+  badge?: boolean;
 }
 
 export function useNotifications() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const notificationProcessedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) {
@@ -28,6 +40,13 @@ export function useNotifications() {
 
     loadNotifications();
     subscribeToNotifications();
+    requestPushPermission();
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
   }, [user]);
 
   const loadNotifications = async () => {
@@ -52,27 +71,183 @@ export function useNotifications() {
     }
   };
 
+  const showPushNotification = useCallback((notification: Notification) => {
+    // Evitar duplicatas processando apenas uma vez
+    if (notificationProcessedRef.current.has(notification.id)) {
+      return;
+    }
+    notificationProcessedRef.current.add(notification.id);
+
+    // Se push notifications estão habilitadas e no navegador
+    if (pushEnabled && "Notification" in window && Notification.permission === "granted") {
+      try {
+        // Determinar ícone baseado no tipo de notificação
+        let icon = "/icon-192x192.png";
+        let badge = "/badge-72x72.png";
+        
+        const notificationOptions: NotificationOptions = {
+          body: notification.message,
+          icon,
+          badge,
+          tag: `kids-${notification.type}`,
+          requireInteraction: false,
+          data: {
+            notificationId: notification.id,
+            url: getDeepLink(notification),
+          },
+        };
+
+        // Adicionar som se habilitado
+        if (pushEnabled) {
+          notificationOptions.silent = false;
+        }
+
+        const push = new Notification(notification.title, notificationOptions);
+
+        // Clicar na notificação abre o app ou navega para página relevante
+        push.onclick = () => {
+          const deepLink = getDeepLink(notification);
+          if (deepLink) {
+            window.location.href = deepLink;
+          }
+          window.focus();
+          push.close();
+        };
+
+        push.onshow = () => {
+          // Auto-fechar após 5 segundos se não for interativa
+          if (!notification.metadata?.requireInteraction) {
+            setTimeout(() => push.close(), 5000);
+          }
+        };
+      } catch (error) {
+        console.error("Error showing push notification:", error);
+      }
+    } else {
+      // Fallback: mostrar toast se push não disponível
+      toast({
+        title: notification.title,
+        description: notification.message,
+        duration: 5000,
+      });
+    }
+  }, [pushEnabled, toast]);
+
+  const requestPushPermission = async () => {
+    if (!("Notification" in window)) {
+      console.warn("Browser não suporta Notifications API");
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      setPushEnabled(true);
+      return;
+    }
+
+    if (Notification.permission !== "denied") {
+      try {
+        const permission = await Notification.requestPermission();
+        setPushEnabled(permission === "granted");
+      } catch (error) {
+        console.error("Error requesting notification permission:", error);
+        setPushEnabled(false);
+      }
+    }
+  };
+
+  const getDeepLink = (notification: Notification): string => {
+    const { type, metadata } = notification;
+
+    switch (type) {
+      case "kids_diario":
+        // Navegar para o diário da criança
+        return metadata?.crianca_id
+          ? `/kids/diario/${metadata.crianca_id}?date=${metadata.data}`
+          : "/kids/dashboard";
+      
+      case "kids_checkout":
+        // Navegar para o check-in/checkout
+        return metadata?.crianca_id
+          ? `/kids/checkin/${metadata.crianca_id}`
+          : "/kids/dashboard";
+      
+      case "novo_visitante":
+        // Navegar para visitantes
+        return metadata?.visitante_id
+          ? `/visitantes/${metadata.visitante_id}`
+          : "/visitantes";
+      
+      case "promocao_status":
+        // Navegar para membros
+        return metadata?.pessoa_id
+          ? `/pessoas/${metadata.pessoa_id}`
+          : "/membros";
+      
+      default:
+        return "/dashboard";
+    }
+  };
+
   const subscribeToNotifications = () => {
     if (!user) return;
 
-    const channel = supabase
-      .channel("notifications")
+    channelRef.current = supabase
+      .channel(`notifications:${user.id}`)
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          loadNotifications();
+        (payload: any) => {
+          const newNotification = payload.new as Notification;
+          
+          // Adicionar à lista
+          setNotifications(prev => [newNotification, ...prev]);
+          setUnreadCount(prev => prev + 1);
+
+          // Mostrar push notification
+          showPushNotification(newNotification);
         }
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          const updatedNotification = payload.new as Notification;
+          
+          setNotifications(prev =>
+            prev.map(n =>
+              n.id === updatedNotification.id ? updatedNotification : n
+            )
+          );
+
+          // Atualizar contagem de não lidos
+          const wasUnread = payload.old?.read === false && updatedNotification.read === true;
+          if (wasUnread) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("✅ Notificações em tempo real ativadas");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("❌ Erro ao conectar ao canal de notificações");
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
     };
   };
 
@@ -137,8 +312,10 @@ export function useNotifications() {
     notifications,
     unreadCount,
     loading,
+    pushEnabled,
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    requestPushPermission,
   };
 }

@@ -98,6 +98,41 @@ function getMoodEmoji(mood: string | null): { emoji: string; label: string } {
   return moods[mood || ""] || { emoji: "🙂", label: "Bem" };
 }
 
+/**
+ * Função auxiliar para inverter o papel de parentesco
+ * Quando alguém me adiciona, preciso ver o papel do ponto de vista dela
+ * 
+ * @param storedRole - O papel armazenado no banco (ex: 'pai', 'mãe', 'filha')
+ * @param isReverse - Se true, estamos no fluxo reverso (pessoa me adicionou)
+ * @param memberSex - Sexo do membro ('M', 'F', ou null)
+ * @returns O papel que devo exibir
+ */
+function getDisplayRole(storedRole: string | null | undefined, isReverse: boolean, memberSex?: string | null): string {
+  if (!storedRole) return "Familiar";
+  if (!isReverse) return storedRole; // Fluxo normal: exibe como está
+
+  // Fluxo reverso: precisa inverter
+  const role = storedRole.toLowerCase();
+
+  // Se são conjuges, mantém "Cônjuge"
+  if (["marido", "esposa", "cônjuge"].includes(role)) {
+    return "Cônjuge";
+  }
+
+  // Se eu cadastrei como pai/mãe e ele me adicionou, ele é meu filho/filha
+  if (role === "pai" || role === "mãe") {
+    return memberSex === "M" ? "Filho" : "Filha";
+  }
+
+  // Se eu cadastrei como filho/filha e ele me adicionou, ele é meu responsável
+  if (role === "filho" || role === "filha") {
+    return "Responsável";
+  }
+
+  // Outros casos genéricos
+  return "Familiar";
+}
+
 export default function FamilyWallet() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -129,36 +164,81 @@ export default function FamilyWallet() {
     refetchInterval: 10000, // Atualiza a cada 10 segundos
   });
 
-  // --- BUSCA REAL NO BANCO DE DADOS ---
+  // --- BUSCA REAL NO BANCO DE DADOS (BIDIRECIONAL) ---
   const { data: familyMembers, isLoading: isFamilyLoading } = useQuery({
     queryKey: ['family-members', profile?.id],
     queryFn: async () => {
       if (!profile?.id) return [];
 
+      // Query abrangente: busca os dois lados da relação
+      // (pessoas que EU cadastrei + pessoas que me ADICIONARAM)
       const { data: relationships, error: relError } = await supabase
         .from('familias')
-        .select('id, tipo_parentesco, familiar_id')
-        .eq('pessoa_id', profile.id);
+        .select('id, pessoa_id, familiar_id, tipo_parentesco')
+        .or(`pessoa_id.eq.${profile.id},familiar_id.eq.${profile.id}`);
 
       if (relError) throw relError;
       if (!relationships || relationships.length === 0) return [];
 
-      const familiarIds = relationships.map(r => r.familiar_id).filter(Boolean);
-      if (familiarIds.length === 0) return [];
+      // Identificação inteligente do alvo:
+      // Para cada relação, determina quem é o "outro" (o familiar)
+      const familiarIds = new Set<string>();
+      const familiarMap = new Map<string, {
+        familiarId: string;
+        storedRole: string;
+        isReverse: boolean;
+      }>();
 
+      relationships.forEach(item => {
+        let targetId: string;
+        let isReverse = false;
+
+        if (item.pessoa_id === profile.id) {
+          // Fluxo normal: EU sou pessoa_id, o familiar é familiar_id
+          targetId = item.familiar_id;
+          isReverse = false;
+        } else {
+          // Fluxo reverso: EU sou familiar_id, a pessoa me adicionou
+          targetId = item.pessoa_id;
+          isReverse = true;
+        }
+
+        if (targetId) {
+          familiarIds.add(targetId);
+          familiarMap.set(targetId, {
+            familiarId: targetId,
+            storedRole: item.tipo_parentesco,
+            isReverse,
+          });
+        }
+      });
+
+      if (familiarIds.size === 0) return [];
+
+      // Busca dados dos familiares
       const { data: familiarProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, nome, data_nascimento, avatar_url, alergias, sexo, responsavel_legal, status')
-        .in('id', familiarIds);
+        .in('id', Array.from(familiarIds));
 
       if (profilesError) throw profilesError;
 
       const profileMap = new Map(familiarProfiles?.map(p => [p.id, p]) || []);
 
-      return relationships
-        .filter(r => r.familiar_id && profileMap.has(r.familiar_id))
-        .map(r => {
-          const familiar = profileMap.get(r.familiar_id)!;
+      // Montar resultado final com inversão de papel se necessário
+      return Array.from(familiarIds)
+        .filter(id => profileMap.has(id))
+        .map(id => {
+          const familiar = profileMap.get(id)!;
+          const relationData = familiarMap.get(id)!;
+
+          // Lógica de inversão de papel (labels)
+          const displayRole = getDisplayRole(
+            relationData.storedRole,
+            relationData.isReverse,
+            familiar.sexo
+          );
+
           return {
             id: familiar.id,
             nome: familiar.nome,
@@ -167,7 +247,8 @@ export default function FamilyWallet() {
             alergias: familiar.alergias,
             sexo: familiar.sexo,
             responsavel_legal: familiar.responsavel_legal,
-            tipo_parentesco: r.tipo_parentesco
+            tipo_parentesco: displayRole,
+            _isReverse: relationData.isReverse, // Marcador interno para debug
           };
         });
     },
