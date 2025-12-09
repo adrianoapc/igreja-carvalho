@@ -92,7 +92,7 @@ export default function MinhaFamilia() {
       // Fetch profiles for those familiars
       const { data: familiarProfiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, nome, data_nascimento, avatar_url, alergias, sexo, responsavel_legal, status')
+        .select('id, nome, data_nascimento, avatar_url, alergias, necessidades_especiais, sexo, responsavel_legal, status')
         .in('id', familiarIds);
 
       if (profilesError) throw profilesError;
@@ -111,6 +111,7 @@ export default function MinhaFamilia() {
             data_nascimento: familiar.data_nascimento,
             avatar_url: familiar.avatar_url,
             alergias: familiar.alergias,
+            necessidades_especiais: familiar.necessidades_especiais,
             sexo: familiar.sexo,
             responsavel_legal: familiar.responsavel_legal,
             tipo_parentesco: r.tipo_parentesco
