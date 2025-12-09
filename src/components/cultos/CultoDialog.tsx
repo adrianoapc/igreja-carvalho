@@ -263,7 +263,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[88vh] sm:max-h-[90vh] overflow-y-auto px-4 sm:px-6">
+      <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto px-4 sm:px-6 z-50">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Editar Evento" : "Novo Evento"}
@@ -314,7 +314,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         )}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Tipo */}
               <FormField
@@ -413,13 +413,13 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0 z-50" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
                           initialFocus
-                          className="pointer-events-auto"
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                         />
                       </PopoverContent>
                     </Popover>
