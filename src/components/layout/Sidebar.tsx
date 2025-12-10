@@ -277,11 +277,6 @@ const financasConfigItems = [
     label: "Fornecedores",
     path: "/financas/fornecedores",
   },
-  {
-    icon: Receipt,
-    label: "Reembolsos",
-    path: "/financas/reembolsos",
-  },
 ];
 const financasMovimentaItems = [
   {
@@ -293,6 +288,11 @@ const financasMovimentaItems = [
     icon: TrendingDown,
     label: "Saídas",
     path: "/financas/saidas",
+  },
+    {
+    icon: Receipt,
+    label: "Reembolsos",
+    path: "/financas/reembolsos",
   },
   {
     icon: Building2,
