@@ -60,10 +60,13 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarUpdat
       const fileExt = selectedFile.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      // Deletar avatar antigo se existir
-      if (currentAvatarUrl) {
+      // Deletar avatar antigo se existir e pertence ao usuário atual
+      if (currentAvatarUrl && currentAvatarUrl.includes(`/${user.id}/`)) {
         const oldPath = currentAvatarUrl.split("/").slice(-2).join("/");
-        await supabase.storage.from("avatars").remove([oldPath]);
+        // Validate path before deletion
+        if (oldPath && oldPath.startsWith(user.id)) {
+          await supabase.storage.from("avatars").remove([oldPath]);
+        }
       }
 
       // Upload do novo arquivo

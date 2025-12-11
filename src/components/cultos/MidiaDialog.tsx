@@ -190,10 +190,17 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
         urlFinal = publicUrl;
 
         // Deletar arquivo antigo se estiver editando
+        // RLS policies on storage bucket enforce ownership
         if (midia?.url) {
           const oldPath = midia.url.split('/midias/')[1];
-          if (oldPath) {
-            await supabase.storage.from('midias').remove([oldPath]);
+          // Validate path to prevent path traversal
+          if (oldPath && !oldPath.includes('..') && !oldPath.startsWith('/')) {
+            try {
+              await supabase.storage.from('midias').remove([oldPath]);
+            } catch (e) {
+              // Ignore deletion errors - file may not exist or user may not have permission
+              console.warn('Could not delete old file:', e);
+            }
           }
         }
 
