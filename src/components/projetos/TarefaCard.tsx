@@ -82,19 +82,6 @@ export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
       {...attributes}
       {...listeners}
     >
-      {whatsappLink && (
-        <Button
-          variant="secondary"
-          size="icon"
-          className="absolute -top-2 -right-2 h-9 w-9 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation();
-            window.open(whatsappLink, "_blank");
-          }}
-        >
-          <MessageCircle className="w-4 h-4" />
-        </Button>
-      )}
       <div className="space-y-2">
         <p className="font-medium text-sm leading-tight line-clamp-2">{tarefa.titulo}</p>
 
