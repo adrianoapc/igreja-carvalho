@@ -91,6 +91,7 @@ import KidsConfig from "./pages/kids/Config";
 import KidsCriancas from "./pages/kids/Criancas";
 import EnsinoDashboard from "./pages/ensino/Dashboard";
 import TurmaAtiva from "./pages/kids/TurmaAtiva";
+import NotificacoesAdmin from "./pages/admin/Notificacoes";
 
 const queryClient = new QueryClient();
 
@@ -685,6 +686,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Admin />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/notificacoes"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <NotificacoesAdmin />
                 </MainLayout>
               </ProtectedRoute>
             }

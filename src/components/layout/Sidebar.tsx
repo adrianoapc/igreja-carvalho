@@ -41,6 +41,7 @@ import {
   FileText,
   Cog,
   Receipt,
+  Bell,
 } from "lucide-react";
 import {
   Sidebar,
@@ -190,6 +191,11 @@ const administrativoItems = [
     icon: Shield,
     label: "Gestão de Acesso",
     path: "/admin",
+  },
+  {
+    icon: Bell,
+    label: "Notificações",
+    path: "/admin/notificacoes",
   },
 ];
 
