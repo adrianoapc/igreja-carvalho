@@ -14,30 +14,34 @@ interface DisparadorPayload {
 
 interface NotificacaoRegra {
   id: string;
-  evento: string;
-  titulo_template: string;
-  mensagem_template: string;
-  role_destinatario?: string; // compat legado
-  role_alvo?: string; // novo campo
-  user_id_especifico?: string;
-  canais?: any; // jsonb com flags por canal
-  canal_inapp?: boolean; // legado
-  canal_whatsapp?: boolean; // legado
-  canal_push?: boolean; // legado
-  template_meta?: string | null;
+  evento_slug: string;
+  role_alvo?: string | null;
+  user_id_especifico?: string | null;
+  canais?: {
+    in_app?: boolean;
+    push?: boolean;
+    whatsapp?: boolean;
+    whatsapp_provider?: string;
+    template_meta?: string;
+  } | null;
   ativo?: boolean;
 }
 
 interface NotificacaoEvento {
-  provider_preferencial?: string | null; // 'make' | 'meta_direto'
+  slug: string;
+  nome: string;
+  categoria: string;
+  provider_preferencial?: string | null;
+  template_meta?: string | null;
+  variaveis?: string[] | null;
 }
 
 interface ProfileComRoles {
   id: string;
   nome: string;
   email: string;
-  telefone?: string;
-  avatar_url?: string;
+  telefone?: string | null;
+  avatar_url?: string | null;
 }
 
 // Formatar string com variáveis do tipo {{chave}}
@@ -49,13 +53,13 @@ function formatarTemplate(template: string, dados: Record<string, any>): string 
 
 // Buscar regras para o evento
 async function buscarRegras(
-  supabase: ReturnType<typeof createClient>,
-  evento: string
+  supabase: any,
+  eventoSlug: string
 ): Promise<NotificacaoRegra[]> {
   const { data, error } = await supabase
     .from("notificacao_regras")
     .select("*")
-    .eq("evento", evento)
+    .eq("evento_slug", eventoSlug)
     .eq("ativo", true);
 
   if (error) {
@@ -63,12 +67,31 @@ async function buscarRegras(
     return [];
   }
 
-  return data || [];
+  return (data as NotificacaoRegra[]) || [];
+}
+
+// Buscar evento config
+async function buscarEvento(
+  supabase: any,
+  eventoSlug: string
+): Promise<NotificacaoEvento | null> {
+  const { data, error } = await supabase
+    .from("notificacao_eventos")
+    .select("*")
+    .eq("slug", eventoSlug)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Erro ao buscar evento:", error);
+    return null;
+  }
+
+  return data as NotificacaoEvento | null;
 }
 
 // Buscar usuários por role
 async function buscarUsuariosPorRole(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   role: string
 ): Promise<ProfileComRoles[]> {
   // Tabela legada
@@ -92,8 +115,8 @@ async function buscarUsuariosPorRole(
   }
 
   const userIds = [
-    ...(roleUsers?.map((r) => r.user_id) || []),
-    ...(appRoles?.map((r) => r.user_id) || []),
+    ...(roleUsers?.map((r: any) => r.user_id) || []),
+    ...(appRoles?.map((r: any) => r.user_id) || []),
   ];
 
   if (userIds.length === 0) return [];
@@ -101,19 +124,19 @@ async function buscarUsuariosPorRole(
   const { data: profiles, error: profileError } = await supabase
     .from("profiles")
     .select("id, nome, email, telefone, avatar_url")
-    .in("id", userIds);
+    .in("user_id", userIds);
 
   if (profileError) {
     console.error("Erro ao buscar perfis:", profileError);
     return [];
   }
 
-  return profiles || [];
+  return (profiles as ProfileComRoles[]) || [];
 }
 
 // Buscar usuário específico
 async function buscarUsuario(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   userId: string
 ): Promise<ProfileComRoles | null> {
   const { data, error } = await supabase
@@ -127,12 +150,12 @@ async function buscarUsuario(
     return null;
   }
 
-  return data;
+  return data as ProfileComRoles | null;
 }
 
 // Disparar notificação in-app
 async function dispararInApp(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   userId: string,
   titulo: string,
   mensagem: string,
@@ -140,11 +163,10 @@ async function dispararInApp(
 ): Promise<boolean> {
   const { error } = await supabase.from("notifications").insert({
     user_id: userId,
-    titulo,
-    mensagem,
-    tipo: evento,
-    lido: false,
-    created_at: new Date().toISOString(),
+    title: titulo,
+    message: mensagem,
+    type: evento,
+    read: false,
   });
 
   if (error) {
@@ -308,22 +330,12 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Buscar configuração do evento
+    const eventoCfg = await buscarEvento(supabase, evento);
+    const providerPreferencial = eventoCfg?.provider_preferencial || "make";
+
     // Buscar regras para o evento
     const regras = await buscarRegras(supabase, evento);
-
-    // Buscar configuração do evento (provider preferencial)
-    let providerPreferencial: string | null = null;
-    const { data: eventoCfg, error: eventoError } = await supabase
-      .from("notificacao_eventos")
-      .select("provider_preferencial")
-      .eq("evento", evento)
-      .maybeSingle();
-
-    if (eventoError) {
-      console.error("Erro ao buscar notificacao_eventos:", eventoError);
-    } else {
-      providerPreferencial = (eventoCfg as NotificacaoEvento | null)?.provider_preferencial || null;
-    }
 
     if (regras.length === 0) {
       return new Response(
@@ -360,9 +372,8 @@ serve(async (req) => {
       } else if (regra.user_id_especifico) {
         const usuario = await buscarUsuario(supabase, regra.user_id_especifico);
         if (usuario) destinatarios = [usuario];
-      } else if (regra.role_alvo || regra.role_destinatario) {
-        const role = regra.role_alvo || regra.role_destinatario!;
-        destinatarios = await buscarUsuariosPorRole(supabase, role);
+      } else if (regra.role_alvo) {
+        destinatarios = await buscarUsuariosPorRole(supabase, regra.role_alvo);
       }
 
       if (destinatarios.length === 0) {
@@ -373,17 +384,20 @@ serve(async (req) => {
       console.log(`👥 ${destinatarios.length} destinatário(s) encontrado(s)`);
       totalDestinatarios += destinatarios.length;
 
-      // Formatar título e mensagem
-      const titulo = formatarTemplate(regra.titulo_template, dados);
-      const mensagem = formatarTemplate(regra.mensagem_template, dados);
+      // Formatar título e mensagem usando dados e nome do evento
+      const titulo = eventoCfg?.nome || evento;
+      const mensagem = formatarTemplate(
+        `Evento: ${eventoCfg?.nome || evento}. ${JSON.stringify(dados)}`,
+        dados
+      );
 
-      // Canais (json) com fallback para booleans legados
+      // Canais (json) com defaults
       const canais = regra.canais || {};
-      const usarInApp = canais.inapp ?? regra.canal_inapp ?? true; // in-app sempre, mas mantemos flag para eventual bypass
-      const usarWhatsApp = canais.whatsapp ?? regra.canal_whatsapp ?? false;
-      const usarPush = canais.push ?? regra.canal_push ?? false;
+      const usarInApp = canais.in_app ?? true;
+      const usarWhatsApp = canais.whatsapp ?? false;
+      const usarPush = canais.push ?? false;
       const providerWhats = canais.whatsapp_provider || providerPreferencial || "make";
-      const templateMeta = canais.template_meta || regra.template_meta || null;
+      const templateMeta = canais.template_meta || eventoCfg?.template_meta || null;
 
       // Disparar por cada destinatário e canal
       for (const destinatario of destinatarios) {
