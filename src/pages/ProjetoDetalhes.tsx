@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Plus, Pencil, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -123,6 +124,15 @@ export default function ProjetoDetalhes() {
     setTarefaDialogOpen(true);
   };
 
+  const totalTarefas = tarefas?.length || 0;
+  const tarefasConcluidas = tarefas?.filter(t => t.status === "done").length || 0;
+  const tarefasAtrasadas = tarefas?.filter(t => t.data_vencimento && new Date(t.data_vencimento) < new Date() && t.status !== "done").length || 0;
+  const taxaConclusao = totalTarefas > 0 ? (tarefasConcluidas / totalTarefas) * 100 : 0;
+
+  const getInitials = (nome: string) => {
+    return nome.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+  };
+
   if (loadingProjeto) {
     return (
       <div className="space-y-6">
@@ -147,42 +157,58 @@ export default function ProjetoDetalhes() {
     <div className="h-[calc(100vh-64px)] w-full max-w-full overflow-hidden relative flex flex-col">
       {/* Header */}
       <div className="shrink-0 z-10 relative p-4 border-b bg-background">
-        <div className="flex items-center gap-4 mb-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/projetos")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-foreground">{projeto.titulo}</h1>
-              <Badge variant={statusBadgeVariant(projeto.status)}>{projeto.status}</Badge>
+        <div className="flex items-center justify-between gap-4 mb-3">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/projetos")}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-bold text-foreground truncate">{projeto.titulo}</h1>
+                <Badge variant={statusBadgeVariant(projeto.status)}>{projeto.status}</Badge>
+              </div>
+              {projeto.descricao && (
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{projeto.descricao}</p>
+              )}
+              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+                <span>{totalTarefas} tarefas</span>
+                <span className="flex items-center gap-1 text-foreground font-semibold">
+                  Conclusão: {taxaConclusao.toFixed(0)}%
+                </span>
+                {tarefasAtrasadas > 0 && (
+                  <span className="flex items-center gap-1 text-destructive font-semibold">
+                    Atrasadas: {tarefasAtrasadas}
+                  </span>
+                )}
+                {projeto.data_fim && (
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {format(new Date(projeto.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                  </span>
+                )}
+              </div>
             </div>
-            {projeto.descricao && (
-              <p className="text-sm text-muted-foreground mt-1">{projeto.descricao}</p>
-            )}
           </div>
-          <Button variant="outline" size="sm" onClick={() => setProjetoDialogOpen(true)}>
-            <Pencil className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
-          <Button size="sm" onClick={handleNovaTarefa}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Tarefa
-          </Button>
-        </div>
 
-        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-          {projeto.lider && (
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4" />
-              <span>Líder: {projeto.lider.nome}</span>
-            </div>
-          )}
-          {projeto.data_fim && (
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span>Prazo: {format(new Date(projeto.data_fim), "dd/MM/yyyy", { locale: ptBR })}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {projeto.lider && (
+              <Avatar className="h-9 w-9 border-2 border-primary/60">
+                <AvatarImage src={projeto.lider.avatar_url || undefined} />
+                <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
+                  {getInitials(projeto.lider.nome)}
+                </AvatarFallback>
+              </Avatar>
+            )}
+
+            <Button variant="outline" size="sm" onClick={() => setProjetoDialogOpen(true)}>
+              <Pencil className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Editar</span>
+            </Button>
+            <Button size="sm" onClick={handleNovaTarefa}>
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Nova Tarefa</span>
+            </Button>
+          </div>
         </div>
       </div>
 

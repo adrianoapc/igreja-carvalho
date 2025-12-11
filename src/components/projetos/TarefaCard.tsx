@@ -1,11 +1,12 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { format, isPast, isToday } from "date-fns";
+import { format, isPast, isToday, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, Flag } from "lucide-react";
+import { Calendar, Flag, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface Tarefa {
   id: string;
@@ -54,18 +55,47 @@ export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
 
   const isOverdue = tarefa.data_vencimento && isPast(new Date(tarefa.data_vencimento)) && !isToday(new Date(tarefa.data_vencimento));
   const isDueToday = tarefa.data_vencimento && isToday(new Date(tarefa.data_vencimento));
+  
+  const diasAteVencimento = tarefa.data_vencimento
+    ? differenceInCalendarDays(new Date(tarefa.data_vencimento), new Date())
+    : null;
+
+  const alertaPrazo =
+    isOverdue
+      ? { label: `⚠️ Atrasada ${Math.abs(diasAteVencimento || 0)}d`, variant: "destructive" as const }
+      : isDueToday
+        ? { label: "Vence Hoje!", variant: "destructive" as const }
+        : diasAteVencimento !== null && diasAteVencimento <= 3 && diasAteVencimento >= 0
+          ? { label: "Atenção", variant: "warning" as const }
+          : null;
+
+  const phoneDigits = tarefa.responsavel?.telefone ? tarefa.responsavel.telefone.replace(/\D/g, "") : "";
+  const whatsappLink = phoneDigits ? `https://wa.me/${phoneDigits}` : null;
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
       onClick={onClick}
-      className={`w-full p-3 cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 ${
+      className={`group w-full p-3 cursor-grab active:cursor-grabbing transition-all bg-card border shadow-sm hover:shadow-md hover:border-primary/30 relative ${
         isDragging ? "opacity-50 shadow-lg ring-2 ring-primary rotate-1 z-10" : ""
       }`}
       {...attributes}
       {...listeners}
     >
+      {whatsappLink && (
+        <Button
+          variant="secondary"
+          size="icon"
+          className="absolute -top-2 -right-2 h-9 w-9 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            window.open(whatsappLink, "_blank");
+          }}
+        >
+          <MessageCircle className="w-4 h-4" />
+        </Button>
+      )}
       <div className="space-y-2">
         <p className="font-medium text-sm leading-tight line-clamp-2">{tarefa.titulo}</p>
 
@@ -74,7 +104,7 @@ export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
         )}
 
         <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Badge
               variant="secondary"
               className={`text-[10px] px-1.5 py-0 h-5 ${prioridadeCor[tarefa.prioridade as keyof typeof prioridadeCor] || ""}`}
@@ -83,27 +113,33 @@ export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
               {tarefa.prioridade}
             </Badge>
 
-            {tarefa.data_vencimento && (
+            {alertaPrazo ? (
               <Badge
-                variant="secondary"
-                className={`text-[10px] px-1.5 py-0 h-5 ${
-                  isOverdue
-                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                    : isDueToday
-                    ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                    : ""
-                }`}
+                variant={alertaPrazo.variant === "destructive" ? "destructive" : "secondary"}
+                className="text-[10px] px-1.5 py-0 h-5"
               >
+                {alertaPrazo.label}
+              </Badge>
+            ) : tarefa.data_vencimento ? (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
                 <Calendar className="w-2.5 h-2.5 mr-0.5" />
                 {format(new Date(tarefa.data_vencimento), "dd/MM", { locale: ptBR })}
               </Badge>
-            )}
+            ) : null}
           </div>
 
           {tarefa.responsavel && (
-            <Avatar className="h-5 w-5 border border-background ring-1 ring-border/20">
+            <Avatar
+              className={`h-8 w-8 border-2 ${
+                isOverdue
+                  ? "border-red-400/70"
+                  : isDueToday
+                    ? "border-orange-400/70"
+                    : "border-primary/60"
+              }`}
+            >
               <AvatarImage src={tarefa.responsavel.avatar_url || undefined} />
-              <AvatarFallback className="text-[8px] bg-primary/10 text-primary font-bold">
+              <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-bold">
                 {getInitials(tarefa.responsavel.nome)}
               </AvatarFallback>
             </Avatar>

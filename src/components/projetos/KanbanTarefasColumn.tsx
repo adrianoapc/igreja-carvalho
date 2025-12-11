@@ -26,12 +26,12 @@ export default function KanbanTarefasColumn({ id, titulo, cor, tarefas, onEditar
   return (
     <div
       ref={setNodeRef}
-      className={`w-80 shrink-0 rounded-lg ${cor} ${isOver ? "ring-2 ring-primary" : ""}`}
+      className={`w-80 shrink-0 rounded-lg bg-slate-50 dark:bg-slate-900/20 border border-border/50 ${isOver ? "ring-2 ring-primary border-primary/30" : ""}`}
     >
       <div className="p-3 border-b border-border/50">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm text-foreground">{titulo}</h3>
-          <span className="text-xs text-muted-foreground bg-background/50 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/30">
             {tarefas.length}
           </span>
         </div>
