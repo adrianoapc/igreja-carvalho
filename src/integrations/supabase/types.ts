@@ -2008,65 +2008,59 @@ export type Database = {
         Row: {
           categoria: string
           created_at: string | null
-          descricao: string | null
           nome: string
+          provider_preferencial: string | null
           slug: string
-          variaveis_disponiveis: string[] | null
+          template_meta: string | null
+          variaveis: string[] | null
         }
         Insert: {
           categoria: string
           created_at?: string | null
-          descricao?: string | null
           nome: string
+          provider_preferencial?: string | null
           slug: string
-          variaveis_disponiveis?: string[] | null
+          template_meta?: string | null
+          variaveis?: string[] | null
         }
         Update: {
           categoria?: string
           created_at?: string | null
-          descricao?: string | null
           nome?: string
+          provider_preferencial?: string | null
           slug?: string
-          variaveis_disponiveis?: string[] | null
+          template_meta?: string | null
+          variaveis?: string[] | null
         }
         Relationships: []
       }
       notificacao_regras: {
         Row: {
           ativo: boolean | null
-          canal_email: boolean | null
-          canal_in_app: boolean | null
-          canal_push: boolean | null
-          canal_whatsapp: boolean | null
+          canais: Json | null
           created_at: string | null
-          destinatario_role: Database["public"]["Enums"]["app_role"] | null
-          destinatario_user_id: string | null
           evento_slug: string | null
           id: string
+          role_alvo: string | null
+          user_id_especifico: string | null
         }
         Insert: {
           ativo?: boolean | null
-          canal_email?: boolean | null
-          canal_in_app?: boolean | null
-          canal_push?: boolean | null
-          canal_whatsapp?: boolean | null
+          canais?: Json | null
           created_at?: string | null
-          destinatario_role?: Database["public"]["Enums"]["app_role"] | null
-          destinatario_user_id?: string | null
           evento_slug?: string | null
           id?: string
+          role_alvo?: string | null
+          user_id_especifico?: string | null
         }
         Update: {
           ativo?: boolean | null
-          canal_email?: boolean | null
-          canal_in_app?: boolean | null
-          canal_push?: boolean | null
-          canal_whatsapp?: boolean | null
+          canais?: Json | null
           created_at?: string | null
-          destinatario_role?: Database["public"]["Enums"]["app_role"] | null
-          destinatario_user_id?: string | null
           evento_slug?: string | null
           id?: string
+          role_alvo?: string | null
+          user_id_especifico?: string | null
         }
         Relationships: [
           {
@@ -2075,6 +2069,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "notificacao_eventos"
             referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "notificacao_regras_user_id_especifico_fkey"
+            columns: ["user_id_especifico"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacao_regras_user_id_especifico_fkey"
+            columns: ["user_id_especifico"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "notificacao_regras_user_id_especifico_fkey"
+            columns: ["user_id_especifico"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
         ]
       }
