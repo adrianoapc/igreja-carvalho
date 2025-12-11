@@ -5,11 +5,12 @@ import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, PieChart, Calendar } f
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, format, subMonths, addDays, startOfDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsePieChart, Pie, Cell } from "recharts";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { ReconciliacaoBancaria } from "@/components/financas/ReconciliacaoBancaria";
+import { ContasAPagarWidget } from "@/components/financas/ContasAPagarWidget";
 import { useState } from "react";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
@@ -115,6 +116,29 @@ export default function Dashboard() {
       return data;
     },
   });
+
+  // Pendências críticas da semana
+  const hoje = startOfDay(new Date());
+  const fimSemana = addDays(hoje, 7);
+
+  const { data: pendenciasSemana = [] } = useQuery({
+    queryKey: ['dashboard-contas-semana'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transacoes_financeiras')
+        .select('id, valor, data_vencimento')
+        .eq('tipo', 'saida')
+        .eq('status', 'pendente')
+        .lte('data_vencimento', format(fimSemana, 'yyyy-MM-dd'));
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const vencidasSemana = pendenciasSemana.filter((item) => parseISO(item.data_vencimento) < hoje);
+  const totalSemana = pendenciasSemana.reduce((sum, item) => sum + Number(item.valor || 0), 0);
+  const mostrarAlertaSemana = pendenciasSemana.length > 0;
 
   const formatCurrency = (value: number) => {
     return formatValue(value);
@@ -223,71 +247,92 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-        <Card className="shadow-soft">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-green-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Receitas {format(mesAtual, 'MMM/yy', { locale: ptBR })}</p>
-                <p className="text-lg font-bold">{formatCurrency(receitasMesAtual)}</p>
-                {variacaoReceitas !== 0 && (
-                  <p className={`text-xs ${variacaoReceitas > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {variacaoReceitas > 0 ? '+' : ''}{variacaoReceitas.toFixed(1)}% vs mês anterior
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
+        <div className="space-y-3 lg:col-span-2">
+          {mostrarAlertaSemana && (
+            <Card className={`shadow-soft ${vencidasSemana.length ? 'bg-destructive/10 border-destructive/30' : ''}`}>
+              <CardContent className="p-4">
+                <p className="text-sm font-medium">
+                  Você tem <span className="font-semibold">{pendenciasSemana.length}</span> contas vencendo esta semana, totalizando <span className="font-semibold">{formatCurrency(totalSemana)}</span>.
+                </p>
+                {vencidasSemana.length > 0 && (
+                  <p className="text-xs text-destructive mt-1">
+                    Existem contas vencidas. Priorize o pagamento hoje.
                   </p>
                 )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
 
-        <Card className="shadow-soft">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-                <TrendingDown className="w-5 h-5 text-red-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Despesas {format(mesAtual, 'MMM/yy', { locale: ptBR })}</p>
-                <p className="text-lg font-bold">{formatCurrency(despesasMesAtual)}</p>
-                {variacaoDespesas !== 0 && (
-                  <p className={`text-xs ${variacaoDespesas > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {variacaoDespesas > 0 ? '+' : ''}{variacaoDespesas.toFixed(1)}% vs mês anterior
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Cards de Resumo */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            <Card className="shadow-soft">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Receitas {format(mesAtual, 'MMM/yy', { locale: ptBR })}</p>
+                    <p className="text-lg font-bold">{formatCurrency(receitasMesAtual)}</p>
+                    {variacaoReceitas !== 0 && (
+                      <p className={`text-xs ${variacaoReceitas > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {variacaoReceitas > 0 ? '+' : ''}{variacaoReceitas.toFixed(1)}% vs mês anterior
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card 
-          className="shadow-soft hover:shadow-md transition-all cursor-pointer"
-          onClick={() => navigate('/financas/contas')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                saldoMesAtual >= 0 
-                  ? 'bg-blue-100 dark:bg-blue-900/20' 
-                  : 'bg-orange-100 dark:bg-orange-900/20'
-              }`}>
-                <DollarSign className={`w-5 h-5 ${saldoMesAtual >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Saldo {format(mesAtual, 'MMM/yy', { locale: ptBR })}</p>
-                <p className={`text-lg font-bold ${saldoMesAtual >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                  {formatCurrency(saldoMesAtual)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {saldoMesAtual >= 0 ? 'Superávit' : 'Déficit'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="shadow-soft">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                    <TrendingDown className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Despesas {format(mesAtual, 'MMM/yy', { locale: ptBR })}</p>
+                    <p className="text-lg font-bold">{formatCurrency(despesasMesAtual)}</p>
+                    {variacaoDespesas !== 0 && (
+                      <p className={`text-xs ${variacaoDespesas > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {variacaoDespesas > 0 ? '+' : ''}{variacaoDespesas.toFixed(1)}% vs mês anterior
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="shadow-soft hover:shadow-md transition-all cursor-pointer"
+              onClick={() => navigate('/financas/contas')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    saldoMesAtual >= 0 
+                      ? 'bg-blue-100 dark:bg-blue-900/20' 
+                      : 'bg-orange-100 dark:bg-orange-900/20'
+                  }`}>
+                    <DollarSign className={`w-5 h-5 ${saldoMesAtual >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Saldo {format(mesAtual, 'MMM/yy', { locale: ptBR })}</p>
+                    <p className={`text-lg font-bold ${saldoMesAtual >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                      {formatCurrency(saldoMesAtual)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {saldoMesAtual >= 0 ? 'Superávit' : 'Déficit'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <ContasAPagarWidget />
       </div>
 
       {/* Gráfico Comparativo */}
