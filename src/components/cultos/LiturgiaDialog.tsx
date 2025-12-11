@@ -138,7 +138,34 @@ function MidiaSelecionadaItem({ midia, index, onRemove }: { midia: Midia; index:
                   const parent = e.currentTarget.parentElement;
                   if (parent) {
                     parent.classList.add('flex', 'items-center', 'justify-center');
-                    parent.innerHTML = '<svg class="w-6 h-6 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                    // Use safe DOM manipulation instead of innerHTML
+                    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('class', 'w-6 h-6 text-muted-foreground');
+                    svg.setAttribute('width', '24');
+                    svg.setAttribute('height', '24');
+                    svg.setAttribute('viewBox', '0 0 24 24');
+                    svg.setAttribute('fill', 'none');
+                    svg.setAttribute('stroke', 'currentColor');
+                    svg.setAttribute('stroke-width', '2');
+                    svg.setAttribute('stroke-linecap', 'round');
+                    svg.setAttribute('stroke-linejoin', 'round');
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('width', '18');
+                    rect.setAttribute('height', '18');
+                    rect.setAttribute('x', '3');
+                    rect.setAttribute('y', '3');
+                    rect.setAttribute('rx', '2');
+                    rect.setAttribute('ry', '2');
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', '9');
+                    circle.setAttribute('cy', '9');
+                    circle.setAttribute('r', '2');
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21');
+                    svg.appendChild(rect);
+                    svg.appendChild(circle);
+                    svg.appendChild(path);
+                    parent.appendChild(svg);
                   }
                 }}
               />
@@ -856,12 +883,39 @@ Qualquer dúvida, entre em contato conosco.`;
                                                   src={midia.url} 
                                                   alt={midia.titulo}
                                                   className="w-full h-full object-cover"
-                                                  onError={(e) => {
+                                                onError={(e) => {
                                                     e.currentTarget.style.display = 'none';
-                                                    e.currentTarget.parentElement!.classList.add('flex', 'items-center', 'justify-center');
-                                                    const icon = document.createElement('div');
-                                                    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
-                                                    e.currentTarget.parentElement!.appendChild(icon);
+                                                    const parent = e.currentTarget.parentElement;
+                                                    if (parent) {
+                                                      parent.classList.add('flex', 'items-center', 'justify-center');
+                                                      // Use safe DOM manipulation instead of innerHTML
+                                                      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                                                      svg.setAttribute('width', '32');
+                                                      svg.setAttribute('height', '32');
+                                                      svg.setAttribute('viewBox', '0 0 24 24');
+                                                      svg.setAttribute('fill', 'none');
+                                                      svg.setAttribute('stroke', 'currentColor');
+                                                      svg.setAttribute('stroke-width', '2');
+                                                      svg.setAttribute('stroke-linecap', 'round');
+                                                      svg.setAttribute('stroke-linejoin', 'round');
+                                                      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                                                      rect.setAttribute('width', '18');
+                                                      rect.setAttribute('height', '18');
+                                                      rect.setAttribute('x', '3');
+                                                      rect.setAttribute('y', '3');
+                                                      rect.setAttribute('rx', '2');
+                                                      rect.setAttribute('ry', '2');
+                                                      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                                                      circle.setAttribute('cx', '9');
+                                                      circle.setAttribute('cy', '9');
+                                                      circle.setAttribute('r', '2');
+                                                      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                                                      path.setAttribute('d', 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21');
+                                                      svg.appendChild(rect);
+                                                      svg.appendChild(circle);
+                                                      svg.appendChild(path);
+                                                      parent.appendChild(svg);
+                                                    }
                                                   }}
                                                 />
                                               ) : (
@@ -1036,7 +1090,34 @@ Qualquer dúvida, entre em contato conosco.`;
                                         const parent = e.currentTarget.parentElement;
                                         if (parent) {
                                           parent.classList.add('flex', 'items-center', 'justify-center');
-                                          parent.innerHTML = '<svg class="w-8 h-8 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                                          // Use safe DOM manipulation instead of innerHTML
+                                          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                                          svg.setAttribute('class', 'w-8 h-8 text-muted-foreground');
+                                          svg.setAttribute('width', '24');
+                                          svg.setAttribute('height', '24');
+                                          svg.setAttribute('viewBox', '0 0 24 24');
+                                          svg.setAttribute('fill', 'none');
+                                          svg.setAttribute('stroke', 'currentColor');
+                                          svg.setAttribute('stroke-width', '2');
+                                          svg.setAttribute('stroke-linecap', 'round');
+                                          svg.setAttribute('stroke-linejoin', 'round');
+                                          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                                          rect.setAttribute('width', '18');
+                                          rect.setAttribute('height', '18');
+                                          rect.setAttribute('x', '3');
+                                          rect.setAttribute('y', '3');
+                                          rect.setAttribute('rx', '2');
+                                          rect.setAttribute('ry', '2');
+                                          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                                          circle.setAttribute('cx', '9');
+                                          circle.setAttribute('cy', '9');
+                                          circle.setAttribute('r', '2');
+                                          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                                          path.setAttribute('d', 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21');
+                                          svg.appendChild(rect);
+                                          svg.appendChild(circle);
+                                          svg.appendChild(path);
+                                          parent.appendChild(svg);
                                         }
                                       }}
                                     />
