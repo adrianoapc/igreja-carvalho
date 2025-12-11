@@ -69,8 +69,7 @@ export default function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
           ? { label: "Atenção", variant: "warning" as const }
           : null;
 
-  const phoneDigits = tarefa.responsavel?.telefone ? tarefa.responsavel.telefone.replace(/\D/g, "") : "";
-  const whatsappLink = phoneDigits ? `https://wa.me/${phoneDigits}` : null;
+  // WhatsApp link removed - telefone not available in responsavel object
 
   return (
     <Card

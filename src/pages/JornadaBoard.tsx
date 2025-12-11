@@ -271,23 +271,7 @@ export default function JornadaBoard() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            {Array.isArray(jornada?.lideres) && jornada?.lideres.length > 0 && (
-              <div className="flex items-center -space-x-2">
-                {jornada.lideres.slice(0, 4).map((lider: any) => (
-                  <Avatar key={lider.id} className="h-8 w-8 border-2 border-background shadow-sm">
-                    <AvatarImage src={lider.avatar_url} />
-                    <AvatarFallback className="text-[10px] bg-muted font-medium">
-                      {lider.nome?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-                {jornada.lideres.length > 4 && (
-                  <div className="h-8 w-8 rounded-full bg-muted text-xs flex items-center justify-center border border-border">
-                    +{jornada.lideres.length - 4}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Leaders section removed - lideres property not in jornadas table */}
 
             <ToggleGroup
               type="single"
