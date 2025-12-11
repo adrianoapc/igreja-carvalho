@@ -2,11 +2,11 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { format, isPast, isToday, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, Flag, MessageCircle } from "lucide-react";
+import { Calendar, Flag } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+
 
 interface Tarefa {
   id: string;
