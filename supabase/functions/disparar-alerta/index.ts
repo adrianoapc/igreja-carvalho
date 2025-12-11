@@ -17,10 +17,19 @@ interface NotificacaoRegra {
   evento: string;
   titulo_template: string;
   mensagem_template: string;
-  role_destinatario?: string;
-  canal_inapp: boolean;
-  canal_whatsapp: boolean;
-  canal_push: boolean;
+  role_destinatario?: string; // compat legado
+  role_alvo?: string; // novo campo
+  user_id_especifico?: string;
+  canais?: any; // jsonb com flags por canal
+  canal_inapp?: boolean; // legado
+  canal_whatsapp?: boolean; // legado
+  canal_push?: boolean; // legado
+  template_meta?: string | null;
+  ativo?: boolean;
+}
+
+interface NotificacaoEvento {
+  provider_preferencial?: string | null; // 'make' | 'meta_direto'
 }
 
 interface ProfileComRoles {
@@ -46,7 +55,8 @@ async function buscarRegras(
   const { data, error } = await supabase
     .from("notificacao_regras")
     .select("*")
-    .eq("evento", evento);
+    .eq("evento", evento)
+    .eq("ativo", true);
 
   if (error) {
     console.error("Erro ao buscar regras:", error);
@@ -61,21 +71,32 @@ async function buscarUsuariosPorRole(
   supabase: ReturnType<typeof createClient>,
   role: string
 ): Promise<ProfileComRoles[]> {
+  // Tabela legada
   const { data: roleUsers, error: roleError } = await supabase
     .from("user_roles")
     .select("user_id")
     .eq("role", role);
 
+  // Tabela nova (user_app_roles), se existir
+  const { data: appRoles, error: appRoleError } = await supabase
+    .from("user_app_roles")
+    .select("user_id")
+    .eq("role", role);
+
   if (roleError) {
-    console.error(`Erro ao buscar usuários com role ${role}:`, roleError);
-    return [];
+    console.error(`Erro ao buscar usuários com role ${role} (user_roles):`, roleError);
   }
 
-  if (!roleUsers || roleUsers.length === 0) {
-    return [];
+  if (appRoleError) {
+    console.error(`Erro ao buscar usuários com role ${role} (user_app_roles):`, appRoleError);
   }
 
-  const userIds = roleUsers.map((r) => r.user_id);
+  const userIds = [
+    ...(roleUsers?.map((r) => r.user_id) || []),
+    ...(appRoles?.map((r) => r.user_id) || []),
+  ];
+
+  if (userIds.length === 0) return [];
 
   const { data: profiles, error: profileError } = await supabase
     .from("profiles")
@@ -139,45 +160,104 @@ async function dispararInApp(
 async function dispararWhatsApp(
   telefone: string,
   mensagem: string,
-  evento: string
+  evento: string,
+  provider: string | null,
+  templateMeta?: string | null
 ): Promise<boolean> {
-  const MAKE_WEBHOOK_URL = Deno.env.get("MAKE_WEBHOOK_URL");
-
-  if (!MAKE_WEBHOOK_URL) {
-    console.warn("MAKE_WEBHOOK_URL não configurada, pulando WhatsApp");
-    return false;
-  }
-
   if (!telefone) {
     console.warn("Telefone não disponível, pulando WhatsApp");
     return false;
   }
 
-  try {
-    const payload = {
-      telefone,
-      mensagem,
-      template: evento,
-      timestamp: new Date().toISOString(),
-    };
+  const providerPref = provider || "make";
 
-    const response = await fetch(MAKE_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      console.error(`Erro ao disparar WhatsApp: ${response.statusText}`);
+  // Rota Make (webhook)
+  if (providerPref === "make") {
+    const MAKE_WEBHOOK_URL = Deno.env.get("MAKE_WEBHOOK_URL");
+    if (!MAKE_WEBHOOK_URL) {
+      console.warn("MAKE_WEBHOOK_URL não configurada, pulando WhatsApp via Make");
       return false;
     }
 
-    console.log(`✅ WhatsApp disparado para ${telefone}`);
-    return true;
-  } catch (error) {
-    console.error("Erro ao chamar Make webhook:", error);
-    return false;
+    try {
+      const payload = {
+        telefone,
+        mensagem,
+        template: evento,
+        timestamp: new Date().toISOString(),
+      };
+
+      const response = await fetch(MAKE_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        console.error(`Erro ao disparar WhatsApp (Make): ${response.statusText}`);
+        return false;
+      }
+
+      console.log(`✅ WhatsApp (Make) disparado para ${telefone}`);
+      return true;
+    } catch (error) {
+      console.error("Erro ao chamar webhook Make:", error);
+      return false;
+    }
   }
+
+  // Rota Meta Cloud API (direto)
+  if (providerPref === "meta_direto") {
+    const META_WA_URL = Deno.env.get("META_WA_URL");
+    const META_WA_TOKEN = Deno.env.get("META_WA_TOKEN");
+    const templateName = templateMeta || evento;
+
+    if (!META_WA_URL || !META_WA_TOKEN) {
+      console.warn("META_WA_URL ou META_WA_TOKEN não configurados, pulando Meta direto");
+      return false;
+    }
+
+    try {
+      const payload = {
+        to: telefone,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: "pt_BR" },
+          components: [
+            {
+              type: "body",
+              parameters: [{ type: "text", text: mensagem.slice(0, 1024) }],
+            },
+          ],
+        },
+      };
+
+      const response = await fetch(META_WA_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${META_WA_TOKEN}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`Erro ao disparar WhatsApp (Meta): ${response.status} - ${body}`);
+        return false;
+      }
+
+      console.log(`✅ WhatsApp (Meta) disparado para ${telefone} via template ${templateName}`);
+      return true;
+    } catch (error) {
+      console.error("Erro ao chamar Meta API:", error);
+      return false;
+    }
+  }
+
+  console.warn(`Provider WhatsApp desconhecido: ${providerPref}`);
+  return false;
 }
 
 // Disparar notificação push (placeholder para futuro)
@@ -231,6 +311,20 @@ serve(async (req) => {
     // Buscar regras para o evento
     const regras = await buscarRegras(supabase, evento);
 
+    // Buscar configuração do evento (provider preferencial)
+    let providerPreferencial: string | null = null;
+    const { data: eventoCfg, error: eventoError } = await supabase
+      .from("notificacao_eventos")
+      .select("provider_preferencial")
+      .eq("evento", evento)
+      .maybeSingle();
+
+    if (eventoError) {
+      console.error("Erro ao buscar notificacao_eventos:", eventoError);
+    } else {
+      providerPreferencial = (eventoCfg as NotificacaoEvento | null)?.provider_preferencial || null;
+    }
+
     if (regras.length === 0) {
       return new Response(
         JSON.stringify({
@@ -263,9 +357,12 @@ serve(async (req) => {
         if (usuario) {
           destinatarios = [usuario];
         }
-      } else if (regra.role_destinatario) {
-        // Notificação para todos com um role específico
-        destinatarios = await buscarUsuariosPorRole(supabase, regra.role_destinatario);
+      } else if (regra.user_id_especifico) {
+        const usuario = await buscarUsuario(supabase, regra.user_id_especifico);
+        if (usuario) destinatarios = [usuario];
+      } else if (regra.role_alvo || regra.role_destinatario) {
+        const role = regra.role_alvo || regra.role_destinatario!;
+        destinatarios = await buscarUsuariosPorRole(supabase, role);
       }
 
       if (destinatarios.length === 0) {
@@ -280,12 +377,20 @@ serve(async (req) => {
       const titulo = formatarTemplate(regra.titulo_template, dados);
       const mensagem = formatarTemplate(regra.mensagem_template, dados);
 
+      // Canais (json) com fallback para booleans legados
+      const canais = regra.canais || {};
+      const usarInApp = canais.inapp ?? regra.canal_inapp ?? true; // in-app sempre, mas mantemos flag para eventual bypass
+      const usarWhatsApp = canais.whatsapp ?? regra.canal_whatsapp ?? false;
+      const usarPush = canais.push ?? regra.canal_push ?? false;
+      const providerWhats = canais.whatsapp_provider || providerPreferencial || "make";
+      const templateMeta = canais.template_meta || regra.template_meta || null;
+
       // Disparar por cada destinatário e canal
       for (const destinatario of destinatarios) {
         console.log(`   → Enviando para ${destinatario.nome} (${destinatario.id})`);
 
         // Canal In-App
-        if (regra.canal_inapp) {
+        if (usarInApp) {
           const sucesso = await dispararInApp(
             supabase,
             destinatario.id,
@@ -297,17 +402,19 @@ serve(async (req) => {
         }
 
         // Canal WhatsApp
-        if (regra.canal_whatsapp && destinatario.telefone) {
+        if (usarWhatsApp && destinatario.telefone) {
           const sucesso = await dispararWhatsApp(
             destinatario.telefone,
             mensagem,
-            evento
+            evento,
+            providerWhats,
+            templateMeta
           );
           if (sucesso) totalNotificacoes++;
         }
 
         // Canal Push (placeholder)
-        if (regra.canal_push) {
+        if (usarPush) {
           const sucesso = await dispararPush(
             destinatario.id,
             titulo,
