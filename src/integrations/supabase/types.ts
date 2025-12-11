@@ -2004,6 +2004,80 @@ export type Database = {
         }
         Relationships: []
       }
+      notificacao_eventos: {
+        Row: {
+          categoria: string
+          created_at: string | null
+          descricao: string | null
+          nome: string
+          slug: string
+          variaveis_disponiveis: string[] | null
+        }
+        Insert: {
+          categoria: string
+          created_at?: string | null
+          descricao?: string | null
+          nome: string
+          slug: string
+          variaveis_disponiveis?: string[] | null
+        }
+        Update: {
+          categoria?: string
+          created_at?: string | null
+          descricao?: string | null
+          nome?: string
+          slug?: string
+          variaveis_disponiveis?: string[] | null
+        }
+        Relationships: []
+      }
+      notificacao_regras: {
+        Row: {
+          ativo: boolean | null
+          canal_email: boolean | null
+          canal_in_app: boolean | null
+          canal_push: boolean | null
+          canal_whatsapp: boolean | null
+          created_at: string | null
+          destinatario_role: Database["public"]["Enums"]["app_role"] | null
+          destinatario_user_id: string | null
+          evento_slug: string | null
+          id: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          canal_email?: boolean | null
+          canal_in_app?: boolean | null
+          canal_push?: boolean | null
+          canal_whatsapp?: boolean | null
+          created_at?: string | null
+          destinatario_role?: Database["public"]["Enums"]["app_role"] | null
+          destinatario_user_id?: string | null
+          evento_slug?: string | null
+          id?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          canal_email?: boolean | null
+          canal_in_app?: boolean | null
+          canal_push?: boolean | null
+          canal_whatsapp?: boolean | null
+          created_at?: string | null
+          destinatario_role?: Database["public"]["Enums"]["app_role"] | null
+          destinatario_user_id?: string | null
+          evento_slug?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacao_regras_evento_slug_fkey"
+            columns: ["evento_slug"]
+            isOneToOne: false
+            referencedRelation: "notificacao_eventos"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
