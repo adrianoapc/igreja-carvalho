@@ -1,95 +1,214 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Bell, Loader2, MessageCircle, Plus, Smartphone, Trash2 } from "lucide-react";
+import { AlertTriangle, Bell, Loader2, MessageCircle, Plus, Smartphone, Trash2, Users } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// Cargos disponíveis na aplicação
-const APP_ROLES = [
-  "admin",
-  "pastor",
-  "lider",
-  "secretario",
-  "tesoureiro",
-  "intercessor",
-  "membro",
-  "basico",
-] as const;
-
+// --- TIPOS ---
+const APP_ROLES = ["admin", "pastor", "lider", "secretario", "tesoureiro", "intercessor", "membro", "basico"] as const;
 type AppRole = (typeof APP_ROLES)[number];
-
 type CanalKey = "inapp" | "push" | "whatsapp";
 
-type CanaisConfig = {
-  inapp?: boolean;
-  push?: boolean;
-  whatsapp?: boolean;
-  whatsapp_provider?: string | null;
-  template_meta?: string | null;
-};
-
-type NotificacaoEvento = {
+interface NotificacaoEvento {
   id?: string;
   evento: string;
   titulo?: string | null;
   descricao?: string | null;
   categoria?: string | null;
   provider_preferencial?: string | null;
-};
+}
 
-type NotificacaoRegra = {
+interface NotificacaoRegra {
   id: string;
   evento: string;
   role_alvo?: string | null;
-  role_destinatario?: string | null; // legado
+  role_destinatario?: string | null;
   user_id_especifico?: string | null;
-  canais?: CanaisConfig | null;
-  titulo_template?: string | null;
-  mensagem_template?: string | null;
-  ativo?: boolean;
-};
+  canais?: { inapp?: boolean; push?: boolean; whatsapp?: boolean } | null;
+  canal_inapp?: boolean | null;
+  canal_push?: boolean | null;
+  canal_whatsapp?: boolean | null;
+}
 
-const ROLE_LABELS: Record<AppRole, string> = {
+const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
   pastor: "Pastor",
   lider: "Líder",
-  secretario: "Secretário(a)",
-  tesoureiro: "Tesoureiro(a)",
-  intercessor: "Intercessor",
+  secretario: "Secretaria",
+  tesoureiro: "Tesouraria",
+  intercessor: "Intercessão",
   membro: "Membro",
   basico: "Básico",
 };
 
+// --- HELPER FUNCTIONS ---
 function formatEventoNome(evento?: string | null) {
   if (!evento) return "Evento";
-  return evento
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (l) => l.toUpperCase());
+  return evento.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
+function getRegraCanais(regra: NotificacaoRegra) {
+  const canais = regra.canais || {};
+  return {
+    inapp: canais.inapp ?? regra.canal_inapp ?? true,
+    push: canais.push ?? regra.canal_push ?? false,
+    whatsapp: canais.whatsapp ?? regra.canal_whatsapp ?? false,
+  };
+}
+
+// --- SUB-COMPONENTE: CARD DO EVENTO ---
+const NotificationEventCard = ({
+  evento,
+  regras,
+  onAddRegra,
+  onDeleteRegra,
+  onToggleCanal,
+  loadingIds,
+}: {
+  evento: NotificacaoEvento;
+  regras: NotificacaoRegra[];
+  onAddRegra: (evento: string) => void;
+  onDeleteRegra: (id: string) => void;
+  onToggleCanal: (id: string, canal: CanalKey) => void;
+  loadingIds: Record<string, boolean>;
+}) => {
+  const titulo = evento.titulo || formatEventoNome(evento.evento);
+  const waProvider = evento.provider_preferencial;
+
+  return (
+    <Card className="flex flex-col h-full border-l-4 border-l-primary/20 shadow-sm hover:shadow-md transition-all duration-200">
+      <CardHeader className="pb-3 bg-slate-50/30">
+        <div className="flex justify-between items-start gap-4">
+          <div className="space-y-1">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              {titulo}
+              {waProvider && (
+                <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground border-slate-200">
+                  {waProvider === 'meta_direto' ? 'Meta API' : 'Make'}
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription className="line-clamp-2 text-xs text-muted-foreground/80">
+              {evento.descricao || "Sem descrição definida."}
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => onAddRegra(evento.evento)}>
+            <Plus className="w-3 h-3" /> Add
+          </Button>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="flex-1 p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b border-slate-100">
+              <TableHead className="w-[40%] h-9 text-xs font-medium text-slate-500 pl-4">Destinatário</TableHead>
+              <TableHead className="w-[15%] h-9 text-center p-0" title="Notificação no App"><Bell className="w-3.5 h-3.5 mx-auto text-slate-400" /></TableHead>
+              <TableHead className="w-[15%] h-9 text-center p-0" title="Push Notification"><Smartphone className="w-3.5 h-3.5 mx-auto text-slate-400" /></TableHead>
+              <TableHead className="w-[15%] h-9 text-center p-0" title="WhatsApp"><MessageCircle className="w-3.5 h-3.5 mx-auto text-slate-400" /></TableHead>
+              <TableHead className="w-[15%] h-9"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {regras.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-xs italic bg-slate-50/20">
+                  Ninguém configurado para receber.
+                </TableCell>
+              </TableRow>
+            ) : (
+              regras.map((regra) => {
+                const canais = getRegraCanais(regra);
+                const role = regra.role_alvo || regra.role_destinatario;
+                const label = role ? ROLE_LABELS[role] || role : "Usuário Específico";
+                const isWaActive = canais.whatsapp;
+
+                return (
+                  <TableRow key={regra.id} className={`text-sm group transition-colors ${isWaActive ? 'bg-amber-50/60 hover:bg-amber-100/50' : 'hover:bg-slate-50'}`}>
+                    <TableCell className="font-medium py-3 pl-4">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="truncate max-w-[120px] text-slate-700" title={label}>{label}</span>
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell className="p-0 text-center">
+                      <div className="flex justify-center">
+                        <Switch 
+                          checked={canais.inapp} 
+                          onCheckedChange={() => onToggleCanal(regra.id, 'inapp')}
+                          disabled={loadingIds[`${regra.id}-inapp`]}
+                          className="scale-75 data-[state=checked]:bg-primary"
+                        />
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="p-0 text-center">
+                      <div className="flex justify-center">
+                        <Switch 
+                          checked={canais.push} 
+                          onCheckedChange={() => onToggleCanal(regra.id, 'push')}
+                          disabled={loadingIds[`${regra.id}-push`]}
+                          className="scale-75 data-[state=checked]:bg-sky-500"
+                        />
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="p-0 text-center">
+                      <div className="flex justify-center relative">
+                         <Switch 
+                          checked={canais.whatsapp} 
+                          onCheckedChange={() => onToggleCanal(regra.id, 'whatsapp')}
+                          disabled={loadingIds[`${regra.id}-whatsapp`]}
+                          className="scale-75 data-[state=checked]:bg-green-600"
+                        />
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="text-right py-2 pr-3">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-600"
+                        onClick={() => onDeleteRegra(regra.id)}
+                        disabled={loadingIds[regra.id]}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+// --- COMPONENTE PRINCIPAL ---
 export default function NotificacoesAdmin() {
   const { toast } = useToast();
-  const supa = supabase as any; // relax types for dynamic tables not in generated schema
+  const supa = supabase as any;
+  
   const [eventos, setEventos] = useState<NotificacaoEvento[]>([]);
   const [regras, setRegras] = useState<NotificacaoRegra[]>([]);
   const [loading, setLoading] = useState(true);
-  const [savingSwitch, setSavingSwitch] = useState<Record<string, boolean>>({});
-  const [dialogEvento, setDialogEvento] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<AppRole | "">("");
+  const [loadingOps, setLoadingOps] = useState<Record<string, boolean>>({});
+  
+  // Dialog State
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedEventSlug, setSelectedEventSlug] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -99,376 +218,196 @@ export default function NotificacoesAdmin() {
   const loadDados = async () => {
     try {
       setLoading(true);
-      const [{ data: eventosData, error: eventosError }, { data: regrasData, error: regrasError }] =
-        await Promise.all([
-          supa.from("notificacao_eventos").select("*"),
-          supa.from("notificacao_regras").select("*"),
-        ]);
+      const [resEventos, resRegras] = await Promise.all([
+        supa.from("notificacao_eventos").select("*"),
+        supa.from("notificacao_regras").select("*")
+      ]);
 
-      if (eventosError) throw eventosError;
-      if (regrasError) throw regrasError;
+      if (resEventos.error) throw resEventos.error;
+      if (resRegras.error) throw resRegras.error;
 
-      setEventos((eventosData as NotificacaoEvento[]) || []);
-      setRegras((regrasData as NotificacaoRegra[]) || []);
+      setEventos(resEventos.data || []);
+      setRegras(resRegras.data || []);
     } catch (error) {
-      console.error("Erro ao carregar dados da central:", error);
-      toast({
-        title: "Erro ao carregar",
-        description: "Não foi possível carregar eventos e regras",
-        variant: "destructive",
-      });
+      console.error(error);
+      toast({ title: "Erro", description: "Falha ao carregar configurações.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const eventosAgrupados = useMemo(() => {
-    const conhecidos = new Set(eventos.map((e) => e.evento));
-    const combinados: NotificacaoEvento[] = [...eventos];
-
-    regras.forEach((regra) => {
-      if (!conhecidos.has(regra.evento)) {
-        combinados.push({ evento: regra.evento, categoria: "Outros" });
-      }
-    });
-
-    const grouped: Record<string, NotificacaoEvento[]> = {};
-    combinados.forEach((evento) => {
-      const cat = evento.categoria || "Outros";
-      if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(evento);
-    });
-
-    return grouped;
-  }, [eventos, regras]);
-
-  const getRegraCanais = (regra: NotificacaoRegra): CanaisConfig => {
-    const canais = regra.canais || {};
-    return {
-      inapp: canais.inapp ?? true,
-      push: canais.push ?? false,
-      whatsapp: canais.whatsapp ?? false,
-      whatsapp_provider: canais.whatsapp_provider,
-      template_meta: canais.template_meta,
-    };
-  };
-
   const handleToggleCanal = async (regraId: string, canal: CanalKey) => {
-    const regra = regras.find((r) => r.id === regraId);
+    const regra = regras.find(r => r.id === regraId);
     if (!regra) return;
 
-    const canaisAtuais = getRegraCanais(regra);
-    const novoValor = !canaisAtuais[canal];
-    const novoCanais = { ...canaisAtuais, [canal]: novoValor };
-
-    setSavingSwitch((prev) => ({ ...prev, [`${regraId}-${canal}`]: true }));
+    const current = getRegraCanais(regra);
+    const newValue = !current[canal];
+    const newCanais = { ...current, [canal]: newValue };
+    
+    // Optimistic Update
+    const oldRegras = [...regras];
+    setRegras(prev => prev.map(r => r.id === regraId ? { ...r, canais: newCanais, [`canal_${canal}`]: newValue } : r));
+    setLoadingOps(prev => ({ ...prev, [`${regraId}-${canal}`]: true }));
 
     try {
-      const payload = { canais: novoCanais };
-      const { data, error } = await supa
-        .from("notificacao_regras")
-        .update(payload)
-        .eq("id", regraId)
-        .select()
-        .single();
+      const payload: any = { canais: newCanais };
+      if (canal === 'inapp') payload.canal_inapp = newValue;
+      if (canal === 'push') payload.canal_push = newValue;
+      if (canal === 'whatsapp') payload.canal_whatsapp = newValue;
 
+      const { error } = await supa.from("notificacao_regras").update(payload).eq("id", regraId);
       if (error) throw error;
+      
+      toast({ 
+        description: `Canal ${canal.toUpperCase()} ${newValue ? 'ativado' : 'desativado'}.`,
+        duration: 2000,
+        className: "bg-background border-border"
+      });
 
-      setRegras((prev) => prev.map((r) => (r.id === regraId ? { ...r, ...payload } : r)));
-      toast({
-        title: "Canal atualizado",
-        description: `Canal ${canal === "whatsapp" ? "WhatsApp" : canal === "push" ? "Push" : "In-App"} ${
-          novoValor ? "ativado" : "desativado"
-        }`,
-      });
-    } catch (error) {
-      console.error("Erro ao atualizar canal:", error);
-      toast({
-        title: "Erro ao salvar",
-        description: "Não foi possível atualizar o canal",
-        variant: "destructive",
-      });
+    } catch (err) {
+      setRegras(oldRegras);
+      toast({ title: "Erro ao salvar", variant: "destructive" });
     } finally {
-      setSavingSwitch((prev) => ({ ...prev, [`${regraId}-${canal}`]: false }));
+      setLoadingOps(prev => ({ ...prev, [`${regraId}-${canal}`]: false }));
     }
   };
 
   const handleAddRegra = async () => {
-    if (!dialogEvento || !selectedRole) return;
-
-    const base = regras.find((r) => r.evento === dialogEvento);
-    const canaisPadrao: CanaisConfig = { inapp: true, push: false, whatsapp: false };
-
-    const payload = {
-      evento: dialogEvento,
-      role_alvo: selectedRole,
-      canais: canaisPadrao,
-      ativo: true,
-      titulo_template: base?.titulo_template || `Notificação de ${formatEventoNome(dialogEvento)}`,
-      mensagem_template:
-        base?.mensagem_template ||
-        `Você tem uma nova atualização do evento ${formatEventoNome(dialogEvento)}`,
-    };
-
+    if (!selectedEventSlug || !selectedRole) return;
     setCreating(true);
-    try {
-      const { data, error } = await supa
-        .from("notificacao_regras")
-        .insert(payload)
-        .select()
-        .single();
 
+    try {
+      const payload = {
+        evento_slug: selectedEventSlug,
+        evento: selectedEventSlug, 
+        role_alvo: selectedRole,
+        canais: { inapp: true, push: false, whatsapp: false },
+        canal_inapp: true,
+        ativo: true
+      };
+
+      const { data, error } = await supa.from("notificacao_regras").insert(payload).select().single();
       if (error) throw error;
 
-      setRegras((prev) => [...prev, data as NotificacaoRegra]);
-      toast({
-        title: "Destinatário adicionado",
-        description: `Regra criada para ${ROLE_LABELS[selectedRole]} em ${formatEventoNome(dialogEvento)}`,
-      });
-      setDialogEvento(null);
+      setRegras(prev => [...prev, data]);
+      toast({ title: "Regra criada com sucesso!", className: "bg-green-50 border-green-200 text-green-800" });
+      setDialogOpen(false);
       setSelectedRole("");
-    } catch (error) {
-      console.error("Erro ao adicionar regra:", error);
-      toast({
-        title: "Erro ao adicionar",
-        description: "Não foi possível criar a nova regra",
-        variant: "destructive",
-      });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro ao criar regra", variant: "destructive" });
     } finally {
       setCreating(false);
     }
   };
 
-  const handleDeleteRegra = async (regraId: string) => {
-    setSavingSwitch((prev) => ({ ...prev, [regraId]: true }));
+  const handleDeleteRegra = async (id: string) => {
+    setLoadingOps(prev => ({ ...prev, [id]: true }));
     try {
-      const { error } = await supa.from("notificacao_regras").delete().eq("id", regraId);
+      const { error } = await supa.from("notificacao_regras").delete().eq("id", id);
       if (error) throw error;
-      setRegras((prev) => prev.filter((r) => r.id !== regraId));
-      toast({ title: "Regra removida", description: "Destinatário excluído" });
-    } catch (error) {
-      console.error("Erro ao excluir regra:", error);
-      toast({ title: "Erro ao excluir", description: "Não foi possível remover a regra", variant: "destructive" });
+      setRegras(prev => prev.filter(r => r.id !== id));
+      toast({ description: "Regra removida." });
+    } catch (err) {
+      toast({ title: "Erro ao remover", variant: "destructive" });
     } finally {
-      setSavingSwitch((prev) => ({ ...prev, [regraId]: false }));
+      setLoadingOps(prev => ({ ...prev, [id]: false }));
     }
   };
 
-  const renderLinhaRegra = (regra: NotificacaoRegra) => {
-    const canais = getRegraCanais(regra);
-    const role = regra.role_alvo || regra.role_destinatario || null;
-    const roleLabel = role ? (ROLE_LABELS as Record<string, string>)[role] || role : null;
-    const waAtivo = !!canais.whatsapp;
+  const eventosPorCategoria = useMemo(() => {
+    const groups: Record<string, NotificacaoEvento[]> = {};
+    eventos.forEach(ev => {
+      const cat = ev.categoria || "Geral";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(ev);
+    });
+    return groups;
+  }, [eventos]);
 
-    return (
-      <TableRow key={regra.id} className={waAtivo ? "bg-amber-50/40" : undefined}>
-        <TableCell className="font-medium">
-          {roleLabel ? (
-            <Badge variant="secondary" className="capitalize">{roleLabel}</Badge>
-          ) : regra.user_id_especifico ? (
-            <Badge variant="outline">Usuário específico</Badge>
-          ) : (
-            <span className="text-muted-foreground">Não definido</span>
-          )}
-        </TableCell>
-        <TableCell className="py-3">
-          <div className="flex items-center justify-center gap-2">
-            <Bell className="w-4 h-4 text-emerald-500" />
-            <Switch
-              checked={!!canais.inapp}
-              onCheckedChange={() => handleToggleCanal(regra.id, "inapp")}
-              disabled={savingSwitch[`${regra.id}-inapp`]}
-            />
-          </div>
-        </TableCell>
-        <TableCell className="py-3">
-          <div className="flex items-center justify-center gap-2">
-            <Smartphone className="w-4 h-4 text-sky-500" />
-            <Switch
-              checked={!!canais.push}
-              onCheckedChange={() => handleToggleCanal(regra.id, "push")}
-              disabled={savingSwitch[`${regra.id}-push`]}
-            />
-          </div>
-        </TableCell>
-        <TableCell className="py-3">
-          <div className="flex items-center justify-center gap-2">
-            <MessageCircle className={waAtivo ? "w-4 h-4 text-amber-600" : "w-4 h-4 text-muted-foreground"} />
-            <Switch
-              checked={!!canais.whatsapp}
-              onCheckedChange={() => handleToggleCanal(regra.id, "whatsapp")}
-              disabled={savingSwitch[`${regra.id}-whatsapp`]}
-            />
-            {waAtivo && <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50 text-xs">WA</Badge>}
-          </div>
-        </TableCell>
-        <TableCell className="text-right py-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDeleteRegra(regra.id)}
-            disabled={savingSwitch[regra.id]}
-          >
-            <Trash2 className="w-4 h-4 text-muted-foreground" />
-          </Button>
-        </TableCell>
-      </TableRow>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="p-6 space-y-4">
-        <div className="h-10 w-64 bg-muted animate-pulse rounded" />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="h-48 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="h-[80vh] flex flex-col items-center justify-center gap-4 text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p>Carregando central...</p></div>;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="p-6 max-w-[1600px] mx-auto space-y-8 pb-24 animate-in fade-in duration-500">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-xl border shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold">Central de Notificações</h1>
-          <p className="text-muted-foreground">Ative os canais por evento e cargo.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">Central de Notificações</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Configure as regras de disparo automático para toda a igreja.</p>
         </div>
-        <Badge variant="outline" className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600" />
-          <span className="text-sm text-amber-700">WhatsApp gera custo</span>
-        </Badge>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <Badge variant="outline" className="flex items-center gap-2 px-3 py-1.5 border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 cursor-help">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>WhatsApp gera custos</span>
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p>Envios ativos (iniciados pelo sistema) consomem saldo da API. Use com sabedoria.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
-      {Object.entries(eventosAgrupados).map(([categoria, eventosLista]) => (
-        <div key={categoria} className="space-y-3">
+      {/* Grid de Categorias */}
+      {Object.entries(eventosPorCategoria).map(([categoria, listaEventos]) => (
+        <section key={categoria} className="space-y-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold">{categoria}</h2>
-            <Separator className="flex-1" />
+            <div className="h-8 w-1 bg-primary rounded-full" />
+            <h2 className="text-lg font-semibold tracking-tight text-foreground/80 capitalize">{categoria}</h2>
+            <div className="h-px bg-border flex-1 opacity-50" />
           </div>
 
-          {eventosLista.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-sm text-muted-foreground">Nenhum evento nesta categoria.</CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {eventosLista.map((evento) => {
-                const regrasEvento = regras.filter((r) => r.evento === evento.evento);
-                const provider = evento.provider_preferencial;
-                const tituloEvento = formatEventoNome(evento.evento);
-                const eventoKey = evento.id || evento.evento || Math.random().toString();
-
-                return (
-                  <Card key={eventoKey} className="border-border/60 h-full flex flex-col">
-                    <CardHeader className="space-y-2 p-4 pb-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-base">{evento.titulo || tituloEvento}</CardTitle>
-                          {evento.descricao && (
-                            <CardDescription className="text-sm text-muted-foreground">
-                              {evento.descricao}
-                            </CardDescription>
-                          )}
-                        </div>
-                        {provider && (
-                          <Badge variant="secondary" className="text-xs">
-                            WA: {provider}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="px-2 py-0.5 rounded-full bg-muted">{evento.evento || "evento"}</span>
-                        <span>
-                          {regrasEvento.length} regra{regrasEvento.length === 1 ? "" : "s"}
-                        </span>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="space-y-4 p-4 pt-2 flex-1 flex flex-col">
-                      <div className="rounded-md border bg-card overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[140px]">Cargo</TableHead>
-                              <TableHead className="w-[100px] text-center">In-App</TableHead>
-                              <TableHead className="w-[100px] text-center">Push</TableHead>
-                              <TableHead className="w-[140px] text-center">WhatsApp</TableHead>
-                              <TableHead className="w-[60px] text-right">Ações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {regrasEvento.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-6">
-                                  Nenhum destinatário configurado.
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              regrasEvento.map(renderLinhaRegra)
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button variant="secondary" size="sm" onClick={() => setDialogEvento(evento.evento)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Adicionar Destinatário
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {listaEventos.map(evento => (
+              <NotificationEventCard
+                key={evento.id || evento.evento}
+                evento={evento}
+                regras={regras.filter(r => r.evento === evento.evento || r.evento === (evento as any).slug)}
+                onAddRegra={(slug) => {
+                  setSelectedEventSlug(slug);
+                  setDialogOpen(true);
+                }}
+                onDeleteRegra={handleDeleteRegra}
+                onToggleCanal={handleToggleCanal}
+                loadingIds={loadingOps}
+              />
+            ))}
+          </div>
+        </section>
       ))}
 
-      <Dialog open={!!dialogEvento} onOpenChange={(open) => !open && setDialogEvento(null)}>
-        <DialogContent>
+      {/* Dialog Nova Regra */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Adicionar Destinatário</DialogTitle>
+            <DialogTitle>Novo Destinatário</DialogTitle>
             <DialogDescription>
-              Escolha o cargo que deve receber notificações deste evento.
+              Quem receberá alertas de <strong className="text-foreground">{formatEventoNome(selectedEventSlug)}</strong>?
             </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Evento</p>
-              <div className="px-3 py-2 rounded-md bg-muted text-sm font-medium">
-                {formatEventoNome(dialogEvento)}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Cargo</p>
-              <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as AppRole)}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="role" className="text-sm font-medium">Cargo / Função</label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cargo" />
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {APP_ROLES.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {ROLE_LABELS[role]}
-                    </SelectItem>
+                  {APP_ROLES.map(role => (
+                    <SelectItem key={role} value={role}>{ROLE_LABELS[role]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-
-          <DialogFooter className="flex items-center justify-end gap-2">
-            <Button variant="ghost" onClick={() => setDialogEvento(null)} disabled={creating}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAddRegra} disabled={!selectedRole || creating}>
-              {creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Salvar
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleAddRegra} disabled={creating || !selectedRole}>
+              {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Adicionar
             </Button>
           </DialogFooter>
         </DialogContent>

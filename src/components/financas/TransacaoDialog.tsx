@@ -639,6 +639,27 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       if (error) throw error;
 
+      // Apenas notificar se for uma NOVA transação (não na edição) e se for uma SAÍDA (Conta a Pagar)
+      if (!transacao && tipo === 'saida') {
+        try {
+          await supabase.functions.invoke('disparar-alerta', {
+            body: {
+              evento: 'financeiro_conta_vencer',
+              dados: {
+                descricao,
+                valor: valorNumerico,
+                data_vencimento: format(dataVencimento, "yyyy-MM-dd"),
+                // Formata o valor para BRL para ficar bonito na mensagem
+                valor_formatado: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorNumerico)
+              }
+            }
+          });
+          console.log("🔔 Alerta de nova conta a pagar disparado");
+        } catch (err) {
+          console.error("Erro ao disparar alerta (não bloqueante):", err);
+        }
+      }
+
       toast.success(`${tipo === "entrada" ? "Entrada" : "Saída"} ${transacao ? "atualizada" : "cadastrada"}!`);
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
