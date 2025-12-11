@@ -33,10 +33,10 @@ export default function KanbanColumn({
       {/* Column Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">
+          <h3 className="text-sm font-semibold text-foreground">
             {title}
           </h3>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/30">
             {items.length}
           </span>
         </div>
@@ -45,11 +45,11 @@ export default function KanbanColumn({
       {/* Column Content */}
       <div
         ref={setNodeRef}
-        className={`flex-1 rounded-xl border transition-colors overflow-hidden ${
+        className={`flex-1 rounded-xl border transition-colors overflow-hidden bg-slate-50 dark:bg-slate-900/20 ${
           isOver 
-            ? "bg-primary/5 border-primary/30" 
-            : "bg-muted/30 border-border/50"
-        }`}
+            ? "border-primary/30" 
+            : "border-border/50"
+        } ${isOver ? "bg-primary/5" : ""}`}
       >
         <ScrollArea className="h-full max-h-[calc(100vh-220px)]">
           <div className="p-3 w-full">

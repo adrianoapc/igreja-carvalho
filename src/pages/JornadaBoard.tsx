@@ -23,6 +23,7 @@ import KanbanColumn from "@/components/jornadas/KanbanColumn";
 import AdicionarPessoaDialog from "@/components/jornadas/AdicionarPessoaDialog";
 import EditarJornadaDialog from "@/components/jornadas/EditarJornadaDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function JornadaBoard() {
   const { id } = useParams<{ id: string }>();
@@ -216,6 +217,9 @@ export default function JornadaBoard() {
 
   const totalEtapas = etapas?.length || 1;
   const totalInscritos = inscricoes?.length || 0;
+  const totalConcluidos = inscricoes?.filter((i) => i.concluido)?.length || 0;
+  const totalAtivos = totalInscritos - totalConcluidos;
+  const taxaRetencao = totalInscritos > 0 ? (totalConcluidos / totalInscritos) * 100 : 0;
 
   if (loadingJornada || loadingEtapas) {
     return (
@@ -234,7 +238,7 @@ export default function JornadaBoard() {
     <div className="flex flex-col h-[calc(100vh-64px)] w-full max-w-full overflow-hidden relative -m-4 md:-m-8">
       {/* Header Fixo */}
       <div className="shrink-0 bg-background border-b z-10 relative px-4 md:px-6 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <Button
               variant="ghost"
@@ -251,14 +255,40 @@ export default function JornadaBoard() {
               />
               <div className="min-w-0">
                 <h1 className="text-lg font-semibold truncate">{jornada?.titulo}</h1>
-                <p className="text-xs text-muted-foreground">
-                  {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
-                </p>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                  <span>
+                    {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
+                  </span>
+                  <span className="flex items-center gap-1 text-foreground font-semibold">
+                    Taxa de Retenção: {taxaRetencao.toFixed(0)}%
+                  </span>
+                  <span className="flex items-center gap-1">
+                    Total Ativos: <span className="font-semibold text-foreground">{totalAtivos}</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
+            {Array.isArray(jornada?.lideres) && jornada?.lideres.length > 0 && (
+              <div className="flex items-center -space-x-2">
+                {jornada.lideres.slice(0, 4).map((lider: any) => (
+                  <Avatar key={lider.id} className="h-8 w-8 border-2 border-background shadow-sm">
+                    <AvatarImage src={lider.avatar_url} />
+                    <AvatarFallback className="text-[10px] bg-muted font-medium">
+                      {lider.nome?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+                {jornada.lideres.length > 4 && (
+                  <div className="h-8 w-8 rounded-full bg-muted text-xs flex items-center justify-center border border-border">
+                    +{jornada.lideres.length - 4}
+                  </div>
+                )}
+              </div>
+            )}
+
             <ToggleGroup
               type="single"
               value={filtro}

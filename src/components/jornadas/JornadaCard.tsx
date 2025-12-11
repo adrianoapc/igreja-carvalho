@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, MoreHorizontal, Trash2, CheckCircle2, UserPlus } from "lucide-react";
+import { Clock, MoreHorizontal, Trash2, CheckCircle2, UserPlus, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
@@ -53,6 +53,8 @@ export default function JornadaCard({
 
   const pessoa = inscricao.pessoa;
   const responsavel = inscricao.responsavel;
+  const phoneDigits = pessoa?.telefone ? pessoa.telefone.replace(/\D/g, "") : "";
+  const whatsappLink = phoneDigits ? `https://wa.me/${phoneDigits}` : null;
   
   // Calcular progresso baseado nas etapas CONCLUÍDAS (presencas_aula com status='concluido')
   const etapasConcluidas = inscricao.etapas_concluidas || 0;
@@ -120,18 +122,23 @@ export default function JornadaCard({
     }
   };
 
-  const tempoNaFase = inscricao.data_mudanca_fase
-    ? formatDistanceToNow(new Date(inscricao.data_mudanca_fase), {
+  const referenciaData = inscricao.data_mudanca_fase || inscricao.created_at;
+  const tempoNaFase = referenciaData
+    ? formatDistanceToNow(new Date(referenciaData), {
         addSuffix: false,
         locale: ptBR,
       })
     : null;
 
-  const diasNaFase = inscricao.data_mudanca_fase
-    ? differenceInDays(new Date(), new Date(inscricao.data_mudanca_fase))
+  const diasNaFase = referenciaData
+    ? differenceInDays(new Date(), new Date(referenciaData))
     : 0;
 
-  const isStagnant = diasNaFase > 15;
+  const alertaFase = diasNaFase > 30
+    ? { label: `⚠️ ${diasNaFase} dias parado`, variant: "destructive" as const }
+    : diasNaFase < 7
+      ? { label: "Novo nesta fase", variant: "success" as const }
+      : null;
 
   const getInitials = (nome: string) => {
     return nome
@@ -180,10 +187,31 @@ export default function JornadaCard({
         {...attributes}
         {...listeners}
       >
+        {whatsappLink && (
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute -top-2 -right-2 h-9 w-9 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(whatsappLink, "_blank");
+            }}
+          >
+            <MessageCircle className="w-4 h-4" />
+          </Button>
+        )}
         <div className="p-3">
           {/* Top: Avatar + Nome + Menu */}
           <div className="flex items-start gap-3">
-            <Avatar className="h-8 w-8 shrink-0 border border-border/50">
+            <Avatar
+              className={`h-10 w-10 shrink-0 border-2 ${
+                inscricao.concluido
+                  ? "border-emerald-400/70"
+                  : alertaFase?.variant === "destructive"
+                    ? "border-orange-400/70"
+                    : "border-primary/60"
+              }`}
+            >
               <AvatarImage src={pessoa?.avatar_url} />
               <AvatarFallback className="text-[10px] bg-muted font-medium">
                 {pessoa?.nome ? getInitials(pessoa.nome) : "?"}
@@ -201,17 +229,26 @@ export default function JornadaCard({
               </div>
 
               {/* Tempo na fase */}
-              {tempoNaFase && (
+              {alertaFase ? (
                 <div className="flex mt-1">
                   <Badge
-                    variant={isStagnant ? "destructive" : "secondary"}
+                    variant={alertaFase.variant === "success" ? "secondary" : "destructive"}
+                    className="text-[10px] font-normal h-5 px-1.5 whitespace-nowrap"
+                  >
+                    {alertaFase.label}
+                  </Badge>
+                </div>
+              ) : tempoNaFase ? (
+                <div className="flex mt-1">
+                  <Badge
+                    variant="secondary"
                     className="text-[10px] font-normal h-5 px-1.5 whitespace-nowrap"
                   >
                     <Clock className="w-2.5 h-2.5 mr-1" />
                     {tempoNaFase}
                   </Badge>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Menu - shrink-0 garante que ele nunca será esmagado/cortado */}
@@ -264,11 +301,12 @@ export default function JornadaCard({
             </button>
 
             {/* Progress */}
-            <div className="flex-1 ml-3 flex items-center gap-2">
+            <div className="flex-1 ml-3 flex flex-col gap-1">
               <Progress value={progress} className="h-1.5 flex-1" />
-              <span className="text-[10px] text-muted-foreground font-medium min-w-[28px] text-right">
-                {Math.round(progress)}%
-              </span>
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium">
+                <span>{Math.round(progress)}%</span>
+                <span>{etapasConcluidas}/{totalEtapas} aulas</span>
+              </div>
             </div>
           </div>
         </div>
