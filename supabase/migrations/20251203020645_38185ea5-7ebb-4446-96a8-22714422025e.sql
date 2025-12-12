@@ -45,6 +45,6 @@ BEGIN
   FROM public.sentimentos_membros sm
   JOIN public.profiles p ON p.id = sm.pessoa_id
   WHERE sm.data_registro > (now() - INTERVAL '7 days')
-  AND sm.sentimento IN ('angustiado', 'triste', 'sozinho', 'doente', 'com_pouca_fe', 'com_medo');
+  AND sm.sentimento IN ('angustiado', 'triste', 'sozinho', 'doente', 'com_pouca_fe');
 END;
 $$;

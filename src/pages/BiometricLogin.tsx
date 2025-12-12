@@ -17,7 +17,7 @@ export default function BiometricLogin() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const { isEnabled, verifyBiometric, getRefreshToken, clearRefreshToken } = useBiometricAuth();
+  const { isEnabled, verifyBiometric, getRefreshToken, getAccessToken, clearRefreshToken } = useBiometricAuth();
 
   // Verificar se já tem sessão ativa
   useEffect(() => {
@@ -100,11 +100,18 @@ export default function BiometricLogin() {
       if (success) {
         console.log('[BiometricLogin] Biometria verificada com sucesso!');
         
-        // Biometria funcionou! Agora tentar restaurar a sessão com refresh token
         const refreshToken = getRefreshToken();
+        const accessToken = getAccessToken();
         
-        if (!refreshToken) {
-          console.error('[BiometricLogin] Nenhum refresh token armazenado');
+        console.log('[BiometricLogin] Checking tokens:', {
+          hasRefreshToken: !!refreshToken,
+          refreshTokenLength: refreshToken ? refreshToken.length : 0,
+          hasAccessToken: !!accessToken,
+          accessTokenLength: accessToken ? accessToken.length : 0,
+        });
+        
+        if (!refreshToken && !accessToken) {
+          console.error('[BiometricLogin] Nenhum token armazenado (refresh ou access)');
           incrementAttempts();
           toast({
             title: "Erro",
@@ -117,13 +124,57 @@ export default function BiometricLogin() {
           return;
         }
 
-        // Tentar fazer login com refresh token
-        const { data, error } = await supabase.auth.refreshSession({
-          refresh_token: refreshToken,
-        });
+        // Tentar com refresh token primeiro (melhor opção)
+        let sessionData = null;
+        let sessionError = null;
 
-        if (error || !data.session) {
-          console.error('[BiometricLogin] Erro ao restaurar sessão:', error);
+        if (refreshToken) {
+          console.log('[BiometricLogin] Attempting to refresh session with refresh_token...');
+          const result = await supabase.auth.refreshSession({
+            refresh_token: refreshToken,
+          });
+          sessionData = result.data;
+          sessionError = result.error;
+
+          console.log('[BiometricLogin] Refresh session result:', {
+            hasSession: !!sessionData.session,
+            hasUser: !!sessionData.session?.user,
+            userId: sessionData.session?.user?.id,
+            error: sessionError?.message,
+          });
+        }
+
+        // Fallback para access token se refresh falhar
+        if ((!sessionData?.session || sessionError) && accessToken) {
+          console.log('[BiometricLogin] Refresh token failed, trying with access_token fallback...');
+          
+          try {
+            // Usar setSession com access_token como fallback
+            const result = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || '', // Pode estar vazio
+            });
+            
+            if (result.error) {
+              throw result.error;
+            }
+            
+            sessionData = result.data;
+            sessionError = null;
+            
+            console.log('[BiometricLogin] Access token fallback successful:', {
+              hasSession: !!sessionData?.session,
+              hasUser: !!sessionData?.session?.user,
+              userId: sessionData?.session?.user?.id,
+            });
+          } catch (fallbackError) {
+            console.error('[BiometricLogin] Access token fallback also failed:', fallbackError);
+            sessionError = fallbackError as any;
+          }
+        }
+
+        if (sessionError || !sessionData?.session) {
+          console.error('[BiometricLogin] Erro ao restaurar sessão:', sessionError);
           clearRefreshToken();
           incrementAttempts();
           toast({

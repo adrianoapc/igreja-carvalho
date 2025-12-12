@@ -23,12 +23,23 @@ export default function AtencaoPastoralWidget() {
   const { data: alerts = [], isLoading } = useQuery({
     queryKey: ["ovelhas-em-risco"],
     queryFn: async () => {
+      // Verificar se está autenticado antes de chamar RPC
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn('Usuário não autenticado, pulando chamada RPC');
+        return [];
+      }
+
       const { data, error } = await supabase.rpc("get_ovelhas_em_risco");
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar ovelhas em risco:', error);
+        return [];
+      }
       return (data as OvelhaEmRisco[] || [])
         .sort((a, b) => b.gravidade - a.gravidade)
         .slice(0, 10);
     },
+    retry: false,
   });
 
   const openWhatsApp = (telefone: string | null, nome: string, tipoRisco: string) => {
