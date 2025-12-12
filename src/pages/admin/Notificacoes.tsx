@@ -24,6 +24,7 @@ interface NotificacaoEvento {
   categoria?: string | null;
   provider_preferencial?: string | null;
   variaveis?: string[] | null;
+  template_meta?: string | null;
 }
 
 interface NotificacaoRegra {
@@ -93,9 +94,9 @@ const NotificationEventCard = ({
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription className="line-clamp-2 text-xs text-muted-foreground/80">
-              {evento.descricao || "Sem descrição definida."}
-            </CardDescription>
+          <CardDescription className="line-clamp-2 text-xs text-muted-foreground/80">
+            {evento.template_meta || evento.descricao || "Sem descrição definida."}
+          </CardDescription>
           </div>
           <Button variant="outline" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => onAddRegra(evento.slug)}>
             <Plus className="w-3 h-3" /> Add
