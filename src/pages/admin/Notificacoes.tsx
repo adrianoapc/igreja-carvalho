@@ -18,24 +18,21 @@ type AppRole = (typeof APP_ROLES)[number];
 type CanalKey = "inapp" | "push" | "whatsapp";
 
 interface NotificacaoEvento {
-  id?: string;
-  evento: string;
-  titulo?: string | null;
+  slug: string;
+  nome?: string | null;
   descricao?: string | null;
   categoria?: string | null;
   provider_preferencial?: string | null;
+  variaveis?: string[] | null;
 }
 
 interface NotificacaoRegra {
   id: string;
-  evento: string;
+  evento_slug: string;
   role_alvo?: string | null;
-  role_destinatario?: string | null;
   user_id_especifico?: string | null;
   canais?: { inapp?: boolean; push?: boolean; whatsapp?: boolean } | null;
-  canal_inapp?: boolean | null;
-  canal_push?: boolean | null;
-  canal_whatsapp?: boolean | null;
+  ativo?: boolean | null;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -58,9 +55,9 @@ function formatEventoNome(evento?: string | null) {
 function getRegraCanais(regra: NotificacaoRegra) {
   const canais = regra.canais || {};
   return {
-    inapp: canais.inapp ?? regra.canal_inapp ?? true,
-    push: canais.push ?? regra.canal_push ?? false,
-    whatsapp: canais.whatsapp ?? regra.canal_whatsapp ?? false,
+    inapp: canais.inapp ?? true,
+    push: canais.push ?? false,
+    whatsapp: canais.whatsapp ?? false,
   };
 }
 
@@ -80,7 +77,7 @@ const NotificationEventCard = ({
   onToggleCanal: (id: string, canal: CanalKey) => void;
   loadingIds: Record<string, boolean>;
 }) => {
-  const titulo = evento.titulo || formatEventoNome(evento.evento);
+  const titulo = evento.nome || formatEventoNome(evento.slug);
   const waProvider = evento.provider_preferencial;
 
   return (
@@ -100,7 +97,7 @@ const NotificationEventCard = ({
               {evento.descricao || "Sem descrição definida."}
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => onAddRegra(evento.evento)}>
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => onAddRegra(evento.slug)}>
             <Plus className="w-3 h-3" /> Add
           </Button>
         </div>
@@ -127,7 +124,7 @@ const NotificationEventCard = ({
             ) : (
               regras.map((regra) => {
                 const canais = getRegraCanais(regra);
-                const role = regra.role_alvo || regra.role_destinatario;
+                const role = regra.role_alvo;
                 const label = role ? ROLE_LABELS[role] || role : "Usuário Específico";
                 const isWaActive = canais.whatsapp;
 
@@ -279,10 +276,8 @@ export default function NotificacoesAdmin() {
     try {
       const payload = {
         evento_slug: selectedEventSlug,
-        evento: selectedEventSlug, 
         role_alvo: selectedRole,
         canais: { inapp: true, push: false, whatsapp: false },
-        canal_inapp: true,
         ativo: true
       };
 
@@ -363,9 +358,9 @@ export default function NotificacoesAdmin() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {listaEventos.map(evento => (
               <NotificationEventCard
-                key={evento.id || evento.evento}
+                key={evento.slug}
                 evento={evento}
-                regras={regras.filter(r => r.evento === evento.evento || r.evento === (evento as any).slug)}
+                regras={regras.filter(r => r.evento_slug === evento.slug)}
                 onAddRegra={(slug) => {
                   setSelectedEventSlug(slug);
                   setDialogOpen(true);
