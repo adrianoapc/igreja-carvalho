@@ -88,7 +88,7 @@ const NotificationEventCard = ({
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               {titulo}
               {waProvider && (
-                <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground border-slate-200">
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal bg-green-50 text-green-700 border-green-200">
                   {waProvider === 'meta_direto' ? 'Meta API' : 'Make'}
                 </Badge>
               )}
