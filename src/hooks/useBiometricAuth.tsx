@@ -5,7 +5,8 @@ const BIOMETRIC_USER_KEY = 'biometric_user_id';
 const BIOMETRIC_CREDENTIAL_KEY = 'biometric_credential_id';
 // Security: Use sessionStorage instead of localStorage for refresh tokens
 // sessionStorage is cleared when browser/tab closes, reducing XSS token theft window
-const BIOMETRIC_REFRESH_TOKEN_KEY = 'biometric_refresh_token';
+const BIOMETRIC_REFRESH_TOKEN_KEY = 'biometric_refresh_token'; // Persistiremos também em localStorage (menos seguro)
+const BIOMETRIC_ACCESS_TOKEN_KEY = 'biometric_access_token'; // Fallback when refresh_token unavailable
 const LAST_EMAIL_KEY = 'last_login_email';
 const BIOMETRIC_TEST_MODE_KEY = 'biometric_test_mode'; // Para desenvolvimento
 
@@ -79,6 +80,16 @@ export function useBiometricAuth() {
     const isEnabled = localStorage.getItem(BIOMETRIC_ENABLED_KEY) === 'true';
     const storedUserId = localStorage.getItem(BIOMETRIC_USER_KEY);
     const storedCredentialId = localStorage.getItem(BIOMETRIC_CREDENTIAL_KEY);
+    const storedEmail = localStorage.getItem('last_login_email');
+    const storedRefreshToken = localStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY) || sessionStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY);
+
+    console.log('[BiometricAuth] checkSupport - localStorage state:', {
+      biometric_enabled: isEnabled,
+      biometric_user_id: storedUserId,
+      biometric_credential_id: storedCredentialId ? 'exists' : 'missing',
+      last_login_email: storedEmail,
+      biometric_refresh_token: storedRefreshToken ? 'exists' : 'missing',
+    });
 
     setState({
       isSupported,
@@ -91,7 +102,7 @@ export function useBiometricAuth() {
     checkSupport();
   }, [checkSupport]);
 
-  const enableBiometric = useCallback(async (userId: string): Promise<boolean> => {
+  const enableBiometric = useCallback(async (userId: string, userEmail?: string): Promise<boolean> => {
     if (!state.isSupported) {
       console.warn('Biometric authentication not supported');
       return false;
@@ -123,6 +134,10 @@ export function useBiometricAuth() {
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
 
+      // Use o email do usuário se fornecido, senão usa um padrão
+      const displayEmail = userEmail || 'usuario@app';
+      const displayName = userEmail ? userEmail.split('@')[0] : 'Usuário';
+
       // Create credential
       const credential = await navigator.credentials.create({
         publicKey: {
@@ -133,8 +148,8 @@ export function useBiometricAuth() {
           },
           user: {
             id: new TextEncoder().encode(userId),
-            name: 'user@app',
-            displayName: 'Usuário',
+            name: displayEmail,
+            displayName: displayName,
           },
           pubKeyCredParams: [
             { alg: -7, type: 'public-key' }, // ES256
@@ -155,6 +170,12 @@ export function useBiometricAuth() {
 
       // Store credential ID for later verification
       const credentialId = arrayBufferToBase64(credential.rawId);
+      
+      console.log('[BiometricAuth] enableBiometric - Saving biometric data:', {
+        userId,
+        userEmail,
+        credentialIdLength: credentialId.length,
+      });
       
       localStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
       localStorage.setItem(BIOMETRIC_USER_KEY, userId);
@@ -232,17 +253,33 @@ export function useBiometricAuth() {
   // Security: Use sessionStorage for refresh tokens - cleared on browser close
   // This reduces the window for XSS attacks to steal persistent tokens
   const saveRefreshToken = useCallback((refreshToken: string) => {
+    // Persistir em sessionStorage (seguro para aba) e localStorage (sobrevive a fechar aba)
     sessionStorage.setItem(BIOMETRIC_REFRESH_TOKEN_KEY, refreshToken);
+    localStorage.setItem(BIOMETRIC_REFRESH_TOKEN_KEY, refreshToken);
   }, []);
 
   const getRefreshToken = useCallback((): string | null => {
-    return sessionStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY);
+    return sessionStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY) || localStorage.getItem(BIOMETRIC_REFRESH_TOKEN_KEY);
   }, []);
 
   const clearRefreshToken = useCallback(() => {
     sessionStorage.removeItem(BIOMETRIC_REFRESH_TOKEN_KEY);
-    // Also clear from localStorage if migrating from old storage
     localStorage.removeItem(BIOMETRIC_REFRESH_TOKEN_KEY);
+  }, []);
+
+  // Access token fallback storage (quando refresh_token não está disponível)
+  const saveAccessToken = useCallback((accessToken: string) => {
+    sessionStorage.setItem(BIOMETRIC_ACCESS_TOKEN_KEY, accessToken);
+    localStorage.setItem(BIOMETRIC_ACCESS_TOKEN_KEY, accessToken);
+  }, []);
+
+  const getAccessToken = useCallback((): string | null => {
+    return sessionStorage.getItem(BIOMETRIC_ACCESS_TOKEN_KEY) || localStorage.getItem(BIOMETRIC_ACCESS_TOKEN_KEY);
+  }, []);
+
+  const clearAccessToken = useCallback(() => {
+    sessionStorage.removeItem(BIOMETRIC_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(BIOMETRIC_ACCESS_TOKEN_KEY);
   }, []);
 
   // Email storage functions
@@ -270,6 +307,10 @@ export function useBiometricAuth() {
     saveRefreshToken,
     getRefreshToken,
     clearRefreshToken,
+    // Access token fallback functions
+    saveAccessToken,
+    getAccessToken,
+    clearAccessToken,
     // Email functions
     saveLastEmail,
     getLastEmail,

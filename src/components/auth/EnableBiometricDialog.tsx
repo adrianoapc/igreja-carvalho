@@ -16,6 +16,7 @@ interface EnableBiometricDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId: string;
+  userEmail?: string;
   onComplete: () => void;
 }
 
@@ -23,6 +24,7 @@ export function EnableBiometricDialog({
   open,
   onOpenChange,
   userId,
+  userEmail,
   onComplete,
 }: EnableBiometricDialogProps) {
   const [isEnabling, setIsEnabling] = useState(false);
@@ -32,7 +34,7 @@ export function EnableBiometricDialog({
     setIsEnabling(true);
     
     try {
-      const success = await enableBiometric(userId);
+      const success = await enableBiometric(userId, userEmail);
       
       if (success) {
         toast.success('Biometria ativada com sucesso!');

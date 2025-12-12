@@ -97,6 +97,7 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { loading, isAuthenticated } = useAuth();
+  const biometricEnabled = typeof window !== 'undefined' && localStorage.getItem('biometric_enabled') === 'true';
 
   if (loading) {
     return (
@@ -109,7 +110,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Permite acesso se estiver autenticado (membro ou visitante)
   // A distinção de permissões é feita no menu lateral
   if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to={biometricEnabled ? "/auth?mode=biometric" : "/auth"} replace />;
   }
 
   return <>{children}</>;

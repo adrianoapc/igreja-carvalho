@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus, Mail, ArrowLeft, Loader2, Eye, EyeOff, Lock, Smartphone, MessageSquare } from "lucide-react";
+import { LogIn, UserPlus, Mail, ArrowLeft, Loader2, Eye, EyeOff, Lock, Smartphone, MessageSquare, Fingerprint } from "lucide-react";
 import { EnableBiometricDialog } from "@/components/auth/EnableBiometricDialog";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
@@ -18,9 +18,13 @@ type LoginMethod = "email" | "phone";
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isBiometricAttempting, setIsBiometricAttempting] = useState(false);
+  const [isAutoBiometricAttempt, setIsAutoBiometricAttempt] = useState(false);
+  const [biometricFailed, setBiometricFailed] = useState(false);
   const [showBiometricDialog, setShowBiometricDialog] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
@@ -32,7 +36,63 @@ export default function Auth() {
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [otpCode, setOtpCode] = useState("");
   const [phoneForOtp, setPhoneForOtp] = useState("");
-  const { isSupported, isEnabled, isLoading: isBiometricLoading, saveLastEmail, getLastEmail, saveRefreshToken } = useBiometricAuth();
+  const { isSupported, isEnabled, isLoading: isBiometricLoading, saveLastEmail, getLastEmail, saveRefreshToken, saveAccessToken, authenticateWithBiometric, getRefreshToken, getAccessToken } = useBiometricAuth();
+  const preferBiometric = searchParams.get("mode") === "biometric";
+
+  // Função para tentar login com biometria
+  const attemptBiometricLogin = useCallback(async (isAuto = false) => {
+    const biometricFlag = localStorage.getItem('biometric_enabled') === 'true';
+    if (!isSupported || isBiometricLoading || !isEnabled || !biometricFlag) return false;
+
+    setBiometricFailed(false);
+    if (isAuto) setIsAutoBiometricAttempt(true);
+    setIsBiometricAttempting(true);
+
+    try {
+      const verified = await authenticateWithBiometric();
+      if (!verified) throw new Error('Biometric verification failed');
+
+      const refreshToken = getRefreshToken();
+      const accessToken = getAccessToken();
+
+      let sessionData: Awaited<ReturnType<typeof supabase.auth.refreshSession>>['data'] | null = null;
+      let sessionError: any = null;
+
+      if (refreshToken) {
+        const result = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+        sessionData = result.data;
+        sessionError = result.error;
+      }
+
+      if ((!sessionData?.session || sessionError) && accessToken) {
+        const result = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        });
+        if (result.error) {
+          sessionError = result.error;
+        } else {
+          sessionData = result.data;
+        }
+      }
+
+      if (sessionError || !sessionData?.session?.user) {
+        console.warn('Não foi possível restaurar sessão biométrica:', sessionError?.message);
+        setBiometricFailed(true);
+        return false;
+      }
+
+      navigate('/dashboard', { replace: true });
+      return true;
+    } catch (error) {
+      console.error('Biometric auth failed:', error);
+      setBiometricFailed(true);
+      return false;
+    } finally {
+      setIsBiometricAttempting(false);
+      setIsAutoBiometricAttempt(false);
+    }
+  }, [authenticateWithBiometric, getRefreshToken, isBiometricLoading, isEnabled, isSupported, navigate]);
 
   // Verificar se usuário já está autenticado ao montar
   useEffect(() => {
@@ -40,8 +100,8 @@ export default function Auth() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          // Usuário já autenticado, redirecionar para dashboard
           navigate("/dashboard", { replace: true });
+          return;
         }
       } catch (error) {
         console.error("Erro ao verificar autenticação:", error);
@@ -49,8 +109,11 @@ export default function Auth() {
         setIsCheckingAuth(false);
       }
     };
-    checkAuthStatus();
-  }, [navigate]);
+
+    if (!isBiometricLoading) {
+      checkAuthStatus();
+    }
+  }, [navigate, isBiometricLoading]);
 
   // Load last used email on mount
   useEffect(() => {
@@ -96,40 +159,39 @@ export default function Auth() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: { nome },
         },
       });
 
-      if (signUpError) {
-        // Verificar se é erro de email já cadastrado
-        if (signUpError.message.includes("already registered") || signUpError.message.includes("already exists")) {
-          throw new Error("Este email já está cadastrado. Tente fazer login ou use outro email.");
-        }
-        throw signUpError;
+      if (signUpError) throw signUpError;
+
+      if (authData.session?.refresh_token) {
+        console.log('[Auth] Saving refresh token (signup):', {
+          tokenLength: authData.session.refresh_token.length,
+        });
+        saveRefreshToken(authData.session.refresh_token);
+      } else {
+        console.warn('[Auth] No refresh token in signup session:', {
+          hasSession: !!authData.session,
+          sessionKeys: Object.keys(authData.session || {}),
+        });
       }
 
-      if (authData.user) {
-        // Save email for next login
-        saveLastEmail(email);
+      toast({
+        title: "Cadastro realizado!",
+        description: "Bem-vindo! Você pode acessar o sistema.",
+      });
 
-        // O perfil será criado automaticamente pelo trigger do banco
-        // Apenas aguardar um momento para garantir que foi criado
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // Salvar email para biometria
+      saveLastEmail(email);
 
-        toast({
-          title: "Cadastro realizado!",
-          description: "Bem-vindo! Você pode acessar o sistema.",
-        });
-
-        // Oferecer biometria após cadastro bem-sucedido
-        if (!isBiometricLoading && isSupported && !isEnabled) {
-          setPendingUserId(authData.user.id);
-          setShowBiometricDialog(true);
-        } else {
-          // Redirecionar para dashboard após cadastro
-          navigate("/dashboard", { replace: true });
-        }
+      // Oferecer biometria após cadastro bem-sucedido
+      if (!isBiometricLoading && isSupported && !isEnabled && authData.user) {
+        setPendingUserId(authData.user.id);
+        setLoginEmail(email); // Garantir que email está salvo para passar ao diálogo
+        setShowBiometricDialog(true);
+      } else {
+        navigate("/dashboard", { replace: true });
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
@@ -166,14 +228,54 @@ export default function Auth() {
         password,
       });
 
+      console.log('[Auth] Raw signInWithPassword data:', data);
+      console.log('[Auth] Raw signInWithPassword error:', error);
+
       if (error) throw error;
+
+      console.log('[Auth] signInWithPassword response:', {
+        hasSession: !!data.session,
+        sessionKeys: Object.keys(data.session || {}),
+        refresh_token_value: data.session?.refresh_token,
+        access_token_value: data.session?.access_token ? data.session.access_token.substring(0, 50) + '...' : 'missing',
+        user: data.user?.email,
+      });
 
       // Save email for next login
       saveLastEmail(email);
       
       // Salvar refresh token para login automático com biometria
-      if (data.session?.refresh_token) {
+      // IMPORTANTE: Validar que o refresh token tem um tamanho mínimo (real tokens tem 100+ chars)
+      // FALLBACK: Salvar também access_token para uso se refresh_token não estiver disponível
+      
+      // Sempre salvar access_token como fallback
+      if (data.session?.access_token) {
+        console.log('[Auth] Saving access token (fallback):', {
+          tokenLength: data.session.access_token.length,
+          tokenStart: data.session.access_token.substring(0, 50),
+        });
+        saveAccessToken(data.session.access_token);
+      }
+
+      if (data.session?.refresh_token && data.session.refresh_token.length > 50) {
+        console.log('[Auth] Saving valid refresh token:', {
+          tokenLength: data.session.refresh_token.length,
+          tokenStart: data.session.refresh_token.substring(0, 50),
+          sessionStorageBefore: sessionStorage.getItem('biometric_refresh_token') ? 'exists' : 'missing',
+          localStorageBefore: localStorage.getItem('biometric_refresh_token') ? 'exists' : 'missing',
+        });
         saveRefreshToken(data.session.refresh_token);
+        console.log('[Auth] After saveRefreshToken:', {
+          sessionStorageAfter: sessionStorage.getItem('biometric_refresh_token') ? sessionStorage.getItem('biometric_refresh_token').substring(0, 50) + '...' : 'missing',
+          localStorageAfter: localStorage.getItem('biometric_refresh_token') ? localStorage.getItem('biometric_refresh_token').substring(0, 50) + '...' : 'missing',
+        });
+      } else {
+        console.warn('[Auth] Invalid or missing refresh token:', {
+          hasToken: !!data.session?.refresh_token,
+          tokenLength: data.session?.refresh_token?.length || 0,
+          tokenValue: data.session?.refresh_token,
+        });
+        console.log('[Auth] Will use access_token fallback for biometric login');
       }
 
       toast({
@@ -184,6 +286,7 @@ export default function Auth() {
       // Oferecer biometria após login bem-sucedido se ainda não estiver ativada
       if (!isBiometricLoading && isSupported && !isEnabled && data.user) {
         setPendingUserId(data.user.id);
+        setLoginEmail(email); // Garantir que email está salvo para passar ao diálogo
         setShowBiometricDialog(true);
       } else {
         navigate("/dashboard", { replace: true });
@@ -383,7 +486,12 @@ export default function Auth() {
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
+        <div className="flex flex-col items-center gap-2 text-center">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <p className="text-muted-foreground">
+            {isAutoBiometricAttempt ? "Verificando credenciais..." : "Carregando..."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -646,7 +754,7 @@ export default function Auth() {
       {/* Logo e Título */}
       <div className="w-full max-w-md mb-4">
         <button
-          onClick={() => navigate('/biometric-login')}
+          onClick={() => navigate(preferBiometric ? '/auth?mode=biometric' : '/biometric-login')}
           className="flex items-center gap-2 text-primary hover:underline text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -682,17 +790,37 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           {loginMethod === "email" ? (
-            <form onSubmit={handleSignIn} className="space-y-6">
+            <>
+              {isSupported && isEnabled && (
+                <div className="mb-4">
+                  <Button
+                    type="button"
+                    variant={preferBiometric ? "default" : "outline"}
+                    className="w-full flex items-center justify-center gap-2"
+                    onClick={() => attemptBiometricLogin(false)}
+                    disabled={isBiometricAttempting}
+                  >
+                    <Fingerprint className="w-4 h-4" />
+                    {isBiometricAttempting ? "Verificando..." : "Entrar com FaceID/TouchID"}
+                  </Button>
+                  {biometricFailed && (
+                    <p className="text-xs text-muted-foreground mt-1">Não foi possível validar biometria. Tente novamente ou use sua senha.</p>
+                  )}
+                </div>
+              )}
+
+              <form onSubmit={handleSignIn} className="space-y-6" autoComplete="on">
               <div className="space-y-2">
                 <Label htmlFor="login-email">Email</Label>
                 <Input
                   id="login-email"
+                  name="email"
                   type="email"
                   placeholder="seu@email.com"
-                  value={loginEmail}
+                  defaultValue={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   required
-                  autoComplete="email"
+                  autoComplete="username email"
                   disabled={isLoading}
                 />
                 <button
@@ -709,9 +837,10 @@ export default function Auth() {
                 <div className="relative">
                   <Input
                     id="login-password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    value={loginPassword}
+                    defaultValue={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
                     autoComplete="current-password"
@@ -786,6 +915,7 @@ export default function Auth() {
                 </p>
               </div>
             </form>
+            </>
           ) : (
             <form onSubmit={handlePhoneSignIn} className="space-y-6">
               <div className="space-y-2">
@@ -884,6 +1014,7 @@ export default function Auth() {
         open={showBiometricDialog}
         onOpenChange={setShowBiometricDialog}
         userId={pendingUserId || ''}
+        userEmail={loginEmail || getLastEmail() || undefined}
         onComplete={handleBiometricComplete}
       />
     </div>
