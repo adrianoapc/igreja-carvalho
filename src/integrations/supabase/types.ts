@@ -77,6 +77,7 @@ export type Database = {
       }
       app_config: {
         Row: {
+          allow_public_access: boolean | null
           created_at: string | null
           id: number
           maintenance_message: string | null
@@ -85,6 +86,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          allow_public_access?: boolean | null
           created_at?: string | null
           id?: number
           maintenance_message?: string | null
@@ -93,6 +95,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          allow_public_access?: boolean | null
           created_at?: string | null
           id?: number
           maintenance_message?: string | null
