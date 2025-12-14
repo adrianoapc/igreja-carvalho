@@ -75,6 +75,33 @@ export type Database = {
           },
         ]
       }
+      app_config: {
+        Row: {
+          created_at: string | null
+          id: number
+          maintenance_message: string | null
+          maintenance_mode: boolean | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          maintenance_message?: string | null
+          maintenance_mode?: boolean | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          maintenance_message?: string | null
+          maintenance_mode?: boolean | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       app_permissions: {
         Row: {
           description: string | null
