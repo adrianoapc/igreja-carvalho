@@ -3854,6 +3854,7 @@ export type Database = {
         | "professor"
         | "membro"
         | "basico"
+        | "tecnico"
       categoria_testemunho:
         | "espiritual"
         | "casamento"
@@ -4027,6 +4028,7 @@ export const Constants = {
         "professor",
         "membro",
         "basico",
+        "tecnico",
       ],
       categoria_testemunho: [
         "espiritual",
