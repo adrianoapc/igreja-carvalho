@@ -86,7 +86,6 @@ import TelaoLiturgia from "./pages/TelaoLiturgia";
 import Escalas from "./pages/Escalas";
 import MinhasEscalas from "./pages/MinhasEscalas";
 import Checkin from "./pages/Checkin";
-import { useAuth } from "./hooks/useAuth";
 import PermissionMatrixPrototype from "./pages/AdminPermissions";
 import FamilyWallet from "./pages/FamilyWallet";
 import KidsCheckinScanner from "./pages/kids/Scanner";
@@ -194,9 +193,9 @@ function App() {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <MaintenanceGate>
-                <AuthGate>
-        <Routes>
+              <AuthGate>
+                <MaintenanceGate>
+                  <Routes>
           {/* Rota raiz redireciona para /biometric-login */}
           <Route path="/" element={<Navigate to="/biometric-login" replace />} />
           
@@ -863,8 +862,8 @@ function App() {
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
+                </MaintenanceGate>
               </AuthGate>
-              </MaintenanceGate>
             </BrowserRouter>
           </TooltipProvider>
         </HideValuesProvider>
