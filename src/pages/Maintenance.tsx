@@ -67,7 +67,7 @@ export default function Maintenance({ message }: MaintenanceProps) {
           {/* Botão para Admin/Técnico */}
           <div className="flex flex-col gap-4">
             <Button
-              onClick={() => navigate("/auth")}
+              onClick={() => navigate("/dashboard")}
               variant="outline"
               size="lg"
               className="w-full group"

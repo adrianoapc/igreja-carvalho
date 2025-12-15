@@ -123,6 +123,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Maintenance />;
   }
 
+  // Se é admin/técnico e está em manutenção, envolve com banner
+  if (maintenanceConfig.maintenance_mode && user && canAccessDuringMaintenance(user.user_metadata?.role)) {
+    return <ProtectedLayout>{children}</ProtectedLayout>;
+  }
+
   return <>{children}</>;
 }
 
@@ -152,6 +157,16 @@ function MaintenanceBanner() {
   );
 }
 
+// Wrapper que renderiza banner + conteúdo para rotas protegidas
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <MaintenanceBanner />
+      {children}
+    </>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -162,7 +177,6 @@ function App() {
             <Sonner />
             <BrowserRouter>
               <AuthGate>
-                <MaintenanceBanner />
                 <Routes>
           {/* Rota raiz redireciona para /biometric-login */}
           <Route path="/" element={<Navigate to="/biometric-login" replace />} />
