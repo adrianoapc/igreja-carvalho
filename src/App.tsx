@@ -2,12 +2,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { HideValuesProvider } from "@/hooks/useHideValues";
 import MainLayout from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import BiometricLogin from "./pages/BiometricLogin";
+import Maintenance from "./pages/Maintenance";
+import { useAppConfig } from "./hooks/useAppConfig";
+import { canAccessDuringMaintenance } from "./utils/roles";
+import { useAuth } from "./hooks/useAuth";
 import Dashboard from "./pages/Dashboard";
 import Comunicados from "./pages/Comunicados";
 import Publicacao from "./pages/Publicacao";
@@ -116,6 +120,71 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Rotas públicas que ficam acessíveis mesmo em manutenção (quando allow_public_access = true)
+const PUBLIC_ROUTES = [
+  '/cadastro',
+  '/cadastro/visitante',
+  '/cadastro/membro',
+  '/atualizar-dados',
+  '/auth',
+  '/auth/reset',
+  '/biometric-login',
+  '/telao',
+  '/checkin'
+];
+
+// Banner de aviso para admins e técnicos durante manutenção
+function MaintenanceBanner() {
+  return (
+    <div className="bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium">
+      ⚠️ Modo de Manutenção Ativo - Você tem acesso como administrador
+    </div>
+  );
+}
+
+// Gate que controla acesso durante manutenção
+function MaintenanceGate({ children }: { children: React.ReactNode }) {
+  const { config, isLoading } = useAppConfig();
+  const { user } = useAuth();
+  const location = useLocation();
+
+  // Enquanto carrega config, mostra loading
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando configurações...</p>
+      </div>
+    );
+  }
+
+  // Se não está em manutenção, libera tudo
+  if (!config.maintenance_mode) {
+    return <>{children}</>;
+  }
+
+  // Se está em manutenção...
+  const userCanAccess = user && canAccessDuringMaintenance(user.user_metadata?.role);
+  const isPublicRoute = PUBLIC_ROUTES.some(route => location.pathname.startsWith(route));
+
+  // Admin/Técnico tem acesso total com banner de aviso
+  if (userCanAccess) {
+    return (
+      <>
+        <MaintenanceBanner />
+        {children}
+      </>
+    );
+  }
+
+  // Rotas públicas liberadas se allow_public_access = true
+  if (isPublicRoute && config.allow_public_access) {
+    return <>{children}</>;
+  }
+
+  // Bloqueia e mostra página de manutenção
+  return <Maintenance />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -125,7 +194,8 @@ function App() {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <AuthGate>
+              <MaintenanceGate>
+                <AuthGate>
         <Routes>
           {/* Rota raiz redireciona para /biometric-login */}
           <Route path="/" element={<Navigate to="/biometric-login" replace />} />
@@ -794,6 +864,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
               </AuthGate>
+              </MaintenanceGate>
             </BrowserRouter>
           </TooltipProvider>
         </HideValuesProvider>
