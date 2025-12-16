@@ -198,8 +198,17 @@ flowchart TD
 ### Objetivo
 Prover controle financeiro com separação clara entre **Fato Gerador** (competência), **Fluxo de Caixa** (pagamentos) e **DRE** (resultado contábil), garantindo relatórios precisos e auditáveis.
 
-### Arquitetura de Dados
+---
 
+## Módulo Pessoas / Membros (visão técnica)
+
+### Como o frontend carrega e persiste dados
+
+### Interação com Supabase
+
+### Considerações de RLS / permissões / multi-tenant
+
+### Diagramas relacionados
 O módulo financeiro utiliza uma arquitetura de três camadas, conforme documentado no [ADR-001](../adr/ADR-001-separacao-fato-gerador-caixa-dre.md):
 
 #### 1. Camada de Competência (Fato Gerador)

@@ -29,6 +29,11 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Status:** Aceito
 - **Link:** [ADR-003](ADR-003-rls-e-modelo-permissoes.md)
 
+### ADR-004
+- **Titulo:** Relacionamentos Bidirecionais em Familias
+- **Status:** Aceito
+- **Link:** [ADR-004](ADR-004-relacionamentos-bidirecionais-familias.md)
+
 ---
 
 ## 📐 Relacao com Diagramas

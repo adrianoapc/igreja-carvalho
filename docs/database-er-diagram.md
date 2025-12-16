@@ -62,7 +62,60 @@ erDiagram
 
 ---
 
+## Pessoas / Membros — entidades e relações
+- **profiles**: cadastro unificado de pessoas (visitante/frequentador/membro); PK `id`; FK explícita `user_id -> auth.users.id`; inclui dados pessoais, contatos, status (`user_status`), datas (visita, batismo, casamento), flags de liderança/pastorado e observações.
+- **familias**: relacionamentos de parentesco entre pessoas; PK `id`; colunas `pessoa_id`, `familiar_id` (referenciam perfis, sem FK explícita no script), `tipo_parentesco`, timestamps.
+- **funcoes_igreja**: catálogo de funções ministeriais; PK `id`; campos `nome`, `descricao`, `ativo`.
+- **membro_funcoes**: atribuição de funções a pessoas; PK `id`; FK `funcao_id -> funcoes_igreja.id`; coluna `membro_id` (referencia perfil), datas de início/fim, flag `ativo`.
+- **alteracoes_perfil_pendentes**: fila de alterações de perfil para aprovação; PK `id`; colunas `profile_id` (perfil alvo), `dados_antigos`, `dados_novos`, `campos_aprovados`, `status`, `aprovado_por`, timestamps.
+
+Relações principais
+- `profiles.user_id` associa o perfil ao usuário de autenticação (`auth.users`).
+- `membro_funcoes.funcao_id` referencia `funcoes_igreja.id` para atribuição de função.
+- `familias` armazena vínculos pessoa ↔ familiar, permitindo múltiplos relacionamentos por perfil.
+- `alteracoes_perfil_pendentes` guarda propostas de edição ligadas a um `profile_id` e, quando aprovado, registra quem aprovou.
+
+Fonte de esquema: [`database-schema.sql`](database-schema.sql)
+
 ## Diagrama ER Completo
+
+---
+
+## Pessoas / Membros — modelo de dados
+
+Com base exclusiva no `database-schema.sql`, as tabelas relacionadas a Pessoas/Membros são:
+
+- `profiles` — cadastro unificado de pessoas com dados pessoais, contato e status.
+    - PK: `id`
+    - FK: `user_id` → `auth.users(id)`
+    - Observações: inclui campos de datas (visitas, batismo, casamento), indicadores (`e_lider`, `e_pastor`) e metadados de criação/atualização.
+
+- `funcoes_igreja` — catálogo de funções ministeriais.
+    - PK: `id`
+    - Observações: `nome`, `descricao`, flag `ativo` e timestamps.
+
+- `membro_funcoes` — atribuições de funções para perfis.
+    - PK: `id`
+    - FK: `funcao_id` → `funcoes_igreja(id)`
+    - Observações: `membro_id` (referencia um perfil), datas de início/fim e flag `ativo`.
+
+- `familias` — vínculos familiares entre perfis.
+    - PK: `id`
+    - Observações: `pessoa_id`, `familiar_id`, `tipo_parentesco`, timestamps (sem FK explícita no script para `profiles`).
+
+- `alteracoes_perfil_pendentes` — fila de alterações de perfil para aprovação.
+    - PK: `id`
+    - Observações: `profile_id` (perfil alvo), `dados_antigos`, `dados_novos`, `campos_aprovados`, `status`, `aprovado_por`, timestamps.
+
+Relações relevantes (explicitadas no schema):
+- `profiles.user_id` associa perfis a usuários de autenticação (`auth.users`).
+- `membro_funcoes.funcao_id` vincula atribuições ao catálogo `funcoes_igreja`.
+
+Relações utilizadas (sem FK explícita no schema, mas presentes por convenção):
+- `familias.pessoa_id` e `familias.familiar_id` referenciam `profiles.id` para construção de vínculos.
+- `alteracoes_perfil_pendentes.profile_id` referencia `profiles.id` para controle de aprovações.
+
+Referência: [`database-schema.sql`](database-schema.sql)
 
 ```mermaid
 erDiagram

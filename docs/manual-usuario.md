@@ -102,6 +102,34 @@ O sino no canto superior direito mostra suas notificações:
 
 ## 3. Gestão de Pessoas
 
+### 3.X Pessoas / Membros
+- **Onde acessar**: Menu lateral → **Pessoas** → escolha **Todos**, **Membros**, **Visitantes** ou **Frequentadores** (atalhos principais) ou use a página inicial de Pessoas.
+- **Ao abrir a tela**: você vê cards/estatísticas (totais por status), atalhos rápidos, e a lista de pessoas com nome, contato, status e avatar (quando cadastrado). Em dispositivos móveis, os cards podem ocupar mais espaço; role para chegar na lista.
+- **Buscar/filtrar** (passo a passo):
+   1. Use a barra de busca (nome, telefone ou email)
+   2. Selecione o filtro de **Status** (Visitante/Frequentador/Membro)
+   3. Confira os contadores por status para validar o filtro
+   4. Role para carregar mais pessoas (infinite scroll)
+- **Cadastrar nova pessoa** (passo a passo):
+   1. Clique em **+ Novo** (na lista ou no atalho de Membros/Visitantes)
+   2. Preencha **Nome** (obrigatório)
+   3. Informe **Telefone ou Email** (recomendado para contato)
+   4. Defina **Status inicial**: Visitante, Frequentador ou Membro
+   5. Salve para concluir o cadastro; a pessoa aparece na listagem
+- **Editar pessoa existente** (passo a passo):
+   1. Abra a pessoa pela lista (clique no nome)
+   2. Use **Editar** para ajustar dados pessoais/contatos/status
+   3. Salve; a lista e o perfil são atualizados
+- **Campos obrigatórios e validações**: Nome é obrigatório; status deve ser um dos valores válidos (Visitante/Frequentador/Membro); contatos ajudam na busca e no follow-up. Em mobile, priorize inserir contato para facilitar ações posteriores.
+- **Vincular funções/roles ministeriais**: No perfil, acesse a área de status/igreja e atribua funções (quando disponível) conforme a liderança definir.
+
+**Exemplos práticos**
+- Cadastro de novo membro: Pessoas → Membros → **+ Novo** → Nome obrigatório, telefone/email recomendado, status **membro** → Salvar → aparece na lista com badge.
+- Atualização de dados: Pessoas → Todos → abra a pessoa → **Editar** → ajuste endereço/telefone/status → Salvar → a listagem reflete as alterações.
+
+**Links úteis**: [Fluxo Pessoas](diagramas/fluxo-pessoas.md) · [Sequência Pessoas](diagramas/sequencia-pessoas.md)
+**Referências complementares**: [BIDIRECTIONAL_RELATIONSHIPS.md](BIDIRECTIONAL_RELATIONSHIPS.md) (lista familiares nos dois sentidos), [AUTHORIZED_GUARDIANS.md](AUTHORIZED_GUARDIANS.md) (responsáveis autorizados para crianças) e [KIDS_INCLUSION.md](KIDS_INCLUSION.md) (campo de necessidades especiais no Kids).
+
 ### 3.1 Acessando o Módulo
 
 1. No menu lateral, clique em **"Pessoas"**
