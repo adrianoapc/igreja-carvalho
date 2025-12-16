@@ -41,6 +41,7 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- ADR-001 (Fato Gerador vs Caixa vs DRE): [`adr/ADR-001-separacao-fato-gerador-caixa-dre.md`](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
 	- ADR-002 (Autenticação Supabase): [`adr/ADR-002-autenticacao-supabase.md`](adr/ADR-002-autenticacao-supabase.md)
 	- ADR-003 (RLS e modelo de permissões): [`adr/ADR-003-rls-e-modelo-permissoes.md`](adr/ADR-003-rls-e-modelo-permissoes.md)
+	- ADR-006 (Separação Comunicação e Notificações): [`adr/ADR-006-separacao-comunicacao-notificacoes.md`](adr/ADR-006-separacao-comunicacao-notificacoes.md)
 
 ## Como navegar
 - Use os links acima para chegar diretamente ao tópico.

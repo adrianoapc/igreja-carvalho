@@ -431,6 +431,8 @@ REFRESH MATERIALIZED VIEW mv_dre_anual; -- Job noturno
 
 ## Módulo Comunicação (visão técnica)
 
+> A separação conceitual entre Comunicação e Notificações está formalizada no [ADR-006 — Separação entre Comunicação e Notificações](../adr/ADR-006-separacao-comunicacao-notificacoes.md).
+
 ### Frontend → Comunicação
 - Páginas em `src/pages/` (Comunicados, Announcements, AnnouncementsAdmin, Publicacao) e componentes em `src/components/comunicados/` (ComunicadoDialog), `src/components/publicacao/` (PublicacaoStepper) e `src/components/` (BannerCarousel para exibição no app).
 - Operações via `supabase-js` para: tabela `comunicados` (INSERT/UPDATE/DELETE de comunicados) e storage bucket `comunicados` (upload de imagens/artes).
