@@ -487,6 +487,7 @@ Em qualquer lista financeira:
 
 ---
 
+
 ### Referências Técnicas
 
 Para entender melhor a arquitetura financeira e decisões técnicas:

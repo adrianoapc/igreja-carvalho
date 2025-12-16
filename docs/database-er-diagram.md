@@ -978,6 +978,32 @@ erDiagram
 
 ---
 
+## Kids — entidades e relações
+
+Fonte exclusiva: [`database-schema.sql`](database-schema.sql)
+
+Com base no schema atual (gerado em 2025-12-03):
+
+- Tabelas relacionadas a Kids/crianças:
+    - Não há tabelas `kids_*` definidas neste arquivo de schema.
+
+- Tabelas relacionadas a guardians/autorizados:
+    - `familias` — vínculos de parentesco entre perfis.
+        - PK: `id`
+        - Colunas-chave: `pessoa_id`, `familiar_id`, `tipo_parentesco`, `nome_familiar`, timestamps
+        - FKs explícitas: não declaradas no script para `profiles` (uso por convenção)
+        - Propósito: modelar relações familiares que podem ser usadas pela aplicação para determinar responsáveis autorizados.
+
+- Tabelas relacionadas a notificações Kids (se existirem):
+    - Não há tabelas de notificações específicas do módulo Kids neste schema.
+    - Existe a tabela genérica `notifications` (notificações do sistema em geral).
+        - PK: `id`
+        - Colunas-chave: `user_id`, `title`, `message`, `type`, `read`, `related_user_id`, `metadata`, `created_at`
+        - FKs explícitas: não declaradas no script (por exemplo, `user_id` não referencia `profiles` via FK neste arquivo)
+        - Propósito: armazenar notificações destinadas a usuários do sistema (múltiplos módulos podem utilizá-la).
+
+Observação: Este resumo reflete exclusivamente o conteúdo presente em [`database-schema.sql`](database-schema.sql). Caso existam tabelas `kids_*` ou views relacionadas em migrações separadas, elas não constam neste arquivo e, portanto, não foram consideradas aqui.
+
 ## Views do Sistema
 
 | View | Descrição |
