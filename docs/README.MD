@@ -42,6 +42,8 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- ADR-002 (Autenticação Supabase): [`adr/ADR-002-autenticacao-supabase.md`](adr/ADR-002-autenticacao-supabase.md)
 	- ADR-003 (RLS e modelo de permissões): [`adr/ADR-003-rls-e-modelo-permissoes.md`](adr/ADR-003-rls-e-modelo-permissoes.md)
 	- ADR-006 (Separação Comunicação e Notificações): [`adr/ADR-006-separacao-comunicacao-notificacoes.md`](adr/ADR-006-separacao-comunicacao-notificacoes.md)
+	- ADR-007 (Estratégia de Entrega de Notificações): [`adr/ADR-007-estrategia-entrega-notificacoes.md`](adr/ADR-007-estrategia-entrega-notificacoes.md)
+	- ADR-008 (Uso de Eventos de Domínio): [`adr/ADR-008-eventos-dominio.md`](adr/ADR-008-eventos-dominio.md)
 
 ## Como navegar
 - Use os links acima para chegar diretamente ao tópico.
