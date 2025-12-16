@@ -45,12 +45,36 @@ export function LinksExternosCard() {
 
   const copyToClipboard = async (url: string, title: string) => {
     try {
-      await navigator.clipboard.writeText(url);
+      // Tenta API moderna (requer HTTPS e gesto do usuário)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // Fallback amplo para navegadores sem clipboard API (iOS Safari, WebViews)
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.setAttribute("readonly", "");
+        document.body.appendChild(textarea);
+        textarea.select();
+        textarea.setSelectionRange(0, url.length);
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (!ok) throw new Error("execCommand copy failed");
+      }
+
       toast({
         title: "Link copiado!",
         description: `O link "${title}" foi copiado para a área de transferência.`,
       });
     } catch (error) {
+      // Último recurso: oferecer compartilhamento nativo quando possível
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, text: title, url });
+          return;
+        } catch {}
+      }
       toast({
         title: "Erro",
         description: "Não foi possível copiar o link.",

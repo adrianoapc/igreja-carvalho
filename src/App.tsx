@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,9 +6,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { HideValuesProvider } from "@/hooks/useHideValues";
+import { useAuth } from "@/hooks/useAuth";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { canAccessDuringMaintenance } from "@/utils/roles";
+import { AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import MainLayout from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import BiometricLogin from "./pages/BiometricLogin";
+import Maintenance from "./pages/Maintenance";
 import Dashboard from "./pages/Dashboard";
 import Comunicados from "./pages/Comunicados";
 import Publicacao from "./pages/Publicacao";
@@ -82,7 +89,6 @@ import TelaoLiturgia from "./pages/TelaoLiturgia";
 import Escalas from "./pages/Escalas";
 import MinhasEscalas from "./pages/MinhasEscalas";
 import Checkin from "./pages/Checkin";
-import { useAuth } from "./hooks/useAuth";
 import PermissionMatrixPrototype from "./pages/AdminPermissions";
 import FamilyWallet from "./pages/FamilyWallet";
 import KidsCheckinScanner from "./pages/kids/Scanner";
@@ -95,9 +101,58 @@ import NotificacoesAdmin from "./pages/admin/Notificacoes";
 
 const queryClient = new QueryClient();
 
+// Barra de aviso de manutenção
+function MaintenanceBar() {
+  const { config } = useAppConfig();
+  const { user } = useAuth();
+  const [isPrivileged, setIsPrivileged] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    let active = true;
+    const resolve = async () => {
+      if (!user) { setIsPrivileged(false); return; }
+      // Primeiro tenta via user_metadata
+      const metaRole = (user as any)?.user_metadata?.role as string | undefined;
+      if (metaRole && canAccessDuringMaintenance(metaRole)) {
+        setIsPrivileged(true);
+        return;
+      }
+      // Fallback: consultar user_roles
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        if (error) throw error;
+        const roles = (data || []).map(r => r.role);
+        if (active) setIsPrivileged(roles.includes('admin') || roles.includes('tecnico'));
+      } catch {
+        if (active) setIsPrivileged(false);
+      }
+    };
+    resolve();
+    return () => { active = false; };
+  }, [user]);
+
+  if (!config.maintenance_mode || !isPrivileged) return null;
+
+  return (
+    <div className="bg-orange-500 text-white px-4 py-3">
+      <div className="flex items-center justify-center gap-2 text-center">
+        <AlertTriangle className="w-5 h-5" />
+        <p className="font-semibold text-sm">⚠️ MODO MANUTENÇÃO ATIVO - Acesso Privilegiado</p>
+      </div>
+      <p className="text-xs opacity-90 text-center mt-1">
+        {config.maintenance_message || "O sistema está passando por manutenção"}
+      </p>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { loading, isAuthenticated } = useAuth();
   const biometricEnabled = typeof window !== 'undefined' && localStorage.getItem('biometric_enabled') === 'true';
+  const { config: maintenanceConfig } = useAppConfig();
 
   if (loading) {
     return (
@@ -113,6 +168,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to={biometricEnabled ? "/auth?mode=biometric" : "/auth"} replace />;
   }
 
+  // A lógica de manutenção agora está centralizada no AuthGate.
+
   return <>{children}</>;
 }
 
@@ -126,7 +183,8 @@ function App() {
             <Sonner />
             <BrowserRouter>
               <AuthGate>
-        <Routes>
+                <MaintenanceBar />
+                <Routes>
           {/* Rota raiz redireciona para /biometric-login */}
           <Route path="/" element={<Navigate to="/biometric-login" replace />} />
           
@@ -151,6 +209,9 @@ function App() {
           
           {/* Rota pública de Check-in por QR Code */}
           <Route path="/checkin/:tipo/:id" element={<Checkin />} />
+
+          {/* Página pública de manutenção */}
+          <Route path="/maintenance" element={<Maintenance />} />
 
           {/* Rota de Prototipação Novo Admin */}
           <Route path="/teste-permissoes" element={<PermissionMatrixPrototype />} />
