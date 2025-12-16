@@ -1,0 +1,63 @@
+name: Docs Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  docs_guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: changed
+        uses: tj-actions/changed-files@v45
+
+      - name: Enforce docs update for touched modules
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Lista de arquivos alterados no PR
+          changed="${{ steps.changed.outputs.all_changed_files }}"
+          echo "Changed files:"
+          echo "$changed" | tr ' ' '\n'
+
+          # Se QUALQUER arquivo em docs/ mudou, consideramos doc atualizada
+          DOCS_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/' || true)
+
+          # Mapeamento: "módulo" -> regex de paths no código
+          # Ajuste os paths conforme seu repo (ex.: src/modules/..., src/pages/..., etc.)
+          declare -A MODULE_PATHS
+          MODULE_PATHS[financeiro]='^src/.*(finance|financial|tesour|caixa|dre)/'
+          MODULE_PATHS[pessoas]='^src/.*(pessoas|membros|people|members)/'
+          MODULE_PATHS[kids]='^src/.*(kids|crianc|children)/'
+          MODULE_PATHS[comunicacao]='^src/.*(comunic|aviso|anuncio|mensag)/'
+          MODULE_PATHS[notificacoes]='^src/.*(notific|notification|notify|alert)/'
+          MODULE_PATHS[ensino]='^src/.*(ensino|teaching|aulas|classes)/'
+          MODULE_PATHS[auth]='^src/.*(auth|login|session|jwt)/'
+          MODULE_PATHS[database]='^(supabase/|docs/database-|.*schema\.sql)'
+
+          touched_modules=()
+          for module in "${!MODULE_PATHS[@]}"; do
+            rx="${MODULE_PATHS[$module]}"
+            if echo "$changed" | tr ' ' '\n' | grep -E "$rx" >/dev/null 2>&1; then
+              touched_modules+=("$module")
+            fi
+          done
+
+          if [ ${#touched_modules[@]} -eq 0 ]; then
+            echo "No module matched; skipping docs enforcement."
+            exit 0
+          fi
+
+          echo "Touched modules: ${touched_modules[*]}"
+
+          # Regra: se módulo foi tocado, tem que haver mudança em docs/
+          if [ -z "$DOCS_CHANGED" ]; then
+            echo "::error::Módulos tocados (${touched_modules[*]}), mas nenhuma mudança em docs/. Atualize a documentação antes do merge."
+            exit 1
+          fi
+
+          echo "Docs updated ✅"
