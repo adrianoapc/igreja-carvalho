@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Construction, Lock, ArrowRight } from "lucide-react";
@@ -9,7 +8,9 @@ interface MaintenanceProps {
 }
 
 export default function Maintenance({ message }: MaintenanceProps) {
-  const navigate = useNavigate();
+  const handleAdminAccess = () => {
+    window.location.href = "/dashboard";
+  };
 
   const defaultMessage = 
     "Estamos realizando manutenção no sistema para melhorar sua experiência. " +
@@ -67,7 +68,7 @@ export default function Maintenance({ message }: MaintenanceProps) {
           {/* Botão para Admin/Técnico */}
           <div className="flex flex-col gap-4">
             <Button
-              onClick={() => navigate("/dashboard")}
+              onClick={handleAdminAccess}
               variant="outline"
               size="lg"
               className="w-full group"

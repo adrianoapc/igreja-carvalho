@@ -5,13 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { HideValuesProvider } from "@/hooks/useHideValues";
+import { useAuth } from "@/hooks/useAuth";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { canAccessDuringMaintenance } from "@/utils/roles";
+import { AlertTriangle } from "lucide-react";
 import MainLayout from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import BiometricLogin from "./pages/BiometricLogin";
 import Maintenance from "./pages/Maintenance";
-import { useAppConfig } from "./hooks/useAppConfig";
-import { canAccessDuringMaintenance } from "./utils/roles";
-import { useAuth } from "./hooks/useAuth";
 import Dashboard from "./pages/Dashboard";
 import Comunicados from "./pages/Comunicados";
 import Publicacao from "./pages/Publicacao";
@@ -98,6 +99,28 @@ import NotificacoesAdmin from "./pages/admin/Notificacoes";
 
 const queryClient = new QueryClient();
 
+// Barra de aviso de manutenção
+function MaintenanceBar() {
+  const { config } = useAppConfig();
+  const { user } = useAuth();
+  const isAdmin = user && canAccessDuringMaintenance(user.user_metadata?.role);
+
+  // Mostrar barra apenas se estiver em manutenção e for admin/técnico
+  if (!config.maintenance_mode || !isAdmin) {
+    return null;
+  }
+
+  return (
+    <div className="bg-orange-500 text-white px-4 py-3 flex items-center gap-3">
+      <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+      <div className="flex-1">
+        <p className="font-semibold text-sm">Modo de Manutenção Ativo</p>
+        <p className="text-xs opacity-90">{config.maintenance_message || "O sistema está passando por manutenção"}</p>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { loading, isAuthenticated } = useAuth();
   const biometricEnabled = typeof window !== 'undefined' && localStorage.getItem('biometric_enabled') === 'true';
@@ -118,53 +141,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to={biometricEnabled ? "/auth?mode=biometric" : "/auth"} replace />;
   }
 
-  // Se em manutenção e usuário não é admin/técnico, mostra página de manutenção
+  // Se em manutenção e usuário não é admin/técnico, bloqueia
   if (maintenanceConfig.maintenance_mode && user && !canAccessDuringMaintenance(user.user_metadata?.role)) {
     return <Maintenance />;
   }
 
-  // Se é admin/técnico e está em manutenção, envolve com banner
-  if (maintenanceConfig.maintenance_mode && user && canAccessDuringMaintenance(user.user_metadata?.role)) {
-    return <ProtectedLayout>{children}</ProtectedLayout>;
-  }
-
   return <>{children}</>;
-}
-
-// Rotas públicas que ficam acessíveis mesmo em manutenção (quando allow_public_access = true)
-const PUBLIC_ROUTES = [
-  '/cadastro',
-  '/cadastro/visitante',
-  '/cadastro/membro',
-  '/atualizar-dados',
-  '/auth',
-  '/auth/reset',
-  '/biometric-login',
-  '/telao',
-  '/checkin'
-];
-
-// Banner de aviso para admins e técnicos durante manutenção
-function MaintenanceBanner() {
-  const { config } = useAppConfig();
-  
-  if (!config.maintenance_mode) return null;
-  
-  return (
-    <div className="bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium">
-      ⚠️ Modo de Manutenção Ativo - Você tem acesso como administrador
-    </div>
-  );
-}
-
-// Wrapper que renderiza banner + conteúdo para rotas protegidas
-function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <MaintenanceBanner />
-      {children}
-    </>
-  );
 }
 
 function App() {
@@ -177,6 +159,7 @@ function App() {
             <Sonner />
             <BrowserRouter>
               <AuthGate>
+                <MaintenanceBar />
                 <Routes>
           {/* Rota raiz redireciona para /biometric-login */}
           <Route path="/" element={<Navigate to="/biometric-login" replace />} />
