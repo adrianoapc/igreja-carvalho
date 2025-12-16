@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus, Mail, ArrowLeft, Loader2, Eye, EyeOff, Lock, Smartphone, MessageSquare, Fingerprint } from "lucide-react";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { LogIn, UserPlus, Mail, ArrowLeft, Loader2, Eye, EyeOff, Lock, Smartphone, MessageSquare, Fingerprint, AlertTriangle } from "lucide-react";
 import { EnableBiometricDialog } from "@/components/auth/EnableBiometricDialog";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
@@ -38,6 +39,7 @@ export default function Auth() {
   const [phoneForOtp, setPhoneForOtp] = useState("");
   const { isSupported, isEnabled, isLoading: isBiometricLoading, saveLastEmail, getLastEmail, saveRefreshToken, saveAccessToken, authenticateWithBiometric, getRefreshToken, getAccessToken } = useBiometricAuth();
   const preferBiometric = searchParams.get("mode") === "biometric";
+  const { config, isLoading: isConfigLoading, refreshConfig } = useAppConfig();
 
   // Função para tentar login com biometria
   const attemptBiometricLogin = useCallback(async (isAuto = false) => {
@@ -114,6 +116,11 @@ export default function Auth() {
       checkAuthStatus();
     }
   }, [navigate, isBiometricLoading]);
+
+  // Garantir fetch explícito da configuração de manutenção nesta página
+  useEffect(() => {
+    refreshConfig();
+  }, [refreshConfig]);
 
   // Load last used email on mount
   useEffect(() => {
@@ -761,6 +768,21 @@ export default function Auth() {
           <span>Voltar</span>
         </button>
       </div>
+
+      {/* Aviso de manutenção */}
+      {!isConfigLoading && config.maintenance_mode && (
+        <div className="w-full max-w-md mb-4">
+          <div className="bg-orange-500 text-white rounded-lg px-3 py-2 shadow-sm flex gap-2 items-start">
+            <AlertTriangle className="w-4 h-4 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold">Modo de manutenção ativo</p>
+              <p className="text-xs opacity-90">
+                {config.maintenance_message || "O sistema está em manutenção. Apenas admins e técnicos têm acesso completo."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card className="w-full max-w-md shadow-soft">
         <CardHeader className="text-center">

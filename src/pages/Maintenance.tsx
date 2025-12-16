@@ -1,6 +1,10 @@
+import { useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Construction, Lock, ArrowRight } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { canAccessDuringMaintenance } from "@/utils/roles";
+import { Construction, Lock, ArrowRight, LogOut } from "lucide-react";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 
 interface MaintenanceProps {
@@ -8,8 +12,28 @@ interface MaintenanceProps {
 }
 
 export default function Maintenance({ message }: MaintenanceProps) {
+  const navigate = useNavigate();
+  const { user, loading, signOut } = useAuth();
+
+  // Evita piscar o botão enquanto o perfil está carregando
+  const canBypassMaintenance = useMemo(
+    () => !!user && canAccessDuringMaintenance(user.user_metadata?.role),
+    [user]
+  );
+
+  useEffect(() => {
+    if (canBypassMaintenance) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [canBypassMaintenance, navigate]);
+
   const handleAdminAccess = () => {
-    window.location.href = "/dashboard";
+    navigate("/dashboard", { replace: true });
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/auth", { replace: true });
   };
 
   const defaultMessage = 
@@ -66,21 +90,30 @@ export default function Maintenance({ message }: MaintenanceProps) {
           </div>
 
           {/* Botão para Admin/Técnico */}
-          <div className="flex flex-col gap-4">
-            <Button
-              onClick={handleAdminAccess}
-              variant="outline"
-              size="lg"
-              className="w-full group"
-            >
-              <Lock className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-              Área Administrativa
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
+          {canBypassMaintenance && !loading && (
+            <div className="flex flex-col gap-4">
+              <Button
+                onClick={handleAdminAccess}
+                variant="outline"
+                size="lg"
+                className="w-full group"
+              >
+                <Lock className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                Área Administrativa
+                <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              </Button>
 
-            <p className="text-xs text-center text-slate-500">
-              Apenas administradores e técnicos podem acessar durante a manutenção
-            </p>
+              <p className="text-xs text-center text-slate-500">
+                Apenas administradores e técnicos podem acessar durante a manutenção
+              </p>
+            </div>
+          )}
+
+          {/* Botão de Logout - sempre visível */}
+          <div className="mt-4">
+            <Button onClick={handleLogout} variant="destructive" size="sm" className="w-full">
+              <LogOut className="w-4 h-4 mr-2" /> Sair
+            </Button>
           </div>
 
           {/* Footer */}

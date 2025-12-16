@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { canAccessDuringMaintenance } from "@/utils/roles";
 import { AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import MainLayout from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import BiometricLogin from "./pages/BiometricLogin";
@@ -103,20 +105,46 @@ const queryClient = new QueryClient();
 function MaintenanceBar() {
   const { config } = useAppConfig();
   const { user } = useAuth();
-  const isAdmin = user && canAccessDuringMaintenance(user.user_metadata?.role);
+  const [isPrivileged, setIsPrivileged] = React.useState<boolean>(false);
 
-  // Mostrar barra apenas se estiver em manutenção e for admin/técnico
-  if (!config.maintenance_mode || !isAdmin) {
-    return null;
-  }
+  React.useEffect(() => {
+    let active = true;
+    const resolve = async () => {
+      if (!user) { setIsPrivileged(false); return; }
+      // Primeiro tenta via user_metadata
+      const metaRole = (user as any)?.user_metadata?.role as string | undefined;
+      if (metaRole && canAccessDuringMaintenance(metaRole)) {
+        setIsPrivileged(true);
+        return;
+      }
+      // Fallback: consultar user_roles
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        if (error) throw error;
+        const roles = (data || []).map(r => r.role);
+        if (active) setIsPrivileged(roles.includes('admin') || roles.includes('tecnico'));
+      } catch {
+        if (active) setIsPrivileged(false);
+      }
+    };
+    resolve();
+    return () => { active = false; };
+  }, [user]);
+
+  if (!config.maintenance_mode || !isPrivileged) return null;
 
   return (
-    <div className="bg-orange-500 text-white px-4 py-3 flex items-center gap-3">
-      <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-      <div className="flex-1">
-        <p className="font-semibold text-sm">Modo de Manutenção Ativo</p>
-        <p className="text-xs opacity-90">{config.maintenance_message || "O sistema está passando por manutenção"}</p>
+    <div className="bg-orange-500 text-white px-4 py-3">
+      <div className="flex items-center justify-center gap-2 text-center">
+        <AlertTriangle className="w-5 h-5" />
+        <p className="font-semibold text-sm">⚠️ MODO MANUTENÇÃO ATIVO - Acesso Privilegiado</p>
       </div>
+      <p className="text-xs opacity-90 text-center mt-1">
+        {config.maintenance_message || "O sistema está passando por manutenção"}
+      </p>
     </div>
   );
 }
@@ -125,7 +153,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { loading, isAuthenticated } = useAuth();
   const biometricEnabled = typeof window !== 'undefined' && localStorage.getItem('biometric_enabled') === 'true';
   const { config: maintenanceConfig } = useAppConfig();
-  const { user } = useAuth();
 
   if (loading) {
     return (
@@ -141,10 +168,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to={biometricEnabled ? "/auth?mode=biometric" : "/auth"} replace />;
   }
 
-  // Se em manutenção e usuário não é admin/técnico, bloqueia
-  if (maintenanceConfig.maintenance_mode && user && !canAccessDuringMaintenance(user.user_metadata?.role)) {
-    return <Maintenance />;
-  }
+  // A lógica de manutenção agora está centralizada no AuthGate.
 
   return <>{children}</>;
 }
@@ -185,6 +209,9 @@ function App() {
           
           {/* Rota pública de Check-in por QR Code */}
           <Route path="/checkin/:tipo/:id" element={<Checkin />} />
+
+          {/* Página pública de manutenção */}
+          <Route path="/maintenance" element={<Maintenance />} />
 
           {/* Rota de Prototipação Novo Admin */}
           <Route path="/teste-permissoes" element={<PermissionMatrixPrototype />} />

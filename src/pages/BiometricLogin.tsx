@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Fingerprint, Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Fingerprint, Loader2, AlertTriangle } from "lucide-react";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAppConfig } from "@/hooks/useAppConfig";
 
 const MAX_BIOMETRIC_ATTEMPTS = 3;
 const BIOMETRIC_ATTEMPTS_KEY = 'biometric_attempts';
@@ -18,6 +20,7 @@ export default function BiometricLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const { isEnabled, verifyBiometric, getRefreshToken, getAccessToken, clearRefreshToken } = useBiometricAuth();
+  const { config, isLoading: isConfigLoading } = useAppConfig();
 
   // Verificar se já tem sessão ativa
   useEffect(() => {
@@ -260,6 +263,23 @@ export default function BiometricLogin() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 flex flex-col items-center justify-center p-4">
+      {/* Aviso de manutenção */}
+      {!isConfigLoading && config.maintenance_mode && (
+        <div className="w-full max-w-sm mb-4">
+          <Card className="bg-orange-500 text-white border-0 shadow-md">
+            <div className="px-3 py-2 flex gap-2 items-start">
+              <AlertTriangle className="w-4 h-4 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold">Modo de manutenção ativo</p>
+                <p className="text-xs opacity-90">
+                  {config.maintenance_message || "O sistema está em manutenção. Apenas admins e técnicos têm acesso completo."}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div className="w-full max-w-sm">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-6">
