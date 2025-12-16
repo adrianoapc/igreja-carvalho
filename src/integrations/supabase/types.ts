@@ -1329,6 +1329,101 @@ export type Database = {
         }
         Relationships: []
       }
+      itens_reembolso: {
+        Row: {
+          base_ministerial_id: string | null
+          categoria_id: string | null
+          centro_custo_id: string | null
+          created_at: string | null
+          data_item: string
+          descricao: string
+          fornecedor_id: string | null
+          foto_url: string | null
+          id: string
+          solicitacao_id: string
+          subcategoria_id: string | null
+          valor: number
+        }
+        Insert: {
+          base_ministerial_id?: string | null
+          categoria_id?: string | null
+          centro_custo_id?: string | null
+          created_at?: string | null
+          data_item: string
+          descricao: string
+          fornecedor_id?: string | null
+          foto_url?: string | null
+          id?: string
+          solicitacao_id: string
+          subcategoria_id?: string | null
+          valor: number
+        }
+        Update: {
+          base_ministerial_id?: string | null
+          categoria_id?: string | null
+          centro_custo_id?: string | null
+          created_at?: string | null
+          data_item?: string
+          descricao?: string
+          fornecedor_id?: string | null
+          foto_url?: string | null
+          id?: string
+          solicitacao_id?: string
+          subcategoria_id?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itens_reembolso_base_ministerial_id_fkey"
+            columns: ["base_ministerial_id"]
+            isOneToOne: false
+            referencedRelation: "bases_ministeriais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_centro_custo_id_fkey"
+            columns: ["centro_custo_id"]
+            isOneToOne: false
+            referencedRelation: "centros_custo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_reembolso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_solicitacoes_reembolso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       itens_template_culto: {
         Row: {
           created_at: string
@@ -3723,6 +3818,26 @@ export type Database = {
             referencedColumns: ["pessoa_id"]
           },
         ]
+      }
+      view_movimento_contabil: {
+        Row: {
+          base_ministerial_id: string | null
+          categoria_id: string | null
+          centro_custo_id: string | null
+          data_competencia: string | null
+          data_pagamento: string | null
+          fornecedor_nome: string | null
+          item_descricao: string | null
+          item_valor: number | null
+          origem: string | null
+          status: string | null
+          subcategoria_id: string | null
+          tipo: string | null
+          transacao_id: string | null
+          valor_contabil: number | null
+          valor_total_saida: number | null
+        }
+        Relationships: []
       }
       view_room_occupancy: {
         Row: {

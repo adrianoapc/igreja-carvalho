@@ -60,11 +60,36 @@ interface ItemReembolso {
   descricao: string;
   valor: number;
   categoria_id: string;
+  subcategoria_id: string;
+  fornecedor_id: string;
+  base_ministerial_id: string;
+  centro_custo_id: string;
   data_item: string;
   anexo_url: string;
 }
 
 interface Categoria {
+  id: string;
+  nome: string;
+}
+
+interface Subcategoria {
+  id: string;
+  nome: string;
+  categoria_id: string;
+}
+
+interface Fornecedor {
+  id: string;
+  nome: string;
+}
+
+interface BaseMinisterial {
+  id: string;
+  titulo: string;
+}
+
+interface CentroCusto {
   id: string;
   nome: string;
 }
@@ -96,8 +121,12 @@ export default function Reembolsos() {
     descricao: "",
     valor: "",
     categoria_id: "",
+    subcategoria_id: "",
+    fornecedor_id: "",
+    base_ministerial_id: "",
+    centro_custo_id: "",
     data_item: "",
-    anexo_url: "", // URL interna do arquivo processado
+    anexo_url: "",
   });
   const [processandoIA, setProcessandoIA] = useState(false);
 
@@ -171,10 +200,74 @@ export default function Reembolsos() {
         .from("categorias_financeiras")
         .select("id, nome")
         .eq("tipo", "despesa")
+        .eq("ativo", true)
         .order("nome");
 
       if (error) throw error;
       return data as Categoria[];
+    },
+  });
+
+  // Query: Subcategorias (baseado na categoria selecionada)
+  const { data: subcategorias = [] } = useQuery({
+    queryKey: ["subcategorias", itemAtual.categoria_id],
+    queryFn: async () => {
+      if (!itemAtual.categoria_id) return [];
+      const { data, error } = await supabase
+        .from("subcategorias_financeiras")
+        .select("id, nome, categoria_id")
+        .eq("categoria_id", itemAtual.categoria_id)
+        .eq("ativo", true)
+        .order("nome");
+
+      if (error) throw error;
+      return data as Subcategoria[];
+    },
+    enabled: !!itemAtual.categoria_id,
+  });
+
+  // Query: Fornecedores
+  const { data: fornecedores = [] } = useQuery({
+    queryKey: ["fornecedores-ativos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
+
+      if (error) throw error;
+      return data as Fornecedor[];
+    },
+  });
+
+  // Query: Bases Ministeriais
+  const { data: basesMinisteriais = [] } = useQuery({
+    queryKey: ["bases-ministeriais-ativas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bases_ministeriais")
+        .select("id, titulo")
+        .eq("ativo", true)
+        .order("titulo");
+
+      if (error) throw error;
+      return data as BaseMinisterial[];
+    },
+  });
+
+  // Query: Centros de Custo
+  const { data: centrosCusto = [] } = useQuery({
+    queryKey: ["centros-custo-ativos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("centros_custo")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
+
+      if (error) throw error;
+      return data as CentroCusto[];
     },
   });
 
@@ -203,6 +296,9 @@ export default function Reembolsos() {
   // Mutation: Criar solicitação de reembolso
   const criarSolicitacaoMutation = useMutation({
     mutationFn: async () => {
+      // Calcular valor total dos itens
+      const valorTotalItens = itens.reduce((sum, item) => sum + item.valor, 0);
+
       // 1. Criar a solicitação
       const { data: solicitacao, error: solicitacaoError } = await supabase
         .from("solicitacoes_reembolso")
@@ -213,32 +309,32 @@ export default function Reembolsos() {
           forma_pagamento_preferida: formaPagamento,
           dados_bancarios: dadosBancarios,
           observacoes: observacoes,
+          valor_total: valorTotalItens,
         })
         .select()
         .single();
 
       if (solicitacaoError) throw solicitacaoError;
 
-      // 2. Criar as transações (itens)
-      const transacoes = itens.map((item) => ({
-        tipo: "saida" as const,
-        tipo_lancamento: "unico" as const,
-        valor: Math.abs(item.valor),
+      // 2. Criar os itens na tabela itens_reembolso (sem criar transações financeiras)
+      const itensReembolso = itens.map((item) => ({
+        solicitacao_id: solicitacao.id,
         descricao: item.descricao,
+        valor: Math.abs(item.valor),
+        data_item: item.data_item || new Date().toISOString().split('T')[0],
         categoria_id: item.categoria_id || null,
-        status: "pendente" as const,
-        data_vencimento: item.data_item || dataVencimento || new Date().toISOString().split('T')[0],
-        data_competencia: new Date().toISOString().split('T')[0],
-        conta_id: contaPadrao,
-        solicitacao_reembolso_id: solicitacao.id,
-        anexo_url: item.anexo_url || null,
+        subcategoria_id: item.subcategoria_id || null,
+        fornecedor_id: item.fornecedor_id || null,
+        base_ministerial_id: item.base_ministerial_id || null,
+        centro_custo_id: item.centro_custo_id || null,
+        foto_url: item.anexo_url || null,
       }));
 
-      const { error: transacoesError } = await supabase
-        .from("transacoes_financeiras")
-        .insert(transacoes);
+      const { error: itensError } = await supabase
+        .from("itens_reembolso")
+        .insert(itensReembolso);
 
-      if (transacoesError) throw transacoesError;
+      if (itensError) throw itensError;
 
       return solicitacao;
     },
@@ -398,7 +494,17 @@ export default function Reembolsos() {
     setDadosBancarios("");
     setObservacoes("");
     setItens([]);
-    setItemAtual({ descricao: "", valor: "", categoria_id: "", data_item: "", anexo_url: "" });
+    setItemAtual({ 
+      descricao: "", 
+      valor: "", 
+      categoria_id: "", 
+      subcategoria_id: "",
+      fornecedor_id: "",
+      base_ministerial_id: "",
+      centro_custo_id: "",
+      data_item: "", 
+      anexo_url: "" 
+    });
   };
 
   const adicionarItem = () => {
@@ -414,7 +520,17 @@ export default function Reembolsos() {
         valor: parseFloat(itemAtual.valor),
       },
     ]);
-    setItemAtual({ descricao: "", valor: "", categoria_id: "", data_item: "", anexo_url: "" });
+    setItemAtual({ 
+      descricao: "", 
+      valor: "", 
+      categoria_id: "", 
+      subcategoria_id: "",
+      fornecedor_id: "",
+      base_ministerial_id: "",
+      centro_custo_id: "",
+      data_item: "", 
+      anexo_url: "" 
+    });
     toast.success("Item adicionado!");
   };
 
@@ -821,30 +937,125 @@ export default function Reembolsos() {
                   </div>
                 </div>
 
+                {/* Categoria e Subcategoria */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="categoria">Categoria</Label>
+                    <Select
+                      value={itemAtual.categoria_id}
+                      onValueChange={(value) =>
+                        setItemAtual({ ...itemAtual, categoria_id: value, subcategoria_id: "" })
+                      }
+                      disabled={processandoIA}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categorias.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="subcategoria">Subcategoria</Label>
+                    <Select
+                      value={itemAtual.subcategoria_id}
+                      onValueChange={(value) =>
+                        setItemAtual({ ...itemAtual, subcategoria_id: value })
+                      }
+                      disabled={processandoIA || !itemAtual.categoria_id}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={itemAtual.categoria_id ? "Selecione" : "Selecione categoria"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subcategorias.length === 0 ? (
+                          <SelectItem value="none" disabled>Nenhuma subcategoria</SelectItem>
+                        ) : (
+                          subcategorias.map((sub) => (
+                            <SelectItem key={sub.id} value={sub.id}>
+                              {sub.nome}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Fornecedor */}
                 <div className="space-y-2">
-                  <Label htmlFor="categoria">Categoria (opcional)</Label>
+                  <Label htmlFor="fornecedor">Fornecedor</Label>
                   <Select
-                    value={itemAtual.categoria_id}
+                    value={itemAtual.fornecedor_id}
                     onValueChange={(value) =>
-                      setItemAtual({ ...itemAtual, categoria_id: value })
+                      setItemAtual({ ...itemAtual, fornecedor_id: value })
                     }
                     disabled={processandoIA}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
+                      <SelectValue placeholder="Selecione um fornecedor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categorias.length === 0 ? (
-                        <SelectItem value="none" disabled>Nenhuma categoria disponível</SelectItem>
-                      ) : (
-                        categorias.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.nome}
-                          </SelectItem>
-                        ))
-                      )}
+                      {fornecedores.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.nome}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Base Ministerial e Centro de Custo */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="base_ministerial">Base Ministerial</Label>
+                    <Select
+                      value={itemAtual.base_ministerial_id}
+                      onValueChange={(value) =>
+                        setItemAtual({ ...itemAtual, base_ministerial_id: value })
+                      }
+                      disabled={processandoIA}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {basesMinisteriais.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.titulo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="centro_custo">Centro de Custo</Label>
+                    <Select
+                      value={itemAtual.centro_custo_id}
+                      onValueChange={(value) =>
+                        setItemAtual({ ...itemAtual, centro_custo_id: value })
+                      }
+                      disabled={processandoIA}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {centrosCusto.map((cc) => (
+                          <SelectItem key={cc.id} value={cc.id}>
+                            {cc.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <Button 
