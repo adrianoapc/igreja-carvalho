@@ -427,6 +427,153 @@ REFRESH MATERIALIZED VIEW mv_dre_anual; -- Job noturno
 - Sequência de Notificações: [`../diagramas/sequencia-kids-notificacoes.md`](../diagramas/sequencia-kids-notificacoes.md)
 - Permissões (Guardians): [`../diagramas/permissoes-kids-guardians.md`](../diagramas/permissoes-kids-guardians.md)
 
+---
+
+## Módulo Comunicação (visão técnica)
+
+### Frontend → Comunicação
+- Páginas em `src/pages/` (Comunicados, Announcements, AnnouncementsAdmin, Publicacao) e componentes em `src/components/comunicados/` (ComunicadoDialog), `src/components/publicacao/` (PublicacaoStepper) e `src/components/` (BannerCarousel para exibição no app).
+- Operações via `supabase-js` para: tabela `comunicados` (INSERT/UPDATE/DELETE de comunicados) e storage bucket `comunicados` (upload de imagens/artes).
+- Wizard de criação em 3 etapas: conteúdo (título, tipo banner/alerta, descrição, imagem), canais (flags `exibir_app`, `exibir_telao`, `exibir_site`), agendamento (`data_inicio`, `data_fim`, tags, categoria, FK opcional para `culto_id` e `midia_id`).
+
+### Persistência (Supabase)
+- Tabela: `comunicados` com campos de conteúdo, flags de canal, datas de período, categorização e vinculação opcional.
+- Storage bucket: `comunicados` (público para leitura, upload restrito a autenticados).
+- Trigger: `update_comunicados_updated_at` (BEFORE UPDATE) atualiza `updated_at` automaticamente.
+
+### Publicação e exibição
+- **Publicação instantânea**: comunicados são inseridos com `ativo = true` (ou `false` se desativado); não há workflow de aprovação, filas ou workers. A publicação é síncrona: INSERT → comunicado visível imediatamente nos canais selecionados.
+- **Exibição por canal**:
+  - **App/Dashboard** (`exibir_app = true`): membros visualizam via carrossel `BannerCarousel.tsx`; query filtra por `ativo = true`, `data_inicio <= NOW()`, `data_fim IS NULL OR >= NOW()`.
+  - **Telão/Projetor** (`exibir_telao = true`): operador acessa `/telao` (`Telao.tsx`); carrossel automático com ordem por `ordem_telao`; suporta arte alternativa via `url_arquivo_telao`.
+  - **Site Público** (`exibir_site = true`): integração com carrossel do site (a confirmar).
+- **Expiração passiva**: comunicados com `data_fim` passada são filtrados automaticamente nas queries de visualização; não há job/cron para desativar registros.
+
+### Mecanismo de entrega
+- **Não há triggers de notificação**: este módulo não dispara notificações push, e-mails ou mensagens WhatsApp. Comunicados são conteúdo editorial estático consumido por queries síncronas.
+- **Sem edge functions ou workers**: toda lógica é client-side (validação, upload, persistência) ou server-side (RLS, trigger de `updated_at`).
+- **Leitura em tempo real** (a confirmar): possível uso de Supabase Realtime para atualizar carrosséis automaticamente quando novos comunicados são publicados, mas não confirmado no código atual.
+
+### Segurança e permissões (RLS)
+- **Policy `comunicados_leitura_publica`** (SELECT):
+  - Escopo: qualquer usuário (incluindo não autenticados)
+  - Condição: `ativo = true` e período válido (`data_inicio <= NOW()` e `data_fim IS NULL OR >= NOW()`)
+  - Propósito: permitir visualização pública de comunicados ativos no app, telão e site
+- **Policy `comunicados_gestao_admin`** (ALL):
+  - Escopo: apenas usuários autenticados (`auth.role() = 'authenticated'`)
+  - Refinamento: aplicação valida roles admin/secretario via `has_role()` antes de exibir UI de criação/edição
+  - Propósito: restringir CRUD de comunicados à liderança
+- **Storage bucket `comunicados`**:
+  - SELECT: público (policy `comunicados_public_access`)
+  - INSERT/UPDATE/DELETE: apenas autenticados (policies `comunicados_admin_insert/update/delete`)
+- **Sem segmentação por perfil**: todos os usuários autenticados veem os mesmos comunicados ativos por canal; não há filtros por role, grupo ou pessoa específica.
+
+### Considerações arquiteturais
+- **Modelo editorial**: comunicados são criados manualmente pela liderança, não há automação de conteúdo ou templates dinâmicos.
+- **Multiplataforma**: um comunicado pode ser publicado simultaneamente em app, telão e site (flags independentes).
+- **Sem analytics**: não há rastreamento de visualizações, cliques ou engajamento (a confirmar).
+- **Vínculo opcional com eventos**: FK `culto_id` permite associar comunicado a culto específico, mas não é obrigatório.
+- **Reutilização de mídias**: FK `midia_id` permite vincular comunicado à biblioteca de mídias existente.
+
+### Diagramas relacionados
+- Fluxo Comunicação: [`../diagramas/fluxo-comunicacao.md`](../diagramas/fluxo-comunicacao.md)
+- Sequência Comunicação: [`../diagramas/sequencia-comunicacao.md`](../diagramas/sequencia-comunicacao.md)
+
+---
+
+## Módulo Notificações (visão técnica)
+
+### Frontend → Notificações
+- Hook central: `src/hooks/useNotifications.tsx` — gerencia estado local de notificações, subscrição Realtime, ações de leitura/exclusão e permissões de push.
+- Componentes:
+  - `src/components/NotificationBell.tsx`: sininho na barra superior, popover com lista de notificações, deep linking por tipo de evento, ações de leitura/exclusão.
+  - `src/components/NotificationSettings.tsx`: configurações de preferências do usuário (a confirmar).
+  - `src/pages/admin/Notificacoes.tsx`: interface de administração para gerenciar eventos e regras de disparo (quem recebe, por qual canal).
+- Operações via `supabase-js`:
+  - **Leitura**: SELECT em `notifications` (WHERE `user_id = auth.uid()`) e `notificacao_eventos` / `notificacao_regras` (para admin).
+  - **Atualização**: UPDATE `read = true` ao clicar em notificação ou "Limpar".
+  - **Exclusão**: DELETE em `notifications` ao clicar na lixeira.
+  - **Admin CRUD**: INSERT/UPDATE/DELETE em `notificacao_regras` para adicionar/remover destinatários e alternar canais.
+- **Realtime Subscription**: hook subscreve canal `notifications:user_id=eq.{uid}` via WebSocket; ao receber evento INSERT, atualiza estado local imediatamente.
+- **Browser Push**: se permissão concedida (`Notification.permission === 'granted'`), dispara `new Notification(title, body)` ao receber notificação via Realtime.
+
+### Persistência (Supabase)
+- **Tabela `notifications`** (database-schema.sql):
+  - Campos: `id`, `user_id`, `title`, `message`, `type`, `read` (boolean), `related_user_id`, `metadata` (jsonb), `created_at`.
+  - Índice implícito em `user_id` (para queries por usuário).
+  - Sem soft delete (DELETE físico ao excluir).
+- **Tabela `notificacao_eventos`** (migration 20251211170047):
+  - Catálogo de eventos do sistema: `slug` (PK), `nome`, `descricao`, `categoria`, `provider_preferencial` (meta_direto/make), `variaveis` (array de placeholders), `template_meta` (texto com `{{chave}}` para substituição).
+  - Exemplos: `financeiro_conta_vencer`, `kids_checkin`, `novo_visitante`, `pedido_oracao`.
+- **Tabela `notificacao_regras`** (migration 20251211170047):
+  - Regras de disparo: `id` (PK), `evento_slug` (FK), `role_alvo` (app_role), `user_id_especifico` (UUID opcional), `canais` (jsonb: `{inapp, push, whatsapp}`), `ativo` (boolean).
+  - Uma regra define: para qual evento, quem recebe (cargo ou pessoa específica), por quais canais.
+
+### Disparo e Entrega
+- **Edge Function `disparar-alerta`** (supabase/functions/disparar-alerta/index.ts):
+  - Entrada: `{evento: string, dados: Record<string, any>, user_id_alvo?: string}`
+  - Fluxo:
+    1. Busca evento em `notificacao_eventos` (valida se slug existe).
+    2. Busca regras ativas em `notificacao_regras` WHERE `evento_slug = evento` AND `ativo = true`.
+    3. Resolve destinatários: se `role_alvo`, busca usuários com esse cargo em `user_roles`; se `user_id_especifico`, apenas esse usuário.
+    4. Para cada destinatário, busca dados em `profiles` (nome, telefone, email).
+    5. Formata template substituindo `{{chave}}` por valores em `dados` (ex: `{{crianca}}` → "João Silva").
+    6. Para cada canal ativo na regra:
+       - **In-App**: INSERT em `notifications` (user_id, title, message, type, metadata).
+       - **Push**: frontend detecta via Realtime e dispara Browser Notification API.
+       - **WhatsApp**: POST para Meta API (se `provider_preferencial = 'meta_direto'`) ou Make webhook (se `'make'`).
+  - **Síncrono**: função retorna após processar todos destinatários; não há fila ou worker assíncrono.
+- **Edge Functions auxiliares** (cron jobs):
+  - `notificar-aniversarios`: executa diariamente (via cron ou scheduler), verifica aniversários do dia seguinte e invoca `disparar-alerta` com evento correspondente.
+  - `notificar-sentimentos-diario`: dispara notificação perguntando sobre sentimentos diários.
+  - `notificar-liturgia-make`: envia notificação de liturgia via Make.
+- **Entrega Imediata**: notificações são criadas e entregues no momento do evento; não há agendamento ou delay.
+
+### Mecanismo de Atualização em Tempo Real
+- **Supabase Realtime**: ao INSERT em `notifications`, evento é propagado via WebSocket para todos clientes subscritos ao canal `notifications:user_id=eq.{uid}`.
+- **Frontend Hook**: `useNotifications` recebe evento, adiciona notificação ao estado local, incrementa `unreadCount`, atualiza badge do sininho.
+- **Optimistic Update**: ao marcar como lida ou excluir, frontend atualiza estado local antes de confirmar UPDATE/DELETE (melhor UX).
+- **Push Notification**: se permissão ativa, `useNotifications` dispara `new Notification()` ao receber notificação via Realtime; usuário vê alerta no navegador mesmo com aba fechada.
+
+### Segurança e Permissões (RLS)
+- **Tabela `notifications`**:
+  - **Criar** (`"Sistema pode criar notificações"`): INSERT sem restrição (service role pode criar para qualquer usuário).
+  - **Ler** (`"Usuários podem ver suas notificações"`): SELECT WHERE `auth.uid() = user_id`.
+  - **Atualizar** (`"Usuários podem atualizar suas notificações"`): UPDATE WHERE `auth.uid() = user_id`.
+  - **Sem DELETE policy explícita** (a confirmar: provavelmente DELETE restrito via aplicação ou policy `auth.uid() = user_id`).
+- **Tabelas `notificacao_eventos` e `notificacao_regras`**:
+  - **Leitura pública** (authenticated): SELECT para todos usuários autenticados (necessário para sistema resolver regras).
+  - **Admin gerencia regras**: ALL (INSERT/UPDATE/DELETE) apenas para usuários com `role = 'admin'` em `user_roles`.
+- **Sem exposição pública**: notificações são estritamente privadas por usuário; não há endpoint público ou exibição externa.
+
+### Considerações Arquiteturais
+- **Modelo push baseado em eventos**: notificações são reações automáticas a eventos do sistema, não criação manual.
+- **Templates fixos**: conteúdo é gerado por template do evento, sem edição manual pelo usuário.
+- **Multi-canal configurável**: admin pode ativar/desativar canais (in-app, push, WhatsApp) por evento e destinatário.
+- **Provider Plugável**: arquitetura permite trocar provider de WhatsApp (Meta direto vs Make) via flag `provider_preferencial`.
+- **Sem fila ou retry**: se entrega falhar (ex: Meta API down), notificação é perdida; não há mecanismo de reenvio (a confirmar).
+- **Realtime First**: arquitetura assume conexão WebSocket ativa; se desconectado, notificações in-app só aparecem após reload.
+- **Sem analytics**: não há rastreamento de taxa de abertura, clique ou engajamento (a confirmar).
+- **Deep Linking**: cada tipo de notificação tem rota mapeada no `NotificationBell` (ex: `kids_checkin` → `/kids/dashboard`).
+
+### Integrações Externas
+- **Meta Business API** (WhatsApp):
+  - Autenticação via token bearer.
+  - POST para envio de mensagem template.
+  - Provider: `meta_direto`.
+- **Make/n8n Webhook** (WhatsApp):
+  - POST HTTP para workflow externo.
+  - Workflow processa e envia via WhatsApp Business API.
+  - Provider: `make`.
+- **Browser Notification API**:
+  - Requer permissão do usuário (`Notification.requestPermission()`).
+  - Suporta ícone, badge, requireInteraction, data payload.
+  - Deep linking ao clicar na notificação.
+
+### Diagramas relacionados
+- Fluxo Notificações: [`../diagramas/fluxo-notificacoes.md`](../diagramas/fluxo-notificacoes.md)
+- Sequência Notificações: [`../diagramas/sequencia-notificacoes.md`](../diagramas/sequencia-notificacoes.md)
+
 ### Diagramas e Referências
 
 - **Fluxo Completo**: [Diagrama de Fluxo Financeiro](../diagramas/fluxo-financeiro.md)
