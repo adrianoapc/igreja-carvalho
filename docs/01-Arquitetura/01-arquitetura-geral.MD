@@ -401,6 +401,32 @@ SELECT ... FROM view_dre_anual;
 REFRESH MATERIALIZED VIEW mv_dre_anual; -- Job noturno
 ```
 
+---
+
+## Módulo Kids (visão técnica)
+
+### Frontend → Kids
+- Páginas em `src/pages/kids/` (Dashboard, Scanner, Config, Diretório de Crianças, Turma Ativa) e componentes em `src/components/kids/` (ocupação de salas, alerta de ausentes, diálogo de observações).
+- Operações via `supabase-js` para: `kids_checkins` (check-in/checkout), `kids_diario` (diário/observações) e view `view_kids_checkins_ativos` (check-ins abertos). A configuração de responsáveis autorizados ocorre em `familias` e é usada pelo app para definir o `responsavel_id` válido nas ações do Kids.
+
+### Persistência (Supabase)
+- Tabelas: `kids_checkins`, `kids_diario`, `familias`, `notifications`.
+- Views: `view_kids_checkins_ativos` para leitura consolidada de check-ins ativos.
+- Triggers/Functions: `notify_kids_diario()` (AFTER INSERT em `kids_diario`) e `notify_kids_checkout()` (AFTER UPDATE de `checkout_at` em `kids_checkins`) criam notificações.
+
+### Segurança e permissões (guardians)
+- RLS em `kids_checkins`: líderes/admin/secretaria podem gerenciar (ALL); responsáveis podem visualizar seus próprios registros e realizar checkout enquanto `checkout_at` estiver nulo.
+- Autorização de responsáveis é modelada em `familias` (buscar pessoa → confirmar parentesco → selecionar crianças). O vínculo orienta o frontend a usar um `responsavel_id` consistente; o bloqueio efetivo é garantido pelas políticas RLS de `kids_checkins`/`view_kids_checkins_ativos`.
+
+### Notificações
+- DB triggers criam linhas em `notifications` para diário e checkout; Supabase Realtime entrega o evento ao frontend.
+- O frontend assina `notifications` (Realtime) e usa a Notifications API do navegador para exibir push; deep links levam às telas do Kids.
+
+### Diagramas relacionados
+- Fluxo Kids: [`../diagramas/fluxo-kids.md`](../diagramas/fluxo-kids.md)
+- Sequência de Notificações: [`../diagramas/sequencia-kids-notificacoes.md`](../diagramas/sequencia-kids-notificacoes.md)
+- Permissões (Guardians): [`../diagramas/permissoes-kids-guardians.md`](../diagramas/permissoes-kids-guardians.md)
+
 ### Diagramas e Referências
 
 - **Fluxo Completo**: [Diagrama de Fluxo Financeiro](../diagramas/fluxo-financeiro.md)

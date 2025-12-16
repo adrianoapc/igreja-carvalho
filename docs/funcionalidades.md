@@ -55,6 +55,28 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 
 ---
 
+## Módulo Kids
+
+### Visão de funcionalidades
+- **Gestão de crianças e turmas**: diretório de crianças com busca/filtragem e visão de salas/turmas do ministério Kids (cadastro/edição direto no diretório está **a confirmar** conforme disponibilidade da tela).
+- **Presença e diário**: registro de check-in/checkout nas atividades e anotações de diário (humor, saúde, observações). Resumo conceitual em `docs/KIDS_INCLUSION.md`.
+- **Etiquetas e segurança**: uso das informações de perfil para etiquetas de segurança e conferência na retirada.
+- **Ocupação por sala**: visão de lotação em tempo real das salas Kids.
+
+### Regras de autorização de responsáveis
+- **Quem pode retirar**: apenas responsáveis autorizados (guardians) configurados previamente podem realizar o checkout de uma criança.
+- **Como configurar**: seleção de pessoa autorizada e, quando aplicável, indicação das crianças específicas. Fluxos e cenários em `docs/AUTHORIZED_GUARDIANS.md`.
+- **Escopo**: autorização é vinculada ao contexto familiar e às crianças selecionadas; alterações devem ser registradas antes do evento.
+
+### Regras de notificações
+- **Eventos que disparam**: checkout concluído, registros de diário/observações e alertas comportamentais/assiduidade.
+- **Para quem e quando**: direcionamento conforme perfil (equipe do Kids, responsáveis, liderança) e momento do evento. Resumo operacional em `docs/NOTIFICACOES_KIDS.md`.
+
+### Referências
+- Manual (seção Kids): [docs/manual-usuario.md](manual-usuario.md#kids)
+- Produto (seção Kids): [docs/produto/README_PRODUTO.MD](produto/README_PRODUTO.MD#kids-visão-de-produto)
+- Regras e fluxos Kids: [KIDS_INCLUSION.md](KIDS_INCLUSION.md) · [AUTHORIZED_GUARDIANS.md](AUTHORIZED_GUARDIANS.md) · [NOTIFICACOES_KIDS.md](NOTIFICACOES_KIDS.md)
+
 ## 2. Módulo Financeiro
 
 ### Objetivo do Módulo
