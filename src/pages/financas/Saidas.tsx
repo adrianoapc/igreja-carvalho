@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowLeft, Calendar, TrendingDown, Building2, FileText, Upload, X, Download } from "lucide-react";
+import { Plus, ArrowLeft, Calendar, TrendingDown, Building2, FileText, Upload, X, Download, ReceiptText } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { exportToExcel, formatDateForExport, formatCurrencyForExport } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
@@ -469,7 +470,24 @@ export default function Saidas() {
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="text-right flex-shrink-0">
-                          <p className="text-lg font-bold text-red-600">{formatCurrency(Number(transacao.valor))}</p>
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <p className="text-lg font-bold text-red-600">{formatCurrency(Number(transacao.valor))}</p>
+                            {transacao.solicitacao_reembolso_id && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="text-xs gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400">
+                                      <ReceiptText className="w-3 h-3" />
+                                      Reembolso
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Gerado automaticamente pelo módulo de Reembolsos</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <Badge className={`text-xs mt-1 ${getStatusColorDynamic(transacao)}`}>
                             {getStatusDisplay(transacao)}
                           </Badge>
@@ -478,6 +496,7 @@ export default function Saidas() {
                           transacaoId={transacao.id}
                           status={transacao.status}
                           tipo="saida"
+                          isReembolso={!!transacao.solicitacao_reembolso_id}
                           onEdit={() => {
                             setEditingTransacao(transacao);
                             setDialogOpen(true);

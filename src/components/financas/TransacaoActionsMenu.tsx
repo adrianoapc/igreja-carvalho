@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Edit, Trash2, CheckCircle2, Clock } from "lucide-react";
+import { MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import { ConfirmarPagamentoDialog } from "./ConfirmarPagamentoDialog";
 
@@ -27,12 +28,14 @@ interface TransacaoActionsMenuProps {
   transacaoId: string;
   status: string;
   tipo: "entrada" | "saida";
+  isReembolso?: boolean;
   onEdit: () => void;
 }
 
-export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: TransacaoActionsMenuProps) {
+export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = false, onEdit }: TransacaoActionsMenuProps) {
   const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditWarningDialog, setShowEditWarningDialog] = useState(false);
   const [showConfirmarPagamentoDialog, setShowConfirmarPagamentoDialog] = useState(false);
 
   const handleStatusChange = async (newStatus: string) => {
@@ -82,6 +85,19 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: Tran
     }
   };
 
+  const handleEditClick = () => {
+    if (isReembolso) {
+      setShowEditWarningDialog(true);
+    } else {
+      onEdit();
+    }
+  };
+
+  const handleConfirmEdit = () => {
+    setShowEditWarningDialog(false);
+    onEdit();
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -91,7 +107,7 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: Tran
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={onEdit}>
+          <DropdownMenuItem onClick={handleEditClick}>
             <Edit className="mr-2 h-4 w-4" />
             Editar
           </DropdownMenuItem>
@@ -119,12 +135,56 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, onEdit }: Tran
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Dialog de aviso para edição de transação de reembolso */}
+      <AlertDialog open={showEditWarningDialog} onOpenChange={setShowEditWarningDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Transação vinculada a Reembolso
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <Alert variant="default" className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800 dark:text-amber-200">
+                    Este valor está vinculado a uma solicitação de reembolso. 
+                    Alterações manuais podem gerar inconsistências entre os módulos.
+                  </AlertDescription>
+                </Alert>
+                <p className="text-sm text-muted-foreground">
+                  Deseja continuar com a edição mesmo assim?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmEdit}>
+              Editar mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {isReembolso && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Esta transação está vinculada a uma solicitação de reembolso. 
+                      Excluí-la pode gerar inconsistências no módulo de reembolsos.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <p>Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
