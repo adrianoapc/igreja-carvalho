@@ -13,6 +13,35 @@ Este documento descreve a estrutura do banco de dados do Igreja App, incluindo t
 | **Funções RPC** | 26 |
 | **Enums** | 9 |
 
+## Como ler este diagrama
+- Módulos são agrupados por blocos e comentários `%%` no Mermaid para facilitar navegação.
+- Chaves primárias estão marcadas como `PK`; chaves estrangeiras como `FK`.
+- Enums e funções RPC listados abaixo complementam o diagrama para consultas rápidas.
+- Políticas de RLS não aparecem no Mermaid, mas todas as tabelas expostas a clientes têm RLS habilitado.
+
+## Contexto de autenticação e RLS
+- Claims do JWT: `sub` (user id), `role` (papel de negócio), `igreja_id` (escopo), usados em políticas.
+- Tabelas críticas: `user_roles`, `user_app_roles`, `module_permissions` controlam o que cada usuário pode ver/editar.
+- Para detalhes de fluxo e exemplos de política, ver `01-Arquitetura/02-autenticacao-supabase.MD` e `01-Arquitetura/04-rls-e-seguranca.MD`.
+
+### Diagrama ER resumido
+Visão compacta das entidades principais; veja o diagrama completo mais abaixo para todos os campos. Referências: [`01-Arquitetura/04-rls-e-seguranca.MD`](01-Arquitetura/04-rls-e-seguranca.MD) e [`adr/ADR-003-rls-e-modelo-permissoes.md`](adr/ADR-003-rls-e-modelo-permissoes.md).
+
+```mermaid
+erDiagram
+    auth_users ||--o{ profiles : owns
+    profiles ||--o{ user_roles : tem
+    user_roles ||--o{ module_permissions : controla
+
+    profiles ||--o{ familias : participa
+    profiles ||--o{ funcoes_igreja : exerce
+
+    contas ||--o{ transacoes_financeiras : movimenta
+    transacoes_financeiras ||--o{ fornecedores : paga
+
+    comunicados ||--o{ midias : anexa
+```
+
 ## Visão Geral dos Módulos
 
 | Módulo | Descrição | Tabelas Principais |
@@ -976,3 +1005,282 @@ erDiagram
 | **Projetos** | 2 | projetos, tarefas |
 | **Config** | 3 | configuracoes_igreja, edge_function_config, notifications |
 | **TOTAL** | **56** | |
+
+---
+
+## Financeiro — Entidades e Relações
+
+### Objetivo
+O módulo financeiro implementa a separação entre **Fato Gerador** (competência), **Fluxo de Caixa** (transações) e **DRE** (resultado contábil), conforme [ADR-001](adr/ADR-001-separacao-fato-gerador-caixa-dre.md). Esta arquitetura garante relatórios contábeis precisos independente da forma de pagamento.
+
+### Tabelas Principais
+
+#### 1. `contas`
+**Função**: Representa contas bancárias, virtuais ou físicas (caixa).
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `nome`: Nome da conta (ex: "Conta Corrente Caixa", "Caixa Física")
+- `tipo`: Tipo de conta (corrente, poupança, caixa)
+- `saldo_atual`: Saldo em tempo real (atualizado por trigger)
+- `saldo_inicial`: Saldo de abertura da conta
+- `ativo`: Se a conta está ativa
+
+**Relacionamentos**:
+- `contas` 1→N `transacoes_financeiras`: Uma conta tem múltiplas transações
+
+**Regras de Negócio**:
+- Saldo é atualizado automaticamente via trigger `atualizar_saldo_conta()` após inserção/atualização/exclusão em `transacoes_financeiras`
+- Apenas contas ativas podem receber novas transações
+- RLS: Usuário só vê contas da própria igreja
+
+#### 2. `categorias_financeiras`
+**Função**: Classificação contábil das transações para composição do DRE.
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `nome`: Nome da categoria (ex: "Despesas Administrativas", "Receitas de Dízimo")
+- `tipo`: "receita" ou "despesa"
+- `secao_dre`: Seção no DRE (Receitas Operacionais, Despesas Operacionais, etc.)
+- `cor`: Cor para visualização (hex)
+
+**Relacionamentos**:
+- `categorias_financeiras` 1→N `subcategorias_financeiras`: Uma categoria tem múltiplas subcategorias
+- `categorias_financeiras` 1→N `transacoes_financeiras`: Uma categoria classifica múltiplas transações
+
+**Regras de Negócio**:
+- Categoria define onde o lançamento aparece no DRE
+- Mudança de categoria altera o DRE retroativamente (reprocessamento de views)
+- Categorias inativas não podem ser usadas em novas transações
+
+#### 3. `subcategorias_financeiras`
+**Função**: Detalhamento de categorias para maior granularidade.
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `categoria_id` (FK → `categorias_financeiras`): Categoria pai
+- `nome`: Nome da subcategoria (ex: "Material de Escritório", "Energia Elétrica")
+
+**Relacionamentos**:
+- `subcategorias_financeiras` N→1 `categorias_financeiras`: Subcategoria pertence a uma categoria
+- `subcategorias_financeiras` 1→N `transacoes_financeiras`: Subcategoria detalha múltiplas transações
+
+#### 4. `fornecedores`
+**Função**: Cadastro de pessoas/empresas que recebem pagamentos ou fazem doações.
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `nome`: Nome do fornecedor
+- `cpf_cnpj`: CPF ou CNPJ
+- `tipo_pessoa`: "fisica" ou "juridica"
+- `email`, `telefone`, `endereco`: Dados de contato
+
+**Relacionamentos**:
+- `fornecedores` 1→N `transacoes_financeiras`: Um fornecedor participa de múltiplas transações
+
+**Regras de Negócio**:
+- Sistema sugere categoria com base em histórico do fornecedor (machine learning simples)
+- Fornecedores inativos não aparecem em novas transações (mas histórico permanece)
+
+#### 5. `formas_pagamento`
+**Função**: Define como o dinheiro foi pago/recebido (PIX, boleto, dinheiro, etc.).
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `nome`: Nome da forma de pagamento
+
+**Relacionamentos**:
+- `formas_pagamento` 1→N `transacoes_financeiras`: Uma forma de pagamento é usada em múltiplas transações
+
+**Regras de Negócio**:
+- Forma de pagamento **não altera o DRE** (apenas impacta o caixa)
+
+#### 6. `bases_ministeriais`
+**Função**: Segmentação de custos por unidade ministerial (Sede, Filial, Ministério específico).
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `responsavel_id` (FK → `profiles`): Líder responsável
+- `titulo`: Nome da base (ex: "Sede", "Filial Bairro X")
+
+**Relacionamentos**:
+- `bases_ministeriais` N→1 `profiles`: Base tem um responsável
+- `bases_ministeriais` 1→N `centros_custo`: Base tem múltiplos centros de custo
+
+**Regras de Negócio**:
+- Permite DRE segmentado por base ministerial
+- Responsável pode ter permissões restritas à sua base
+
+#### 7. `centros_custo`
+**Função**: Classificação de despesas por departamento/projeto dentro de uma base ministerial.
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `base_ministerial_id` (FK → `bases_ministeriais`): Base à qual pertence
+- `nome`: Nome do centro de custo (ex: "Manutenção", "Evangelismo")
+
+**Relacionamentos**:
+- `centros_custo` N→1 `bases_ministeriais`: Centro de custo pertence a uma base
+- `centros_custo` 1→N `transacoes_financeiras`: Centro de custo classifica múltiplas transações
+
+#### 8. `transacoes_financeiras` (Tabela Central)
+**Função**: Registra movimentações de caixa (pagamentos e recebimentos).
+
+**Campos-chave**:
+- `id` (PK): Identificador único
+- `conta_id` (FK → `contas`): Conta movimentada
+- `categoria_id` (FK → `categorias_financeiras`): Classificação contábil
+- `subcategoria_id` (FK → `subcategorias_financeiras`): Detalhamento opcional
+- `fornecedor_id` (FK → `fornecedores`): De quem/para quem
+- `centro_custo_id` (FK → `centros_custo`): Departamento/projeto
+- `forma_pagamento_id` (FK → `formas_pagamento`): Como foi pago
+- `created_by`, `conferido_por`, `pago_por` (FK → `profiles`): Auditoria
+- `descricao`: Descrição da transação
+- `valor`: Valor em reais
+- `tipo`: "entrada" ou "saida"
+- `status`: "pendente", "pago", "conciliado"
+- `data_competencia`: Mês/ano de referência contábil (para DRE)
+- `data_vencimento`: Data de vencimento
+- `data_pagamento`: Data efetiva do pagamento
+- `conferido`: Se foi conferido por segundo responsável
+- `recorrente`: Se é uma transação recorrente
+- `comprovante_url`: Link para comprovante em storage
+
+**Relacionamentos**:
+- `transacoes_financeiras` N→1 `contas`: Transação pertence a uma conta
+- `transacoes_financeiras` N→1 `categorias_financeiras`: Transação é classificada por categoria
+- `transacoes_financeiras` N→1 `subcategorias_financeiras`: Transação pode ter subcategoria
+- `transacoes_financeiras` N→1 `fornecedores`: Transação envolve um fornecedor
+- `transacoes_financeiras` N→1 `centros_custo`: Transação pode ter centro de custo
+- `transacoes_financeiras` N→1 `formas_pagamento`: Transação usa uma forma de pagamento
+- `transacoes_financeiras` N→1 `profiles` (multiple): Auditoria de quem criou, conferiu, pagou
+
+**Regras de Negócio**:
+- **Fato Gerador**: `data_competencia` define quando aparece no DRE
+- **Caixa**: `data_pagamento` define quando afeta o saldo da conta
+- **Parcelamento**: Múltiplas transações podem referenciar o mesmo fato gerador (via campo `numero_documento` ou tabela intermediária)
+- **Estorno**: Excluir transação reverte saldo da conta (via trigger)
+- **Conciliação Bancária**: Status "conciliado" indica que bateu com extrato do banco
+- **RLS**: Usuário só vê transações da própria igreja; tesoureiro/admin podem criar/editar
+
+### Relações Essenciais (1:N, N:N)
+
+#### Relações 1:N (Um para Muitos)
+1. **`contas` → `transacoes_financeiras`**
+   - Uma conta tem múltiplas transações
+   - Cascade: Excluir conta bloqueia se houver transações (protect)
+
+2. **`categorias_financeiras` → `transacoes_financeiras`**
+   - Uma categoria classifica múltiplas transações
+   - Cascade: Reclassificação exige atualização em massa
+
+3. **`fornecedores` → `transacoes_financeiras`**
+   - Um fornecedor participa de múltiplas transações
+   - Cascade: Excluir fornecedor bloqueia se houver transações
+
+4. **`bases_ministeriais` → `centros_custo`**
+   - Uma base tem múltiplos centros de custo
+   - Cascade: Excluir base bloqueia se houver centros ativos
+
+#### Relações N:1 (Muitos para Um)
+- Todas as FKs em `transacoes_financeiras` são N:1 com suas tabelas de origem
+
+#### Ausência de N:N
+Não há relações N:N diretas no módulo financeiro. Parcelamentos e vínculos entre transações são gerenciados via:
+- Campo `numero_documento` (agrupa transações relacionadas)
+- Ou tabela intermediária `itens_reembolso` (se implementada conforme ADR-001)
+
+### Views e Funções RPC
+
+#### Views
+1. **`view_contabil_unificada`** (se existir):
+   - Cruza `transacoes_financeiras` com `categorias_financeiras`
+   - Agrupa por `data_competencia` e `categoria`
+   - Base para geração do DRE
+
+2. **`view_dre_anual`** (se existir):
+   - Agrupa por `secao_dre` e `ano`
+   - Calcula totais de receitas e despesas
+   - Retorna resultado líquido
+
+#### Funções RPC
+1. **`get_dre_anual(ano integer)`**
+   - Retorna DRE completo do ano especificado
+   - Filtra automaticamente por `igreja_id` via RLS
+
+2. **`atualizar_saldo_conta()`** (Trigger)
+   - Dispara após INSERT/UPDATE/DELETE em `transacoes_financeiras`
+   - Recalcula `saldo_atual` da conta afetada
+
+3. **`reconciliar_transacoes(conta_id uuid, extrato jsonb)`** (se existir):
+   - Compara transações previstas com extrato bancário
+   - Marca transações como "conciliado" quando valor e data batem
+
+### Fluxos de Dados Típicos
+
+#### Fluxo 1: Registrar Despesa
+```mermaid
+graph LR
+    A[Usuário] -->|Preenche form| B[Frontend]
+    B -->|INSERT transacoes_financeiras| C[Supabase/RLS]
+    C -->|Valida igreja_id e role| D[(Postgres)]
+    D -->|Trigger atualizar_saldo_conta| E[Atualiza saldo]
+    E --> F[Retorna confirmação]
+```
+
+#### Fluxo 2: Gerar DRE
+```mermaid
+graph LR
+    A[Usuário] -->|Solicita DRE| B[Frontend]
+    B -->|SELECT view_dre_anual| C[Supabase/RLS]
+    C -->|Filtra por igreja_id| D[(View)]
+    D -->|Cruza competência + caixa| E[Retorna JSON]
+    E -->|Renderiza| F[Gráfico DRE]
+```
+
+### Casos de Uso Especiais
+
+#### Caso 1: Parcelamento
+- **Problema**: Compra de R$ 3.000 parcelada em 3x
+- **Solução**:
+  - Criar 3 transações com mesmo `numero_documento`
+  - Cada uma com `valor = 1000`, `data_competencia` distinta por mês
+  - DRE exibe R$ 3.000 no primeiro mês (soma das transações do mesmo documento)
+
+#### Caso 2: Reembolso
+- **Problema**: Líder pagou R$ 200 do próprio bolso
+- **Solução**:
+  - Transação 1: Categoria "Material Evangelismo", fornecedor "Papelaria X", valor R$ 200
+  - Transação 2: Tipo "saida", fornecedor "João Silva (líder)", valor R$ 200, observações "Reembolso Material Evangelismo"
+  - DRE exibe -R$ 200 em "Material Evangelismo" (não em "Reembolsos")
+
+#### Caso 3: Estorno
+- **Problema**: Pagamento duplicado
+- **Solução**:
+  - DELETE na transação errada
+  - Trigger reverte `saldo_atual` da conta
+  - Audit log registra quem estornou e por quê
+
+### Validações e Constraints
+
+1. **Não permitir transação sem conta ativa**
+```sql
+CHECK (conta_id IN (SELECT id FROM contas WHERE ativo = true))
+```
+
+2. **Data de pagamento >= data de vencimento** (alerta, não bloqueio)
+
+3. **Categoria obrigatória para transações efetivadas**
+```sql
+CHECK (status = 'pendente' OR categoria_id IS NOT NULL)
+```
+
+4. **Saldo não pode ficar negativo** (opcional, dependendo da regra de negócio)
+
+### Referências
+
+- **Decisão Arquitetural**: [ADR-001 - Separação Fato Gerador vs Caixa vs DRE](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
+- **Arquitetura Técnica**: [Módulo Financeiro (Visão Técnica)](01-Arquitetura/01-arquitetura-geral.MD#módulo-financeiro-visão-técnica)
+- **Funcionalidades**: [Módulo Financeiro](funcionalidades.md#2-módulo-financeiro)
+- **Manual do Usuário**: [Guia Financeiro](manual-usuario.md#4-módulo-financeiro)
+- **Diagramas**: [Fluxo Financeiro](diagramas/fluxo-financeiro.md), [Sequência](diagramas/sequencia-financeira.md), [DRE](diagramas/dre.md)

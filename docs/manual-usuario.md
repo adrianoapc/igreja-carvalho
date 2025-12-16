@@ -203,6 +203,23 @@ Na página de detalhes da pessoa:
 
 ## 4. Módulo Financeiro
 
+### Visão Geral do Módulo
+
+O módulo financeiro separa claramente três conceitos fundamentais para garantir relatórios contábeis precisos:
+
+- **Fato Gerador (Competência)**: Registra quando e por que o valor foi originado, independente do momento do pagamento
+- **Fluxo de Caixa**: Registra quando e como o dinheiro efetivamente entrou ou saiu
+- **DRE (Demonstrativo de Resultado)**: Relatório contábil que mostra o resultado por competência
+
+> **Importante**: Esta separação está documentada no [ADR-001](adr/ADR-001-separacao-fato-gerador-caixa-dre.md) e é fundamental para a integridade contábil do sistema.
+
+Para visualizar os fluxos completos:
+- [Fluxo Financeiro Geral](diagramas/fluxo-financeiro.md)
+- [Sequência de Eventos](diagramas/sequencia-financeira.md)
+- [Composição do DRE](diagramas/dre.md)
+
+---
+
 ### 4.1 Acessando o Módulo
 
 1. No menu lateral, clique em **"Finanças"**
@@ -222,41 +239,72 @@ A visão geral financeira mostra:
 ![Dashboard Financeiro](./screenshots/placeholder-dashboard-financeiro.png)
 > *Screenshot: Dashboard financeiro*
 
-### 4.3 Registrando uma Entrada
+### 4.3 Registrando uma Entrada (Receita)
+
+#### Cenário 1: Oferta Simples (Fato Gerador + Caixa Simultâneos)
 
 1. Acesse **Finanças > Entradas**
 2. Clique em **"+ Nova Entrada"**
 3. Preencha os campos:
 
-| Campo | Descrição |
-|-------|-----------|
-| Descrição | Nome/motivo da entrada |
-| Valor | Valor em reais |
-| Data | Data da transação |
-| Conta | Conta de destino |
-| Categoria | Classificação (Dízimo, Oferta, etc.) |
-| Forma de Pagamento | PIX, Dinheiro, etc. |
+| Campo | Descrição | Exemplo |
+|-------|-----------|---------|
+| Descrição | Nome/motivo da entrada | "Oferta Culto Domingo" |
+| Valor | Valor em reais | R$ 500,00 |
+| Data | Data da transação | 15/12/2024 |
+| Conta | Conta de destino | Conta Corrente |
+| Categoria | Classificação contábil | Receitas Operacionais > Ofertas |
+| Forma de Pagamento | PIX, Dinheiro, etc. | PIX |
 
 ![Nova Entrada](./screenshots/placeholder-nova-entrada.png)
 > *Screenshot: Formulário de nova entrada*
 
 4. Clique em **"Salvar"**
 
-### 4.4 Registrando uma Saída
+**O que acontece:**
+- ✅ **Fato Gerador** criado: "Oferta Culto Domingo" em Receitas Operacionais
+- ✅ **Caixa** atualizado: +R$ 500 na Conta Corrente
+- ✅ **DRE** impactado: +R$ 500 em Receitas do mês
+
+---
+
+### 4.4 Registrando uma Saída (Despesa)
+
+#### Cenário 2: Despesa com Parcelamento (Fato Gerador Único + Múltiplas Transações de Caixa)
 
 1. Acesse **Finanças > Saídas**
 2. Clique em **"+ Nova Saída"**
-3. Preencha os campos (similar às entradas)
-4. **Opcional**: Anexe nota fiscal (imagem ou PDF)
+3. Preencha os campos:
+
+| Campo | Descrição | Exemplo |
+|-------|-----------|---------|
+| Descrição | Natureza da despesa | "Equipamento de Som" |
+| Valor | Valor total | R$ 3.000,00 |
+| Data | Data de competência | 10/12/2024 |
+| Conta | Conta de origem | Conta Corrente |
+| Categoria | Classificação contábil | Despesas Administrativas > Equipamentos |
+| Fornecedor | Quem recebe | Loja de Som LTDA |
+| Forma de Pagamento | Como será pago | Parcelado 3x |
 
 ![Nova Saída](./screenshots/placeholder-nova-saida.png)
 > *Screenshot: Formulário de nova saída*
+
+4. **Opcional**: Anexe nota fiscal (imagem ou PDF)
+5. Clique em **"Salvar"**
+
+**O que acontece:**
+- ✅ **Fato Gerador** criado: "Equipamento de Som" R$ 3.000 em Despesas Administrativas
+- ✅ **3 Transações de Caixa** agendadas: R$ 1.000 cada mês
+- ✅ **DRE de dezembro**: -R$ 3.000 (impacto total no mês da competência)
+- ✅ **Fluxo de Caixa**: -R$ 1.000 por mês (impacto mensal conforme pagamento)
+
+> **Nota**: O DRE reflete o valor total no mês da decisão de compra, independente do parcelamento. O caixa mostra apenas o que saiu efetivamente em cada mês.
 
 #### Processamento Automático de Nota Fiscal
 
 Se você anexar uma nota fiscal:
 
-1. O sistema usa IA para extrair os dados
+1. O sistema usa IA (Gemini) para extrair os dados
 2. Os campos são preenchidos automaticamente
 3. Revise e ajuste se necessário
 4. O fornecedor é criado automaticamente se não existir
@@ -276,6 +324,12 @@ Para transações com status "Pendente":
 
 ![Confirmar Pagamento](./screenshots/placeholder-confirmar-pagamento.png)
 > *Screenshot: Diálogo de confirmação de pagamento*
+
+**O que acontece:**
+- ✅ Status da transação muda para "Pago"
+- ✅ Saldo da conta é atualizado
+- ✅ Juros/multas/descontos **não alteram o DRE** (são ajustes de caixa)
+- ✅ Se houver conciliação bancária, o lançamento pode ser marcado como conciliado
 
 ### 4.6 Filtrando Transações
 
@@ -301,7 +355,64 @@ Use o seletor de período no topo:
 ![Relatório Ofertas](./screenshots/placeholder-relatorio-ofertas.png)
 > *Screenshot: Formulário de relatório de ofertas*
 
-### 4.8 DRE (Demonstrativo de Resultado)
+### 4.8 Gerenciando Reembolsos
+
+#### Cenário 3: Líder Comprou Material e Precisa Ser Reembolsado
+
+1. **Registre o Fato Gerador (Despesa Real)**
+   - Acesse **Finanças > Saídas**
+   - Descrição: "Material de Evangelismo"
+   - Categoria: Despesas Ministeriais > Evangelismo
+   - Fornecedor: Papelaria XYZ
+   - Valor: R$ 200
+   - Observações: "Comprado por João Silva - Aguardando reembolso"
+
+2. **Registre a Transação de Caixa (Reembolso ao Líder)**
+   - Acesse **Finanças > Saídas**
+   - Descrição: "Reembolso João Silva - Material Evangelismo"
+   - Categoria: *Mesma categoria do fato gerador*
+   - Valor: R$ 200
+   - Conta: Caixa ou Transferência
+   - Marque como "Reembolso" (se disponível)
+
+**Resultado:**
+- ✅ **DRE**: Registra despesa de R$ 200 em "Evangelismo" (natureza correta)
+- ✅ **Caixa**: Registra saída de R$ 200 para João Silva
+- ✅ **Rastreabilidade**: Vinculação entre o fato gerador e o reembolso
+
+> **Importante**: Reembolsos **não alteram o DRE** porque já foram registrados no fato gerador original. O reembolso é apenas uma movimentação de caixa.
+
+### 4.9 Estornando Lançamentos
+
+#### Estorno de Fato Gerador
+
+Use quando o lançamento foi feito por engano ou precisa ser cancelado:
+
+1. Na lista de transações, clique no menu **"⋮"**
+2. Selecione **"Estornar Fato Gerador"**
+3. Informe a justificativa
+4. Confirme
+
+**Impacto:**
+- ❌ **DRE**: O lançamento é removido (ou marcado como estornado)
+- ❌ **Caixa**: Se já houve pagamento, o estorno não reverte automaticamente (faça estorno de caixa separadamente)
+
+#### Estorno de Caixa
+
+Use quando o pagamento foi feito por engano mas o fato gerador é válido:
+
+1. Na lista de transações, clique no menu **"⋮"**
+2. Selecione **"Estornar Pagamento"**
+3. Informe a justificativa
+4. Confirme
+
+**Impacto:**
+- ✅ **DRE**: Permanece inalterado
+- ❌ **Caixa**: Saldo é revertido
+
+> **Dica**: Estornos são auditados e registrados em log. Use com cautela e sempre informe uma justificativa clara.
+
+### 4.10 Visualizando o DRE (Demonstrativo de Resultado)
 
 1. Acesse **Finanças > Painéis > DRE**
 2. Selecione o **ano** desejado
@@ -313,12 +424,50 @@ Use o seletor de período no topo:
 ![DRE](./screenshots/placeholder-dre.png)
 > *Screenshot: Relatório DRE*
 
-### 4.9 Exportando Dados
+**Interpretação:**
+- **Receitas**: Todos os fatos geradores de entrada por competência
+- **Despesas**: Todos os fatos geradores de saída por competência
+- **Resultado**: Receita - Despesa (independente se foi pago ou não)
+
+Para entender a composição do DRE em detalhes, consulte: [Diagrama DRE](diagramas/dre.md)
+
+### 4.11 Reconciliação Bancária
+
+1. Acesse **Finanças > Reconciliação**
+2. Selecione a conta bancária
+3. Importe o extrato bancário (Excel)
+4. O sistema compara lançamentos previstos vs extrato
+5. Marque transações conciliadas
+6. Identifique divergências (juros, taxas, lançamentos não previstos)
+
+**O que acontece:**
+- ✅ Transações conciliadas recebem status "Conciliado"
+- ⚠️ Divergências são destacadas para ajuste manual
+- ✅ Saldo final é validado contra o extrato
+
+### 4.12 Exportando Dados
 
 Em qualquer lista financeira:
 
 1. Clique no botão **"Exportar"** (ícone de download)
 2. Um arquivo Excel será baixado com todos os dados filtrados
+
+**Formatos disponíveis:**
+- Transações completas (com categoria, fornecedor, forma de pagamento)
+- DRE anual
+- Projeções financeiras
+
+---
+
+### Referências Técnicas
+
+Para entender melhor a arquitetura financeira e decisões técnicas:
+
+- **Decisão Arquitetural**: [ADR-001 - Separação Fato Gerador vs Caixa vs DRE](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
+- **Fluxo Visual Completo**: [Diagrama de Fluxo Financeiro](diagramas/fluxo-financeiro.md)
+- **Sequência Temporal**: [Diagrama de Sequência](diagramas/sequencia-financeira.md)
+- **Composição do DRE**: [Diagrama DRE](diagramas/dre.md)
+- **Funcionalidades Detalhadas**: [Documentação de Funcionalidades](funcionalidades.md#2-módulo-financeiro)
 
 ---
 

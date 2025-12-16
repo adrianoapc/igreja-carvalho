@@ -61,9 +61,16 @@ Adotamos separacao explicita em camadas:
 
 ## 🔁 Diagramas Relacionados
 
-- [Fluxo Financeiro](../diagramas/fluxo-financeiro.md)
-- [Sequencia do Processo](../diagramas/sequencia-financeira.md)
-- [DRE](../diagramas/dre.md)
+- [Fluxo Financeiro](../diagramas/fluxo-financeiro.md) — Fluxo completo (Fato Gerador → Caixa → Conciliação → DRE)
+- [Sequencia do Processo](../diagramas/sequencia-financeira.md) — Ordem temporal dos eventos
+- [DRE](../diagramas/dre.md) — Composição do DRE a partir da view unificada
+
+## 📚 Documentação Relacionada
+
+- [Funcionalidades do Módulo Financeiro](../funcionalidades.md#2-módulo-financeiro)
+- [Manual do Usuário - Financeiro](../manual-usuario.md#4-módulo-financeiro)
+- [Arquitetura Técnica - Módulo Financeiro](../01-Arquitetura/01-arquitetura-geral.MD#módulo-financeiro-visão-técnica)
+- [Modelo de Dados - Financeiro](../database-er-diagram.md#financeiro--entidades-e-relações)
 
 ---
 

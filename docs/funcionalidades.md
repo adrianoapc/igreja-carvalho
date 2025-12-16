@@ -43,42 +43,136 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 
 ## 2. Módulo Financeiro
 
+### Objetivo do Módulo
+Prover controle financeiro completo e transparente para igrejas, separando claramente os conceitos de **Fato Gerador**, **Fluxo de Caixa** e **DRE** para garantir relatórios contábeis precisos e rastreabilidade fiscal. O sistema permite gestão de receitas, despesas, reembolsos e relatórios gerenciais sem perder a integridade contábil.
+
+### Conceitos Fundamentais
+
+#### Fato Gerador (Competência)
+- Representa **quando e por que** um valor foi originado (ex.: compra de material, evento, doação)
+- Registrado independentemente do momento do pagamento/recebimento
+- Vinculado a **categoria contábil**, **fornecedor**, **centro de custo** e **base ministerial**
+- Pode ser decomposto em múltiplos itens (ex.: uma nota fiscal com vários produtos)
+- Fonte de verdade para o DRE e análises gerenciais
+
+#### Fluxo de Caixa (Regime de Caixa)
+- Representa **quando e como** o dinheiro saiu ou entrou fisicamente
+- Registra forma de pagamento, parcelamento, juros, multas, descontos
+- Pode haver um fato gerador e múltiplos pagamentos (ex.: compra parcelada em 3x)
+- Base para conciliação bancária e gestão de liquidez
+
+#### DRE (Demonstrativo de Resultado do Exercício)
+- Relatório contábil por competência que mostra resultado (receita - despesa) do período
+- Calculado a partir dos **fatos geradores** (categorias), não do caixa
+- Independente da forma de pagamento (parcelamento não altera a natureza do gasto)
+- Agrupa receitas e despesas por seção DRE (Receitas Operacionais, Despesas Administrativas, etc.)
+
+> **Importante**: Esta separação conceitual está documentada no [ADR-001](adr/ADR-001-separacao-fato-gerador-caixa-dre.md) e é a base de toda a arquitetura financeira do sistema.
+
+---
+
 ### 2.1 Estrutura Contábil
 - **Contas**: Bancárias, virtuais e físicas (caixa)
-- **Bases Ministeriais**: Unidades de negócio/ministério
-- **Centros de Custo**: Classificação de despesas
-- **Categorias Financeiras**: Com seção DRE (Receitas/Despesas)
-- **Subcategorias**: Detalhamento de categorias
-- **Fornecedores**: Cadastro completo com CNPJ/CPF
+- **Bases Ministeriais**: Unidades de negócio/ministério para segmentação de custos
+- **Centros de Custo**: Classificação de despesas por departamento/projeto
+- **Categorias Financeiras**: Com seção DRE (Receitas/Despesas) e natureza contábil
+- **Subcategorias**: Detalhamento de categorias para maior granularidade
+- **Fornecedores**: Cadastro completo com CNPJ/CPF e dados bancários
 
 ### 2.2 Transações
 - **Entradas**: Dízimos, ofertas, doações, outras receitas
-- **Saídas**: Pagamentos, despesas operacionais
+- **Saídas**: Pagamentos, despesas operacionais, reembolsos
 - **Status**: Pendente ou Pago/Recebido
 - **Confirmação de Pagamento**: Registro de juros, multas, descontos, taxas
+- **Vinculação**: Cada transação pode referenciar um ou mais fatos geradores
 
 ### 2.3 Relatório de Ofertas
 - Workflow de duplo controle (lançador + conferente)
 - Detalhamento por forma de pagamento
 - Auditoria com aprovação independente
+- Rastreabilidade completa de quem lançou, conferiu e aprovou
 
 ### 2.4 Dashboards e Relatórios
 - **Dashboard Geral**: Visão consolidada de receitas e despesas
-- **Dashboard de Ofertas**: Análise específica de ofertas
+- **Dashboard de Ofertas**: Análise específica de ofertas por período
 - **Projeção Financeira**: 12 meses histórico + 6 meses projetado
-- **DRE**: Demonstrativo de Resultado do Exercício anual
-- **Insights**: Análises e tendências
+- **DRE**: Demonstrativo de Resultado do Exercício anual por competência
+- **Insights**: Análises e tendências baseadas em histórico
 
 ### 2.5 Funcionalidades Avançadas
-- **Importação Excel**: Importação em massa de transações
-- **Processamento de Notas Fiscais**: IA (Gemini) extrai dados de NF
-- **Reconciliação Bancária**: Comparação automática de saldos
-- **Sistema de Aprendizado**: Auto-sugestão baseada em histórico por fornecedor
-- **Exportação**: Excel com todos os dados filtrados
+- **Importação Excel**: Importação em massa de transações com validação
+- **Processamento de Notas Fiscais**: IA (Gemini) extrai dados de NF automaticamente
+- **Reconciliação Bancária**: Comparação automática entre lançamentos e extrato bancário
+- **Sistema de Aprendizado**: Auto-sugestão de categoria/fornecedor baseada em histórico
+- **Exportação**: Excel com todos os dados filtrados e formatados
 
 ### 2.6 Formas de Pagamento
-- Cadastro configurável (Dinheiro, PIX, Cartão, etc.)
-- Vinculação em transações
+- Cadastro configurável (Dinheiro, PIX, Cartão, Transferência, Boleto, etc.)
+- Vinculação em transações com rastreamento completo
+- Suporte a parcelamento e juros
+
+---
+
+### Regras de Negócio
+
+#### O que altera o DRE
+- Lançamento de novos fatos geradores (receitas ou despesas)
+- Reclassificação de categoria de um fato gerador
+- Estorno de fato gerador (cancela o lançamento contábil)
+- Ajustes de competência (mudança de mês/ano de referência)
+
+#### O que altera o Caixa
+- Registro de pagamento/recebimento efetivo
+- Conciliação bancária (confirmação de entrada/saída)
+- Ajustes de saldo manual (ex.: erro de lançamento)
+- Juros, multas ou descontos aplicados no momento do pagamento
+
+#### O que NÃO altera o DRE
+- Forma de pagamento escolhida (à vista, parcelado, PIX, boleto)
+- Data de pagamento diferente da data de competência
+- Juros ou descontos aplicados no caixa (são tratados como ajustes de caixa, não de competência)
+
+#### Reembolsos
+- Fato gerador original permanece inalterado (ex.: líder comprou material)
+- Transação de caixa registra o reembolso ao líder
+- DRE reflete a categoria do material (não "Reembolso")
+- Permite rastreamento de quem pagou e quando foi reembolsado
+
+#### Estornos
+- **Estorno de Fato Gerador**: Cancela o lançamento contábil e impacta DRE
+- **Estorno de Caixa**: Reverte o pagamento/recebimento, impacta apenas o saldo da conta
+- Ambos exigem justificativa e são registrados em log de auditoria
+
+---
+
+### Fluxo Completo (Exemplo Prático)
+
+#### Cenário 1: Oferta Simples
+1. Tesoureiro registra **fato gerador**: "Oferta Culto Domingo" (categoria: Receita Operacional)
+2. Tesoureiro registra **transação de caixa**: Entrada de R$ 500 via PIX
+3. Sistema vincula transação ao fato gerador automaticamente
+4. DRE exibe R$ 500 em "Receita Operacional"
+5. Caixa exibe R$ 500 em "Entradas do mês"
+
+#### Cenário 2: Despesa com Parcelamento
+1. Líder compra equipamento de R$ 3.000 parcelado em 3x sem juros
+2. Sistema registra **fato gerador**: "Equipamento de Som" (categoria: Despesas Administrativas) - R$ 3.000
+3. Tesoureiro registra **3 transações de caixa**: R$ 1.000 cada mês
+4. **DRE do mês da compra**: Exibe R$ 3.000 em Despesas (competência)
+5. **Fluxo de Caixa**: Exibe R$ 1.000 saindo por mês (regime de caixa)
+6. Resultado: DRE reflete o impacto real da decisão; Caixa mostra o impacto financeiro mensal
+
+---
+
+### Referências e Links
+
+- **Manual do Usuário (Financeiro)**: [docs/manual-usuario.md](manual-usuario.md) — Passo a passo para uso do módulo
+- **Fluxo Visual (Mermaid)**: [docs/diagramas/fluxo-financeiro.md](diagramas/fluxo-financeiro.md) — Diagrama do fluxo completo
+- **Sequência de Eventos**: [docs/diagramas/sequencia-financeira.md](diagramas/sequencia-financeira.md) — Ordem temporal das operações
+- **Composição do DRE**: [docs/diagramas/dre.md](diagramas/dre.md) — Como o DRE é gerado
+- **Decisão Arquitetural**: [docs/adr/ADR-001-separacao-fato-gerador-caixa-dre.md](adr/ADR-001-separacao-fato-gerador-caixa-dre.md) — Fundamento técnico da separação conceitual
+
+---
 
 ---
 

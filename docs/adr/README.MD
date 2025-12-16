@@ -19,9 +19,18 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Status:** Aceito
 - **Link:** [ADR-001](ADR-001-separacao-fato-gerador-caixa-dre.md)
 
+### ADR-002
+- **Titulo:** Autenticacao Supabase (Auth + JWT)
+- **Status:** Aceito
+- **Link:** [ADR-002](ADR-002-autenticacao-supabase.md)
+
+### ADR-003
+- **Titulo:** RLS e Modelo de Permissoes
+- **Status:** Aceito
+- **Link:** [ADR-003](ADR-003-rls-e-modelo-permissoes.md)
+
 ---
 
 ## 📐 Relacao com Diagramas
-
-Os ADRs referenciam diagramas localizados em:
+Os ADRs referenciam diagramas localizados em `../diagramas/` e documentos de arquitetura em `../01-Arquitetura/`.
 
