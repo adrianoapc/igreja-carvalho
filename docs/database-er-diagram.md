@@ -1004,6 +1004,156 @@ Com base no schema atual (gerado em 2025-12-03):
 
 Observação: Este resumo reflete exclusivamente o conteúdo presente em [`database-schema.sql`](database-schema.sql). Caso existam tabelas `kids_*` ou views relacionadas em migrações separadas, elas não constam neste arquivo e, portanto, não foram consideradas aqui.
 
+---
+
+## Comunicação — entidades e relações
+
+Fonte exclusiva: [`database-schema.sql`](database-schema.sql)
+
+Com base no schema atual (gerado em 2025-12-03):
+
+- Tabelas relacionadas à comunicação institucional:
+  - Não há tabela `comunicados` definida neste arquivo de schema.
+  - Existe a tabela `banners` — comunicados visuais com agendamento.
+    - PK: `id`
+    - Colunas-chave: `title`, `message`, `type` (tipo do banner, default 'info'), `image_url`, `active` (flag ativo/inativo), `scheduled_at`, `expires_at` (período de exibição), `created_by` (criador), timestamps
+    - FKs explícitas: não declaradas no script (`created_by` não referencia explicitamente `profiles` ou `auth.users` via FK)
+    - Propósito: armazenar avisos/banners institucionais com controle de período de exibição; lógica de ativação via função `is_banner_active()` que considera `active`, `scheduled_at` e `expires_at`.
+
+- Tabelas relacionadas a mensagens/avisos:
+  - Apenas `banners` foi encontrada no schema.
+  - Não há tabelas separadas para histórico de envios, targets/destinatários ou canais de entrega neste arquivo.
+
+- Tabelas relacionadas a notificações (genéricas, não específicas de comunicação):
+  - `notifications` — notificações do sistema em geral.
+    - PK: `id`
+    - Colunas-chave: `user_id`, `title`, `message`, `type`, `read`, `related_user_id`, `metadata`, `created_at`
+    - FKs explícitas: não declaradas no script
+    - Propósito: armazenar notificações destinadas a usuários do sistema; usada por múltiplos módulos (Kids, comunicação, etc.).
+
+Relações principais:
+- `banners.created_by` referencia (por convenção) o usuário que criou o banner, mas não há FK explícita no schema.
+- Função `is_banner_active(p_active, p_scheduled_at, p_expires_at)` valida se um banner está visível com base no período e flag `active`.
+
+RLS policies de `banners`:
+- "Todos podem ver banners no período": SELECT para admins ou banners ativos (`is_banner_active()` retorna true).
+- "Admins podem criar/atualizar/deletar banners": INSERT/UPDATE/DELETE restrito a role `admin`.
+
+Storage bucket relacionado:
+- `banner-images` — bucket público para armazenar imagens de banners.
+
+Observação: Este resumo reflete exclusivamente o conteúdo presente em [`database-schema.sql`](database-schema.sql). A tabela `comunicados` (mencionada em migrações separadas) não consta neste arquivo e, portanto, não foi incluída aqui.
+
+---
+
+## Notificações — entidades e relações
+
+Fonte: [`database-schema.sql`](database-schema.sql) (tabela `notifications`) + migrations `20251211170047_...sql` e `20251211215552_...sql` (tabelas `notificacao_eventos` e `notificacao_regras`)
+
+### Tabelas Principais
+
+#### Tabela `notifications` (database-schema.sql)
+Registro de notificações enviadas/recebidas:
+- **PK**: `id` (UUID)
+- **Colunas-chave**:
+  - `user_id` (UUID) — destinatário da notificação (FK implícita para `auth.users` via RLS)
+  - `title` (TEXT) — título da notificação
+  - `message` (TEXT) — corpo da mensagem
+  - `type` (TEXT) — tipo/categoria do evento (ex: `kids_checkin`, `financeiro_conta_vencer`)
+  - `read` (BOOLEAN, default `false`) — status de leitura
+  - `related_user_id` (UUID, nullable) — usuário relacionado ao evento (a confirmar uso)
+  - `metadata` (JSONB, nullable) — dados adicionais do evento (payload, deep link, etc.)
+  - `created_at` (TIMESTAMP WITH TIME ZONE) — data/hora de criação
+- **Propósito**: armazenar notificações in-app entregues a usuários; suporta múltiplos tipos de eventos do sistema.
+
+#### Tabela `notificacao_eventos` (migration 20251211170047)
+Catálogo de eventos que podem disparar notificações:
+- **PK**: `slug` (TEXT) — identificador único do evento (ex: `kids_ocorrencia`, `novo_visitante`)
+- **Colunas-chave**:
+  - `nome` (TEXT) — nome legível do evento
+  - `descricao` (TEXT, nullable) — descrição do evento
+  - `categoria` (TEXT) — categoria do evento (ex: `kids`, `financeiro`, `pessoas`)
+  - `provider_preferencial` (TEXT, nullable) — provedor de WhatsApp preferido: `meta_direto` (Meta API) ou `make` (Make webhook)
+  - `variaveis` (TEXT[], nullable) — array de placeholders para substituição no template (ex: `['crianca', 'responsavel']`)
+  - `template_meta` (TEXT, nullable) — template de mensagem com placeholders `{{chave}}` (a confirmar)
+  - `created_at` (TIMESTAMP WITH TIME ZONE)
+- **Propósito**: definir quais eventos existem no sistema e como formatá-los para notificação.
+
+#### Tabela `notificacao_regras` (migration 20251211170047)
+Regras de disparo de notificações (quem recebe, por qual canal):
+- **PK**: `id` (UUID)
+- **Colunas-chave**:
+  - `evento_slug` (TEXT) — FK para `notificacao_eventos(slug)` ON DELETE CASCADE
+  - `role_alvo` (TEXT, nullable) — cargo/role que recebe notificação (ex: `admin`, `tesoureiro`, `lider`)
+  - `user_id_especifico` (UUID, nullable) — FK implícita para `auth.users` (override para usuário específico)
+  - `canais` (JSONB) — objeto com flags de canais ativos: `{inapp: boolean, push: boolean, whatsapp: boolean}`
+  - `ativo` (BOOLEAN, default `true`) — liga/desliga a regra
+  - `created_at` (TIMESTAMP WITH TIME ZONE)
+- **Propósito**: definir para cada evento quem são os destinatários e por quais canais devem receber.
+
+### Relações Principais
+
+```
+notificacao_eventos (slug)
+    ↓ (1:N)
+notificacao_regras (evento_slug)
+    ↓ (N:1 via role_alvo ou user_id_especifico)
+user_roles ou profiles
+    ↓ (1:N)
+notifications (user_id) — notificações entregues
+```
+
+- **`notificacao_regras.evento_slug`** → **`notificacao_eventos.slug`** (FK com CASCADE DELETE)
+- **`notificacao_regras.role_alvo`** → resolve para lista de `user_ids` via query em `user_roles` (sem FK explícita)
+- **`notificacao_regras.user_id_especifico`** → `auth.users.id` (FK implícita, sem constraint explícito no schema)
+- **`notifications.user_id`** → `auth.users.id` (FK implícita via RLS, não declarada no schema)
+
+### RLS Policies
+
+#### Tabela `notifications` (database-schema.sql)
+- **"Sistema pode criar notificações"** (INSERT): permite INSERT sem restrição (service role pode criar para qualquer usuário)
+- **"Usuários podem ver suas notificações"** (SELECT): `auth.uid() = user_id`
+- **"Usuários podem atualizar suas notificações"** (UPDATE): `auth.uid() = user_id` (para marcar como lida)
+
+#### Tabelas `notificacao_eventos` e `notificacao_regras` (migration 20251211215552)
+- **"Leitura publica eventos"** (SELECT em `notificacao_eventos`): todos autenticados podem ler (necessário para sistema resolver regras)
+- **"Leitura publica regras"** (SELECT em `notificacao_regras`): todos autenticados podem ler
+- **"Admin gerencia regras"** (ALL em `notificacao_regras`): apenas usuários com `role = 'admin'` em `user_roles` podem INSERT/UPDATE/DELETE
+
+### Eventos Cadastrados (migration 20251211215552)
+
+| Slug do Evento                    | Categoria   | Provider       | Variáveis                        |
+|-----------------------------------|-------------|----------------|----------------------------------|
+| `financeiro_conta_vencer`         | financeiro  | meta_direto    | `descricao`, `valor`, `vencimento` |
+| `financeiro_reembolso_aprovacao`  | financeiro  | make           | `solicitante`, `valor`             |
+| `kids_checkin`                    | kids        | meta_direto    | `crianca`, `responsavel`           |
+| `kids_ocorrencia`                 | kids        | meta_direto    | `crianca`, `motivo`                |
+| `novo_visitante`                  | pessoas     | make           | `nome`, `telefone`                 |
+| `pedido_oracao`                   | intercessao | make           | `nome`, `motivo`                   |
+
+### Edge Functions Relacionadas
+
+- **`disparar-alerta`**: função central de disparo; recebe evento e dados, resolve regras, formata mensagens, envia multi-canal (in-app, push, WhatsApp).
+- **`notificar-aniversarios`**: cron job que verifica aniversários do dia seguinte e invoca `disparar-alerta`.
+- **`notificar-sentimentos-diario`**: cron job diário de pergunta sobre sentimentos.
+- **`notificar-liturgia-make`**: envia notificação de liturgia via Make (a confirmar).
+
+### Integrações Externas
+
+- **Meta Business API** (WhatsApp): provider `meta_direto` — POST direto para Meta API com autenticação via bearer token.
+- **Make/n8n Webhook** (WhatsApp): provider `make` — POST HTTP para workflow externo que processa e envia WhatsApp.
+- **Browser Notification API**: notificações push no navegador via `new Notification()` (requer permissão do usuário).
+
+### Observações
+
+- **Disparo Imediato**: notificações são criadas e entregues síncronamente ao evento; não há fila ou retry.
+- **Templates Automáticos**: mensagens são formatadas via substituição de `{{chave}}` por valores em `dados` do evento.
+- **Multi-Canal**: sistema suporta 3 canais simultâneos configuráveis por regra (in-app, push, WhatsApp).
+- **Realtime First**: notificações in-app propagadas via Supabase Realtime (WebSocket); frontend atualiza estado ao receber INSERT event.
+- **Sem Soft Delete**: notificações excluídas são removidas fisicamente (DELETE); não há flag `deleted`.
+
+---
+
 ## Views do Sistema
 
 | View | Descrição |

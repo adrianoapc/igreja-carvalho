@@ -905,53 +905,106 @@ Tarefas vencidas aparecem destacadas em **vermelho**. O dashboard também mostra
 
 ## 9. Comunicação
 
-### 9.1 Hub de Publicação
+O módulo de Comunicação permite que liderança e secretaria criem e publiquem comunicados institucionais (avisos, banners, alertas) manualmente, controlando onde e quando serão exibidos (app, telão/projetor, site).
 
-1. Acesse **Publicação** no menu
-2. Visualize todos os comunicados por aba:
-   - **Visão Geral**: Todos
-   - **App**: Comunicados do aplicativo
-   - **Telão**: Comunicados para projeção
-   - **Site**: Comunicados para o website
+**Observação:** Este módulo é para criação editorial de conteúdo. Notificações automáticas de sistema são gerenciadas em outro módulo.
+
+### 9.1 Acessando o Módulo
+
+- **Onde acessar**: Menu lateral → **Comunicação** ou **Publicação** (ou navegue para `/comunicados`).
+- **Ao abrir a tela**: você vê a lista de comunicados existentes com título, status (ativo/inativo), canais de exibição (app, telão, site) e datas de início/fim.
+- **Permissões**: apenas administradores e liderança podem criar/editar comunicados (RLS `comunicados_gestao_admin`).
 
 ![Hub Publicação](./screenshots/placeholder-hub-publicacao.png)
 > *Screenshot: Hub de publicação*
 
-### 9.2 Criando um Comunicado
+### 9.2 Criando um Comunicado (passo a passo)
 
-1. Clique em **"+ Novo Comunicado"**
-2. O wizard guia você em 3 passos:
+1. Acesse **Comunicação** → **Comunicados**
+2. Clique em **"+ Novo Comunicado"**
+3. Preencha os dados no wizard de 3 passos:
 
 #### Passo 1: Conteúdo
 
-- Título
-- Tipo (Banner ou Alerta)
-- Mensagem/Descrição
-- Selecione mídia da biblioteca
+- **Título** (obrigatório): nome do comunicado
+- **Tipo**: escolha **Banner** (visual com imagem) ou **Alerta** (mensagem de urgência)
+- **Descrição/Mensagem**: texto do comunicado (para alertas, é obrigatório)
+- **Imagem**: faça upload ou selecione uma mídia da biblioteca
+  - Formatos aceitos: imagem (JPG, PNG) ou vídeo (a confirmar)
+  - Armazenamento: storage bucket público `comunicados`
+- **Link de ação** (opcional): URL para direcionar quando o usuário clicar
 
 ![Comunicado Passo 1](./screenshots/placeholder-comunicado-passo1.png)
 > *Screenshot: Passo 1 - Conteúdo*
 
-#### Passo 2: Canais
+#### Passo 2: Canais de Publicação
 
-Selecione onde publicar:
-- ☐ App/Dashboard
-- ☐ Telão
-- ☐ Site
+Defina onde o comunicado será exibido (múltipla escolha):
+- ☐ **App/Dashboard**: aparece no carrossel do dashboard dos membros
+- ☐ **Telão/Projetor**: entra na playlist do ProPresenter ou sistema de projeção
+  - Pode definir **ordem de exibição** no telão (campo `ordem_telao`)
+  - Pode enviar **arte alternativa** para telão (16:9 vs 9:16 no campo `url_arquivo_telao`)
+- ☐ **Site Público**: exibido no carrossel do site da igreja
+
+**Observação:** Um comunicado pode ser publicado em múltiplos canais simultaneamente.
 
 ![Comunicado Passo 2](./screenshots/placeholder-comunicado-passo2.png)
 > *Screenshot: Passo 2 - Canais*
 
-#### Passo 3: Agendamento
+#### Passo 3: Agendamento e Categorização
 
-- Data de início
-- Data de fim (opcional)
-- Nível de urgência
+- **Data de início**: quando o comunicado começa a ser exibido
+- **Data de fim** (opcional): quando expira automaticamente
+- **Nível de urgência** (a confirmar): para priorização visual
+- **Categoria de mídia** (opcional): `geral`, `eventos`, `liturgia` (campo `categoria_midia`)
+- **Tags** (opcional): para organização (ex.: `Abertura`, `Louvor`, `Avisos Gerais`)
+- **Vincular a culto** (opcional): associa o comunicado a um culto específico (FK `culto_id`)
 
 ![Comunicado Passo 3](./screenshots/placeholder-comunicado-passo3.png)
 > *Screenshot: Passo 3 - Agendamento*
 
-3. Clique em **"Publicar"**
+4. Clique em **"Publicar"** para ativar o comunicado
+
+### 9.3 Editando e Gerenciando Comunicados
+
+- **Visualizar lista**: Na tela principal de Comunicados, você vê todos os comunicados cadastrados com contadores por status.
+- **Editar**: Clique no comunicado desejado para abrir o diálogo de edição (mesmo wizard de 3 passos).
+- **Ativar/Desativar**: Use o toggle de status `ativo` para pausar ou retomar a exibição sem excluir o comunicado.
+- **Excluir**: Clique em **Excluir** (ícone de lixeira); a imagem vinculada será removida do storage `comunicados` se não estiver em uso por outros registros.
+
+### 9.4 Histórico e Status
+
+- **Status disponíveis**: `ativo` (sendo exibido) ou `inativo` (pausado/expirado).
+- **Contadores**: A tela exibe quantos comunicados estão cadastrados e quantos estão ativos no momento.
+- **Filtros** (a confirmar): buscar por título, filtrar por canal de exibição, ordenar por data de criação/atualização.
+
+### 9.5 Definindo Público-Alvo
+
+**Observação:** A segmentação de público no módulo Comunicação é feita por **canal de exibição** (app, telão, site), não por perfis de usuário individuais.
+
+- **App/Dashboard**: todos os membros logados veem os comunicados ativos no carrossel do dashboard.
+- **Telão**: exibido durante cultos/eventos para toda a congregação presente.
+- **Site Público**: visível para visitantes e público geral no site da igreja.
+
+Não há segmentação por roles (admin, membro, visitante) ou grupos específicos dentro do módulo. Para comunicação direcionada (ex.: apenas líderes), use outros canais (a confirmar) ou ajuste as permissões de acesso às páginas.
+
+### 9.6 Visualização nos Canais
+
+#### No App/Dashboard
+- Membros veem os comunicados ativos no **carrossel de banners** (`BannerCarousel.tsx`) na tela principal.
+- Query: `SELECT * FROM comunicados WHERE ativo = true AND exibir_app = true AND (data_inicio <= NOW() AND (data_fim IS NULL OR data_fim >= NOW()))`.
+
+#### No Telão/Projetor
+- Comunicados com `exibir_telao = true` são consumidos pela página `/telao` (`Telao.tsx`).
+- Exibição em carrossel automático com controles de navegação e pausa.
+- Ordem definida pelo campo `ordem_telao`.
+
+#### No Site Público
+- Comunicados com `exibir_site = true` são exibidos no carrossel do site (integração a confirmar).
+
+**Links úteis**: (diagrama de fluxo de comunicação a criar)
+
+**Referências complementares**: [Visão de produto — Comunicação](produto/README_PRODUTO.MD)
 
 ### 9.3 Biblioteca de Mídias
 
@@ -972,7 +1025,114 @@ Selecione onde publicar:
 
 ---
 
-## 10. Minha Área
+## 10. Notificações
+
+O módulo de **Notificações** entrega alertas automáticos do sistema diretamente para você, baseado em eventos relevantes da sua área de atuação (role). Diferente da **Comunicação** (que é criação manual de avisos), as notificações são **disparadas automaticamente** pelo sistema sempre que algo importante acontece.
+
+### 10.1 Acessando Notificações
+
+1. No canto superior direito da barra de navegação, clique no **ícone de sino 🔔**
+2. Um popover abre com a lista de notificações recentes
+3. Notificações **não lidas** aparecem com uma bolinha azul à esquerda e fundo branco
+4. Notificações já lidas ficam acinzentadas
+
+![Sino de Notificações](./screenshots/placeholder-sino-notificacoes.png)
+> *Screenshot: Popover de notificações*
+
+### 10.2 Tipos de Notificações
+
+As notificações são categorizadas automaticamente:
+
+- **💰 Financeiro**: nova conta a pagar, reembolso aguardando aprovação
+- **👶 Kids**: check-in realizado, ocorrência/choro de criança
+- **🙏 Intercessão**: novo pedido de oração cadastrado
+- **👋 Recepção**: novo visitante registrado no sistema
+- **⚠️ Alerta**: situações críticas ou de urgência
+- **📅 Agenda**: lembretes de escalas ou cultos
+
+Cada tipo tem **ícone e cor próprios** para rápida identificação visual.
+
+### 10.3 Interagindo com Notificações
+
+#### Ver detalhes:
+- Clique sobre a notificação para **ser redirecionado** à tela correspondente (ex: clicar em "Nova Conta a Pagar" leva ao Financeiro)
+
+#### Marcar como lida:
+- Ao clicar, a notificação é **automaticamente marcada como lida**
+- Você também pode clicar em **"Limpar"** (botão no topo) para marcar **todas como lidas de uma vez**
+
+#### Excluir:
+- Passe o mouse sobre uma notificação e clique no **ícone de lixeira** que aparece à direita
+
+![Ações de Notificação](./screenshots/placeholder-acoes-notificacao.png)
+> *Screenshot: Ações em notificações*
+
+### 10.4 Canais de Entrega
+
+Você pode receber notificações por até **3 canais diferentes**, dependendo da configuração do seu cargo:
+
+1. **In-App (Sininho)**: sempre ativo, aparece na barra superior do sistema
+2. **Push Notification**: alerta no navegador mesmo com aba fechada (requer permissão)
+3. **WhatsApp**: mensagem via Meta API ou Make (a confirmar por evento)
+
+> 🔐 **Permissão Push**: na primeira vez, o navegador solicitará permissão para enviar notificações. Aceite para receber alertas em tempo real.
+
+### 10.5 Configurações de Notificações (Admin)
+
+Se você é **Administrador**, pode gerenciar quais eventos disparam notificações e para quem:
+
+1. Acesse **Admin > Notificações**
+2. Você verá **cards de eventos** agrupados por categoria (Financeiro, Kids, Pessoas, Intercessão)
+3. Para cada evento, há uma **tabela de destinatários** (roles) e **switches de canais**:
+   - 🔔 **In-App**: sininho no sistema
+   - 📱 **Push**: notificação no navegador/celular
+   - 💬 **WhatsApp**: via integração externa
+
+#### Adicionar destinatário:
+1. Clique em **"+ Add"** no card do evento
+2. Selecione o **role** (cargo) no dropdown
+3. O destinatário é criado com canais padrão ativos
+
+#### Ativar/Desativar canal:
+- Use os **switches** (toggle) para ativar/desativar canais por destinatário
+- Exemplo: "Tesoureiro recebe apenas in-app e push, sem WhatsApp"
+
+#### Remover destinatário:
+- Passe o mouse sobre a linha e clique no **ícone de lixeira**
+
+![Admin Notificações](./screenshots/placeholder-admin-notificacoes.png)
+> *Screenshot: Tela de configuração de notificações (admin)*
+
+### 10.6 Eventos Disponíveis
+
+Principais eventos que podem disparar notificações automáticas:
+
+| Evento                          | Categoria    | Quando dispara                                    |
+|---------------------------------|--------------|--------------------------------------------------|
+| `financeiro_conta_vencer`       | Financeiro   | Nova conta a pagar cadastrada                     |
+| `financeiro_reembolso_aprovacao`| Financeiro   | Reembolso aguardando aprovação                    |
+| `kids_checkin`                  | Kids         | Criança fez check-in no ministério                |
+| `kids_ocorrencia`               | Kids         | Registrada ocorrência/choro de criança            |
+| `novo_visitante`                | Pessoas      | Novo visitante cadastrado no sistema              |
+| `pedido_oracao`                 | Intercessão  | Novo pedido de oração recebido                    |
+
+> 📌 **Nota**: A lista de eventos é expansível. Novos eventos podem ser adicionados conforme necessidades operacionais da igreja.
+
+### 10.7 Diferença: Notificações vs. Comunicação
+
+| Aspecto                | Notificações                          | Comunicação                        |
+|------------------------|---------------------------------------|------------------------------------|
+| **Origem**             | Automática (evento do sistema)        | Manual (criação humana)            |
+| **Conteúdo**           | Template fixo (ex: "Nova conta X")    | Livre (banners, avisos, editoria)  |
+| **Destinatário**       | Definido por role/cargo               | Público geral (app/telão/site)     |
+| **Objetivo**           | Alerta operacional / ação requerida   | Informação institucional           |
+| **Edição**             | Não editável (gerado pelo sistema)    | Totalmente editável                |
+
+> **Regra de ouro**: Se é uma **reação a um evento do sistema**, é Notificação. Se é **conteúdo criado manualmente para comunicar algo**, é Comunicação.
+
+---
+
+## 11. Minha Área
 
 ### 10.1 Perfil
 

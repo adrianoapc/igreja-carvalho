@@ -502,3 +502,328 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - **Gráficos**: Recharts
 - **PWA**: Instalável como aplicativo
 - **Realtime**: Supabase Realtime para atualizações ao vivo
+
+---
+
+## Módulo Comunicação
+
+### Objetivo do Módulo
+Facilitar a criação e publicação de comunicados institucionais (avisos, banners, alertas) de forma manual e editorial pela liderança, garantindo visibilidade multiplataforma (app, telão/projetor, site público). O módulo **não** faz disparo automático de notificações push, e-mail ou WhatsApp; apenas publica conteúdo gerenciado manualmente.
+
+### Funcionalidades Principais
+
+#### Tipos de Comunicação
+Baseado na tabela `comunicados`:
+- **Banner**: comunicado visual com imagem destacada, exibido em carrossel (campo `tipo = 'banner'`)
+- **Alerta**: comunicado de urgência com mensagem obrigatória, exibido com destaque visual (campo `tipo = 'alerta'`)
+
+#### Criação e Gestão de Comunicados
+- **Criar comunicado**: wizard em 3 etapas (conteúdo, canais, agendamento)
+  - Conteúdo: título, tipo (banner/alerta), descrição, imagem (storage `comunicados`), link de ação
+  - Canais: selecionar onde exibir (`exibir_app`, `exibir_telao`, `exibir_site`)
+  - Agendamento: datas de início/fim (`data_inicio`, `data_fim`), tags (`tags[]`), categoria (`categoria_midia`), ordem telão (`ordem_telao`)
+- **Editar comunicado**: abrir comunicado existente e modificar via diálogo de edição
+- **Ativar/Desativar**: flag `ativo` controla se o comunicado está visível ou pausado
+- **Excluir**: remove registro e arquivo do storage `comunicados` (se não usado por outros)
+- **Vincular a culto**: FK opcional `culto_id` para associar comunicado a evento específico
+- **Vincular a mídia**: FK opcional `midia_id` para reutilizar mídias da biblioteca
+
+#### Segmentação por Canal
+- **App/Dashboard** (`exibir_app = true`):
+  - Exibido no carrossel de banners do dashboard dos membros
+  - Componente: `BannerCarousel.tsx`
+  - Query: comunicados ativos dentro do período (`data_inicio <= NOW()` e `data_fim >= NOW()` ou nula)
+- **Telão/Projetor** (`exibir_telao = true`):
+  - Consumido pela página `/telao` em carrossel automático
+  - Componente: `Telao.tsx`
+  - Ordem controlada por `ordem_telao`
+  - Suporta arte alternativa via `url_arquivo_telao` (ex.: formato 16:9 vs 9:16)
+- **Site Público** (`exibir_site = true`):
+  - Exibido no carrossel do site da igreja (integração a confirmar)
+
+#### Estados do Comunicado
+Baseado nos campos da tabela `comunicados`:
+- **Ativo** (`ativo = true`): comunicado está sendo exibido nos canais selecionados (respeitando período de data_inicio/data_fim)
+- **Inativo** (`ativo = false`): comunicado pausado ou expirado, não aparece em nenhum canal
+
+**Observação:** Não há estados intermediários como "rascunho", "em aprovação" ou "enviado". Comunicados são criados e imediatamente ativados ou desativados.
+
+#### Histórico e Listagem
+- **Listagem completa**: página `/comunicados` mostra todos os comunicados cadastrados com:
+  - Título, tipo (banner/alerta), status (ativo/inativo)
+  - Canais de exibição (ícones app/telão/site)
+  - Datas de início/fim
+  - Contadores: total de comunicados e quantos estão ativos
+- **Busca e filtros**: (a confirmar) buscar por título, filtrar por canal ou status
+- **Ordenação**: (a confirmar) por data de criação/atualização
+
+#### Categorização e Tags
+- **Tags** (`tags[]`): array de strings para categorização livre (ex.: `["Abertura", "Louvor", "Avisos Gerais"]`)
+- **Categoria de mídia** (`categoria_midia`): classificação predefinida (`geral`, `eventos`, `liturgia`)
+- Uso: organização e busca dentro da biblioteca de comunicados/mídias
+
+### Regras de Autorização
+
+#### Permissões RLS (Row Level Security)
+Baseado nas policies da migração `20251203182759_...sql`:
+
+1. **Leitura pública** (`comunicados_leitura_publica`):
+   - **Quem**: todos os usuários (incluindo não autenticados)
+   - **O que**: SELECT em comunicados ativos dentro do período de exibição
+   - **Condição**: `ativo = true` e `data_inicio <= NOW()` e (`data_fim IS NULL` ou `data_fim >= NOW()`)
+
+2. **Gestão admin** (`comunicados_gestao_admin`):
+   - **Quem**: apenas usuários autenticados com role `admin` ou `secretario` (a confirmar via `has_role()`)
+   - **O que**: ALL (INSERT, UPDATE, DELETE, SELECT ilimitado)
+   - **Condição**: `auth.role() = 'authenticated'` (policy simplificada; refinamento via app-level se necessário)
+
+#### Storage Bucket
+Baseado na migração de storage:
+- **Bucket `comunicados`**: público (`public = true`)
+- **Policies**:
+  - `comunicados_public_access`: SELECT público
+  - `comunicados_admin_insert`: INSERT apenas para autenticados
+  - `comunicados_admin_update`: UPDATE apenas para autenticados
+  - `comunicados_admin_delete`: DELETE apenas para autenticados
+
+#### Resumo de Permissões
+- **Visualizar comunicados ativos**: qualquer pessoa (público)
+- **Criar/editar/excluir comunicados**: apenas administradores e secretaria
+- **Upload de imagens**: apenas usuários autenticados
+
+### Fluxo Típico de Uso
+
+1. **Criação**:
+   - Liderança/secretaria acessa `/comunicados` → "+ Novo Comunicado"
+   - Preenche wizard (conteúdo, canais, agendamento)
+   - Clica em "Publicar" → INSERT na tabela `comunicados` com `ativo = true`
+
+2. **Exibição**:
+   - **App**: membros veem no carrossel do dashboard (query automática por `exibir_app = true`)
+   - **Telão**: operador abre `/telao` → carrossel consome comunicados com `exibir_telao = true`
+   - **Site**: (integração a confirmar)
+
+3. **Gestão**:
+   - Editar: clicar no comunicado → modal de edição → UPDATE
+   - Desativar: toggle `ativo = false` → comunicado some dos canais
+   - Excluir: DELETE → remove do banco e storage
+
+4. **Expiração**:
+   - Comunicados com `data_fim` passada são automaticamente filtrados nas queries de exibição
+   - Não há job automático para desativar; permanecem com `ativo = true` mas não aparecem
+
+### Integrações e Limitações
+
+#### O que o módulo FAZ:
+- Criação editorial manual de comunicados
+- Publicação multiplataforma (app, telão, site)
+- Agendamento de período de exibição
+- Upload e gestão de imagens no storage público
+- Vínculo opcional com cultos e biblioteca de mídias
+- Controle de ordem de exibição no telão
+
+#### O que o módulo NÃO FAZ:
+- ❌ Disparo automático de push notifications
+- ❌ Envio de e-mails ou mensagens WhatsApp
+- ❌ Segmentação por perfis de usuário (roles/grupos)
+- ❌ Workflow de aprovação ou estados intermediários (rascunho/revisão)
+- ❌ Automação de marketing ou CRM
+- ❌ Analytics de visualizações/cliques (a confirmar)
+
+### Referências
+
+- Manual do Usuário — Comunicação: [docs/manual-usuario.md](manual-usuario.md#9-comunicação)
+- Produto — Comunicação: [docs/produto/README_PRODUTO.MD](produto/README_PRODUTO.MD#comunicação-visão-de-produto)
+- Diagrama de fluxo: [docs/diagramas/fluxo-comunicacao.md](diagramas/fluxo-comunicacao.md)
+- Diagrama de sequência: [docs/diagramas/sequencia-comunicacao.md](diagramas/sequencia-comunicacao.md)
+
+---
+
+## Módulo Notificações
+
+O **Módulo Notificações** gerencia alertas automáticos disparados pelo sistema em resposta a **eventos operacionais**. Diferente do módulo de Comunicação (que é criação manual e editorial), as notificações são **automáticas, baseadas em templates fixos e destinatários definidos por cargo (role)**.
+
+### Objetivo
+
+Reduzir a dependência de comunicação manual entre áreas, garantindo que **pessoas certas sejam notificadas no momento certo** sobre eventos críticos ou relevantes para suas funções.
+
+### Componentes Principais
+
+#### Frontend
+- **`src/pages/admin/Notificacoes.tsx`**: tela de configuração de regras de notificações (admin)
+- **`src/hooks/useNotifications.tsx`**: hook para gerenciar notificações in-app, push e sincronização em tempo real
+- **`src/components/NotificationBell.tsx`**: componente do sininho (bell) na barra superior com popover de notificações
+- **`src/components/NotificationSettings.tsx`**: tela de preferências do usuário (a confirmar)
+
+#### Backend (Supabase)
+- **Tabelas**:
+  - `notifications`: registro de notificações enviadas/recebidas (user_id, title, message, type, read, metadata)
+  - `notificacao_eventos`: catálogo de eventos que podem disparar notificações (slug, nome, categoria, variaveis, provider_preferencial)
+  - `notificacao_regras`: regras de disparo (evento_slug, role_alvo, canais, ativo)
+
+- **Edge Functions**:
+  - `disparar-alerta`: função central que recebe eventos, busca regras ativas, resolve destinatários e dispara notificações multi-canal
+  - `notificar-aniversarios`: cron job que verifica aniversários do dia seguinte e dispara notificações
+  - `notificar-sentimentos-diario`: cron job diário perguntando aos membros sobre sentimentos
+  - `notificar-liturgia-make`: notificação de liturgia via Make (a confirmar)
+
+#### Canais de Entrega
+- **In-App (Sininho)**: notificação no sistema via tabela `notifications`, visível no `NotificationBell`
+- **Push Notification**: browser Notification API (requer permissão do usuário)
+- **WhatsApp**: via Meta API direto ou Make (conforme `provider_preferencial` do evento)
+- **Email**: estrutura preparada na tabela `notificacao_regras`, mas não implementado
+
+### Catálogo de Eventos
+
+Baseado na migration `20251211215552_509ce355-3ad5-444f-857c-4bf1e1001209.sql`:
+
+| Evento Slug                       | Categoria   | Provider Preferencial | Variáveis Disponíveis                      |
+|-----------------------------------|-------------|-----------------------|--------------------------------------------|
+| `financeiro_conta_vencer`         | financeiro  | meta_direto           | descricao, valor, vencimento               |
+| `financeiro_reembolso_aprovacao`  | financeiro  | make                  | solicitante, valor                         |
+| `kids_checkin`                    | kids        | meta_direto           | crianca, responsavel                       |
+| `kids_ocorrencia`                 | kids        | meta_direto           | crianca, motivo                            |
+| `novo_visitante`                  | pessoas     | make                  | nome, telefone                             |
+| `pedido_oracao`                   | intercessao | make                  | nome, motivo                               |
+
+> 📌 **Provider Preferencial**: define qual integração externa usar para WhatsApp (`meta_direto` = Meta API, `make` = n8n/Make webhook).
+
+### Regras de Disparo
+
+Cada **regra** (`notificacao_regras`) define:
+- **evento_slug**: qual evento escutar (ex: `kids_checkin`)
+- **role_alvo**: qual cargo recebe (ex: `admin`, `pastor`, `tesoureiro`)
+- **user_id_especifico**: override para usuário específico (opcional)
+- **canais** (jsonb):
+  - `inapp`: boolean (sininho no sistema)
+  - `push`: boolean (push notification no navegador)
+  - `whatsapp`: boolean (via integração externa)
+- **ativo**: boolean (liga/desliga a regra)
+
+Exemplo de regra:
+```json
+{
+  "evento_slug": "kids_ocorrencia",
+  "role_alvo": "admin",
+  "canais": {
+    "inapp": true,
+    "push": true,
+    "whatsapp": false
+  },
+  "ativo": true
+}
+```
+
+### Fluxo de Disparo
+
+1. **Evento Ocorre no Sistema**:
+   - Ex: criança faz check-in → código frontend/backend invoca Edge Function `disparar-alerta` com payload:
+     ```json
+     {
+       "evento": "kids_checkin",
+       "dados": {
+         "crianca": "João Silva",
+         "responsavel": "Maria Silva"
+       }
+     }
+     ```
+
+2. **Edge Function Processa**:
+   - Busca evento em `notificacao_eventos` (valida se existe)
+   - Busca regras ativas em `notificacao_regras` para o evento
+   - Resolve destinatários:
+     - Se `role_alvo`: busca todos usuários com esse cargo em `user_roles`
+     - Se `user_id_especifico`: apenas esse usuário
+   - Formata mensagem substituindo variáveis no template (ex: `{{crianca}}` → "João Silva")
+
+3. **Entrega Multi-Canal**:
+   - **In-App**: INSERT na tabela `notifications` (user_id, title, message, type)
+   - **Push**: usa browser Notification API no frontend (via realtime subscription)
+   - **WhatsApp**: chama API externa (Meta ou Make) com número do destinatário e mensagem formatada
+
+4. **Exibição no Frontend**:
+   - `useNotifications` hook subscreve realtime na tabela `notifications`
+   - Ao receber nova notificação, atualiza estado e exibe no `NotificationBell`
+   - Se push habilitado, dispara também browser notification
+
+### Estados e Ciclo de Vida
+
+- **Criação**: notificação inserida via Edge Function com `read = false`
+- **Não lida**: visível no sininho com bolinha azul à esquerda
+- **Lida**: usuário clica → UPDATE `read = true`, bolinha desaparece
+- **Excluída**: usuário clica na lixeira → DELETE (não há soft delete)
+
+Não há estados intermediários (rascunho, pendente, etc.). Notificações são **imediatas e finais**.
+
+### Regras de Autorização (RLS)
+
+#### Tabela `notifications`
+Baseado em `docs/database-schema.sql`:
+- **Criar**: `"Sistema pode criar notificações"` → INSERT sem restrição (service role)
+- **Ler**: `"Usuários podem ver suas notificações"` → SELECT WHERE `auth.uid() = user_id`
+- **Atualizar**: `"Usuários podem atualizar suas notificações"` → UPDATE WHERE `auth.uid() = user_id`
+
+#### Tabelas `notificacao_eventos` e `notificacao_regras`
+Baseado em migration `20251211215552_...sql`:
+- **Leitura pública eventos**: SELECT para todos autenticados
+- **Leitura pública regras**: SELECT para todos autenticados (para o sistema resolver destinatários)
+- **Admin gerencia regras**: ALL apenas para usuários com role `admin` em `user_roles`
+
+### Fluxo Típico de Uso
+
+#### Como Usuário Final:
+1. **Receber notificação**:
+   - Sistema dispara evento → notificação aparece no sininho
+   - Badge vermelho indica contagem de não lidas
+   - (Opcional) Push notification no navegador/celular
+
+2. **Ver detalhes**:
+   - Clica no sininho → popover abre com lista de notificações
+   - Cada notificação mostra: ícone, categoria, título, mensagem, tempo relativo
+
+3. **Interagir**:
+   - Clicar na notificação → redireciona para tela relevante (deep link) e marca como lida
+   - Clicar em "Limpar" → marca todas como lidas de uma vez
+   - Clicar na lixeira → exclui notificação específica
+
+#### Como Administrador:
+1. **Acessar configurações**:
+   - `/admin/notificacoes` → tela com cards de eventos agrupados por categoria
+
+2. **Adicionar destinatário a um evento**:
+   - Clicar em "+ Add" no card do evento
+   - Selecionar role (cargo) no dropdown
+   - Regra criada com canais padrão (inapp = true, push/whatsapp = false)
+
+3. **Configurar canais**:
+   - Usar switches (toggle) para ativar/desativar canais por destinatário
+   - Exemplo: "Tesoureiro recebe apenas in-app, líder recebe in-app + push + WhatsApp"
+
+4. **Remover destinatário**:
+   - Hover na linha → clicar na lixeira → DELETE da regra
+
+### Integrações e Limitações
+
+#### O que o módulo FAZ:
+- Disparo automático de notificações baseado em eventos reais do sistema
+- Entrega multi-canal (in-app, push, WhatsApp)
+- Configuração flexível por evento e role
+- Templates automáticos com substituição de variáveis
+- Histórico de notificações recebidas (read/unread)
+- Sincronização em tempo real via Supabase Realtime
+
+#### O que o módulo NÃO FAZ:
+- ❌ Criação manual de mensagens (isso é Comunicação)
+- ❌ Edição de conteúdo da notificação (templates são fixos)
+- ❌ Segmentação arbitrária ou campanhas de marketing
+- ❌ Workflow de aprovação ou estados intermediários
+- ❌ Analytics de taxa de abertura/clique (a confirmar)
+- ❌ Agendamento manual de envio (notificações são sempre imediatas ao evento)
+
+### Referências
+
+- Manual do Usuário — Notificações: [docs/manual-usuario.md](manual-usuario.md#10-notificações)
+- Produto — Notificações: [docs/produto/README_PRODUTO.MD](produto/README_PRODUTO.MD#notificações-visão-de-produto)
+- Diagrama de fluxo: [docs/diagramas/fluxo-notificacoes.md](diagramas/fluxo-notificacoes.md) (a criar)
+- Diagrama de sequência: [docs/diagramas/sequencia-notificacoes.md](diagramas/sequencia-notificacoes.md) (a criar)
+

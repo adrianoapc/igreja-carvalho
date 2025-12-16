@@ -32,6 +32,10 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
  	- Diagrama — Fluxo Kids: [`diagramas/fluxo-kids.md`](diagramas/fluxo-kids.md)
  	- Diagrama — Sequência de Notificações (Kids): [`diagramas/sequencia-kids-notificacoes.md`](diagramas/sequencia-kids-notificacoes.md)
  	- Diagrama — Permissões (Guardians/Kids): [`diagramas/permissoes-kids-guardians.md`](diagramas/permissoes-kids-guardians.md)
+ 	- Diagrama — Fluxo Comunicação: [`diagramas/fluxo-comunicacao.md`](diagramas/fluxo-comunicacao.md)
+ 	- Diagrama — Sequência Comunicação: [`diagramas/sequencia-comunicacao.md`](diagramas/sequencia-comunicacao.md)
+ 	- Diagrama — Fluxo Notificações: [`diagramas/fluxo-notificacoes.md`](diagramas/fluxo-notificacoes.md)
+ 	- Diagrama — Sequência Notificações: [`diagramas/sequencia-notificacoes.md`](diagramas/sequencia-notificacoes.md)
 - ADRs
 	- Lista de ADRs: [`adr/README.MD`](adr/README.MD)
 	- ADR-001 (Fato Gerador vs Caixa vs DRE): [`adr/ADR-001-separacao-fato-gerador-caixa-dre.md`](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)

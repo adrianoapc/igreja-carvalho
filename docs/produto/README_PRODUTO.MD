@@ -39,3 +39,36 @@ Referências de produto e fluxos detalhados:
 - Inclusão de crianças e regras: `../KIDS_INCLUSION.md`
 - Notificações do Kids: `../NOTIFICACOES_KIDS.md`
 - Responsáveis autorizados: `../AUTHORIZED_GUARDIANS.md`
+
+## Comunicação (visão de produto)
+
+- **Objetivo**: facilitar a criação e publicação de comunicados institucionais (avisos, banners, alertas) de forma manual e editorial pela liderança, garantindo visibilidade multiplataforma (app, telão/projetor, site público).
+- **Para quem**: liderança/secretaria (criação de conteúdo), equipe de comunicação (arte e publicação), administradores (gestão de canais de exibição), membros (consumo no app/site).
+- **Principais capacidades**: 
+	- criar comunicados manualmente (tipo banner ou alerta), com título, descrição, imagem e link de ação;
+	- segmentar publicação por canal (exibir no app, telão/projetor ou site);
+	- agendar período de exibição (data início/fim);
+	- vincular opcionalmente a cultos ou mídias;
+	- organizar por tags e ordem de exibição no telão;
+	- histórico completo de comunicados criados e status (ativo/inativo).
+- **Limites do escopo**: NÃO faz disparo automático de push notifications, e-mail ou WhatsApp; NÃO substitui notificações de sistema (que são automáticas e vinculadas a eventos); apenas publica conteúdo editorial gerenciado manualmente; não é ferramenta de automação de marketing ou CRM.
+
+Referências complementares:
+- Manual do usuário — Comunicação: `../manual-usuario.md` (seção 9)
+
+## Notificações (visão de produto)
+
+- **Objetivo**: automatizar o envio de alertas relevantes para usuários específicos (por cargo/role) baseado em eventos do sistema, reduzindo dependência de comunicação manual e aumentando a agilidade nas respostas operacionais.
+- **Para quem**: administradores (configuração de regras de disparo e canais), líderes e responsáveis por áreas (recebem notificações personalizadas conforme seu cargo), equipe técnica (gestão de eventos e integrações).
+- **Principais capacidades**: 
+	- catálogo de eventos do sistema (ex: `novo_visitante`, `financeiro_conta_vencer`, `kids_checkin`, `kids_ocorrencia`, `pedido_oracao`);
+	- configuração de regras por evento (quem recebe: role ou usuário específico, canais ativos: in-app/push/WhatsApp);
+	- disparo automático via Edge Function (`disparar-alerta`) ao detectar evento;
+	- entrega multi-canal: notificação in-app (sininho na barra superior), push notification (browser API), WhatsApp (Meta API direto ou Make);
+	- histórico de envio e status (lido/não lido) na tabela `notifications`;
+	- interface admin para ativar/desativar regras e canais por evento.
+- **Limites do escopo**: NÃO é criação manual de mensagens (isso é Comunicação); NÃO permite editar conteúdo da notificação (usa templates automáticos); NÃO substitui comunicação editorial ou avisos gerais; apenas dispara alertas baseados em eventos reais do sistema; não faz segmentação arbitrária ou campanhas de marketing.
+
+Referências complementares:
+- Manual do usuário — Notificações: `../manual-usuario.md` (seção 10, a confirmar)
+
