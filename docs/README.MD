@@ -21,10 +21,17 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- Guia de produto: [`produto/README_PRODUTO.MD`](produto/README_PRODUTO.MD)
 	- Manual do usuário: [`manual-usuario.md`](manual-usuario.md)
 	- Funcionalidades: [`funcionalidades.md`](funcionalidades.md)
+ 	- Kids — Inclusão e necessidades: [`KIDS_INCLUSION.md`](KIDS_INCLUSION.md)
+ 	- Kids — Responsáveis autorizados (guardians): [`AUTHORIZED_GUARDIANS.md`](AUTHORIZED_GUARDIANS.md)
+ 	- Kids — Notificações: [`NOTIFICACOES_KIDS.md`](NOTIFICACOES_KIDS.md)
+ 	- Manual — Ministério Infantil (Kids): [`manual-usuario.md`](manual-usuario.md)
 - Banco de Dados
 	- Esquema SQL: [`database-schema.sql`](database-schema.sql)
 	- Diagrama ER: [`database-er-diagram.md`](database-er-diagram.md)
 	- Diagramas: [`diagramas/`](diagramas/)
+ 	- Diagrama — Fluxo Kids: [`diagramas/fluxo-kids.md`](diagramas/fluxo-kids.md)
+ 	- Diagrama — Sequência de Notificações (Kids): [`diagramas/sequencia-kids-notificacoes.md`](diagramas/sequencia-kids-notificacoes.md)
+ 	- Diagrama — Permissões (Guardians/Kids): [`diagramas/permissoes-kids-guardians.md`](diagramas/permissoes-kids-guardians.md)
 - ADRs
 	- Lista de ADRs: [`adr/README.MD`](adr/README.MD)
 	- ADR-001 (Fato Gerador vs Caixa vs DRE): [`adr/ADR-001-separacao-fato-gerador-caixa-dre.md`](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
