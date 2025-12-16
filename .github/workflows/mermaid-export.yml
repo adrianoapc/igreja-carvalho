@@ -1,0 +1,102 @@
+name: Export Mermaid diagrams to PNG
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/**/*.md"
+      - ".github/workflows/mermaid-export.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "docs/**/*.md"
+
+permissions:
+  contents: write
+
+jobs:
+  export-mermaid:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Mermaid CLI
+        run: |
+          npm i -g @mermaid-js/mermaid-cli
+
+      - name: Extract Mermaid blocks and export PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SRC_DIR="docs/diagramas"
+          OUT_DIR="docs/diagramas/exports"
+          mkdir -p "$OUT_DIR"
+
+          # Python extrai blocos ```mermaid ... ``` com segurança (sem concatenar)
+          python3 - << 'PY'
+          import re, os, pathlib, sys
+
+          src_dir = pathlib.Path("docs/diagramas")
+          out_dir = pathlib.Path("docs/diagramas/exports")
+          out_dir.mkdir(parents=True, exist_ok=True)
+
+          md_files = sorted(src_dir.glob("*.md"))
+          if not md_files:
+              print(f"Nenhum .md encontrado em {src_dir}")
+              sys.exit(0)
+
+          fence_re = re.compile(r"```mermaid\s*\n(.*?)\n```", re.DOTALL | re.IGNORECASE)
+
+          total_blocks = 0
+          for md in md_files:
+              text = md.read_text(encoding="utf-8", errors="replace")
+              # normaliza CRLF -> LF
+              text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+              blocks = fence_re.findall(text)
+              if not blocks:
+                  print(f"Sem bloco Mermaid em {md.name} — pulando")
+                  continue
+
+              base = md.stem
+              for i, b in enumerate(blocks, start=1):
+                  # remove espaços extras nas bordas, preservando o conteúdo
+                  b = b.strip() + "\n"
+                  mmd_path = out_dir / f"{base}_{i}.mmd"
+                  mmd_path.write_text(b, encoding="utf-8")
+                  total_blocks += 1
+                  print(f"Extraido: {mmd_path}")
+
+          print(f"Total de blocos Mermaid extraidos: {total_blocks}")
+          PY
+
+          # Renderiza cada .mmd para .png (um por bloco)
+          shopt -s nullglob
+          for mmd in "$OUT_DIR"/*.mmd; do
+            png="${mmd%.mmd}.png"
+            mmdc -i "$mmd" -o "$png" -b transparent --scale 2
+            echo "Gerado: $png"
+          done
+
+      - name: Commit exported diagrams
+        if: github.event_name == 'push'
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [[ -n "$(git status --porcelain docs/diagramas/exports)" ]]; then
+            git add docs/diagramas/exports
+            git commit -m "chore(diagrams): export mermaid PNGs"
+            git push
+          else
+            echo "Nenhuma mudanca para commitar."
+          fi
