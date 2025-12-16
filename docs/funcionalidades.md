@@ -39,6 +39,20 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 - Filtros por tipo e período
 - Calendário visual
 
+### 1.7 Módulo Pessoas / Membros
+- **Objetivo**: Centralizar o cadastro unificado de visitantes, frequentadores e membros, permitindo listar, buscar/filtrar e manter dados completos de perfil e status.
+- **Funcionalidades principais**: listar (ordenado por nome via `profiles`), buscar/filtrar por nome/telefone/email/status, criar pessoa, editar pessoa (dados pessoais, contatos, eclesiásticos, adicionais, status), exportar listagens e navegar para detalhes.
+- **Campos/atributos (profiles)**: `id`, `nome`, `email`, `telefone`, `avatar_url`, `status` (`visitante` | `frequentador` | `membro`), `data_primeira_visita`, `numero_visitas`, `user_id`, `sexo`, `data_nascimento`, `estado_civil`, `data_casamento`, `rg`, `cpf`, `alergias`, `necessidades_especiais`, `cep`, `cidade`, `bairro`, `estado`, `endereco`, `entrou_por`, `data_entrada`, `status_igreja`, `data_conversao`, `batizado`, `data_batismo`, `e_lider`, `e_pastor`, `escolaridade`, `profissao`, `nacionalidade`, `naturalidade`, `entrevistado_por`, `cadastrado_por`, `tipo_sanguineo`, `observacoes`.
+- **Regras de negócio**: status permitido limitado a `visitante`/`frequentador`/`membro`; filtros locais por nome/telefone/email/status na listagem; criação/edição persiste em `profiles` via Supabase; não há deduplicação automática visível para nome/telefone/email (conferência manual necessária).
+- **Links**: [Manual do Usuário — Pessoas](manual-usuario.md#3-gestão-de-pessoas) · [Fluxo Pessoas (Mermaid)](diagramas/fluxo-pessoas.md) · [Sequência Pessoas (Mermaid)](diagramas/sequencia-pessoas.md) · [Permissões Pessoas](diagramas/permissoes-pessoas.md)
+- **Referências complementares**: [BIDIRECTIONAL_RELATIONSHIPS.md](BIDIRECTIONAL_RELATIONSHIPS.md) (exibição bidirecional de familiares), [AUTHORIZED_GUARDIANS.md](AUTHORIZED_GUARDIANS.md) (responsáveis autorizados para crianças/Kids) e [KIDS_INCLUSION.md](KIDS_INCLUSION.md) (campo de necessidades especiais na jornada Kids ligado aos perfis).
+
+#### Módulo Pessoas / Membros — visão funcional
+- **Funcionalidades disponíveis**: dashboard com estatísticas por status; listagem com ordenação por nome e avatars (quando cadastrados); busca e filtro de status; criação/edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem.
+- **Ações permitidas**: criar pessoa (nome obrigatório, contato recomendado), editar dados pessoais/contatos/status/funções, navegar para detalhes, aplicar busca/filtros, carregar mais itens via scroll, acionar atalhos rápidos para segmentos (membros, visitantes, frequentadores).
+- **Regras funcionais**: status restrito a `visitante`/`frequentador`/`membro`; sem deduplicação automática (verificar duplicidade de nome/telefone/email antes de salvar); campos mínimos para cadastro exigem nome; contatos incompletos reduzem eficácia da busca e follow-up; vínculos familiares exibem ambos os lados com inversão de papel; avatars não são obrigatórios e podem exibir fallback.
+- **Links relacionados**: [Manual do Usuário — Pessoas](manual-usuario.md#3-gestão-de-pessoas) · [Produto — Pessoas/Membros](produto/README_PRODUTO.MD#pessoas--membros-visão-de-produto)
+
 ---
 
 ## 2. Módulo Financeiro
