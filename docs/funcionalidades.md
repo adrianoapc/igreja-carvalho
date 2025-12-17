@@ -309,6 +309,18 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 
 ---
 
+### 5.5 Cursos Pagos (Integração Financeira)
+- **Campos (DB)**: `jornadas.requer_pagamento` (boolean), `jornadas.valor` (number), `inscricoes_jornada.status_pagamento` (`isento` | `pendente` | `pago`), `inscricoes_jornada.transacao_id` (uuid), `transacoes_financeiras` (entrada vinculada à inscrição).
+- **Fluxo de Inscrição (Aluno)**: ao inscrever-se em jornada paga, o sistema cria uma `transacoes_financeiras` de entrada com `status: pendente` e registra a inscrição com `status_pagamento: pendente` e vínculo em `transacao_id`. Para cursos gratuitos, `status_pagamento: isento`.
+- **Bloqueio de Acesso**: o `CursoPlayer` impede acesso ao conteúdo enquanto `status_pagamento = pendente`, exibindo mensagem de aguardo com o valor da inscrição.
+- **Configuração Financeira**: resolução de `categoria_id`, `base_ministerial_id` e `conta_id` via nomes existentes ou variáveis `.env` (`VITE_FIN_CATEGORIA_CURSOS_ID`, `VITE_BASE_MINISTERIAL_ENSINO_ID`, `VITE_CONTA_PADRAO_ENTRADAS_ID`). Caso não haja `conta_id`, a inscrição paga permanece pendente (a confirmar política de fallback).
+- **Admin (Jornadas)**: criação/edição de jornadas inclui seleção "curso é pago?" e campo de valor (R$), persistindo em `jornadas.requer_pagamento` e `jornadas.valor`.
+- **Diagrama do Fluxo**: ver `docs/diagramas/fluxo-cursos-pagos.md`.
+
+> Observações
+> - Integração PIX/checkout externo: (a confirmar) — não há evidência de integração direta no código atual.
+> - Baixas de pagamento: realizadas no módulo financeiro; quando a transação muda para `pago`, o acesso ao curso é liberado.
+
 ## 6. Comunicação
 
 ### 6.1 Canais de Distribuição
