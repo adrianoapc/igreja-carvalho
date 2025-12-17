@@ -89,4 +89,6 @@ Referências:
 - Funcionalidades — Jornadas e Ensino: `../funcionalidades.md#5-jornadas-e-ensino`
 - Manual do usuário — Jornadas e Ensino: `../manual-usuario.md#7-jornadas-e-ensino`
 - Diagrama de cursos pagos: `../diagramas/fluxo-cursos-pagos.md`
+ - Diagramas gerais do módulo: `../diagramas/fluxo-ensino.md`, `../diagramas/sequencia-ensino.md`
+ - Arquitetura (visão técnica): `../01-Arquitetura/01-arquitetura-geral.MD#módulo-jornadas-e-ensino-visão-técnica`
 

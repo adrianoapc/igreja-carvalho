@@ -230,6 +230,12 @@ O módulo financeiro utiliza uma arquitetura de três camadas, conforme document
   - Aluno/visitante se inscreve; player lê progresso e etapas; presenças gravadas na aula.
   - Cursos pagos: criação de transação financeira de entrada e vínculo na inscrição (status pendente até baixa).
 - Segurança: RLS aplicado via Supabase; consultas via `supabase-js`; sem Edge Function dedicada ao módulo no momento (a confirmar).
+
+**Links relacionados**
+- Funcionalidades: `../funcionalidades.md#5-jornadas-e-ensino`
+- Manual do usuário: `../manual-usuario.md#7-jornadas-e-ensino`
+- Produto: `../produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto`
+- Diagramas: `../diagramas/fluxo-ensino.md`, `../diagramas/sequencia-ensino.md`, `../diagramas/fluxo-cursos-pagos.md`
   - `DELETE`: Estornar fato gerador (requer justificativa)
 
 #### 2. Camada de Caixa (Transações)

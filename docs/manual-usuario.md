@@ -859,6 +859,11 @@ Após o check-in:
 3. Confirme o responsável que está retirando
 4. Verifique o código de segurança
 
+**Links relacionados**
+- Funcionalidades — Jornadas e Ensino: `funcionalidades.md#5-jornadas-e-ensino`
+- Produto — Jornadas e Ensino: `produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto`
+- Diagramas: `diagramas/fluxo-ensino.md`, `diagramas/sequencia-ensino.md`, `diagramas/fluxo-cursos-pagos.md`
+
 ---
 
 ## 8. Projetos e Tarefas

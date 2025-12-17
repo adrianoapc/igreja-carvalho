@@ -319,6 +319,12 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - **Admin (Jornadas)**: criação/edição de jornadas inclui seleção "curso é pago?" e campo de valor (R$), persistindo em `jornadas.requer_pagamento` e `jornadas.valor`.
 - **Diagrama do Fluxo**: ver `docs/diagramas/fluxo-cursos-pagos.md`.
 
+**Links relacionados**
+- Manual do usuário — Jornadas e Ensino: `manual-usuario.md#7-jornadas-e-ensino`
+- Produto — Jornadas e Ensino: `produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto`
+- Arquitetura — Módulo Jornadas e Ensino: `01-Arquitetura/01-arquitetura-geral.MD#módulo-jornadas-e-ensino-visão-técnica`
+- Diagramas: `diagramas/fluxo-ensino.md`, `diagramas/sequencia-ensino.md`, `diagramas/fluxo-cursos-pagos.md`
+
 #### Admin — Confirmação de Pagamento e Liberação de Acesso
 - **Onde confirmar**: no módulo Financeiro, localizar a `transacoes_financeiras` vinculada à inscrição (via descrição e/ou `transacao_id`).
 - **Como confirmar**: executar a baixa alterando o **status** da transação para **pago**. Passo a passo em: [Manual do Usuário — Confirmar Pagamento](manual-usuario.md#45-confirmando-pagamento).
