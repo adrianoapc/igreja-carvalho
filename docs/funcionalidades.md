@@ -317,6 +317,12 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - **Admin (Jornadas)**: criação/edição de jornadas inclui seleção "curso é pago?" e campo de valor (R$), persistindo em `jornadas.requer_pagamento` e `jornadas.valor`.
 - **Diagrama do Fluxo**: ver `docs/diagramas/fluxo-cursos-pagos.md`.
 
+#### Admin — Confirmação de Pagamento e Liberação de Acesso
+- **Onde confirmar**: no módulo Financeiro, localizar a `transacoes_financeiras` vinculada à inscrição (via descrição e/ou `transacao_id`).
+- **Como confirmar**: executar a baixa alterando o **status** da transação para **pago**. Passo a passo em: [Manual do Usuário — Confirmar Pagamento](manual-usuario.md#45-confirmando-pagamento).
+- **Efeito esperado**: a inscrição deve refletir **`status_pagamento: pago`** e o acesso ao `CursoPlayer` é liberado.
+- **Automação da atualização da inscrição**: (a confirmar) — caso não haja atualização automática, o admin pode ajustar manualmente o `status_pagamento` da inscrição no gerenciamento de alunos.
+
 > Observações
 > - Integração PIX/checkout externo: (a confirmar) — não há evidência de integração direta no código atual.
 > - Baixas de pagamento: realizadas no módulo financeiro; quando a transação muda para `pago`, o acesso ao curso é liberado.
