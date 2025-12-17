@@ -401,6 +401,41 @@ Todas as queries financeiras são filtradas por `igreja_id` automaticamente:
 
 ---
 
+## Módulo Intercessão, Oração e Testemunhos (visão técnica)
+
+### Como o frontend carrega e persiste dados
+
+#### Consultas Principais
+- **Pedidos de Oração**: `SELECT * FROM pedidos_oracao WHERE (admin OR membro_id = auth.uid() OR intercessor_id IN (...))` com filtros por status/tipo
+- **Intercessores**: `SELECT * FROM intercessores` com contagem de pedidos via join
+- **Testemunhos**: `SELECT * FROM testemunhos WHERE (admin OR autor_id = auth.uid() OR status = 'publico')`
+- **Sentimentos**: `SELECT * FROM sentimentos_membros WHERE pessoa_id = auth.uid()` ou admin vê todos
+
+#### Operações de Escrita
+- **Criar Pedido**: `INSERT INTO pedidos_oracao (pessoa_id, pedido, tipo, status, ...)` via `NovoPedidoDialog`
+- **Alocar Pedido**: `UPDATE pedidos_oracao SET intercessor_id = ?, status = 'alocado', data_alocacao = now()` (admin)
+- **Registrar Sentimento**: `INSERT INTO sentimentos_membros (pessoa_id, sentimento, mensagem, ...)` via dialog
+- **Criar Testemunho**: `INSERT INTO testemunhos (autor_id, titulo, mensagem, categoria, status = 'aberto', ...)` via `NovoTestemunhoDialog`
+- **Aprovar Testemunho**: `UPDATE testemunhos SET status = 'publico', publicar = true, data_publicacao = now()` (admin)
+
+#### Segurança (RLS)
+Todas as tabelas possuem RLS:
+- `pedidos_oracao`: Admin vê todos; Intercessor vê apenas alocados; Membro vê próprios
+- `testemunhos`: Admin vê todos; Autor vê próprios; Todos veem com `status = 'publico'`
+- `sentimentos_membros`: Admin vê todos; Membro vê próprios; INSERT restrito ao próprio usuário
+- `intercessores`: Admin gerencia; Intercessor vê próprio perfil
+
+#### Frontend Interactions
+- **TanStack Query**: Cache de listagens; `refetch` manual ou automático após mutação
+- **Realtime (a confirmar)**: Subscriptions em `pedidos_oracao`, `testemunhos`, `sentimentos_membros` para atualizações ao vivo
+- **Dialogs**: Componentes `NovoPedidoDialog`, `IntercessoresManager`, etc. encapsulam lógica de criação/edição
+
+### Diagramas Relacionados
+- Fluxo: [`../diagramas/fluxo-intercessao.md`](../diagramas/fluxo-intercessao.md)
+- Sequência: [`../diagramas/sequencia-intercessao.md`](../diagramas/sequencia-intercessao.md)
+
+---
+
 ## Módulo Cultos (visão técnica)
 
 ### Como o frontend lê/grava dados (evidências)

@@ -119,6 +119,49 @@ Referência: [`database-schema.sql`](database-schema.sql)
 
 ---
 
+## Intercessão, Oração e Testemunhos — entidades e relações
+
+Com base exclusiva no `database-schema.sql`:
+
+- `intercessores` — equipe dedicada de intercessores
+    - PK: `id`
+    - FK: `user_id` → `auth.users(id)` (opcional)
+    - Campos: `nome`, `email`, `telefone`, `ativo`, `max_pedidos` (limite simultâneo de pedidos), timestamps
+    - RLS: Admin gerencia (CRUD); Intercessor vê próprio perfil
+
+- `pedidos_oracao` — pedidos de oração/intercessão
+    - PK: `id`
+    - FKs: `pessoa_id` → `profiles(id)`, `membro_id` → `profiles(id)` (via `auth.users`), `intercessor_id` → `intercessores(id)`
+    - Campos: `pedido` (texto), `tipo` (enum: saúde, família, financeiro, trabalho, espiritual, outro), `status` (pendente, alocado, em_oracao, respondido, arquivado), `anonimo` (boolean), `nome_solicitante`/`email_solicitante`/`telefone_solicitante` (se anônimo ou externo), `observacoes_intercessor`, `data_criacao`, `data_alocacao`, `data_resposta`
+    - RLS: Admin vê todos; Intercessor vê alocados a si; Membro vê próprios
+
+- `testemunhos` — testemunhos de fé/milagres
+    - PK: `id`
+    - FKs: `autor_id` → `profiles(id)` (via `auth.users`), `pessoa_id` → `profiles(id)` (opcional)
+    - Campos: `titulo`, `mensagem` (texto), `categoria` (enum: espiritual, casamento, família, saúde, trabalho, financeiro, ministerial, outro), `status` (aberto, publico, arquivado), `anonimo` (boolean), `publicar` (boolean), `data_publicacao`, `nome_externo`/`email_externo`/`telefone_externo` (se anônimo), timestamps
+    - RLS: Admin vê todos; Autor vê próprios; Todos veem com `status = 'publico'`
+
+- `sentimentos_membros` — registro diário de sentimentos
+    - PK: `id`
+    - FK: `pessoa_id` → `profiles(id)` (obrigatório)
+    - Campos: `sentimento` (enum: feliz, triste, ansioso, grato, abençoado, angustiado), `mensagem` (texto opcional), `data_registro`, timestamps
+    - RLS: Admin vê todos; Membro vê/insere próprios; INSERT validado por RLS
+
+Relações lógicas (sem FKs explícitas em alguns casos, mas presentes por convenção):
+- `pedidos_oracao.pessoa_id` referencia perfil do solicitante (membro)
+- `pedidos_oracao.intercessor_id` aloca pedido a intercessor específico
+- `testemunhos.autor_id` referencia perfil do autor
+- `sentimentos_membros.pessoa_id` referencia perfil que registra sentimento
+
+Observações:
+- Nenhuma relação direta entre `intercessores` ↔ `pedidos_oracao` em nível de index explícito (RLS gerencia acesso)
+- Enum types mencionados presumem criação no schema (a confirmar se todas as enums estão declaradas)
+- Tabelas não possuem particionamento ou replicação especial (padrão Postgres)
+
+Fonte: [`database-schema.sql`](database-schema.sql)
+
+---
+
 ## Cultos — entidades e relações
 
 Com base exclusiva no `database-schema.sql`, as entidades relacionadas ao módulo de Cultos e áreas correlatas são:

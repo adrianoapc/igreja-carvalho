@@ -327,33 +327,67 @@ Integrações Supabase (consultas confirmadas nos arquivos):
 
 ---
 
-## 4. Intercessão
+## 4. Intercessão, Oração e Testemunhos
+
+### Objetivo do Módulo
+Centralizar gestão de pedidos de oração, intercessão organizada, registro de testemunhos e acompanhamento emocional dos membros, fortalecendo cuidado pastoral e resposta ágil a necessidades espirituais.
+
+### Estrutura Geral
+
+#### Páginas Principais (Rotas)
+- `/intercessao`: Container com dashboard de 4 módulos (cards de acesso rápido)
+- `/intercessao/pedidos`: Listagem e gestão de pedidos de oração
+- `/intercessao/intercessores`: Gerenciamento de equipe de intercessores
+- `/intercessao/testemunhos`: Listagem, aprovação e publicação de testemunhos
+- `/intercessao/sentimentos`: Monitoramento de sentimentos e alertas críticos
 
 ### 4.1 Pedidos de Oração
-- Recebimento de pedidos (membros e externos)
-- Classificação por tipo (saúde, família, financeiro, etc.)
-- Status: Pendente, Alocado, Orando, Respondido, Arquivado
-- Suporte a pedidos anônimos
+- **Criação**: Membro/visitante/anônimo cria pedido via dialog, com tipo (saúde, família, financeiro, trabalho, espiritual, outro)
+- **Fluxo de Status**: pendente → alocado → em_oracao → respondido/arquivado
+- **Alocação**: Admin aloca a intercessor(es) manualmente ou via "Alocar Automático" (balanceado por carga)
+- **Gerenciamento**: Intercessor registra observações, marca como "Em Oração" ou "Respondido"; admin pode reclassificar
+- **Visualização Intercessor**: Vê apenas pedidos alocados (RLS aplicado)
+- **Tabela**: `pedidos_oracao` com campos `id`, `pessoa_id`, `membro_id`, `intercessor_id`, `pedido`, `tipo`, `status`, `anonimo`, `data_criacao`, `data_alocacao`, `data_resposta`, `observacoes_intercessor`
+- **Operações Supabase**: INSERT (novo pedido), SELECT (listagem/filtros por status/tipo), UPDATE (alocar/mudar status/adicionar observação), DELETE (admin apenas)
 
 ### 4.2 Intercessores
-- Cadastro de intercessores dedicados
-- Limite máximo de pedidos por intercessor
-- Alocação automática balanceada
-- Observações e acompanhamento
+- **Cadastro**: Admin cria intercessor com nome, email, telefone, `max_pedidos` (limite simultâneo)
+- **Gerenciamento**: Ativar/inativar, editar dados, visualizar carga (count de pedidos alocados)
+- **Alocação Automática**: Sistema distribui pedidos pendentes entre intercessores ativos respeitando limite
+- **Tabela**: `intercessores` com campos `id`, `user_id`, `nome`, `email`, `telefone`, `ativo`, `max_pedidos`, `created_at`, `updated_at`
+- **Operações Supabase**: INSERT, SELECT, UPDATE, DELETE (admin apenas)
 
 ### 4.3 Testemunhos
-- Envio de testemunhos por membros
-- Categorização e aprovação para publicação
-- Status: Aberto, Público, Arquivado
-- Vinculação automática com perfis existentes
+- **Criação**: Membro envia testemunho via dialog, com título, categoria, mensagem, opcional anônimo
+- **Workflow de Aprovação**: Status aberto (submissão) → público (aprovado/publicado) ou arquivado
+- **Publicação**: Testemunho com `status = publico` aparece no carrossel do dashboard para todos membros
+- **Exportação**: Admin pode baixar listagem em Excel
+- **Tabela**: `testemunhos` com campos `id`, `autor_id`, `pessoa_id`, `titulo`, `mensagem`, `categoria`, `status`, `anonimo`, `publicar`, `data_publicacao`, `nome_externo` (se anônimo), `created_at`, `updated_at`
+- **Operações Supabase**: INSERT (novo), SELECT (listagem por status), UPDATE (aprovar/arquivar), DELETE (admin apenas)
 
 ### 4.4 Sentimentos
-- Registro diário de sentimentos pelos membros
-- Notificação push diária às 9h ("Como você está?")
-- Redirecionamento inteligente:
-  - Sentimentos positivos → Compartilhar testemunho
-  - Sentimentos negativos → Criar pedido de oração
-- **Alertas Críticos**: Detecção de 3+ dias consecutivos de sentimentos negativos
+- **Registro**: Membro registra sentimento diário (feliz, triste, ansioso, grato, abençoado, angustiado) via dialog ou notificação automática (9h)
+- **Redirecionamento Inteligente**: Sistema sugere ação baseada em sentimento
+  - Positivo (feliz/grato/abençoado) → "Compartilhar Testemunho?" → link para `/intercessao/testemunhos?novo=true`
+  - Negativo (triste/ansioso/angustiado) → "Fazer Pedido de Oração?" → link para `/intercessao/pedidos?novo=true`
+- **Alertas Críticos**: Detecção automática de 3+ dias consecutivos de sentimentos negativos; exibidos em cards destacados no dashboard com dados de contato
+- **Tabela**: `sentimentos_membros` com campos `id`, `pessoa_id`, `sentimento`, `mensagem`, `data_registro`, `created_at`, `updated_at`
+- **Operações Supabase**: INSERT (novo sentimento), SELECT (listar por período/pessoa), UPDATE (opcional), DELETE (não usual)
+
+### 4.5 Integração Frontend
+- **Container** (`Intercessao.tsx`): Dashboard com 4 cards (Pedidos, Intercessores, Testemunhos, Sentimentos); cada card exibe estatísticas e link para página específica; ações rápidas (Novo Pedido, Alocar Automático)
+- **Componentes Dialogs**: `NovoPedidoDialog`, `PedidoDetailsDialog`, `IntercessoresManager`, `NovoTestemunhoDialog`, `TestemunhoDetailsDialog`, `RegistrarSentimentoDialog`, `AlertasCriticos`
+- **Timeline por Pessoa**: `VidaIgrejaIntercessao` exibe histórico unificado (pedidos + sentimentos + testemunhos) para contexto pastoral
+- **Queries/Realtime**: Uso de `@supabase/supabase-js` para CRUD; TanStack Query para cache; Supabase Realtime para atualizações em tempo real (a confirmar se implementado)
+
+### 4.6 Permissões (RLS Básico)
+- **Membro**: Cria próprio pedido, vê próprios sentimentos, envia testemunho
+- **Intercessor**: Vê pedidos alocados a si, atualiza observações/status
+- **Admin/Pastor**: CRUD completo em todas as tabelas; aprova testemunhos; aloca pedidos; gerencia intercessores
+
+### 4.7 Referências e Links
+- Manual do usuário: [`../manual-usuario.md#6-intercessão`](../manual-usuario.md#6-intercessão)
+- Diagramas: [`../diagramas/fluxo-intercessao.md`](../diagramas/fluxo-intercessao.md), [`../diagramas/sequencia-intercessao.md`](../diagramas/sequencia-intercessao.md)
 
 ---
 

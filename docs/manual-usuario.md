@@ -675,98 +675,205 @@ Para apresentar na igreja, utilize um dos modos abaixo (ambos em tela cheia):
 
 ## 6. Intercessão
 
-### 6.1 Acessando o Módulo
+**Acesso**: Menu lateral → **Intercessão** → expande submenu com opções.
 
-1. No menu lateral, clique em **"Intercessão"**
-2. O módulo se expande
+### 6.1 Visão Geral (Dashboard)
 
-![Menu Intercessão](./screenshots/placeholder-menu-intercessao.png)
-> *Screenshot: Menu de Intercessão*
+A página inicial `/intercessao` exibe:
 
-### 6.2 Visão Geral
+- **Módulos Principais** (4 cards):
+  - **Pedidos de Oração**: estatísticas (pendentes, em oração), link para `/intercessao/pedidos`
+  - **Intercessores**: equipe ativa, link para `/intercessao/intercessores`
+  - **Testemunhos**: pendentes de aprovação, link para `/intercessao/testemunhos`
+  - **Sentimentos**: monitoramento emocional, link para `/intercessao/sentimentos`
+- **Ações Rápidas**:
+  - **"Novo Pedido de Oração"**: abre formulário para criar pedido (link com `?novo=true` ou navega para `/intercessao/pedidos?novo=true`)
+  - **"Alocar Pedidos Pendentes"**: dispara alocação automática balanceada entre intercessores
 
-Dashboard com:
+### 6.2 Pedidos de Oração (`/intercessao/pedidos`)
 
-- Pedidos pendentes de alocação
-- Intercessores ativos
-- Testemunhos aguardando aprovação
-- Estatísticas gerais
+#### Visualizando e Filtrando
 
-![Intercessão Geral](./screenshots/placeholder-intercessao-geral.png)
-> *Screenshot: Dashboard de Intercessão*
+1. Acesse **Intercessão → Pedidos de Oração**
+2. **Listagem** exibe:
+   - Título/descrição do pedido
+   - Tipo (saúde, família, financeiro, trabalho, etc.)
+   - Status (pendente, alocado, em oração, respondido, arquivado)
+   - Intercessor alocado (quando aplicável)
+   - Data de criação
+3. **Filtros/Abas** por status (todos, pendente, alocado, em oração, respondido, arquivado)
+4. **Busca** por palavras-chave
+5. **Ação**: Clique em um pedido para **Ver Detalhes** (modal com observações, historico de alocação, comentários)
+6. **Exportar**: Botão para baixar listagem em Excel
 
-### 6.3 Pedidos de Oração
+#### Criando Novo Pedido (Membro/Visitante)
 
-#### Visualizando Pedidos
+1. Na tela de Pedidos, clique em **"+ Fazer Novo Pedido de Oração"** (destaque com ícone)
+2. Preencha:
+   - **Pedido** (texto obrigatório): descrição detalhada da necessidade
+   - **Tipo** (dropdown): saúde, família, financeiro, trabalho, espiritual, outro
+   - **Anônimo** (checkbox): marca para ocultar nome/contato
+   - **Contato** (se não anônimo): telefone/email para retorno
+3. Clique em **"Enviar Pedido"**
+   - Pedido criado com `status = pendente`
+   - Notificação enviada aos intercessores (a confirmar)
 
-1. Acesse **Intercessão > Pedidos de Oração**
-2. Use os filtros:
-   - Por status (Pendente, Alocado, etc.)
-   - Por tipo (Saúde, Família, etc.)
+#### Admin: Alocando e Gerenciando
 
-![Lista Pedidos](./screenshots/placeholder-lista-pedidos.png)
-> *Screenshot: Lista de pedidos de oração*
+1. Em **Admin/Pastor**, visualize **"Todos os Pedidos"** (tab ou view dedicated)
+2. Para um pedido com `status = pendente`:
+   - Botão/ação **"Alocar Intercessor"** (dropdown com intercessores ordenados por carga)
+   - Selecione intercessor e confirme (status muda para `alocado`, data_alocacao preenchida)
+3. Para pedido com `status = alocado` ou `em_oracao`:
+   - Intercessor pode atualizar observações em campo de texto
+   - Admin pode reclassificar status (ex: `em_oracao` → `respondido`)
+4. **Ações contextuais**:
+   - Visualizar histórico de alterações
+   - Anexar/visualizar observações
+   - Marcar como respondido (com data_resposta)
+   - Arquivar pedido
 
-#### Alocando para Intercessor
+#### Intercessor: Acompanhando Pedidos
 
-1. Clique no pedido para abrir detalhes
-2. Clique em **"Alocar Intercessor"**
-3. Selecione um intercessor disponível
-4. Clique em **"Confirmar"**
+1. Acesse `/intercessao/pedidos` com role `intercessor`
+2. Visualize apenas pedidos alocados a você (RLS aplicado)
+3. Para cada pedido:
+   - Veja descrição completa, tipo e contato do solicitante
+   - Campo de **"Observações do Intercessor"** para registrar: oração realizada, progresso, respostas observadas
+   - Botão para marcar como **"Em Oração"** (muda `status = em_oracao`)
+   - Botão para marcar como **"Respondido"** (muda `status = respondido`, preenche `data_resposta`)
 
-![Alocar Intercessor](./screenshots/placeholder-alocar-intercessor.png)
-> *Screenshot: Diálogo de alocação*
+### 6.3 Intercessores (`/intercessao/intercessores`)
 
-### 6.4 Intercessores
+#### Listando Intercessores
+
+1. Acesse **Intercessão → Intercessores**
+2. **Listagem** exibe:
+   - Nome
+   - Email / Telefone
+   - Status (ativo/inativo)
+   - Pedidos ativos (count)
+   - Limite máximo de pedidos
+   - Últimas datas de atualização
+3. **Ações**:
+   - Clique para editar ou visualizar detalhes
+   - Inativar (toggle status `ativo = false`)
+   - Excluir (se sem pedidos alocados)
 
 #### Cadastrando Intercessor
 
-1. Acesse **Intercessão > Intercessores**
-2. Clique em **"+ Novo Intercessor"**
-3. Preencha:
-   - Nome
-   - Email
-   - Telefone
-   - Máximo de pedidos simultâneos
+1. Clique em **"+ Novo Intercessor"** (ou atalho em `/intercessao`)
+2. Preencha diálogo:
+   - **Nome** (obrigatório)
+   - **Email** (recomendado)
+   - **Telefone** (recomendado)
+   - **Máximo de Pedidos** (padrão 10): limite simultâneo para balanceamento
+   - **Ativo** (checkbox): habilita para alocação
+3. Clique em **"Salvar"**
+   - Intercessor criado em tabela `intercessores`
+   - Pode começar a receber pedidos imediatamente
+
+#### Editando / Inativando
+
+1. Clique no intercessor na listagem
+2. Modifique dados conforme necessário
+3. Ao inativar (`ativo = false`), novos pedidos não são alocados; existentes continuam alocados (a confirmar política)
 4. Clique em **"Salvar"**
 
-![Novo Intercessor](./screenshots/placeholder-novo-intercessor.png)
-> *Screenshot: Formulário de intercessor*
+### 6.4 Testemunhos (`/intercessao/testemunhos`)
 
-### 6.5 Testemunhos
+#### Visualizando e Filtrando
 
-#### Aprovando Testemunho
+1. Acesse **Intercessão → Testemunhos**
+2. **Abas por status**:
+   - **Aberto**: testemunhos em submissão, aguardando aprovação
+   - **Público**: testemunhos aprovados para publicação
+   - **Arquivado**: histórico
+3. **Filtros**:
+   - Por categoria (espiritual, casamento, família, saúde, trabalho, financeiro, ministerial, outro)
+   - Busca por palavra-chave/título
+4. **Cada testemunho** exibe:
+   - Título, categoria, autor (ou "Anônimo")
+   - Snippet de texto
+   - Data de criação
+5. **Ações**:
+   - Ver detalhes (modal/drawer com texto completo)
+   - Clique em testemunho → opções de **Aprovar para Publicação** ou **Arquivar**
+   - Exportar listagem em Excel
 
-1. Acesse **Intercessão > Testemunhos**
-2. Clique em um testemunho com status "Aberto"
-3. Revise o conteúdo
-4. Clique em **"Aprovar para Publicação"** ou **"Arquivar"**
+#### Membro: Enviar Testemunho
 
-![Aprovar Testemunho](./screenshots/placeholder-aprovar-testemunho.png)
-> *Screenshot: Detalhes do testemunho*
+1. Em Dashboard ou via `/intercessao/testemunhos`, clique em **"+ Novo Testemunho"**
+2. Preencha:
+   - **Título** (obrigatório)
+   - **Categoria** (dropdown)
+   - **Mensagem** (texto obrigatório): relato detalhado da bênção/milagre
+   - **Anônimo** (checkbox)
+   - **Contato** (se não anônimo)
+3. Clique em **"Enviar Testemunho"**
+   - Criado com `status = aberto` (aguardando aprovação)
+   - Notificação enviada para admin/secretaria (a confirmar)
 
-### 6.6 Sentimentos
+#### Admin: Aprovando Testemunhos
 
-#### Monitorando Sentimentos
+1. Na aba **"Aberto"** (`/intercessao/testemunhos` com `statusTab=aberto`), visualize testemunhos em submissão
+2. Para cada testemunho, clique para abrir detalhes:
+   - Revise conteúdo, categoria, autor
+   - Botões:
+     - **"Aprovar para Publicação"**: status muda para `publico`, `publicar = true`, `data_publicacao = now()`; testemunho exibido no carrossel de dashboard/app para todos os membros
+     - **"Arquivar"**: status muda para `arquivado`; não aparece em listagens ativas
+3. **Visualize histórico** de aprovações (quem aprovou, quando)
 
-1. Acesse **Intercessão > Sentimentos**
-2. Visualize:
-   - Gráfico de sentimentos por período
-   - **Alertas Críticos**: Membros com 3+ dias negativos
+### 6.5 Sentimentos (`/intercessao/sentimentos`)
 
-![Sentimentos](./screenshots/placeholder-sentimentos.png)
-> *Screenshot: Dashboard de sentimentos*
+#### Monitorando Sentimentos de Membros
 
-#### Alertas Críticos
+1. Acesse **Intercessão → Sentimentos**
+2. **Seção "Hoje e Próximos Dias"**:
+   - Gráfico de sentimentos registrados no dia (quantos felizes, tristes, ansiosos, etc.)
+   - Pode filtrar por período (hoje, últimos 7 dias, últimos 30 dias)
+3. **Alertas Críticos**:
+   - Exibidos em cards destacados: membros com 3+ dias consecutivos de sentimentos negativos
+   - Informações de contato e link para WhatsApp
+   - Admin pode enviar mensagem de apoio direto do sistema (a confirmar)
+4. **Timeline de Sentimentos por Membro**:
+   - Clique em um membro para ver histórico completo
+   - Visualize padrões (ex: picos de ansiedade, melhora após testemunho)
 
-Quando um membro registra sentimentos negativos por 3 dias consecutivos:
+#### Membro: Registrando Sentimentos
 
-1. Um alerta é exibido no dashboard
-2. Mostra informações de contato
-3. Botão para enviar mensagem WhatsApp
+1. **Notificação diária** (às 9h): "Como você está?" → clique para registrar
+2. Ou acesse `/intercessao/sentimentos` diretamente (tela com registro)
+3. Selecione sentimento (radio buttons ou dropdown):
+   - **Feliz**: sentimento positivo
+   - **Triste**: angústia
+   - **Ansioso**: preocupação
+   - **Grato**: gratidão
+   - **Abençoado**: alegria espiritual
+   - **Angustiado**: crises
+4. **Campo opcional**: "Quer compartilhar?" (texto curto)
+5. Clique em **"Registrar"**
+   - Sistema analisa sentimento e oferece **"Redirecionamento Inteligente"**:
+     - **Se positivo (feliz/grato/abençoado)**: sugestão "Compartilhar Testemunho?" → link para `/intercessao/testemunhos?novo=true`
+     - **Se negativo (triste/ansioso/angustiado)**: sugestão "Fazer Pedido de Oração?" → link para `/intercessao/pedidos?novo=true`
+6. Sentimento registrado em `sentimentos_membros` com timestamp
 
-![Alerta Crítico](./screenshots/placeholder-alerta-critico.png)
-> *Screenshot: Card de alerta crítico*
+#### Direcionar Apoio (Admin)
+
+1. Se membro registra 3+ dias negativos seguidos, alerta crítico aparece no Dashboard
+2. Admin recebe notificação (a confirmar) com dados do membro
+3. Pode:
+   - Enviar mensagem WhatsApp de apoio
+   - Navegar para perfil do membro (seção Vida Igreja → Intercessão/Sentimentos)
+   - Registrar observações pastorais (em campo de notas do perfil)
+
+**Links Úteis**:
+- Fluxo Intercessão (Mermaid): [`../diagramas/fluxo-intercessao.md`](../diagramas/fluxo-intercessao.md)
+- Sequência Intercessão (Mermaid): [`../diagramas/sequencia-intercessao.md`](../diagramas/sequencia-intercessao.md)
+- Produto — Intercessão: [`../produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto`](../produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto)
+- Funcionalidades — Intercessão: [`../funcionalidades.md#4-intercessão-oração-e-testemunhos`](../funcionalidades.md#4-intercessão-oração-e-testemunhos)
+- Arquitetura — Intercessão: [`../01-Arquitetura/01-arquitetura-geral.MD#módulo-intercessão-oração-e-testemunhos-visão-técnica`](../01-Arquitetura/01-arquitetura-geral.MD#módulo-intercessão-oração-e-testemunhos-visão-técnica)
+- ER — Intercessão: [`../database-er-diagram.md#intercessão-oração-e-testemunhos--entidades-e-relações`](../database-er-diagram.md#intercessão-oração-e-testemunhos--entidades-e-relações)
 
 ---
 
