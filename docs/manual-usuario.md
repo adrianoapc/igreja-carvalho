@@ -1188,6 +1188,33 @@ Principais eventos que podem disparar notificações automáticas:
 ![Meus Cursos](./screenshots/placeholder-meus-cursos.png)
 > *Screenshot: Lista de cursos*
 
+#### Inscrição em Cursos Pagos (Aluno)
+
+Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O sistema diferencia cursos gratuitos e pagos para garantir uma experiência clara e segura.
+
+**Como inscrever-se**
+1. Acesse **Minha Área > Meus Cursos**.
+2. Use as abas no topo:
+   - **Meus cursos**: cursos já inscritos (com progresso e status).
+   - **Disponíveis**: cursos abertos para inscrição.
+3. Na aba **Disponíveis**, escolha o curso:
+   - Se estiver marcado como **Pago**, o cartão exibe o **valor (R$)**.
+4. Clique em **Inscrever-se**:
+   - Cursos **gratuitos**: a inscrição é imediata e o acesso é liberado.
+   - Cursos **pagos**: uma transação financeira de **entrada** é criada com **status pendente** e sua inscrição fica com **status_pagamento: pendente**.
+
+**O que você verá após a inscrição paga**
+- No painel **Meus cursos**, o curso aparece com o badge **“Aguardando Pagamento”**.
+- Ao tentar abrir o **Player**, o acesso fica **bloqueado** até a confirmação de pagamento.
+- Após a confirmação (baixa no módulo financeiro), o status muda para **pago** e o conteúdo é liberado.
+
+**Dicas e avisos**
+- Caso veja um aviso de **configuração financeira ausente**, procure a secretaria/tesouraria para ajustar a conta de recebimento (a confirmar conforme política interna).
+- Formas de pagamento como **PIX/Cartão** não aparecem no app do aluno neste fluxo (a confirmar integração); a baixa é registrada administrativamente no módulo financeiro.
+
+**Fluxo visual (Mermaid)**
+- Consulte o diagrama: [Fluxo de Cursos Pagos](diagramas/fluxo-cursos-pagos.md)
+
 ### 10.5 Registrando Sentimento
 
 1. No dashboard, clique em **"Como você está?"**
