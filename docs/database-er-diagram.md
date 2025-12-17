@@ -789,6 +789,10 @@ erDiagram
         timestamp updated_at
     }
 
+### Observação sobre o schema atual
+- A versão mais recente de `docs/database-schema.sql` (2025-12-03) não contém as definições das tabelas de Jornadas/Ensino acima; validar se há migrações pendentes ou se o dump precisa ser atualizado.
+- Links úteis: funcionalidades (`../funcionalidades.md#5-jornadas-e-ensino`), manual (`../manual-usuario.md#7-jornadas-e-ensino`), produto (`../produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto`), diagramas (`../diagramas/fluxo-ensino.md`, `../diagramas/sequencia-ensino.md`).
+
     %% =============================================
     %% KIDS (MINISTÉRIO INFANTIL)
     %% =============================================

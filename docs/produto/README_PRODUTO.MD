@@ -72,3 +72,23 @@ Referências complementares:
 Referências complementares:
 - Manual do usuário — Notificações: `../manual-usuario.md` (seção 10, a confirmar)
 
+## Jornadas e Ensino (visão de produto)
+
+- **Objetivo**: estruturar trilhas de formação (jornadas/cursos) e o dia a dia de aulas/presenças, oferecendo ao aluno um player simples e ao time de ensino ferramentas de controle.
+- **Para quem**: líderes/discipuladores e secretaria (criam jornadas, etapas e matrículas), professores/voluntários (agendam aulas, registram presença), alunos/membros (consomem conteúdo e acompanham progresso), pais/responsáveis no Kids (check-in/check-out e etiquetas).
+- **Principais capacidades**:
+	- criar e editar jornadas com etapas sequenciais (vídeo, texto, presencial);
+	- matricular alunos (manual ou autoinscrição), acompanhar progresso e responsáveis;
+	- player para o aluno marcar etapas concluídas e continuar de onde parou;
+	- gestão de aulas: sala, modalidade, professor, datas e presenças;
+	- check-in manual e impressão de etiquetas de segurança para Kids (quando aplicável);
+	- cursos pagos: flag de pagamento, valor e bloqueio de acesso até confirmação financeira.
+- **Limites do escopo**: não é LMS completo de avaliações/provas; não gera certificados automaticamente (a confirmar); integrações de pagamento no app do aluno não estão presentes (baixa ocorre no financeiro); comunicação editorial deve usar o módulo Comunicação.
+
+Referências:
+- Funcionalidades — Jornadas e Ensino: `../funcionalidades.md#5-jornadas-e-ensino`
+- Manual do usuário — Jornadas e Ensino: `../manual-usuario.md#7-jornadas-e-ensino`
+- Diagrama de cursos pagos: `../diagramas/fluxo-cursos-pagos.md`
+ - Diagramas gerais do módulo: `../diagramas/fluxo-ensino.md`, `../diagramas/sequencia-ensino.md`
+ - Arquitetura (visão técnica): `../01-Arquitetura/01-arquitetura-geral.MD#módulo-jornadas-e-ensino-visão-técnica`
+

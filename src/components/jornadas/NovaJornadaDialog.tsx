@@ -42,6 +42,8 @@ export default function NovaJornadaDialog({
   const [corTema, setCorTema] = useState(CORES_TEMA[0]);
   const [exibirPortal, setExibirPortal] = useState(true);
   const [etapas, setEtapas] = useState<string[]>(["Etapa 1", "Etapa 2", "Etapa 3"]);
+  const [requerPagamento, setRequerPagamento] = useState(false);
+  const [valor, setValor] = useState<string>("");
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -53,6 +55,8 @@ export default function NovaJornadaDialog({
           descricao: descricao || null,
           cor_tema: corTema,
           exibir_portal: exibirPortal,
+          requer_pagamento: requerPagamento,
+          valor: requerPagamento ? Number(valor) : null,
         })
         .select()
         .single();
@@ -95,6 +99,8 @@ export default function NovaJornadaDialog({
     setCorTema(CORES_TEMA[0]);
     setExibirPortal(true);
     setEtapas(["Etapa 1", "Etapa 2", "Etapa 3"]);
+    setRequerPagamento(false);
+    setValor("");
   };
 
   const addEtapa = () => {
@@ -188,6 +194,31 @@ export default function NovaJornadaDialog({
               <p className="text-xs text-muted-foreground">
                 Se desmarcado, esta jornada será invisível para o membro, servindo apenas para controle interno da liderança.
               </p>
+            </div>
+
+            <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="requer_pagamento" className="font-medium">
+                  Este curso é pago?
+                </Label>
+                <Switch
+                  id="requer_pagamento"
+                  checked={requerPagamento}
+                  onCheckedChange={setRequerPagamento}
+                />
+              </div>
+              {requerPagamento && (
+                <div className="space-y-2">
+                  <Label>Valor da Inscrição (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={valor}
+                    onChange={(e) => setValor(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
           <div className="space-y-2">

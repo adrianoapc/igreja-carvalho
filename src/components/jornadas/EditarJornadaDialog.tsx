@@ -80,6 +80,8 @@ export default function EditarJornadaDialog({
   const [corTema, setCorTema] = useState(CORES_TEMA[0]);
   const [ativo, setAtivo] = useState(true);
   const [exibirPortal, setExibirPortal] = useState(true);
+  const [requerPagamento, setRequerPagamento] = useState(false);
+  const [valor, setValor] = useState<string>("");
   const [etapas, setEtapas] = useState<EtapaLocal[]>([]);
   const [selectedEtapa, setSelectedEtapa] = useState<EtapaLocal | null>(null);
   const [showContentDialog, setShowContentDialog] = useState(false);
@@ -108,6 +110,8 @@ export default function EditarJornadaDialog({
       setCorTema(jornada.cor_tema || CORES_TEMA[0]);
       setAtivo(jornada.ativo);
       setExibirPortal(jornada.exibir_portal ?? true);
+      setRequerPagamento(!!jornada.requer_pagamento);
+      setValor(jornada.valor ? String(jornada.valor) : "");
     }
   }, [open, jornada]);
 
@@ -137,6 +141,8 @@ export default function EditarJornadaDialog({
           cor_tema: corTema,
           ativo,
           exibir_portal: exibirPortal,
+          requer_pagamento: requerPagamento,
+          valor: requerPagamento ? Number(valor) : null,
         })
         .eq("id", jornada.id);
 
@@ -311,6 +317,31 @@ export default function EditarJornadaDialog({
               <p className="text-xs text-muted-foreground">
                 Se desmarcado, esta jornada será invisível para o membro, servindo apenas para controle interno da liderança.
               </p>
+            </div>
+
+            <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="requer_pagamento" className="font-medium">
+                  Este curso é pago?
+                </Label>
+                <Switch
+                  id="requer_pagamento"
+                  checked={requerPagamento}
+                  onCheckedChange={setRequerPagamento}
+                />
+              </div>
+              {requerPagamento && (
+                <div className="space-y-2">
+                  <Label>Valor da Inscrição (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={valor}
+                    onChange={(e) => setValor(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
