@@ -60,6 +60,8 @@ export default function CursoPlayer() {
   const [loading, setLoading] = useState(true);
   const [marcandoConcluido, setMarcandoConcluido] = useState(false);
   const [sidebarAberta, setSidebarAberta] = useState(true);
+  const [bloqueadoPagamento, setBloqueadoPagamento] = useState(false);
+  const [valorCurso, setValorCurso] = useState<number | null>(null);
 
   useEffect(() => {
     if (id && profile?.id) {
@@ -82,12 +84,27 @@ export default function CursoPlayer() {
       // Buscar jornada
       const { data: jornadaData, error: jornadaError } = await supabase
         .from("jornadas")
-        .select("id, titulo, descricao, cor_tema")
+        .select("id, titulo, descricao, cor_tema, valor, requer_pagamento")
         .eq("id", id)
         .single();
 
       if (jornadaError) throw jornadaError;
       setJornada(jornadaData);
+
+      // Verificar inscrição e pagamento
+      const { data: inscricao } = await supabase
+        .from("inscricoes_jornada")
+        .select("status_pagamento")
+        .eq("jornada_id", id)
+        .eq("pessoa_id", profile.id)
+        .maybeSingle();
+
+      if (inscricao?.status_pagamento === "pendente") {
+        setBloqueadoPagamento(true);
+        setValorCurso(jornadaData.valor || null);
+        setLoading(false);
+        return;
+      }
 
       // Buscar etapas
       const { data: etapasData, error: etapasError } = await supabase
@@ -130,6 +147,22 @@ export default function CursoPlayer() {
       setLoading(false);
     }
   };
+  if (bloqueadoPagamento) {
+    return (
+      <div className="container mx-auto p-4">
+        <Card>
+          <CardContent className="py-10 text-center space-y-2">
+            <Lock className="h-10 w-10 mx-auto text-muted-foreground" />
+            <h2 className="text-lg font-semibold">Acesso bloqueado</h2>
+            <p className="text-sm text-muted-foreground">
+              Pagamento pendente{valorCurso ? ` (R$ ${valorCurso.toFixed(2)})` : ""}. Aguarde confirmação da tesouraria.
+            </p>
+            <Button variant="link" onClick={() => navigate(-1)}>Voltar</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const fetchAulaVinculada = async (aulaId: string) => {
     const { data } = await supabase

@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { BookOpen, Play, ChevronRight, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useConfiguracaoFinanceiraEnsino } from "@/hooks/useConfiguracaoFinanceiraEnsino";
 
 interface InscricaoComProgresso {
   id: string;
@@ -21,7 +24,10 @@ interface InscricaoComProgresso {
     descricao: string | null;
     cor_tema: string | null;
     exibir_portal: boolean | null;
+    requer_pagamento?: boolean | null;
+    valor?: number | null;
   };
+  status_pagamento?: "isento" | "pendente" | "pago" | null;
   totalEtapas: number;
   etapasConcluidas: number;
 }
@@ -33,6 +39,8 @@ interface JornadaDisponivel {
   titulo: string;
   descricao: string | null;
   cor_tema: string | null;
+  requer_pagamento?: boolean | null;
+  valor?: number | null;
 }
 
 export default function MeusCursos() {
@@ -44,6 +52,9 @@ export default function MeusCursos() {
   const [loadingDisponiveis, setLoadingDisponiveis] = useState(true);
   const [activeTab, setActiveTab] = useState("inscritos");
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
+  const { categoriaId, baseMinisterialId, contaId } = useConfiguracaoFinanceiraEnsino();
+  const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
+  const [pagamentoMensagem, setPagamentoMensagem] = useState("");
 
   const fetchInscricoes = useCallback(async () => {
     if (!profile?.id) return;
@@ -56,7 +67,8 @@ export default function MeusCursos() {
           jornada_id,
           etapa_atual_id,
           concluido,
-          jornada:jornadas!inner(id, titulo, descricao, cor_tema, exibir_portal)
+          status_pagamento,
+          jornada:jornadas!inner(id, titulo, descricao, cor_tema, exibir_portal, requer_pagamento, valor)
         `)
         .eq("pessoa_id", profile.id)
         .eq("concluido", false)
@@ -118,7 +130,7 @@ export default function MeusCursos() {
 
       const { data: inscricoesUsuario, error: inscricoesError } = await supabase
         .from("inscricoes_jornada")
-        .select("jornada_id")
+        .select("jornada_id, status_pagamento")
         .eq("pessoa_id", profile.id);
 
       if (inscricoesError) throw inscricoesError;
@@ -127,7 +139,7 @@ export default function MeusCursos() {
 
       const { data: jornadas, error } = await supabase
         .from("jornadas")
-        .select("id, titulo, descricao, cor_tema")
+        .select("id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal")
         .eq("ativo", true)
         .eq("exibir_portal", true)
         .order("created_at", { ascending: false });
@@ -156,22 +168,65 @@ export default function MeusCursos() {
     return Math.round((inscricao.etapasConcluidas / inscricao.totalEtapas) * 100);
   };
 
-  const handleInscrever = async (jornadaId: string) => {
+  const handleInscrever = async (jornada: JornadaDisponivel) => {
     if (!profile?.id) return;
-    setEnrollingId(jornadaId);
+    setEnrollingId(jornada.id);
 
     try {
-      const { error } = await supabase.from("inscricoes_jornada").insert({
-        jornada_id: jornadaId,
-        pessoa_id: profile.id,
-        responsavel_id: profile.id,
-      });
+      if (!jornada.requer_pagamento) {
+        const { error } = await supabase.from("inscricoes_jornada").insert({
+          jornada_id: jornada.id,
+          pessoa_id: profile.id,
+          responsavel_id: profile.id,
+          status_pagamento: "isento",
+        });
+        if (error) throw error;
+        toast.success("Inscrição realizada com sucesso");
+        await Promise.all([fetchInscricoes(), fetchDisponiveis()]);
+        navigate(`/cursos/${jornada.id}`);
+        return;
+      }
 
-      if (error) throw error;
+      // Curso pago
+      if (!contaId) {
+        toast.error("Configuração financeira ausente (conta padrão). Configure em Financeiro.");
+        return;
+      }
+      const hoje = new Date();
+      const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
 
-      toast.success("Inscrição realizada com sucesso");
+      const { data: transacaoCriada, error: txError } = await supabase
+        .from("transacoes_financeiras")
+        .insert({
+          descricao: `Inscrição Jornada: ${jornada.titulo}`,
+          valor: Number(jornada.valor || 0),
+          tipo: "entrada",
+          tipo_lancamento: "unico",
+          status: "pendente",
+          data_vencimento: data,
+          data_competencia: data,
+          conta_id: contaId,
+          categoria_id: categoriaId,
+          base_ministerial_id: baseMinisterialId,
+        })
+        .select("id")
+        .single();
+      if (txError) throw txError;
+
+      const { error: inscError } = await supabase
+        .from("inscricoes_jornada")
+        .insert({
+          jornada_id: jornada.id,
+          pessoa_id: profile.id,
+          responsavel_id: profile.id,
+          status_pagamento: "pendente",
+          transacao_id: transacaoCriada.id,
+        });
+      if (inscError) throw inscError;
+
+      setPagamentoMensagem(`Inscrição realizada! Para liberar o acesso, realize o pagamento de R$ ${Number(jornada.valor || 0).toFixed(2)}.`);
+      setPagamentoDialogOpen(true);
       await Promise.all([fetchInscricoes(), fetchDisponiveis()]);
-      navigate(`/cursos/${jornadaId}`);
     } catch (error) {
       const duplicate = (error as { code?: string } | null)?.code === "23505";
       if (duplicate) {
@@ -228,11 +283,12 @@ export default function MeusCursos() {
                 const progresso = calcularProgresso(inscricao);
                 const corTema = inscricao.jornada?.cor_tema || "hsl(var(--primary))";
                 
+                const bloqueado = inscricao.status_pagamento === "pendente";
                 return (
                   <Card 
                     key={inscricao.id} 
-                    className="overflow-hidden hover:shadow-md transition-all cursor-pointer group"
-                    onClick={() => navigate(`/cursos/${inscricao.jornada_id}`)}
+                    className={`overflow-hidden hover:shadow-md transition-all ${bloqueado ? "opacity-90" : "cursor-pointer group"}`}
+                    onClick={() => !bloqueado && navigate(`/cursos/${inscricao.jornada_id}`)}
                   >
                     <div className="flex items-stretch">
                       <div 
@@ -242,9 +298,12 @@ export default function MeusCursos() {
                       
                       <div className="flex-1 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
-                            {inscricao.jornada?.titulo}
-                          </h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
+                              {inscricao.jornada?.titulo}
+                            </h3>
+                            {bloqueado && <Badge variant="secondary">Aguardando Pagamento</Badge>}
+                          </div>
                           {inscricao.jornada?.descricao && (
                             <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
                               {inscricao.jornada.descricao}
@@ -263,23 +322,26 @@ export default function MeusCursos() {
                             <Progress value={progresso} className="h-1.5" />
                           </div>
                           
-                          <Button 
-                            size="sm" 
-                            variant={progresso === 0 ? "default" : "outline"}
-                            className="shrink-0"
-                          >
-                            {progresso === 0 ? (
-                              <>
-                                <Play className="h-4 w-4 mr-1.5" />
-                                Iniciar
-                              </>
-                            ) : (
-                              <>
-                                <ChevronRight className="h-4 w-4 mr-1.5" />
-                                Continuar
-                              </>
-                            )}
-                          </Button>
+                          {!bloqueado && (
+                            <Button 
+                              size="sm" 
+                              variant={progresso === 0 ? "default" : "outline"}
+                              className="shrink-0 hidden sm:flex"
+                              onClick={() => navigate(`/cursos/${inscricao.jornada_id}`)}
+                            >
+                              {progresso === 0 ? (
+                                <>
+                                  <Play className="h-4 w-4 mr-1.5" />
+                                  Iniciar
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronRight className="h-4 w-4 mr-1.5" />
+                                  Continuar
+                                </>
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -327,10 +389,13 @@ export default function MeusCursos() {
                       </div>
                     </div>
 
-                    <div className="mt-auto flex justify-end">
+                    <div className="mt-auto flex justify-between items-center">
+                      {jornada.requer_pagamento && (
+                        <span className="text-sm font-medium">Valor: R$ {(jornada.valor || 0).toFixed(2)}</span>
+                      )}
                       <Button 
                         size="sm"
-                        onClick={() => handleInscrever(jornada.id)}
+                        onClick={() => handleInscrever(jornada)}
                         disabled={enrollingId === jornada.id}
                       >
                         {enrollingId === jornada.id ? "Inscrevendo..." : "Inscrever-se"}
@@ -343,6 +408,18 @@ export default function MeusCursos() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={pagamentoDialogOpen} onOpenChange={setPagamentoDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Inscrição realizada</DialogTitle>
+            <DialogDescription>{pagamentoMensagem}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setPagamentoDialogOpen(false)}>Entendi</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

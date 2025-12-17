@@ -25,6 +25,9 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
  	- Kids — Responsáveis autorizados (guardians): [`AUTHORIZED_GUARDIANS.md`](AUTHORIZED_GUARDIANS.md)
  	- Kids — Notificações: [`NOTIFICACOES_KIDS.md`](NOTIFICACOES_KIDS.md)
  	- Manual — Ministério Infantil (Kids): [`manual-usuario.md`](manual-usuario.md)
+	- Jornadas e Ensino — visão de produto: [`produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto`](produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto)
+	- Jornadas e Ensino — manual do usuário: [`manual-usuario.md#7-jornadas-e-ensino`](manual-usuario.md#7-jornadas-e-ensino)
+	- Jornadas e Ensino — funcionalidades: [`funcionalidades.md#5-jornadas-e-ensino`](funcionalidades.md#5-jornadas-e-ensino)
 - Banco de Dados
 	- Esquema SQL: [`database-schema.sql`](database-schema.sql)
 	- Diagrama ER: [`database-er-diagram.md`](database-er-diagram.md)
@@ -36,6 +39,9 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
  	- Diagrama — Sequência Comunicação: [`diagramas/sequencia-comunicacao.md`](diagramas/sequencia-comunicacao.md)
  	- Diagrama — Fluxo Notificações: [`diagramas/fluxo-notificacoes.md`](diagramas/fluxo-notificacoes.md)
  	- Diagrama — Sequência Notificações: [`diagramas/sequencia-notificacoes.md`](diagramas/sequencia-notificacoes.md)
+	- Diagrama — Fluxo Ensino: [`diagramas/fluxo-ensino.md`](diagramas/fluxo-ensino.md)
+	- Diagrama — Sequência Ensino: [`diagramas/sequencia-ensino.md`](diagramas/sequencia-ensino.md)
+	- Diagrama — Cursos Pagos (Ensino): [`diagramas/fluxo-cursos-pagos.md`](diagramas/fluxo-cursos-pagos.md)
 - ADRs
 	- Lista de ADRs: [`adr/README.MD`](adr/README.MD)
 	- ADR-001 (Fato Gerador vs Caixa vs DRE): [`adr/ADR-001-separacao-fato-gerador-caixa-dre.md`](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
