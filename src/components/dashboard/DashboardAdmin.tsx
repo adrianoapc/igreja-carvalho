@@ -48,6 +48,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader"; // <--- Novo
+import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
 
 interface Comunicado {
   id: string;
@@ -372,6 +373,9 @@ export default function DashboardAdmin() {
           <span>Como você está?</span>
         </Button>
       </div>
+
+      {/* Widget de Monitoramento de Escalas para Admin */}
+      <EscalasPendentesWidget />
 
       <RegistrarSentimentoDialog open={sentimentoDialogOpen} onOpenChange={setSentimentoDialogOpen} />
 

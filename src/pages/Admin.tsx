@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -488,6 +489,9 @@ export default function Admin() {
         </div>
         <Shield className="w-12 h-12 text-primary opacity-20" />
       </div>
+
+      {/* Widget de Monitoramento de Escalas para Admin */}
+      <EscalasPendentesWidget />
 
       <Tabs defaultValue="users" className="w-full">
         <TabsList>
