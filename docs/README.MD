@@ -36,6 +36,7 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- Intercessão — visão de produto: [`produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto`](produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto)
 	- Intercessão — manual do usuário: [`manual-usuario.md#6-intercessão`](manual-usuario.md#6-intercessão)
 	- Intercessão — funcionalidades: [`funcionalidades.md#4-intercessão-oração-e-testemunhos`](funcionalidades.md#4-intercessão-oração-e-testemunhos)
+	- Intercessão — próximos passos: [`PROXIMOS_PASSOS_INTERCESSAO.md`](PROXIMOS_PASSOS_INTERCESSAO.md)
 - Banco de Dados
 	- Esquema SQL: [`database-schema.sql`](database-schema.sql)
 	- Diagrama ER: [`database-er-diagram.md`](database-er-diagram.md)
