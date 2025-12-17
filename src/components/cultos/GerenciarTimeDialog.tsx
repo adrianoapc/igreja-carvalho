@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Users, UserPlus, X } from "lucide-react";
+import { Plus, Edit, Trash2, Users, UserPlus, X, AlertTriangle, Clock, CheckCircle2, XCircle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Time {
   id: string;
@@ -59,6 +60,13 @@ interface Pessoa {
   status: string;
 }
 
+interface ConflictInfo {
+  conflito_detectado: boolean;
+  time_nome: string;
+  culto_titulo: string;
+  culto_data: string;
+}
+
 interface GerenciarTimeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -79,6 +87,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
   const [pessoaSelecionada, setPessoaSelecionada] = useState<string>("");
   const [posicaoSelecionada, setPosicaoSelecionada] = useState<string>("");
   const [buscaPessoa, setBuscaPessoa] = useState("");
+  const [checkingConflict, setCheckingConflict] = useState(false);
+  const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
+  const [showConflictWarning, setShowConflictWarning] = useState(false);
 
   useEffect(() => {
     if (open && time) {
@@ -231,10 +242,65 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
     }
   };
 
+  const checkConflito = async (pessoaId: string, cultoData: string) => {
+    if (!pessoaId || !cultoData) return;
+
+    setCheckingConflict(true);
+    setConflictInfo(null);
+    
+    try {
+      const { data, error } = await supabase.rpc("check_voluntario_conflito", {
+        p_voluntario_id: pessoaId,
+        p_data_inicio: cultoData,
+        p_duracao_minutos: 120, // 2 horas padrão
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const conflito = data[0];
+        if (conflito.conflito_detectado) {
+          setConflictInfo(conflito);
+          setShowConflictWarning(true);
+        }
+      }
+    } catch (error: any) {
+      console.error("Erro ao verificar conflito:", error);
+    } finally {
+      setCheckingConflict(false);
+    }
+  };
+
+  const handleSelecionarPessoa = async (pessoaId: string) => {
+    setPessoaSelecionada(pessoaId);
+    setConflictInfo(null);
+    setShowConflictWarning(false);
+
+    // Buscar próximo culto para verificar conflito
+    const { data: proximoCulto } = await supabase
+      .from("cultos")
+      .select("data_culto")
+      .gte("data_culto", new Date().toISOString())
+      .order("data_culto", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (proximoCulto) {
+      await checkConflito(pessoaId, proximoCulto.data_culto);
+    }
+  };
+
   const handleAdicionarMembro = async () => {
     if (!time || !pessoaSelecionada) {
       toast.error("Selecione uma pessoa");
       return;
+    }
+
+    if (showConflictWarning && conflictInfo) {
+      const confirmar = window.confirm(
+        `⚠️ ATENÇÃO: Esta pessoa já está escalada em "${conflictInfo.time_nome}" para o culto "${conflictInfo.culto_titulo}".\n\nDeseja adicionar mesmo assim?`
+      );
+      if (!confirmar) return;
     }
 
     setLoading(true);
@@ -255,6 +321,8 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       setPessoaSelecionada("");
       setPosicaoSelecionada("");
       setShowAddMembro(false);
+      setConflictInfo(null);
+      setShowConflictWarning(false);
       loadMembros();
     } catch (error: any) {
       if (error.code === "23505") {
@@ -483,7 +551,7 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                         {pessoasFiltradas.map((pessoa) => (
                           <button
                             key={pessoa.id}
-                            onClick={() => setPessoaSelecionada(pessoa.id)}
+                            onClick={() => handleSelecionarPessoa(pessoa.id)}
                             className={`w-full text-left p-2 rounded-md hover:bg-muted transition-colors ${
                               pessoaSelecionada === pessoa.id ? "bg-muted" : ""
                             }`}
@@ -501,6 +569,37 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                         )}
                       </div>
                     </ScrollArea>
+
+                    {/* Alerta de Conflito */}
+                    {checkingConflict && (
+                      <Alert>
+                        <Clock className="h-4 w-4 animate-spin" />
+                        <AlertDescription>Verificando disponibilidade...</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {showConflictWarning && conflictInfo && (
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          <p className="font-semibold">⚠️ Conflito Detectado</p>
+                          <p className="text-sm mt-1">
+                            Esta pessoa já está escalada em <strong>{conflictInfo.time_nome}</strong>{" "}
+                            para o culto <strong>"{conflictInfo.culto_titulo}"</strong>{" "}
+                            em{" "}
+                            {new Date(conflictInfo.culto_data).toLocaleString("pt-BR", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })}
+                            .
+                          </p>
+                          <p className="text-xs mt-2 italic">
+                            Você pode continuar, mas considere verificar a disponibilidade.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
                     <div className="space-y-2">
                       <Label htmlFor="posicao-membro">Posição (opcional)</Label>
                       <select
@@ -519,10 +618,10 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                     </div>
                     <Button
                       onClick={handleAdicionarMembro}
-                      disabled={!pessoaSelecionada || loading}
+                      disabled={!pessoaSelecionada || loading || checkingConflict}
                       className="w-full bg-gradient-primary"
                     >
-                      Adicionar ao Time
+                      {showConflictWarning ? "Adicionar Mesmo Assim" : "Adicionar ao Time"}
                     </Button>
                   </CardContent>
                 </Card>

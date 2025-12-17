@@ -11,7 +11,8 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertTriangle,
-  X
+  X,
+  Clock
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -42,6 +43,7 @@ interface Escala {
   pessoa_id: string;
   posicao_id: string | null;
   confirmado: boolean;
+  status_confirmacao?: string | null;
   profiles: { nome: string };
   posicoes_time: { nome: string } | null;
 }
@@ -146,6 +148,22 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
     }
   };
 
+  const getStatusIcon = (escala: Escala) => {
+    const status = escala.status_confirmacao || (escala.confirmado ? "aceito" : "pendente");
+    
+    switch (status) {
+      case "aceito":
+      case "confirmado":
+        return <CheckCircle2 className="h-4 w-4 text-green-500" title="Confirmado" />;
+      case "recusado":
+        return <XCircle className="h-4 w-4 text-red-500" title="Recusado" />;
+      case "troca_solicitada":
+        return <AlertTriangle className="h-4 w-4 text-orange-500" title="Troca Solicitada" />;
+      default:
+        return <Clock className="h-4 w-4 text-yellow-500" title="Pendente" />;
+    }
+  };
+
   // Group teams by category
   const timesByCategoria = times.reduce((acc, time) => {
     if (!acc[time.categoria]) acc[time.categoria] = [];
@@ -169,18 +187,18 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Users className="h-5 w-5" />
           Escalas do Culto
         </h3>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm flex-wrap">
           <div className="flex items-center gap-1">
             <CheckCircle2 className="h-4 w-4 text-green-500" />
             <span>{totalConfirmados} confirmados</span>
           </div>
           <div className="flex items-center gap-1">
-            <XCircle className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-4 w-4 text-yellow-500" />
             <span>{totalEscalados - totalConfirmados} pendentes</span>
           </div>
           <Badge variant="outline">Total: {totalEscalados}</Badge>
@@ -249,13 +267,17 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
                               </div>
                               {escalasPosicao.map((escala) => (
                                 <div key={escala.id} className="flex items-center justify-between mt-1 pl-6">
-                                  <span className="text-sm">{escala.profiles.nome}</span>
+                                  <div className="flex items-center gap-2">
+                                    {getStatusIcon(escala)}
+                                    <span className="text-sm">{escala.profiles.nome}</span>
+                                  </div>
                                   <div className="flex items-center gap-1">
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
                                       className="h-6 w-6"
                                       onClick={() => handleToggleConfirmacao(escala)}
+                                      title={escala.confirmado ? "Desmarcar" : "Confirmar"}
                                     >
                                       {escala.confirmado ? (
                                         <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -288,7 +310,10 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
                         <span className="text-xs text-muted-foreground">Geral</span>
                         {escalasTime.filter(e => !e.posicao_id).map((escala) => (
                           <div key={escala.id} className="flex items-center justify-between p-1">
-                            <span className="text-sm">{escala.profiles.nome}</span>
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(escala)}
+                              <span className="text-sm">{escala.profiles.nome}</span>
+                            </div>
                             <div className="flex items-center gap-1">
                               <Button 
                                 variant="ghost" 

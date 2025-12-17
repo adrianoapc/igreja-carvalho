@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, UserPlus, Check, X, CheckCircle2, XCircle } from "lucide-react";
+import { Users, UserPlus, Check, X, CheckCircle2, XCircle, Clock, AlertTriangle, Bell, CheckCheck, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,6 +46,8 @@ interface Escala {
   pessoa_id: string;
   posicao_id: string | null;
   confirmado: boolean;
+  status_confirmacao?: string | null;
+  checkin_realizado?: boolean;
   observacoes: string | null;
   profiles: {
     nome: string;
@@ -69,6 +71,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddMembro, setShowAddMembro] = useState(false);
+  const [sendingNotifications, setSendingNotifications] = useState(false);
 
   useEffect(() => {
     if (open && culto) {
@@ -223,6 +226,123 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
     }
   };
 
+  const handleNotificarPendentes = async () => {
+    const pendentes = escalasDoTime.filter(
+      e => !e.status_confirmacao || e.status_confirmacao === "pendente"
+    );
+
+    if (pendentes.length === 0) {
+      toast.info("Não há escalas pendentes para notificar");
+      return;
+    }
+
+    setSendingNotifications(true);
+    let sucessos = 0;
+    let erros = 0;
+
+    try {
+      for (const escala of pendentes) {
+        try {
+          const { error } = await supabase.functions.invoke('disparar-alerta', {
+            body: {
+              user_id: escala.pessoa_id,
+              titulo: 'Confirme sua Escala',
+              mensagem: `Olá! Você foi escalado para ${culto?.titulo} no time ${timeAtual?.nome}. Por favor, confirme sua presença no App.`,
+              tipo: 'push'
+            }
+          });
+
+          if (error) throw error;
+          sucessos++;
+        } catch (error) {
+          console.error(`Erro ao notificar ${escala.profiles.nome}:`, error);
+          erros++;
+        }
+      }
+
+      if (sucessos > 0) {
+        toast.success(`✅ ${sucessos} notificação(ões) enviada(s)!`, {
+          description: erros > 0 ? `${erros} falharam` : undefined
+        });
+      }
+      if (erros === pendentes.length) {
+        toast.error("Falha ao enviar notificações");
+      }
+    } catch (error) {
+      console.error("Erro geral ao notificar:", error);
+      toast.error("Erro ao enviar notificações");
+    } finally {
+      setSendingNotifications(false);
+    }
+  };
+
+  const getStatusIcon = (escala: Escala) => {
+    const status = escala.status_confirmacao || (escala.confirmado ? "aceito" : "pendente");
+    
+    // Se já fez checkin, mostrar check duplo
+    if (escala.checkin_realizado) {
+      return <CheckCheck className="w-4 h-4 text-green-600" title="Check-in realizado" />;
+    }
+    
+    switch (status) {
+      case "aceito":
+      case "confirmado":
+        return <CheckCircle2 className="w-4 h-4 text-green-500" title="Confirmado" />;
+      case "recusado":
+        return <XCircle className="w-4 h-4 text-red-500" title="Recusado" />;
+      case "troca_solicitada":
+        return <RefreshCw className="w-4 h-4 text-orange-500" title="Troca Solicitada" />;
+      default:
+        return <Clock className="w-4 h-4 text-yellow-500" title="Pendente" />;
+    }
+  };
+
+  const getStatusBadge = (escala: Escala) => {
+    // Priorizar checkin se realizado
+    if (escala.checkin_realizado) {
+      return (
+        <Badge className="gap-1 bg-green-600/20 text-green-800 border-green-600/30">
+          <CheckCheck className="w-3 h-3" />
+          Check-in OK
+        </Badge>
+      );
+    }
+
+    const status = escala.status_confirmacao || (escala.confirmado ? "aceito" : "pendente");
+    
+    switch (status) {
+      case "aceito":
+      case "confirmado":
+        return (
+          <Badge className="gap-1 bg-green-500/20 text-green-700 border-green-500/30">
+            <CheckCircle2 className="w-3 h-3" />
+            Confirmado
+          </Badge>
+        );
+      case "recusado":
+        return (
+          <Badge variant="destructive" className="gap-1">
+            <XCircle className="w-3 h-3" />
+            Recusado
+          </Badge>
+        );
+      case "troca_solicitada":
+        return (
+          <Badge variant="outline" className="gap-1 bg-orange-500/20 text-orange-700 border-orange-500/30">
+            <RefreshCw className="w-3 h-3" />
+            Troca Solicitada
+          </Badge>
+        );
+      default: // pendente
+        return (
+          <Badge variant="secondary" className="gap-1 bg-yellow-500/20 text-yellow-700 border-yellow-500/30">
+            <Clock className="w-3 h-3" />
+            Pendente
+          </Badge>
+        );
+    }
+  };
+
   const escalasDoTime = escalas.filter((e) => e.time_id === timeSelecionado);
   const membrosDisponiveis = membrosTime.filter(
     (m) => !escalasDoTime.some((e) => e.pessoa_id === m.pessoa_id && e.posicao_id === m.posicao_id),
@@ -270,66 +390,109 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
             {/* Escalados */}
             <Card className="flex flex-col overflow-hidden">
               <CardHeader className="p-4">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span>Escalados ({escalasDoTime.length})</span>
-                  {timeAtual && (
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: timeAtual.cor || "#8B5CF6" }}
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <span>Escalados ({escalasDoTime.length})</span>
+                    {timeAtual && (
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: timeAtual.cor || "#8B5CF6" }}
+                      >
+                        <Users className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </CardTitle>
+                  {isAdmin && escalasDoTime.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleNotificarPendentes}
+                      disabled={sendingNotifications || loading}
+                      className="gap-2"
                     >
-                      <Users className="w-4 h-4 text-white" />
-                    </div>
+                      <Bell className="w-4 h-4" />
+                      {sendingNotifications ? "Enviando..." : "Notificar Pendentes"}
+                    </Button>
                   )}
-                </CardTitle>
+                </div>
               </CardHeader>
               <CardContent className="p-4 pt-0 flex-1 overflow-hidden">
                 <ScrollArea className="h-full">
                   <div className="space-y-2">
-                    {escalasDoTime.map((escala) => (
-                      <Card key={escala.id} className="relative">
-                        <CardContent className="p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-sm">{escala.profiles.nome}</p>
-                                {escala.confirmado && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
-                              </div>
-                              {escala.posicoes_time && (
-                                <Badge variant="outline" className="text-xs mt-1">
-                                  {escala.posicoes_time.nome}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleConfirmarPresenca(escala)}
-                                disabled={loading}
-                                title={escala.confirmado ? "Desmarcar confirmação" : "Confirmar presença"}
-                              >
-                                {escala.confirmado ? (
-                                  <XCircle className="w-4 h-4 text-destructive" />
-                                ) : (
-                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    {escalasDoTime.map((escala) => {
+                      const isRecusado = escala.status_confirmacao === "recusado";
+                      const isTrocaSolicitada = escala.status_confirmacao === "troca_solicitada";
+                      const needsAttention = isRecusado || isTrocaSolicitada;
+                      
+                      return (
+                        <Card 
+                          key={escala.id} 
+                          className={`relative ${
+                            needsAttention ? "border-orange-500/50 bg-orange-500/5" : ""
+                          }`}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {getStatusIcon(escala)}
+                                  <p className="font-medium text-sm">{escala.profiles.nome}</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                  {escala.posicoes_time && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {escala.posicoes_time.nome}
+                                    </Badge>
+                                  )}
+                                  {getStatusBadge(escala)}
+                                </div>
+                                {escala.observacoes && (
+                                  <p className="text-xs text-muted-foreground mt-1 italic">
+                                    {escala.observacoes}
+                                  </p>
                                 )}
-                              </Button>
-                              {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoverEscala(escala.id)}
-                                  disabled={loading}
-                                  title="Remover da escala"
-                                >
-                                  <X className="w-4 h-4 text-destructive" />
-                                </Button>
-                              )}
+                                {needsAttention && (
+                                  <div className="mt-2 p-2 rounded bg-orange-500/10 border border-orange-500/20">
+                                    <p className="text-xs font-medium text-orange-700">
+                                      {isRecusado && "⚠️ Encontre um substituto"}
+                                      {isTrocaSolicitada && "🔄 Resolva a solicitação de troca"}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                {isAdmin && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleConfirmarPresenca(escala)}
+                                    disabled={loading}
+                                    title={escala.confirmado ? "Desmarcar confirmação" : "Confirmar presença"}
+                                  >
+                                    {escala.confirmado ? (
+                                      <XCircle className="w-4 h-4 text-destructive" />
+                                    ) : (
+                                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    )}
+                                  </Button>
+                                )}
+                                {isAdmin && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoverEscala(escala.id)}
+                                    disabled={loading}
+                                    title={needsAttention ? "Remover e buscar substituto" : "Remover da escala"}
+                                  >
+                                    <X className="w-4 h-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                     {escalasDoTime.length === 0 && (
                       <div className="text-center p-8">
                         <Users className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
@@ -393,15 +556,25 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
           {/* Resumo de Confirmações */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-sm">{escalas.filter((e) => e.confirmado).length} confirmados</span>
+                    <span className="text-sm">
+                      {escalas.filter((e) => e.confirmado || e.status_confirmacao === "aceite").length} confirmados
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <XCircle className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{escalas.filter((e) => !e.confirmado).length} pendentes</span>
+                    <Clock className="w-4 h-4 text-yellow-500" />
+                    <span className="text-sm">
+                      {escalas.filter((e) => !e.confirmado && (!e.status_confirmacao || e.status_confirmacao === "pendente")).length} pendentes
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                    <span className="text-sm">
+                      {escalas.filter((e) => e.status_confirmacao === "recusado").length} recusados
+                    </span>
                   </div>
                 </div>
                 <Badge variant="outline">Total: {escalas.length} escalados</Badge>
