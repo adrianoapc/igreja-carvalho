@@ -28,27 +28,44 @@ flowchart TD
     style J fill:#f8d7da
 ```
 
-## 2. Fluxo: Intercessores (Equipe)
+## 2. Fluxo: Intercessores (Equipe) — Entrada no Ministério
+
+> **Atualização (2025-12-17)**: Intercessão agora é gerenciada como **Time** padrão.  
+> Entrada/saída unificada no módulo de Times. Trigger sincroniza automaticamente com tabela `intercessores`.  
+> Ver [ADR-011](../adr/ADR-011-evolucao-ministerio-intercessao.md).
 
 ```mermaid
 flowchart TD
-    Start([Admin]) -->|Acessa Intercessão| A[Intercessão - Intercessores]
-    A -->|Clica 'Novo Intercessor'| B[Dialog: Novo Intercessor]
-    B -->|Preenche Nome, Email, Telefone, max_pedidos| C["Intercessor criado: ativo=true"]
+    Start([Líder de Intercessão]) -->|Acessa Módulo de Equipes| A[Times - Lista de Ministérios]
+    A -->|Seleciona 'Intercessão'| B[Gerenciar Time - Dialog]
+    B -->|Aba 'Membros'| C[Adicionar Membro ao Time]
     
-    C -->|Sistema inicia Alocação Automática| D[Balancear Pedidos]
-    D -->|Distribui pendentes respeitando max_pedidos| E["Pedidos alocados aos intercessores"]
+    C -->|Busca pessoa na lista| D["Pessoa adicionada em membros_time"]
     
-    E -->|Admin pode| F[Editar/Inativar Intercessor]
-    F -->|Inativa| G["Intercessor: ativo=false<br/>não recebe novos pedidos"]
+    D -->|Trigger detecta Time 'Intercessão'| E["Trigger: sync_membro_intercessor()"]
+    E -->|Busca dados do perfil| F["Se user_id existe"]
+    F -->|Sim| G["Insere/Reativa em intercessores<br/>ativo=true, max_pedidos=10"]
+    F -->|Não| H["Não sincroniza<br/>(apenas membros com login)"]
     
-    F -->|Ativa| H["Intercessor: ativo=true<br/>volta a receber pedidos"]
+    G -->|Sistema inicia Alocação Automática| I[Balancear Pedidos]
+    I -->|Distribui pendentes respeitando max_pedidos| J["Pedidos alocados aos intercessores"]
     
-    style C fill:#d4edda
-    style E fill:#d1ecf1
-    style G fill:#f8d7da
-    style H fill:#d4edda
+    J -->|Admin pode ajustar na tela de Intercessão| K[Editar/Inativar Intercessor]
+    K -->|Inativa| L["Intercessor: ativo=false<br/>não recebe novos pedidos"]
+    
+    K -->|Ativa| M["Intercessor: ativo=true<br/>volta a receber pedidos"]
+    
+    style D fill:#fff3cd
+    style G fill:#d4edda
+    style J fill:#d1ecf1
+    style L fill:#f8d7da
+    style M fill:#d4edda
 ```
+
+**Mudança de comportamento:**
+- **Antes**: Líder adicionava intercessor via tela específica "Novo Intercessor" (campos manuais).
+- **Depois**: Líder adiciona membro ao Time "Intercessão" (módulo de Equipes) → Trigger sincroniza automaticamente.
+- **Lógica de negócio**: Mantida na tabela `intercessores` para distribuição de pedidos.
 
 ## 3. Fluxo: Testemunhos
 
