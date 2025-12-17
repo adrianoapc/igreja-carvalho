@@ -754,7 +754,21 @@ Quando um membro registra sentimentos negativos por 3 dias consecutivos:
    - Título
    - Descrição
    - Cor do tema
+   - **Requer pagamento** (opcional): Marque se o curso é pago
+   - **Valor** (se pago): Defina o valor do curso
 4. Clique em **"Salvar"**
+
+#### Cursos Pagos
+
+Para jornadas que requerem pagamento:
+
+1. Ao criar/editar a jornada, marque **"Requer pagamento"**
+2. Informe o **valor** do curso
+3. Ao inscrever participantes, o status de pagamento inicia como **"Pendente"**
+4. Quando o pagamento for confirmado, atualize para **"Pago"**
+5. Participantes isentos podem ter status alterado para **"Isento"**
+
+> **Nota**: Pagamentos confirmados podem ser vinculados a transações financeiras (categoria "Cursos e Treinamentos") para rastreabilidade contábil.
 
 ![Nova Jornada](./screenshots/placeholder-nova-jornada.png)
 > *Screenshot: Formulário de nova jornada*
