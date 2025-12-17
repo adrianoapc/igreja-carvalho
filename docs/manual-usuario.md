@@ -814,6 +814,16 @@ Para jornadas que requerem pagamento:
 3. Defina o responsável/discipulador
 4. Clique em **"Salvar"**
 
+#### Usando o Player do Curso (Aluno)
+
+1. Acesse **Meus Cursos** e abra o curso desejado
+2. Navegue pelas etapas (vídeo/texto/quiz/tarefa/reunião)
+3. Etapas com **check automático** liberam automaticamente quando concluídas; etapas manuais pedem **"Marcar como Concluído"**
+4. Quando **todas as etapas** estiverem concluídas, o player mostra uma tela de celebração e um botão **"Baixar Certificado"** (também disponível na sidebar)
+5. Clique em **"Baixar Certificado"** para gerar o PDF (pode ser necessário permitir pop-ups)
+
+> Observação: Cursos pagos permanecem bloqueados enquanto o pagamento estiver **pendente**; o certificado só aparece após 100% das etapas concluídas.
+
 ### 7.2 Ensino (Gestão de Aulas)
 
 #### Agendando uma Aula
