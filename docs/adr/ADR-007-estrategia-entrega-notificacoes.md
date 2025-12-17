@@ -127,10 +127,6 @@ CREATE TABLE notification_logs (
 - [Arquitetura — Módulo Notificações](../01-Arquitetura/01-arquitetura-geral.MD#módulo-notificações-visão-técnica)
 - Edge Function `disparar-alerta`: `supabase/functions/disparar-alerta/index.ts`
 
-### Escopo e Fronteira com Comunicação
-- Mensagens operacionais sobre **pagamentos/financeiro** (ex.: cobrança ou confirmação de pagamento de cursos) devem seguir o módulo de **Comunicação** ou o fluxo financeiro, conforme ADR-006; o módulo de Notificações não deve ser usado para avisos editoriais ou institucionais.
-- Caso seja necessário futuramente disparar alerta automático de pagamento, registrar nova ADR especificando canal, template e critérios de disparo (a confirmar).
-
 ## Próximos Passos
 
 1. **Curto prazo** (próximas 2 sprints):
