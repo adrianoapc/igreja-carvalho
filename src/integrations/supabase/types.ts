@@ -816,9 +816,11 @@ export type Database = {
       }
       escalas_culto: {
         Row: {
+          checkin_realizado: boolean | null
           confirmado: boolean
           created_at: string
           culto_id: string
+          data_confirmacao: string | null
           id: string
           motivo_recusa: string | null
           observacoes: string | null
@@ -829,9 +831,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          checkin_realizado?: boolean | null
           confirmado?: boolean
           created_at?: string
           culto_id: string
+          data_confirmacao?: string | null
           id?: string
           motivo_recusa?: string | null
           observacoes?: string | null
@@ -842,9 +846,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          checkin_realizado?: boolean | null
           confirmado?: boolean
           created_at?: string
           culto_id?: string
+          data_confirmacao?: string | null
           id?: string
           motivo_recusa?: string | null
           observacoes?: string | null
@@ -3994,6 +4000,19 @@ export type Database = {
       buscar_pessoa_por_contato: {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
         Returns: string
+      }
+      check_voluntario_conflito: {
+        Args: {
+          p_data_inicio: string
+          p_duracao_minutos?: number
+          p_voluntario_id: string
+        }
+        Returns: {
+          conflito_detectado: boolean
+          culto_data: string
+          culto_titulo: string
+          time_nome: string
+        }[]
       }
       checkin_por_localizacao: {
         Args: { p_lat: number; p_long: number; p_telefone: string }
