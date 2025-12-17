@@ -779,9 +779,20 @@ Para jornadas que requerem pagamento:
 2. Clique em **"+ Nova Etapa"**
 3. Para cada etapa, defina:
    - Título
-   - Tipo de conteúdo (Vídeo, Texto, Presencial)
-   - Conteúdo (URL ou texto)
+   - **Tipo de conteúdo**: Texto, Vídeo, Quiz, Tarefa ou Reunião
+   - **URL do conteúdo** (para vídeo): Link do YouTube, Vimeo ou embed
+   - **Duração estimada** (minutos): Tempo previsto para conclusão
+   - **Check automático**: Se marcado, sistema avança sozinho ao completar
    - Ordem na sequência
+4. Clique em **"Salvar"**
+
+##### Configurando Quiz (Tipo Quiz)
+
+1. Ao selecionar tipo **"Quiz"**, configure:
+   - **Nota mínima**: Pontuação necessária para aprovação (ex: 7)
+   - **Perguntas**: Lista de questões com alternativas
+2. O aluno pode tentar múltiplas vezes
+3. Sistema registra nota, aprovação e número de tentativas
 
 ![Etapas Jornada](./screenshots/placeholder-etapas-jornada.png)
 > *Screenshot: Configuração de etapas*
