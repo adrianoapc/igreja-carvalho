@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Users, ArrowLeft, ChevronRight } from "lucide-react";
+import { Plus, Users, ArrowLeft, ChevronRight, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +44,35 @@ export default function Jornadas() {
       .join("")
       .slice(0, 2)
       .toUpperCase();
+  };
+
+  const getTipoLabel = (tipo?: string) => {
+    switch (tipo) {
+      case 'auto_instrucional':
+        return {
+          label: 'Curso',
+          color: 'bg-blue-100 text-blue-800 border-blue-200',
+          icon: <BookOpen className="w-3.5 h-3.5" />
+        };
+      case 'processo_acompanhado':
+        return {
+          label: 'Processo',
+          color: 'bg-green-100 text-green-800 border-green-200',
+          icon: <Users className="w-3.5 h-3.5" />
+        };
+      case 'hibrido':
+        return {
+          label: 'Híbrido',
+          color: 'bg-purple-100 text-purple-800 border-purple-200',
+          icon: null
+        };
+      default:
+        return {
+          label: 'Jornada',
+          color: 'bg-gray-100 text-gray-800 border-gray-200',
+          icon: null
+        };
+    }
   };
 
   return (
@@ -115,9 +144,20 @@ export default function Jornadas() {
                             {jornada.titulo}
                           </h3>
                         </div>
-                        <Badge variant="secondary" className="text-xs font-normal shrink-0">
-                          {etapas} etapas
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs font-normal shrink-0">
+                            {etapas} etapas
+                          </Badge>
+                          {(() => {
+                            const tipo = getTipoLabel(jornada.tipo_jornada);
+                            return (
+                              <Badge className={`text-xs font-normal shrink-0 border ${tipo.color} flex items-center gap-1`}>
+                                {tipo.icon && tipo.icon}
+                                {tipo.label}
+                              </Badge>
+                            );
+                          })()}
+                        </div>
                       </div>
                       <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </div>
