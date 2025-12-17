@@ -45,3 +45,34 @@ Passo 5 — Conectar tudo:
 - Adicionar links relativos entre as seções criadas (manual ↔ funcionalidades ↔ diagramas ↔ produto ↔ arquitetura)
 - Atualizar docs/README.MD adicionando links do módulo (sem duplicar ou reestruturar)
 Saída pronta para commit.
+
+
+
+✍️ PADRÃO DE DOCUMENTAÇÃO PARA CORREÇÃO (simples e poderoso)
+📄 Em docs/funcionalidades.md
+> 🔧 **Correção (Jan/2026)**  
+> Ajustada validação de <X> para evitar <problema>.  
+> Não houve mudança de uso para o usuário final.
+
+📄 Em diagrama (se necessário)
+> Nota: condição de validação ajustada para evitar duplicidade.
+
+📄 Em ADR (quando aplicável)
+## Revisão
+Este ADR foi revisado para corrigir comportamento inconsistente identificado em produção.
+
+🤖 PROMPT COPILOT — CORREÇÃO (ANTI-BUROCRACIA)
+
+Use este prompt quando a PR for só correção:
+
+Esta alteração é uma CORREÇÃO (bugfix).
+
+Atualizar documentação de forma MÍNIMA e OBJETIVA:
+- Registrar a correção em um documento existente do módulo
+- Não criar novos diagramas ou seções grandes
+- Não alterar manual do usuário, salvo se o uso mudou
+- Se a correção revelar uma decisão errada, criar ou atualizar ADR
+
+Usar linguagem curta, factual e rastreável.
+
+
