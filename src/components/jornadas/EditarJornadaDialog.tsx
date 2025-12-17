@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, GripVertical, Trash2, Play, FileText, Users, Settings2 } from "lucide-react";
+import { Plus, X, GripVertical, Trash2, Play, FileText, Users, Settings2, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -24,6 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import EtapaContentDialog from "./EtapaContentDialog";
 
@@ -79,6 +81,7 @@ export default function EditarJornadaDialog({
   const [descricao, setDescricao] = useState("");
   const [corTema, setCorTema] = useState(CORES_TEMA[0]);
   const [ativo, setAtivo] = useState(true);
+  const [tipoJornada, setTipoJornada] = useState<'auto_instrucional' | 'processo_acompanhado' | 'hibrido'>('auto_instrucional');
   const [exibirPortal, setExibirPortal] = useState(true);
   const [requerPagamento, setRequerPagamento] = useState(false);
   const [valor, setValor] = useState<string>("");
@@ -109,6 +112,7 @@ export default function EditarJornadaDialog({
       setDescricao(jornada.descricao || "");
       setCorTema(jornada.cor_tema || CORES_TEMA[0]);
       setAtivo(jornada.ativo);
+      setTipoJornada(jornada.tipo_jornada || 'auto_instrucional');
       setExibirPortal(jornada.exibir_portal ?? true);
       setRequerPagamento(!!jornada.requer_pagamento);
       setValor(jornada.valor ? String(jornada.valor) : "");
@@ -140,9 +144,10 @@ export default function EditarJornadaDialog({
           descricao: descricao || null,
           cor_tema: corTema,
           ativo,
-          exibir_portal: exibirPortal,
-          requer_pagamento: requerPagamento,
-          valor: requerPagamento ? Number(valor) : null,
+          tipo_jornada: tipoJornada,
+          exibir_portal: tipoJornada === 'processo_acompanhado' ? false : exibirPortal,
+          requer_pagamento: tipoJornada === 'processo_acompanhado' ? false : requerPagamento,
+          valor: tipoJornada === 'processo_acompanhado' || !requerPagamento ? null : Number(valor),
         })
         .eq("id", jornada.id);
 
@@ -303,46 +308,99 @@ export default function EditarJornadaDialog({
               <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
             </div>
 
-            <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="exibir_portal" className="font-medium">
-                  Disponível no Portal do Aluno?
-                </Label>
-                <Switch
-                  id="exibir_portal"
-                  checked={exibirPortal}
-                  onCheckedChange={setExibirPortal}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Se desmarcado, esta jornada será invisível para o membro, servindo apenas para controle interno da liderança.
-              </p>
+            <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+              <Label className="font-medium">Tipo de Jornada</Label>
+              <RadioGroup value={tipoJornada} onValueChange={(v: any) => setTipoJornada(v)}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="auto_instrucional" id="tipo_curso" />
+                  <Label htmlFor="tipo_curso" className="font-normal cursor-pointer flex-1">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Curso / EAD</p>
+                        <p className="text-xs text-muted-foreground">Conteúdo educacional com etapas, vídeos e materiais</p>
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="processo_acompanhado" id="tipo_processo" />
+                  <Label htmlFor="tipo_processo" className="font-normal cursor-pointer flex-1">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Processo / Pipeline</p>
+                        <p className="text-xs text-muted-foreground">Acompanhamento de pessoas em um processo interno (pastoral, onboarding, etc)</p>
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="hibrido" id="tipo_hibrido" />
+                  <Label htmlFor="tipo_hibrido" className="font-normal cursor-pointer flex-1">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <p className="font-medium">Híbrido</p>
+                        <p className="text-xs text-muted-foreground">Combina conteúdo educacional com acompanhamento em processo</p>
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
 
-            <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="requer_pagamento" className="font-medium">
-                  Este curso é pago?
-                </Label>
-                <Switch
-                  id="requer_pagamento"
-                  checked={requerPagamento}
-                  onCheckedChange={setRequerPagamento}
-                />
-              </div>
-              {requerPagamento && (
-                <div className="space-y-2">
-                  <Label>Valor da Inscrição (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={valor}
-                    onChange={(e) => setValor(e.target.value)}
+            {tipoJornada !== 'processo_acompanhado' && (
+              <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="exibir_portal" className="font-medium">
+                    Disponível no Portal do Aluno?
+                  </Label>
+                  <Switch
+                    id="exibir_portal"
+                    checked={exibirPortal}
+                    onCheckedChange={setExibirPortal}
                   />
                 </div>
-              )}
-            </div>
+                <p className="text-xs text-muted-foreground">
+                  Se desmarcado, esta jornada será invisível para o membro, servindo apenas para controle interno da liderança.
+                </p>
+              </div>
+            )}
+
+            {tipoJornada !== 'processo_acompanhado' && (
+              <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="requer_pagamento" className="font-medium">
+                    Este curso é pago?
+                  </Label>
+                  <Switch
+                    id="requer_pagamento"
+                    checked={requerPagamento}
+                    onCheckedChange={setRequerPagamento}
+                  />
+                </div>
+                {requerPagamento && (
+                  <div className="space-y-2">
+                    <Label>Valor da Inscrição (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0,00"
+                      value={valor}
+                      onChange={(e) => setValor(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tipoJornada === 'processo_acompanhado' && (
+              <Alert>
+                <AlertDescription>
+                  Processos acompanhados não são visíveis no portal do aluno e não são pagos. Utilize este tipo para pipelines internos de acompanhamento pastoral.
+                </AlertDescription>
+              </Alert>
+            )}
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
