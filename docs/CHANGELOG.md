@@ -8,6 +8,23 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Corrigido
+
+#### 🔒 Correções de Segurança (17 de Dez/2025)
+- **Path Traversal em uploads**: Adicionada validação de caminho em `Publicacao.tsx` e `MidiasGeral.tsx` para prevenir ataques de path traversal em uploads de arquivos
+- **Funções RPC sem autorização**: Adicionadas verificações de `auth.uid()` em 3 funções SECURITY DEFINER:
+  - `get_user_familia_id`: Agora verifica se usuário consulta próprio familia_id (ou é admin)
+  - `alocar_pedido_balanceado`: Agora requer role admin, pastor ou intercessor ativo
+  - `buscar_pessoa_por_contato`: Agora requer autenticação (defense in depth)
+
+**Causa**: Funções RPC com SECURITY DEFINER bypassavam RLS sem validar permissões do chamador
+
+**Impacto**: Nenhum para usuário final; hardening interno de segurança
+
+**Módulos afetados**: Segurança (global), Intercessão, Família, Publicação, Mídias
+
+---
+
 ### Adicionado
 
 #### 🎓 Editor de Conteúdo de Etapas com Quiz (17 de Dez/2025)
