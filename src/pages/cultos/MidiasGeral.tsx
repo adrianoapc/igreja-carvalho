@@ -402,7 +402,8 @@ export default function MidiasGeral() {
       const midia = midias.find(m => m.id === id);
       if (midia?.url) {
         const path = midia.url.split('/midias/')[1];
-        if (path) {
+        // Security: validate path to prevent traversal attacks
+        if (path && !path.includes('..') && !path.startsWith('/')) {
           await supabase.storage.from('midias').remove([path]);
         }
       }
