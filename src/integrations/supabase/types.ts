@@ -1208,6 +1208,8 @@ export type Database = {
           jornada_id: string
           pessoa_id: string
           responsavel_id: string | null
+          status_pagamento: string | null
+          transacao_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1220,6 +1222,8 @@ export type Database = {
           jornada_id: string
           pessoa_id: string
           responsavel_id?: string | null
+          status_pagamento?: string | null
+          transacao_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1232,6 +1236,8 @@ export type Database = {
           jornada_id?: string
           pessoa_id?: string
           responsavel_id?: string | null
+          status_pagamento?: string | null
+          transacao_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1290,6 +1296,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
           },
         ]
       }
@@ -1482,8 +1502,10 @@ export type Database = {
           descricao: string | null
           exibir_portal: boolean | null
           id: string
+          requer_pagamento: boolean | null
           titulo: string
           updated_at: string | null
+          valor: number | null
         }
         Insert: {
           ativo?: boolean | null
@@ -1492,8 +1514,10 @@ export type Database = {
           descricao?: string | null
           exibir_portal?: boolean | null
           id?: string
+          requer_pagamento?: boolean | null
           titulo: string
           updated_at?: string | null
+          valor?: number | null
         }
         Update: {
           ativo?: boolean | null
@@ -1502,8 +1526,10 @@ export type Database = {
           descricao?: string | null
           exibir_portal?: boolean | null
           id?: string
+          requer_pagamento?: boolean | null
           titulo?: string
           updated_at?: string | null
+          valor?: number | null
         }
         Relationships: []
       }
