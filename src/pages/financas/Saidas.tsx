@@ -60,7 +60,8 @@ export default function Saidas() {
           subcategoria:subcategoria_id(nome),
           base_ministerial:base_ministerial_id(titulo),
           centro_custo:centro_custo_id(nome),
-          fornecedor:fornecedor_id(nome, id)
+          fornecedor:fornecedor_id(nome, id),
+          solicitacao_reembolso:solicitacao_reembolso_id(status)
         `)
         .eq('tipo', 'saida')
         .gte('data_vencimento', dateRange.inicio.toISOString().split('T')[0])
@@ -68,7 +69,12 @@ export default function Saidas() {
         .order('data_vencimento', { ascending: false });
       
       if (error) throw error;
-      return data;
+      
+      // Filtrar: exclui transações de reembolso que NÃO estão pagas
+      return data?.filter(t => 
+        !t.solicitacao_reembolso_id || 
+        t.solicitacao_reembolso?.status === 'pago'
+      ) || [];
     },
   });
 

@@ -81,7 +81,8 @@ export default function Dashboard() {
         .from('transacoes_financeiras')
         .select(`
           *,
-          categoria:categoria_id(nome, cor)
+          categoria:categoria_id(nome, cor),
+          solicitacao_reembolso:solicitacao_reembolso_id(status)
         `)
         .gte('data_vencimento', dateRange.inicio)
         .lte('data_vencimento', dateRange.fim);
@@ -98,7 +99,12 @@ export default function Dashboard() {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      
+      // Filtrar: exclui transações de reembolso que NÃO estão pagas
+      return data?.filter(t => 
+        !t.solicitacao_reembolso_id || 
+        t.solicitacao_reembolso?.status === 'pago'
+      ) || [];
     },
   });
 
@@ -108,12 +114,20 @@ export default function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transacoes_financeiras')
-        .select('*')
+        .select(`
+          *,
+          solicitacao_reembolso:solicitacao_reembolso_id(status)
+        `)
         .gte('data_vencimento', startOfMonth(mesAnterior).toISOString().split('T')[0])
         .lte('data_vencimento', endOfMonth(mesAnterior).toISOString().split('T')[0]);
       
       if (error) throw error;
-      return data;
+      
+      // Filtrar: exclui transações de reembolso que NÃO estão pagas
+      return data?.filter(t => 
+        !t.solicitacao_reembolso_id || 
+        t.solicitacao_reembolso?.status === 'pago'
+      ) || [];
     },
   });
 
@@ -126,13 +140,21 @@ export default function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transacoes_financeiras')
-        .select('id, valor, data_vencimento')
+        .select(`
+          id, valor, data_vencimento, solicitacao_reembolso_id,
+          solicitacao_reembolso:solicitacao_reembolso_id(status)
+        `)
         .eq('tipo', 'saida')
         .eq('status', 'pendente')
         .lte('data_vencimento', format(fimSemana, 'yyyy-MM-dd'));
 
       if (error) throw error;
-      return data || [];
+      
+      // Filtrar: exclui transações de reembolso que NÃO estão pagas
+      return (data || []).filter(t => 
+        !t.solicitacao_reembolso_id || 
+        t.solicitacao_reembolso?.status === 'pago'
+      );
     },
   });
 
