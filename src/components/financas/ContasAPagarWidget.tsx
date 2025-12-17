@@ -52,14 +52,24 @@ export function ContasAPagarWidget() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("transacoes_financeiras")
-        .select("id, descricao, valor, data_vencimento")
+        .select(`
+          id, descricao, valor, data_vencimento, solicitacao_reembolso_id,
+          solicitacao_reembolso:solicitacao_reembolso_id(status)
+        `)
         .eq("tipo", "saida")
         .eq("status", "pendente")
         .order("data_vencimento", { ascending: true })
-        .limit(10);
+        .limit(20); // Buscar mais pois vamos filtrar
 
       if (error) throw error;
-      return (data || []) as TransacaoPendente[];
+      
+      // Filtrar: exclui transações de reembolso que NÃO estão pagas
+      const filtered = (data || []).filter(t => 
+        !t.solicitacao_reembolso_id || 
+        (t.solicitacao_reembolso as any)?.status === 'pago'
+      );
+      
+      return filtered.slice(0, 10) as TransacaoPendente[];
     },
   });
 
