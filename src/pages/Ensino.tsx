@@ -27,6 +27,7 @@ import NovaAulaDrawer from "@/components/ensino/NovaAulaDrawer";
 import SalaDialog from "@/components/ensino/SalaDialog";
 import AulaDetailsSheet from "@/components/ensino/AulaDetailsSheet";
 import RegistrarVisitanteFamiliaDialog from "@/components/ensino/RegistrarVisitanteFamiliaDialog";
+import { CheckinManualDialog } from "@/components/ensino/CheckinManualDialog";
 
 interface Aula {
   id: string;
@@ -69,6 +70,8 @@ export default function Ensino() {
   const [selectedAula, setSelectedAula] = useState<Aula | null>(null);
   const [aulaDetailsOpen, setAulaDetailsOpen] = useState(false);
   const [visitanteFamiliaOpen, setVisitanteFamiliaOpen] = useState(false);
+  const [checkinOpen, setCheckinOpen] = useState(false);
+  const [salaSelecionadaParaCheckin, setSalaSelecionadaParaCheckin] = useState<Sala | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -360,7 +363,8 @@ export default function Ensino() {
                             className="w-full mt-4 gap-2"
                             onClick={(e) => {
                               e.stopPropagation();
-                              toast.info("Funcionalidade em desenvolvimento");
+                              setSalaSelecionadaParaCheckin(sala);
+                              setCheckinOpen(true);
                             }}
                           >
                             <User className="w-4 h-4" />
@@ -469,6 +473,15 @@ export default function Ensino() {
           setVisitanteFamiliaOpen(false);
           // TODO: Open room selection for check-in
           toast.success("Família cadastrada! Selecione a sala para check-in.");
+          fetchSalas();
+        }}
+      />
+
+      <CheckinManualDialog
+        open={checkinOpen}
+        onOpenChange={setCheckinOpen}
+        sala={salaSelecionadaParaCheckin}
+        onSuccess={() => {
           fetchSalas();
         }}
       />

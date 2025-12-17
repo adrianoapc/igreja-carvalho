@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,7 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Play, ChevronRight } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { BookOpen, Play, ChevronRight, Sparkles } from "lucide-react";
 
 interface InscricaoComProgresso {
   id: string;
@@ -24,26 +26,32 @@ interface InscricaoComProgresso {
   etapasConcluidas: number;
 }
 
+interface SupabaseInscricao extends Omit<InscricaoComProgresso, "totalEtapas" | "etapasConcluidas"> {}
+
+interface JornadaDisponivel {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  cor_tema: string | null;
+}
+
 export default function MeusCursos() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [inscricoes, setInscricoes] = useState<InscricaoComProgresso[]>([]);
+  const [jornadasDisponiveis, setJornadasDisponiveis] = useState<JornadaDisponivel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDisponiveis, setLoadingDisponiveis] = useState(true);
+  const [activeTab, setActiveTab] = useState("inscritos");
+  const [enrollingId, setEnrollingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (profile?.id) {
-      fetchInscricoes();
-    }
-  }, [profile?.id]);
-
-  const fetchInscricoes = async () => {
+  const fetchInscricoes = useCallback(async () => {
     if (!profile?.id) return;
 
     try {
-      // Buscar inscrições do aluno (apenas jornadas visíveis no portal)
       const { data: inscricoesData, error } = await supabase
         .from("inscricoes_jornada")
-        .select(`
+        .select<SupabaseInscricao[]>(`
           id,
           jornada_id,
           etapa_atual_id,
@@ -56,24 +64,21 @@ export default function MeusCursos() {
 
       if (error) throw error;
 
-      // Para cada inscrição, calcular progresso
       const inscricoesComProgresso: InscricaoComProgresso[] = [];
 
       for (const inscricao of inscricoesData || []) {
-        // Buscar total de etapas
         const { count: totalEtapas } = await supabase
           .from("etapas_jornada")
           .select("*", { count: "exact", head: true })
           .eq("jornada_id", inscricao.jornada_id);
 
-        // Buscar etapas concluídas (presencas_aula com etapa_id desta jornada)
         const { data: etapasJornada } = await supabase
           .from("etapas_jornada")
           .select("id")
           .eq("jornada_id", inscricao.jornada_id);
 
-        const etapaIds = etapasJornada?.map(e => e.id) || [];
-        
+        const etapaIds = etapasJornada?.map((e) => e.id) || [];
+
         let etapasConcluidas = 0;
         if (etapaIds.length > 0) {
           const { count } = await supabase
@@ -85,9 +90,13 @@ export default function MeusCursos() {
           etapasConcluidas = count || 0;
         }
 
+        const jornadaNormalizada = Array.isArray(inscricao.jornada)
+          ? inscricao.jornada[0]
+          : inscricao.jornada;
+
         inscricoesComProgresso.push({
           ...inscricao,
-          jornada: Array.isArray(inscricao.jornada) ? inscricao.jornada[0] : inscricao.jornada,
+          jornada: jornadaNormalizada,
           totalEtapas: totalEtapas || 0,
           etapasConcluidas,
         });
@@ -99,11 +108,81 @@ export default function MeusCursos() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile?.id]);
+
+  const fetchDisponiveis = useCallback(async () => {
+    if (!profile?.id) return;
+
+    try {
+      setLoadingDisponiveis(true);
+
+      const { data: inscricoesUsuario, error: inscricoesError } = await supabase
+        .from("inscricoes_jornada")
+        .select("jornada_id")
+        .eq("pessoa_id", profile.id);
+
+      if (inscricoesError) throw inscricoesError;
+
+      const idsInscritos = new Set((inscricoesUsuario || []).map((i) => i.jornada_id));
+
+      const { data: jornadas, error } = await supabase
+        .from("jornadas")
+        .select("id, titulo, descricao, cor_tema")
+        .eq("ativo", true)
+        .eq("exibir_portal", true)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const filtradas = (jornadas || []).filter((j) => !idsInscritos.has(j.id));
+      setJornadasDisponiveis(filtradas);
+    } catch (error) {
+      console.error("Erro ao buscar jornadas disponíveis:", error);
+      toast.error("Não foi possível carregar jornadas disponíveis");
+    } finally {
+      setLoadingDisponiveis(false);
+    }
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      fetchInscricoes();
+      fetchDisponiveis();
+    }
+  }, [profile?.id, fetchInscricoes, fetchDisponiveis]);
 
   const calcularProgresso = (inscricao: InscricaoComProgresso) => {
     if (inscricao.totalEtapas === 0) return 0;
     return Math.round((inscricao.etapasConcluidas / inscricao.totalEtapas) * 100);
+  };
+
+  const handleInscrever = async (jornadaId: string) => {
+    if (!profile?.id) return;
+    setEnrollingId(jornadaId);
+
+    try {
+      const { error } = await supabase.from("inscricoes_jornada").insert({
+        jornada_id: jornadaId,
+        pessoa_id: profile.id,
+        responsavel_id: profile.id,
+      });
+
+      if (error) throw error;
+
+      toast.success("Inscrição realizada com sucesso");
+      await Promise.all([fetchInscricoes(), fetchDisponiveis()]);
+      navigate(`/cursos/${jornadaId}`);
+    } catch (error) {
+      const duplicate = (error as { code?: string } | null)?.code === "23505";
+      if (duplicate) {
+        toast.error("Você já está inscrito nesta jornada");
+      } else {
+        toast.error("Não foi possível realizar a inscrição");
+      }
+      console.error("Erro ao inscrever:", error);
+    } finally {
+      setEnrollingId(null);
+    }
   };
 
   if (loading) {
@@ -126,85 +205,144 @@ export default function MeusCursos() {
         <h1 className="text-2xl font-bold">Meus Cursos</h1>
       </div>
 
-      {inscricoes.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Nenhum curso encontrado</h3>
-            <p className="text-muted-foreground text-sm">
-              Você ainda não está inscrito em nenhuma jornada de ensino.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {inscricoes.map((inscricao) => {
-            const progresso = calcularProgresso(inscricao);
-            const corTema = inscricao.jornada?.cor_tema || "hsl(var(--primary))";
-            
-            return (
-              <Card 
-                key={inscricao.id} 
-                className="overflow-hidden hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => navigate(`/cursos/${inscricao.jornada_id}`)}
-              >
-                <div className="flex items-stretch">
-                  {/* Color accent bar */}
-                  <div 
-                    className="w-1.5 shrink-0" 
-                    style={{ backgroundColor: corTema }}
-                  />
-                  
-                  <div className="flex-1 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-                    {/* Course info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
-                        {inscricao.jornada?.titulo}
-                      </h3>
-                      {inscricao.jornada?.descricao && (
-                        <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
-                          {inscricao.jornada.descricao}
-                        </p>
-                      )}
-                    </div>
-                    
-                    {/* Progress section */}
-                    <div className="flex items-center gap-4 sm:gap-6">
-                      <div className="flex-1 sm:w-40 space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            {inscricao.etapasConcluidas}/{inscricao.totalEtapas} etapas
-                          </span>
-                          <span className="font-medium">{progresso}%</span>
-                        </div>
-                        <Progress value={progresso} className="h-1.5" />
-                      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="inscritos">Meus cursos</TabsTrigger>
+          <TabsTrigger value="disponiveis">Disponíveis</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inscritos" className="space-y-3">
+          {inscricoes.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Nenhum curso encontrado</h3>
+                <p className="text-muted-foreground text-sm">
+                  Você ainda não está inscrito em nenhuma jornada de ensino.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {inscricoes.map((inscricao) => {
+                const progresso = calcularProgresso(inscricao);
+                const corTema = inscricao.jornada?.cor_tema || "hsl(var(--primary))";
+                
+                return (
+                  <Card 
+                    key={inscricao.id} 
+                    className="overflow-hidden hover:shadow-md transition-all cursor-pointer group"
+                    onClick={() => navigate(`/cursos/${inscricao.jornada_id}`)}
+                  >
+                    <div className="flex items-stretch">
+                      <div 
+                        className="w-1.5 shrink-0" 
+                        style={{ backgroundColor: corTema }}
+                      />
                       
-                      <Button 
-                        size="sm" 
-                        variant={progresso === 0 ? "default" : "outline"}
-                        className="shrink-0"
-                      >
-                        {progresso === 0 ? (
-                          <>
-                            <Play className="h-4 w-4 mr-1.5" />
-                            Iniciar
-                          </>
-                        ) : (
-                          <>
-                            <ChevronRight className="h-4 w-4 mr-1.5" />
-                            Continuar
-                          </>
+                      <div className="flex-1 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
+                            {inscricao.jornada?.titulo}
+                          </h3>
+                          {inscricao.jornada?.descricao && (
+                            <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                              {inscricao.jornada.descricao}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-4 sm:gap-6">
+                          <div className="flex-1 sm:w-40 space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">
+                                {inscricao.etapasConcluidas}/{inscricao.totalEtapas} etapas
+                              </span>
+                              <span className="font-medium">{progresso}%</span>
+                            </div>
+                            <Progress value={progresso} className="h-1.5" />
+                          </div>
+                          
+                          <Button 
+                            size="sm" 
+                            variant={progresso === 0 ? "default" : "outline"}
+                            className="shrink-0"
+                          >
+                            {progresso === 0 ? (
+                              <>
+                                <Play className="h-4 w-4 mr-1.5" />
+                                Iniciar
+                              </>
+                            ) : (
+                              <>
+                                <ChevronRight className="h-4 w-4 mr-1.5" />
+                                Continuar
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="disponiveis" className="space-y-3">
+          {loadingDisponiveis ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-44" />
+              ))}
+            </div>
+          ) : jornadasDisponiveis.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Sparkles className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Nada disponível no momento</h3>
+                <p className="text-muted-foreground text-sm">
+                  Assim que novas jornadas forem liberadas, elas aparecerão aqui.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {jornadasDisponiveis.map((jornada) => (
+                <Card key={jornada.id} className="h-full flex flex-col border hover:shadow-md transition-all">
+                  <CardContent className="p-5 flex flex-col gap-3 flex-1">
+                    <div className="flex items-start gap-3">
+                      <div 
+                        className="w-2 h-10 rounded-full"
+                        style={{ backgroundColor: jornada.cor_tema || "hsl(var(--primary))" }}
+                      />
+                      <div className="space-y-1">
+                        <h3 className="font-semibold leading-tight">{jornada.titulo}</h3>
+                        {jornada.descricao && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {jornada.descricao}
+                          </p>
                         )}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex justify-end">
+                      <Button 
+                        size="sm"
+                        onClick={() => handleInscrever(jornada.id)}
+                        disabled={enrollingId === jornada.id}
+                      >
+                        {enrollingId === jornada.id ? "Inscrevendo..." : "Inscrever-se"}
                       </Button>
                     </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

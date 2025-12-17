@@ -82,6 +82,7 @@ import CadastroMembro from "./pages/cadastro/Membro";
 import Chamada from "./pages/Chamada";
 import Jornadas from "./pages/Jornadas";
 import JornadaBoard from "./pages/JornadaBoard";
+import DetalhesJornada from "./pages/ensino/DetalhesJornada";
 import Projetos from "./pages/Projetos";
 import ProjetoDetalhes from "./pages/ProjetoDetalhes";
 import Telao from "./pages/Telao";
@@ -824,6 +825,16 @@ function App() {
           />
           <Route
             path="/jornadas/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <DetalhesJornada />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/jornadas/:id/board"
             element={
               <ProtectedRoute>
                 <MainLayout>
