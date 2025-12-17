@@ -127,7 +127,8 @@ export default function Publicacao() {
       
       if (item?.imagem_url) {
         const path = item.imagem_url.split("/").pop();
-        if (path) {
+        // Security: validate path to prevent traversal attacks
+        if (path && !path.includes('..') && !path.startsWith('/')) {
           await supabase.storage.from("comunicados").remove([path]);
         }
       }
