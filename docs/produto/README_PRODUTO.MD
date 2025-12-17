@@ -118,5 +118,33 @@ Referências:
 Referências e links úteis:
 - Manual do usuário — Cultos: `../manual-usuario.md#5-cultos-e-liturgia`
 - Fluxo (Mermaid): `../diagramas/fluxo-cultos.md`
-- Sequência (Mermaid): `../diagramas/sequencia-cultos.md` (a confirmar)
+- Sequência (Mermaid): `../diagramas/sequencia-cultos.md`
+
+## Intercessão, Oração e Testemunhos (visão de produto)
+
+- **Objetivo**: centralizar a gestão de pedidos de oração, intercessão organizada, registro de testemunhos e acompanhamento emocional dos membros, fortalecendo o cuidado pastoral e a resposta ágil a necessidades espirituais.
+- **Para quem**: 
+	- Membros e visitantes (criar pedidos de oração, registrar sentimentos, compartilhar testemunhos);
+	- Intercessores e líderes de intercessão (gerenciar e acompanhar pedidos alocados, registrar observações);
+	- Liderança/pastores (visão geral de crises, crises emocionais, testemunhos em aprovação, acompanhamento pastoral);
+	- Secretaria (gestão de intercessores, aprovação de testemunhos para publicação).
+- **Principais capacidades**:
+	- **Pedidos de Oração**: criar pedidos (membros/externos/anônimos), classificar por tipo, gerenciar ciclo de vida (pendente → alocado → em oração → respondido/arquivado), atribuir a intercessores, registrar observações.
+	- **Intercessores**: cadastro de equipe dedicada, limite máximo de pedidos por pessoa, alocação automática balanceada, histórico de pedidos e observações.
+	- **Testemunhos**: envio de testemunhos por membros, categorização (espiritual, casamento, família, saúde, trabalho, financeiro, ministerial, outro), workflow de aprovação (aberto → público/arquivado), suporte a anônimos, exportação de histórico.
+	- **Sentimentos**: registro diário de sentimentos (feliz, triste, ansioso, grato, abençoado, angustiado), notificação diária automática ("Como você está?"), redirecionamento inteligente (positivos → testemunho; negativos → pedido de oração), detecção de alertas críticos (3+ dias negativos).
+	- **Timeline de Vida**: visualização unificada de pedidos, sentimentos e testemunhos por membro (para contexto pastoral).
+- **Limites do escopo**:
+	- Não substitui acompanhamento pastoral direto; suporta mas não automatiza intervenções.
+	- Não faz disparo de lembretes automáticos de intercessão (apenas exibe no dashboard).
+	- Testemunhos não são publicados automaticamente (requer aprovação manual).
+	- Não integra com aplicativos de oração comunitária externo ou plataformas de transmissão.
+	- Alertas críticos de sentimentos são informativos (a confirmar se há integração com notificação automática).
+
+Referências e links úteis:
+- Manual do usuário — Intercessão: `../manual-usuario.md#6-intercessão` (a confirmar seção)
+- Fluxo (Mermaid): `../diagramas/fluxo-intercessao.md`
+- Arquitetura (visão técnica): `../01-Arquitetura/01-arquitetura-geral.MD#módulo-intercessão-oração-e-testemunhos-visão-técnica` (a confirmar)
+
+```
 
