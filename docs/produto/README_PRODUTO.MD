@@ -92,3 +92,31 @@ Referências:
  - Diagramas gerais do módulo: `../diagramas/fluxo-ensino.md`, `../diagramas/sequencia-ensino.md`
  - Arquitetura (visão técnica): `../01-Arquitetura/01-arquitetura-geral.MD#módulo-jornadas-e-ensino-visão-técnica`
 
+
+## Cultos (visão de produto)
+
+- **Objetivo**: organizar a realização de cultos/eventos, contemplando agenda, programação litúrgica, gestão de times/posições, alocação de voluntários (escalas), mídias de apoio e projeção em telão.
+- **Para quem**: secretaria (agenda/eventos), liderança/pastores (planejamento de liturgia e acompanhamento), equipe de mídia/projeção (telão e recursos visuais), coordenação de voluntários (times/posições/escalas). (músicas/equipe de louvor — a confirmar)
+- **Principais capacidades** (com base em evidências no repositório):
+	- Agenda/Visão Geral de Cultos e Eventos: `src/pages/cultos/Geral.tsx` (métricas de próximos cultos, realizados, times ativos e mídias ativas; atalhos para criação e gestão)
+	- Eventos (lista/gestão): `src/pages/cultos/Eventos.tsx` (a confirmar detalhamento)
+	- Times e Posições: `src/pages/cultos/Times.tsx`, `src/pages/cultos/Posicoes.tsx`; componentes de gestão em `src/components/cultos/GerenciarTimeDialog.tsx`, `TimeDialog.tsx`, `PosicaoDialog.tsx`
+	- Escalas (alocação de voluntários): componentes em `src/components/cultos/EscalasTabContent.tsx`, `EscalasDialog.tsx` (evidência de fluxo de escalação)
+	- Liturgia (timeline e edição de itens): `src/components/cultos/LiturgiaTimeline.tsx`, `LiturgiaWorkspace.tsx`, `LiturgiaDialog.tsx`, `LiturgiaItemDialog.tsx`
+	- Recursos de Liturgia (mídias vinculadas por item): `src/components/cultos/RecursosLiturgiaSheet.tsx`, `MidiaDialog.tsx`, `TagMidiaDialog.tsx`, `SlideshowPreview.tsx`; playlist de projeção usa `liturgia_culto`/`liturgia_recursos`/`midias`
+	- Templates de Liturgia: `src/components/cultos/TemplatesLiturgiaDialog.tsx`, `AplicarTemplateDialog.tsx`, `SalvarLiturgiaTemplateDialog.tsx`, `SalvarComoTemplateDialog.tsx`, `TemplatePreviewDialog.tsx`
+	- Músicas do Culto: `src/components/cultos/MusicaTabContent.tsx`, `CancoesDialog.tsx` (gestão de canções — a confirmar escopo)
+	- Projeção (Telão):
+		- Comunicados: `src/pages/Telao.tsx` (rota `/telao`, fonte `comunicados` com filtros por período/canal e ordem)
+		- Liturgia: `src/pages/TelaoLiturgia.tsx` (rota `/telao-liturgia/:id`, playlist dos recursos da liturgia com auto-avance, atalhos e realtime)
+	- Dashboard de Liturgia: `src/pages/cultos/LiturgiaDashboard.tsx` (análises/indicadores — a confirmar detalhamento)
+- **Limites do escopo**:
+	- Não realiza transmissão ao vivo ou controle de áudio/iluminação; foca em programação e projeção de mídias.
+	- Não substitui sistemas de letras/partituras com controle avançado de setlist/cifras (integrações — a confirmar).
+	- Confirmação de presença do público e controle de acesso não fazem parte deste módulo (check-in geral — a confirmar).
+
+Referências e links úteis:
+- Manual do usuário — Cultos: `../manual-usuario.md#5-cultos-e-liturgia`
+- Fluxo (Mermaid): `../diagramas/fluxo-cultos.md`
+- Sequência (Mermaid): `../diagramas/sequencia-cultos.md` (a confirmar)
+

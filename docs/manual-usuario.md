@@ -510,6 +510,14 @@ Para entender melhor a arquitetura financeira e decisões técnicas:
 ![Calendário Cultos](./screenshots/placeholder-calendario-cultos.png)
 > *Screenshot: Calendário de cultos*
 
+#### O que aparece na tela (Geral)
+- Cards com métricas: **Próximos Cultos**, **Times Ativos**, **Membros Escalados**, **Realizados**, **Mídias Ativas**
+- Módulos principais (cards clicáveis): **Eventos**, **Times**, **Dashboard Liturgia**, **Mídias**
+- Ações rápidas: **Novo Culto/Evento**, **Gerenciar Times**, **Ver Dashboard Liturgia**, **Gerenciar Mídias**
+
+> Evidência: `src/pages/Cultos.tsx` (redireciona `/cultos` → `/cultos/geral`) e `src/pages/cultos/Geral.tsx` (estatísticas, módulos e ações). 
+> Calendário de eventos — (a confirmar)
+
 ### 5.2 Criando um Novo Culto
 
 1. Clique em **"+ Novo Culto"**
@@ -524,6 +532,8 @@ Para entender melhor a arquitetura financeira e decisões técnicas:
 
 ![Novo Culto](./screenshots/placeholder-novo-culto.png)
 > *Screenshot: Formulário de novo culto*
+
+> Observação: criação/edição ocorre pela página de **Eventos** (rota `src/pages/cultos/Eventos.tsx`, detalhes — (a confirmar)). Atalho de criação pode abrir com parâmetro `?novo=true`.
 
 ### 5.3 Mesa de Controle do Culto
 
@@ -623,11 +633,12 @@ Visualização e gestão dos voluntários escalados:
 
 ### 5.5 Projeção (Telão)
 
-Para apresentar na igreja:
+Para apresentar na igreja, utilize um dos modos abaixo (ambos em tela cheia):
 
-1. Na Mesa de Controle, clique em **"Modo Apresentação"**
-2. Uma nova aba abre em tela cheia
-3. Use os controles de teclado:
+#### 5.5.1 Modo Comunicados (`/telao`)
+- Fonte: comunicados com `ativo = true` e `exibir_telao = true` (ordem por `ordem_telao`/`created_at`)
+- Como abrir: acessar a rota `/telao` no navegador do projetor
+- Controles de teclado:
 
 | Tecla | Ação |
 |-------|------|
@@ -635,13 +646,30 @@ Para apresentar na igreja:
 | **←** | Slide anterior |
 | **F** | Tela cheia |
 | **P** | Pausar/retomar auto-play |
+
+#### 5.5.2 Modo Liturgia (`/telao-liturgia/:cultoId`)
+- Fonte: itens da liturgia (`liturgia_culto`) e recursos vinculados (`liturgia_recursos` → `midias`)
+- Como abrir: acessar `/telao-liturgia/<ID_DO_CULTO>` a partir da Mesa de Controle
+- Realtime: alterações na liturgia/recursos atualizam a playlist automaticamente
+- Controles de teclado:
+
+| Tecla | Ação |
+|-------|------|
+| **→** ou **Espaço** | Próximo recurso |
+| **←** | Recurso anterior |
+| **F** | Tela cheia |
+| **P** | Pausar/retomar auto-avance |
 | **B** | Tela preta |
-| **C** | Limpar tela |
+| **C** | Tela limpa (neutra) |
 
 ![Telão](./screenshots/placeholder-telao.png)
 > *Screenshot: Tela de projeção*
 
-> **Nota**: O telão atualiza em tempo real. Alterações feitas na Mesa de Controle são refletidas instantaneamente.
+> Observação: no modo liturgia, exibe barra de progresso quando definido `duracao_segundos` no recurso.
+
+#### Links de Diagramas (Cultos)
+- Fluxo do módulo: `diagramas/fluxo-cultos.md`
+- Sequência do módulo: `diagramas/sequencia-cultos.md`
 
 ---
 
@@ -813,6 +841,14 @@ Para jornadas que requerem pagamento:
 2. Selecione a pessoa
 3. Defina o responsável/discipulador
 4. Clique em **"Salvar"**
+Guard-rails (Cultos):
+
+- Não mover/renomear/apagar arquivos em /docs
+- Apenas COMPLEMENTAR docs existentes
+- Não inventar telas/fluxos: primeiro listar evidências no repo (paths e comportamentos)
+- Se faltar evidência, marcar (a confirmar)
+- Diagramas Mermaid em docs/diagramas/
+- Saída pronta para commit
 
 #### Usando o Player do Curso (Aluno)
 

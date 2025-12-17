@@ -117,6 +117,79 @@ Relações utilizadas (sem FK explícita no schema, mas presentes por convençã
 
 Referência: [`database-schema.sql`](database-schema.sql)
 
+---
+
+## Cultos — entidades e relações
+
+Com base exclusiva no `database-schema.sql`, as entidades relacionadas ao módulo de Cultos e áreas correlatas são:
+
+- `cultos` — cadastro de cultos/eventos com título, tipo, data/horário, local/tema/pregador, status e metadados.
+    - PK: `id`
+    - RLS: leitura para membros; CRUD para admins (conforme políticas no schema)
+
+- `liturgia_culto` — itens da liturgia vinculados a um culto (ordem, tipo, título, duração, responsável), com campo `midias_ids` (array de UUIDs) para associação de mídias.
+    - PK: `id`
+    - FK: `culto_id` → `cultos(id)` (ON DELETE CASCADE)
+    - RLS: leitura para membros; CRUD para admins
+
+- `cancoes_culto` — canções do culto com ordem, título, artista, tom/BPM, links e referências a ministro/solista.
+    - PK: `id`
+    - FK: `culto_id` → `cultos(id)` (ON DELETE CASCADE)
+    - RLS: leitura para membros; CRUD para admins
+
+- `categorias_times` — categorias para classificação de times (nome, cor, ativo).
+    - PK: `id`
+    - RLS: leitura quando ativo; CRUD para admins
+
+- `posicoes_time` — posições/funções dentro de um time (nome, descrição, ativo).
+    - PK: `id`
+    - Coluna: `time_id` (tabela `times` não aparece no schema — (a confirmar))
+    - RLS: leitura quando ativo; CRUD para admins
+
+- `membros_time` — membros vinculados a times, com posição e indicador de ativo.
+    - PK: `id`
+    - Colunas: `time_id`, `pessoa_id`, `posicao_id` (FKs não explicitadas no script — (a confirmar))
+    - RLS: leitura para membros; CRUD para admins
+
+- `escalas_culto` — alocação de pessoas em times/posições para um culto específico, com `confirmado` (boolean) e observações.
+    - PK: `id`
+    - FK: `culto_id` → `cultos(id)` (ON DELETE CASCADE)
+    - Colunas: `time_id`, `pessoa_id`, `posicao_id` (FKs não explicitadas no script — (a confirmar))
+    - RLS: leitura para membros; atualização permitida ao próprio escalado; CRUD para admins
+
+- `templates_culto` — templates reutilizáveis de culto, com campos padrão e flag `incluir_escalas`.
+    - PK: `id`
+    - RLS: leitura quando ativo; CRUD para admins
+
+- `itens_template_culto` — itens (ordem, tipo, título, duração) pertencentes a um template, com `midias_ids`.
+    - PK: `id`
+    - FK: `template_id` → `templates_culto(id)` (ON DELETE CASCADE)
+    - RLS: leitura quando template ativo; CRUD para admins
+
+- `escalas_template` — definição de escalas no contexto do template (time, pessoa, posição, observações).
+    - PK: `id`
+    - FK: `template_id` → `templates_culto(id)` (ON DELETE CASCADE)
+    - RLS: leitura quando template ativo; CRUD para admins
+
+- `midias` — mídias com título/tipo/url, canal (padrão `telao`), ordem, ativo e janelas de publicação.
+    - PK: `id`
+    - Coluna opcional: `culto_id` para associação a um culto
+    - RLS: leitura para membros; CRUD para admins
+
+- `tags_midias` — catálogo de tags de mídia (nome, cor, ativo).
+    - PK: `id`
+    - RLS: leitura quando ativo; CRUD para admins
+
+- `midia_tags` — relação N:N entre mídias e tags.
+    - PK: `id`
+    - FK: `midia_id` → `midias(id)` (ON DELETE CASCADE), `tag_id` → `tags_midias(id)` (ON DELETE CASCADE)
+    - RLS: leitura para todos; CRUD para admins
+
+Observações:
+- A tabela `liturgia_recursos` é usada no frontend (playlist do telão), mas não aparece no `database-schema.sql` — (a confirmar).
+- A entidade `times` é referenciada em colunas (`time_id`), porém não consta explicitamente no `database-schema.sql` — (a confirmar).
+
+Fonte do esquema: [`database-schema.sql`](database-schema.sql)
 ```mermaid
 erDiagram
     %% =============================================
