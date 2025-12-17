@@ -289,6 +289,25 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - **Kanban**: Visualização do progresso dos participantes
 - **Responsáveis**: Líderes/discipuladores por participante
 
+#### Tipos de Jornada (Dez/2024)
+- **auto_instrucional**: Exibe Player como visão principal (aluno avança sozinho)
+- **processo_acompanhado**: Exibe Kanban como visão principal (líder acompanha)
+- **hibrido**: Combinação de ambos os modos
+- **Campo**: `tipo_jornada` em `jornadas`
+
+#### Etapas Avançadas (Dez/2024)
+- **Tipos de conteúdo**: `texto`, `video`, `quiz`, `tarefa`, `reuniao`
+- **URL de conteúdo**: Link de vídeo ou embed externo
+- **Configuração de Quiz**: JSON com nota mínima e perguntas (`quiz_config`)
+- **Check automático**: Se `true`, sistema avança sozinho; se `false`, requer ação do aluno (soft-lock)
+- **Duração estimada**: Tempo previsto para conclusão em minutos
+- **Campos**: `conteudo_tipo`, `conteudo_url`, `quiz_config`, `check_automatico`, `duracao_estimada_minutos` em `etapas_jornada`
+
+#### Sistema de Quiz (Dez/2024)
+- **Tabela**: `respostas_quiz` armazena histórico de respostas
+- **Campos**: `inscricao_id`, `etapa_id`, `respostas` (JSONB), `nota_obtida`, `aprovado`, `tentativa_numero`
+- **RLS**: Aluno vê e insere apenas suas próprias respostas; admin gerencia todas
+
 #### Cursos Pagos (Dez/2024)
 - **Configuração de valor**: Admin pode definir se a jornada requer pagamento e o valor
 - **Status de pagamento**: Inscrições possuem status `isento` (padrão), `pendente` ou `pago`
