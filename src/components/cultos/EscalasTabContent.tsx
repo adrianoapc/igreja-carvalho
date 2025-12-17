@@ -154,13 +154,13 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
     switch (status) {
       case "aceito":
       case "confirmado":
-        return <CheckCircle2 className="h-4 w-4 text-green-500" title="Confirmado" />;
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case "recusado":
-        return <XCircle className="h-4 w-4 text-red-500" title="Recusado" />;
+        return <XCircle className="h-4 w-4 text-red-500" />;
       case "troca_solicitada":
-        return <AlertTriangle className="h-4 w-4 text-orange-500" title="Troca Solicitada" />;
+        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
       default:
-        return <Clock className="h-4 w-4 text-yellow-500" title="Pendente" />;
+        return <Clock className="h-4 w-4 text-yellow-500" />;
     }
   };
 

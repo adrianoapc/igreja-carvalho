@@ -281,19 +281,19 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
     
     // Se já fez checkin, mostrar check duplo
     if (escala.checkin_realizado) {
-      return <CheckCheck className="w-4 h-4 text-green-600" title="Check-in realizado" />;
+      return <CheckCheck className="w-4 h-4 text-green-600" />;
     }
     
     switch (status) {
       case "aceito":
       case "confirmado":
-        return <CheckCircle2 className="w-4 h-4 text-green-500" title="Confirmado" />;
+        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case "recusado":
-        return <XCircle className="w-4 h-4 text-red-500" title="Recusado" />;
+        return <XCircle className="w-4 h-4 text-red-500" />;
       case "troca_solicitada":
-        return <RefreshCw className="w-4 h-4 text-orange-500" title="Troca Solicitada" />;
+        return <RefreshCw className="w-4 h-4 text-orange-500" />;
       default:
-        return <Clock className="w-4 h-4 text-yellow-500" title="Pendente" />;
+        return <Clock className="w-4 h-4 text-yellow-500" />;
     }
   };
 
