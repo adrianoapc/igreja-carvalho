@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import { WelcomeHeader } from "./WelcomeHeader";
+import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
 
 interface Aniversariante {
   id: string;
@@ -129,6 +130,9 @@ export default function DashboardLeader() {
           <span>Como você está?</span>
         </Button>
       </div>
+
+      {/* Widget de Monitoramento de Escalas */}
+      <EscalasPendentesWidget />
 
       <RegistrarSentimentoDialog open={sentimentoDialogOpen} onOpenChange={setSentimentoDialogOpen} />
 
