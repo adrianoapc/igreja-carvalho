@@ -1,4 +1,4 @@
-name: Docs Guard
+name: Docs Guard (Hard Mode)
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ jobs:
         id: changed
         uses: tj-actions/changed-files@v45
 
-      - name: Enforce docs update for touched modules
+      - name: Enforce documentation discipline
         shell: bash
         run: |
           set -euo pipefail
@@ -23,9 +23,16 @@ jobs:
           echo "Changed files:"
           echo "$changed" | tr ' ' '\n'
 
+          # ===============================
+          # Detect docs changes
+          # ===============================
           DOCS_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/' || true)
+          DIAGRAM_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/diagramas/' || true)
+          TEXT_DOC_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/)' || true)
 
-          # Mapa de módulos (regex corretos conforme sua estrutura src/pages e src/components)
+          # ===============================
+          # Module path mapping (REAL paths)
+          # ===============================
           declare -A MODULES=(
             [admin]='^(src/pages/admin/|src/components/admin/)'
             [auth]='^(src/pages/auth/|src/components/auth/|src/integrations/supabase/)'
@@ -54,8 +61,7 @@ jobs:
 
           touched=()
           for m in "${!MODULES[@]}"; do
-            rx="${MODULES[$m]}"
-            if echo "$changed" | tr ' ' '\n' | grep -E "$rx" >/dev/null 2>&1; then
+            if echo "$changed" | tr ' ' '\n' | grep -E "${MODULES[$m]}" >/dev/null 2>&1; then
               touched+=("$m")
             fi
           done
@@ -67,9 +73,28 @@ jobs:
 
           echo "Touched modules: ${touched[*]}"
 
+          # ===============================
+          # HARD RULE 1: docs/ must change
+          # ===============================
           if [ -z "$DOCS_CHANGED" ]; then
-            echo "::error::Módulos tocados (${touched[*]}), mas nenhuma mudança em docs/. Atualize a documentação antes do merge."
+            echo "::error::Código foi alterado (${touched[*]}), mas nenhuma mudança em docs/. Documentação é obrigatória."
             exit 1
           fi
 
-          echo "Docs updated ✅"
+          # ===============================
+          # HARD RULE 2: diagram is mandatory
+          # ===============================
+          if [ -z "$DIAGRAM_CHANGED" ]; then
+            echo "::error::É obrigatório atualizar/criar ao menos um diagrama em docs/diagramas/ para os módulos: ${touched[*]}"
+            exit 1
+          fi
+
+          # ===============================
+          # HARD RULE 3: textual doc is mandatory
+          # ===============================
+          if [ -z "$TEXT_DOC_CHANGED" ]; then
+            echo "::error::Além de diagramas, é obrigatório atualizar documentação textual (manual, funcionalidades, produto, arquitetura ou ADR)."
+            exit 1
+          fi
+
+          echo "Documentation requirements satisfied ✅"
