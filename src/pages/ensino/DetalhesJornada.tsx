@@ -109,7 +109,7 @@ export default function DetalhesJornada() {
 
       const { data: inscricoesData, error: inscricoesError } = await supabase
         .from("inscricoes_jornada")
-        .select<RawInscricao[]>(`
+        .select(`
           id,
           pessoa_id,
           etapa_atual_id,
@@ -127,20 +127,20 @@ export default function DetalhesJornada() {
       if (etapaIds.length > 0) {
         const { data: presencas, error: presencasError } = await supabase
           .from("presencas_aula")
-          .select<PresencaEtapa[]>("aluno_id, etapa_id, status")
+          .select("aluno_id, etapa_id, status")
           .eq("status", "concluido")
           .in("etapa_id", etapaIds);
 
         if (presencasError) throw presencasError;
 
-        concluidoPorAluno = (presencas || []).reduce((acc, presenca) => {
+        concluidoPorAluno = ((presencas || []) as PresencaEtapa[]).reduce((acc, presenca) => {
           if (!presenca.aluno_id) return acc;
           acc[presenca.aluno_id] = (acc[presenca.aluno_id] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
       }
 
-      const inscricoesComProgresso: InscricaoComProgresso[] = (inscricoesData || []).map(
+      const inscricoesComProgresso: InscricaoComProgresso[] = ((inscricoesData || []) as RawInscricao[]).map(
         (inscricao) => ({
           ...inscricao,
           etapasConcluidas: concluidoPorAluno[inscricao.pessoa_id] || 0,
