@@ -319,6 +319,7 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - Barra de progresso por curso
 - Marcação de etapas concluídas
 - Navegação entre etapas com status visual
+- **Certificado de Conclusão (Dez/2025)**: download de PDF (jsPDF) ao completar 100% das etapas; tela de celebração destaca a conquista e oferece botão de download (sidebar e tela cheia). Sem alterações de schema — reutiliza dados de jornada/inscrição.
 
 ### 5.3 Gestão de Ensino
 - Agendamento de aulas (presencial/online/híbrido), vinculadas a jornadas e/ou cultos

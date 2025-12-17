@@ -8,6 +8,23 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Adicionado
+
+#### 🎓 Player do Aluno: Certificado e Celebração (17 de Dez/2025)
+- **Download de certificado em PDF** diretamente no `CursoPlayer` ao concluir 100% das etapas (botão na sidebar e na tela de celebração)
+- **Tela de celebração** em tela cheia quando todas as etapas estão concluídas, com chamada para baixar o certificado
+- **Design do PDF**: paisagem A4, bordas decorativas azul/dourado, identifica aluno, jornada e data de conclusão
+
+**Impacto no usuário:**
+- Alunos obtêm comprovante imediato de conclusão sem intervenção do admin
+- Jornada paga continua bloqueada até pagamento, mas certificado só aparece após todas as etapas concluídas
+
+**Riscos/Observações:**
+- Geração de PDF ocorre no front-end (jsPDF); navegadores bloqueiam pop-up se for acionado automaticamente — ação do usuário é necessária
+- Sem alterações de schema; usa dados existentes de jornada/inscrição
+
+**Módulos afetados:** Ensino / Jornadas (Player do Aluno)
+
 ### Corrigido
 
 #### 🔒 Correções de Segurança (17 de Dez/2025)

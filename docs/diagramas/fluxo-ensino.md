@@ -68,7 +68,9 @@ flowchart TD
     NM -->|Sim| CA
     NM -->|Não| RQ
     
-    CA -->|Sim| AV --> PL
+    CA -->|Sim| AV --> FC{100% das etapas?}
+    FC -->|Sim| BC[Baixar certificado PDF]
+    FC -->|Não| PL
     CA -->|Não| MA --> PL
 
     %% Estilos
