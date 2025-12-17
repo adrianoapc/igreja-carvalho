@@ -62,7 +62,7 @@ export default function MeusCursos() {
     try {
       const { data: inscricoesData, error } = await supabase
         .from("inscricoes_jornada")
-        .select<SupabaseInscricao[]>(`
+        .select(`
           id,
           jornada_id,
           etapa_atual_id,
@@ -78,7 +78,7 @@ export default function MeusCursos() {
 
       const inscricoesComProgresso: InscricaoComProgresso[] = [];
 
-      for (const inscricao of inscricoesData || []) {
+      for (const inscricao of (inscricoesData || []) as SupabaseInscricao[]) {
         const { count: totalEtapas } = await supabase
           .from("etapas_jornada")
           .select("*", { count: "exact", head: true })

@@ -978,36 +978,48 @@ export type Database = {
       etapas_jornada: {
         Row: {
           aula_vinculada_id: string | null
+          check_automatico: boolean | null
           conteudo_texto: string | null
+          conteudo_tipo: string | null
           conteudo_url: string | null
           created_at: string | null
+          duracao_estimada_minutos: number | null
           id: string
           jornada_id: string
           ordem: number
+          quiz_config: Json | null
           tipo_conteudo: string | null
           titulo: string
           updated_at: string | null
         }
         Insert: {
           aula_vinculada_id?: string | null
+          check_automatico?: boolean | null
           conteudo_texto?: string | null
+          conteudo_tipo?: string | null
           conteudo_url?: string | null
           created_at?: string | null
+          duracao_estimada_minutos?: number | null
           id?: string
           jornada_id: string
           ordem: number
+          quiz_config?: Json | null
           tipo_conteudo?: string | null
           titulo: string
           updated_at?: string | null
         }
         Update: {
           aula_vinculada_id?: string | null
+          check_automatico?: boolean | null
           conteudo_texto?: string | null
+          conteudo_tipo?: string | null
           conteudo_url?: string | null
           created_at?: string | null
+          duracao_estimada_minutos?: number | null
           id?: string
           jornada_id?: string
           ordem?: number
+          quiz_config?: Json | null
           tipo_conteudo?: string | null
           titulo?: string
           updated_at?: string | null
@@ -1503,6 +1515,7 @@ export type Database = {
           exibir_portal: boolean | null
           id: string
           requer_pagamento: boolean | null
+          tipo_jornada: string | null
           titulo: string
           updated_at: string | null
           valor: number | null
@@ -1515,6 +1528,7 @@ export type Database = {
           exibir_portal?: boolean | null
           id?: string
           requer_pagamento?: boolean | null
+          tipo_jornada?: string | null
           titulo: string
           updated_at?: string | null
           valor?: number | null
@@ -1527,6 +1541,7 @@ export type Database = {
           exibir_portal?: boolean | null
           id?: string
           requer_pagamento?: boolean | null
+          tipo_jornada?: string | null
           titulo?: string
           updated_at?: string | null
           valor?: number | null
@@ -2792,6 +2807,54 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
+      respostas_quiz: {
+        Row: {
+          aprovado: boolean | null
+          created_at: string | null
+          etapa_id: string | null
+          id: string
+          inscricao_id: string | null
+          nota_obtida: number | null
+          respostas: Json
+          tentativa_numero: number | null
+        }
+        Insert: {
+          aprovado?: boolean | null
+          created_at?: string | null
+          etapa_id?: string | null
+          id?: string
+          inscricao_id?: string | null
+          nota_obtida?: number | null
+          respostas: Json
+          tentativa_numero?: number | null
+        }
+        Update: {
+          aprovado?: boolean | null
+          created_at?: string | null
+          etapa_id?: string | null
+          id?: string
+          inscricao_id?: string | null
+          nota_obtida?: number | null
+          respostas?: Json
+          tentativa_numero?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "respostas_quiz_etapa_id_fkey"
+            columns: ["etapa_id"]
+            isOneToOne: false
+            referencedRelation: "etapas_jornada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_quiz_inscricao_id_fkey"
+            columns: ["inscricao_id"]
+            isOneToOne: false
+            referencedRelation: "inscricoes_jornada"
+            referencedColumns: ["id"]
           },
         ]
       }
