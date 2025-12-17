@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   ChevronRight
 } from "lucide-react";
+import QuizPlayer from "@/components/ensino/QuizPlayer";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -30,6 +31,8 @@ interface Etapa {
   tipo_conteudo: string | null;
   conteudo_url: string | null;
   conteudo_texto: string | null;
+  quiz_config?: any;
+  check_automatico?: boolean | null;
   aula_vinculada_id: string | null;
   concluida: boolean;
   data_conclusao?: string;
@@ -62,6 +65,7 @@ export default function CursoPlayer() {
   const [sidebarAberta, setSidebarAberta] = useState(true);
   const [bloqueadoPagamento, setBloqueadoPagamento] = useState(false);
   const [valorCurso, setValorCurso] = useState<number | null>(null);
+  const [inscricaoId, setInscricaoId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id && profile?.id) {
@@ -94,10 +98,14 @@ export default function CursoPlayer() {
       // Verificar inscrição e pagamento
       const { data: inscricao } = await supabase
         .from("inscricoes_jornada")
-        .select("status_pagamento")
+        .select("id, status_pagamento")
         .eq("jornada_id", id)
         .eq("pessoa_id", profile.id)
         .maybeSingle();
+
+      if (inscricao) {
+        setInscricaoId(inscricao.id);
+      }
 
       if (inscricao?.status_pagamento === "pendente") {
         setBloqueadoPagamento(true);
@@ -106,10 +114,10 @@ export default function CursoPlayer() {
         return;
       }
 
-      // Buscar etapas
+      // Buscar etapas com campos de quiz
       const { data: etapasData, error: etapasError } = await supabase
         .from("etapas_jornada")
-        .select("id, titulo, ordem, tipo_conteudo, conteudo_url, conteudo_texto, aula_vinculada_id")
+        .select("id, titulo, ordem, tipo_conteudo, conteudo_url, conteudo_texto, quiz_config, check_automatico, aula_vinculada_id")
         .eq("jornada_id", id)
         .order("ordem");
 
@@ -177,6 +185,11 @@ export default function CursoPlayer() {
         sala: Array.isArray(data.sala) ? data.sala[0] : data.sala
       });
     }
+  };
+
+  const handleQuizAprovado = async () => {
+    // Callback chamado pelo QuizPlayer quando aprovado
+    await marcarConcluido();
   };
 
   const marcarConcluido = async () => {
@@ -320,6 +333,26 @@ export default function CursoPlayer() {
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(conteudo_texto || "") }}
             />
           </div>
+        );
+
+      case "quiz":
+        if (!etapaSelecionada.quiz_config || !inscricaoId) {
+          return (
+            <div className="text-center text-muted-foreground py-8">
+              Quiz não configurado ou inscrição não encontrada
+            </div>
+          );
+        }
+        return (
+          <QuizPlayer 
+            etapa={{
+              id: etapaSelecionada.id,
+              titulo: etapaSelecionada.titulo,
+              quiz_config: etapaSelecionada.quiz_config
+            }}
+            inscricaoId={inscricaoId}
+            onAprovado={handleQuizAprovado}
+          />
         );
 
       case "aula_presencial":
@@ -521,20 +554,30 @@ export default function CursoPlayer() {
                     </span>
                   </div>
                 ) : (
-                  <Button 
-                    onClick={marcarConcluido}
-                    disabled={marcandoConcluido}
-                    className="gap-2"
-                  >
-                    {marcandoConcluido ? (
-                      "Salvando..."
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4" />
-                        Marcar como Concluído
-                      </>
-                    )}
-                  </Button>
+                  // Soft-lock: ocultar botão para quiz e video com check_automatico
+                  (etapaSelecionada.tipo_conteudo === "quiz" || 
+                   (etapaSelecionada.tipo_conteudo === "video" && etapaSelecionada.check_automatico)) ? (
+                    <div className="text-sm text-muted-foreground">
+                      {etapaSelecionada.tipo_conteudo === "quiz" 
+                        ? "Complete o quiz para avançar" 
+                        : "Assista o vídeo completo para avançar"}
+                    </div>
+                  ) : (
+                    <Button 
+                      onClick={marcarConcluido}
+                      disabled={marcandoConcluido}
+                      className="gap-2"
+                    >
+                      {marcandoConcluido ? (
+                        "Salvando..."
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Marcar como Concluído
+                        </>
+                      )}
+                    </Button>
+                  )
                 )}
               </div>
             </div>
