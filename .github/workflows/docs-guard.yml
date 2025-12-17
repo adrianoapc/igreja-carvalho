@@ -19,44 +19,56 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Lista de arquivos alterados no PR
           changed="${{ steps.changed.outputs.all_changed_files }}"
           echo "Changed files:"
           echo "$changed" | tr ' ' '\n'
 
-          # Se QUALQUER arquivo em docs/ mudou, consideramos doc atualizada
           DOCS_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/' || true)
 
-          # Mapeamento: "módulo" -> regex de paths no código
-          # Ajuste os paths conforme seu repo (ex.: src/modules/..., src/pages/..., etc.)
-          declare -A MODULE_PATHS
-          MODULE_PATHS[financeiro]='^src/.*(finance|financial|tesour|caixa|dre)/'
-          MODULE_PATHS[pessoas]='^src/.*(pessoas|membros|people|members)/'
-          MODULE_PATHS[kids]='^src/.*(kids|crianc|children)/'
-          MODULE_PATHS[comunicacao]='^src/.*(comunic|aviso|anuncio|mensag)/'
-          MODULE_PATHS[notificacoes]='^src/.*(notific|notification|notify|alert)/'
-          MODULE_PATHS[ensino]='^src/.*(ensino|teaching|aulas|classes)/'
-          MODULE_PATHS[auth]='^src/.*(auth|login|session|jwt)/'
-          MODULE_PATHS[database]='^(supabase/|docs/database-|.*schema\.sql)'
+          # Mapa de módulos (regex corretos conforme sua estrutura src/pages e src/components)
+          declare -A MODULES=(
+            [admin]='^(src/pages/admin/|src/components/admin/)'
+            [auth]='^(src/pages/auth/|src/components/auth/|src/integrations/supabase/)'
+            [cadastro]='^src/pages/cadastro/'
+            [cultos]='^(src/pages/cultos/|src/components/cultos/)'
+            [dashboard]='^src/components/dashboard/'
+            [ensino]='^(src/pages/ensino/|src/components/ensino/)'
+            [financas]='^(src/pages/financas/|src/components/financas/)'
+            [intercessao]='^src/pages/intercessao/'
+            [kids]='^(src/pages/kids/|src/components/kids/)'
+            [pessoas]='^(src/pages/pessoas/|src/components/pessoas/|src/components/membros/)'
+            [agenda]='^src/components/agenda/'
+            [familia]='^src/components/familia/'
+            [jornadas]='^src/components/jornadas/'
+            [pedidos]='^src/components/pedidos/'
+            [perfil]='^src/components/perfil/'
+            [projetos]='^src/components/projetos/'
+            [comunicacao]='^(src/components/comunicados/|src/components/publicacao/)'
+            [sentimentos]='^src/components/sentimentos/'
+            [testemunhos]='^src/components/testemunhos/'
+            [visitantes]='^src/components/visitantes/'
+            [voluntario]='^src/components/voluntario/'
+            [layout-ui]='^(src/components/layout/|src/components/ui/|src/assets/|src/lib/|src/hooks/|src/utils/)'
+            [integrations]='^src/integrations/'
+          )
 
-          touched_modules=()
-          for module in "${!MODULE_PATHS[@]}"; do
-            rx="${MODULE_PATHS[$module]}"
+          touched=()
+          for m in "${!MODULES[@]}"; do
+            rx="${MODULES[$m]}"
             if echo "$changed" | tr ' ' '\n' | grep -E "$rx" >/dev/null 2>&1; then
-              touched_modules+=("$module")
+              touched+=("$m")
             fi
           done
 
-          if [ ${#touched_modules[@]} -eq 0 ]; then
-            echo "No module matched; skipping docs enforcement."
+          if [ ${#touched[@]} -eq 0 ]; then
+            echo "No mapped modules touched; skipping docs enforcement."
             exit 0
           fi
 
-          echo "Touched modules: ${touched_modules[*]}"
+          echo "Touched modules: ${touched[*]}"
 
-          # Regra: se módulo foi tocado, tem que haver mudança em docs/
           if [ -z "$DOCS_CHANGED" ]; then
-            echo "::error::Módulos tocados (${touched_modules[*]}), mas nenhuma mudança em docs/. Atualize a documentação antes do merge."
+            echo "::error::Módulos tocados (${touched[*]}), mas nenhuma mudança em docs/. Atualize a documentação antes do merge."
             exit 1
           fi
 
