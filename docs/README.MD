@@ -37,6 +37,9 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- Intercessão — manual do usuário: [`manual-usuario.md#6-intercessão`](manual-usuario.md#6-intercessão)
 	- Intercessão — funcionalidades: [`funcionalidades.md#4-intercessão-oração-e-testemunhos`](funcionalidades.md#4-intercessão-oração-e-testemunhos)
 	- Intercessão — próximos passos: [`PROXIMOS_PASSOS_INTERCESSAO.md`](PROXIMOS_PASSOS_INTERCESSAO.md)
+ - Telas & Segurança
+	- Catálogo de Telas: [`telas/catalogo-telas.md`](telas/catalogo-telas.md)
+	- Matriz de Permissões (ACL): [`telas/matriz-permissoes.md`](telas/matriz-permissoes.md)
 - Banco de Dados
 	- Esquema SQL: [`database-schema.sql`](database-schema.sql)
 	- Diagrama ER: [`database-er-diagram.md`](database-er-diagram.md)
