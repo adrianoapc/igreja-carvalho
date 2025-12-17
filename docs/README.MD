@@ -40,6 +40,8 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
  - Telas & Segurança
 	- Catálogo de Telas: [`telas/catalogo-telas.md`](telas/catalogo-telas.md)
 	- Matriz de Permissões (ACL): [`telas/matriz-permissoes.md`](telas/matriz-permissoes.md)
+	- Catálogo (Geral): [`catalogo/catalogo-telas.md`](catalogo/catalogo-telas.md) — canônico em `telas/`
+	- Matriz (Geral): [`catalogo/matriz-permissoes.md`](catalogo/matriz-permissoes.md) — canônico em `telas/`
 - Banco de Dados
 	- Esquema SQL: [`database-schema.sql`](database-schema.sql)
 	- Diagrama ER: [`database-er-diagram.md`](database-er-diagram.md)
