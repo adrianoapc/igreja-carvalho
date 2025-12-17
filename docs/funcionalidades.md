@@ -289,6 +289,12 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - **Kanban**: Visualização do progresso dos participantes
 - **Responsáveis**: Líderes/discipuladores por participante
 
+#### Cursos Pagos (Dez/2024)
+- **Configuração de valor**: Admin pode definir se a jornada requer pagamento e o valor
+- **Status de pagamento**: Inscrições possuem status `isento` (padrão), `pendente` ou `pago`
+- **Integração financeira**: Pagamentos podem ser vinculados a transações financeiras (categoria "Cursos e Treinamentos")
+- **Campos**: `requer_pagamento` (boolean), `valor` (numeric) em `jornadas`; `status_pagamento`, `transacao_id` em `inscricoes_jornada`
+
 ### 5.2 Player de Cursos (Aluno)
 - Interface LMS para consumo de conteúdo
 - Barra de progresso por curso
