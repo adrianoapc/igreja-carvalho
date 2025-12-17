@@ -194,12 +194,12 @@ export default function Reembolsos() {
 
   // Query: Categorias
   const { data: categorias = [] } = useQuery({
-    queryKey: ["categorias-despesa"],
+    queryKey: ["categorias-saida"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categorias_financeiras")
         .select("id, nome")
-        .eq("tipo", "despesa")
+        .eq("tipo", "saida")
         .eq("ativo", true)
         .order("nome");
 
