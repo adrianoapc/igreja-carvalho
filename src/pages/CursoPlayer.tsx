@@ -18,9 +18,12 @@ import {
   Calendar,
   MapPin,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  Trophy,
+  Sparkles
 } from "lucide-react";
 import QuizPlayer from "@/components/ensino/QuizPlayer";
+import { gerarCertificado } from "@/components/ensino/CertificadoGenerator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -66,6 +69,9 @@ export default function CursoPlayer() {
   const [bloqueadoPagamento, setBloqueadoPagamento] = useState(false);
   const [valorCurso, setValorCurso] = useState<number | null>(null);
   const [inscricaoId, setInscricaoId] = useState<string | null>(null);
+
+  // Verificar se jornada está 100% concluída
+  const jornadaConcluida = etapas.length > 0 && etapas.every(e => e.concluida);
 
   useEffect(() => {
     if (id && profile?.id) {
@@ -514,6 +520,40 @@ export default function CursoPlayer() {
                   </div>
                 </button>
               ))}
+
+              {/* Card de Celebração - Jornada 100% Concluída */}
+              {jornadaConcluida && (
+                <Card className="mt-4 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-amber-600" />
+                      <p className="font-semibold text-amber-900 dark:text-amber-100">
+                        Jornada Concluída! 🎉
+                      </p>
+                    </div>
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      Parabéns! Você completou todas as etapas desta jornada.
+                    </p>
+                    <Button 
+                      onClick={() => {
+                        if (profile?.nome && jornada?.titulo) {
+                          gerarCertificado({
+                            nomeAluno: profile.nome,
+                            nomeJornada: jornada.titulo,
+                            dataConclusao: new Date()
+                          });
+                          toast.success("Certificado baixado com sucesso!");
+                        }
+                      }}
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                      size="sm"
+                    >
+                      <Trophy className="h-4 w-4 mr-2" />
+                      Baixar Certificado
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -522,9 +562,68 @@ export default function CursoPlayer() {
         <div className={`flex-1 flex flex-col min-w-0 ${sidebarAberta ? 'hidden lg:flex' : 'flex'}`}>
           {/* Conteúdo */}
           <ScrollArea className="flex-1 p-4 lg:p-6">
-            <div className="max-w-4xl mx-auto">
-              {renderConteudo()}
-            </div>
+            {/* Tela de Celebração Fullscreen - Exibida quando jornada 100% concluída e nenhuma etapa está aberta */}
+            {jornadaConcluida && !etapaSelecionada ? (
+              <div className="flex items-center justify-center min-h-full">
+                <Card className="max-w-2xl w-full bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/40 dark:via-yellow-950/40 dark:to-orange-950/40 border-amber-300 dark:border-amber-700 shadow-xl">
+                  <CardContent className="p-8 md:p-12 space-y-6 text-center">
+                    <div className="flex justify-center items-center gap-4">
+                      <Trophy className="h-16 w-16 text-amber-600 animate-bounce" />
+                      <Sparkles className="h-12 w-12 text-yellow-500 animate-pulse" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <h1 className="text-3xl md:text-4xl font-bold text-amber-900 dark:text-amber-100">
+                        Parabéns! 🎉
+                      </h1>
+                      <p className="text-xl text-amber-800 dark:text-amber-200">
+                        Você concluiu a jornada:
+                      </p>
+                      <p className="text-2xl font-semibold text-amber-900 dark:text-amber-100">
+                        {jornada?.titulo}
+                      </p>
+                    </div>
+
+                    <p className="text-base text-amber-700 dark:text-amber-300 max-w-lg mx-auto">
+                      Todas as etapas foram completadas com sucesso. Continue sua caminhada de aprendizado e crescimento!
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+                      <Button 
+                        onClick={() => {
+                          if (profile?.nome && jornada?.titulo) {
+                            gerarCertificado({
+                              nomeAluno: profile.nome,
+                              nomeJornada: jornada.titulo,
+                              dataConclusao: new Date()
+                            });
+                            toast.success("Certificado baixado com sucesso!");
+                          }
+                        }}
+                        size="lg"
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                      >
+                        <Trophy className="h-5 w-5 mr-2" />
+                        Baixar Certificado
+                      </Button>
+                      <Button 
+                        onClick={() => navigate("/cursos")}
+                        variant="outline"
+                        size="lg"
+                        className="border-amber-300 dark:border-amber-700"
+                      >
+                        <ArrowLeft className="h-5 w-5 mr-2" />
+                        Voltar aos Cursos
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="max-w-4xl mx-auto">
+                {renderConteudo()}
+              </div>
+            )}
           </ScrollArea>
 
           {/* Barra de Ação */}
