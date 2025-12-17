@@ -399,6 +399,44 @@ Todas as queries financeiras são filtradas por `igreja_id` automaticamente:
 - Frontend força campo de justificativa (required)
 - Apenas admin pode estornar lançamentos de outros tesoureiros
 
+---
+
+## Módulo Cultos (visão técnica)
+
+### Como o frontend lê/grava dados (evidências)
+- Leitura (Visão Geral): `src/pages/cultos/Geral.tsx` consulta Supabase para métricas
+  - `cultos`: count de futuros/atuais por `status ∈ {planejado, confirmado}` e `data_culto ≥ hoje`
+  - `escalas_culto`: count por lista de `culto_id`
+  - `times_culto`: count de times ativos
+  - `midias`: count de mídias ativas
+- Leitura (Projeção – Comunicados): `src/pages/Telao.tsx`
+  - `comunicados`: `select *` com filtros `ativo = true` e `exibir_telao = true`, janelas `data_inicio`/`data_fim` e ordenação por `ordem_telao` e `created_at`
+  - Atualização automática: `refetchInterval` (60s)
+- Leitura (Projeção – Liturgia): `src/pages/TelaoLiturgia.tsx`
+  - `cultos`: título/data do culto
+  - `liturgia_culto`: itens ordenados por `ordem`
+  - `liturgia_recursos` (join `midias`): recursos por item (tabela não aparece no schema atual — (a confirmar))
+  - Supabase Realtime: canal `postgres_changes` escuta mudanças em `liturgia_culto` e `liturgia_recursos` para atualizar a playlist
+- Escrita: diálogos/containers em `src/components/cultos/*` sugerem criação/edição de liturgia, mídias, times/posições e escalas (insert/update/delete) — detalhes de payloads não visíveis nesta análise — (a confirmar).
+
+### Uso do Supabase
+- Client: `@supabase/supabase-js` (via `integrations/supabase/client`)
+- Queries: `.from(...).select(...).eq(...) .in(...) .order(...)` com TanStack Query para cache/refetch
+- Realtime: `supabase.channel(...).on('postgres_changes', ...)` em `TelaoLiturgia.tsx` para refletir edições de liturgia/recursos em tempo real
+
+### Permissões / RLS (com base no schema)
+- `cultos`: RLS ativo; políticas de leitura aberta a membros e CRUD para admins
+- `liturgia_culto`: RLS ativo; leitura para membros; CRUD para admins
+- `cancoes_culto`: RLS ativo; leitura para membros; CRUD para admins
+- `escalas_culto`: RLS ativo; leitura para membros; update limitado para o próprio membro confirmar; CRUD para admins
+- `templates_culto` e `itens_template_culto`: RLS ativo; leitura quando template ativo; CRUD para admins
+- `midias`, `tags_midias`, `midia_tags`: RLS ativo; leitura para membros; CRUD para admins
+- `liturgia_recursos`: não está presente no `database-schema.sql` — (a confirmar)
+
+### Diagramas relacionados (Cultos)
+- Fluxo (Mermaid): [`../diagramas/fluxo-cultos.md`](../diagramas/fluxo-cultos.md)
+- Sequência (Mermaid): [`../diagramas/sequencia-cultos.md`](../diagramas/sequencia-cultos.md)
+
 #### Permissões Granulares
 Via `user_app_roles` e `module_permissions`:
 - Tesoureiro A pode ter acesso apenas à base ministerial "Sede"

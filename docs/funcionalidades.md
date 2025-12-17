@@ -248,6 +248,83 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - Atualização em tempo real via Supabase Realtime
 - Suporte a imagens e vídeos
 
+#### Modos de Projeção (Evidências)
+- **Modo Comunicados** — rota `/telao` (arquivo `src/pages/Telao.tsx`)
+  - Fonte: tabela `comunicados` com filtros `ativo = true`, `exibir_telao = true`, janelas `data_inicio`/`data_fim`, `ordem_telao`
+  - Controles: `→`/`Espaço` (próximo), `←` (anterior), `P` (pausa), `F` (tela cheia)
+  - Suporte a imagens e vídeos (mp4/webm/mov)
+- **Modo Liturgia** — rota `/telao-liturgia/:id` (arquivo `src/pages/TelaoLiturgia.tsx`)
+  - Fonte: `cultos` → `liturgia_culto` (itens) → `liturgia_recursos` (recursos com `midias`)
+  - Realtime: assina mudanças em `liturgia_culto` e `liturgia_recursos` (canal Supabase)
+  - Controles: `→`/`Espaço` (próximo), `←` (anterior), `P` (pausa), `F` (tela cheia), `B` (tela preta), `C` (tela limpa)
+  - Barra de progresso por recurso (quando `duracao_segundos > 0`)
+
+#### Evidências no Repositório (Cultos)
+- Páginas (src/pages/cultos/): `Geral.tsx`, `Eventos.tsx`, `Times.tsx`, `Posicoes.tsx`, `Templates.tsx`, `LiturgiaDashboard.tsx`, `MidiasGeral.tsx`
+- Projeção: `src/pages/Telao.tsx`, `src/pages/TelaoLiturgia.tsx`
+- Componentes: `src/components/cultos/` — dialogs e telas para liturgia, templates, escalas e mídias
+  - Exemplos: `LiturgiaTimeline.tsx`, `LiturgiaWorkspace.tsx`, `LiturgiaDialog.tsx`, `LiturgiaItemDialog.tsx`, `EscalasTabContent.tsx`, `EscalasDialog.tsx`, `TimeDialog.tsx`, `PosicaoDialog.tsx`, `MidiaDialog.tsx`, `TemplatesLiturgiaDialog.tsx`, `SalvarComoTemplateDialog.tsx`
+
+#### Tabelas/Entidades Referenciadas (Evidência de Código)
+- `cultos`, `times_culto`, `escalas_culto`, `midias` (dashboard de `Geral.tsx`)
+- `liturgia_culto`, `liturgia_recursos`, `midias` (playlist do `TelaoLiturgia.tsx`)
+- `comunicados` (slideshow do `Telao.tsx`)
+
+### Módulo Cultos
+
+#### Evidências (código e rotas)
+- `src/pages/Cultos.tsx`: container de módulo; redireciona `/cultos` → `/cultos/geral` e exibe botão voltar para `/cultos/geral`.
+- `src/pages/cultos/Geral.tsx`: visão geral com métricas (próximos cultos, times ativos, membros escalados, realizados, mídias ativas) e cards para módulos; ações rápidas para criar culto/evento e navegar.
+- `src/pages/cultos/Eventos.tsx`: página de eventos/cultos (detalhamento — (a confirmar)).
+- `src/pages/cultos/Times.tsx`: página de times/equipes (detalhamento — (a confirmar)).
+- `src/pages/cultos/Posicoes.tsx`: página de posições/funções (detalhamento — (a confirmar)).
+- `src/pages/cultos/Templates.tsx`: página de templates de liturgia (detalhamento — (a confirmar)).
+- `src/pages/cultos/LiturgiaDashboard.tsx`: dashboard de liturgia (detalhamento — (a confirmar)).
+- `src/pages/cultos/MidiasGeral.tsx`: gestão/lista de mídias (detalhamento — (a confirmar)).
+- `src/pages/Telao.tsx` (`/telao`): projeção fullscreen de comunicados (playlist com imagens/vídeos, filtros por período e ordem; controles de teclado).
+- `src/pages/TelaoLiturgia.tsx` (`/telao-liturgia/:id`): projeção fullscreen da liturgia (playlist de recursos por item; controles de teclado; barra de progresso; atualiza via Supabase Realtime).
+
+Componentes (src/components/cultos/):
+- `LiturgiaTimeline.tsx`, `LiturgiaWorkspace.tsx`, `LiturgiaDialog.tsx`, `LiturgiaItemDialog.tsx`: componentes de liturgia (timeline/edição — (a confirmar funcionamento específico)).
+- `RecursosLiturgiaSheet.tsx`, `MidiaDialog.tsx`, `TagMidiaDialog.tsx`, `SlideshowPreview.tsx`: componentes de recursos/mídias (vincular/visualizar — (a confirmar)).
+- `TemplatesLiturgiaDialog.tsx`, `AplicarTemplateDialog.tsx`, `SalvarLiturgiaTemplateDialog.tsx`, `SalvarComoTemplateDialog.tsx`, `TemplatePreviewDialog.tsx`: componentes para templates de liturgia (aplicar/salvar/preview — (a confirmar)).
+- `EscalasTabContent.tsx`, `EscalasDialog.tsx`: componentes para escalas de culto (alocação/visualização — (a confirmar)).
+- `GerenciarTimeDialog.tsx`, `TimeDialog.tsx`: componentes para gestão de times (criar/editar — (a confirmar)).
+- `PosicaoDialog.tsx`: componente para gestão de posições (criar/editar — (a confirmar)).
+- `CancoesDialog.tsx`, `MusicaTabContent.tsx`: componentes relacionados a músicas do culto (gestão/lista — (a confirmar)).
+
+Rotas relacionadas (evidência por navegação/código):
+- `/cultos`, `/cultos/geral`, `/cultos/eventos`, `/cultos/times`, `/cultos/posicoes`, `/cultos/templates`, `/cultos/liturgia-dashboard`, `/cultos/midias`.
+- Projeção: `/telao`, `/telao-liturgia/:id`.
+
+Integrações Supabase (consultas confirmadas nos arquivos):
+- `Geral.tsx`: `cultos` (status `planejado`/`confirmado` para futuros, `realizado` para contagem), `times_culto` (ativos), `escalas_culto` (por `culto_id`), `midias` (ativas).
+- `Telao.tsx`: `comunicados` com filtros `ativo`, `exibir_telao`, janelas `data_inicio`/`data_fim`, ordenação `ordem_telao` e `created_at`.
+- `TelaoLiturgia.tsx`: `cultos` (título/data), `liturgia_culto` (itens), `liturgia_recursos` (recursos com join `midias`); assinatura Realtime para atualizar playlist.
+
+#### Funcionalidades confirmadas
+- **Visão Geral**: métricas de cultos e atalhos de navegação para módulos (confirmado em `Geral.tsx`).
+- **Ações rápidas**: navegar para novo culto/evento (`/cultos/eventos?novo=true`), times, dashboard liturgia e mídias (confirmado em `Geral.tsx`).
+- **Projeção (Comunicados)**: slideshow com auto-avance e controles (`→`, `←`, `P`, `F`), suportando imagens/vídeos e filtro por período/canal (confirmado em `Telao.tsx`).
+- **Projeção (Liturgia)**: playlist linear dos recursos de liturgia com barra de progresso, controles (`→`, `←`, `P`, `F`, `B`, `C`) e atualização em tempo real (confirmado em `TelaoLiturgia.tsx`).
+- **Templates/Liturgia/Times/Posições/Escalas/Músicas**: existência de componentes/díalogos específicos (fluxos detalhados — (a confirmar)).
+
+#### Ações disponíveis (evidenciadas)
+- Acessar **Geral** (redirect automático) e navegar para **Eventos**, **Times**, **Dashboard Liturgia**, **Mídias**.
+- Criar novo culto/evento via ação rápida (navegação com `?novo=true`).
+- Abrir projeção de **Comunicados** (`/telao`) e **Liturgia** (`/telao-liturgia/:id`) com atalhos de teclado.
+
+#### Regras importantes
+- Métricas em **Geral** filtram cultos futuros por `status ∈ {planejado, confirmado}` e contam realizados por `status = realizado` (confirmado).
+- Projeção **Comunicados** respeita janela de exibição (`data_inicio`/`data_fim`), canal (`exibir_telao`) e ordenação (`ordem_telao`, `created_at`) (confirmado).
+- Projeção **Liturgia** auto-avança por `duracao_segundos` e atualiza via Realtime ao editar liturgia/recursos (confirmado).
+- Permissões/validações específicas de edição/criação não estão explícitas nos arquivos analisados — (a confirmar).
+
+#### Links
+- Manual do usuário — Cultos: `manual-usuario.md#5-cultos-e-liturgia`
+- Fluxo (Mermaid): `diagramas/fluxo-cultos.md`
+- Sequência (Mermaid): `diagramas/sequencia-cultos.md`
+
 ---
 
 ## 4. Intercessão
