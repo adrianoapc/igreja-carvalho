@@ -1,8 +1,8 @@
-name: Docs Guard (Hard Mode)
+name: Docs Guard (Hard + Fix Mode)
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
   docs_guard:
@@ -19,20 +19,36 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "==============================="
+          echo "Docs Guard — Hard + Fix Mode"
+          echo "==============================="
+
           changed="${{ steps.changed.outputs.all_changed_files }}"
           echo "Changed files:"
           echo "$changed" | tr ' ' '\n'
 
-          # ===============================
-          # Detect docs changes
-          # ===============================
+          # --------------------------------
+          # Detect PR labels
+          # --------------------------------
+          PR_LABELS="${{ github.event.pull_request.labels.*.name }}"
+          FIX_MODE=$(echo "$PR_LABELS" | tr ' ' '\n' | grep -E '^doc:fix$' || true)
+
+          if [ -n "$FIX_MODE" ]; then
+            echo "PR label detected: doc:fix → FIX MODE enabled"
+          else
+            echo "No doc:fix label → HARD MODE enabled"
+          fi
+
+          # --------------------------------
+          # Detect documentation changes
+          # --------------------------------
           DOCS_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/' || true)
           DIAGRAM_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/diagramas/' || true)
           TEXT_DOC_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/)' || true)
 
-          # ===============================
+          # --------------------------------
           # Module path mapping (REAL paths)
-          # ===============================
+          # --------------------------------
           declare -A MODULES=(
             [admin]='^(src/pages/admin/|src/components/admin/)'
             [auth]='^(src/pages/auth/|src/components/auth/|src/integrations/supabase/)'
@@ -73,28 +89,39 @@ jobs:
 
           echo "Touched modules: ${touched[*]}"
 
-          # ===============================
-          # HARD RULE 1: docs/ must change
-          # ===============================
+          # ============================================================
+          # FIX MODE — minimal documentation required
+          # ============================================================
+          if [ -n "$FIX_MODE" ]; then
+            if [ -z "$DOCS_CHANGED" ]; then
+              echo "::error::PR marcada como doc:fix, mas nenhuma atualização mínima em docs/ foi encontrada."
+              exit 1
+            fi
+
+            echo "Minimal documentation for fix detected ✅"
+            exit 0
+          fi
+
+          # ============================================================
+          # HARD MODE — full documentation required
+          # ============================================================
+
+          # Rule 1: docs/ must change
           if [ -z "$DOCS_CHANGED" ]; then
             echo "::error::Código foi alterado (${touched[*]}), mas nenhuma mudança em docs/. Documentação é obrigatória."
             exit 1
           fi
 
-          # ===============================
-          # HARD RULE 2: diagram is mandatory
-          # ===============================
+          # Rule 2: at least one diagram must change
           if [ -z "$DIAGRAM_CHANGED" ]; then
             echo "::error::É obrigatório atualizar/criar ao menos um diagrama em docs/diagramas/ para os módulos: ${touched[*]}"
             exit 1
           fi
 
-          # ===============================
-          # HARD RULE 3: textual doc is mandatory
-          # ===============================
+          # Rule 3: at least one textual doc must change
           if [ -z "$TEXT_DOC_CHANGED" ]; then
             echo "::error::Além de diagramas, é obrigatório atualizar documentação textual (manual, funcionalidades, produto, arquitetura ou ADR)."
             exit 1
           fi
 
-          echo "Documentation requirements satisfied ✅"
+          echo "Full documentation requirements satisfied ✅"
