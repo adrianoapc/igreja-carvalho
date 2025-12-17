@@ -296,9 +296,11 @@ Prover controle financeiro completo e transparente para igrejas, separando clara
 - Navegação entre etapas com status visual
 
 ### 5.3 Gestão de Ensino
-- Agendamento de aulas (presencial/online/híbrido)
-- Vinculação com jornadas e cultos
-- Registro de presenças
+- Agendamento de aulas (presencial/online/híbrido), vinculadas a jornadas e/ou cultos
+- Cadastro/edição de salas com capacidade, tipo e status ativo/inativo
+- Registro de presenças por aula (inclui check-in manual com validação de criança/perfil)
+- Impressão de etiquetas de segurança por aula/sala (quando aplicável)
+- Detalhamento de aula com tema, professor, horário e modalidade
 
 ### 5.4 Ministério Infantil (Kids)
 - **Salas**: Cadastro com capacidade e faixa etária

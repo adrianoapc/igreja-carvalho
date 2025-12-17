@@ -218,6 +218,18 @@ O módulo financeiro utiliza uma arquitetura de três camadas, conforme document
 - **Operações no Frontend**:
   - `INSERT`: Registrar novo fato gerador (categoria, fornecedor, valor)
   - `UPDATE`: Reclassificar categoria ou ajustar competência
+
+---
+
+## Módulo Jornadas e Ensino (visão técnica)
+
+- Frontend: páginas `src/pages/Ensino.tsx` e `src/pages/ensino/DetalhesJornada.tsx`, componentes de aula/sala/check-in em `src/components/ensino/`.
+- Dados principais (Supabase): jornadas, etapas, inscrições, aulas, salas e presenças de aula (ver ERD), com bloqueio de player quando `status_pagamento = 'pendente'` nas inscrições.
+- Fluxos:
+  - Admin cria/edita jornada e etapas; matricula alunos; agenda aulas com sala e professor.
+  - Aluno/visitante se inscreve; player lê progresso e etapas; presenças gravadas na aula.
+  - Cursos pagos: criação de transação financeira de entrada e vínculo na inscrição (status pendente até baixa).
+- Segurança: RLS aplicado via Supabase; consultas via `supabase-js`; sem Edge Function dedicada ao módulo no momento (a confirmar).
   - `DELETE`: Estornar fato gerador (requer justificativa)
 
 #### 2. Camada de Caixa (Transações)

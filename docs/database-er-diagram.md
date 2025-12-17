@@ -789,6 +789,9 @@ erDiagram
         timestamp updated_at
     }
 
+### Observação sobre o schema atual
+- A versão mais recente de `docs/database-schema.sql` (2025-12-03) não contém as definições das tabelas de Jornadas/Ensino acima; validar se há migrações pendentes ou se o dump precisa ser atualizado.
+
     %% =============================================
     %% KIDS (MINISTÉRIO INFANTIL)
     %% =============================================

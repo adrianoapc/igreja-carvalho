@@ -806,6 +806,14 @@ Quando um membro registra sentimentos negativos por 3 dias consecutivos:
 ![Nova Aula](./screenshots/placeholder-nova-aula.png)
 > *Screenshot: Drawer de nova aula*
 
+#### Registrando Presenças (Check-in Manual)
+
+1. Acesse **Ensino** e escolha a aula do dia.
+2. Clique em **"Check-in Manual"**.
+3. Filtre/busque a criança ou aluno.
+4. Confirme o registro; presenças duplicadas são avisadas.
+5. Opcional: imprima etiqueta de segurança quando disponível.
+
 ### 7.3 Ministério Infantil (Kids)
 
 #### Configurando Salas
