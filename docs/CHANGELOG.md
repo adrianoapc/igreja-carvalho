@@ -10,6 +10,36 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 🔐 Página de Configuração de Webhooks (18 de Dez/2025)
+- **Nova tela admin**: `/admin/webhooks` para gerenciar webhooks de integração de forma segura
+- **Segurança**: Valores de webhook são mascarados na interface (exibe apenas `••••••••••`)
+- **Atualização via Secrets**: Botão "Atualizar" abre formulário seguro para inserir novos valores sem expor dados
+- **Integração**: Suporte a `MAKE_WEBHOOK_URL` e `MAKE_WEBHOOK_LITURGIA` como secrets do projeto
+- **Remoção de campo exposto**: Campo `webhook_make_liturgia` removido de ConfiguracoesIgreja.tsx por segurança
+
+**Impacto no usuário:**
+- Admins/Técnicos podem gerenciar webhooks sem expor URLs sensíveis na interface
+- Navegação via card em Configurações da Igreja → "Webhooks de Integração"
+
+**Módulos afetados:** Admin (Configurações, Integrações)
+
+---
+
+#### ⏰ Melhorias nas Edge Functions de Escalas (18 de Dez/2025)
+- **disparar-escala**: Agora busca webhook de `configuracoes_igreja` ou secrets do projeto; atualiza `ultimo_aviso_em` após envio bem-sucedido
+- **verificar-escalas-pendentes**: Filtro anti-spam adicionado - só dispara para escalas onde `ultimo_aviso_em IS NULL` ou `> 24h`
+- **Rastreabilidade**: Campo `ultimo_aviso_em` em `escalas_culto` registra timestamp do último aviso enviado
+
+**Impacto no usuário:**
+- Voluntários não recebem lembretes duplicados em curto período
+- Sistema de notificações mais confiável e rastreável
+
+**Módulos afetados:** Voluntariado (Escalas)
+
+---
+
+### Adicionado
+
 #### 🤖 Análise de IA para Pedidos de Oração (18 de Dez/2025)
 - **Categorização automática por IA**: Pedidos de oração agora são analisados automaticamente via Edge Function `analise-pedido-ia` usando Lovable AI (Gemini 2.5 Flash)
 - **Campos de análise**: `analise_ia_titulo` (título sugerido), `analise_ia_motivo` (categoria raiz: Saúde, Financeiro, Luto, Relacionamento, etc.), `analise_ia_gravidade` (baixa/media/critica), `analise_ia_resposta` (mensagem pastoral sugerida)
