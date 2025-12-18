@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Heart, Info, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Heart, Info, TrendingUp, TrendingDown, MessageCircle, Clock, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,17 @@ interface TrendData {
   negativos: number;
 }
 
+interface SentimentoRecord {
+  id: string;
+  pessoa_id: string;
+  sentimento: SentimentoTipo;
+  mensagem: string | null;
+  data_registro: string;
+  profiles: {
+    nome: string;
+  } | null;
+}
+
 export default function Sentimentos() {
   const navigate = useNavigate();
   const [periodo, setPeriodo] = useState("7");
@@ -55,9 +66,12 @@ export default function Sentimentos() {
   });
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [totalRegistros, setTotalRegistros] = useState(0);
+  const [historico, setHistorico] = useState<SentimentoRecord[]>([]);
+  const [expandedComment, setExpandedComment] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
+    fetchHistorico();
   }, [periodo]);
 
   const fetchStats = async () => {
@@ -119,6 +133,33 @@ export default function Sentimentos() {
       setTrendData(trendArray);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
+    }
+  };
+
+  const fetchHistorico = async () => {
+    try {
+      const dias = parseInt(periodo);
+      const dataInicio = new Date();
+      dataInicio.setDate(dataInicio.getDate() - dias);
+
+      const { data, error } = await supabase
+        .from('sentimentos_membros')
+        .select(`
+          id,
+          pessoa_id,
+          sentimento,
+          mensagem,
+          data_registro,
+          profiles!sentimentos_membros_pessoa_id_fkey(nome)
+        `)
+        .gte('data_registro', dataInicio.toISOString())
+        .order('data_registro', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setHistorico(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar histórico:', error);
     }
   };
 
@@ -200,25 +241,102 @@ export default function Sentimentos() {
       {/* Alertas Críticos */}
       <AlertasCriticos />
 
+      {/* Histórico de Sentimentos com Comentários */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-primary" />
+              <CardTitle className="text-base md:text-lg">Registros Recentes</CardTitle>
+            </div>
+            <Select value={periodo} onValueChange={setPeriodo}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">7 dias</SelectItem>
+                <SelectItem value="15">15 dias</SelectItem>
+                <SelectItem value="30">30 dias</SelectItem>
+                <SelectItem value="90">90 dias</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0">
+          {historico.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Nenhum registro no período selecionado.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {historico.map((registro) => {
+                const config = sentimentosConfig[registro.sentimento];
+                const hasComment = !!registro.mensagem;
+                const isExpanded = expandedComment === registro.id;
+
+                return (
+                  <div
+                    key={registro.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="text-2xl flex-shrink-0">{config.emoji}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm truncate">
+                          {registro.profiles?.nome || 'Membro'}
+                        </span>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${config.type === 'negative' ? 'border-destructive/50 text-destructive' : ''}`}
+                        >
+                          {config.label}
+                        </Badge>
+                        {hasComment && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => setExpandedComment(isExpanded ? null : registro.id)}
+                                >
+                                  <MessageCircle className="w-4 h-4 text-primary" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-sm">{registro.mensagem}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          {format(new Date(registro.data_registro), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                      {hasComment && isExpanded && (
+                        <div className="mt-2 p-2 bg-muted rounded text-sm">
+                          <p className="text-foreground">{registro.mensagem}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         {/* Gráfico de Tendência */}
         <Card>
           <CardHeader className="p-4 md:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <CardTitle className="text-base md:text-lg">Tendência ao Longo do Tempo</CardTitle>
-              <Select value={periodo} onValueChange={setPeriodo}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">7 dias</SelectItem>
-                  <SelectItem value="15">15 dias</SelectItem>
-                  <SelectItem value="30">30 dias</SelectItem>
-                  <SelectItem value="90">90 dias</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <CardTitle className="text-base md:text-lg">Tendência ao Longo do Tempo</CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
             <ResponsiveContainer width="100%" height={300}>

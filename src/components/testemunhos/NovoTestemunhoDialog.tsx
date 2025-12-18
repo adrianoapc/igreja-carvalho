@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,9 +41,10 @@ interface NovoTestemunhoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  initialContent?: string;
 }
 
-export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess }: NovoTestemunhoDialogProps) {
+export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess, initialContent = "" }: NovoTestemunhoDialogProps) {
   const { toast } = useToast();
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -51,7 +52,7 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess }: NovoTest
   
   const [formData, setFormData] = useState({
     titulo: "",
-    mensagem: "",
+    mensagem: initialContent,
     categoria: "",
     nome: "",
     email: "",
@@ -59,6 +60,13 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess }: NovoTest
   });
   const [anonimo, setAnonimo] = useState(false);
   const [publicar, setPublicar] = useState(false);
+
+  // Update mensagem when initialContent changes
+  useEffect(() => {
+    if (initialContent && open) {
+      setFormData(prev => ({ ...prev, mensagem: initialContent }));
+    }
+  }, [initialContent, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
