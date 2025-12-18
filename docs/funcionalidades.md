@@ -347,7 +347,13 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Alocação**: Admin aloca a intercessor(es) manualmente ou via "Alocar Automático" (balanceado por carga)
 - **Gerenciamento**: Intercessor registra observações, marca como "Em Oração" ou "Respondido"; admin pode reclassificar
 - **Visualização Intercessor**: Vê apenas pedidos alocados (RLS aplicado)
-- **Tabela**: `pedidos_oracao` com campos `id`, `pessoa_id`, `membro_id`, `intercessor_id`, `pedido`, `tipo`, `status`, `anonimo`, `data_criacao`, `data_alocacao`, `data_resposta`, `observacoes_intercessor`
+- **Análise de IA (Dez/2025)**: Pedidos são analisados automaticamente via Edge Function `analise-pedido-ia` usando Lovable AI (Gemini 2.5 Flash):
+  - `analise_ia_titulo`: Título sugerido resumindo a situação
+  - `analise_ia_motivo`: Categoria raiz (Saúde, Financeiro, Luto, Relacionamento, Espiritual, Trabalho, Família, Outros)
+  - `analise_ia_gravidade`: Classificação de urgência (baixa, media, critica)
+  - `analise_ia_resposta`: Mensagem pastoral sugerida para acompanhamento
+- **UI de Gravidade**: Badges coloridos (verde/amarelo/vermelho) com ícones na listagem para triagem visual rápida
+- **Tabela**: `pedidos_oracao` com campos `id`, `pessoa_id`, `membro_id`, `intercessor_id`, `pedido`, `tipo`, `status`, `anonimo`, `data_criacao`, `data_alocacao`, `data_resposta`, `observacoes_intercessor`, `analise_ia_titulo`, `analise_ia_motivo`, `analise_ia_gravidade`, `analise_ia_resposta`
 - **Operações Supabase**: INSERT (novo pedido), SELECT (listagem/filtros por status/tipo), UPDATE (alocar/mudar status/adicionar observação), DELETE (admin apenas)
 
 ### 4.2 Intercessores
@@ -371,7 +377,13 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
   - Positivo (feliz/grato/abençoado) → "Compartilhar Testemunho?" → link para `/intercessao/testemunhos?novo=true`
   - Negativo (triste/ansioso/angustiado) → "Fazer Pedido de Oração?" → link para `/intercessao/pedidos?novo=true`
 - **Alertas Críticos**: Detecção automática de 3+ dias consecutivos de sentimentos negativos; exibidos em cards destacados no dashboard com dados de contato
-- **Tabela**: `sentimentos_membros` com campos `id`, `pessoa_id`, `sentimento`, `mensagem`, `data_registro`, `created_at`, `updated_at`
+- **Análise de IA (Dez/2025)**: Sentimentos são analisados automaticamente via Edge Function `analise-sentimento-ia` usando Lovable AI (Gemini 2.5 Flash):
+  - `analise_ia_titulo`: Título resumindo a situação emocional
+  - `analise_ia_motivo`: Categoria raiz (Saúde, Financeiro, Luto, Relacionamento, Espiritual, etc.)
+  - `analise_ia_gravidade`: Classificação de urgência (baixa, media, critica)
+  - `analise_ia_resposta`: Mensagem pastoral sugerida
+- **Notificação Automática**: Sentimentos críticos disparam alertas WhatsApp para líder de equipe ou plantão pastoral via Make.com
+- **Tabela**: `sentimentos_membros` com campos `id`, `pessoa_id`, `sentimento`, `mensagem`, `data_registro`, `analise_ia_titulo`, `analise_ia_motivo`, `analise_ia_gravidade`, `analise_ia_resposta`, `created_at`, `updated_at`
 - **Operações Supabase**: INSERT (novo sentimento), SELECT (listar por período/pessoa), UPDATE (opcional), DELETE (não usual)
 
 ### 4.5 Integração Frontend

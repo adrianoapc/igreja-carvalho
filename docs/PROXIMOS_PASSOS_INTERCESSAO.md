@@ -80,36 +80,25 @@ Este documento lista os próximos passos e validações pendentes após a docume
 
 ---
 
-## 4. Implementar/Clarificar Alertas Críticos (3+ Dias Negativos)
+## 4. ✅ Implementar Análise de IA para Sentimentos e Pedidos (CONCLUÍDO)
 
-**Objetivo:** Definir e implementar a lógica de detecção e exibição de alertas críticos para membros com sentimentos negativos consecutivos.
+**Objetivo:** Categorização automática de sentimentos e pedidos de oração via IA para triagem eficiente.
 
-**Ações:**
-- [ ] Definir arquitetura de alertas:
-  - **Opção A:** Job nocturno (cron) que varre `sentimentos_membros` e detecta padrões
-  - **Opção B:** Trigger/função em tempo real após cada INSERT em `sentimentos_membros`
-  - **Opção C:** Lógica frontend que consulta últimas N entradas ao renderizar dashboard admin
-- [ ] Implementar lógica de detecção:
-  - Query SQL: `SELECT * FROM sentimentos_membros WHERE pessoa_id = ? ORDER BY data_registro DESC LIMIT 3`
-  - Validar se 3 registros consecutivos são todos negativos (triste/ansioso/angustiado)
-- [ ] Criar UI de "Alertas Críticos":
-  - Card destacado no dashboard admin (`/intercessao` ou `/dashboard`)
-  - Exibir: Nome do membro, telefone, email, link WhatsApp, histórico de sentimentos
-  - Ações rápidas: "Enviar WhatsApp", "Ver Perfil", "Marcar como Resolvido"
-- [ ] Decidir sobre notificações automáticas:
-  - Admin recebe push notification ao detectar alerta crítico?
-  - Email/WhatsApp automático para pastor responsável?
-- [ ] Criar tabela `alertas_criticos` (opcional):
-  - Se necessário persistir alertas para histórico e auditoria
-  - Campos: `id`, `pessoa_id`, `tipo`, `detectado_em`, `resolvido_em`, `resolvido_por`, `observacoes`
-- [ ] Atualizar diagramas e docs após implementação
+**Status:** ✅ CONCLUÍDO (Dezembro 2025)
 
-**Responsável:** Tecnologia + Liderança Pastoral  
-**Prazo:** Q2 2025 (prioridade média-alta)  
-**Referências:**
-- Sequência Alertas Críticos: [`diagramas/sequencia-intercessao.md#6`](diagramas/sequencia-intercessao.md#6)
-- Fluxo Sentimentos: [`diagramas/fluxo-intercessao.md#4`](diagramas/fluxo-intercessao.md#4)
-- Funcionalidades (4.4): [`funcionalidades.md#44-sentimentos`](funcionalidades.md#44-sentimentos)
+**Implementação:**
+- [x] Edge Function `analise-sentimento-ia` criada usando Lovable AI (Gemini 2.5 Flash)
+- [x] Edge Function `analise-pedido-ia` criada usando Lovable AI (Gemini 2.5 Flash)
+- [x] Campos de análise adicionados às tabelas `sentimentos_membros` e `pedidos_oracao`:
+  - `analise_ia_titulo`: Título resumindo a situação
+  - `analise_ia_motivo`: Categoria raiz (Saúde, Financeiro, Luto, Relacionamento, etc.)
+  - `analise_ia_gravidade`: Classificação de urgência (baixa, media, critica)
+  - `analise_ia_resposta`: Mensagem pastoral sugerida
+- [x] UI atualizada com badges de gravidade coloridos (verde/amarelo/vermelho)
+- [x] Disparo assíncrono após criação de registros
+- [x] Integração com Make.com para alertas WhatsApp em casos críticos
+
+**Módulos afetados:** Intercessão (Sentimentos, Pedidos de Oração)
 
 ---
 
@@ -267,7 +256,7 @@ Este documento lista os próximos passos e validações pendentes após a docume
 |------|------------|-------|---------|
 | 7. Criar PR e Mergear | 🔴 Alta | Imediato | Documentação disponível para toda equipe |
 | 2. Validar RLS | 🔴 Alta | Q1 2025 | Segurança crítica |
-| 4. Implementar Alertas Críticos | 🟡 Média-Alta | Q2 2025 | Cuidado pastoral proativo |
+| ~~4. Implementar Análise de IA~~ | ✅ Concluído | Dez/2025 | Triagem automática de pedidos/sentimentos |
 | 3. Confirmar Realtime | 🟡 Média | Q1 2025 | UX em tempo real |
 | 1. Revisar ADR-010 | 🟡 Média | Q2 2025 | Validação de produto |
 | 5. Validar com Usuários | 🟡 Média | Q2 2025 | UX e usabilidade |
@@ -278,6 +267,6 @@ Este documento lista os próximos passos e validações pendentes após a docume
 
 ---
 
-**Última Atualização:** 2025-03-15  
+**Última Atualização:** 2025-12-18  
 **Responsável pela Revisão:** Tecnologia + Liderança  
 **Contato:** [Adicionar contato do responsável técnico]
