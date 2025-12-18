@@ -25,7 +25,9 @@ import {
   ListMusic,
   ClipboardList,
   Save,
-  QrCode
+  QrCode,
+  Send,
+  Loader2
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -75,6 +77,7 @@ export default function CultoDetalhes() {
   const [culto, setCulto] = useState<Culto | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [notificando, setNotificando] = useState(false);
   const [escalasCount, setEscalasCount] = useState(0);
   const [liturgiaCount, setLiturgiaCount] = useState(0);
 
@@ -158,6 +161,31 @@ export default function CultoDetalhes() {
     }
   };
 
+  const handleNotificarEscalados = async () => {
+    if (!culto) return;
+    setNotificando(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('disparar-escala', {
+        body: { culto_id: culto.id }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success(data.message, {
+          description: data.erros > 0 ? `${data.erros} falhas` : undefined
+        });
+      } else {
+        toast.error("Erro ao notificar", { description: data.message });
+      }
+    } catch (error: any) {
+      toast.error("Erro ao notificar escalados", { description: error.message });
+    } finally {
+      setNotificando(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -238,6 +266,19 @@ export default function CultoDetalhes() {
               </div>
             </DialogContent>
           </Dialog>
+          
+          <Button
+            variant="outline"
+            onClick={handleNotificarEscalados}
+            disabled={notificando || escalasCount === 0}
+          >
+            {notificando ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            Notificar Escalados
+          </Button>
           
           <Button
             variant="outline"
