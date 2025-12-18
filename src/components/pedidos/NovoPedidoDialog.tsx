@@ -14,9 +14,10 @@ interface NovoPedidoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  initialDescription?: string;
 }
 
-export function NovoPedidoDialog({ open, onOpenChange, onSuccess }: NovoPedidoDialogProps) {
+export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescription }: NovoPedidoDialogProps) {
   const [loading, setLoading] = React.useState(false);
   const [anonimo, setAnonimo] = React.useState(false);
   const [tipo, setTipo] = React.useState("outro");
@@ -26,6 +27,13 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess }: NovoPedidoDi
   const [telefone, setTelefone] = React.useState("");
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Preencher pedido com valor inicial quando dialog abre
+  React.useEffect(() => {
+    if (open && initialDescription) {
+      setPedido(initialDescription);
+    }
+  }, [open, initialDescription]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
