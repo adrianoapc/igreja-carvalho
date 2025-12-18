@@ -18,6 +18,9 @@ interface ChatResponse {
   texto_na_integra?: string;
   categoria?: string;
   risco?: string;
+  // Novos campos de controle
+  anonimo?: boolean;   // Para oração
+  publicar?: boolean;  // Para testemunho
 }
 
 // --- CONFIGURAÇÃO ---
@@ -26,7 +29,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const WHATSAPP_API_TOKEN = Deno.env.get('WHATSAPP_API_TOKEN');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -35,66 +38,32 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
 // --- FUNÇÕES AUXILIARES ---
 
-// 1. Processar Áudio (Transcrição via Lovable AI Gemini)
 async function processarAudio(mediaId: string): Promise<string | null> {
   try {
-    if (!WHATSAPP_API_TOKEN || !LOVABLE_API_KEY) return null;
-    
-    // Pega URL de download do WhatsApp
-    const mediaUrlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { 
-      headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } 
-    });
+    if (!WHATSAPP_API_TOKEN) return null;
+    const mediaUrlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
     const mediaData = await mediaUrlRes.json();
     if (!mediaData.url) return null;
-    
-    // Baixa o binário do áudio
-    const audioRes = await fetch(mediaData.url, { 
-      headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } 
-    });
+    const audioRes = await fetch(mediaData.url, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
     const audioBlob = await audioRes.blob();
-    
-    // Converte para base64
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    
-    // Usa Lovable AI (Gemini) para transcrever
-    const transRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.ogg');
+    formData.append('model', 'whisper-1');
+    const transRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Transcreva este áudio em português. Retorne APENAS o texto transcrito, sem explicações.' },
-              { 
-                type: 'input_audio', 
-                input_audio: { 
-                  data: base64Audio, 
-                  format: 'ogg' 
-                } 
-              }
-            ]
-          }
-        ]
-      }),
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      body: formData
     });
-    
     const data = await transRes.json();
-    return data.choices?.[0]?.message?.content || null;
+    return data.text;
   } catch (e) {
-    console.error("Erro processamento audio:", e);
+    console.error("Erro audio:", e);
     return null;
   }
 }
 
-// 2. Get ou Create VISITANTE LEAD (CRM)
 async function getOrCreateLead(telefone: string, nome: string) {
-  // Busca por telefone na tabela visitantes_leads
+  // 1. Busca na tabela de leads/visitantes
   const { data: existing } = await supabase
     .from('visitantes_leads')
     .select('id')
@@ -102,14 +71,11 @@ async function getOrCreateLead(telefone: string, nome: string) {
     .maybeSingle();
 
   if (existing) {
-    // Atualiza data do último contato
-    await supabase.from('visitantes_leads')
-      .update({ data_ultimo_contato: new Date() })
-      .eq('id', existing.id);
+    await supabase.from('visitantes_leads').update({ data_ultimo_contato: new Date() }).eq('id', existing.id);
     return existing.id;
   }
 
-  // Cria novo Lead
+  // 2. Cria novo se não existir
   const { data: newLead, error } = await supabase
     .from('visitantes_leads')
     .insert({
@@ -122,77 +88,65 @@ async function getOrCreateLead(telefone: string, nome: string) {
     .select('id')
     .single();
 
-  if (error) {
-    console.error("Erro criar lead:", error);
-    return null;
-  }
+  if (error) { console.error("Erro lead:", error); return null; }
   return newLead.id;
 }
 
-// --- SYSTEM PROMPT ---
-const SYSTEM_PROMPT = `Você é o assistente virtual de acolhimento da Igreja Carvalho.
+// --- SYSTEM PROMPT (A INTELIGÊNCIA) ---
+// Aqui definimos as regras de Anônimo e Publicação
+const SYSTEM_PROMPT = `
+Você é o assistente virtual da Igreja Carvalho. Seu tom é PASTORAL, ACOLHEDOR e SEGURO. Use emojis (🙏, 🙌).
 
-Objetivo: Coletar Nome Real e Motivo de Oração.
+**SITUAÇÃO ATUAL:** Conversando via WhatsApp.
 
-**CLASSIFICAÇÃO DE INTENÇÃO:**
+**BASE DE CONHECIMENTO (Para Dúvidas):**
+- Cultos: Dom 18:30h, Quinta 19:30h.
+- Endereço: Avenida Gabriel Jorge Cury, 232 - Parque Municipal - São José do Rio Preto - SP.
+- Secretaria: (17) 99198-5016 (Horário comercial).
+*(Se perguntarem algo fora disso ou se desejar atendimento pastoral, diga para ligar na secretaria.).*
 
-Primeiro, classifique a intenção do usuário em uma das categorias:
+**FLUXO DE ATENDIMENTO:**
 
-- PEDIDO_ORACAO: Pessoa quer pedir oração por algo
-- TESTEMUNHO: Pessoa quer compartilhar um testemunho/gratidão
-- DUVIDA_IGREJA: Perguntas sobre horários, endereço, eventos
-- CONVERSA_PASTORAL: Precisa de aconselhamento/conversa
-- SAUDACAO: Apenas cumprimentando
-- OUTRO: Não se encaixa nas anteriores
+1. **DÚVIDAS / SAUDAÇÃO:**
+   - Responda a dúvida ou saúde.
+   - Pergunte: "Gostaria de deixar um pedido de oração ou contar um testemunho?".
+   - 🚫 NÃO gere JSON de conclusão aqui. Mantenha a conversa fluindo.
 
-**REGRAS GERAIS:**
+2. **PEDIDO DE ORAÇÃO (Fluxo Obrigatório):**
+   - Passo 1: Colete o NOME e o MOTIVO.
+   - Passo 2: **OBRIGATÓRIO:** Pergunte: "Você prefere que este pedido seja ANÔNIMO ou podemos compartilhar com a equipe de intercessão com seu nome?".
+   - Passo 3: Somente após a resposta do anônimo, gere o JSON.
 
-1. Se for a primeira mensagem, avise sobre a LGPD/Privacidade de forma breve.
-2. Seja breve e empático. Não pregue nem prometa milagres.
-3. Se detectar risco de vida (suicídio, crime, violência), retorne JSON com "risco": "CRITICO".
-4. O campo "texto_na_integra" deve ser a compilação fiel de todo o relato do usuário.
-5. Se tiver Nome e Motivo, retorne APENAS um JSON (sem texto adicional).
-6. Se faltar dados, retorne APENAS texto (string) com a próxima pergunta.
-7. Nunca retorne JSON e texto juntos. Ou um ou outro.
+3. **TESTEMUNHO (Fluxo Obrigatório):**
+   - Passo 1: Colete o RELATO e vibre com a pessoa ("Glória a Deus!").
+   - Passo 2: **OBRIGATÓRIO:** Pergunte: "Podemos compartilhar essa vitória com a igreja (mural/culto) ou prefere manter apenas para a liderança?".
+   - Passo 3: Somente após a permissão, gere o JSON.
 
-**PARA PEDIDO_ORACAO:**
-Colete: Nome Real e Motivo de Oração.
-Quando tiver os dados, retorne JSON no formato abaixo.
+**ESTRUTURA DE SAÍDA JSON (Gere APENAS quando o Passo 3 for concluído):**
 
-**PARA TESTEMUNHO:**
-Colete: Nome Real e o Testemunho completo.
-Quando tiver os dados, retorne JSON com intencao: "TESTEMUNHO".
-
-**PARA DUVIDA_IGREJA:**
-Responda diretamente com informações úteis:
-- Cultos: Domingos 9h e 18h, Quartas 19h30
-- Endereço: Pergunte ao usuário sua localização para indicar a unidade mais próxima
-- Eventos: Mencione que podem verificar no app ou site
-
-**PARA CONVERSA_PASTORAL:**
-Informe que um pastor entrará em contato e colete nome e telefone.
-
-**FORMATO DE RESPOSTA:**
-
-- Se faltar dados ou for conversa: retorne APENAS texto (string)
-- Se tiver dados completos: retorne APENAS JSON (sem texto adicional):
-
+Se PEDIDO_ORACAO:
 {
   "concluido": true,
-  "intencao": "PEDIDO_ORACAO|TESTEMUNHO|CONVERSA_PASTORAL",
-  "nome_final": "...",
-  "motivo_resumo": "...",
+  "intencao": "PEDIDO_ORACAO",
+  "nome_final": "Nome",
+  "motivo_resumo": "Título curto",
+  "texto_na_integra": "Relato completo",
   "categoria": "SAUDE|FAMILIA|ESPIRITUAL|FINANCEIRO|OUTROS",
-  "texto_na_integra": "Compilação fiel de todo o relato",
-  "risco": "BAIXO|MEDIO|ALTO|CRITICO"
+  "anonimo": trueOrFalse // true se pediu sigilo, false se liberou
 }
 
-**IMPORTANTE:**
-- Nunca retorne JSON e texto juntos. Ou um ou outro.
-- Se receber descrição de áudio ou imagem, trate o conteúdo normalmente.
+Se TESTEMUNHO:
+{
+  "concluido": true,
+  "intencao": "TESTEMUNHO",
+  "nome_final": "Nome",
+  "motivo_resumo": "Título",
+  "texto_na_integra": "Relato completo",
+  "categoria": "CURA|PROVISAO|...",
+  "publicar": trueOrFalse // true se liberou divulgar, false se é restrito
+}
 `;
 
-// --- HANDLER PRINCIPAL ---
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -201,19 +155,15 @@ serve(async (req) => {
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
     let { conteudo_texto } = body;
 
-    // 1. Processar Multimodalidade (Áudio)
+    // 1. Áudio para Texto
     if (tipo_mensagem === 'audio' && media_id) {
       const transcricao = await processarAudio(media_id);
-      if (transcricao) {
-        conteudo_texto = `[Áudio Transcrito]: ${transcricao}`;
-      } else {
-        conteudo_texto = "[Erro ao baixar áudio. Peça para o usuário escrever]";
-      }
+      conteudo_texto = transcricao ? `[Áudio Transcrito]: ${transcricao}` : "[Erro áudio]";
     }
 
     const inputTexto = conteudo_texto || "";
 
-    // 2. Gestão de Sessão (State Machine)
+    // 2. Gestão de Sessão
     let { data: sessao } = await supabase
       .from('atendimentos_bot')
       .select('*')
@@ -222,46 +172,35 @@ serve(async (req) => {
       .gt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       .maybeSingle();
 
-    let historico: any[] = [];
+    let historico = sessao ? sessao.historico_conversa : [];
 
-    if (sessao) {
-      historico = sessao.historico_conversa || [];
-    } else {
-      const { data: nova, error } = await supabase
-        .from('atendimentos_bot')
-        .insert({ telefone, status: 'INICIADO', historico_conversa: [] })
-        .select().single();
-      if (error) throw error;
+    if (!sessao) {
+      const { data: nova } = await supabase.from('atendimentos_bot').insert({ telefone, status: 'INICIADO', historico_conversa: [] }).select().single();
       sessao = nova;
     }
 
-    // 3. Auditoria (Log User)
+    // 3. Auditoria (Input)
     await supabase.from('logs_auditoria_chat').insert({
-      sessao_id: sessao.id,
-      ator: 'USER',
-      payload_raw: { tipo: tipo_mensagem, texto: inputTexto, nome: nome_perfil }
+      sessao_id: sessao.id, ator: 'USER', payload_raw: { texto: inputTexto, tipo: tipo_mensagem }
     });
 
-    // 4. Chamada Lovable AI (Gemini)
+    // 4. Inteligência (OpenAI)
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
       ...historico.map((h: any) => ({ role: h.role, content: h.content })),
-      { role: "user", content: `Nome: ${nome_perfil}. Msg: ${inputTexto}` }
+      { role: "user", content: `Nome Perfil: ${nome_perfil}. Msg: ${inputTexto}` }
     ];
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const openAIRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ model: 'google/gemini-2.5-flash', messages }),
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages, temperature: 0.3 }),
     });
 
-    const aiData = await aiRes.json();
+    const aiData = await openAIRes.json();
     const aiContent = aiData.choices?.[0]?.message?.content || "";
     
-    // Tentar parsear JSON
+    // Tenta extrair JSON
     let parsedJson: ChatResponse | null = null;
     try {
       const clean = aiContent.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -270,81 +209,79 @@ serve(async (req) => {
 
     let responseMessage = aiContent;
 
-    // 5. Lógica de Negócio (Se concluiu)
+    // 5. Execução (Se concluído)
     if (parsedJson?.concluido) {
-      // Fecha sessão
+      // Fecha a sessão
       await supabase.from('atendimentos_bot').update({
         status: 'CONCLUIDO',
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);
 
-      // Identificar Membro vs Visitante
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('telefone', telefone)
-        .maybeSingle();
-
+      // Verifica Membro ou Visitante
+      const { data: profile } = await supabase.from('profiles').select('id').eq('telefone', telefone).maybeSingle();
+      
       let visitanteId = null;
       let origem = 'WABA_INTERNO';
 
       if (!profile) {
         origem = 'WABA_EXTERNO';
-        // Cria ou atualiza na tabela VISITANTES_LEADS
         visitanteId = await getOrCreateLead(telefone, parsedJson.nome_final || nome_perfil);
       }
 
-      // Salvar Pedido
+      // ROTA: PEDIDO DE ORAÇÃO
       if (parsedJson.intencao === 'PEDIDO_ORACAO') {
         await supabase.from('pedidos_oracao').insert({
           analise_ia_titulo: parsedJson.motivo_resumo,
           texto_na_integra: parsedJson.texto_na_integra,
+          analise_ia_motivo: parsedJson.categoria,
+          anonimo: parsedJson.anonimo || false, // <--- CAMPO IMPORTANTE
           origem: origem,
           membro_id: profile?.id || null,
           visitante_id: visitanteId,
-          analise_ia_motivo: parsedJson.categoria,
           status: 'pendente'
         });
-        responseMessage = `Seu pedido foi anotado, ${parsedJson.nome_final || 'irmão(ã)'}! Vamos orar por isso. 🙏`;
+        
+        responseMessage = parsedJson.anonimo 
+          ? `Entendido. Seu pedido foi registrado de forma ANÔNIMA. Vamos orar por você em secreto. 🙏`
+          : `Combinado, ${parsedJson.nome_final || 'irmão'}! Seu pedido foi enviado para nossa equipe de intercessão. 🙏`;
       } 
       
-      // Salvar Testemunho
+      // ROTA: TESTEMUNHO
       else if (parsedJson.intencao === 'TESTEMUNHO') {
         await supabase.from('testemunhos').insert({
           titulo: parsedJson.motivo_resumo,
           mensagem: parsedJson.texto_na_integra,
           categoria: parsedJson.categoria || 'ESPIRITUAL',
           status: 'aberto',
+          publicar: parsedJson.publicar || false, // <--- CAMPO IMPORTANTE (Visibilidade)
           autor_id: profile?.id || null,
           visitante_id: visitanteId,
           origem: origem,
           nome_externo: profile ? null : (parsedJson.nome_final || nome_perfil),
           telefone_externo: profile ? null : telefone
         });
-        responseMessage = `Glória a Deus! Testemunho recebido. 🙌`;
+
+        responseMessage = parsedJson.publicar
+          ? `Que bênção! 🙌 Registramos seu testemunho e ele poderá edificar a igreja. Glória a Deus!`
+          : `Amém! Registramos seu testemunho para conhecimento da liderança. Obrigado por compartilhar!`;
       }
 
     } else {
-      // Apenas atualiza histórico
+      // Conversa continua (Status permanece INICIADO)
       await supabase.from('atendimentos_bot').update({
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);
     }
 
-    // 6. Auditoria (Log Bot)
+    // 6. Auditoria (Output)
     await supabase.from('logs_auditoria_chat').insert({
-      sessao_id: sessao.id,
-      ator: 'BOT',
-      payload_raw: { resposta: responseMessage, json_ia: parsedJson }
+      sessao_id: sessao.id, ator: 'BOT', payload_raw: { resposta: responseMessage, json: parsedJson }
     });
 
-    return new Response(
-      JSON.stringify({ reply_message: parsedJson?.risco === 'CRITICO' ? "⚠️ Atendimento Humano Solicitado" : responseMessage }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ reply_message: responseMessage }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    console.error('Erro function:', error);
+    console.error('Erro:', error);
     return new Response(JSON.stringify({ error: 'Erro interno' }), { status: 500, headers: corsHeaders });
   }
 });
