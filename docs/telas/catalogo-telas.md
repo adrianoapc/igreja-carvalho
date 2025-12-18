@@ -10,6 +10,7 @@
 | `ResetPassword.tsx` | `/auth/reset` | `/auth/reset` | Auth | Segurança | Público | Recuperar Senha | Todos |
 | `BiometricLogin.tsx` | `/biometric-login` | `/auth/biometric (sugestão)` | Auth | Segurança | Público | Login Facial | Todos |
 | `ConfiguracoesIgreja.tsx` | `/configuracoes-igreja` | `/configuracoes (sugestão)` | Admin | Config | Admin | Dados da Igreja | Admin/Técnico |
+| `admin/Webhooks.tsx` | `/admin/webhooks` | `/admin/webhooks` | Admin | Integrações | Admin | Gerir Webhooks | Admin/Técnico |
 | `AdminPermissions.tsx` | `/teste-permissoes` | `/admin/permissoes (sugestão)` | Admin | Segurança | Admin | Gerir Roles | Admin |
 | `admin/Notificacoes.tsx` | `/admin/notificacoes` | `/admin/notificacoes` | Admin | Comunicação | Admin | Enviar Push | Admin |
 | **DASHBOARD & PERFIL** | | | | | | | |
