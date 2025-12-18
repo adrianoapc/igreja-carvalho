@@ -24,6 +24,33 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 1. Buscar configurações da igreja para validar se WhatsApp está ativo
+    const { data: configIgreja, error: configError } = await supabase
+      .from('configuracoes_igreja')
+      .select('whatsapp_provider, whatsapp_token, whatsapp_instance_id')
+      .limit(1)
+      .single();
+
+    if (configError) {
+      console.error('Erro ao buscar configurações:', configError);
+    }
+
+    // Verificar se WhatsApp está configurado
+    const whatsappProvider = configIgreja?.whatsapp_provider;
+    if (!whatsappProvider || whatsappProvider === 'nenhum') {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Envio de WhatsApp desativado nas configurações da igreja' 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Buscar URL do webhook (env var ou poderia vir da config)
     const webhookUrl = Deno.env.get('MAKE_WEBHOOK_ESCALAS');
 
     if (!webhookUrl) {
@@ -34,9 +61,7 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // 1. Buscar dados do culto
+    // 2. Buscar dados do culto
     const { data: culto, error: cultoError } = await supabase
       .from('cultos')
       .select('id, titulo, data_culto')
@@ -64,7 +89,7 @@ serve(async (req) => {
 
     console.log(`Culto: ${culto.titulo} - ${dataFormatada}`);
 
-    // 2. Buscar todos os escalados
+    // 3. Buscar todos os escalados
     const { data: escalas, error: escalasError } = await supabase
       .from('escalas_culto')
       .select(`
@@ -96,10 +121,11 @@ serve(async (req) => {
 
     console.log(`Total de escalados: ${escalas.length}`);
 
-    // 3. Loop de envio
+    // 4. Loop de envio
     let enviados = 0;
     let erros = 0;
     const detalhes: string[] = [];
+    const escalaIdsEnviados: string[] = [];
 
     for (const escala of escalas) {
       const profile = escala.profiles as any;
@@ -141,6 +167,7 @@ serve(async (req) => {
         if (webhookResponse.ok) {
           enviados++;
           detalhes.push(`${nome}: enviado`);
+          escalaIdsEnviados.push(escala.id);
           console.log(`✓ Enviado para ${nome}`);
         } else {
           erros++;
@@ -152,6 +179,20 @@ serve(async (req) => {
         erros++;
         detalhes.push(`${nome}: erro de conexão`);
         console.error(`✗ Erro de conexão para ${nome}:`, err);
+      }
+    }
+
+    // 5. Atualizar ultimo_aviso_em para escalas enviadas com sucesso
+    if (escalaIdsEnviados.length > 0) {
+      const { error: updateError } = await supabase
+        .from('escalas_culto')
+        .update({ ultimo_aviso_em: new Date().toISOString() })
+        .in('id', escalaIdsEnviados);
+
+      if (updateError) {
+        console.error('Erro ao atualizar ultimo_aviso_em:', updateError);
+      } else {
+        console.log(`✓ Atualizado ultimo_aviso_em para ${escalaIdsEnviados.length} escalas`);
       }
     }
 
