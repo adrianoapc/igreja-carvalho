@@ -69,15 +69,26 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
 
       if (!profile) throw new Error("Perfil não encontrado");
 
-      const { error } = await supabase
+      const { data: insertedData, error } = await supabase
         .from('sentimentos_membros')
         .insert({
           pessoa_id: profile.id,
           sentimento,
           mensagem: msg || null
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Trigger AI analysis in background (non-blocking)
+      if (msg && insertedData?.id) {
+        supabase.functions.invoke('analise-sentimento-ia', {
+          body: { sentimento_id: insertedData.id }
+        }).catch(err => {
+          console.error('AI analysis background error:', err);
+        });
+      }
 
       setStep('result');
       
