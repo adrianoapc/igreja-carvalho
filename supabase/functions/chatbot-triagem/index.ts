@@ -26,7 +26,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const WHATSAPP_API_TOKEN = Deno.env.get('WHATSAPP_API_TOKEN');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -35,37 +35,57 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
 // --- FUNÇÕES AUXILIARES ---
 
-// 1. Processar Áudio (Whisper)
+// 1. Processar Áudio (Transcrição via Lovable AI Gemini)
 async function processarAudio(mediaId: string): Promise<string | null> {
   try {
-    if (!WHATSAPP_API_TOKEN) return null;
+    if (!WHATSAPP_API_TOKEN || !LOVABLE_API_KEY) return null;
     
-    // Pega URL de download
+    // Pega URL de download do WhatsApp
     const mediaUrlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { 
       headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } 
     });
     const mediaData = await mediaUrlRes.json();
     if (!mediaData.url) return null;
     
-    // Baixa o binário
+    // Baixa o binário do áudio
     const audioRes = await fetch(mediaData.url, { 
       headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } 
     });
     const audioBlob = await audioRes.blob();
     
-    // Envia para Whisper
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.ogg');
-    formData.append('model', 'whisper-1');
+    // Converte para base64
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
     
-    const transRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    // Usa Lovable AI (Gemini) para transcrever
+    const transRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
-      body: formData
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Transcreva este áudio em português. Retorne APENAS o texto transcrito, sem explicações.' },
+              { 
+                type: 'input_audio', 
+                input_audio: { 
+                  data: base64Audio, 
+                  format: 'ogg' 
+                } 
+              }
+            ]
+          }
+        ]
+      }),
     });
     
     const data = await transRes.json();
-    return data.text;
+    return data.choices?.[0]?.message?.content || null;
   } catch (e) {
     console.error("Erro processamento audio:", e);
     return null;
@@ -196,23 +216,23 @@ serve(async (req) => {
       payload_raw: { tipo: tipo_mensagem, texto: inputTexto, nome: nome_perfil }
     });
 
-    // 4. Chamada OpenAI
+    // 4. Chamada Lovable AI (Gemini)
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
       ...historico.map((h: any) => ({ role: h.role, content: h.content })),
       { role: "user", content: `Nome: ${nome_perfil}. Msg: ${inputTexto}` }
     ];
 
-    const openAIRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages, temperature: 0.3 }),
+      body: JSON.stringify({ model: 'google/gemini-2.5-flash', messages }),
     });
 
-    const aiData = await openAIRes.json();
+    const aiData = await aiRes.json();
     const aiContent = aiData.choices?.[0]?.message?.content || "";
     
     // Tentar parsear JSON
