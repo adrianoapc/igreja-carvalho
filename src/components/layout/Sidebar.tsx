@@ -580,7 +580,7 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Minha Família">
                     <NavLink
-                      to="/minha-familia"
+                      to="/perfil/familia"
                       end
                       className="hover:bg-sidebar-accent"
                       activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium"
