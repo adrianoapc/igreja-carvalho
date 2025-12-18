@@ -305,6 +305,10 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
 
     setSaving(true);
     try {
+      // Tipos que permitem múltiplas mídias
+      const tiposMultiplos = ['avisos', 'anúncios', 'anuncios', 'comunicados', 'outro'];
+      const permiteMultiplo = tiposMultiplos.includes(tipo.toLowerCase());
+
       const { error } = await supabase
         .from("liturgia_culto")
         .update({
@@ -314,6 +318,7 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
           duracao_minutos: duracaoMinutos ? parseInt(duracaoMinutos) : null,
           responsavel_id: isConvidadoExterno ? null : (responsavelId || null),
           responsavel_externo: isConvidadoExterno ? nomeConvidadoExterno.trim() : null,
+          permite_multiplo: permiteMultiplo,
         })
         .eq("id", item.id);
 
