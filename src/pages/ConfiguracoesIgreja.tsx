@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Save, X, AlertTriangle, Bell, Phone, MessageSquare, Webhook } from "lucide-react";
+import { Upload, Save, X, AlertTriangle, Bell, Phone, MessageSquare, Webhook, Bot, CheckCircle2, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -426,6 +426,76 @@ export default function ConfiguracoesIgreja() {
           </Button>
           <p className="text-xs text-muted-foreground mt-2 text-center">
             Configure de forma segura os webhooks de escalas, liturgia e notificações
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Card de Configuração de IA/Chatbot */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Bot className="text-primary" />
+            <CardTitle>Chatbot & Inteligência Artificial</CardTitle>
+          </div>
+          <CardDescription>
+            Configurações do chatbot de triagem e IA para análise de pedidos
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Status OpenAI API */}
+          <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <div>
+                <p className="font-medium text-green-900 dark:text-green-100">OpenAI API Configurada</p>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Usando gpt-4o-mini + Whisper para transcrição de áudio
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Informações sobre o Chatbot */}
+          <div className="space-y-3">
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <h4 className="font-medium mb-2">🤖 Chatbot de Triagem</h4>
+              <p className="text-sm text-muted-foreground">
+                O chatbot recebe mensagens via WhatsApp e classifica automaticamente:
+              </p>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                <li>Pedidos de oração (cria registro automático)</li>
+                <li>Testemunhos (encaminha para aprovação)</li>
+                <li>Dúvidas sobre a igreja (responde FAQ)</li>
+                <li>Solicitações pastorais (alerta plantão)</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <h4 className="font-medium mb-2">⚙️ Modelos Utilizados</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Chat/Triagem:</p>
+                  <p className="font-mono text-xs">gpt-4o-mini</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Áudio:</p>
+                  <p className="font-mono text-xs">whisper-1</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Link para documentação */}
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={() => window.open('https://platform.openai.com/usage', '_blank')}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Ver Uso da API OpenAI
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Para alterar a chave da API, acesse as configurações de secrets do backend
           </p>
         </CardContent>
       </Card>
