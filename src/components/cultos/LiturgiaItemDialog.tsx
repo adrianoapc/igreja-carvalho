@@ -71,6 +71,10 @@ export function LiturgiaItemDialog({
 
       const novaOrdem = itensData && itensData.length > 0 ? itensData[0].ordem + 1 : 1;
 
+      // Tipos que permitem múltiplas mídias
+      const tiposMultiplos = ['avisos', 'anúncios', 'anuncios', 'comunicados', 'outro'];
+      const permiteMultiplo = tiposMultiplos.includes(tipo.toLowerCase());
+
       const { error } = await supabase
         .from("liturgia_culto")
         .insert({
@@ -82,6 +86,7 @@ export function LiturgiaItemDialog({
           responsavel_id: isConvidadoExterno ? null : (responsavelId || null),
           responsavel_externo: isConvidadoExterno ? nomeConvidadoExterno.trim() : null,
           ordem: novaOrdem,
+          permite_multiplo: permiteMultiplo,
         });
 
       if (error) throw error;
