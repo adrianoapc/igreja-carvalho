@@ -58,8 +58,11 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- Diagrama — Cursos Pagos (Ensino): [`diagramas/fluxo-cursos-pagos.md`](diagramas/fluxo-cursos-pagos.md)
  	- Diagrama — Fluxo Cultos: [`diagramas/fluxo-cultos.md`](diagramas/fluxo-cultos.md)
 	- Diagrama — Sequência Cultos: [`diagramas/sequencia-cultos.md`](diagramas/sequencia-cultos.md)
+	- Diagrama — Fluxo Liturgia ↔ Escalas: [`diagramas/fluxo-liturgia-escalas.md`](diagramas/fluxo-liturgia-escalas.md)
  	- Diagrama — Fluxo Intercessão: [`diagramas/fluxo-intercessao.md`](diagramas/fluxo-intercessao.md)
 	- Diagrama — Sequência Intercessão: [`diagramas/sequencia-intercessao.md`](diagramas/sequencia-intercessao.md)
+	- Diagrama — Fluxo Sentimentos IA: [`diagramas/fluxo-sentimentos-ia.md`](diagramas/fluxo-sentimentos-ia.md)
+	- Diagrama — Fluxo Escalas Lembretes: [`diagramas/fluxo-escalas-lembretes.md`](diagramas/fluxo-escalas-lembretes.md)
 - ADRs
 	- Lista de ADRs: [`adr/README.MD`](adr/README.MD)
 	- ADR-001 (Fato Gerador vs Caixa vs DRE): [`adr/ADR-001-separacao-fato-gerador-caixa-dre.md`](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
