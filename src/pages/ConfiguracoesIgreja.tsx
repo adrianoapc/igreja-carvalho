@@ -5,14 +5,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Save, X, AlertTriangle, Bell, Phone, MessageSquare } from "lucide-react";
+import { Upload, Save, X, AlertTriangle, Bell, Phone, MessageSquare, Webhook } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import InputMask from "react-input-mask";
-
+import { useNavigate } from "react-router-dom";
 export default function ConfiguracoesIgreja() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -21,7 +22,6 @@ export default function ConfiguracoesIgreja() {
     nome_igreja: "Igreja App",
     subtitulo: "Gestão Completa",
     logo_url: null as string | null,
-    webhook_make_liturgia: null as string | null,
     whatsapp_provider: "make_webhook" as string,
     whatsapp_token: null as string | null,
     whatsapp_instance_id: null as string | null,
@@ -176,7 +176,6 @@ export default function ConfiguracoesIgreja() {
           nome_igreja: config.nome_igreja,
           subtitulo: config.subtitulo,
           logo_url: logoUrl,
-          webhook_make_liturgia: config.webhook_make_liturgia,
           whatsapp_provider: config.whatsapp_provider,
           whatsapp_token: config.whatsapp_token,
           whatsapp_instance_id: config.whatsapp_instance_id,
@@ -392,20 +391,6 @@ export default function ConfiguracoesIgreja() {
             />
           </div>
 
-          {/* Webhook Make Liturgia */}
-          <div className="space-y-2">
-            <Label htmlFor="webhook">Webhook Make.com (Liturgia)</Label>
-            <Input
-              id="webhook"
-              type="url"
-              value={config.webhook_make_liturgia || ""}
-              onChange={(e) => setConfig(prev => ({ ...prev, webhook_make_liturgia: e.target.value }))}
-              placeholder="https://hook.us1.make.com/..."
-            />
-            <p className="text-xs text-muted-foreground">
-              URL do webhook do Make.com para receber notificações de liturgia
-            </p>
-          </div>
 
           {/* Botão Salvar */}
           <Button 
@@ -419,7 +404,32 @@ export default function ConfiguracoesIgreja() {
         </CardContent>
       </Card>
 
-      {/* Painel de Notificações & Plantão */}
+      {/* Card de Webhooks */}
+      <Card className="border-dashed">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Webhook className="text-primary" />
+            <CardTitle>Webhooks de Integração</CardTitle>
+          </div>
+          <CardDescription>
+            Gerencie URLs de webhook para Make.com e outras integrações
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/admin/webhooks')}
+            className="w-full"
+          >
+            <Webhook className="w-4 h-4 mr-2" />
+            Gerenciar Webhooks
+          </Button>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Configure de forma segura os webhooks de escalas, liturgia e notificações
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
