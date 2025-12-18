@@ -1,0 +1,30 @@
+# ADR-013: Módulo Intercessão V2, CRM de Evangelismo e Chatbot Multimodal
+
+* **Status:** Aceito
+* **Data:** 18/12/2025
+* **Contexto:** Evolução do sistema de Intercessão para lidar com entradas complexas (áudio, imagem) e múltiplos fluxos (testemunhos, dúvidas), além da oração.
+
+## Decisões Arquiteturais
+
+### 1. Chatbot e Triagem (IA)
+* **Lógica Central:** Migração do Make para Supabase Edge Functions (`/chatbot-triagem`).
+* **Estado (State Machine):** Tabela `atendimentos_bot` gerencia o contexto da conversa (janela de 24h).
+
+### 2. Multimodalidade (Ver e Ouvir)
+O sistema deve aceitar nativamente mídias do WhatsApp:
+* **Áudio:** Transcrição automática via OpenAI Whisper antes do processamento. O intercessor receberá o texto transcrito, facilitando a leitura rápida (sem precisar ouvir áudios de 5 min).
+* **Imagem:** Análise visual via GPT-4o (Vision) para extrair texto de fotos (ex: foto de laudo médico ou versículo).
+
+### 3. Router de Intenções (Classificação)
+A IA atuará como um "Switch" no início da conversa:
+* **ORAÇÃO:** Segue o fluxo de triagem (Nome + Motivo).
+* **TESTEMUNHO:** Agradece, salva na tabela `testemunhos` e notifica liderança.
+* **DÚVIDA/OUTROS:** Responde com informações padrão ou transfere (human handoff).
+
+### 4. Gestão de Dados e Compliance
+* **Visitantes:** Criação automática de leads na tabela `visitantes` para não-membros.
+* **Logs Auditáveis:** Tabela `logs_auditoria_chat` (Append-Only) guarda o payload cru e a transcrição.
+
+## Consequências
+* O sistema torna-se acessível para idosos ou pessoas com dificuldade de digitar (uso de áudio).
+* Redução de ruído: Testemunhos e dúvidas não poluem a lista de oração.
