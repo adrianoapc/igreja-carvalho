@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { exportToExcel, formatDateTimeForExport } from "@/lib/exportUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { NovoPedidoDialog } from "@/components/pedidos/NovoPedidoDialog";
 import { PedidoDetailsDialog } from "@/components/pedidos/PedidoDetailsDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -91,13 +91,27 @@ export default function PedidosOracao() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { user, profile } = useAuth();
+  const [initialDescription, setInitialDescription] = React.useState<string | undefined>(undefined);
 
   React.useEffect(() => {
+    // Abre dialog via query param
     if (searchParams.get("novo") === "true") {
       setNovoPedidoOpen(true);
     }
-  }, [searchParams]);
+    
+    // Abre dialog via state (vindo de Sentimentos)
+    const state = location.state as { openNew?: boolean; description?: string } | null;
+    if (state?.openNew) {
+      setNovoPedidoOpen(true);
+      if (state.description) {
+        setInitialDescription(state.description);
+      }
+      // Limpar state para evitar reabrir ao navegar
+      window.history.replaceState({}, document.title);
+    }
+  }, [searchParams, location.state]);
 
   React.useEffect(() => {
     if (user?.id) {
@@ -387,8 +401,12 @@ export default function PedidosOracao() {
 
         <NovoPedidoDialog 
           open={novoPedidoOpen}
-          onOpenChange={setNovoPedidoOpen}
+          onOpenChange={(open) => {
+            setNovoPedidoOpen(open);
+            if (!open) setInitialDescription(undefined);
+          }}
           onSuccess={fetchMeusPedidos}
+          initialDescription={initialDescription}
         />
 
         {selectedPedido && (
@@ -540,8 +558,12 @@ export default function PedidosOracao() {
 
       <NovoPedidoDialog 
         open={novoPedidoOpen}
-        onOpenChange={setNovoPedidoOpen}
+        onOpenChange={(open) => {
+          setNovoPedidoOpen(open);
+          if (!open) setInitialDescription(undefined);
+        }}
         onSuccess={fetchPedidos}
+        initialDescription={initialDescription}
       />
 
       {selectedPedido && (
