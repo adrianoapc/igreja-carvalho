@@ -141,7 +141,12 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
             <Button 
               onClick={() => {
                 handleClose();
-                navigate('/intercessao/testemunhos?novo=true');
+                navigate('/intercessao/testemunhos', { 
+                  state: { 
+                    openNew: true, 
+                    content: mensagem 
+                  } 
+                });
               }}
               className="w-full"
             >

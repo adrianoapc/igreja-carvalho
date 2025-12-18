@@ -5,9 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Heart, Clock, ArrowLeft, Search, Filter, Download } from "lucide-react";
-import { toast } from "sonner";
 import { exportToExcel, formatDateTimeForExport } from "@/lib/exportUtils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { NovoTestemunhoDialog } from "@/components/testemunhos/NovoTestemunhoDialog";
@@ -45,8 +44,14 @@ const CATEGORIAS = [
   { value: "outro", label: "Outros" },
 ];
 
+interface LocationState {
+  openNew?: boolean;
+  content?: string;
+}
+
 export default function Testemunhos() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +61,7 @@ export default function Testemunhos() {
   const [novoDialogOpen, setNovoDialogOpen] = useState(false);
   const [selectedTestemunho, setSelectedTestemunho] = useState<Testemunho | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [initialContent, setInitialContent] = useState<string>("");
 
   const fetchTestemunhos = async () => {
     try {
@@ -87,6 +93,17 @@ export default function Testemunhos() {
     if (testemunho.nome_externo) return testemunho.nome_externo;
     return "Não identificado";
   };
+
+  // Check for navigation state to auto-open dialog with pre-filled content
+  useEffect(() => {
+    const state = location.state as LocationState | null;
+    if (state?.openNew) {
+      setInitialContent(state.content || "");
+      setNovoDialogOpen(true);
+      // Clear the state to prevent re-opening on navigation
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     fetchTestemunhos();
@@ -390,8 +407,12 @@ export default function Testemunhos() {
       {/* Dialogs */}
       <NovoTestemunhoDialog
         open={novoDialogOpen}
-        onOpenChange={setNovoDialogOpen}
+        onOpenChange={(open) => {
+          setNovoDialogOpen(open);
+          if (!open) setInitialContent("");
+        }}
         onSuccess={fetchTestemunhos}
+        initialContent={initialContent}
       />
 
       <TestemunhoDetailsDialog
