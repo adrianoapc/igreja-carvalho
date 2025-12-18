@@ -10,6 +10,15 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 📚 Documentação de Fluxos (18 de Dez/2025)
+- **Novo diagrama**: `docs/diagramas/fluxo-sentimentos-ia.md` — Fluxo completo de análise de sentimentos via IA e alertas pastorais
+- **Novo diagrama**: `docs/diagramas/fluxo-escalas-lembretes.md` — Fluxo de lembretes automáticos de escalas (cron + anti-spam)
+- **Novo diagrama**: `docs/diagramas/fluxo-liturgia-escalas.md` — Integração automática Liturgia ↔ Escalas via triggers
+
+**Módulos documentados:** Intercessão (Sentimentos), Voluntariado (Escalas), Cultos (Liturgia)
+
+---
+
 #### 🔐 Página de Configuração de Webhooks (18 de Dez/2025)
 - **Nova tela admin**: `/admin/webhooks` para gerenciar webhooks de integração de forma segura
 - **Segurança**: Valores de webhook são mascarados na interface (exibe apenas `••••••••••`)
