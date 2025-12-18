@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Clock, User, Search, ArrowLeft, Filter, Download, HandHeart } from "lucide-react";
+import { Plus, Clock, User, Search, ArrowLeft, Filter, Download, HandHeart, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { exportToExcel, formatDateTimeForExport } from "@/lib/exportUtils";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +25,10 @@ interface Pedido {
   intercessor_id: string | null;
   membro_id: string | null;
   pessoa_id: string | null;
+  analise_ia_titulo: string | null;
+  analise_ia_motivo: string | null;
+  analise_ia_gravidade: string | null;
+  analise_ia_resposta: string | null;
   intercessores?: {
     nome: string;
   };
@@ -299,6 +303,33 @@ export default function PedidosOracao() {
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
           <p className="text-sm md:text-base text-muted-foreground line-clamp-2">{pedido.pedido}</p>
+          
+          {/* AI Analysis Section */}
+          {pedido.analise_ia_titulo && (
+            <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-primary">Análise IA</span>
+                {pedido.analise_ia_gravidade === 'critica' && (
+                  <Badge variant="destructive" className="text-xs">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Crítico
+                  </Badge>
+                )}
+                {pedido.analise_ia_gravidade === 'media' && (
+                  <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                    Atenção
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm font-medium">{pedido.analise_ia_titulo}</p>
+              {pedido.analise_ia_motivo && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Categoria: {pedido.analise_ia_motivo}
+                </p>
+              )}
+            </div>
+          )}
           
           {pedido.intercessores && (
             <div className="flex items-center gap-2 mt-3 text-xs md:text-sm text-muted-foreground">

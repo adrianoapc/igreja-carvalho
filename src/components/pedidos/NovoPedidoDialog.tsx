@@ -74,9 +74,11 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
         }
       }
 
-      const { error } = await supabase
+      const { data: insertedPedido, error } = await supabase
         .from("pedidos_oracao")
-        .insert([pedidoData]);
+        .insert([pedidoData])
+        .select('id')
+        .single();
 
       if (error) throw error;
 
@@ -84,6 +86,15 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
         title: "Sucesso",
         description: "Pedido de oração criado com sucesso"
       });
+
+      // Trigger AI analysis in background (non-blocking)
+      if (insertedPedido?.id) {
+        supabase.functions.invoke('analise-pedido-ia', {
+          body: { pedido_id: insertedPedido.id }
+        }).catch(err => {
+          console.error('AI analysis failed (non-blocking):', err);
+        });
+      }
 
       // Reset form
       setPedido("");

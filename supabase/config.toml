@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.analise-sentimento-ia]
 verify_jwt = true
+
+[functions.analise-pedido-ia]
+verify_jwt = true
