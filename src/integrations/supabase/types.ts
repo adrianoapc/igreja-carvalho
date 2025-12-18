@@ -2932,6 +2932,10 @@ export type Database = {
       }
       sentimentos_membros: {
         Row: {
+          analise_ia_gravidade: string | null
+          analise_ia_motivo: string | null
+          analise_ia_resposta: string | null
+          analise_ia_titulo: string | null
           created_at: string
           data_registro: string
           id: string
@@ -2941,6 +2945,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          analise_ia_gravidade?: string | null
+          analise_ia_motivo?: string | null
+          analise_ia_resposta?: string | null
+          analise_ia_titulo?: string | null
           created_at?: string
           data_registro?: string
           id?: string
@@ -2950,6 +2958,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          analise_ia_gravidade?: string | null
+          analise_ia_motivo?: string | null
+          analise_ia_resposta?: string | null
+          analise_ia_titulo?: string | null
           created_at?: string
           data_registro?: string
           id?: string

@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.verificar-escalas-pendentes]
 verify_jwt = false
+
+[functions.analise-sentimento-ia]
+verify_jwt = true
