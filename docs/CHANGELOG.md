@@ -8,6 +8,28 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Adicionado
+
+#### 🤖 Intercessão V2 - Fase 1: Schema de Banco de Dados (18 de Dez/2025)
+- **ENUMs criados**: `status_intercessor` (ATIVO, PAUSA, FERIAS) e `status_sessao_chat` (INICIADO, EM_ANDAMENTO, CONCLUIDO, EXPIRADO)
+- **Nova tabela `visitantes_leads`**: CRM de Evangelismo para leads externos via WhatsApp/Bot (telefone único, estágio de funil, origem)
+- **Nova tabela `atendimentos_bot`**: State Machine para controle de sessão do chatbot de triagem (histórico_conversa JSONB, meta_dados IA)
+- **Nova tabela `logs_auditoria_chat`**: Audit log imutável para compliance LGPD (Append-Only, sem UPDATE/DELETE)
+- **Coluna `status_disponibilidade`** em `intercessores`: Controle de carga de trabalho (ATIVO/PAUSA/FERIAS)
+- **Colunas em `pedidos_oracao`**: `texto_na_integra` (relato completo), `origem` (WABA/APP/MANUAL), `visitante_id` (FK)
+- **RLS restritivo**: Admins/Pastores gerenciam; Intercessores visualizam; Logs apenas INSERT
+
+**Decisão arquitetural:** ADR-012 - CRM de Evangelismo, Chatbot IA e Compliance LGPD
+
+**Impacto no usuário:**
+- Preparação para receber pedidos de oração via WhatsApp com triagem por IA
+- Separação clara entre cuidado pastoral (membros) e evangelismo (leads externos)
+- Controle de burnout de intercessores com status de disponibilidade
+
+**Módulos afetados:** Intercessão, Evangelismo (novo), Compliance/LGPD
+
+---
+
 ### Corrigido
 
 #### 🔧 Correções de Rotas e Políticas RLS (18 de Dez/2025)

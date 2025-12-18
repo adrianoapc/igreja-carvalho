@@ -153,6 +153,74 @@ export type Database = {
         }
         Relationships: []
       }
+      atendimentos_bot: {
+        Row: {
+          created_at: string | null
+          historico_conversa: Json | null
+          id: string
+          meta_dados: Json | null
+          pessoa_id: string | null
+          status: Database["public"]["Enums"]["status_sessao_chat"] | null
+          telefone: string
+          ultima_mensagem_at: string | null
+          updated_at: string | null
+          visitante_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          historico_conversa?: Json | null
+          id?: string
+          meta_dados?: Json | null
+          pessoa_id?: string | null
+          status?: Database["public"]["Enums"]["status_sessao_chat"] | null
+          telefone: string
+          ultima_mensagem_at?: string | null
+          updated_at?: string | null
+          visitante_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          historico_conversa?: Json | null
+          id?: string
+          meta_dados?: Json | null
+          pessoa_id?: string | null
+          status?: Database["public"]["Enums"]["status_sessao_chat"] | null
+          telefone?: string
+          ultima_mensagem_at?: string | null
+          updated_at?: string | null
+          visitante_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atendimentos_bot_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_bot_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_bot_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_bot_visitante_id_fkey"
+            columns: ["visitante_id"]
+            isOneToOne: false
+            referencedRelation: "visitantes_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aulas: {
         Row: {
           created_at: string | null
@@ -1354,6 +1422,9 @@ export type Database = {
           id: string
           max_pedidos: number | null
           nome: string
+          status_disponibilidade:
+            | Database["public"]["Enums"]["status_intercessor"]
+            | null
           telefone: string | null
           updated_at: string | null
           user_id: string | null
@@ -1365,6 +1436,9 @@ export type Database = {
           id?: string
           max_pedidos?: number | null
           nome: string
+          status_disponibilidade?:
+            | Database["public"]["Enums"]["status_intercessor"]
+            | null
           telefone?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -1376,6 +1450,9 @@ export type Database = {
           id?: string
           max_pedidos?: number | null
           nome?: string
+          status_disponibilidade?:
+            | Database["public"]["Enums"]["status_intercessor"]
+            | null
           telefone?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -1941,6 +2018,44 @@ export type Database = {
         }
         Relationships: []
       }
+      logs_auditoria_chat: {
+        Row: {
+          ator: string
+          id: string
+          ip_origem: string | null
+          payload_raw: Json
+          sessao_id: string | null
+          timestamp_exato: string | null
+          tipo_evento: string | null
+        }
+        Insert: {
+          ator: string
+          id?: string
+          ip_origem?: string | null
+          payload_raw: Json
+          sessao_id?: string | null
+          timestamp_exato?: string | null
+          tipo_evento?: string | null
+        }
+        Update: {
+          ator?: string
+          id?: string
+          ip_origem?: string | null
+          payload_raw?: Json
+          sessao_id?: string | null
+          timestamp_exato?: string | null
+          tipo_evento?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logs_auditoria_chat_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos_bot"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membro_funcoes: {
         Row: {
           ativo: boolean | null
@@ -2333,12 +2448,15 @@ export type Database = {
           membro_id: string | null
           nome_solicitante: string | null
           observacoes_intercessor: string | null
+          origem: string | null
           pedido: string
           pessoa_id: string | null
           status: Database["public"]["Enums"]["status_pedido"]
           telefone_solicitante: string | null
+          texto_na_integra: string | null
           tipo: Database["public"]["Enums"]["tipo_pedido"]
           updated_at: string | null
+          visitante_id: string | null
         }
         Insert: {
           analise_ia_gravidade?: string | null
@@ -2356,12 +2474,15 @@ export type Database = {
           membro_id?: string | null
           nome_solicitante?: string | null
           observacoes_intercessor?: string | null
+          origem?: string | null
           pedido: string
           pessoa_id?: string | null
           status?: Database["public"]["Enums"]["status_pedido"]
           telefone_solicitante?: string | null
+          texto_na_integra?: string | null
           tipo?: Database["public"]["Enums"]["tipo_pedido"]
           updated_at?: string | null
+          visitante_id?: string | null
         }
         Update: {
           analise_ia_gravidade?: string | null
@@ -2379,12 +2500,15 @@ export type Database = {
           membro_id?: string | null
           nome_solicitante?: string | null
           observacoes_intercessor?: string | null
+          origem?: string | null
           pedido?: string
           pessoa_id?: string | null
           status?: Database["public"]["Enums"]["status_pedido"]
           telefone_solicitante?: string | null
+          texto_na_integra?: string | null
           tipo?: Database["public"]["Enums"]["tipo_pedido"]
           updated_at?: string | null
+          visitante_id?: string | null
         }
         Relationships: [
           {
@@ -2421,6 +2545,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "pedidos_oracao_visitante_id_fkey"
+            columns: ["visitante_id"]
+            isOneToOne: false
+            referencedRelation: "visitantes_leads"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3747,6 +3878,45 @@ export type Database = {
           },
         ]
       }
+      visitantes_leads: {
+        Row: {
+          created_at: string | null
+          data_ultimo_contato: string | null
+          email: string | null
+          estagio_funil: string | null
+          id: string
+          nome: string | null
+          observacoes: string | null
+          origem: string | null
+          telefone: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_ultimo_contato?: string | null
+          email?: string | null
+          estagio_funil?: string | null
+          id?: string
+          nome?: string | null
+          observacoes?: string | null
+          origem?: string | null
+          telefone: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_ultimo_contato?: string | null
+          email?: string | null
+          estagio_funil?: string | null
+          id?: string
+          nome?: string | null
+          observacoes?: string | null
+          origem?: string | null
+          telefone?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       view_absent_kids: {
@@ -4166,7 +4336,9 @@ export type Database = {
         | "triste"
         | "doente"
         | "com_pouca_fe"
+      status_intercessor: "ATIVO" | "PAUSA" | "FERIAS"
       status_pedido: "pendente" | "em_oracao" | "respondido" | "arquivado"
+      status_sessao_chat: "INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO" | "EXPIRADO"
       status_testemunho: "aberto" | "publico" | "arquivado"
       tipo_comunicado: "banner" | "alerta"
       tipo_pedido:
@@ -4343,7 +4515,9 @@ export const Constants = {
         "doente",
         "com_pouca_fe",
       ],
+      status_intercessor: ["ATIVO", "PAUSA", "FERIAS"],
       status_pedido: ["pendente", "em_oracao", "respondido", "arquivado"],
+      status_sessao_chat: ["INICIADO", "EM_ANDAMENTO", "CONCLUIDO", "EXPIRADO"],
       status_testemunho: ["aberto", "publico", "arquivado"],
       tipo_comunicado: ["banner", "alerta"],
       tipo_pedido: [
