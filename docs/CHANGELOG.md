@@ -10,6 +10,34 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 🤖 Edge Function chatbot-triagem (Intercessão V2 - 18 de Dez/2025)
+- **Nova Edge Function `chatbot-triagem`**: Chatbot de triagem para receber pedidos de oração via WhatsApp/Make webhook
+  - **Gestão de sessão (State Machine)**: Busca/cria sessão em `atendimentos_bot` com janela de 24h
+  - **IA integrada**: Usa Lovable AI (Gemini 2.5 Flash) para coletar nome e motivo de oração
+  - **Auditoria LGPD**: Registra todas as mensagens (USER/BOT/SYSTEM) em `logs_auditoria_chat` imutável
+  - **Identificação automática**: Diferencia membros (via telefone em `profiles`) de visitantes (`visitantes_leads`)
+  - **Criação de pedido**: Insere automaticamente em `pedidos_oracao` com categorização IA
+  - **Detecção de risco crítico**: JSON com `risco: CRITICO` dispara alerta ao plantão pastoral
+  - **Endpoint público**: `verify_jwt = false` para receber webhook do Make
+
+**Fluxo:**
+1. Make envia: `{ telefone, nome_perfil, mensagem_texto }`
+2. Busca sessão ativa (< 24h) ou cria nova
+3. Registra audit log (USER)
+4. Chama IA com System Prompt + histórico
+5. Se resposta texto: atualiza sessão, retorna pergunta
+6. Se resposta JSON `concluido`: cria pedido, vincula membro/visitante
+
+**System Prompt IA:**
+- Coleta Nome Real e Motivo de Oração
+- Aviso LGPD na primeira mensagem
+- Detecta risco de vida (suicídio/crime)
+- Retorna JSON estruturado quando completo
+
+**Módulos afetados:** Intercessão (V2), Evangelismo, Compliance/LGPD
+
+---
+
 #### 🤖 Intercessão V2 - Fase 1: Schema de Banco de Dados (18 de Dez/2025)
 - **ENUMs criados**: `status_intercessor` (ATIVO, PAUSA, FERIAS) e `status_sessao_chat` (INICIADO, EM_ANDAMENTO, CONCLUIDO, EXPIRADO)
 - **Nova tabela `visitantes_leads`**: CRM de Evangelismo para leads externos via WhatsApp/Bot (telefone único, estágio de funil, origem)

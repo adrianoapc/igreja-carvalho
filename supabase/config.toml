@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.disparar-escala]
 verify_jwt = false
+
+[functions.chatbot-triagem]
+verify_jwt = false
