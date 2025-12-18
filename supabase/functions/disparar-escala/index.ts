@@ -147,12 +147,18 @@ serve(async (req) => {
 
       // Determinar função/posição
       const funcaoEscala = posicao?.nome || time?.nome || 'Voluntário';
+      
+      // Incluir observações se existirem (contém itens da liturgia, etc.)
+      const observacoesEscala = escala.observacoes || '';
 
       const payload = {
         telefone: telefoneFormatado,
         nome_voluntario: nome,
         data_culto: dataFormatada,
-        funcao_escala: funcaoEscala
+        funcao_escala: funcaoEscala,
+        observacoes: observacoesEscala,
+        // Campo completo com função + observações para facilitar uso no Make
+        descricao_completa: observacoesEscala ? `${funcaoEscala}: ${observacoesEscala}` : funcaoEscala
       };
 
       console.log(`Enviando para ${nome} (${telefoneFormatado}): ${funcaoEscala}`);
