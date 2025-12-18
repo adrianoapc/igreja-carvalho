@@ -26,7 +26,7 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
   const [email, setEmail] = React.useState("");
   const [telefone, setTelefone] = React.useState("");
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   // Preencher pedido com valor inicial quando dialog abre
   React.useEffect(() => {
@@ -61,6 +61,10 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
       if (!anonimo) {
         if (user) {
           pedidoData.membro_id = user.id;
+          // Também salvar pessoa_id para permitir filtrar por profile
+          if (profile?.id) {
+            pedidoData.pessoa_id = profile.id;
+          }
         } else if (pessoaId) {
           pedidoData.pessoa_id = pessoaId;
         } else {
