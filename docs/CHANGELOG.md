@@ -8,6 +8,26 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Adicionado
+
+#### 🤖 Análise de IA para Pedidos de Oração (18 de Dez/2025)
+- **Categorização automática por IA**: Pedidos de oração agora são analisados automaticamente via Edge Function `analise-pedido-ia` usando Lovable AI (Gemini 2.5 Flash)
+- **Campos de análise**: `analise_ia_titulo` (título sugerido), `analise_ia_motivo` (categoria raiz: Saúde, Financeiro, Luto, Relacionamento, etc.), `analise_ia_gravidade` (baixa/media/critica), `analise_ia_resposta` (mensagem pastoral sugerida)
+- **UI integrada**: Cards de pedidos exibem badge de gravidade com cores (verde/amarelo/vermelho), ícones contextuais, e resposta pastoral na visualização detalhada
+- **Disparo assíncrono**: Análise executada automaticamente após criação do pedido, sem bloquear fluxo do usuário
+
+**Impacto no usuário:**
+- Intercessores e liderança visualizam categorização automática para triagem mais eficiente
+- Gravidade visual facilita priorização de pedidos críticos
+- Resposta pastoral sugerida auxilia no acompanhamento
+
+**Tabelas/Campos afetados:**
+- `pedidos_oracao`: Adicionados campos `analise_ia_titulo`, `analise_ia_motivo`, `analise_ia_gravidade`, `analise_ia_resposta`
+
+**Módulos afetados:** Intercessão (Pedidos de Oração)
+
+---
+
 ### Refatorado
 
 #### 📊 Reuso do Widget de Escalas (17 de Dez/2025)
