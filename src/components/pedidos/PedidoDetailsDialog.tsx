@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, User, Mail, Phone, EyeOff } from "lucide-react";
+import { Clock, User, Mail, Phone, EyeOff, Sparkles, AlertTriangle } from "lucide-react";
 
 interface PedidoDetailsDialogProps {
   open: boolean;
@@ -163,6 +163,43 @@ export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: Pe
             <Label>Pedido</Label>
             <p className="text-sm bg-muted p-4 rounded-md">{pedido.pedido}</p>
           </div>
+
+          {/* AI Analysis Section */}
+          {pedido.analise_ia_titulo && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <Label>Análise IA</Label>
+                {pedido.analise_ia_gravidade === 'critica' && (
+                  <Badge variant="destructive" className="text-xs">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Crítico
+                  </Badge>
+                )}
+                {pedido.analise_ia_gravidade === 'media' && (
+                  <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                    Atenção
+                  </Badge>
+                )}
+                {pedido.analise_ia_gravidade === 'baixa' && (
+                  <Badge variant="secondary" className="text-xs">Normal</Badge>
+                )}
+              </div>
+              <div className="bg-primary/5 border border-primary/10 p-4 rounded-md space-y-2">
+                <p className="font-medium">{pedido.analise_ia_titulo}</p>
+                {pedido.analise_ia_motivo && (
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">Categoria:</span> {pedido.analise_ia_motivo}
+                  </p>
+                )}
+                {pedido.analise_ia_resposta && (
+                  <p className="text-sm text-muted-foreground italic">
+                    {pedido.analise_ia_resposta}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {pedido.intercessores && (
             <div className="space-y-2">

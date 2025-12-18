@@ -2315,6 +2315,10 @@ export type Database = {
       }
       pedidos_oracao: {
         Row: {
+          analise_ia_gravidade: string | null
+          analise_ia_motivo: string | null
+          analise_ia_resposta: string | null
+          analise_ia_titulo: string | null
           anonimo: boolean | null
           created_at: string | null
           data_alocacao: string | null
@@ -2334,6 +2338,10 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          analise_ia_gravidade?: string | null
+          analise_ia_motivo?: string | null
+          analise_ia_resposta?: string | null
+          analise_ia_titulo?: string | null
           anonimo?: boolean | null
           created_at?: string | null
           data_alocacao?: string | null
@@ -2353,6 +2361,10 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          analise_ia_gravidade?: string | null
+          analise_ia_motivo?: string | null
+          analise_ia_resposta?: string | null
+          analise_ia_titulo?: string | null
           anonimo?: boolean | null
           created_at?: string | null
           data_alocacao?: string | null
