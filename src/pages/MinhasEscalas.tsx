@@ -157,6 +157,7 @@ export default function MinhasEscalas() {
     const status = escala.status_confirmacao || "pendente";
     switch (status) {
       case "aceito":
+      case "confirmado":
         return <Badge className="bg-green-500/20 text-green-600 border-green-500/30">Confirmado</Badge>;
       case "recusado":
         return <Badge variant="destructive">Recusado</Badge>;
@@ -166,7 +167,7 @@ export default function MinhasEscalas() {
   };
 
   const pendentes = escalas.filter(e => !e.status_confirmacao || e.status_confirmacao === "pendente");
-  const confirmadas = escalas.filter(e => e.status_confirmacao === "aceito");
+  const confirmadas = escalas.filter(e => e.status_confirmacao === "aceito" || e.status_confirmacao === "confirmado");
   const recusadas = escalas.filter(e => e.status_confirmacao === "recusado");
 
   return (
