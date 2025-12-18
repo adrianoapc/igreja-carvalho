@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Webhook, Eye, EyeOff, Save, ArrowLeft, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { Webhook, Eye, EyeOff, Save, ArrowLeft, CheckCircle2, XCircle, RefreshCw, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import InputMask from "react-input-mask";
 
 interface WebhookConfig {
   key: string;
@@ -15,6 +16,7 @@ interface WebhookConfig {
   description: string;
   placeholder: string;
   isConfigured: boolean;
+  type?: 'url' | 'phone';
 }
 
 const WEBHOOKS: Omit<WebhookConfig, 'isConfigured'>[] = [
@@ -22,19 +24,29 @@ const WEBHOOKS: Omit<WebhookConfig, 'isConfigured'>[] = [
     key: "MAKE_WEBHOOK_URL",
     name: "Make.com (Geral)",
     description: "Webhook principal para notificações gerais e alertas críticos",
-    placeholder: "https://hook.us1.make.com/..."
+    placeholder: "https://hook.us1.make.com/...",
+    type: 'url'
   },
   {
     key: "MAKE_WEBHOOK_ESCALAS",
     name: "Make.com (Escalas)",
     description: "Webhook para envio de convites e lembretes de escalas de voluntários",
-    placeholder: "https://hook.us1.make.com/..."
+    placeholder: "https://hook.us1.make.com/...",
+    type: 'url'
   },
   {
     key: "MAKE_WEBHOOK_SECRET",
     name: "Make.com (Liturgia)",
     description: "Webhook para distribuição de liturgia aos times de culto",
-    placeholder: "https://hook.us1.make.com/..."
+    placeholder: "https://hook.us1.make.com/...",
+    type: 'url'
+  },
+  {
+    key: "TELEFONE_PLANTAO",
+    name: "Telefone Plantão Pastoral",
+    description: "Número de WhatsApp para receber alertas críticos de sentimentos e emergências pastorais",
+    placeholder: "(11) 99999-9999",
+    type: 'phone'
   }
 ];
 
@@ -60,7 +72,7 @@ export default function Webhooks() {
       
       // Verificar se os secrets estão configurados via uma edge function de teste
       // Por enquanto, vamos assumir que estão configurados se existem no projeto
-      const knownSecrets = ['MAKE_WEBHOOK_URL', 'MAKE_WEBHOOK_ESCALAS', 'MAKE_WEBHOOK_SECRET'];
+      const knownSecrets = ['MAKE_WEBHOOK_URL', 'MAKE_WEBHOOK_ESCALAS', 'MAKE_WEBHOOK_SECRET', 'TELEFONE_PLANTAO'];
       
       // Como não podemos ler secrets diretamente, marcamos como "verificar manualmente"
       // ou fazemos uma chamada de teste para cada webhook
@@ -90,33 +102,45 @@ export default function Webhooks() {
   };
 
   const handleSaveWebhook = async (key: string) => {
+    const config = configs.find(c => c.key === key);
+    const isPhone = config?.type === 'phone';
+    
     if (!newValue.trim()) {
-      toast.error("Digite a URL do webhook");
+      toast.error(isPhone ? "Digite o número de telefone" : "Digite a URL do webhook");
       return;
     }
 
-    // Validar formato básico de URL
-    try {
-      new URL(newValue);
-    } catch {
-      toast.error("URL inválida", {
-        description: "Digite uma URL válida começando com https://"
-      });
-      return;
+    // Validação baseada no tipo
+    if (isPhone) {
+      const cleanPhone = newValue.replace(/\D/g, '');
+      if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+        toast.error("Telefone inválido", {
+          description: "Digite um número de telefone válido com DDD"
+        });
+        return;
+      }
+    } else {
+      try {
+        new URL(newValue);
+      } catch {
+        toast.error("URL inválida", {
+          description: "Digite uma URL válida começando com https://"
+        });
+        return;
+      }
     }
 
     setSaving(key);
     try {
       // Para atualizar secrets, precisamos usar o sistema de secrets do Lovable
       // Como não temos acesso direto à API de secrets, orientamos o usuário
-      toast.info("Para atualizar este webhook:", {
+      toast.info("Para atualizar este secret:", {
         description: `Acesse Configurações do Projeto > Cloud > Secrets e atualize o secret "${key}" com o novo valor.`,
         duration: 10000
       });
       
       // Salvar no banco como fallback/backup (se houver coluna)
       if (key === 'MAKE_WEBHOOK_SECRET') {
-        // Este é o webhook de liturgia que estava em configuracoes_igreja
         const { error } = await supabase
           .from('configuracoes_igreja')
           .update({ webhook_make_liturgia: newValue })
@@ -125,6 +149,21 @@ export default function Webhooks() {
         if (!error) {
           toast.success("Webhook salvo com sucesso!", {
             description: "A configuração foi atualizada no banco de dados"
+          });
+        }
+      }
+      
+      // Salvar telefone de plantão no banco
+      if (key === 'TELEFONE_PLANTAO') {
+        const cleanPhone = newValue.replace(/\D/g, '');
+        const { error } = await supabase
+          .from('configuracoes_igreja')
+          .update({ telefone_plantao_pastoral: cleanPhone })
+          .eq('id', (await supabase.from('configuracoes_igreja').select('id').single()).data?.id);
+        
+        if (!error) {
+          toast.success("Telefone salvo com sucesso!", {
+            description: "O telefone de plantão foi atualizado"
           });
         }
       }
@@ -230,7 +269,11 @@ export default function Webhooks() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Webhook className="h-5 w-5 text-muted-foreground" />
+                  {config.type === 'phone' ? (
+                    <Phone className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <Webhook className="h-5 w-5 text-muted-foreground" />
+                  )}
                   <div>
                     <CardTitle className="text-lg">{config.name}</CardTitle>
                     <CardDescription>{config.description}</CardDescription>
@@ -252,15 +295,33 @@ export default function Webhooks() {
               {editingKey === config.key ? (
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label htmlFor={`webhook-${config.key}`}>Nova URL do Webhook</Label>
-                    <Input
-                      id={`webhook-${config.key}`}
-                      type="url"
-                      value={newValue}
-                      onChange={(e) => setNewValue(e.target.value)}
-                      placeholder={config.placeholder}
-                      className="font-mono text-sm"
-                    />
+                    <Label htmlFor={`webhook-${config.key}`}>
+                      {config.type === 'phone' ? 'Novo Telefone' : 'Nova URL do Webhook'}
+                    </Label>
+                    {config.type === 'phone' ? (
+                      <InputMask
+                        mask="(99) 99999-9999"
+                        value={newValue}
+                        onChange={(e) => setNewValue(e.target.value)}
+                      >
+                        {(inputProps: any) => (
+                          <Input
+                            {...inputProps}
+                            id={`webhook-${config.key}`}
+                            placeholder={config.placeholder}
+                          />
+                        )}
+                      </InputMask>
+                    ) : (
+                      <Input
+                        id={`webhook-${config.key}`}
+                        type="url"
+                        value={newValue}
+                        onChange={(e) => setNewValue(e.target.value)}
+                        placeholder={config.placeholder}
+                        className="font-mono text-sm"
+                      />
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button 
