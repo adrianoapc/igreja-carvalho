@@ -4,11 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Save, X, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Upload, Save, X, AlertTriangle, Bell, Phone, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import InputMask from "react-input-mask";
 
 export default function ConfiguracoesIgreja() {
   const [loading, setLoading] = useState(true);
@@ -19,7 +21,11 @@ export default function ConfiguracoesIgreja() {
     nome_igreja: "Igreja App",
     subtitulo: "Gestão Completa",
     logo_url: null as string | null,
-    webhook_make_liturgia: null as string | null
+    webhook_make_liturgia: null as string | null,
+    whatsapp_provider: "make_webhook" as string,
+    whatsapp_token: null as string | null,
+    whatsapp_instance_id: null as string | null,
+    telefone_plantao_pastoral: null as string | null
   });
   const [novoLogo, setNovoLogo] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -170,7 +176,11 @@ export default function ConfiguracoesIgreja() {
           nome_igreja: config.nome_igreja,
           subtitulo: config.subtitulo,
           logo_url: logoUrl,
-          webhook_make_liturgia: config.webhook_make_liturgia
+          webhook_make_liturgia: config.webhook_make_liturgia,
+          whatsapp_provider: config.whatsapp_provider,
+          whatsapp_token: config.whatsapp_token,
+          whatsapp_instance_id: config.whatsapp_instance_id,
+          telefone_plantao_pastoral: config.telefone_plantao_pastoral?.replace(/\D/g, '') || null
         })
         .eq("id", config.id);
 
@@ -405,6 +415,136 @@ export default function ConfiguracoesIgreja() {
           >
             <Save className="w-4 h-4 mr-2" />
             {uploading ? "Fazendo upload..." : saving ? "Salvando..." : "Salvar Alterações"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Painel de Notificações & Plantão */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Bell className="text-primary" />
+            <CardTitle>Notificações & Plantão Pastoral</CardTitle>
+          </div>
+          <CardDescription>
+            Configure alertas críticos e integrações de WhatsApp
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Telefone Plantão */}
+          <div className="space-y-2">
+            <Label htmlFor="telefone-plantao" className="flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              Telefone do Plantão Pastoral
+            </Label>
+            <InputMask
+              mask="(99) 99999-9999"
+              value={config.telefone_plantao_pastoral || ""}
+              onChange={(e) => setConfig(prev => ({ ...prev, telefone_plantao_pastoral: e.target.value }))}
+            >
+              {(inputProps: any) => (
+                <Input
+                  {...inputProps}
+                  id="telefone-plantao"
+                  placeholder="(11) 99999-9999"
+                />
+              )}
+            </InputMask>
+            <p className="text-xs text-muted-foreground">
+              Número que receberá alertas críticos de sentimentos negativos
+            </p>
+          </div>
+
+          {/* Provedor WhatsApp */}
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp-provider" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Provedor WhatsApp
+            </Label>
+            <Select
+              value={config.whatsapp_provider}
+              onValueChange={(value) => setConfig(prev => ({ ...prev, whatsapp_provider: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o provedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="make_webhook">Make.com (Webhook)</SelectItem>
+                <SelectItem value="meta_official">Meta Official API</SelectItem>
+                <SelectItem value="evolution_api">Evolution API</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Escolha como os alertas serão enviados via WhatsApp
+            </p>
+          </div>
+
+          {/* Campos condicionais baseados no provedor */}
+          {config.whatsapp_provider === 'meta_official' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-token">Token de Acesso (Meta)</Label>
+                <Input
+                  id="whatsapp-token"
+                  type="password"
+                  value={config.whatsapp_token || ""}
+                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_token: e.target.value }))}
+                  placeholder="EAAxxxxxx..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-instance">Phone Number ID</Label>
+                <Input
+                  id="whatsapp-instance"
+                  value={config.whatsapp_instance_id || ""}
+                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_instance_id: e.target.value }))}
+                  placeholder="1234567890123456"
+                />
+              </div>
+            </>
+          )}
+
+          {config.whatsapp_provider === 'evolution_api' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-token">API Key (Evolution)</Label>
+                <Input
+                  id="whatsapp-token"
+                  type="password"
+                  value={config.whatsapp_token || ""}
+                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_token: e.target.value }))}
+                  placeholder="B6D711FCDE4D4FD5936544120E713976"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-instance">Nome da Instância</Label>
+                <Input
+                  id="whatsapp-instance"
+                  value={config.whatsapp_instance_id || ""}
+                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_instance_id: e.target.value }))}
+                  placeholder="minha-instancia"
+                />
+              </div>
+            </>
+          )}
+
+          {config.whatsapp_provider === 'make_webhook' && (
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                📌 Usando webhook Make.com configurado acima para envios de WhatsApp.
+              </p>
+            </div>
+          )}
+
+          {/* Botão Salvar Notificações */}
+          <Button 
+            onClick={handleSave} 
+            disabled={saving}
+            variant="outline"
+            className="w-full"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Salvar Configurações de Notificação
           </Button>
         </CardContent>
       </Card>

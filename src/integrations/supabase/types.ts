@@ -650,8 +650,12 @@ export type Database = {
           logo_url: string | null
           nome_igreja: string
           subtitulo: string | null
+          telefone_plantao_pastoral: string | null
           updated_at: string | null
           webhook_make_liturgia: string | null
+          whatsapp_instance_id: string | null
+          whatsapp_provider: string | null
+          whatsapp_token: string | null
         }
         Insert: {
           created_at?: string | null
@@ -659,8 +663,12 @@ export type Database = {
           logo_url?: string | null
           nome_igreja?: string
           subtitulo?: string | null
+          telefone_plantao_pastoral?: string | null
           updated_at?: string | null
           webhook_make_liturgia?: string | null
+          whatsapp_instance_id?: string | null
+          whatsapp_provider?: string | null
+          whatsapp_token?: string | null
         }
         Update: {
           created_at?: string | null
@@ -668,8 +676,12 @@ export type Database = {
           logo_url?: string | null
           nome_igreja?: string
           subtitulo?: string | null
+          telefone_plantao_pastoral?: string | null
           updated_at?: string | null
           webhook_make_liturgia?: string | null
+          whatsapp_instance_id?: string | null
+          whatsapp_provider?: string | null
+          whatsapp_token?: string | null
         }
         Relationships: []
       }

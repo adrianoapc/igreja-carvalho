@@ -213,6 +213,15 @@ Mensagem do membro:
     if (isCritical) {
       console.log('Critical sentiment detected, triggering alert');
 
+      // Fetch church configuration for notification settings
+      const { data: churchConfig } = await supabase
+        .from('configuracoes_igreja')
+        .select('whatsapp_provider, whatsapp_token, whatsapp_instance_id, telefone_plantao_pastoral, webhook_make_liturgia')
+        .single();
+
+      const telefonePlantao = churchConfig?.telefone_plantao_pastoral;
+      const whatsappProvider = churchConfig?.whatsapp_provider || 'make_webhook';
+
       // Create notification for admins/pastors
       const alertMessage = `🚨 ALERTA [${analysis.gravidade.toUpperCase()}]: ${analysis.titulo}. Motivo: ${analysis.motivo}. Membro: ${memberName}.`;
       
@@ -237,28 +246,75 @@ Mensagem do membro:
         console.log('Admin notification sent');
       }
 
-      // Try to trigger Make webhook for WhatsApp (if configured)
+      // Prepare WhatsApp payload
+      const whatsappPayload = {
+        tipo: 'alerta_pastoral',
+        membro_nome: memberName,
+        membro_telefone: sentimento.profiles?.telefone,
+        titulo: analysis.titulo,
+        gravidade: analysis.gravidade,
+        motivo: analysis.motivo,
+        mensagem_acolhimento: analysis.resposta,
+        sentimento_original: sentimentoLabel,
+        telefone_destino: telefonePlantao
+      };
+
+      // Send WhatsApp alert based on provider
       try {
-        const makeWebhookSecret = Deno.env.get('MAKE_WEBHOOK_SECRET');
-        if (makeWebhookSecret) {
-          await fetch(makeWebhookSecret, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tipo: 'alerta_pastoral',
-              membro_nome: memberName,
-              membro_telefone: sentimento.profiles?.telefone,
-              titulo: analysis.titulo,
-              gravidade: analysis.gravidade,
-              motivo: analysis.motivo,
-              mensagem_acolhimento: analysis.resposta,
-              sentimento_original: sentimentoLabel
-            })
-          });
-          console.log('Make webhook triggered');
+        if (whatsappProvider === 'make_webhook') {
+          // Use Make.com webhook
+          const makeWebhook = Deno.env.get('MAKE_WEBHOOK_SECRET') || churchConfig?.webhook_make_liturgia;
+          if (makeWebhook) {
+            await fetch(makeWebhook, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(whatsappPayload)
+            });
+            console.log('Make webhook triggered');
+          }
+        } else if (whatsappProvider === 'meta_official' && churchConfig?.whatsapp_token && churchConfig?.whatsapp_instance_id) {
+          // Use Meta Official API
+          const phoneNumberId = churchConfig.whatsapp_instance_id;
+          const accessToken = churchConfig.whatsapp_token;
+          
+          if (telefonePlantao) {
+            await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: telefonePlantao.replace(/\D/g, ''),
+                type: 'text',
+                text: { body: alertMessage }
+              })
+            });
+            console.log('Meta API WhatsApp sent');
+          }
+        } else if (whatsappProvider === 'evolution_api' && churchConfig?.whatsapp_token && churchConfig?.whatsapp_instance_id) {
+          // Use Evolution API
+          const instanceName = churchConfig.whatsapp_instance_id;
+          const apiKey = churchConfig.whatsapp_token;
+          
+          if (telefonePlantao) {
+            await fetch(`https://api.evolution.com.br/message/sendText/${instanceName}`, {
+              method: 'POST',
+              headers: {
+                'apikey': apiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                number: telefonePlantao.replace(/\D/g, ''),
+                text: alertMessage
+              })
+            });
+            console.log('Evolution API WhatsApp sent');
+          }
         }
       } catch (webhookError) {
-        console.error('Webhook error (non-blocking):', webhookError);
+        console.error('WhatsApp send error (non-blocking):', webhookError);
       }
     }
 
