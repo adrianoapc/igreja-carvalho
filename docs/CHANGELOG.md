@@ -8,6 +8,18 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Corrigido
+
+#### 🔧 Correções de Rotas e Políticas RLS (18 de Dez/2025)
+- **Rota /biblia**: Adicionada rota faltante no App.tsx que causava erro 404 ao acessar a página da Bíblia
+- **RLS inscricoes_jornada**: Adicionada política permitindo membros autenticados se inscreverem em jornadas (pessoa_id vinculado ao user_id via profiles)
+
+**Causa**: Rota não registrada no roteador; política RLS restritiva bloqueava auto-inscrição de membros em cursos
+
+**Módulos afetados:** Conteúdo (Bíblia), Ensino (Jornadas/Cursos)
+
+---
+
 ### Adicionado
 
 #### 📚 Documentação de Fluxos (18 de Dez/2025)
