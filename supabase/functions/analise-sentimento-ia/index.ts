@@ -25,6 +25,75 @@ const sentimentosLabels: Record<string, string> = {
 
 const negativeSentiments = ['angustiado', 'sozinho', 'triste', 'doente', 'com_pouca_fe', 'com_medo'];
 
+// Helper to find the team leader phone for a member
+async function findLeaderPhone(supabase: any, pessoaId: string): Promise<string | null> {
+  try {
+    // Find teams where this person is a member
+    const { data: memberships, error } = await supabase
+      .from('membros_time')
+      .select(`
+        time_id,
+        times_culto!inner (
+          id,
+          nome,
+          lider_id,
+          lider:lider_id (
+            telefone
+          )
+        )
+      `)
+      .eq('pessoa_id', pessoaId)
+      .eq('ativo', true);
+
+    if (error) {
+      console.error('Error fetching team memberships:', error);
+      return null;
+    }
+
+    if (!memberships || memberships.length === 0) {
+      console.log('No active team memberships found for member');
+      return null;
+    }
+
+    // Find the first team with a leader that has a phone
+    for (const membership of memberships) {
+      const leaderPhone = membership.times_culto?.lider?.telefone;
+      if (leaderPhone) {
+        console.log(`Found leader phone from team "${membership.times_culto.nome}": ${leaderPhone}`);
+        return leaderPhone;
+      }
+    }
+
+    console.log('No leader with phone found in member teams');
+    return null;
+  } catch (err) {
+    console.error('Error in findLeaderPhone:', err);
+    return null;
+  }
+}
+
+// Helper to send webhook to Make
+async function sendMakeWebhook(webhookUrl: string, payload: any): Promise<boolean> {
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+      console.error('Make webhook failed:', response.status, await response.text());
+      return false;
+    }
+    
+    console.log('Make webhook sent successfully');
+    return true;
+  } catch (err) {
+    console.error('Make webhook error:', err);
+    return false;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -53,6 +122,7 @@ serve(async (req) => {
       .select(`
         *,
         profiles:pessoa_id (
+          id,
           nome,
           telefone,
           user_id
@@ -80,6 +150,8 @@ serve(async (req) => {
 
     const sentimentoLabel = sentimentosLabels[sentimento.sentimento] || sentimento.sentimento;
     const memberName = sentimento.profiles?.nome || 'Membro';
+    const memberPhone = sentimento.profiles?.telefone || '';
+    const pessoaId = sentimento.profiles?.id;
 
     console.log(`Analyzing sentiment from ${memberName}: ${sentimentoLabel}`);
 
@@ -116,66 +188,67 @@ IMPORTANTE: Responda SOMENTE com um JSON válido no formato:
 Mensagem do membro:
 "${sentimento.mensagem}"`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: 'Payment required' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      return new Response(JSON.stringify({ error: 'AI analysis failed' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content;
-
-    if (!content) {
-      console.error('No content in AI response');
-      return new Response(JSON.stringify({ error: 'Empty AI response' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('AI Response:', content);
-
-    // Parse AI response
     let analysis;
+    
     try {
-      // Clean potential markdown code blocks
-      const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
-      analysis = JSON.parse(cleanContent);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      // Fallback analysis
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error('AI API error:', aiResponse.status, errorText);
+        
+        // Use fallback analysis instead of failing
+        analysis = {
+          titulo: 'Relato recebido',
+          motivo: 'Não identificado',
+          gravidade: negativeSentiments.includes(sentimento.sentimento) ? 'media' : 'baixa',
+          resposta: 'Recebemos seu relato e estamos orando por você. A igreja está aqui para apoiá-lo.'
+        };
+      } else {
+        const aiData = await aiResponse.json();
+        const content = aiData.choices?.[0]?.message?.content;
+
+        if (!content) {
+          console.error('No content in AI response');
+          analysis = {
+            titulo: 'Relato recebido',
+            motivo: 'Não identificado',
+            gravidade: negativeSentiments.includes(sentimento.sentimento) ? 'media' : 'baixa',
+            resposta: 'Recebemos seu relato e estamos orando por você. A igreja está aqui para apoiá-lo.'
+          };
+        } else {
+          console.log('AI Response:', content);
+
+          // Parse AI response
+          try {
+            const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+            analysis = JSON.parse(cleanContent);
+          } catch (parseError) {
+            console.error('Failed to parse AI response:', parseError);
+            analysis = {
+              titulo: 'Relato recebido',
+              motivo: 'Não identificado',
+              gravidade: negativeSentiments.includes(sentimento.sentimento) ? 'media' : 'baixa',
+              resposta: 'Recebemos seu relato e estamos orando por você. A igreja está aqui para apoiá-lo.'
+            };
+          }
+        }
+      }
+    } catch (aiError) {
+      console.error('AI request failed (non-blocking):', aiError);
       analysis = {
         titulo: 'Relato recebido',
         motivo: 'Não identificado',
@@ -216,11 +289,28 @@ Mensagem do membro:
       // Fetch church configuration for notification settings
       const { data: churchConfig } = await supabase
         .from('configuracoes_igreja')
-        .select('whatsapp_provider, whatsapp_token, whatsapp_instance_id, telefone_plantao_pastoral, webhook_make_liturgia')
+        .select('telefone_plantao_pastoral, webhook_make_liturgia')
         .single();
 
-      const telefonePlantao = churchConfig?.telefone_plantao_pastoral;
-      const whatsappProvider = churchConfig?.whatsapp_provider || 'make_webhook';
+      // Get telefone plantão from config or env
+      const telefonePlantao = churchConfig?.telefone_plantao_pastoral || Deno.env.get('TELEFONE_PLANTAO') || '';
+      const makeWebhookUrl = Deno.env.get('MAKE_WEBHOOK_URL') || churchConfig?.webhook_make_liturgia || '';
+      
+      // Get app URL for admin link
+      const appUrl = Deno.env.get('APP_URL') || SUPABASE_URL.replace('.supabase.co', '.lovable.app');
+      const linkAdmin = `${appUrl}/intercessao/sentimentos`;
+
+      // Find the leader phone for this member
+      let leaderPhone: string | null = null;
+      if (pessoaId) {
+        leaderPhone = await findLeaderPhone(supabase, pessoaId);
+      }
+
+      // If no leader found, use plantão
+      const primaryPhone = leaderPhone || telefonePlantao;
+
+      console.log(`Primary phone (leader or plantão): ${primaryPhone}`);
+      console.log(`Plantão phone (always receives copy): ${telefonePlantao}`);
 
       // Create notification for admins/pastors
       const alertMessage = `🚨 ALERTA [${analysis.gravidade.toUpperCase()}]: ${analysis.titulo}. Motivo: ${analysis.motivo}. Membro: ${memberName}.`;
@@ -246,75 +336,40 @@ Mensagem do membro:
         console.log('Admin notification sent');
       }
 
-      // Prepare WhatsApp payload
-      const whatsappPayload = {
-        tipo: 'alerta_pastoral',
-        membro_nome: memberName,
-        membro_telefone: sentimento.profiles?.telefone,
-        titulo: analysis.titulo,
-        gravidade: analysis.gravidade,
-        motivo: analysis.motivo,
-        mensagem_acolhimento: analysis.resposta,
-        sentimento_original: sentimentoLabel,
-        telefone_destino: telefonePlantao
-      };
+      // Send to Make Webhook
+      if (makeWebhookUrl) {
+        // Build the payload for Make
+        const makePayload = {
+          membro_nome: memberName,
+          membro_telefone: memberPhone,
+          sentimento: sentimentoLabel,
+          gravidade: analysis.gravidade,
+          ai_resumo: `${analysis.titulo} - ${analysis.motivo}`,
+          ai_mensagem_membro: analysis.resposta,
+          pastor_telefone: primaryPhone,
+          link_admin: linkAdmin
+        };
 
-      // Send WhatsApp alert based on provider
-      try {
-        if (whatsappProvider === 'make_webhook') {
-          // Use Make.com webhook
-          const makeWebhook = Deno.env.get('MAKE_WEBHOOK_SECRET') || churchConfig?.webhook_make_liturgia;
-          if (makeWebhook) {
-            await fetch(makeWebhook, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(whatsappPayload)
-            });
-            console.log('Make webhook triggered');
-          }
-        } else if (whatsappProvider === 'meta_official' && churchConfig?.whatsapp_token && churchConfig?.whatsapp_instance_id) {
-          // Use Meta Official API
-          const phoneNumberId = churchConfig.whatsapp_instance_id;
-          const accessToken = churchConfig.whatsapp_token;
-          
-          if (telefonePlantao) {
-            await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                messaging_product: 'whatsapp',
-                to: telefonePlantao.replace(/\D/g, ''),
-                type: 'text',
-                text: { body: alertMessage }
-              })
-            });
-            console.log('Meta API WhatsApp sent');
-          }
-        } else if (whatsappProvider === 'evolution_api' && churchConfig?.whatsapp_token && churchConfig?.whatsapp_instance_id) {
-          // Use Evolution API
-          const instanceName = churchConfig.whatsapp_instance_id;
-          const apiKey = churchConfig.whatsapp_token;
-          
-          if (telefonePlantao) {
-            await fetch(`https://api.evolution.com.br/message/sendText/${instanceName}`, {
-              method: 'POST',
-              headers: {
-                'apikey': apiKey,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                number: telefonePlantao.replace(/\D/g, ''),
-                text: alertMessage
-              })
-            });
-            console.log('Evolution API WhatsApp sent');
-          }
+        // Send to primary recipient (leader or plantão)
+        if (primaryPhone) {
+          console.log('Sending to primary phone via Make:', primaryPhone);
+          await sendMakeWebhook(makeWebhookUrl, {
+            ...makePayload,
+            pastor_telefone: primaryPhone
+          });
         }
-      } catch (webhookError) {
-        console.error('WhatsApp send error (non-blocking):', webhookError);
+
+        // ALWAYS send a copy to plantão pastoral (if different from primary)
+        if (telefonePlantao && telefonePlantao !== primaryPhone) {
+          console.log('Sending copy to plantão pastoral via Make:', telefonePlantao);
+          await sendMakeWebhook(makeWebhookUrl, {
+            ...makePayload,
+            pastor_telefone: telefonePlantao,
+            is_copy: true // Flag to indicate this is a copy
+          });
+        }
+      } else {
+        console.log('No Make webhook URL configured, skipping WhatsApp alerts');
       }
     }
 
