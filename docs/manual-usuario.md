@@ -1440,15 +1440,41 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
 
 ### 11.3 Configurações da Igreja
 
-1. Acesse **Configurações** no menu
-2. Edite:
-   - Nome da igreja
-   - Subtítulo
-   - Logo
-   - Webhook de integrações
+1. Acesse **Configurações** no menu lateral
+2. Seções disponíveis:
+
+**Modo de Manutenção:**
+- Ativar/desativar modo manutenção (bloqueia acesso ao sistema)
+- Permitir acesso público durante manutenção
+- Personalizar mensagem de manutenção
+
+**Informações Básicas:**
+- Nome da igreja
+- Subtítulo
+- Logo (upload com preview)
+
+**Webhooks de Integração:**
+- Card com link para página dedicada `/admin/webhooks`
+- Gerenciamento seguro de URLs de webhook (valores mascarados)
+
+**Notificações & Plantão Pastoral:**
+- Telefone do plantão pastoral (para alertas críticos)
+- Provedor WhatsApp: Make.com, Meta Official API, ou Evolution API
+- Campos de credenciais variam conforme provedor selecionado
 
 ![Configurações Igreja](./screenshots/placeholder-config-igreja.png)
 > *Screenshot: Configurações da igreja*
+
+### 11.3.1 Webhooks de Integração
+
+Página dedicada em `/admin/webhooks` para gerenciar webhooks de forma segura:
+
+1. Acesse via card "Webhooks de Integração" nas Configurações
+2. Webhooks disponíveis:
+   - **MAKE_WEBHOOK_URL**: Webhook principal do Make.com
+   - **MAKE_WEBHOOK_LITURGIA**: Webhook para notificações de liturgia
+3. Valores são mascarados por segurança (exibe `••••••••••`)
+4. Clique em "Atualizar" para inserir novo valor via formulário seguro
 
 ### 11.4 Links Externos e QR Codes
 
