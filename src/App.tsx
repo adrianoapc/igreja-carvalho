@@ -825,6 +825,16 @@ function App() {
             }
           />
           <Route
+            path="/biblia"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Biblia />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/jornadas"
             element={
               <ProtectedRoute>
