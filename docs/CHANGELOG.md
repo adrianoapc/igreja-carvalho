@@ -12,11 +12,12 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 #### 🔧 Correções de Rotas e Políticas RLS (18 de Dez/2025)
 - **Rota /biblia**: Adicionada rota faltante no App.tsx que causava erro 404 ao acessar a página da Bíblia
+- **Rota /minha-familia → /perfil/familia**: Corrigidos links em Sidebar, UserMenu e DashboardVisitante que apontavam para rota inexistente `/minha-familia`; rota correta é `/perfil/familia` (componente FamilyWallet)
 - **RLS inscricoes_jornada**: Adicionada política permitindo membros autenticados se inscreverem em jornadas (pessoa_id vinculado ao user_id via profiles)
 
-**Causa**: Rota não registrada no roteador; política RLS restritiva bloqueava auto-inscrição de membros em cursos
+**Causa**: Rotas não registradas ou inconsistentes no roteador; política RLS restritiva bloqueava auto-inscrição
 
-**Módulos afetados:** Conteúdo (Bíblia), Ensino (Jornadas/Cursos)
+**Módulos afetados:** Conteúdo (Bíblia), Core (Família/Carteira), Ensino (Jornadas/Cursos)
 
 ---
 
