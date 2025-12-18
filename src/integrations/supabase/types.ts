@@ -840,6 +840,7 @@ export type Database = {
           posicao_id: string | null
           status_confirmacao: string | null
           time_id: string
+          ultimo_aviso_em: string | null
           updated_at: string
         }
         Insert: {
@@ -855,6 +856,7 @@ export type Database = {
           posicao_id?: string | null
           status_confirmacao?: string | null
           time_id: string
+          ultimo_aviso_em?: string | null
           updated_at?: string
         }
         Update: {
@@ -870,6 +872,7 @@ export type Database = {
           posicao_id?: string | null
           status_confirmacao?: string | null
           time_id?: string
+          ultimo_aviso_em?: string | null
           updated_at?: string
         }
         Relationships: [
