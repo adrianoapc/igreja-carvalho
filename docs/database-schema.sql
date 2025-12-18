@@ -1597,5 +1597,68 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('midias', 'midias', true)
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true);
 
 -- =====================================================
+-- TRIGGERS E SINCRONIZAÇÕES
+-- =====================================================
+
+-- -----------------------------------------------------
+-- Trigger: Sincronização Intercessores ↔ Times
+-- -----------------------------------------------------
+-- Contexto: Quando um membro é adicionado ao Time "Intercessão",
+-- o sistema automaticamente cria/reativa o registro na tabela
+-- especializada `intercessores` para manter a lógica de negócio
+-- de distribuição de pedidos.
+-- ADR: docs/adr/ADR-011-evolucao-ministerio-intercessao.md
+
+CREATE OR REPLACE FUNCTION public.sync_membro_intercessor()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_time_nome TEXT;
+  v_user_id UUID;
+  v_user_nome TEXT;
+  v_user_email TEXT;
+  v_user_telefone TEXT;
+BEGIN
+  -- Identifica o nome do time
+  SELECT nome INTO v_time_nome FROM public.times_culto WHERE id = NEW.time_id;
+
+  -- Se o time for relacionado à Intercessão/Oração
+  IF v_time_nome ILIKE '%Intercessão%' OR v_time_nome ILIKE '%Oração%' THEN
+    
+    -- Busca dados do perfil
+    SELECT user_id, nome, email, telefone 
+    INTO v_user_id, v_user_nome, v_user_email, v_user_telefone
+    FROM public.profiles 
+    WHERE id = NEW.pessoa_id;
+
+    -- Apenas sincroniza se o perfil tem user_id (login ativo)
+    IF v_user_id IS NOT NULL THEN
+      -- Insere ou Reativa na tabela especializada
+      INSERT INTO public.intercessores (user_id, nome, email, telefone, ativo, max_pedidos)
+      VALUES (v_user_id, v_user_nome, v_user_email, v_user_telefone, true, 10)
+      ON CONFLICT (user_id) DO UPDATE SET 
+        ativo = true,
+        nome = EXCLUDED.nome,
+        email = EXCLUDED.email,
+        telefone = EXCLUDED.telefone;
+    END IF;
+    
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- Gatilho que executa após inserção em membros_time
+DROP TRIGGER IF EXISTS trigger_sync_intercessor ON public.membros_time;
+CREATE TRIGGER trigger_sync_intercessor
+  AFTER INSERT ON public.membros_time
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_membro_intercessor();
+
+-- =====================================================
 -- FIM DO SCHEMA
 -- =====================================================

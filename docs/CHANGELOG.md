@@ -8,6 +8,15 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Refatorado
+
+#### 📊 Reuso do Widget de Escalas (17 de Dez/2025)
+- Unificamos o widget de monitoramento de escalas em um componente compartilhado (`EscalasPendentesWidget`) e o adicionamos aos dashboards de Líder e Admin para reaproveitar lógica de consulta e apresentação.
+
+**Comportamento:** passa a exibir o mesmo painel de confirmados/pendentes/recusados também no dashboard do Admin (sem alterações de fluxo ou regras de negócio).
+
+**Riscos/Observações:** aumento leve de leituras no Supabase ao carregar os dashboards; sem mudanças de schema ou permissões.
+
 ### Adicionado
 
 #### 🎓 Player do Aluno: Certificado e Celebração (17 de Dez/2025)
