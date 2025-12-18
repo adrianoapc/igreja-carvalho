@@ -99,6 +99,7 @@ import KidsCriancas from "./pages/kids/Criancas";
 import EnsinoDashboard from "./pages/ensino/Dashboard";
 import TurmaAtiva from "./pages/kids/TurmaAtiva";
 import NotificacoesAdmin from "./pages/admin/Notificacoes";
+import WebhooksAdmin from "./pages/admin/Webhooks";
 
 const queryClient = new QueryClient();
 
@@ -759,6 +760,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <NotificacoesAdmin />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/webhooks"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <WebhooksAdmin />
                 </MainLayout>
               </ProtectedRoute>
             }
