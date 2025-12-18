@@ -238,7 +238,7 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
               </SelectTrigger>
               <SelectContent className="bg-background z-50">
                 {categorias.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
+                  <SelectItem key={cat.id} value={cat.nome}>
                     <div className="flex items-center gap-2">
                       <div 
                         className="w-3 h-3 rounded-full" 
