@@ -274,7 +274,319 @@ async function processarAudio(mediaId: string, audioModel: string): Promise<stri
   }
 }
 
-async function getOrCreateLead(telefone: string, nome: string) {
-  const { data: existing } = await supabase.from('visitantes_leads').select('id').eq('telefone', telefone).maybeSingle();
-  if (existing) {
-    await supabase.from('visitantes_leads').update
+async function getOrCreateLead(telefone: string, nome: string): Promise<string | null> {
+  try {
+    const { data: existing } = await supabase.from('visitantes_leads').select('id').eq('telefone', telefone).maybeSingle();
+    if (existing) {
+      await supabase.from('visitantes_leads').update({ nome, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      return existing.id;
+    }
+    const { data: newLead } = await supabase.from('visitantes_leads').insert({ telefone, nome, origem: 'chatbot' }).select('id').single();
+    return newLead?.id || null;
+  } catch (e) {
+    console.error("❌ [LEAD] Erro:", e);
+    return null;
+  }
+}
+
+// --- HANDLER PRINCIPAL ---
+serve(async (req: Request) => {
+  const requestId = crypto.randomUUID().substring(0, 8);
+  const startTime = Date.now();
+  
+  console.log(`\n${"=".repeat(60)}\n`);
+  console.log(`🚀 [${requestId}] NOVA REQUISIÇÃO - ${new Date().toISOString()}`);
+  console.log(`${"=".repeat(60)}`);
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Parse request body
+    console.log(`📥 [${requestId}] Parseando body da requisição...`);
+    const body: RequestBody = await req.json();
+    
+    const { telefone, nome_perfil, tipo_mensagem = 'text', conteudo_texto, media_id } = body;
+
+    console.log(`📥 [${requestId}] Dados recebidos:`);
+    console.log(`   - telefone: ${telefone}`);
+    console.log(`   - nome_perfil: ${nome_perfil}`);
+    console.log(`   - tipo_mensagem: ${tipo_mensagem}`);
+    console.log(`   - conteudo_texto: "${conteudo_texto?.substring(0, 80)}..."`);
+    console.log(`   - media_id: ${media_id || 'N/A'}`);
+
+    // Validate required fields
+    if (!telefone) {
+      return new Response(JSON.stringify({ error: 'Telefone é obrigatório' }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    // Get chatbot configuration
+    console.log(`\n🔧 [${requestId}] ETAPA: Busca de configuração`);
+    const config = await getChatbotConfig();
+    
+    console.log(`✅ [CONFIG] Configuração encontrada!`);
+    console.log(`✅ [CONFIG] modelo_texto: ${config.textModel}`);
+    console.log(`✅ [CONFIG] modelo_audio: ${config.audioModel}`);
+    console.log(`✅ [CONFIG] role_texto presente: ${!!config.systemPrompt}`);
+    console.log(`✅ [CONFIG] role_audio presente: ${!!config.audioPrompt}`);
+    console.log(`🔧 [${requestId}] Configuração final:`);
+    console.log(`   - textModel: ${config.textModel}`);
+    console.log(`   - audioModel: ${config.audioModel}`);
+    console.log(`   - systemPrompt length: ${config.systemPrompt.length} chars`);
+
+    // Process audio if needed
+    let messageContent = conteudo_texto || '';
+    if (tipo_mensagem === 'audio' && media_id) {
+      console.log(`\n🎤 [${requestId}] ETAPA: Processamento de áudio`);
+      const transcription = await processarAudio(media_id, config.audioModel);
+      if (transcription) {
+        messageContent = transcription;
+        console.log(`✅ [${requestId}] Áudio transcrito: "${transcription.substring(0, 50)}..."`);
+      } else {
+        messageContent = "[Áudio não pôde ser transcrito]";
+      }
+    }
+
+    // Get or create session
+    console.log(`\n💬 [${requestId}] ETAPA: Gerenciamento de sessão`);
+    const { data: existingSession } = await supabase
+      .from('atendimentos_bot')
+      .select('*')
+      .eq('telefone', telefone)
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .is('finalizado_em', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    console.log(`💬 [${requestId}] Sessão existente: ${existingSession ? 'SIM' : 'NÃO'}`);
+
+    let sessionId: string;
+    let historico: any[] = [];
+
+    if (existingSession) {
+      sessionId = existingSession.id;
+      historico = existingSession.historico_conversa || [];
+      console.log(`✅ [${requestId}] Usando sessão existente: ${sessionId}`);
+      console.log(`💬 [${requestId}] Histórico: ${historico.length} mensagens`);
+    } else {
+      const leadId = await getOrCreateLead(telefone, nome_perfil);
+      const { data: newSession } = await supabase
+        .from('atendimentos_bot')
+        .insert({
+          telefone,
+          visitante_id: leadId,
+          status: 'em_atendimento',
+          historico_conversa: [],
+          meta_dados: { nome_perfil, origem: 'whatsapp' }
+        })
+        .select()
+        .single();
+      
+      sessionId = newSession!.id;
+      console.log(`✅ [${requestId}] Nova sessão criada: ${sessionId}`);
+    }
+
+    // Save user message to audit log
+    await supabase.from('logs_auditoria_chat').insert({
+      atendimento_id: sessionId,
+      tipo_evento: 'USER',
+      payload_cru: { tipo_mensagem, conteudo: messageContent, media_id },
+      transcricao_audio: tipo_mensagem === 'audio' ? messageContent : null
+    });
+    console.log(`📝 [${requestId}] Log de auditoria USER salvo`);
+
+    // Build messages array for AI
+    const messages: any[] = [
+      { role: 'system', content: config.systemPrompt }
+    ];
+
+    // Add history
+    for (const msg of historico) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+
+    // Add current user message with context
+    const userMessageWithContext = nome_perfil 
+      ? `[Contexto: Nome=${nome_perfil}, Tel=${telefone}]\n\n${messageContent}`
+      : messageContent;
+    messages.push({ role: 'user', content: userMessageWithContext });
+
+    console.log(`\n🤖 [${requestId}] ETAPA: Chamada da IA`);
+    console.log(`🤖 [${requestId}] Total de mensagens para IA: ${messages.length}`);
+    console.log(`🤖 [${requestId}] OPENAI_API_KEY presente: ${OPENAI_API_KEY ? 'SIM' : 'NÃO'}`);
+
+    // Call OpenAI
+    const isLovableModel = config.textModel.includes('/');
+    console.log(`🤖 [MODEL] Verificando modelo "${config.textModel}" - isLovable: ${isLovableModel}`);
+
+    let aiResponse: string;
+    
+    if (isLovableModel && LOVABLE_API_KEY) {
+      console.log(`🤖 [${requestId}] Usando Lovable AI`);
+      const lovableStart = Date.now();
+      const lovableRes = await fetch('https://api.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: config.textModel,
+          messages,
+          temperature: 0.7
+        })
+      });
+      console.log(`🤖 [${requestId}] Resposta recebida em ${Date.now() - lovableStart}ms`);
+      console.log(`🤖 [${requestId}] Status: ${lovableRes.status}`);
+      const lovableData = await lovableRes.json();
+      aiResponse = lovableData.choices?.[0]?.message?.content || '';
+    } else {
+      // Check if model is from Lovable AI or OpenAI
+      console.log(`🤖 [${requestId}] Usando OpenAI diretamente`);
+      console.log(`🤖 [${requestId}] Enviando requisição para OpenAI...`);
+      const openaiStart = Date.now();
+      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: config.textModel,
+          messages,
+          temperature: 0.7
+        })
+      });
+      console.log(`🤖 [${requestId}] Status: ${openaiRes.status}`);
+      console.log(`🤖 [${requestId}] Resposta recebida em ${Date.now() - openaiStart}ms`);
+      const openaiData = await openaiRes.json();
+      aiResponse = openaiData.choices?.[0]?.message?.content || '';
+    }
+
+    console.log(`✅ [${requestId}] Resposta IA (${aiResponse.length} chars): "${aiResponse.substring(0, 100)}..."`);
+
+    // Parse response
+    console.log(`\n📦 [${requestId}] ETAPA: Parse de resposta`);
+    const { cleanText, parsedJson } = extractJsonAndText(aiResponse);
+    
+    let replyMessage = cleanText || aiResponse;
+    let notificarAdmin = false;
+    let dadosContato: any = null;
+
+    if (parsedJson?.concluido === true) {
+      console.log(`📦 [${requestId}] JSON de conclusão detectado: ${parsedJson.intencao}`);
+      
+      console.log(`\n⚙️ [${requestId}] ETAPA: Execução de lógica`);
+      
+      // Process based on intention
+      const intencao = parsedJson.intencao;
+      
+      if (intencao === 'PEDIDO_ORACAO') {
+        console.log(`🙏 [${requestId}] Criando pedido de oração...`);
+        await supabase.from('pedidos_oracao').insert({
+          nome_solicitante: parsedJson.nome_final || nome_perfil,
+          telefone: telefone,
+          motivo: parsedJson.motivo_resumo,
+          descricao: parsedJson.texto_na_integra,
+          categoria: parsedJson.categoria || 'OUTROS',
+          anonimo: parsedJson.anonimo ?? false,
+          origem: 'chatbot'
+        });
+        console.log(`✅ [${requestId}] Pedido de oração criado`);
+      } else if (intencao === 'TESTEMUNHO') {
+        console.log(`🌟 [${requestId}] Criando testemunho...`);
+        await supabase.from('testemunhos').insert({
+          nome: parsedJson.nome_final || nome_perfil,
+          telefone: telefone,
+          titulo: parsedJson.motivo_resumo,
+          descricao: parsedJson.texto_na_integra,
+          publicar: parsedJson.publicar ?? false,
+          origem: 'chatbot'
+        });
+        console.log(`✅ [${requestId}] Testemunho criado`);
+      } else if (intencao === 'SOLICITACAO_PASTORAL') {
+        console.log(`⛪ [${requestId}] Criando solicitação pastoral...`);
+        notificarAdmin = true;
+        dadosContato = { nome: parsedJson.nome_final || nome_perfil, telefone, motivo: parsedJson.motivo_resumo };
+        await supabase.from('pedidos_oracao').insert({
+          nome_solicitante: parsedJson.nome_final || nome_perfil,
+          telefone: telefone,
+          motivo: parsedJson.motivo_resumo,
+          descricao: parsedJson.texto_na_integra,
+          categoria: 'GABINETE',
+          gravidade: 3,
+          origem: 'chatbot'
+        });
+        console.log(`✅ [${requestId}] Solicitação pastoral criada`);
+      }
+
+      // Close session
+      await supabase.from('atendimentos_bot').update({
+        status: 'finalizado',
+        finalizado_em: new Date().toISOString()
+      }).eq('id', sessionId);
+      console.log(`✅ [${requestId}] Sessão finalizada`);
+      
+    } else {
+      console.log(`📦 [${requestId}] Resposta não é JSON (conversa em andamento)`);
+      
+      console.log(`\n⚙️ [${requestId}] ETAPA: Execução de lógica`);
+      console.log(`⚙️ [${requestId}] Conversa em andamento - atualizando histórico`);
+      
+      // Update conversation history
+      const updatedHistory = [
+        ...historico,
+        { role: 'user', content: messageContent },
+        { role: 'assistant', content: replyMessage }
+      ];
+
+      await supabase.from('atendimentos_bot').update({
+        historico_conversa: updatedHistory,
+        ultima_mensagem_at: new Date().toISOString()
+      }).eq('id', sessionId);
+    }
+
+    // Save bot response to audit log
+    await supabase.from('logs_auditoria_chat').insert({
+      atendimento_id: sessionId,
+      tipo_evento: 'BOT',
+      payload_cru: { resposta: replyMessage, json_extraido: parsedJson }
+    });
+    console.log(`📝 [${requestId}] Log de auditoria BOT salvo`);
+
+    const executionTime = Date.now() - startTime;
+    console.log(`📊 [${requestId}] Tempo de execução: ${executionTime}ms`);
+    
+    console.log(`\n✅ [${requestId}] RESPOSTA FINAL:`);
+    console.log(`   - reply_message: "${replyMessage.substring(0, 80)}..."`);
+    console.log(`   - notificar_admin: ${notificarAdmin}`);
+    console.log(`${"=".repeat(60)}\n`);
+
+    return new Response(JSON.stringify({
+      reply_message: replyMessage,
+      notificar_admin: notificarAdmin,
+      dados_contato: dadosContato
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const executionTime = Date.now() - startTime;
+    console.error(`\n❌ [${requestId}] ERRO após ${executionTime}ms:`, error);
+    console.log(`${"=".repeat(60)}\n`);
+    
+    return new Response(JSON.stringify({ 
+      error: 'Erro interno',
+      reply_message: 'Desculpe, tive um problema técnico. Pode tentar novamente?' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
