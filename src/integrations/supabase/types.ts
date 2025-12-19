@@ -621,6 +621,54 @@ export type Database = {
           },
         ]
       }
+      chatbot_configs: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          descricao: string | null
+          edge_function_name: string
+          id: string
+          modelo_audio: string | null
+          modelo_texto: string | null
+          modelo_visao: string | null
+          nome: string
+          role_audio: string | null
+          role_texto: string | null
+          role_visao: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          edge_function_name: string
+          id?: string
+          modelo_audio?: string | null
+          modelo_texto?: string | null
+          modelo_visao?: string | null
+          nome: string
+          role_audio?: string | null
+          role_texto?: string | null
+          role_visao?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          edge_function_name?: string
+          id?: string
+          modelo_audio?: string | null
+          modelo_texto?: string | null
+          modelo_visao?: string | null
+          nome?: string
+          role_audio?: string | null
+          role_texto?: string | null
+          role_visao?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       comunicados: {
         Row: {
           ativo: boolean | null
