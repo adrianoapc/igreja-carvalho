@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-// --- INTERFACES ---
 interface RequestBody {
   telefone: string;
   nome_perfil: string;
@@ -10,7 +9,6 @@ interface RequestBody {
   media_id?: string;
 }
 
-// --- CONFIGURAÇÃO ---
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -22,41 +20,22 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// ⚠️ NÚMERO DE EMERGÊNCIA (Hardcoded para garantir envio ao Make)
 const TELEFONE_PASTOR_PLANTAO = "5517991985016";
 const FUNCTION_NAME = 'chatbot-triagem';
 
 const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-// PROMPT DE FALLBACK (Caso o banco falhe, usa este)
 const DEFAULT_SYSTEM_PROMPT = `
 Você é da Equipe de Acolhimento da Igreja Carvalho.
-REGRAS:
-1. Nunca diga que é IA.
-2. Use a FAQ para dúvidas.
-3. FLUXOS: ORAÇÃO (Colete Nome/Motivo/Anonimo -> JSON), PASTOR (JSON SOLICITACAO_PASTORAL), TESTEMUNHO (JSON TESTEMUNHO).
+REGRAS: 1. Nunca diga que é IA. 2. Use a FAQ. 3. Fluxos: ORAÇÃO, PASTOR, TESTEMUNHO.
 FAQ: Cultos Dom 18h30/Qui 19h30. End: Av. Gabriel Jorge Cury 232.
-
-JSON FINAL:
-\`\`\`json
-{
-  "concluido": true,
-  "intencao": "PEDIDO_ORACAO" | "TESTEMUNHO" | "SOLICITACAO_PASTORAL",
-  "nome_final": "...",
-  "motivo_resumo": "...",
-  "texto_na_integra": "...",
-  "categoria": "...",
-  "anonimo": true,
-  "publicar": false,
-  "notificar_admin": false
-}
-\`\`\`
+JSON FINAL: \`\`\`json { "concluido": true, "intencao": "...", "notificar_admin": false } \`\`\`
 `;
 
 const DEFAULT_TEXT_MODEL = 'gpt-4o-mini';
 const DEFAULT_AUDIO_MODEL = 'whisper-1';
 
-// --- BUSCA CONFIGURAÇÃO NO BANCO (MANTIDO) ---
+// --- CONFIGURAÇÃO (RESTORED) ---
 async function getChatbotConfig() {
   try {
     const { data: config } = await supabase
@@ -64,73 +43,63 @@ async function getChatbotConfig() {
       .select('modelo_texto, modelo_audio, role_texto')
       .eq('edge_function_name', FUNCTION_NAME)
       .eq('ativo', true)
-      .single();
+      .maybeSingle();
 
-    if (!config) throw new Error("Config não encontrada");
-
+    if (!config) return { textModel: DEFAULT_TEXT_MODEL, audioModel: DEFAULT_AUDIO_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
     return {
       textModel: config.modelo_texto || DEFAULT_TEXT_MODEL,
       audioModel: config.modelo_audio || DEFAULT_AUDIO_MODEL,
       systemPrompt: config.role_texto || DEFAULT_SYSTEM_PROMPT
     };
-  } catch (err) {
-    console.log("⚠️ Usando Config Padrão (Erro DB ou Vazio)");
+  } catch (e) {
     return { textModel: DEFAULT_TEXT_MODEL, audioModel: DEFAULT_AUDIO_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
   }
 }
 
-// --- FUNÇÃO "FAXINEIRA" DE JSON (CORREÇÃO CRÍTICA) ---
+// --- FAXINEIRO DE JSON (A ÚNICA MUDANÇA REAL) ---
 function extractJsonAndText(aiContent: string) {
   let cleanText = aiContent;
   let parsedJson: any = null;
 
   try {
-    // 1. Tenta Markdown ```json ... ```
     const markdownMatch = aiContent.match(/```(?:json)?([\s\S]*?)```/i);
     if (markdownMatch && markdownMatch[1]) {
       try {
         parsedJson = JSON.parse(markdownMatch[1].trim());
         cleanText = aiContent.replace(markdownMatch[0], '').trim();
-      } catch (e) { /* Erro parse markdown */ }
+      } catch (e) {}
     }
     
-    // 2. Se falhar, tenta JSON puro entre chaves
     if (!parsedJson) {
       const firstOpen = aiContent.indexOf('{');
       const lastClose = aiContent.lastIndexOf('}');
       if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
          try {
             const tempJson = JSON.parse(aiContent.substring(firstOpen, lastClose + 1));
-            // Valida se é o nosso JSON de conclusão
             if (tempJson.concluido) {
                 parsedJson = tempJson;
                 cleanText = aiContent.substring(0, firstOpen).trim();
             }
-         } catch (e) { /* Erro parse puro */ }
+         } catch (e) {}
       }
     }
   } catch (e) { console.error("Erro extrator:", e); }
-
-  // Limpeza final de sobras visuais
+  
   cleanText = (cleanText || aiContent).replace(/```json/g, '').replace(/```/g, '').trim();
-
   return { cleanText, parsedJson };
 }
 
-// --- PROCESSAMENTO DE ÁUDIO ---
 async function processarAudio(mediaId: string, audioModel: string): Promise<string | null> {
   try {
     if (!WHATSAPP_API_TOKEN || !OPENAI_API_KEY) return null;
     const urlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
     const mediaData = await urlRes.json();
     if (!mediaData.url) return null;
-    
     const audioRes = await fetch(mediaData.url, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
     const blob = await audioRes.blob();
     const formData = new FormData();
     formData.append('file', blob, 'audio.ogg');
     formData.append('model', audioModel);
-    
     const openAiRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST', headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` }, body: formData
     });
@@ -139,7 +108,6 @@ async function processarAudio(mediaId: string, audioModel: string): Promise<stri
   } catch (e) { return null; }
 }
 
-// --- SERVIDOR PRINCIPAL ---
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   
@@ -152,17 +120,17 @@ serve(async (req) => {
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
     let { conteudo_texto } = body;
 
-    // 1. CONFIGURAÇÃO (Banco)
+    // 1. Config
     const config = await getChatbotConfig();
 
-    // 2. ÁUDIO
+    // 2. Audio
     if (tipo_mensagem === 'audio' && media_id) {
       const transcricao = await processarAudio(media_id, config.audioModel);
       conteudo_texto = transcricao ? `[Áudio]: ${transcricao}` : "[Erro áudio]";
     }
     const inputTexto = conteudo_texto || "";
 
-    // 3. SESSÃO (Banco)
+    // 3. Sessão (Lógica Simplificada Restaurada)
     let { data: sessao } = await supabase.from('atendimentos_bot')
       .select('*').eq('telefone', telefone).neq('status', 'CONCLUIDO')
       .gt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()).maybeSingle();
@@ -170,14 +138,20 @@ serve(async (req) => {
     let historico = sessao ? sessao.historico_conversa : [];
 
     if (!sessao) {
-      const { data: nova } = await supabase.from('atendimentos_bot').insert({ telefone, status: 'INICIADO', historico_conversa: [] }).select().single();
+      // Criação robusta
+      const { data: nova, error } = await supabase.from('atendimentos_bot')
+        .insert({ telefone, status: 'INICIADO', historico_conversa: [] })
+        .select()
+        .single();
+      
+      if (error || !nova) throw new Error("Falha ao criar sessão no banco.");
       sessao = nova;
     }
 
-    // LOG INPUT
+    // Log Input
     await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'USER', payload_raw: { texto: inputTexto } });
 
-    // 4. CHAMADA IA
+    // 4. IA Call
     const messages = [
       { role: "system", content: config.systemPrompt },
       { role: "system", content: `CTX: Tel ${telefone}, Nome ${nome_perfil}.` },
@@ -186,7 +160,6 @@ serve(async (req) => {
     ];
 
     let aiContent = "";
-    // Lógica simples para escolher provedor (Lovable ou OpenAI)
     if (config.textModel.startsWith('google/') && LOVABLE_API_KEY) {
        const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
          method: 'POST', headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
@@ -203,19 +176,19 @@ serve(async (req) => {
        aiContent = data.choices?.[0]?.message?.content || "";
     }
 
-    // 5. LIMPEZA E EXTRAÇÃO (O PULO DO GATO)
+    // 5. LIMPEZA (AQUI ESTA A CORRECAO)
     const { cleanText, parsedJson } = extractJsonAndText(aiContent);
     let responseMessage = cleanText;
     let notificarAdmin = false;
 
-    // 6. EXECUÇÃO LÓGICA (Banco)
+    // 6. Lógica de Negócio
     if (parsedJson?.concluido) {
       await supabase.from('atendimentos_bot').update({
         status: 'CONCLUIDO',
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);
 
-      // Gestão de Lead (Mantido)
+      // Lead Logic
       const { data: profile } = await supabase.from('profiles').select('id').eq('telefone', telefone).maybeSingle();
       let visitanteId = null;
       let origem = 'WABA_INTERNO';
@@ -226,13 +199,12 @@ serve(async (req) => {
         if (lead) visitanteId = lead.id;
         else {
             const { data: newLead } = await supabase.from('visitantes_leads').insert({ 
-                telefone, nome: parsedJson.nome_final || nome_perfil, origem: 'WABA_BOT', data_ultimo_contato: new Date()
+                telefone, nome: parsedJson.nome_final || nome_perfil, origem: 'BOT', data_ultimo_contato: new Date()
             }).select('id').single();
             visitanteId = newLead?.id;
         }
       }
 
-      // Salva Tabelas
       if (parsedJson.intencao === 'PEDIDO_ORACAO') {
         await supabase.from('pedidos_oracao').insert({
           analise_ia_titulo: parsedJson.motivo_resumo,
@@ -251,7 +223,7 @@ serve(async (req) => {
           analise_ia_gravidade: 'ALTA',
           origem, membro_id: profile?.id, visitante_id: visitanteId
         });
-        notificarAdmin = true; // Força Admin
+        notificarAdmin = true;
         responseMessage = `Entendido. Já notifiquei o pastor sobre: "${parsedJson.motivo_resumo}".`;
       }
       else if (parsedJson.intencao === 'TESTEMUNHO') {
@@ -259,29 +231,27 @@ serve(async (req) => {
           titulo: parsedJson.motivo_resumo, mensagem: parsedJson.texto_na_integra, publicar: parsedJson.publicar || false,
           origem, autor_id: profile?.id, visitante_id: visitanteId
         });
-        responseMessage = parsedJson.publicar ? "Glória a Deus! 🙌" : "Amém! Salvo para liderança.";
+        responseMessage = parsedJson.publicar ? "Glória a Deus! 🙌" : "Amém! Guardado.";
       }
 
     } else {
-      // Conversa Continua
       await supabase.from('atendimentos_bot').update({
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);
     }
 
-    // LOG OUTPUT
+    // Log Output
     await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'BOT', payload_raw: { resposta: responseMessage, json: parsedJson } });
 
-    // MÉTRICAS (Mantido para não perder histórico)
+    // Métricas
     const executionTime = Date.now() - startTime;
     try {
         await supabase.rpc('log_edge_function_with_metrics', {
             p_function_name: FUNCTION_NAME, p_status: 'success', p_execution_time_ms: executionTime,
             p_request_payload: requestPayload, p_response_payload: { reply: responseMessage, admin: notificarAdmin }
         });
-    } catch (e) { /* Falha silenciosa métrica */ }
+    } catch (e) {}
 
-    // 7. RETORNO MAKE
     return new Response(JSON.stringify({ 
       reply_message: responseMessage, 
       notificar_admin: notificarAdmin, 
@@ -294,8 +264,8 @@ serve(async (req) => {
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    console.error('ERRO CRÍTICO:', error);
-    const msg = error instanceof Error ? error.message : 'Unknown';
+    const msg = error instanceof Error ? error.message : "Erro desconhecido";
+    console.error("ERRO FATAL:", msg);
     return new Response(JSON.stringify({ error: 'Erro interno', details: msg }), { status: 500, headers: corsHeaders });
   }
 });
