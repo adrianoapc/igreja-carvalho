@@ -314,4 +314,19 @@ async function getOrCreateLead(telefone: string, nome: string) {
   }
   
   console.log(`👤 [LEAD] Criando novo lead...`);
-  const
+  const { data: newLead, error } = await supabase.from('visitantes_leads').insert({
+    nome: nome || 'Lead WhatsApp',
+    telefone: telefone,
+    origem: 'whatsapp_bot',
+    data_primeiro_contato: new Date(),
+    data_ultimo_contato: new Date()
+  }).select('id').single();
+  
+  if (error) {
+    console.error(`❌ [LEAD] Erro ao criar lead:`, error);
+    return null;
+  }
+  
+  console.log(`✅ [LEAD] Novo lead criado: ${newLead.id}`);
+  return newLead.id;
+}
