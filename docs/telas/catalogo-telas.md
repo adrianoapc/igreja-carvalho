@@ -8,7 +8,7 @@
 | `NotFound.tsx` | `*` | `*` | Sistema | Erro | Público | - | Todos |
 | `Auth.tsx` | `/auth` | `/auth` | Auth | Login | Público | Login/Cadastro | Todos |
 | `ResetPassword.tsx` | `/auth/reset` | `/auth/reset` | Auth | Segurança | Público | Recuperar Senha | Todos |
-| `BiometricLogin.tsx` | `/biometric-login` | `/auth/biometric (sugestão)` | Auth | Segurança | Público | Login Facial | Todos |
+| `BiometricLogin.tsx` | `/biometric-login` | `/auth/biometric (sugestão)` | Auth | Segurança | Público | Login Biométrico (Face ID/Touch ID) | Todos |
 | `ConfiguracoesIgreja.tsx` | `/configuracoes-igreja` | `/configuracoes (sugestão)` | Admin | Config | Admin | Dados da Igreja, Webhooks, IA/Chatbot | Admin/Técnico |
 | `admin/Webhooks.tsx` | `/admin/webhooks` | `/admin/webhooks` | Admin | Integrações | Admin | Gerir Webhooks | Admin/Técnico |
 | `AdminPermissions.tsx` | `/teste-permissoes` | `/admin/permissoes (sugestão)` | Admin | Segurança | Admin | Gerir Roles | Admin |

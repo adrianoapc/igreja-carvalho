@@ -8,6 +8,32 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Melhorado
+
+#### 🔐 Melhorias na Autenticação Biométrica (19 de Dez/2025)
+- **Detecção automática de tipo de biometria**: Sistema detecta se dispositivo usa Face ID (iPhones X+, iPads Pro) ou Touch ID/Fingerprint e exibe ícone e textos apropriados
+- **Tratamento de erros específicos**: 8 tipos de erro WebAuthn mapeados (`NOT_ALLOWED`, `NOT_RECOGNIZED`, `TIMEOUT`, `HARDWARE_ERROR`, `NOT_FOUND`, `SECURITY_ERROR`, `NOT_SUPPORTED`, `UNKNOWN`) com mensagens contextuais
+- **Estados de loading contextuais**: Feedback visual específico para cada fase ("Olhe para a câmera...", "Toque no sensor...", "Verificando...", "Entrando...")
+- **Haptic Feedback**: Vibração em dispositivos móveis para sucesso (curta) e erro (padrão duplo) via `navigator.vibrate()`
+- **Animações visuais**: Transições de cor e pulse animation durante verificação biométrica
+- **Fluxo de habilitação melhorado**: `EnableBiometricDialog` com estados visuais (idle → enrolling → success/error) e recuperação de erros
+
+**Arquivos alterados:**
+- `src/hooks/useBiometricAuth.tsx`: Novo tipo `BiometricResult`, função `parseWebAuthnError()`, `detectBiometricType()`, `triggerHapticFeedback()`
+- `src/pages/BiometricLogin.tsx`: Estados de loading, mensagens contextuais, ícones dinâmicos
+- `src/components/auth/BiometricUnlockScreen.tsx`: Estados visuais, detecção de tipo, animações
+- `src/components/auth/EnableBiometricDialog.tsx`: Fluxo de habilitação com feedback visual
+
+**Impacto no usuário:**
+- Experiência mais clara com feedback visual e textual específico para cada situação
+- Usuários de Face ID veem ícone de rosto; usuários de Touch ID veem ícone de digital
+- Mensagens de erro orientam próximos passos (tentar novamente vs usar senha)
+- Vibração confirma sucesso/erro em dispositivos móveis
+
+**Módulos afetados:** Auth (Biometria)
+
+---
+
 ### Adicionado
 
 #### 🤖 Edge Function chatbot-triagem (Intercessão V2 - 18 de Dez/2025)
