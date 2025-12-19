@@ -152,6 +152,9 @@ interface ChatbotConfig {
 
 // Fetch chatbot config from database
 async function getChatbotConfig(): Promise<ChatbotConfig> {
+  console.log('🔧 [CONFIG] Iniciando busca de configuração...');
+  console.log(`🔧 [CONFIG] Function name: ${FUNCTION_NAME}`);
+  
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
@@ -160,8 +163,10 @@ async function getChatbotConfig(): Promise<ChatbotConfig> {
       .eq('ativo', true)
       .single();
 
-    if (error || !config) {
-      console.log(`No config found for ${FUNCTION_NAME}, using defaults`);
+    if (error) {
+      console.log(`⚠️ [CONFIG] Erro na busca: ${error.message}`);
+      console.log(`⚠️ [CONFIG] Código do erro: ${error.code}`);
+      console.log(`⚠️ [CONFIG] Usando configuração padrão`);
       return {
         textModel: DEFAULT_TEXT_MODEL,
         audioModel: DEFAULT_AUDIO_MODEL,
@@ -170,6 +175,23 @@ async function getChatbotConfig(): Promise<ChatbotConfig> {
       };
     }
 
+    if (!config) {
+      console.log(`⚠️ [CONFIG] Nenhuma config encontrada para ${FUNCTION_NAME}`);
+      console.log(`⚠️ [CONFIG] Usando configuração padrão`);
+      return {
+        textModel: DEFAULT_TEXT_MODEL,
+        audioModel: DEFAULT_AUDIO_MODEL,
+        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+        audioPrompt: null
+      };
+    }
+
+    console.log(`✅ [CONFIG] Configuração encontrada!`);
+    console.log(`✅ [CONFIG] modelo_texto: ${config.modelo_texto || 'não definido'}`);
+    console.log(`✅ [CONFIG] modelo_audio: ${config.modelo_audio || 'não definido'}`);
+    console.log(`✅ [CONFIG] role_texto presente: ${!!config.role_texto}`);
+    console.log(`✅ [CONFIG] role_audio presente: ${!!config.role_audio}`);
+
     return {
       textModel: config.modelo_texto || DEFAULT_TEXT_MODEL,
       audioModel: config.modelo_audio || DEFAULT_AUDIO_MODEL,
@@ -177,7 +199,7 @@ async function getChatbotConfig(): Promise<ChatbotConfig> {
       audioPrompt: config.role_audio || null
     };
   } catch (err) {
-    console.error('Error fetching chatbot config:', err);
+    console.error('❌ [CONFIG] Erro inesperado:', err);
     return {
       textModel: DEFAULT_TEXT_MODEL,
       audioModel: DEFAULT_AUDIO_MODEL,
@@ -189,94 +211,180 @@ async function getChatbotConfig(): Promise<ChatbotConfig> {
 
 // --- FUNÇÕES AUXILIARES ---
 async function processarAudio(mediaId: string, audioModel: string): Promise<string | null> {
+  console.log(`🎤 [AUDIO] Iniciando processamento de áudio...`);
+  console.log(`🎤 [AUDIO] Media ID: ${mediaId}`);
+  console.log(`🎤 [AUDIO] Modelo: ${audioModel}`);
+  
   try {
-    if (!WHATSAPP_API_TOKEN || !OPENAI_API_KEY) return null;
-    const mediaUrlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
+    if (!WHATSAPP_API_TOKEN) {
+      console.log('❌ [AUDIO] WHATSAPP_API_TOKEN não configurado');
+      return null;
+    }
+    if (!OPENAI_API_KEY) {
+      console.log('❌ [AUDIO] OPENAI_API_KEY não configurado');
+      return null;
+    }
+    
+    console.log('🎤 [AUDIO] Buscando URL da mídia no WhatsApp...');
+    const mediaUrlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { 
+      headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } 
+    });
     const mediaData = await mediaUrlRes.json();
-    if (!mediaData.url) return null;
-    const audioRes = await fetch(mediaData.url, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
+    
+    if (!mediaData.url) {
+      console.log('❌ [AUDIO] URL da mídia não encontrada');
+      console.log('❌ [AUDIO] Resposta:', JSON.stringify(mediaData));
+      return null;
+    }
+    
+    console.log('🎤 [AUDIO] URL obtida, baixando áudio...');
+    const audioRes = await fetch(mediaData.url, { 
+      headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } 
+    });
     const audioBlob = await audioRes.blob();
+    console.log(`🎤 [AUDIO] Áudio baixado, tamanho: ${audioBlob.size} bytes`);
+    
     const formData = new FormData();
     formData.append('file', audioBlob, 'audio.ogg');
     formData.append('model', audioModel);
+    
+    console.log('🎤 [AUDIO] Enviando para transcrição...');
     const transRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
       body: formData
     });
+    
     const data = await transRes.json();
+    console.log(`✅ [AUDIO] Transcrição concluída: "${data.text?.substring(0, 100)}..."`);
     return data.text;
   } catch (e) {
-    console.error("Erro audio:", e);
+    console.error("❌ [AUDIO] Erro no processamento:", e);
     return null;
   }
 }
 
 async function getOrCreateLead(telefone: string, nome: string) {
+  console.log(`👤 [LEAD] Buscando/criando lead para telefone: ${telefone}`);
+  
   const { data: existing } = await supabase.from('visitantes_leads').select('id').eq('telefone', telefone).maybeSingle();
   if (existing) {
+    console.log(`👤 [LEAD] Lead existente encontrado: ${existing.id}`);
     await supabase.from('visitantes_leads').update({ data_ultimo_contato: new Date() }).eq('id', existing.id);
     return existing.id;
   }
+  
+  console.log(`👤 [LEAD] Criando novo lead...`);
   const { data: newLead } = await supabase.from('visitantes_leads').insert({
       telefone, nome: nome || 'Visitante WhatsApp', origem: 'WABA_BOT', estagio_funil: 'NOVO', data_ultimo_contato: new Date()
   }).select('id').single();
+  console.log(`✅ [LEAD] Novo lead criado: ${newLead?.id}`);
   return newLead?.id;
 }
 
 // Check if model is from Lovable AI or OpenAI
 function isLovableModel(model: string): boolean {
-  return model.startsWith('google/') || model.startsWith('openai/gpt-5');
+  const isLovable = model.startsWith('google/') || model.startsWith('openai/gpt-5');
+  console.log(`🤖 [MODEL] Verificando modelo "${model}" - isLovable: ${isLovable}`);
+  return isLovable;
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  const requestId = crypto.randomUUID().substring(0, 8);
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🚀 [${requestId}] NOVA REQUISIÇÃO - ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(60)}`);
+  
+  if (req.method === 'OPTIONS') {
+    console.log(`🔄 [${requestId}] Requisição OPTIONS (CORS preflight)`);
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
+    // 1. Parse do body
+    console.log(`📥 [${requestId}] Parseando body da requisição...`);
     const body = await req.json() as RequestBody;
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
     let { conteudo_texto } = body;
+    
+    console.log(`📥 [${requestId}] Dados recebidos:`);
+    console.log(`   - telefone: ${telefone}`);
+    console.log(`   - nome_perfil: ${nome_perfil}`);
+    console.log(`   - tipo_mensagem: ${tipo_mensagem || 'text'}`);
+    console.log(`   - media_id: ${media_id || 'N/A'}`);
+    console.log(`   - conteudo_texto: "${conteudo_texto?.substring(0, 100) || 'vazio'}..."`);
 
-    // Fetch config from database
+    // 2. Buscar configuração
+    console.log(`\n🔧 [${requestId}] ETAPA: Busca de configuração`);
     const config = await getChatbotConfig();
-    console.log(`Using text model: ${config.textModel}, audio model: ${config.audioModel}`);
+    console.log(`🔧 [${requestId}] Configuração final:`);
+    console.log(`   - textModel: ${config.textModel}`);
+    console.log(`   - audioModel: ${config.audioModel}`);
+    console.log(`   - systemPrompt length: ${config.systemPrompt.length} chars`);
 
-    // 1. Áudio
+    // 3. Processamento de áudio (se necessário)
     if (tipo_mensagem === 'audio' && media_id) {
+      console.log(`\n🎤 [${requestId}] ETAPA: Processamento de áudio`);
       const transcricao = await processarAudio(media_id, config.audioModel);
       conteudo_texto = transcricao ? `[Áudio Transcrito]: ${transcricao}` : "[Erro áudio]";
+      console.log(`🎤 [${requestId}] Resultado: ${conteudo_texto.substring(0, 100)}...`);
     }
     const inputTexto = conteudo_texto || "";
 
-    // 2. Sessão
-    let { data: sessao } = await supabase.from('atendimentos_bot')
+    // 4. Buscar/criar sessão
+    console.log(`\n💬 [${requestId}] ETAPA: Gerenciamento de sessão`);
+    let { data: sessao, error: sessaoError } = await supabase.from('atendimentos_bot')
       .select('*').eq('telefone', telefone).neq('status', 'CONCLUIDO')
       .gt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()).maybeSingle();
 
-    let historico = sessao ? sessao.historico_conversa : [];
-
-    if (!sessao) {
-      const { data: nova } = await supabase.from('atendimentos_bot').insert({ telefone, status: 'INICIADO', historico_conversa: [] }).select().single();
-      sessao = nova;
+    if (sessaoError) {
+      console.log(`⚠️ [${requestId}] Erro ao buscar sessão: ${sessaoError.message}`);
     }
 
-    await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'USER', payload_raw: { texto: inputTexto } });
+    let historico = sessao ? sessao.historico_conversa : [];
+    console.log(`💬 [${requestId}] Sessão existente: ${sessao ? 'SIM' : 'NÃO'}`);
+    console.log(`💬 [${requestId}] Histórico: ${historico.length} mensagens`);
 
-    // 3. IA - choose API based on model
+    if (!sessao) {
+      console.log(`💬 [${requestId}] Criando nova sessão...`);
+      const { data: nova, error: novaError } = await supabase.from('atendimentos_bot').insert({ telefone, status: 'INICIADO', historico_conversa: [] }).select().single();
+      if (novaError) {
+        console.log(`❌ [${requestId}] Erro ao criar sessão: ${novaError.message}`);
+      }
+      sessao = nova;
+      console.log(`✅ [${requestId}] Nova sessão criada: ${sessao?.id}`);
+    } else {
+      console.log(`✅ [${requestId}] Usando sessão existente: ${sessao.id}`);
+    }
+
+    // Log de auditoria - entrada
+    await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'USER', payload_raw: { texto: inputTexto } });
+    console.log(`📝 [${requestId}] Log de auditoria USER salvo`);
+
+    // 5. Preparar mensagens para IA
+    console.log(`\n🤖 [${requestId}] ETAPA: Chamada da IA`);
     const messages = [
       { role: "system", content: config.systemPrompt },
       { role: "system", content: `CONTEXTO USUÁRIO: Telefone: ${telefone}. Nome perfil: ${nome_perfil}.` },
       ...historico.map((h: any) => ({ role: h.role, content: h.content })),
       { role: "user", content: inputTexto }
     ];
+    console.log(`🤖 [${requestId}] Total de mensagens para IA: ${messages.length}`);
 
     let aiContent = "";
+    const useLovable = isLovableModel(config.textModel);
 
-    if (isLovableModel(config.textModel)) {
-      // Use Lovable AI Gateway
+    if (useLovable) {
+      console.log(`🤖 [${requestId}] Usando Lovable AI Gateway`);
+      
       if (!LOVABLE_API_KEY) {
+        console.log(`❌ [${requestId}] LOVABLE_API_KEY não configurada!`);
         throw new Error('LOVABLE_API_KEY not configured');
       }
+      console.log(`🤖 [${requestId}] LOVABLE_API_KEY presente: SIM`);
+      
+      console.log(`🤖 [${requestId}] Enviando requisição para Lovable AI...`);
+      const aiStartTime = Date.now();
       
       const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -287,19 +395,31 @@ serve(async (req) => {
         body: JSON.stringify({ model: config.textModel, messages }),
       });
 
+      const aiDuration = Date.now() - aiStartTime;
+      console.log(`🤖 [${requestId}] Resposta recebida em ${aiDuration}ms`);
+      console.log(`🤖 [${requestId}] Status: ${aiRes.status}`);
+
       if (!aiRes.ok) {
         const errorText = await aiRes.text();
-        console.error('Lovable AI error:', aiRes.status, errorText);
-        throw new Error('AI request failed');
+        console.error(`❌ [${requestId}] Erro Lovable AI: ${aiRes.status}`);
+        console.error(`❌ [${requestId}] Detalhes: ${errorText}`);
+        throw new Error(`AI request failed: ${aiRes.status}`);
       }
 
       const aiData = await aiRes.json();
       aiContent = aiData.choices?.[0]?.message?.content || "";
+      console.log(`✅ [${requestId}] Resposta IA (${aiContent.length} chars): "${aiContent.substring(0, 150)}..."`);
     } else {
-      // Use OpenAI directly
+      console.log(`🤖 [${requestId}] Usando OpenAI diretamente`);
+      
       if (!OPENAI_API_KEY) {
+        console.log(`❌ [${requestId}] OPENAI_API_KEY não configurada!`);
         throw new Error('OPENAI_API_KEY not configured');
       }
+      console.log(`🤖 [${requestId}] OPENAI_API_KEY presente: SIM`);
+
+      console.log(`🤖 [${requestId}] Enviando requisição para OpenAI...`);
+      const aiStartTime = Date.now();
 
       const openAIRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -307,25 +427,53 @@ serve(async (req) => {
         body: JSON.stringify({ model: config.textModel, messages, temperature: 0.3 }),
       });
 
+      const aiDuration = Date.now() - aiStartTime;
+      console.log(`🤖 [${requestId}] Resposta recebida em ${aiDuration}ms`);
+      console.log(`🤖 [${requestId}] Status: ${openAIRes.status}`);
+
+      if (!openAIRes.ok) {
+        const errorText = await openAIRes.text();
+        console.error(`❌ [${requestId}] Erro OpenAI: ${openAIRes.status}`);
+        console.error(`❌ [${requestId}] Detalhes: ${errorText}`);
+      }
+
       const aiData = await openAIRes.json();
       aiContent = aiData.choices?.[0]?.message?.content || "";
+      console.log(`✅ [${requestId}] Resposta IA (${aiContent.length} chars): "${aiContent.substring(0, 150)}..."`);
     }
 
+    // 6. Parse de JSON da resposta
+    console.log(`\n📦 [${requestId}] ETAPA: Parse de resposta`);
     let parsedJson: ChatResponse | null = null;
     try {
       const clean = aiContent.replace(/```json/g, '').replace(/```/g, '').trim();
-      if (clean.startsWith('{')) parsedJson = JSON.parse(clean);
-    } catch (e) { }
+      if (clean.startsWith('{')) {
+        parsedJson = JSON.parse(clean);
+        console.log(`📦 [${requestId}] JSON parseado com sucesso:`);
+        console.log(`   - concluido: ${parsedJson?.concluido}`);
+        console.log(`   - intencao: ${parsedJson?.intencao}`);
+        console.log(`   - nome_final: ${parsedJson?.nome_final}`);
+      } else {
+        console.log(`📦 [${requestId}] Resposta não é JSON (conversa em andamento)`);
+      }
+    } catch (e) {
+      console.log(`📦 [${requestId}] Resposta não contém JSON válido (esperado)`);
+    }
 
     let responseMessage = aiContent;
     let notificarAdmin = false;
 
-    // 4. Execução Lógica
+    // 7. Execução da lógica de negócio
+    console.log(`\n⚙️ [${requestId}] ETAPA: Execução de lógica`);
+    
     if (parsedJson?.concluido) {
+      console.log(`⚙️ [${requestId}] Conversa CONCLUÍDA - processando intenção: ${parsedJson.intencao}`);
+      
       await supabase.from('atendimentos_bot').update({
         status: 'CONCLUIDO',
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);
+      console.log(`⚙️ [${requestId}] Sessão marcada como CONCLUIDA`);
 
       const { data: profile } = await supabase.from('profiles').select('id').eq('telefone', telefone).maybeSingle();
       let visitanteId = null;
@@ -333,57 +481,97 @@ serve(async (req) => {
 
       if (!profile) {
         origem = 'WABA_EXTERNO';
+        console.log(`⚙️ [${requestId}] Usuário não encontrado em profiles, criando lead...`);
         visitanteId = await getOrCreateLead(telefone, parsedJson.nome_final || nome_perfil);
+      } else {
+        console.log(`⚙️ [${requestId}] Usuário encontrado em profiles: ${profile.id}`);
       }
 
       if (parsedJson.intencao === 'PEDIDO_ORACAO') {
-        await supabase.from('pedidos_oracao').insert({
+        console.log(`🙏 [${requestId}] Processando PEDIDO_ORACAO...`);
+        const { error: insertError } = await supabase.from('pedidos_oracao').insert({
           analise_ia_titulo: parsedJson.motivo_resumo,
           texto_na_integra: parsedJson.texto_na_integra,
           analise_ia_motivo: parsedJson.categoria,
           anonimo: parsedJson.anonimo || false,
           origem, membro_id: profile?.id, visitante_id: visitanteId
         });
+        if (insertError) {
+          console.log(`❌ [${requestId}] Erro ao inserir pedido: ${insertError.message}`);
+        } else {
+          console.log(`✅ [${requestId}] Pedido de oração salvo`);
+        }
         responseMessage = parsedJson.anonimo 
           ? "Seu pedido foi anotado em sigilo (ANÔNIMO). Estaremos orando. 🙏"
           : `Anotado, ${parsedJson.nome_final}! Já enviei para a equipe de oração. 🙏`;
       }
       else if (parsedJson.intencao === 'SOLICITACAO_PASTORAL') {
-        await supabase.from('pedidos_oracao').insert({
+        console.log(`⛪ [${requestId}] Processando SOLICITACAO_PASTORAL...`);
+        const { error: insertError } = await supabase.from('pedidos_oracao').insert({
           analise_ia_titulo: `ATENDIMENTO PASTORAL: ${parsedJson.motivo_resumo}`,
           texto_na_integra: `[SOLICITAÇÃO DE PASTOR] ${parsedJson.texto_na_integra}`,
           analise_ia_motivo: 'GABINETE_PASTORAL', analise_ia_gravidade: 'ALTA',
           origem, membro_id: profile?.id, visitante_id: visitanteId
         });
+        if (insertError) {
+          console.log(`❌ [${requestId}] Erro ao inserir solicitação: ${insertError.message}`);
+        } else {
+          console.log(`✅ [${requestId}] Solicitação pastoral salva`);
+        }
         notificarAdmin = true;
         responseMessage = `Entendido. Já notifiquei o pastor sobre: "${parsedJson.motivo_resumo}".`;
       }
       else if (parsedJson.intencao === 'TESTEMUNHO') {
-        await supabase.from('testemunhos').insert({
+        console.log(`🎉 [${requestId}] Processando TESTEMUNHO...`);
+        const { error: insertError } = await supabase.from('testemunhos').insert({
           titulo: parsedJson.motivo_resumo, mensagem: parsedJson.texto_na_integra, publicar: parsedJson.publicar || false,
           origem, autor_id: profile?.id, visitante_id: visitanteId
         });
+        if (insertError) {
+          console.log(`❌ [${requestId}] Erro ao inserir testemunho: ${insertError.message}`);
+        } else {
+          console.log(`✅ [${requestId}] Testemunho salvo`);
+        }
         responseMessage = parsedJson.publicar
           ? "Glória a Deus! 🙌 Vamos compartilhar sua vitória com a igreja."
           : "Amém! Seu relato foi salvo para a liderança.";
       }
 
     } else {
+      console.log(`⚙️ [${requestId}] Conversa em andamento - atualizando histórico`);
       await supabase.from('atendimentos_bot').update({
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);
     }
 
+    // 8. Log de auditoria - saída
     await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'BOT', payload_raw: { resposta: responseMessage, json: parsedJson } });
+    console.log(`📝 [${requestId}] Log de auditoria BOT salvo`);
 
-    return new Response(JSON.stringify({ 
+    // 9. Resposta final
+    const finalResponse = { 
       reply_message: responseMessage,
       notificar_admin: notificarAdmin,
       dados_contato: { telefone, nome: parsedJson?.nome_final || nome_perfil, motivo: parsedJson?.motivo_resumo }
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    };
+    
+    console.log(`\n✅ [${requestId}] RESPOSTA FINAL:`);
+    console.log(`   - reply_message: "${responseMessage.substring(0, 100)}..."`);
+    console.log(`   - notificar_admin: ${notificarAdmin}`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    return new Response(JSON.stringify(finalResponse), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
 
   } catch (error) {
-    console.error('Erro:', error);
-    return new Response(JSON.stringify({ error: 'Erro interno' }), { status: 500, headers: corsHeaders });
+    console.error(`\n❌ [${requestId}] ERRO FATAL:`);
+    console.error(error);
+    console.log(`${'='.repeat(60)}\n`);
+    
+    return new Response(JSON.stringify({ error: 'Erro interno', details: error instanceof Error ? error.message : 'Unknown' }), { 
+      status: 500, 
+      headers: corsHeaders 
+    });
   }
 });
