@@ -42,6 +42,7 @@ import {
   Cog,
   Receipt,
   Bell,
+  Bot,
 } from "lucide-react";
 import {
   Sidebar,
@@ -196,6 +197,11 @@ const administrativoItems = [
     icon: Bell,
     label: "Notificações",
     path: "/admin/notificacoes",
+  },
+  {
+    icon: Bot,
+    label: "Chatbots & IAs",
+    path: "/admin/chatbots",
   },
 ];
 
