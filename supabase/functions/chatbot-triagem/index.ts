@@ -210,6 +210,7 @@ async function getChatbotConfig(): Promise<ChatbotConfig> {
   }
 }
 
+
 // --- FUNÇÕES AUXILIARES ---
 
 // ✨ EXTRATOR DE JSON BLINDADO (NOVO CÓDIGO INSERIDO AQUI)
@@ -331,343 +332,327 @@ async function getOrCreateLead(telefone: string, nome: string) {
   return newLead.id;
 }
 
-// --- HANDLER PRINCIPAL ---
-serve(async (req: Request) => {
+/ Check if model is from Lovable AI or OpenAI
+function isLovableModel(model: string): boolean {
+  const isLovable = model.startsWith('google/') || model.startsWith('openai/gpt-5');
+  console.log(`🤖 [MODEL] Verificando modelo "${model}" - isLovable: ${isLovable}`);
+  return isLovable;
+}
+
+serve(async (req) => {
+  const requestId = crypto.randomUUID().substring(0, 8);
   const startTime = Date.now();
-  console.log('🚀 [INICIO] Requisição recebida');
-  console.log(`🚀 [INICIO] Método: ${req.method}`);
   
-  // Handle CORS preflight
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🚀 [${requestId}] NOVA REQUISIÇÃO - ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(60)}`);
+  
   if (req.method === 'OPTIONS') {
-    console.log('🔄 [CORS] Respondendo preflight');
+    console.log(`🔄 [${requestId}] Requisição OPTIONS (CORS preflight)`);
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestPayload: any = null;
+  
   try {
-    // Parse request body
-    const body: RequestBody = await req.json();
-    console.log(`📥 [REQUEST] telefone: ${body.telefone}`);
-    console.log(`📥 [REQUEST] nome_perfil: ${body.nome_perfil}`);
-    console.log(`📥 [REQUEST] tipo_mensagem: ${body.tipo_mensagem || 'text'}`);
-    console.log(`📥 [REQUEST] conteudo_texto: ${body.conteudo_texto?.substring(0, 100) || 'N/A'}`);
-    console.log(`📥 [REQUEST] media_id: ${body.media_id || 'N/A'}`);
-
-    // Validação de entrada
-    if (!body.telefone) {
-      console.log('❌ [VALIDACAO] Telefone obrigatório');
-      return new Response(
-        JSON.stringify({ error: 'Telefone é obrigatório' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Buscar configuração do chatbot
-    const config = await getChatbotConfig();
-    console.log(`✅ [CONFIG] Modelo texto: ${config.textModel}`);
-
-    // Processar áudio se necessário
-    let mensagemUsuario = body.conteudo_texto || '';
-    if (body.tipo_mensagem === 'audio' && body.media_id) {
-      console.log('🎤 [AUDIO] Processando mensagem de áudio...');
-      const transcricao = await processarAudio(body.media_id, config.audioModel);
-      if (transcricao) {
-        mensagemUsuario = transcricao;
-        console.log(`✅ [AUDIO] Transcrição: ${transcricao.substring(0, 100)}...`);
-      } else {
-        mensagemUsuario = '[Áudio não processado]';
-        console.log('⚠️ [AUDIO] Não foi possível transcrever o áudio');
-      }
-    }
-
-    if (!mensagemUsuario || mensagemUsuario.trim() === '') {
-      console.log('❌ [VALIDACAO] Mensagem vazia');
-      return new Response(
-        JSON.stringify({ error: 'Mensagem vazia' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Buscar ou criar lead
-    const leadId = await getOrCreateLead(body.telefone, body.nome_perfil);
-    console.log(`👤 [LEAD] ID: ${leadId}`);
-
-    // Buscar ou criar sessão de atendimento (janela de 24h)
-    const janela24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    console.log('📋 [SESSAO] Buscando sessão ativa...');
+    // 1. Parse do body
+    console.log(`📥 [${requestId}] Parseando body da requisição...`);
+    const body = await req.json() as RequestBody;
+    requestPayload = { telefone: body.telefone, nome_perfil: body.nome_perfil, tipo_mensagem: body.tipo_mensagem };
+    const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
+    let { conteudo_texto } = body;
     
-    let { data: sessao } = await supabase
-      .from('atendimentos_bot')
-      .select('*')
-      .eq('telefone', body.telefone)
-      .is('status', 'ativo')
-      .gte('created_at', janela24h)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    console.log(`📥 [${requestId}] Dados recebidos:`);
+    console.log(`   - telefone: ${telefone}`);
+    console.log(`   - nome_perfil: ${nome_perfil}`);
+    console.log(`   - tipo_mensagem: ${tipo_mensagem || 'text'}`);
+    console.log(`   - media_id: ${media_id || 'N/A'}`);
+    console.log(`   - conteudo_texto: "${conteudo_texto?.substring(0, 100) || 'vazio'}..."`);
+
+    // 2. Buscar configuração
+    console.log(`\n🔧 [${requestId}] ETAPA: Busca de configuração`);
+    const config = await getChatbotConfig();
+    console.log(`🔧 [${requestId}] Configuração final:`);
+    console.log(`   - textModel: ${config.textModel}`);
+    console.log(`   - audioModel: ${config.audioModel}`);
+    console.log(`   - systemPrompt length: ${config.systemPrompt.length} chars`);
+
+    // 3. Processamento de áudio (se necessário)
+    if (tipo_mensagem === 'audio' && media_id) {
+      console.log(`\n🎤 [${requestId}] ETAPA: Processamento de áudio`);
+      const transcricao = await processarAudio(media_id, config.audioModel);
+      conteudo_texto = transcricao ? `[Áudio Transcrito]: ${transcricao}` : "[Erro áudio]";
+      console.log(`🎤 [${requestId}] Resultado: ${conteudo_texto.substring(0, 100)}...`);
+    }
+    const inputTexto = conteudo_texto || "";
+
+    // 4. Buscar/criar sessão
+    console.log(`\n💬 [${requestId}] ETAPA: Gerenciamento de sessão`);
+    let { data: sessao, error: sessaoError } = await supabase.from('atendimentos_bot')
+      .select('*').eq('telefone', telefone).neq('status', 'CONCLUIDO')
+      .gt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()).maybeSingle();
+
+    if (sessaoError) {
+      console.log(`⚠️ [${requestId}] Erro ao buscar sessão: ${sessaoError.message}`);
+    }
+
+    let historico = sessao ? sessao.historico_conversa : [];
+    console.log(`💬 [${requestId}] Sessão existente: ${sessao ? 'SIM' : 'NÃO'}`);
+    console.log(`💬 [${requestId}] Histórico: ${historico.length} mensagens`);
 
     if (!sessao) {
-      console.log('📋 [SESSAO] Criando nova sessão...');
-      const { data: novaSessao, error: sessaoError } = await supabase
-        .from('atendimentos_bot')
-        .insert({
-          telefone: body.telefone,
-          visitante_id: leadId,
-          status: 'ativo',
-          historico_conversa: [],
-          meta_dados: { nome_perfil: body.nome_perfil }
-        })
-        .select()
-        .single();
-
-      if (sessaoError) {
-        console.error('❌ [SESSAO] Erro ao criar sessão:', sessaoError);
-        throw new Error(`Erro ao criar sessão: ${sessaoError.message}`);
+      console.log(`💬 [${requestId}] Criando nova sessão...`);
+      const { data: nova, error: novaError } = await supabase.from('atendimentos_bot').insert({ telefone, status: 'INICIADO', historico_conversa: [] }).select().single();
+      if (novaError) {
+        console.log(`❌ [${requestId}] Erro ao criar sessão: ${novaError.message}`);
       }
-      sessao = novaSessao;
-      console.log(`✅ [SESSAO] Nova sessão criada: ${sessao.id}`);
+      sessao = nova;
+      console.log(`✅ [${requestId}] Nova sessão criada: ${sessao?.id}`);
     } else {
-      console.log(`✅ [SESSAO] Sessão existente: ${sessao.id}`);
+      console.log(`✅ [${requestId}] Usando sessão existente: ${sessao.id}`);
     }
 
-    // Registrar mensagem do usuário no histórico
-    const historicoAtual = sessao.historico_conversa || [];
-    historicoAtual.push({
-      role: 'user',
-      content: mensagemUsuario,
-      timestamp: new Date().toISOString()
-    });
+    // Log de auditoria - entrada
+    await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'USER', payload_raw: { texto: inputTexto } });
+    console.log(`📝 [${requestId}] Log de auditoria USER salvo`);
 
-    // Montar contexto para a IA
-    const mensagensParaIA = [
-      { role: 'system', content: config.systemPrompt },
-      ...historicoAtual.slice(-10).map((msg: any) => ({
-        role: msg.role,
-        content: msg.content
-      }))
+    // 5. Preparar mensagens para IA
+    console.log(`\n🤖 [${requestId}] ETAPA: Chamada da IA`);
+    const messages = [
+      { role: "system", content: config.systemPrompt },
+      { role: "system", content: `CONTEXTO USUÁRIO: Telefone: ${telefone}. Nome perfil: ${nome_perfil}.` },
+      ...historico.map((h: any) => ({ role: h.role, content: h.content })),
+      { role: "user", content: inputTexto }
     ];
+    console.log(`🤖 [${requestId}] Total de mensagens para IA: ${messages.length}`);
 
-    // Adicionar contexto do usuário
-    const contextoUsuario = `\n\n[CONTEXTO: Nome do usuário: ${body.nome_perfil || 'não informado'}, Telefone: ${body.telefone}]`;
-    mensagensParaIA[0].content += contextoUsuario;
+    let aiContent = "";
+    const useLovable = isLovableModel(config.textModel);
 
-    console.log(`🤖 [IA] Enviando ${mensagensParaIA.length} mensagens para o modelo ${config.textModel}`);
-
-    // Chamar OpenAI
-    const apiKey = OPENAI_API_KEY || LOVABLE_API_KEY;
-    if (!apiKey) {
-      throw new Error('Nenhuma API key configurada (OPENAI_API_KEY ou LOVABLE_API_KEY)');
-    }
-
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: config.textModel,
-        messages: mensagensParaIA,
-        max_tokens: 1000,
-        temperature: 0.7
-      })
-    });
-
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error('❌ [IA] Erro na API OpenAI:', errorText);
-      throw new Error(`Erro na API OpenAI: ${openaiResponse.status}`);
-    }
-
-    const openaiData = await openaiResponse.json();
-    const respostaIA = openaiData.choices[0]?.message?.content || '';
-    console.log(`✅ [IA] Resposta recebida: ${respostaIA.substring(0, 200)}...`);
-
-    // Extrair JSON e texto limpo
-    const { cleanText, parsedJson } = extractJsonAndText(respostaIA);
-    console.log(`📦 [PARSE] JSON detectado: ${!!parsedJson}`);
-    console.log(`📦 [PARSE] Texto limpo: ${cleanText.substring(0, 100)}...`);
-
-    // Atualizar histórico com resposta do bot
-    historicoAtual.push({
-      role: 'assistant',
-      content: respostaIA,
-      timestamp: new Date().toISOString()
-    });
-
-    // Processar intenção se conversa concluída
-    let notificarAdmin = false;
-    let dadosCriados: any = null;
-
-    if (parsedJson?.concluido === true) {
-      console.log(`🎯 [INTENCAO] Processando: ${parsedJson.intencao}`);
+    if (useLovable) {
+      console.log(`🤖 [${requestId}] Usando Lovable AI Gateway`);
       
-      switch (parsedJson.intencao) {
-        case 'PEDIDO_ORACAO':
-          console.log('🙏 [INTENCAO] Criando pedido de oração...');
-          const { data: pedido, error: pedidoError } = await supabase
-            .from('pedidos_oracao')
-            .insert({
-              tipo: parsedJson.categoria || 'OUTROS',
-              descricao: parsedJson.texto_na_integra || parsedJson.motivo_resumo,
-              nome_solicitante: parsedJson.nome_final || body.nome_perfil,
-              telefone_solicitante: body.telefone,
-              anonimo: parsedJson.anonimo || false,
-              status: 'pendente',
-              origem: 'whatsapp_bot'
-            })
-            .select()
-            .single();
-          
-          if (pedidoError) {
-            console.error('❌ [INTENCAO] Erro ao criar pedido:', pedidoError);
-          } else {
-            console.log(`✅ [INTENCAO] Pedido criado: ${pedido.id}`);
-            dadosCriados = { tipo: 'pedido_oracao', id: pedido.id };
-          }
-          break;
-
-        case 'TESTEMUNHO':
-          console.log('✨ [INTENCAO] Criando testemunho...');
-          const { data: testemunho, error: testemunhoError } = await supabase
-            .from('testemunhos')
-            .insert({
-              titulo: `Testemunho de ${parsedJson.nome_final || body.nome_perfil}`,
-              descricao: parsedJson.texto_na_integra || parsedJson.motivo_resumo,
-              categoria: 'geral',
-              aprovado: false,
-              anonimo: !parsedJson.publicar,
-              origem: 'whatsapp_bot'
-            })
-            .select()
-            .single();
-          
-          if (testemunhoError) {
-            console.error('❌ [INTENCAO] Erro ao criar testemunho:', testemunhoError);
-          } else {
-            console.log(`✅ [INTENCAO] Testemunho criado: ${testemunho.id}`);
-            dadosCriados = { tipo: 'testemunho', id: testemunho.id };
-          }
-          break;
-
-        case 'SOLICITACAO_PASTORAL':
-          console.log('👨‍💼 [INTENCAO] Criando solicitação pastoral...');
-          notificarAdmin = true;
-          const { data: pastoral, error: pastoralError } = await supabase
-            .from('pedidos_oracao')
-            .insert({
-              tipo: 'GABINETE',
-              descricao: `[SOLICITAÇÃO PASTORAL] ${parsedJson.texto_na_integra || parsedJson.motivo_resumo}`,
-              nome_solicitante: parsedJson.nome_final || body.nome_perfil,
-              telefone_solicitante: body.telefone,
-              anonimo: false,
-              status: 'pendente',
-              origem: 'whatsapp_bot'
-            })
-            .select()
-            .single();
-          
-          if (pastoralError) {
-            console.error('❌ [INTENCAO] Erro ao criar solicitação:', pastoralError);
-          } else {
-            console.log(`✅ [INTENCAO] Solicitação pastoral criada: ${pastoral.id}`);
-            dadosCriados = { tipo: 'solicitacao_pastoral', id: pastoral.id };
-          }
-          break;
-
-        default:
-          console.log(`⚠️ [INTENCAO] Intenção não reconhecida: ${parsedJson.intencao}`);
+      if (!LOVABLE_API_KEY) {
+        console.log(`❌ [${requestId}] LOVABLE_API_KEY não configurada!`);
+        throw new Error('LOVABLE_API_KEY not configured');
       }
-
-      // Encerrar sessão
-      console.log('📋 [SESSAO] Encerrando sessão...');
-      await supabase
-        .from('atendimentos_bot')
-        .update({ 
-          status: 'finalizado',
-          historico_conversa: historicoAtual,
-          meta_dados: {
-            ...sessao.meta_dados,
-            intencao_final: parsedJson.intencao,
-            dados_criados: dadosCriados
-          }
-        })
-        .eq('id', sessao.id);
-    } else {
-      // Atualizar sessão com novo histórico
-      await supabase
-        .from('atendimentos_bot')
-        .update({ 
-          historico_conversa: historicoAtual,
-          ultima_mensagem_at: new Date().toISOString()
-        })
-        .eq('id', sessao.id);
-    }
-
-    // Log de execução
-    const executionTime = Date.now() - startTime;
-    console.log(`⏱️ [FIM] Tempo de execução: ${executionTime}ms`);
-
-    // Registrar log no banco
-    try {
-      await supabase.rpc('log_edge_function_with_metrics', {
-        p_function_name: FUNCTION_NAME,
-        p_status: 'success',
-        p_execution_time_ms: executionTime,
-        p_request_payload: { telefone: body.telefone, tipo: body.tipo_mensagem },
-        p_response_payload: { intencao: parsedJson?.intencao || null }
-      });
-    } catch (logError) {
-      console.error('Erro ao logar:', logError);
-    }
-
-    // Resposta final
-    return new Response(
-      JSON.stringify({
-        success: true,
-        reply_message: cleanText,
-        concluido: parsedJson?.concluido || false,
-        intencao: parsedJson?.intencao || null,
-        notificar_admin: notificarAdmin,
-        dados_contato: {
-          nome: body.nome_perfil,
-          telefone: body.telefone
+      console.log(`🤖 [${requestId}] LOVABLE_API_KEY presente: SIM`);
+      
+      console.log(`🤖 [${requestId}] Enviando requisição para Lovable AI...`);
+      const aiStartTime = Date.now();
+      
+      const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`, 
+          'Content-Type': 'application/json' 
         },
-        dados_criados: dadosCriados,
-        execution_time_ms: executionTime
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-
-  } catch (error: unknown) {
-    const executionTime = Date.now() - startTime;
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.error('❌ [ERRO] Erro no processamento:', error);
-
-    // Registrar erro no log
-    try {
-      await supabase.rpc('log_edge_function_with_metrics', {
-        p_function_name: FUNCTION_NAME,
-        p_status: 'error',
-        p_execution_time_ms: executionTime,
-        p_error_message: errorMessage
+        body: JSON.stringify({ model: config.textModel, messages }),
       });
-    } catch (logError) {
-      console.error('Erro ao logar erro:', logError);
+
+      const aiDuration = Date.now() - aiStartTime;
+      console.log(`🤖 [${requestId}] Resposta recebida em ${aiDuration}ms`);
+      console.log(`🤖 [${requestId}] Status: ${aiRes.status}`);
+
+      if (!aiRes.ok) {
+        const errorText = await aiRes.text();
+        console.error(`❌ [${requestId}] Erro Lovable AI: ${aiRes.status}`);
+        console.error(`❌ [${requestId}] Detalhes: ${errorText}`);
+        throw new Error(`AI request failed: ${aiRes.status}`);
+      }
+
+      const aiData = await aiRes.json();
+      aiContent = aiData.choices?.[0]?.message?.content || "";
+      console.log(`✅ [${requestId}] Resposta IA (${aiContent.length} chars): "${aiContent.substring(0, 150)}..."`);
+    } else {
+      console.log(`🤖 [${requestId}] Usando OpenAI diretamente`);
+      
+      if (!OPENAI_API_KEY) {
+        console.log(`❌ [${requestId}] OPENAI_API_KEY não configurada!`);
+        throw new Error('OPENAI_API_KEY not configured');
+      }
+      console.log(`🤖 [${requestId}] OPENAI_API_KEY presente: SIM`);
+
+      console.log(`🤖 [${requestId}] Enviando requisição para OpenAI...`);
+      const aiStartTime = Date.now();
+
+      const openAIRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: config.textModel, messages, temperature: 0.3 }),
+      });
+
+      const aiDuration = Date.now() - aiStartTime;
+      console.log(`🤖 [${requestId}] Resposta recebida em ${aiDuration}ms`);
+      console.log(`🤖 [${requestId}] Status: ${openAIRes.status}`);
+
+      if (!openAIRes.ok) {
+        const errorText = await openAIRes.text();
+        console.error(`❌ [${requestId}] Erro OpenAI: ${openAIRes.status}`);
+        console.error(`❌ [${requestId}] Detalhes: ${errorText}`);
+      }
+
+      const aiData = await openAIRes.json();
+      aiContent = aiData.choices?.[0]?.message?.content || "";
+      console.log(`✅ [${requestId}] Resposta IA (${aiContent.length} chars): "${aiContent.substring(0, 150)}..."`);
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: errorMessage,
-        execution_time_ms: executionTime
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // 6. Parse de JSON da resposta
+    console.log(`\n📦 [${requestId}] ETAPA: Parse de resposta`);
+    let parsedJson: ChatResponse | null = null;
+    try {
+      const clean = aiContent.replace(/```json/g, '').replace(/```/g, '').trim();
+      if (clean.startsWith('{')) {
+        parsedJson = JSON.parse(clean);
+        console.log(`📦 [${requestId}] JSON parseado com sucesso:`);
+        console.log(`   - concluido: ${parsedJson?.concluido}`);
+        console.log(`   - intencao: ${parsedJson?.intencao}`);
+        console.log(`   - nome_final: ${parsedJson?.nome_final}`);
+        console.log(`   - notificar_admin: ${parsedJson?.notificar_admin}`);
+      } else {
+        console.log(`📦 [${requestId}] Resposta não é JSON (conversa em andamento)`);
       }
-    );
+    } catch (e) {
+      console.log(`📦 [${requestId}] Resposta não contém JSON válido (esperado)`);
+    }
+
+    let responseMessage = aiContent;
+    // Inicializa com o valor do JSON da IA (se presente)
+    let notificarAdmin = parsedJson?.notificar_admin || false;
+
+    // 7. Execução da lógica de negócio
+    console.log(`\n⚙️ [${requestId}] ETAPA: Execução de lógica`);
+    
+    if (parsedJson?.concluido) {
+      console.log(`⚙️ [${requestId}] Conversa CONCLUÍDA - processando intenção: ${parsedJson.intencao}`);
+      
+      await supabase.from('atendimentos_bot').update({
+        status: 'CONCLUIDO',
+        historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
+      }).eq('id', sessao.id);
+      console.log(`⚙️ [${requestId}] Sessão marcada como CONCLUIDA`);
+
+      const { data: profile } = await supabase.from('profiles').select('id').eq('telefone', telefone).maybeSingle();
+      let visitanteId = null;
+      let origem = 'WABA_INTERNO';
+
+      if (!profile) {
+        origem = 'WABA_EXTERNO';
+        console.log(`⚙️ [${requestId}] Usuário não encontrado em profiles, criando lead...`);
+        visitanteId = await getOrCreateLead(telefone, parsedJson.nome_final || nome_perfil);
+      } else {
+        console.log(`⚙️ [${requestId}] Usuário encontrado em profiles: ${profile.id}`);
+      }
+
+      if (parsedJson.intencao === 'PEDIDO_ORACAO') {
+        console.log(`🙏 [${requestId}] Processando PEDIDO_ORACAO...`);
+        const { error: insertError } = await supabase.from('pedidos_oracao').insert({
+          analise_ia_titulo: parsedJson.motivo_resumo,
+          texto_na_integra: parsedJson.texto_na_integra,
+          analise_ia_motivo: parsedJson.categoria,
+          anonimo: parsedJson.anonimo || false,
+          origem, membro_id: profile?.id, visitante_id: visitanteId
+        });
+        if (insertError) {
+          console.log(`❌ [${requestId}] Erro ao inserir pedido: ${insertError.message}`);
+        } else {
+          console.log(`✅ [${requestId}] Pedido de oração salvo`);
+        }
+        responseMessage = parsedJson.anonimo 
+          ? "Seu pedido foi anotado em sigilo (ANÔNIMO). Estaremos orando. 🙏"
+          : `Anotado, ${parsedJson.nome_final}! Já enviei para a equipe de oração. 🙏`;
+      }
+      else if (parsedJson.intencao === 'SOLICITACAO_PASTORAL') {
+        console.log(`⛪ [${requestId}] Processando SOLICITACAO_PASTORAL...`);
+        const { error: insertError } = await supabase.from('pedidos_oracao').insert({
+          analise_ia_titulo: `ATENDIMENTO PASTORAL: ${parsedJson.motivo_resumo}`,
+          texto_na_integra: `[SOLICITAÇÃO DE PASTOR] ${parsedJson.texto_na_integra}`,
+          analise_ia_motivo: 'GABINETE_PASTORAL', analise_ia_gravidade: 'ALTA',
+          origem, membro_id: profile?.id, visitante_id: visitanteId
+        });
+        if (insertError) {
+          console.log(`❌ [${requestId}] Erro ao inserir solicitação: ${insertError.message}`);
+        } else {
+          console.log(`✅ [${requestId}] Solicitação pastoral salva`);
+        }
+        // Força notificar_admin=true para SOLICITACAO_PASTORAL (fallback se IA não enviar)
+        notificarAdmin = parsedJson?.notificar_admin ?? true;
+        console.log(`⚙️ [${requestId}] notificar_admin definido: ${notificarAdmin}`);
+        responseMessage = `Entendido. Já notifiquei o pastor sobre: "${parsedJson.motivo_resumo}".`;
+      }
+      else if (parsedJson.intencao === 'TESTEMUNHO') {
+        console.log(`🎉 [${requestId}] Processando TESTEMUNHO...`);
+        const { error: insertError } = await supabase.from('testemunhos').insert({
+          titulo: parsedJson.motivo_resumo, mensagem: parsedJson.texto_na_integra, publicar: parsedJson.publicar || false,
+          origem, autor_id: profile?.id, visitante_id: visitanteId
+        });
+        if (insertError) {
+          console.log(`❌ [${requestId}] Erro ao inserir testemunho: ${insertError.message}`);
+        } else {
+          console.log(`✅ [${requestId}] Testemunho salvo`);
+        }
+        responseMessage = parsedJson.publicar
+          ? "Glória a Deus! 🙌 Vamos compartilhar sua vitória com a igreja."
+          : "Amém! Seu relato foi salvo para a liderança.";
+      }
+
+    } else {
+      console.log(`⚙️ [${requestId}] Conversa em andamento - atualizando histórico`);
+      await supabase.from('atendimentos_bot').update({
+        historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
+      }).eq('id', sessao.id);
+    }
+
+    // 8. Log de auditoria - saída
+    await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'BOT', payload_raw: { resposta: responseMessage, json: parsedJson } });
+    console.log(`📝 [${requestId}] Log de auditoria BOT salvo`);
+
+    // 9. Resposta final
+    const finalResponse = { 
+      reply_message: responseMessage,
+      notificar_admin: notificarAdmin,
+      dados_contato: { telefone, nome: parsedJson?.nome_final || nome_perfil, motivo: parsedJson?.motivo_resumo }
+    };
+    
+    console.log(`\n✅ [${requestId}] RESPOSTA FINAL:`);
+    console.log(`   - reply_message: "${responseMessage.substring(0, 100)}..."`);
+    console.log(`   - notificar_admin: ${notificarAdmin}`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    // 10. Registrar métricas de execução
+    const executionTime = Date.now() - startTime;
+    console.log(`📊 [${requestId}] Tempo de execução: ${executionTime}ms`);
+    
+    await supabase.rpc('log_edge_function_with_metrics', {
+      p_function_name: FUNCTION_NAME,
+      p_status: 'success',
+      p_execution_time_ms: executionTime,
+      p_request_payload: requestPayload,
+      p_response_payload: { reply_message: responseMessage?.substring(0, 200), notificar_admin: notificarAdmin }
+    });
+
+    return new Response(JSON.stringify(finalResponse), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
+
+  } catch (error) {
+    const executionTime = Date.now() - startTime;
+    console.error(`\n❌ [${requestId}] ERRO FATAL:`);
+    console.error(error);
+    console.log(`${'='.repeat(60)}\n`);
+    
+    // Registrar erro nas métricas
+    await supabase.rpc('log_edge_function_with_metrics', {
+      p_function_name: FUNCTION_NAME,
+      p_status: 'error',
+      p_execution_time_ms: executionTime,
+      p_error_message: error instanceof Error ? error.message : 'Unknown error',
+      p_request_payload: requestPayload
+    });
+    
+    return new Response(JSON.stringify({ error: 'Erro interno', details: error instanceof Error ? error.message : 'Unknown' }), { 
+      status: 500, 
+      headers: corsHeaders 
+    });
   }
 });
