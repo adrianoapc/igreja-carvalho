@@ -13,26 +13,26 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 #### 🤖 Edge Function chatbot-triagem (Intercessão V2 - 18 de Dez/2025)
 - **Nova Edge Function `chatbot-triagem`**: Chatbot de triagem para receber pedidos de oração via WhatsApp/Make webhook
   - **Gestão de sessão (State Machine)**: Busca/cria sessão em `atendimentos_bot` com janela de 24h
-  - **IA integrada**: Usa Lovable AI (Gemini 2.5 Flash) para coletar nome e motivo de oração
+  - **IA integrada**: Usa OpenAI (`gpt-4o-mini` para chat + `whisper-1` para áudio) para conduzir a conversa
   - **Auditoria LGPD**: Registra todas as mensagens (USER/BOT/SYSTEM) em `logs_auditoria_chat` imutável
-  - **Identificação automática**: Diferencia membros (via telefone em `profiles`) de visitantes (`visitantes_leads`)
-  - **Criação de pedido**: Insere automaticamente em `pedidos_oracao` com categorização IA
-  - **Detecção de risco crítico**: JSON com `risco: CRITICO` dispara alerta ao plantão pastoral
+  - **Identificação automática**: Diferencia membros (via telefone em `profiles`) de visitantes (`visitantes_leads`) e atualiza `data_ultimo_contato`
+  - **Criação de pedido/testemunho**: Insere automaticamente em `pedidos_oracao` ou `testemunhos` com campos de análise IA
+  - **Solicitações pastorais**: Prefixa título, marca gravidade ALTA e sinaliza `notificar_admin`
   - **Endpoint público**: `verify_jwt = false` para receber webhook do Make
 
 **Fluxo:**
-1. Make envia: `{ telefone, nome_perfil, mensagem_texto }`
-2. Busca sessão ativa (< 24h) ou cria nova
-3. Registra audit log (USER)
-4. Chama IA com System Prompt + histórico
-5. Se resposta texto: atualiza sessão, retorna pergunta
-6. Se resposta JSON `concluido`: cria pedido, vincula membro/visitante
+1. Make envia: `{ telefone, nome_perfil, tipo_mensagem, conteudo_texto? }`
+2. Se áudio, baixa via API WhatsApp e transcreve com Whisper
+3. Busca sessão ativa (< 24h) ou cria nova em `atendimentos_bot`
+4. Registra audit log (USER) e chama IA com system prompt + histórico
+5. Se resposta texto: atualiza sessão e devolve próxima pergunta
+6. Se resposta JSON `concluido`: encerra sessão, cria registros vinculando membro ou lead externo
+7. Resposta retorna `reply_message`, `notificar_admin` e dados de contato para follow-up
 
 **System Prompt IA:**
-- Coleta Nome Real e Motivo de Oração
-- Aviso LGPD na primeira mensagem
-- Detecta risco de vida (suicídio/crime)
-- Retorna JSON estruturado quando completo
+- Personifica equipe de acolhimento, oculta que é IA e prioriza FAQ antes do fluxo de pedido
+- Guia coleta de nome, motivo e preferência de anonimato/publicação
+- Só retorna JSON estruturado quando o fluxo é concluído (pedido/testemunho/encaminhamento)
 
 **Módulos afetados:** Intercessão (V2), Evangelismo, Compliance/LGPD
 
@@ -94,6 +94,17 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - Navegação via card em Configurações da Igreja → "Webhooks de Integração"
 
 **Módulos afetados:** Admin (Configurações, Integrações)
+
+---
+
+#### 🧠 Card de IA nas Configurações + Tela Admin de Chatbots (18 de Dez/2025)
+- **Novo card "Chatbots & Inteligência Artificial"** em `ConfiguracoesIgreja.tsx` confirma status do `OPENAI_API_KEY` e leva ao gerenciamento dedicado
+- **Nova tela admin `/admin/chatbots`**: CRUD completo para `chatbot_configs`, seleção de modelos (texto/áudio/visão), edição de prompts e toggle de ativação
+- Interface traz diálogos dedicados para criação/edição, pré-visualização dos prompts e controle de exclusão segura
+
+**Impacto no usuário:** Admins visualizam rapidamente se a IA está pronta e conseguem ajustar fluxos de chatbot (modelos, roles, edge functions) sem sair do painel.
+
+**Módulos afetados:** Admin (Configurações, Integrações IA), Intercessão/Evangelismo (Chatbots)
 
 ---
 

@@ -1462,6 +1462,11 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
 - Provedor WhatsApp: Make.com, Meta Official API, ou Evolution API
 - Campos de credenciais variam conforme provedor selecionado
 
+**IA & Chatbot:**
+- Card "Chatbots & Inteligência Artificial" confirma visualmente se o `OPENAI_API_KEY` está presente
+- Botão **Gerenciar Chatbots & IAs** redireciona para a tela administrativa `/admin/chatbots`
+- Dica exibida lembra que os prompts/modelos são ajustados nessa tela dedicada
+
 ![Configurações Igreja](./screenshots/placeholder-config-igreja.png)
 > *Screenshot: Configurações da igreja*
 
@@ -1475,6 +1480,14 @@ Página dedicada em `/admin/webhooks` para gerenciar webhooks de forma segura:
    - **MAKE_WEBHOOK_LITURGIA**: Webhook para notificações de liturgia
 3. Valores são mascarados por segurança (exibe `••••••••••`)
 4. Clique em "Atualizar" para inserir novo valor via formulário seguro
+
+### 11.3.2 Chatbots & IAs
+
+1. Acesse **Configurações → Chatbots & Inteligência Artificial** e clique em **Gerenciar Chatbots & IAs**
+2. Tela lista cada chatbot com status (Ativo/Inativo), edge function vinculada e modelos escolhidos (texto, áudio, visão)
+3. Use o botão **Novo Chatbot** para cadastrar, informando nome, descrição opcional e edge function (ex.: `chatbot-triagem`)
+4. Edite prompts (roles) por canal diretamente no modal e ative/desative bots via toggle
+5. Exclusões pedem confirmação em diálogo para evitar remoções acidentais
 
 ### 11.4 Links Externos e QR Codes
 

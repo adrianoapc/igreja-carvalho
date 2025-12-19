@@ -669,6 +669,22 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 
 ---
 
+## 18. Configurações da Igreja
+
+- Painel único para manutenção, identidade visual e integrações críticas
+- Card "Webhooks de Integração" abre `/admin/webhooks` para gerenciar URLs de forma mascarada
+- Card "Chatbots & Inteligência Artificial" exibe status do `OPENAI_API_KEY` e leva direto à tela `/admin/chatbots` para setup detalhado
+- Configuração de plantão pastoral segue disponível com máscara de telefone e escolha de provedor WhatsApp
+
+### 18.1 Chatbots & IAs (Admin)
+- Tela dedicada em `/admin/chatbots` lista os bots cadastrados (`chatbot_configs`) com status Ativo/Inativo
+- Cadastro/edição permite informar nome, descrição, edge function associada e modelos para texto (`gpt-4o-mini`, `gpt-4o`, etc.), áudio (`whisper-1`) e visão (`gpt-4o`, `gpt-4-turbo`)
+- Cada canal possui campo de prompt/role editável com pré-visualização expandível para leitura rápida
+- Toggle habilita/desabilita o bot sem apagar configuração; exclusão exige confirmação com diálogo dedicado
+- Botão "Novo Chatbot" abre modal para inserir dados obrigatórios e salvar diretamente via Supabase
+
+---
+
 ## Tecnologias Utilizadas
 
 - **Frontend**: React, TypeScript, Tailwind CSS, Shadcn/UI

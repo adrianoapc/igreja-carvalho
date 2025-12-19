@@ -9,10 +9,11 @@
 | `Auth.tsx` | `/auth` | `/auth` | Auth | Login | Público | Login/Cadastro | Todos |
 | `ResetPassword.tsx` | `/auth/reset` | `/auth/reset` | Auth | Segurança | Público | Recuperar Senha | Todos |
 | `BiometricLogin.tsx` | `/biometric-login` | `/auth/biometric (sugestão)` | Auth | Segurança | Público | Login Facial | Todos |
-| `ConfiguracoesIgreja.tsx` | `/configuracoes-igreja` | `/configuracoes (sugestão)` | Admin | Config | Admin | Dados da Igreja | Admin/Técnico |
+| `ConfiguracoesIgreja.tsx` | `/configuracoes-igreja` | `/configuracoes (sugestão)` | Admin | Config | Admin | Dados da Igreja, Webhooks, IA/Chatbot | Admin/Técnico |
 | `admin/Webhooks.tsx` | `/admin/webhooks` | `/admin/webhooks` | Admin | Integrações | Admin | Gerir Webhooks | Admin/Técnico |
 | `AdminPermissions.tsx` | `/teste-permissoes` | `/admin/permissoes (sugestão)` | Admin | Segurança | Admin | Gerir Roles | Admin |
 | `admin/Notificacoes.tsx` | `/admin/notificacoes` | `/admin/notificacoes` | Admin | Comunicação | Admin | Enviar Push | Admin |
+| `admin/Chatbots.tsx` | `/admin/chatbots` | `/admin/chatbots` | Admin | IA & Automações | Admin | Gerir Chatbots, modelos e prompts | Admin |
 | **DASHBOARD & PERFIL** | | | | | | | |
 | `Dashboard.tsx` | `/dashboard` | `/` | Core | Home | Híbrido | KPIs e Atalhos | Todos |
 | `Perfil.tsx` | `/perfil` | `/perfil` | Core | Eu | Membro | Editar Dados | Logado |

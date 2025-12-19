@@ -9,9 +9,10 @@
 | `Auth.tsx` | `/auth` | Auth | Login | Público | Login/Cadastro | Todos |
 | `ResetPassword.tsx` | `/auth/reset` | Auth | Segurança | Público | Recuperar Senha | Todos |
 | `BiometricLogin.tsx` | `/auth/biometric` | Auth | Segurança | Público | Login Facial | Todos |
-| `ConfiguracoesIgreja.tsx` | `/configuracoes` | Admin | Config | Admin | Dados da Igreja | Admin/Técnico |
+| `ConfiguracoesIgreja.tsx` | `/configuracoes` | Admin | Config | Admin | Dados da Igreja, Webhooks, IA/Chatbot | Admin/Técnico |
 | `AdminPermissions.tsx` | `/admin/permissoes` | Admin | Segurança | Admin | Gerir Roles | Admin |
 | `admin/Notificacoes.tsx` | `/admin/notificacoes` | Admin | Comunicação | Admin | Enviar Push | Admin |
+| `admin/Chatbots.tsx` | `/admin/chatbots` | Admin | IA & Automações | Admin | Gerir Chatbots, modelos e prompts | Admin |
 | **DASHBOARD & PERFIL** | | | | | | |
 | `Dashboard.tsx` | `/` | Core | Home | Híbrido | KPIs e Atalhos | Todos |
 | `Perfil.tsx` | `/perfil` | Core | Eu | Membro | Editar Dados | Logado |
