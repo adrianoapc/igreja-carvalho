@@ -332,7 +332,7 @@ async function getOrCreateLead(telefone: string, nome: string) {
   return newLead.id;
 }
 
-/ Check if model is from Lovable AI or OpenAI
+// Check if model is from Lovable AI or OpenAI
 function isLovableModel(model: string): boolean {
   const isLovable = model.startsWith('google/') || model.startsWith('openai/gpt-5');
   console.log(`🤖 [MODEL] Verificando modelo "${model}" - isLovable: ${isLovable}`);
