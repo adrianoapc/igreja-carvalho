@@ -2,25 +2,79 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Fingerprint, Loader2, AlertTriangle } from "lucide-react";
+import { Fingerprint, Loader2, AlertTriangle, ScanFace, ShieldCheck } from "lucide-react";
 import logoCarvalho from "@/assets/logo-carvalho.png";
-import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import { useBiometricAuth, BiometricErrorType, triggerHapticFeedback } from "@/hooks/useBiometricAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import { cn } from "@/lib/utils";
 
 const MAX_BIOMETRIC_ATTEMPTS = 3;
 const BIOMETRIC_ATTEMPTS_KEY = 'biometric_attempts';
-const BIOMETRIC_TIMESTAMP_KEY = 'biometric_timestamp';
 const ATTEMPTS_RESET_TIME = 5 * 60 * 1000; // 5 minutos
+
+type LoadingState = 'idle' | 'awaiting_biometric' | 'authenticating' | 'restoring_session';
+
+// Mensagens de erro contextuais por tipo
+const getErrorMessage = (errorType: BiometricErrorType, biometricType: 'face' | 'fingerprint' | 'unknown'): { title: string; description: string } => {
+  const biometricName = biometricType === 'face' ? 'Face ID' : biometricType === 'fingerprint' ? 'impressão digital' : 'biometria';
+  
+  switch (errorType) {
+    case 'NOT_ALLOWED':
+      return {
+        title: 'Verificação cancelada',
+        description: 'Você cancelou a verificação. Toque no botão para tentar novamente.',
+      };
+    case 'NOT_RECOGNIZED':
+      return {
+        title: `${biometricType === 'face' ? 'Rosto' : 'Digital'} não reconhecido(a)`,
+        description: `Sua ${biometricName} não foi reconhecida. Tente novamente.`,
+      };
+    case 'TIMEOUT':
+      return {
+        title: 'Tempo esgotado',
+        description: `O tempo para verificar sua ${biometricName} expirou. Tente novamente.`,
+      };
+    case 'HARDWARE_ERROR':
+      return {
+        title: 'Erro no sensor',
+        description: `Houve um problema com o sensor de ${biometricName}. Use sua senha.`,
+      };
+    case 'NOT_FOUND':
+      return {
+        title: 'Biometria não configurada',
+        description: 'Sua biometria não está configurada. Faça login com senha para reconfigurar.',
+      };
+    case 'SECURITY_ERROR':
+      return {
+        title: 'Erro de segurança',
+        description: 'Não foi possível verificar sua identidade por motivos de segurança.',
+      };
+    case 'NOT_SUPPORTED':
+      return {
+        title: 'Não suportado',
+        description: 'Seu dispositivo não suporta autenticação biométrica.',
+      };
+    default:
+      return {
+        title: 'Erro na verificação',
+        description: 'Ocorreu um erro inesperado. Tente novamente ou use sua senha.',
+      };
+  }
+};
 
 export default function BiometricLogin() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const { isEnabled, verifyBiometric, getRefreshToken, getAccessToken, clearRefreshToken } = useBiometricAuth();
+  const { isEnabled, verifyBiometric, getRefreshToken, getAccessToken, clearRefreshToken, biometricType } = useBiometricAuth();
   const { config, isLoading: isConfigLoading } = useAppConfig();
+
+  const isLoading = loadingState !== 'idle';
+  const BiometricIcon = biometricType === 'face' ? ScanFace : Fingerprint;
+  const biometricLabel = biometricType === 'face' ? 'Face ID' : biometricType === 'fingerprint' ? 'Touch ID' : 'Biometria';
 
   // Verificar se já tem sessão ativa
   useEffect(() => {
@@ -28,7 +82,6 @@ export default function BiometricLogin() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          // Usuário já autenticado, ir para dashboard
           navigate("/dashboard", { replace: true });
           return;
         }
@@ -49,7 +102,6 @@ export default function BiometricLogin() {
     const { count, timestamp } = JSON.parse(data);
     const now = Date.now();
 
-    // Reset se passou 5 minutos
     if (now - timestamp > ATTEMPTS_RESET_TIME) {
       localStorage.removeItem(BIOMETRIC_ATTEMPTS_KEY);
       return 0;
@@ -73,18 +125,28 @@ export default function BiometricLogin() {
     localStorage.removeItem(BIOMETRIC_ATTEMPTS_KEY);
   };
 
+  const getLoadingText = () => {
+    switch (loadingState) {
+      case 'awaiting_biometric':
+        return biometricType === 'face' ? 'Olhe para a câmera...' : 'Toque no sensor...';
+      case 'authenticating':
+        return 'Verificando...';
+      case 'restoring_session':
+        return 'Entrando...';
+      default:
+        return 'Carregando...';
+    }
+  };
+
   const handleBiometricLogin = async () => {
-    // Se não tem biometria habilitada, ir para login normal
     if (!isEnabled) {
       navigate("/auth", { replace: true });
       return;
     }
 
-    setIsLoading(true);
     const currentAttempts = getAttemptCount();
 
     try {
-      // Se já tentou 3x, ir direto para senha
       if (currentAttempts >= MAX_BIOMETRIC_ATTEMPTS) {
         toast({
           title: "Limite de tentativas atingido",
@@ -95,13 +157,14 @@ export default function BiometricLogin() {
         return;
       }
 
+      setLoadingState('awaiting_biometric');
       console.log('[BiometricLogin] Tentando verificar biometria...');
       
-      // Tentar verificar biometria
-      const success = await verifyBiometric();
+      const result = await verifyBiometric();
 
-      if (success) {
+      if (result.success) {
         console.log('[BiometricLogin] Biometria verificada com sucesso!');
+        setLoadingState('restoring_session');
         
         const refreshToken = getRefreshToken();
         const accessToken = getAccessToken();
@@ -114,25 +177,28 @@ export default function BiometricLogin() {
         });
         
         if (!refreshToken && !accessToken) {
-          console.error('[BiometricLogin] Nenhum token armazenado (refresh ou access)');
+          console.error('[BiometricLogin] Nenhum token armazenado');
           incrementAttempts();
+          triggerHapticFeedback('error');
           toast({
-            title: "Erro",
-            description: "Dados de autenticação não encontrados. Use sua senha.",
+            title: "Sessão não encontrada",
+            description: "Faça login com sua senha para continuar.",
             variant: "destructive",
           });
+          setLoadingState('idle');
           setTimeout(() => {
             navigate("/auth", { replace: true });
           }, 1000);
           return;
         }
 
-        // Tentar com refresh token primeiro (melhor opção)
+        setLoadingState('authenticating');
+        
         let sessionData = null;
         let sessionError = null;
 
         if (refreshToken) {
-          console.log('[BiometricLogin] Attempting to refresh session with refresh_token...');
+          console.log('[BiometricLogin] Attempting to refresh session...');
           const result = await supabase.auth.refreshSession({
             refresh_token: refreshToken,
           });
@@ -147,15 +213,13 @@ export default function BiometricLogin() {
           });
         }
 
-        // Fallback para access token se refresh falhar
         if ((!sessionData?.session || sessionError) && accessToken) {
-          console.log('[BiometricLogin] Refresh token failed, trying with access_token fallback...');
+          console.log('[BiometricLogin] Trying access_token fallback...');
           
           try {
-            // Usar setSession com access_token como fallback
             const result = await supabase.auth.setSession({
               access_token: accessToken,
-              refresh_token: refreshToken || '', // Pode estar vazio
+              refresh_token: refreshToken || '',
             });
             
             if (result.error) {
@@ -165,13 +229,9 @@ export default function BiometricLogin() {
             sessionData = result.data;
             sessionError = null;
             
-            console.log('[BiometricLogin] Access token fallback successful:', {
-              hasSession: !!sessionData?.session,
-              hasUser: !!sessionData?.session?.user,
-              userId: sessionData?.session?.user?.id,
-            });
+            console.log('[BiometricLogin] Access token fallback successful');
           } catch (fallbackError) {
-            console.error('[BiometricLogin] Access token fallback also failed:', fallbackError);
+            console.error('[BiometricLogin] Access token fallback failed:', fallbackError);
             sessionError = fallbackError as any;
           }
         }
@@ -180,19 +240,21 @@ export default function BiometricLogin() {
           console.error('[BiometricLogin] Erro ao restaurar sessão:', sessionError);
           clearRefreshToken();
           incrementAttempts();
+          triggerHapticFeedback('error');
           toast({
             title: "Sessão expirada",
-            description: "Por favor, use sua senha para entrar novamente.",
+            description: "Por favor, faça login novamente com sua senha.",
             variant: "destructive",
           });
+          setLoadingState('idle');
           setTimeout(() => {
             navigate("/auth", { replace: true });
           }, 1000);
           return;
         }
 
-        // Sucesso! Limpar tentativas e ir para dashboard
         resetAttempts();
+        triggerHapticFeedback('success');
         
         toast({
           title: "Bem-vindo!",
@@ -203,11 +265,13 @@ export default function BiometricLogin() {
           navigate("/dashboard", { replace: true });
         }, 500);
       } else {
-        // Falha na biometria
-        console.log('[BiometricLogin] Biometria falhou');
+        // Falha na biometria com erro específico
+        console.log('[BiometricLogin] Biometria falhou:', result.errorType, result.errorMessage);
         incrementAttempts();
         const newCount = getAttemptCount();
         const remaining = MAX_BIOMETRIC_ATTEMPTS - newCount;
+
+        const errorInfo = getErrorMessage(result.errorType || 'UNKNOWN', biometricType);
 
         if (remaining <= 0) {
           toast({
@@ -215,15 +279,17 @@ export default function BiometricLogin() {
             description: "Por favor, use sua senha para entrar.",
             variant: "destructive",
           });
+          setLoadingState('idle');
           setTimeout(() => {
             navigate("/auth", { replace: true });
           }, 1000);
         } else {
           toast({
-            title: "Biometria não reconhecida",
-            description: `${remaining} ${remaining === 1 ? "tentativa" : "tentativas"} restantes`,
+            title: errorInfo.title,
+            description: `${errorInfo.description} (${remaining} ${remaining === 1 ? "tentativa restante" : "tentativas restantes"})`,
             variant: "destructive",
           });
+          setLoadingState('idle');
         }
       }
     } catch (error: any) {
@@ -231,6 +297,7 @@ export default function BiometricLogin() {
       incrementAttempts();
       const newCount = getAttemptCount();
       const remaining = MAX_BIOMETRIC_ATTEMPTS - newCount;
+      triggerHapticFeedback('error');
 
       if (remaining <= 0) {
         toast({
@@ -238,41 +305,44 @@ export default function BiometricLogin() {
           description: "Por favor, use sua senha para entrar.",
           variant: "destructive",
         });
+        setLoadingState('idle');
         setTimeout(() => {
           navigate("/auth", { replace: true });
         }, 1000);
       } else {
         toast({
-          title: "Erro",
-          description: `Erro ao verificar biometria. ${remaining} ${remaining === 1 ? "tentativa" : "tentativas"} restantes`,
+          title: "Erro inesperado",
+          description: `Algo deu errado. ${remaining} ${remaining === 1 ? "tentativa restante" : "tentativas restantes"}.`,
           variant: "destructive",
         });
+        setLoadingState('idle');
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
+      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-primary/10 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Verificando sessão...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-primary/10 flex flex-col items-center justify-center p-4">
       {/* Aviso de manutenção */}
       {!isConfigLoading && config.maintenance_mode && (
         <div className="w-full max-w-sm mb-4">
           <Card className="bg-orange-500 text-white border-0 shadow-md">
             <div className="px-3 py-2 flex gap-2 items-start">
-              <AlertTriangle className="w-4 h-4 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div className="space-y-0.5">
                 <p className="text-sm font-semibold">Modo de manutenção ativo</p>
                 <p className="text-xs opacity-90">
-                  {config.maintenance_message || "O sistema está em manutenção. Apenas admins e técnicos têm acesso completo."}
+                  {config.maintenance_message || "O sistema está em manutenção."}
                 </p>
               </div>
             </div>
@@ -281,52 +351,60 @@ export default function BiometricLogin() {
       )}
 
       <div className="w-full max-w-sm">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-6">
+        <Card className="p-8 shadow-xl">
+          <div className="text-center mb-8">
             <img
               src={logoCarvalho}
               alt="Igreja Carvalho"
-              className="h-16 w-auto mx-auto mb-3"
+              className="h-16 w-auto mx-auto mb-4"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
             />
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                <Fingerprint className="h-5 w-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-bold text-foreground">Entrar</h2>
-            </div>
-            <p className="text-muted-foreground">Use a biometria para acessar</p>
+            <h2 className="text-2xl font-bold text-foreground">Bem-vindo</h2>
+            <p className="text-muted-foreground mt-1">Use {biometricLabel} para entrar</p>
           </div>
 
+          {/* Botão de biometria com animação */}
           <Button
             onClick={handleBiometricLogin}
             disabled={isLoading}
             size="lg"
-            className="w-full gap-2 h-12 text-base"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Verificando...
-              </>
-            ) : (
-              <>
-                <Fingerprint className="h-5 w-5" />
-                Entrar
-              </>
+            variant="outline"
+            className={cn(
+              "w-full h-28 flex-col gap-3 border-2 transition-all duration-300",
+              isLoading && "border-primary bg-primary/5",
+              !isLoading && "hover:border-primary hover:bg-primary/5"
             )}
+          >
+            <div className={cn(
+              "relative",
+              isLoading && loadingState === 'awaiting_biometric' && "animate-pulse"
+            )}>
+              {isLoading ? (
+                loadingState === 'awaiting_biometric' ? (
+                  <BiometricIcon className="h-10 w-10 text-primary animate-pulse" />
+                ) : loadingState === 'authenticating' ? (
+                  <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-10 w-10 text-primary animate-pulse" />
+                )
+              ) : (
+                <BiometricIcon className="h-10 w-10 text-primary" />
+              )}
+            </div>
+            <span className="text-sm font-medium">
+              {isLoading ? getLoadingText() : `Entrar com ${biometricLabel}`}
+            </span>
           </Button>
 
           {/* Info sobre tentativas */}
-          {isEnabled && (
-            <div className="mt-6 text-center">
+          {isEnabled && getAttemptCount() > 0 && (
+            <div className="mt-4 text-center">
               <p className="text-sm text-muted-foreground">
-                {getAttemptCount() > 0 && (
-                  <>
-                    Tentativas: {getAttemptCount()}/{MAX_BIOMETRIC_ATTEMPTS}
-                    {getAttemptCount() >= MAX_BIOMETRIC_ATTEMPTS && (
-                      <span className="text-destructive ml-2">Limite atingido</span>
-                    )}
-                  </>
+                Tentativas: {getAttemptCount()}/{MAX_BIOMETRIC_ATTEMPTS}
+                {getAttemptCount() >= MAX_BIOMETRIC_ATTEMPTS && (
+                  <span className="text-destructive ml-2 font-medium">Limite atingido</span>
                 )}
               </p>
             </div>
@@ -337,12 +415,12 @@ export default function BiometricLogin() {
             <Button
               variant="link"
               onClick={() => navigate("/auth", { replace: true })}
-              className="text-primary hover:underline"
+              className="text-muted-foreground hover:text-primary"
             >
               Entrar com email e senha
             </Button>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );
