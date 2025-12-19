@@ -3,17 +3,34 @@ import { useState, useEffect, useCallback } from 'react';
 const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 const BIOMETRIC_USER_KEY = 'biometric_user_id';
 const BIOMETRIC_CREDENTIAL_KEY = 'biometric_credential_id';
-// Security: Use sessionStorage instead of localStorage for refresh tokens
-// sessionStorage is cleared when browser/tab closes, reducing XSS token theft window
-const BIOMETRIC_REFRESH_TOKEN_KEY = 'biometric_refresh_token'; // Persistiremos também em localStorage (menos seguro)
-const BIOMETRIC_ACCESS_TOKEN_KEY = 'biometric_access_token'; // Fallback when refresh_token unavailable
+const BIOMETRIC_REFRESH_TOKEN_KEY = 'biometric_refresh_token';
+const BIOMETRIC_ACCESS_TOKEN_KEY = 'biometric_access_token';
 const LAST_EMAIL_KEY = 'last_login_email';
-const BIOMETRIC_TEST_MODE_KEY = 'biometric_test_mode'; // Para desenvolvimento
+const BIOMETRIC_TEST_MODE_KEY = 'biometric_test_mode';
+
+// Tipos de erro específicos para WebAuthn
+export type BiometricErrorType = 
+  | 'NOT_ALLOWED' // Usuário cancelou ou negou
+  | 'NOT_SUPPORTED' // Dispositivo não suporta
+  | 'SECURITY_ERROR' // Erro de segurança (domínio, etc)
+  | 'TIMEOUT' // Timeout
+  | 'ABORT' // Abortado
+  | 'NOT_FOUND' // Credencial não encontrada
+  | 'NOT_RECOGNIZED' // Biometria não reconhecida
+  | 'HARDWARE_ERROR' // Erro de hardware
+  | 'UNKNOWN'; // Erro desconhecido
+
+export interface BiometricResult {
+  success: boolean;
+  errorType?: BiometricErrorType;
+  errorMessage?: string;
+}
 
 interface BiometricAuthState {
   isSupported: boolean;
   isEnabled: boolean;
   isLoading: boolean;
+  biometricType: 'face' | 'fingerprint' | 'unknown';
 }
 
 // Helper to convert ArrayBuffer to base64
@@ -36,27 +53,124 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+// Detecta tipo de biometria baseado no dispositivo
+function detectBiometricType(): 'face' | 'fingerprint' | 'unknown' {
+  const userAgent = navigator.userAgent.toLowerCase();
+  
+  // iOS devices com Face ID (iPhone X e posteriores)
+  if (/iphone/.test(userAgent)) {
+    // iPhone X e posteriores geralmente usam Face ID
+    // Podemos inferir pelo tamanho da tela ou modelo
+    const screenHeight = window.screen.height;
+    const screenWidth = window.screen.width;
+    const ratio = screenHeight / screenWidth;
+    
+    // iPhones com Face ID têm ratio maior que 2 (notch design)
+    if (ratio > 2 || screenHeight >= 812) {
+      return 'face';
+    }
+    return 'fingerprint'; // iPhone 8 e anteriores com Touch ID
+  }
+  
+  // iPads podem ter Face ID ou Touch ID
+  if (/ipad/.test(userAgent)) {
+    // iPads Pro mais recentes têm Face ID
+    if (window.screen.width >= 1024) {
+      return 'face';
+    }
+    return 'fingerprint';
+  }
+  
+  // Android - maioria usa fingerprint
+  if (/android/.test(userAgent)) {
+    return 'fingerprint';
+  }
+  
+  // MacBooks com Touch ID
+  if (/macintosh/.test(userAgent)) {
+    return 'fingerprint';
+  }
+  
+  return 'unknown';
+}
+
+// Mapeia erros WebAuthn para tipos específicos
+function parseWebAuthnError(error: any): { type: BiometricErrorType; message: string } {
+  const errorName = error?.name || '';
+  const errorMessage = error?.message || 'Erro desconhecido';
+  
+  switch (errorName) {
+    case 'NotAllowedError':
+      // Usuário cancelou ou negou a verificação
+      if (errorMessage.includes('cancelled') || errorMessage.includes('denied')) {
+        return { type: 'NOT_ALLOWED', message: 'Você cancelou a verificação biométrica.' };
+      }
+      return { type: 'NOT_ALLOWED', message: 'Permissão negada para usar biometria.' };
+      
+    case 'NotSupportedError':
+      return { type: 'NOT_SUPPORTED', message: 'Seu dispositivo não suporta esta funcionalidade.' };
+      
+    case 'SecurityError':
+      return { type: 'SECURITY_ERROR', message: 'Erro de segurança. Verifique se está em uma conexão segura.' };
+      
+    case 'AbortError':
+      return { type: 'ABORT', message: 'A operação foi cancelada.' };
+      
+    case 'InvalidStateError':
+      return { type: 'NOT_FOUND', message: 'Credencial não encontrada. Reconfigure a biometria.' };
+      
+    case 'NotFoundError':
+      return { type: 'NOT_FOUND', message: 'Credencial biométrica não encontrada.' };
+      
+    case 'ConstraintError':
+      return { type: 'HARDWARE_ERROR', message: 'Erro no sensor biométrico.' };
+      
+    default:
+      if (errorMessage.includes('timeout')) {
+        return { type: 'TIMEOUT', message: 'Tempo esgotado. Tente novamente.' };
+      }
+      if (errorMessage.includes('not recognized') || errorMessage.includes('failed')) {
+        return { type: 'NOT_RECOGNIZED', message: 'Biometria não reconhecida. Tente novamente.' };
+      }
+      return { type: 'UNKNOWN', message: errorMessage };
+  }
+}
+
+// Haptic feedback para dispositivos móveis
+export function triggerHapticFeedback(type: 'success' | 'error' | 'warning') {
+  if ('vibrate' in navigator) {
+    switch (type) {
+      case 'success':
+        navigator.vibrate(50); // Vibração curta para sucesso
+        break;
+      case 'error':
+        navigator.vibrate([100, 50, 100]); // Padrão duplo para erro
+        break;
+      case 'warning':
+        navigator.vibrate([50, 30, 50, 30, 50]); // Padrão triplo para aviso
+        break;
+    }
+  }
+}
+
 export function useBiometricAuth() {
   const [state, setState] = useState<BiometricAuthState>({
     isSupported: false,
     isEnabled: false,
     isLoading: true,
+    biometricType: 'unknown',
   });
 
   const checkSupport = useCallback(async () => {
-    // Permitir modo teste via localStorage
     const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
 
-    // Check if WebAuthn is supported
     const hasWebAuthn = !!(
       window.PublicKeyCredential &&
       typeof window.PublicKeyCredential === 'function'
     );
 
-    // Check if running in iframe (WebAuthn doesn't work in iframes)
     const isInIframe = window.self !== window.top;
 
-    // Check if platform authenticator (Touch ID, Face ID) is available
     let hasPlatformAuth = false;
     if (hasWebAuthn && !isInIframe) {
       try {
@@ -68,6 +182,7 @@ export function useBiometricAuth() {
     }
 
     const isSupported = testMode || (hasWebAuthn && hasPlatformAuth && !isInIframe);
+    const biometricType = detectBiometricType();
 
     console.log('[BiometricAuth] Support check:', {
       testMode,
@@ -75,6 +190,7 @@ export function useBiometricAuth() {
       hasPlatformAuth,
       isInIframe,
       isSupported,
+      biometricType,
     });
 
     const isEnabled = localStorage.getItem(BIOMETRIC_ENABLED_KEY) === 'true';
@@ -95,6 +211,7 @@ export function useBiometricAuth() {
       isSupported,
       isEnabled: isEnabled && !!storedUserId && !!storedCredentialId && isSupported,
       isLoading: false,
+      biometricType,
     });
   }, []);
 
@@ -102,16 +219,15 @@ export function useBiometricAuth() {
     checkSupport();
   }, [checkSupport]);
 
-  const enableBiometric = useCallback(async (userId: string, userEmail?: string): Promise<boolean> => {
+  const enableBiometric = useCallback(async (userId: string, userEmail?: string): Promise<BiometricResult> => {
     if (!state.isSupported) {
       console.warn('Biometric authentication not supported');
-      return false;
+      return { success: false, errorType: 'NOT_SUPPORTED', errorMessage: 'Biometria não suportada neste dispositivo.' };
     }
 
     try {
       const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
 
-      // Em modo teste, simular biometria sem WebAuthn
       if (testMode) {
         console.log('[BiometricAuth] Test mode: simulating biometric enrollment');
         const credentialId = 'test-credential-' + Math.random().toString(36).substr(2, 9);
@@ -119,26 +235,23 @@ export function useBiometricAuth() {
         localStorage.setItem(BIOMETRIC_USER_KEY, userId);
         localStorage.setItem(BIOMETRIC_CREDENTIAL_KEY, credentialId);
         setState(prev => ({ ...prev, isEnabled: true }));
-        return true;
+        triggerHapticFeedback('success');
+        return { success: true };
       }
 
-      // Check if platform authenticator is available (fingerprint, face ID)
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       
       if (!available) {
         console.warn('Platform authenticator not available');
-        return false;
+        return { success: false, errorType: 'NOT_SUPPORTED', errorMessage: 'Autenticador de plataforma não disponível.' };
       }
 
-      // Create a challenge for biometric registration
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
 
-      // Use o email do usuário se fornecido, senão usa um padrão
       const displayEmail = userEmail || 'usuario@app';
       const displayName = userEmail ? userEmail.split('@')[0] : 'Usuário';
 
-      // Create credential
       const credential = await navigator.credentials.create({
         publicKey: {
           challenge,
@@ -152,8 +265,8 @@ export function useBiometricAuth() {
             displayName: displayName,
           },
           pubKeyCredParams: [
-            { alg: -7, type: 'public-key' }, // ES256
-            { alg: -257, type: 'public-key' }, // RS256
+            { alg: -7, type: 'public-key' },
+            { alg: -257, type: 'public-key' },
           ],
           authenticatorSelection: {
             authenticatorAttachment: 'platform',
@@ -165,10 +278,9 @@ export function useBiometricAuth() {
       }) as PublicKeyCredential | null;
 
       if (!credential) {
-        return false;
+        return { success: false, errorType: 'NOT_ALLOWED', errorMessage: 'Nenhuma credencial foi criada.' };
       }
 
-      // Store credential ID for later verification
       const credentialId = arrayBufferToBase64(credential.rawId);
       
       console.log('[BiometricAuth] enableBiometric - Saving biometric data:', {
@@ -182,10 +294,13 @@ export function useBiometricAuth() {
       localStorage.setItem(BIOMETRIC_CREDENTIAL_KEY, credentialId);
 
       setState(prev => ({ ...prev, isEnabled: true }));
-      return true;
-    } catch (error) {
+      triggerHapticFeedback('success');
+      return { success: true };
+    } catch (error: any) {
       console.error('Error enabling biometric:', error);
-      return false;
+      const parsed = parseWebAuthnError(error);
+      triggerHapticFeedback('error');
+      return { success: false, errorType: parsed.type, errorMessage: parsed.message };
     }
   }, [state.isSupported]);
 
@@ -196,29 +311,32 @@ export function useBiometricAuth() {
     setState(prev => ({ ...prev, isEnabled: false }));
   }, []);
 
-  const verifyBiometric = useCallback(async (): Promise<boolean> => {
-    if (!state.isSupported || !state.isEnabled) {
-      return false;
+  const verifyBiometric = useCallback(async (): Promise<BiometricResult> => {
+    if (!state.isSupported) {
+      return { success: false, errorType: 'NOT_SUPPORTED', errorMessage: 'Biometria não suportada.' };
+    }
+    
+    if (!state.isEnabled) {
+      return { success: false, errorType: 'NOT_FOUND', errorMessage: 'Biometria não está habilitada.' };
     }
 
     const storedCredentialId = localStorage.getItem(BIOMETRIC_CREDENTIAL_KEY);
     if (!storedCredentialId) {
-      return false;
+      return { success: false, errorType: 'NOT_FOUND', errorMessage: 'Credencial não encontrada.' };
     }
 
     try {
       const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
 
-      // Em modo teste, simular verificação de biometria
       if (testMode) {
         console.log('[BiometricAuth] Test mode: simulating biometric verification');
-        return true;
+        triggerHapticFeedback('success');
+        return { success: true };
       }
 
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
 
-      // Request biometric verification using stored credential
       const credential = await navigator.credentials.get({
         publicKey: {
           challenge,
@@ -233,15 +351,22 @@ export function useBiometricAuth() {
         },
       });
 
-      return !!credential;
+      if (credential) {
+        triggerHapticFeedback('success');
+        return { success: true };
+      }
+      
+      triggerHapticFeedback('error');
+      return { success: false, errorType: 'NOT_RECOGNIZED', errorMessage: 'Biometria não reconhecida.' };
     } catch (error: any) {
       console.error('Biometric verification error:', error);
-      return false;
+      const parsed = parseWebAuthnError(error);
+      triggerHapticFeedback('error');
+      return { success: false, errorType: parsed.type, errorMessage: parsed.message };
     }
   }, [state.isSupported, state.isEnabled]);
 
-  const authenticateWithBiometric = useCallback(async (): Promise<boolean> => {
-    // For backward compatibility, just call verifyBiometric
+  const authenticateWithBiometric = useCallback(async (): Promise<BiometricResult> => {
     return verifyBiometric();
   }, [verifyBiometric]);
 
@@ -249,11 +374,7 @@ export function useBiometricAuth() {
     return localStorage.getItem(BIOMETRIC_USER_KEY);
   }, []);
 
-  // Refresh token storage functions (para login automático)
-  // Security: Use sessionStorage for refresh tokens - cleared on browser close
-  // This reduces the window for XSS attacks to steal persistent tokens
   const saveRefreshToken = useCallback((refreshToken: string) => {
-    // Persistir em sessionStorage (seguro para aba) e localStorage (sobrevive a fechar aba)
     sessionStorage.setItem(BIOMETRIC_REFRESH_TOKEN_KEY, refreshToken);
     localStorage.setItem(BIOMETRIC_REFRESH_TOKEN_KEY, refreshToken);
   }, []);
@@ -267,7 +388,6 @@ export function useBiometricAuth() {
     localStorage.removeItem(BIOMETRIC_REFRESH_TOKEN_KEY);
   }, []);
 
-  // Access token fallback storage (quando refresh_token não está disponível)
   const saveAccessToken = useCallback((accessToken: string) => {
     sessionStorage.setItem(BIOMETRIC_ACCESS_TOKEN_KEY, accessToken);
     localStorage.setItem(BIOMETRIC_ACCESS_TOKEN_KEY, accessToken);
@@ -282,7 +402,6 @@ export function useBiometricAuth() {
     localStorage.removeItem(BIOMETRIC_ACCESS_TOKEN_KEY);
   }, []);
 
-  // Email storage functions
   const saveLastEmail = useCallback((email: string) => {
     localStorage.setItem(LAST_EMAIL_KEY, email);
   }, []);
@@ -303,15 +422,12 @@ export function useBiometricAuth() {
     verifyBiometric,
     getStoredUserId,
     checkSupport,
-    // Refresh token functions
     saveRefreshToken,
     getRefreshToken,
     clearRefreshToken,
-    // Access token fallback functions
     saveAccessToken,
     getAccessToken,
     clearAccessToken,
-    // Email functions
     saveLastEmail,
     getLastEmail,
     clearLastEmail,
