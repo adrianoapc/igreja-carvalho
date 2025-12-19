@@ -100,6 +100,7 @@ import EnsinoDashboard from "./pages/ensino/Dashboard";
 import TurmaAtiva from "./pages/kids/TurmaAtiva";
 import NotificacoesAdmin from "./pages/admin/Notificacoes";
 import WebhooksAdmin from "./pages/admin/Webhooks";
+import ChatbotsAdmin from "./pages/admin/Chatbots";
 
 const queryClient = new QueryClient();
 
@@ -770,6 +771,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <WebhooksAdmin />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/chatbots"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ChatbotsAdmin />
                 </MainLayout>
               </ProtectedRoute>
             }

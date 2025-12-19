@@ -431,71 +431,40 @@ export default function ConfiguracoesIgreja() {
       </Card>
 
       {/* Card de Configuração de IA/Chatbot */}
-      <Card>
+      <Card className="border-dashed">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Bot className="text-primary" />
-            <CardTitle>Chatbot & Inteligência Artificial</CardTitle>
+            <CardTitle>Chatbots & Inteligência Artificial</CardTitle>
           </div>
           <CardDescription>
-            Configurações do chatbot de triagem e IA para análise de pedidos
+            Gerencie configurações de chatbots, modelos de IA e prompts
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Status OpenAI API */}
-          <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-green-600" />
               <div>
-                <p className="font-medium text-green-900 dark:text-green-100">OpenAI API Configurada</p>
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  Usando gpt-4o-mini + Whisper para transcrição de áudio
+                <p className="font-medium text-green-900 dark:text-green-100 text-sm">OpenAI API Configurada</p>
+                <p className="text-xs text-green-700 dark:text-green-300">
+                  Pronto para uso com modelos GPT e Whisper
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Informações sobre o Chatbot */}
-          <div className="space-y-3">
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-medium mb-2">🤖 Chatbot de Triagem</h4>
-              <p className="text-sm text-muted-foreground">
-                O chatbot recebe mensagens via WhatsApp e classifica automaticamente:
-              </p>
-              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-                <li>Pedidos de oração (cria registro automático)</li>
-                <li>Testemunhos (encaminha para aprovação)</li>
-                <li>Dúvidas sobre a igreja (responde FAQ)</li>
-                <li>Solicitações pastorais (alerta plantão)</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-medium mb-2">⚙️ Modelos Utilizados</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Chat/Triagem:</p>
-                  <p className="font-mono text-xs">gpt-4o-mini</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Áudio:</p>
-                  <p className="font-mono text-xs">whisper-1</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Link para documentação */}
           <Button 
             variant="outline" 
+            onClick={() => navigate('/admin/chatbots')}
             className="w-full"
-            onClick={() => window.open('https://platform.openai.com/usage', '_blank')}
           >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Ver Uso da API OpenAI
+            <Bot className="w-4 h-4 mr-2" />
+            Gerenciar Chatbots & IAs
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            Para alterar a chave da API, acesse as configurações de secrets do backend
+            Configure modelos, prompts e roles para cada chatbot
           </p>
         </CardContent>
       </Card>
