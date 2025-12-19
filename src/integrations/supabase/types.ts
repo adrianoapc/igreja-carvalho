@@ -942,6 +942,39 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_function_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          execution_time_ms: number | null
+          function_name: string
+          id: string
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name: string
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          function_name?: string
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
       escalas_culto: {
         Row: {
           checkin_realizado: boolean | null
@@ -3980,6 +4013,32 @@ export type Database = {
         }
         Relationships: []
       }
+      view_edge_function_daily_stats: {
+        Row: {
+          avg_time_ms: number | null
+          errors: number | null
+          execution_date: string | null
+          function_name: string | null
+          successful: number | null
+          total: number | null
+        }
+        Relationships: []
+      }
+      view_edge_function_stats: {
+        Row: {
+          avg_execution_time_ms: number | null
+          errors: number | null
+          function_name: string | null
+          last_execution: string | null
+          max_execution_time_ms: number | null
+          min_execution_time_ms: number | null
+          success_rate: number | null
+          successful: number | null
+          timeouts: number | null
+          total_executions: number | null
+        }
+        Relationships: []
+      }
       view_health_score: {
         Row: {
           avatar_url: string | null
@@ -4336,6 +4395,17 @@ export type Database = {
       log_edge_function_execution: {
         Args: { p_details?: string; p_function_name: string; p_status: string }
         Returns: undefined
+      }
+      log_edge_function_with_metrics: {
+        Args: {
+          p_error_message?: string
+          p_execution_time_ms?: number
+          p_function_name: string
+          p_request_payload?: Json
+          p_response_payload?: Json
+          p_status: string
+        }
+        Returns: string
       }
       mask_cpf_cnpj: { Args: { cpf_cnpj: string }; Returns: string }
       notify_admins: {
