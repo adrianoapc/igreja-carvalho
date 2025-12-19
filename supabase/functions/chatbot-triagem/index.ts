@@ -291,6 +291,8 @@ function isLovableModel(model: string): boolean {
 
 serve(async (req) => {
   const requestId = crypto.randomUUID().substring(0, 8);
+  const startTime = Date.now();
+  
   console.log(`\n${'='.repeat(60)}`);
   console.log(`🚀 [${requestId}] NOVA REQUISIÇÃO - ${new Date().toISOString()}`);
   console.log(`${'='.repeat(60)}`);
@@ -300,10 +302,13 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestPayload: any = null;
+  
   try {
     // 1. Parse do body
     console.log(`📥 [${requestId}] Parseando body da requisição...`);
     const body = await req.json() as RequestBody;
+    requestPayload = { telefone: body.telefone, nome_perfil: body.nome_perfil, tipo_mensagem: body.tipo_mensagem };
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
     let { conteudo_texto } = body;
     
@@ -560,14 +565,36 @@ serve(async (req) => {
     console.log(`   - notificar_admin: ${notificarAdmin}`);
     console.log(`${'='.repeat(60)}\n`);
 
+    // 10. Registrar métricas de execução
+    const executionTime = Date.now() - startTime;
+    console.log(`📊 [${requestId}] Tempo de execução: ${executionTime}ms`);
+    
+    await supabase.rpc('log_edge_function_with_metrics', {
+      p_function_name: FUNCTION_NAME,
+      p_status: 'success',
+      p_execution_time_ms: executionTime,
+      p_request_payload: requestPayload,
+      p_response_payload: { reply_message: responseMessage?.substring(0, 200), notificar_admin: notificarAdmin }
+    });
+
     return new Response(JSON.stringify(finalResponse), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
   } catch (error) {
+    const executionTime = Date.now() - startTime;
     console.error(`\n❌ [${requestId}] ERRO FATAL:`);
     console.error(error);
     console.log(`${'='.repeat(60)}\n`);
+    
+    // Registrar erro nas métricas
+    await supabase.rpc('log_edge_function_with_metrics', {
+      p_function_name: FUNCTION_NAME,
+      p_status: 'error',
+      p_execution_time_ms: executionTime,
+      p_error_message: error instanceof Error ? error.message : 'Unknown error',
+      p_request_payload: requestPayload
+    });
     
     return new Response(JSON.stringify({ error: 'Erro interno', details: error instanceof Error ? error.message : 'Unknown' }), { 
       status: 500, 
