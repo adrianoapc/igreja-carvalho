@@ -10,6 +10,8 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+const FUNCTION_NAME = 'analise-sentimento-ia';
+
 const sentimentosLabels: Record<string, string> = {
   feliz: 'Feliz',
   cuidadoso: 'Cuidadoso',
@@ -25,10 +27,56 @@ const sentimentosLabels: Record<string, string> = {
 
 const negativeSentiments = ['angustiado', 'sozinho', 'triste', 'doente', 'com_pouca_fe', 'com_medo'];
 
+// Default prompt if not configured in database
+const DEFAULT_SYSTEM_PROMPT = `Você é um assistente pastoral sábio e empático de uma igreja cristã. Analise o relato do membro com cuidado e compaixão.
+
+INSTRUÇÕES:
+1. Gere um título curto de 3 a 5 palavras que resuma a situação
+2. Identifique a raiz do problema em uma dessas categorias: Saúde, Família, Espiritual, Financeiro, Trabalho, Relacionamento, Luto, Ansiedade, Outro
+3. Classifique a gravidade:
+   - "baixa": situação rotineira, emoção passageira
+   - "media": requer atenção pastoral, acompanhamento recomendado  
+   - "critica": sinais de desespero, luto recente, risco emocional, precisa de contato urgente
+4. Gere uma mensagem de acolhimento de NO MÁXIMO 3 frases. Seja empático, mencione que a igreja está orando, mas NÃO dê conselhos médicos, psicológicos ou promessas específicas.
+
+IMPORTANTE: Responda SOMENTE com um JSON válido no formato:
+{
+  "titulo": "string",
+  "motivo": "string", 
+  "gravidade": "baixa" | "media" | "critica",
+  "resposta": "string"
+}`;
+
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
+
+// Fetch chatbot config from database
+async function getChatbotConfig(supabase: any): Promise<{ model: string; systemPrompt: string }> {
+  try {
+    const { data: config, error } = await supabase
+      .from('chatbot_configs')
+      .select('modelo_texto, role_texto')
+      .eq('edge_function_name', FUNCTION_NAME)
+      .eq('ativo', true)
+      .single();
+
+    if (error || !config) {
+      console.log(`No config found for ${FUNCTION_NAME}, using defaults`);
+      return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
+    }
+
+    return {
+      model: config.modelo_texto || DEFAULT_MODEL,
+      systemPrompt: config.role_texto || DEFAULT_SYSTEM_PROMPT
+    };
+  } catch (err) {
+    console.error('Error fetching chatbot config:', err);
+    return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
+  }
+}
+
 // Helper to find the team leader phone for a member
 async function findLeaderPhone(supabase: any, pessoaId: string): Promise<string | null> {
   try {
-    // Find teams where this person is a member
     const { data: memberships, error } = await supabase
       .from('membros_time')
       .select(`
@@ -55,7 +103,6 @@ async function findLeaderPhone(supabase: any, pessoaId: string): Promise<string 
       return null;
     }
 
-    // Find the first team with a leader that has a phone
     for (const membership of memberships) {
       const leaderPhone = membership.times_culto?.lider?.telefone;
       if (leaderPhone) {
@@ -95,7 +142,6 @@ async function sendMakeWebhook(webhookUrl: string, payload: any): Promise<boolea
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -113,10 +159,12 @@ serve(async (req) => {
 
     console.log(`Processing sentiment analysis for ID: ${sentimento_id}`);
 
-    // Create Supabase client with service role for full access
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch the sentiment record with profile info
+    // Fetch chatbot configuration from database
+    const { model, systemPrompt } = await getChatbotConfig(supabase);
+    console.log(`Using model: ${model}`);
+
     const { data: sentimento, error: fetchError } = await supabase
       .from('sentimentos_membros')
       .select(`
@@ -139,7 +187,6 @@ serve(async (req) => {
       });
     }
 
-    // If no message, skip AI analysis
     if (!sentimento.mensagem) {
       console.log('No message to analyze, skipping AI analysis');
       return new Response(JSON.stringify({ message: 'No content to analyze' }), {
@@ -155,7 +202,6 @@ serve(async (req) => {
 
     console.log(`Analyzing sentiment from ${memberName}: ${sentimentoLabel}`);
 
-    // Call Lovable AI for analysis
     if (!LOVABLE_API_KEY) {
       console.error('LOVABLE_API_KEY not configured');
       return new Response(JSON.stringify({ error: 'AI API key not configured' }), {
@@ -163,25 +209,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const systemPrompt = `Você é um assistente pastoral sábio e empático de uma igreja cristã. Analise o relato do membro com cuidado e compaixão.
-
-INSTRUÇÕES:
-1. Gere um título curto de 3 a 5 palavras que resuma a situação
-2. Identifique a raiz do problema em uma dessas categorias: Saúde, Família, Espiritual, Financeiro, Trabalho, Relacionamento, Luto, Ansiedade, Outro
-3. Classifique a gravidade:
-   - "baixa": situação rotineira, emoção passageira
-   - "media": requer atenção pastoral, acompanhamento recomendado  
-   - "critica": sinais de desespero, luto recente, risco emocional, precisa de contato urgente
-4. Gere uma mensagem de acolhimento de NO MÁXIMO 3 frases. Seja empático, mencione que a igreja está orando, mas NÃO dê conselhos médicos, psicológicos ou promessas específicas.
-
-IMPORTANTE: Responda SOMENTE com um JSON válido no formato:
-{
-  "titulo": "string",
-  "motivo": "string", 
-  "gravidade": "baixa" | "media" | "critica",
-  "resposta": "string"
-}`;
 
     const userPrompt = `Sentimento registrado: ${sentimentoLabel}
 
@@ -198,7 +225,7 @@ Mensagem do membro:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -210,7 +237,6 @@ Mensagem do membro:
         const errorText = await aiResponse.text();
         console.error('AI API error:', aiResponse.status, errorText);
         
-        // Use fallback analysis instead of failing
         analysis = {
           titulo: 'Relato recebido',
           motivo: 'Não identificado',
@@ -232,7 +258,6 @@ Mensagem do membro:
         } else {
           console.log('AI Response:', content);
 
-          // Parse AI response
           try {
             const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
             analysis = JSON.parse(cleanContent);
@@ -257,7 +282,6 @@ Mensagem do membro:
       };
     }
 
-    // Update the sentiment record with AI analysis
     const { error: updateError } = await supabase
       .from('sentimentos_membros')
       .update({
@@ -279,43 +303,35 @@ Mensagem do membro:
 
     console.log('Analysis saved successfully');
 
-    // Check if critical alert should be triggered
     const isCritical = analysis.gravidade === 'critica' || 
       ['triste', 'com_medo', 'angustiado', 'sozinho'].includes(sentimento.sentimento);
 
     if (isCritical) {
       console.log('Critical sentiment detected, triggering alert');
 
-      // Fetch church configuration for notification settings
       const { data: churchConfig } = await supabase
         .from('configuracoes_igreja')
         .select('telefone_plantao_pastoral, webhook_make_liturgia')
         .single();
 
-      // Get telefone plantão from config or env
       const telefonePlantao = churchConfig?.telefone_plantao_pastoral || Deno.env.get('TELEFONE_PLANTAO') || '';
       const makeWebhookUrl = Deno.env.get('MAKE_WEBHOOK_URL') || churchConfig?.webhook_make_liturgia || '';
       
-      // Get app URL for admin link
       const appUrl = Deno.env.get('APP_URL') || SUPABASE_URL.replace('.supabase.co', '.lovable.app');
       const linkAdmin = `${appUrl}/intercessao/sentimentos`;
 
-      // Find the leader phone for this member
       let leaderPhone: string | null = null;
       if (pessoaId) {
         leaderPhone = await findLeaderPhone(supabase, pessoaId);
       }
 
-      // If no leader found, use plantão
       const primaryPhone = leaderPhone || telefonePlantao;
 
       console.log(`Primary phone (leader or plantão): ${primaryPhone}`);
       console.log(`Plantão phone (always receives copy): ${telefonePlantao}`);
 
-      // Create notification for admins/pastors
       const alertMessage = `🚨 ALERTA [${analysis.gravidade.toUpperCase()}]: ${analysis.titulo}. Motivo: ${analysis.motivo}. Membro: ${memberName}.`;
       
-      // Notify admins via internal notification system
       const { error: notifyError } = await supabase.rpc('notify_admins', {
         p_title: `⚠️ Alerta Pastoral: ${analysis.titulo}`,
         p_message: alertMessage,
@@ -336,9 +352,7 @@ Mensagem do membro:
         console.log('Admin notification sent');
       }
 
-      // Send to Make Webhook
       if (makeWebhookUrl) {
-        // Build the payload for Make
         const makePayload = {
           membro_nome: memberName,
           membro_telefone: memberPhone,
@@ -350,7 +364,6 @@ Mensagem do membro:
           link_admin: linkAdmin
         };
 
-        // Send to primary recipient (leader or plantão)
         if (primaryPhone) {
           console.log('Sending to primary phone via Make:', primaryPhone);
           await sendMakeWebhook(makeWebhookUrl, {
@@ -359,13 +372,12 @@ Mensagem do membro:
           });
         }
 
-        // ALWAYS send a copy to plantão pastoral (if different from primary)
         if (telefonePlantao && telefonePlantao !== primaryPhone) {
           console.log('Sending copy to plantão pastoral via Make:', telefonePlantao);
           await sendMakeWebhook(makeWebhookUrl, {
             ...makePayload,
             pastor_telefone: telefonePlantao,
-            is_copy: true // Flag to indicate this is a copy
+            is_copy: true
           });
         }
       } else {
