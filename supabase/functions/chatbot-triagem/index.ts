@@ -330,3 +330,344 @@ async function getOrCreateLead(telefone: string, nome: string) {
   console.log(`✅ [LEAD] Novo lead criado: ${newLead.id}`);
   return newLead.id;
 }
+
+// --- HANDLER PRINCIPAL ---
+serve(async (req: Request) => {
+  const startTime = Date.now();
+  console.log('🚀 [INICIO] Requisição recebida');
+  console.log(`🚀 [INICIO] Método: ${req.method}`);
+  
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    console.log('🔄 [CORS] Respondendo preflight');
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Parse request body
+    const body: RequestBody = await req.json();
+    console.log(`📥 [REQUEST] telefone: ${body.telefone}`);
+    console.log(`📥 [REQUEST] nome_perfil: ${body.nome_perfil}`);
+    console.log(`📥 [REQUEST] tipo_mensagem: ${body.tipo_mensagem || 'text'}`);
+    console.log(`📥 [REQUEST] conteudo_texto: ${body.conteudo_texto?.substring(0, 100) || 'N/A'}`);
+    console.log(`📥 [REQUEST] media_id: ${body.media_id || 'N/A'}`);
+
+    // Validação de entrada
+    if (!body.telefone) {
+      console.log('❌ [VALIDACAO] Telefone obrigatório');
+      return new Response(
+        JSON.stringify({ error: 'Telefone é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Buscar configuração do chatbot
+    const config = await getChatbotConfig();
+    console.log(`✅ [CONFIG] Modelo texto: ${config.textModel}`);
+
+    // Processar áudio se necessário
+    let mensagemUsuario = body.conteudo_texto || '';
+    if (body.tipo_mensagem === 'audio' && body.media_id) {
+      console.log('🎤 [AUDIO] Processando mensagem de áudio...');
+      const transcricao = await processarAudio(body.media_id, config.audioModel);
+      if (transcricao) {
+        mensagemUsuario = transcricao;
+        console.log(`✅ [AUDIO] Transcrição: ${transcricao.substring(0, 100)}...`);
+      } else {
+        mensagemUsuario = '[Áudio não processado]';
+        console.log('⚠️ [AUDIO] Não foi possível transcrever o áudio');
+      }
+    }
+
+    if (!mensagemUsuario || mensagemUsuario.trim() === '') {
+      console.log('❌ [VALIDACAO] Mensagem vazia');
+      return new Response(
+        JSON.stringify({ error: 'Mensagem vazia' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Buscar ou criar lead
+    const leadId = await getOrCreateLead(body.telefone, body.nome_perfil);
+    console.log(`👤 [LEAD] ID: ${leadId}`);
+
+    // Buscar ou criar sessão de atendimento (janela de 24h)
+    const janela24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    console.log('📋 [SESSAO] Buscando sessão ativa...');
+    
+    let { data: sessao } = await supabase
+      .from('atendimentos_bot')
+      .select('*')
+      .eq('telefone', body.telefone)
+      .is('status', 'ativo')
+      .gte('created_at', janela24h)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!sessao) {
+      console.log('📋 [SESSAO] Criando nova sessão...');
+      const { data: novaSessao, error: sessaoError } = await supabase
+        .from('atendimentos_bot')
+        .insert({
+          telefone: body.telefone,
+          visitante_id: leadId,
+          status: 'ativo',
+          historico_conversa: [],
+          meta_dados: { nome_perfil: body.nome_perfil }
+        })
+        .select()
+        .single();
+
+      if (sessaoError) {
+        console.error('❌ [SESSAO] Erro ao criar sessão:', sessaoError);
+        throw new Error(`Erro ao criar sessão: ${sessaoError.message}`);
+      }
+      sessao = novaSessao;
+      console.log(`✅ [SESSAO] Nova sessão criada: ${sessao.id}`);
+    } else {
+      console.log(`✅ [SESSAO] Sessão existente: ${sessao.id}`);
+    }
+
+    // Registrar mensagem do usuário no histórico
+    const historicoAtual = sessao.historico_conversa || [];
+    historicoAtual.push({
+      role: 'user',
+      content: mensagemUsuario,
+      timestamp: new Date().toISOString()
+    });
+
+    // Montar contexto para a IA
+    const mensagensParaIA = [
+      { role: 'system', content: config.systemPrompt },
+      ...historicoAtual.slice(-10).map((msg: any) => ({
+        role: msg.role,
+        content: msg.content
+      }))
+    ];
+
+    // Adicionar contexto do usuário
+    const contextoUsuario = `\n\n[CONTEXTO: Nome do usuário: ${body.nome_perfil || 'não informado'}, Telefone: ${body.telefone}]`;
+    mensagensParaIA[0].content += contextoUsuario;
+
+    console.log(`🤖 [IA] Enviando ${mensagensParaIA.length} mensagens para o modelo ${config.textModel}`);
+
+    // Chamar OpenAI
+    const apiKey = OPENAI_API_KEY || LOVABLE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Nenhuma API key configurada (OPENAI_API_KEY ou LOVABLE_API_KEY)');
+    }
+
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: config.textModel,
+        messages: mensagensParaIA,
+        max_tokens: 1000,
+        temperature: 0.7
+      })
+    });
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error('❌ [IA] Erro na API OpenAI:', errorText);
+      throw new Error(`Erro na API OpenAI: ${openaiResponse.status}`);
+    }
+
+    const openaiData = await openaiResponse.json();
+    const respostaIA = openaiData.choices[0]?.message?.content || '';
+    console.log(`✅ [IA] Resposta recebida: ${respostaIA.substring(0, 200)}...`);
+
+    // Extrair JSON e texto limpo
+    const { cleanText, parsedJson } = extractJsonAndText(respostaIA);
+    console.log(`📦 [PARSE] JSON detectado: ${!!parsedJson}`);
+    console.log(`📦 [PARSE] Texto limpo: ${cleanText.substring(0, 100)}...`);
+
+    // Atualizar histórico com resposta do bot
+    historicoAtual.push({
+      role: 'assistant',
+      content: respostaIA,
+      timestamp: new Date().toISOString()
+    });
+
+    // Processar intenção se conversa concluída
+    let notificarAdmin = false;
+    let dadosCriados: any = null;
+
+    if (parsedJson?.concluido === true) {
+      console.log(`🎯 [INTENCAO] Processando: ${parsedJson.intencao}`);
+      
+      switch (parsedJson.intencao) {
+        case 'PEDIDO_ORACAO':
+          console.log('🙏 [INTENCAO] Criando pedido de oração...');
+          const { data: pedido, error: pedidoError } = await supabase
+            .from('pedidos_oracao')
+            .insert({
+              tipo: parsedJson.categoria || 'OUTROS',
+              descricao: parsedJson.texto_na_integra || parsedJson.motivo_resumo,
+              nome_solicitante: parsedJson.nome_final || body.nome_perfil,
+              telefone_solicitante: body.telefone,
+              anonimo: parsedJson.anonimo || false,
+              status: 'pendente',
+              origem: 'whatsapp_bot'
+            })
+            .select()
+            .single();
+          
+          if (pedidoError) {
+            console.error('❌ [INTENCAO] Erro ao criar pedido:', pedidoError);
+          } else {
+            console.log(`✅ [INTENCAO] Pedido criado: ${pedido.id}`);
+            dadosCriados = { tipo: 'pedido_oracao', id: pedido.id };
+          }
+          break;
+
+        case 'TESTEMUNHO':
+          console.log('✨ [INTENCAO] Criando testemunho...');
+          const { data: testemunho, error: testemunhoError } = await supabase
+            .from('testemunhos')
+            .insert({
+              titulo: `Testemunho de ${parsedJson.nome_final || body.nome_perfil}`,
+              descricao: parsedJson.texto_na_integra || parsedJson.motivo_resumo,
+              categoria: 'geral',
+              aprovado: false,
+              anonimo: !parsedJson.publicar,
+              origem: 'whatsapp_bot'
+            })
+            .select()
+            .single();
+          
+          if (testemunhoError) {
+            console.error('❌ [INTENCAO] Erro ao criar testemunho:', testemunhoError);
+          } else {
+            console.log(`✅ [INTENCAO] Testemunho criado: ${testemunho.id}`);
+            dadosCriados = { tipo: 'testemunho', id: testemunho.id };
+          }
+          break;
+
+        case 'SOLICITACAO_PASTORAL':
+          console.log('👨‍💼 [INTENCAO] Criando solicitação pastoral...');
+          notificarAdmin = true;
+          const { data: pastoral, error: pastoralError } = await supabase
+            .from('pedidos_oracao')
+            .insert({
+              tipo: 'GABINETE',
+              descricao: `[SOLICITAÇÃO PASTORAL] ${parsedJson.texto_na_integra || parsedJson.motivo_resumo}`,
+              nome_solicitante: parsedJson.nome_final || body.nome_perfil,
+              telefone_solicitante: body.telefone,
+              anonimo: false,
+              status: 'pendente',
+              origem: 'whatsapp_bot'
+            })
+            .select()
+            .single();
+          
+          if (pastoralError) {
+            console.error('❌ [INTENCAO] Erro ao criar solicitação:', pastoralError);
+          } else {
+            console.log(`✅ [INTENCAO] Solicitação pastoral criada: ${pastoral.id}`);
+            dadosCriados = { tipo: 'solicitacao_pastoral', id: pastoral.id };
+          }
+          break;
+
+        default:
+          console.log(`⚠️ [INTENCAO] Intenção não reconhecida: ${parsedJson.intencao}`);
+      }
+
+      // Encerrar sessão
+      console.log('📋 [SESSAO] Encerrando sessão...');
+      await supabase
+        .from('atendimentos_bot')
+        .update({ 
+          status: 'finalizado',
+          historico_conversa: historicoAtual,
+          meta_dados: {
+            ...sessao.meta_dados,
+            intencao_final: parsedJson.intencao,
+            dados_criados: dadosCriados
+          }
+        })
+        .eq('id', sessao.id);
+    } else {
+      // Atualizar sessão com novo histórico
+      await supabase
+        .from('atendimentos_bot')
+        .update({ 
+          historico_conversa: historicoAtual,
+          ultima_mensagem_at: new Date().toISOString()
+        })
+        .eq('id', sessao.id);
+    }
+
+    // Log de execução
+    const executionTime = Date.now() - startTime;
+    console.log(`⏱️ [FIM] Tempo de execução: ${executionTime}ms`);
+
+    // Registrar log no banco
+    try {
+      await supabase.rpc('log_edge_function_with_metrics', {
+        p_function_name: FUNCTION_NAME,
+        p_status: 'success',
+        p_execution_time_ms: executionTime,
+        p_request_payload: { telefone: body.telefone, tipo: body.tipo_mensagem },
+        p_response_payload: { intencao: parsedJson?.intencao || null }
+      });
+    } catch (logError) {
+      console.error('Erro ao logar:', logError);
+    }
+
+    // Resposta final
+    return new Response(
+      JSON.stringify({
+        success: true,
+        reply_message: cleanText,
+        concluido: parsedJson?.concluido || false,
+        intencao: parsedJson?.intencao || null,
+        notificar_admin: notificarAdmin,
+        dados_contato: {
+          nome: body.nome_perfil,
+          telefone: body.telefone
+        },
+        dados_criados: dadosCriados,
+        execution_time_ms: executionTime
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+
+  } catch (error: unknown) {
+    const executionTime = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('❌ [ERRO] Erro no processamento:', error);
+
+    // Registrar erro no log
+    try {
+      await supabase.rpc('log_edge_function_with_metrics', {
+        p_function_name: FUNCTION_NAME,
+        p_status: 'error',
+        p_execution_time_ms: executionTime,
+        p_error_message: errorMessage
+      });
+    } catch (logError) {
+      console.error('Erro ao logar erro:', logError);
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: false,
+        error: errorMessage,
+        execution_time_ms: executionTime
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+});
