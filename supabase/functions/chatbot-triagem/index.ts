@@ -19,6 +19,7 @@ interface ChatResponse {
   categoria?: string;
   anonimo?: boolean;
   publicar?: boolean;
+  notificar_admin?: boolean;
 }
 
 // --- CONFIGURAÇÃO ---
@@ -458,6 +459,7 @@ serve(async (req) => {
         console.log(`   - concluido: ${parsedJson?.concluido}`);
         console.log(`   - intencao: ${parsedJson?.intencao}`);
         console.log(`   - nome_final: ${parsedJson?.nome_final}`);
+        console.log(`   - notificar_admin: ${parsedJson?.notificar_admin}`);
       } else {
         console.log(`📦 [${requestId}] Resposta não é JSON (conversa em andamento)`);
       }
@@ -466,7 +468,8 @@ serve(async (req) => {
     }
 
     let responseMessage = aiContent;
-    let notificarAdmin = false;
+    // Inicializa com o valor do JSON da IA (se presente)
+    let notificarAdmin = parsedJson?.notificar_admin || false;
 
     // 7. Execução da lógica de negócio
     console.log(`\n⚙️ [${requestId}] ETAPA: Execução de lógica`);
@@ -523,7 +526,9 @@ serve(async (req) => {
         } else {
           console.log(`✅ [${requestId}] Solicitação pastoral salva`);
         }
-        notificarAdmin = true;
+        // Força notificar_admin=true para SOLICITACAO_PASTORAL (fallback se IA não enviar)
+        notificarAdmin = parsedJson?.notificar_admin ?? true;
+        console.log(`⚙️ [${requestId}] notificar_admin definido: ${notificarAdmin}`);
         responseMessage = `Entendido. Já notifiquei o pastor sobre: "${parsedJson.motivo_resumo}".`;
       }
       else if (parsedJson.intencao === 'TESTEMUNHO') {
