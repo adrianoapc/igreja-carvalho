@@ -6,8 +6,49 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum image size: 10MB
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+const FUNCTION_NAME = 'processar-nota-fiscal';
+
+// Default config if not in database
+const DEFAULT_MODEL = 'google/gemini-2.5-pro';
+const DEFAULT_VISION_PROMPT = `Você é um assistente especializado em extrair informações de notas fiscais brasileiras (NFe, NFCe, cupons fiscais, etc).
+             
+Analise a imagem da nota fiscal e extraia as seguintes informações:
+- CNPJ ou CPF do fornecedor/emissor
+- Nome/Razão Social do fornecedor
+- Data de emissão (formato YYYY-MM-DD)
+- Valor total
+- Data de vencimento (se houver, formato YYYY-MM-DD)
+- Descrição dos itens/serviços
+- Número da nota fiscal
+
+Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`;
+
+// Fetch chatbot config from database
+async function getChatbotConfig(supabase: any): Promise<{ model: string; systemPrompt: string }> {
+  try {
+    const { data: config, error } = await supabase
+      .from('chatbot_configs')
+      .select('modelo_visao, role_visao')
+      .eq('edge_function_name', FUNCTION_NAME)
+      .eq('ativo', true)
+      .single();
+
+    if (error || !config) {
+      console.log(`No config found for ${FUNCTION_NAME}, using defaults`);
+      return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_VISION_PROMPT };
+    }
+
+    return {
+      model: config.modelo_visao || DEFAULT_MODEL,
+      systemPrompt: config.role_visao || DEFAULT_VISION_PROMPT
+    };
+  } catch (err) {
+    console.error('Error fetching chatbot config:', err);
+    return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_VISION_PROMPT };
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,7 +56,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verify authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -24,15 +64,15 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client with user's auth token
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
 
-    // Verify user session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
     if (authError || !user) {
       console.error('Auth error:', authError);
       return new Response(
@@ -41,8 +81,7 @@ serve(async (req) => {
       );
     }
 
-    // Check if user has admin or tesoureiro role
-    const { data: userRoles, error: rolesError } = await supabase
+    const { data: userRoles, error: rolesError } = await supabaseAuth
       .from('user_app_roles')
       .select('role:app_roles(name)')
       .eq('user_id', user.id);
@@ -68,7 +107,6 @@ serve(async (req) => {
 
     const { imageBase64, mimeType } = await req.json();
     
-    // Validate input
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Imagem não fornecida' }),
@@ -76,7 +114,6 @@ serve(async (req) => {
       );
     }
 
-    // Check image size (base64 is ~33% larger than binary)
     if (imageBase64.length > MAX_IMAGE_SIZE * 1.4) {
       return new Response(
         JSON.stringify({ error: 'Imagem muito grande. Tamanho máximo: 10MB' }),
@@ -84,7 +121,6 @@ serve(async (req) => {
       );
     }
 
-    // Validate mimeType
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (mimeType && !allowedMimeTypes.includes(mimeType)) {
       return new Response(
@@ -104,7 +140,11 @@ serve(async (req) => {
       );
     }
 
-    // Usar Gemini Pro para melhor precisão em OCR
+    // Use service role client to fetch config
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+    const { model, systemPrompt } = await getChatbotConfig(supabaseService);
+    console.log(`Using model: ${model}`);
+
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -112,22 +152,11 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: model,
         messages: [
           {
             role: 'system',
-            content: `Você é um assistente especializado em extrair informações de notas fiscais brasileiras (NFe, NFCe, cupons fiscais, etc).
-            
-Analise a imagem da nota fiscal e extraia as seguintes informações:
-- CNPJ ou CPF do fornecedor/emissor
-- Nome/Razão Social do fornecedor
-- Data de emissão (formato YYYY-MM-DD)
-- Valor total
-- Data de vencimento (se houver, formato YYYY-MM-DD)
-- Descrição dos itens/serviços
-- Número da nota fiscal
-
-Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`
+            content: systemPrompt
           },
           {
             role: 'user',
@@ -221,7 +250,6 @@ Retorne os dados no formato estruturado solicitado. Se algum campo não estiver 
     const data = await response.json();
     console.log('Resposta da IA recebida');
 
-    // Extrair argumentos da tool call
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall || toolCall.function?.name !== 'extrair_nota_fiscal') {
       throw new Error('Resposta da IA não contém dados estruturados');

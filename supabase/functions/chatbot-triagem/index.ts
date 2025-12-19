@@ -27,52 +27,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const WHATSAPP_API_TOKEN = Deno.env.get('WHATSAPP_API_TOKEN');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
+const FUNCTION_NAME = 'chatbot-triagem';
+
 const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-// --- FUNÇÕES AUXILIARES ---
-async function processarAudio(mediaId: string): Promise<string | null> {
-  try {
-    if (!WHATSAPP_API_TOKEN) return null;
-    const mediaUrlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
-    const mediaData = await mediaUrlRes.json();
-    if (!mediaData.url) return null;
-    const audioRes = await fetch(mediaData.url, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
-    const audioBlob = await audioRes.blob();
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.ogg');
-    formData.append('model', 'whisper-1');
-    const transRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
-      body: formData
-    });
-    const data = await transRes.json();
-    return data.text;
-  } catch (e) {
-    console.error("Erro audio:", e);
-    return null;
-  }
-}
-
-async function getOrCreateLead(telefone: string, nome: string) {
-  const { data: existing } = await supabase.from('visitantes_leads').select('id').eq('telefone', telefone).maybeSingle();
-  if (existing) {
-    await supabase.from('visitantes_leads').update({ data_ultimo_contato: new Date() }).eq('id', existing.id);
-    return existing.id;
-  }
-  const { data: newLead } = await supabase.from('visitantes_leads').insert({
-      telefone, nome: nome || 'Visitante WhatsApp', origem: 'WABA_BOT', estagio_funil: 'NOVO', data_ultimo_contato: new Date()
-  }).select('id').single();
-  return newLead?.id;
-}
-
-// --- SYSTEM PROMPT FINAL - ACOLHIMENTO DIGITAL ---
-const BASE_SYSTEM_PROMPT = `🕊️ PROMPT FINAL – ACOLHIMENTO DIGITAL
+// Default prompt if not configured in database
+const DEFAULT_SYSTEM_PROMPT = `🕊️ PROMPT FINAL – ACOLHIMENTO DIGITAL
 Igreja Carvalho – Versão Compacta, com Fallback + Auto-categoria
 
 🎯 PAPEL
@@ -174,6 +140,95 @@ SOLICITACAO_PASTORAL:
 - Ao final da conversa, inclua: "✨ Seus dados ficam protegidos com carinho e são usados apenas para te acolher melhor, conforme a LGPD."
 `;
 
+const DEFAULT_TEXT_MODEL = 'gpt-4o-mini';
+const DEFAULT_AUDIO_MODEL = 'whisper-1';
+
+interface ChatbotConfig {
+  textModel: string;
+  audioModel: string;
+  systemPrompt: string;
+  audioPrompt: string | null;
+}
+
+// Fetch chatbot config from database
+async function getChatbotConfig(): Promise<ChatbotConfig> {
+  try {
+    const { data: config, error } = await supabase
+      .from('chatbot_configs')
+      .select('modelo_texto, modelo_audio, role_texto, role_audio')
+      .eq('edge_function_name', FUNCTION_NAME)
+      .eq('ativo', true)
+      .single();
+
+    if (error || !config) {
+      console.log(`No config found for ${FUNCTION_NAME}, using defaults`);
+      return {
+        textModel: DEFAULT_TEXT_MODEL,
+        audioModel: DEFAULT_AUDIO_MODEL,
+        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+        audioPrompt: null
+      };
+    }
+
+    return {
+      textModel: config.modelo_texto || DEFAULT_TEXT_MODEL,
+      audioModel: config.modelo_audio || DEFAULT_AUDIO_MODEL,
+      systemPrompt: config.role_texto || DEFAULT_SYSTEM_PROMPT,
+      audioPrompt: config.role_audio || null
+    };
+  } catch (err) {
+    console.error('Error fetching chatbot config:', err);
+    return {
+      textModel: DEFAULT_TEXT_MODEL,
+      audioModel: DEFAULT_AUDIO_MODEL,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+      audioPrompt: null
+    };
+  }
+}
+
+// --- FUNÇÕES AUXILIARES ---
+async function processarAudio(mediaId: string, audioModel: string): Promise<string | null> {
+  try {
+    if (!WHATSAPP_API_TOKEN || !OPENAI_API_KEY) return null;
+    const mediaUrlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
+    const mediaData = await mediaUrlRes.json();
+    if (!mediaData.url) return null;
+    const audioRes = await fetch(mediaData.url, { headers: { 'Authorization': `Bearer ${WHATSAPP_API_TOKEN}` } });
+    const audioBlob = await audioRes.blob();
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.ogg');
+    formData.append('model', audioModel);
+    const transRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      body: formData
+    });
+    const data = await transRes.json();
+    return data.text;
+  } catch (e) {
+    console.error("Erro audio:", e);
+    return null;
+  }
+}
+
+async function getOrCreateLead(telefone: string, nome: string) {
+  const { data: existing } = await supabase.from('visitantes_leads').select('id').eq('telefone', telefone).maybeSingle();
+  if (existing) {
+    await supabase.from('visitantes_leads').update({ data_ultimo_contato: new Date() }).eq('id', existing.id);
+    return existing.id;
+  }
+  const { data: newLead } = await supabase.from('visitantes_leads').insert({
+      telefone, nome: nome || 'Visitante WhatsApp', origem: 'WABA_BOT', estagio_funil: 'NOVO', data_ultimo_contato: new Date()
+  }).select('id').single();
+  return newLead?.id;
+}
+
+// Check if model is from Lovable AI or OpenAI
+function isLovableModel(model: string): boolean {
+  return model.startsWith('google/') || model.startsWith('openai/gpt-5');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -182,9 +237,13 @@ serve(async (req) => {
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
     let { conteudo_texto } = body;
 
+    // Fetch config from database
+    const config = await getChatbotConfig();
+    console.log(`Using text model: ${config.textModel}, audio model: ${config.audioModel}`);
+
     // 1. Áudio
     if (tipo_mensagem === 'audio' && media_id) {
-      const transcricao = await processarAudio(media_id);
+      const transcricao = await processarAudio(media_id, config.audioModel);
       conteudo_texto = transcricao ? `[Áudio Transcrito]: ${transcricao}` : "[Erro áudio]";
     }
     const inputTexto = conteudo_texto || "";
@@ -203,22 +262,55 @@ serve(async (req) => {
 
     await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'USER', payload_raw: { texto: inputTexto } });
 
-    // 3. IA
+    // 3. IA - choose API based on model
     const messages = [
-      { role: "system", content: BASE_SYSTEM_PROMPT },
+      { role: "system", content: config.systemPrompt },
       { role: "system", content: `CONTEXTO USUÁRIO: Telefone: ${telefone}. Nome perfil: ${nome_perfil}.` },
       ...historico.map((h: any) => ({ role: h.role, content: h.content })),
       { role: "user", content: inputTexto }
     ];
 
-    const openAIRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages, temperature: 0.3 }), // Temperature baixo evita criatividade excessiva
-    });
+    let aiContent = "";
 
-    const aiData = await openAIRes.json();
-    const aiContent = aiData.choices?.[0]?.message?.content || "";
+    if (isLovableModel(config.textModel)) {
+      // Use Lovable AI Gateway
+      if (!LOVABLE_API_KEY) {
+        throw new Error('LOVABLE_API_KEY not configured');
+      }
+      
+      const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ model: config.textModel, messages }),
+      });
+
+      if (!aiRes.ok) {
+        const errorText = await aiRes.text();
+        console.error('Lovable AI error:', aiRes.status, errorText);
+        throw new Error('AI request failed');
+      }
+
+      const aiData = await aiRes.json();
+      aiContent = aiData.choices?.[0]?.message?.content || "";
+    } else {
+      // Use OpenAI directly
+      if (!OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY not configured');
+      }
+
+      const openAIRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: config.textModel, messages, temperature: 0.3 }),
+      });
+
+      const aiData = await openAIRes.json();
+      aiContent = aiData.choices?.[0]?.message?.content || "";
+    }
+
     let parsedJson: ChatResponse | null = null;
     try {
       const clean = aiContent.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -230,7 +322,6 @@ serve(async (req) => {
 
     // 4. Execução Lógica
     if (parsedJson?.concluido) {
-      // Encerra sessão
       await supabase.from('atendimentos_bot').update({
         status: 'CONCLUIDO',
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
@@ -278,7 +369,6 @@ serve(async (req) => {
       }
 
     } else {
-      // Conversa continua
       await supabase.from('atendimentos_bot').update({
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);

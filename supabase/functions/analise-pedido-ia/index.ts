@@ -10,8 +10,56 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+const FUNCTION_NAME = 'analise-pedido-ia';
+
+// Default prompt if not configured in database
+const DEFAULT_SYSTEM_PROMPT = `Você é um assistente pastoral sábio e empático de uma igreja cristã. Analise o pedido de oração com cuidado e compaixão.
+
+INSTRUÇÕES:
+1. Gere um título curto de 3 a 5 palavras que resuma o pedido
+2. Identifique a raiz/categoria principal em uma dessas opções: Saúde, Família, Espiritual, Financeiro, Trabalho, Relacionamento, Luto, Ansiedade, Agradecimento, Outro
+3. Classifique a gravidade:
+   - "baixa": pedido rotineiro, gratidão, bênçãos gerais
+   - "media": situação que requer atenção pastoral, acompanhamento recomendado  
+   - "critica": sinais de desespero, luto recente, doença grave, risco emocional
+4. Gere uma mensagem de acolhimento de NO MÁXIMO 3 frases. Seja empático, mencione que a equipe de intercessão está orando, mas NÃO dê conselhos médicos, psicológicos ou promessas específicas.
+
+IMPORTANTE: Responda SOMENTE com um JSON válido no formato:
+{
+  "titulo": "string",
+  "motivo": "string", 
+  "gravidade": "baixa" | "media" | "critica",
+  "resposta": "string"
+}`;
+
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
+
+// Fetch chatbot config from database
+async function getChatbotConfig(supabase: any): Promise<{ model: string; systemPrompt: string }> {
+  try {
+    const { data: config, error } = await supabase
+      .from('chatbot_configs')
+      .select('modelo_texto, role_texto')
+      .eq('edge_function_name', FUNCTION_NAME)
+      .eq('ativo', true)
+      .single();
+
+    if (error || !config) {
+      console.log(`No config found for ${FUNCTION_NAME}, using defaults`);
+      return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
+    }
+
+    return {
+      model: config.modelo_texto || DEFAULT_MODEL,
+      systemPrompt: config.role_texto || DEFAULT_SYSTEM_PROMPT
+    };
+  } catch (err) {
+    console.error('Error fetching chatbot config:', err);
+    return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -29,10 +77,12 @@ serve(async (req) => {
 
     console.log(`Processing prayer request analysis for ID: ${pedido_id}`);
 
-    // Create Supabase client with service role for full access
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch the prayer request with profile info
+    // Fetch chatbot configuration from database
+    const { model, systemPrompt } = await getChatbotConfig(supabase);
+    console.log(`Using model: ${model}`);
+
     const { data: pedido, error: fetchError } = await supabase
       .from('pedidos_oracao')
       .select(`
@@ -55,7 +105,6 @@ serve(async (req) => {
       });
     }
 
-    // If no content, skip AI analysis
     if (!pedido.pedido) {
       console.log('No content to analyze, skipping AI analysis');
       return new Response(JSON.stringify({ message: 'No content to analyze' }), {
@@ -69,7 +118,6 @@ serve(async (req) => {
 
     console.log(`Analyzing prayer request from ${memberName}: ${tipoLabel}`);
 
-    // Call Lovable AI for analysis
     if (!LOVABLE_API_KEY) {
       console.error('LOVABLE_API_KEY not configured');
       return new Response(JSON.stringify({ error: 'AI API key not configured' }), {
@@ -77,25 +125,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const systemPrompt = `Você é um assistente pastoral sábio e empático de uma igreja cristã. Analise o pedido de oração com cuidado e compaixão.
-
-INSTRUÇÕES:
-1. Gere um título curto de 3 a 5 palavras que resuma o pedido
-2. Identifique a raiz/categoria principal em uma dessas opções: Saúde, Família, Espiritual, Financeiro, Trabalho, Relacionamento, Luto, Ansiedade, Agradecimento, Outro
-3. Classifique a gravidade:
-   - "baixa": pedido rotineiro, gratidão, bênçãos gerais
-   - "media": situação que requer atenção pastoral, acompanhamento recomendado  
-   - "critica": sinais de desespero, luto recente, doença grave, risco emocional
-4. Gere uma mensagem de acolhimento de NO MÁXIMO 3 frases. Seja empático, mencione que a equipe de intercessão está orando, mas NÃO dê conselhos médicos, psicológicos ou promessas específicas.
-
-IMPORTANTE: Responda SOMENTE com um JSON válido no formato:
-{
-  "titulo": "string",
-  "motivo": "string", 
-  "gravidade": "baixa" | "media" | "critica",
-  "resposta": "string"
-}`;
 
     const userPrompt = `Tipo do pedido: ${tipoLabel}
 
@@ -112,7 +141,7 @@ Pedido de oração:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -124,7 +153,6 @@ Pedido de oração:
         const errorText = await aiResponse.text();
         console.error('AI API error:', aiResponse.status, errorText);
         
-        // Use fallback analysis
         analysis = {
           titulo: 'Pedido recebido',
           motivo: tipoLabel,
@@ -146,7 +174,6 @@ Pedido de oração:
         } else {
           console.log('AI Response:', content);
 
-          // Parse AI response
           try {
             const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
             analysis = JSON.parse(cleanContent);
@@ -171,7 +198,6 @@ Pedido de oração:
       };
     }
 
-    // Update the prayer request with AI analysis
     const { error: updateError } = await supabase
       .from('pedidos_oracao')
       .update({
@@ -179,7 +205,6 @@ Pedido de oração:
         analise_ia_motivo: analysis.motivo,
         analise_ia_gravidade: analysis.gravidade,
         analise_ia_resposta: analysis.resposta,
-        // Also update tipo if AI identified a better category
         tipo: analysis.motivo?.toLowerCase().replace(/[^a-z]/g, '') || pedido.tipo
       })
       .eq('id', pedido_id);
