@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ============= CORS & CONSTANTS =============
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -12,8 +13,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const FUNCTION_NAME = 'analise-pedido-ia';
 
-// Default prompt if not configured in database
-const DEFAULT_SYSTEM_PROMPT = `Você é um assistente pastoral sábio e empático de uma igreja cristã. Analise o pedido de oração com cuidado e compaixão.
+// ============= FALLBACK DEFAULTS =============
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
+
+const DEFAULT_PROMPT = `Analise este pedido de oração. Identifique a categoria e se há GRAVIDADE ALTA (risco de vida, abuso, crise grave). Retorne JSON.
 
 INSTRUÇÕES:
 1. Gere um título curto de 3 a 5 palavras que resuma o pedido
@@ -32,10 +35,23 @@ IMPORTANTE: Responda SOMENTE com um JSON válido no formato:
   "resposta": "string"
 }`;
 
-const DEFAULT_MODEL = 'google/gemini-2.5-flash';
+// ============= TYPES =============
+interface ChatbotConfig {
+  textModel: string;
+  systemPrompt: string;
+}
 
-// Fetch chatbot config from database
-async function getChatbotConfig(supabase: any): Promise<{ model: string; systemPrompt: string }> {
+interface AnaliseResult {
+  titulo: string;
+  motivo: string;
+  gravidade: string;
+  resposta: string;
+}
+
+// ============= HELPER FUNCTIONS =============
+
+// Fetch chatbot config from database with fallback
+async function getChatbotConfig(supabase: any): Promise<ChatbotConfig> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
@@ -45,20 +61,32 @@ async function getChatbotConfig(supabase: any): Promise<{ model: string; systemP
       .single();
 
     if (error || !config) {
-      console.log(`No config found for ${FUNCTION_NAME}, using defaults`);
-      return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
+      console.log(`[${FUNCTION_NAME}] No config found in database, using defaults`);
+      return { textModel: DEFAULT_MODEL, systemPrompt: DEFAULT_PROMPT };
     }
 
+    console.log(`[${FUNCTION_NAME}] Config loaded from database`);
     return {
-      model: config.modelo_texto || DEFAULT_MODEL,
-      systemPrompt: config.role_texto || DEFAULT_SYSTEM_PROMPT
+      textModel: config.modelo_texto || DEFAULT_MODEL,
+      systemPrompt: config.role_texto || DEFAULT_PROMPT
     };
   } catch (err) {
-    console.error('Error fetching chatbot config:', err);
-    return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_SYSTEM_PROMPT };
+    console.error(`[${FUNCTION_NAME}] Error fetching chatbot config:`, err);
+    return { textModel: DEFAULT_MODEL, systemPrompt: DEFAULT_PROMPT };
   }
 }
 
+// Default analysis when AI fails
+function getDefaultAnalysis(tipoLabel: string): AnaliseResult {
+  return {
+    titulo: 'Pedido recebido',
+    motivo: tipoLabel,
+    gravidade: 'baixa',
+    resposta: 'Recebemos seu pedido de oração e nossa equipe de intercessores está orando por você.'
+  };
+}
+
+// ============= MAIN HANDLER =============
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -75,14 +103,15 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Processing prayer request analysis for ID: ${pedido_id}`);
+    console.log(`[${FUNCTION_NAME}] Processing prayer request analysis for ID: ${pedido_id}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Fetch chatbot configuration from database
-    const { model, systemPrompt } = await getChatbotConfig(supabase);
-    console.log(`Using model: ${model}`);
+    const config = await getChatbotConfig(supabase);
+    console.log(`[${FUNCTION_NAME}] Using model: ${config.textModel}`);
 
+    // Fetch prayer request
     const { data: pedido, error: fetchError } = await supabase
       .from('pedidos_oracao')
       .select(`
@@ -116,7 +145,7 @@ serve(async (req) => {
     const tipoLabel = pedido.tipo || 'Não especificado';
     const memberName = pedido.profiles?.nome || pedido.nome_solicitante || 'Solicitante';
 
-    console.log(`Analyzing prayer request from ${memberName}: ${tipoLabel}`);
+    console.log(`[${FUNCTION_NAME}] Analyzing prayer request from ${memberName}: ${tipoLabel}`);
 
     if (!LOVABLE_API_KEY) {
       console.error('LOVABLE_API_KEY not configured');
@@ -131,9 +160,11 @@ serve(async (req) => {
 Pedido de oração:
 "${pedido.pedido}"`;
 
-    let analysis;
+    let analysis: AnaliseResult;
     
     try {
+      console.log(`[${FUNCTION_NAME}] Calling AI with model: ${config.textModel}`);
+      
       const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -141,9 +172,9 @@ Pedido de oração:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: model,
+          model: config.textModel,
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: config.systemPrompt },
             { role: 'user', content: userPrompt }
           ],
         }),
@@ -152,25 +183,14 @@ Pedido de oração:
       if (!aiResponse.ok) {
         const errorText = await aiResponse.text();
         console.error('AI API error:', aiResponse.status, errorText);
-        
-        analysis = {
-          titulo: 'Pedido recebido',
-          motivo: tipoLabel,
-          gravidade: 'baixa',
-          resposta: 'Recebemos seu pedido de oração e nossa equipe de intercessores está orando por você.'
-        };
+        analysis = getDefaultAnalysis(tipoLabel);
       } else {
         const aiData = await aiResponse.json();
         const content = aiData.choices?.[0]?.message?.content;
 
         if (!content) {
           console.error('No content in AI response');
-          analysis = {
-            titulo: 'Pedido recebido',
-            motivo: tipoLabel,
-            gravidade: 'baixa',
-            resposta: 'Recebemos seu pedido de oração e nossa equipe de intercessores está orando por você.'
-          };
+          analysis = getDefaultAnalysis(tipoLabel);
         } else {
           console.log('AI Response:', content);
 
@@ -179,25 +199,16 @@ Pedido de oração:
             analysis = JSON.parse(cleanContent);
           } catch (parseError) {
             console.error('Failed to parse AI response:', parseError);
-            analysis = {
-              titulo: 'Pedido recebido',
-              motivo: tipoLabel,
-              gravidade: 'baixa',
-              resposta: 'Recebemos seu pedido de oração e nossa equipe de intercessores está orando por você.'
-            };
+            analysis = getDefaultAnalysis(tipoLabel);
           }
         }
       }
     } catch (aiError) {
       console.error('AI request failed (non-blocking):', aiError);
-      analysis = {
-        titulo: 'Pedido recebido',
-        motivo: tipoLabel,
-        gravidade: 'baixa',
-        resposta: 'Recebemos seu pedido de oração e nossa equipe de intercessores está orando por você.'
-      };
+      analysis = getDefaultAnalysis(tipoLabel);
     }
 
+    // Update prayer request with analysis
     const { error: updateError } = await supabase
       .from('pedidos_oracao')
       .update({
@@ -217,7 +228,7 @@ Pedido de oração:
       });
     }
 
-    console.log('Analysis saved successfully');
+    console.log(`[${FUNCTION_NAME}] Analysis saved successfully`);
 
     return new Response(JSON.stringify({ 
       success: true, 
