@@ -578,7 +578,7 @@ export default function DashboardAdmin() {
       </div>
 
       {/* Section: Strategic Vision (Charts) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {/* Cash Flow Chart */}
         <Card className="shadow-soft">
           <CardHeader className="pb-2">
@@ -614,8 +614,16 @@ export default function DashboardAdmin() {
             </ChartContainer>
           </CardContent>
         </Card>
+      </div>
 
-        {/* Consolidation Funnel */}
+      {/* Section: Pastoral (Heart of the Church) */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <Heart className="w-5 h-5 text-rose-500" />
+          Vida da Igreja
+        </h2>
+
+        {/* Consolidation Funnel - Moved here */}
         <Card className="shadow-soft">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -647,14 +655,6 @@ export default function DashboardAdmin() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Section: Pastoral (Heart of the Church) */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <Heart className="w-5 h-5 text-rose-500" />
-          Vida da Igreja
-        </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Prayer Requests */}
