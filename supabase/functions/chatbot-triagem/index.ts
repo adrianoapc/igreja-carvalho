@@ -376,19 +376,29 @@ serve(async (req: Request) => {
       console.log(`💬 [${requestId}] Histórico: ${historico.length} mensagens`);
     } else {
       const leadId = await getOrCreateLead(telefone, nome_perfil);
-      const { data: newSession } = await supabase
+      const { data: newSession, error: newSessionError } = await supabase
         .from('atendimentos_bot')
         .insert({
           telefone,
           visitante_id: leadId,
-          status: 'em_atendimento',
+          status: 'EM_ANDAMENTO',
           historico_conversa: [],
           meta_dados: { nome_perfil, origem: 'whatsapp' }
         })
         .select()
         .single();
-      
-      sessionId = newSession!.id;
+
+      if (newSessionError) {
+        console.error(`❌ [${requestId}] Erro ao criar sessão:`, newSessionError);
+        throw new Error(`Falha ao criar sessão do chatbot: ${newSessionError.message}`);
+      }
+
+      if (!newSession) {
+        console.error(`❌ [${requestId}] Inserção de sessão retornou vazio`);
+        throw new Error('Falha ao criar sessão do chatbot: retorno vazio');
+      }
+
+      sessionId = newSession.id;
       console.log(`✅ [${requestId}] Nova sessão criada: ${sessionId}`);
     }
 
@@ -528,7 +538,7 @@ serve(async (req: Request) => {
 
       // Close session
       await supabase.from('atendimentos_bot').update({
-        status: 'finalizado',
+        status: 'CONCLUIDO',
         finalizado_em: new Date().toISOString()
       }).eq('id', sessionId);
       console.log(`✅ [${requestId}] Sessão finalizada`);
