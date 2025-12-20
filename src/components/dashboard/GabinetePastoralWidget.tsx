@@ -59,7 +59,7 @@ export function GabinetePastoralWidget() {
     (a) => a.status === "CONCLUIDO" && isThisWeek(new Date(a.created_at))
   ).length;
 
-  const totalPendentes = atendimentos.filter(
+  const emAberto = atendimentos.filter(
     (a) => a.status !== "CONCLUIDO"
   ).length;
 
@@ -67,32 +67,44 @@ export function GabinetePastoralWidget() {
 
   const kpis = [
     {
-      label: "Críticos",
+      label: "Casos Críticos",
       value: criticos,
       icon: AlertTriangle,
       color: criticos > 0 ? "text-red-500" : "text-muted-foreground",
       bgColor: criticos > 0 ? "bg-red-500/10" : "bg-muted/30",
+      alert: criticos > 0,
     },
     {
-      label: "Alta",
+      label: "Alta Prioridade",
       value: altos,
       icon: Clock,
       color: altos > 0 ? "text-orange-500" : "text-muted-foreground",
       bgColor: altos > 0 ? "bg-orange-500/10" : "bg-muted/30",
+      alert: false,
     },
     {
-      label: "Hoje",
+      label: "Agendados Hoje",
       value: agendadosHoje,
       icon: Calendar,
       color: agendadosHoje > 0 ? "text-blue-500" : "text-muted-foreground",
       bgColor: agendadosHoje > 0 ? "bg-blue-500/10" : "bg-muted/30",
+      alert: false,
     },
     {
-      label: "Concluídos",
+      label: "Em Aberto",
+      value: emAberto,
+      icon: Users,
+      color: emAberto > 0 ? "text-amber-500" : "text-muted-foreground",
+      bgColor: emAberto > 0 ? "bg-amber-500/10" : "bg-muted/30",
+      alert: false,
+    },
+    {
+      label: "Concluídos (Semana)",
       value: concluidosSemana,
       icon: CheckCircle2,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
+      alert: false,
     },
   ];
 
@@ -109,52 +121,45 @@ export function GabinetePastoralWidget() {
           </CardTitle>
           {hasUrgent && (
             <Badge variant="destructive" className="animate-pulse text-xs">
-              {criticos} crítico{criticos > 1 ? "s" : ""}
+              Atenção!
             </Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2">
         {loading ? (
-          <div className="grid grid-cols-4 gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-14 bg-muted/50 rounded-lg animate-pulse" />
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-8 bg-muted/50 rounded-lg animate-pulse" />
             ))}
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-4 gap-2">
-              {kpis.map((kpi) => (
-                <div
-                  key={kpi.label}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-2 rounded-lg",
-                    kpi.bgColor
-                  )}
-                >
-                  <kpi.icon className={cn("h-4 w-4 mb-1", kpi.color)} />
-                  <span className={cn("text-lg font-bold", kpi.color)}>
-                    {kpi.value}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground text-center leading-tight">
-                    {kpi.label}
-                  </span>
+          <div className="space-y-1.5">
+            {kpis.map((kpi) => (
+              <div
+                key={kpi.label}
+                className={cn(
+                  "flex items-center justify-between p-2 rounded-lg",
+                  kpi.bgColor,
+                  kpi.alert && "ring-1 ring-red-500/50"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <kpi.icon className={cn("h-4 w-4", kpi.color)} />
+                  <span className="text-sm text-foreground">{kpi.label}</span>
                 </div>
-              ))}
-            </div>
-
-            {totalPendentes > 0 && (
-              <p className="text-xs text-muted-foreground text-center">
-                {totalPendentes} atendimento{totalPendentes > 1 ? "s" : ""} em aberto
-              </p>
-            )}
-          </>
+                <span className={cn("text-lg font-bold", kpi.color)}>
+                  {kpi.value}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
 
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="w-full text-xs group"
+          className="w-full text-xs group mt-2"
           onClick={() => navigate("/gabinete")}
         >
           Acessar Gabinete
