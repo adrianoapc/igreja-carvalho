@@ -26,7 +26,7 @@ const FUNCTION_NAME = 'chatbot-triagem';
 
 // ⚠️ CONFIGURAÇÃO DE PASTORAL
 // Substitua pelo UUID real de um usuário "Pastor Plantão" na tabela profiles
-const UUID_PASTOR_PLANTAO = "a4097879-f52a-4bf2-86e6-62ad02a06268"; 
+const UUID_PASTOR_PLANTAO: string | null = "a4097879-f52a-4bf2-86e6-62ad02a06268"; 
 const TELEFONE_PASTOR_PLANTAO = "5517988216456"; // Para envio de alerta via Make
 
 const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
