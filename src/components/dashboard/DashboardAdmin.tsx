@@ -23,6 +23,7 @@ import {
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import AtencaoPastoralWidget from "@/components/dashboard/AtencaoPastoralWidget";
 import VisaoProjetosWidget from "@/components/dashboard/VisaoProjetosWidget";
+import { GabinetePastoralWidget } from "@/components/dashboard/GabinetePastoralWidget";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -735,6 +736,9 @@ export default function DashboardAdmin() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Gabinete Pastoral Widget */}
+          <GabinetePastoralWidget />
 
           {/* Sheep Monitoring Widget */}
           <AtencaoPastoralWidget />
