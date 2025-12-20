@@ -227,6 +227,7 @@ export type Database = {
           created_at: string | null
           data_agendamento: string | null
           gravidade: Database["public"]["Enums"]["gravidade_enum"] | null
+          historico_evolucao: Json | null
           id: string
           local_atendimento: string | null
           motivo_resumo: string | null
@@ -244,6 +245,7 @@ export type Database = {
           created_at?: string | null
           data_agendamento?: string | null
           gravidade?: Database["public"]["Enums"]["gravidade_enum"] | null
+          historico_evolucao?: Json | null
           id?: string
           local_atendimento?: string | null
           motivo_resumo?: string | null
@@ -261,6 +263,7 @@ export type Database = {
           created_at?: string | null
           data_agendamento?: string | null
           gravidade?: Database["public"]["Enums"]["gravidade_enum"] | null
+          historico_evolucao?: Json | null
           id?: string
           local_atendimento?: string | null
           motivo_resumo?: string | null

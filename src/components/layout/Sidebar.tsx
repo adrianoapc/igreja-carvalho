@@ -43,6 +43,7 @@ import {
   Receipt,
   Bell,
   Bot,
+  Stethoscope,
 } from "lucide-react";
 import {
   Sidebar,
@@ -258,6 +259,11 @@ const intercessaoItems = [
     icon: Heart,
     label: "Sentimentos",
     path: "/intercessao/sentimentos",
+  },
+  {
+    icon: Stethoscope,
+    label: "Painel Pastoral",
+    path: "/gabinete",
   },
 ];
 
