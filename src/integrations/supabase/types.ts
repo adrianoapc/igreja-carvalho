@@ -221,6 +221,117 @@ export type Database = {
           },
         ]
       }
+      atendimentos_pastorais: {
+        Row: {
+          conteudo_original: string | null
+          created_at: string | null
+          data_agendamento: string | null
+          gravidade: Database["public"]["Enums"]["gravidade_enum"] | null
+          id: string
+          local_atendimento: string | null
+          motivo_resumo: string | null
+          observacoes_internas: string | null
+          origem: string | null
+          pastor_responsavel_id: string | null
+          pessoa_id: string | null
+          sessao_bot_id: string | null
+          status: Database["public"]["Enums"]["status_atendimento_enum"] | null
+          updated_at: string | null
+          visitante_id: string | null
+        }
+        Insert: {
+          conteudo_original?: string | null
+          created_at?: string | null
+          data_agendamento?: string | null
+          gravidade?: Database["public"]["Enums"]["gravidade_enum"] | null
+          id?: string
+          local_atendimento?: string | null
+          motivo_resumo?: string | null
+          observacoes_internas?: string | null
+          origem?: string | null
+          pastor_responsavel_id?: string | null
+          pessoa_id?: string | null
+          sessao_bot_id?: string | null
+          status?: Database["public"]["Enums"]["status_atendimento_enum"] | null
+          updated_at?: string | null
+          visitante_id?: string | null
+        }
+        Update: {
+          conteudo_original?: string | null
+          created_at?: string | null
+          data_agendamento?: string | null
+          gravidade?: Database["public"]["Enums"]["gravidade_enum"] | null
+          id?: string
+          local_atendimento?: string | null
+          motivo_resumo?: string | null
+          observacoes_internas?: string | null
+          origem?: string | null
+          pastor_responsavel_id?: string | null
+          pessoa_id?: string | null
+          sessao_bot_id?: string | null
+          status?: Database["public"]["Enums"]["status_atendimento_enum"] | null
+          updated_at?: string | null
+          visitante_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_sessao_bot_id_fkey"
+            columns: ["sessao_bot_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos_bot"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_visitante_id_fkey"
+            columns: ["visitante_id"]
+            isOneToOne: false
+            referencedRelation: "visitantes_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aulas: {
         Row: {
           created_at: string | null
@@ -4013,6 +4124,42 @@ export type Database = {
         }
         Relationships: []
       }
+      view_agenda_secretaria: {
+        Row: {
+          conteudo: string | null
+          created_at: string | null
+          data_agendamento: string | null
+          id: string | null
+          local_atendimento: string | null
+          pastor_nome: string | null
+          pastor_responsavel_id: string | null
+          pessoa_nome: string | null
+          status: Database["public"]["Enums"]["status_atendimento_enum"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       view_edge_function_daily_stats: {
         Row: {
           avg_time_ms: number | null
@@ -4444,6 +4591,7 @@ export type Database = {
         | "financeiro"
         | "ministerial"
         | "outro"
+      gravidade_enum: "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
       sentimento_tipo:
         | "feliz"
         | "cuidadoso"
@@ -4454,6 +4602,12 @@ export type Database = {
         | "triste"
         | "doente"
         | "com_pouca_fe"
+      status_atendimento_enum:
+        | "PENDENTE"
+        | "TRIAGEM"
+        | "AGENDADO"
+        | "EM_ACOMPANHAMENTO"
+        | "CONCLUIDO"
       status_intercessor: "ATIVO" | "PAUSA" | "FERIAS"
       status_pedido: "pendente" | "em_oracao" | "respondido" | "arquivado"
       status_sessao_chat: "INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO" | "EXPIRADO"
@@ -4622,6 +4776,7 @@ export const Constants = {
         "ministerial",
         "outro",
       ],
+      gravidade_enum: ["BAIXA", "MEDIA", "ALTA", "CRITICA"],
       sentimento_tipo: [
         "feliz",
         "cuidadoso",
@@ -4632,6 +4787,13 @@ export const Constants = {
         "triste",
         "doente",
         "com_pouca_fe",
+      ],
+      status_atendimento_enum: [
+        "PENDENTE",
+        "TRIAGEM",
+        "AGENDADO",
+        "EM_ACOMPANHAMENTO",
+        "CONCLUIDO",
       ],
       status_intercessor: ["ATIVO", "PAUSA", "FERIAS"],
       status_pedido: ["pendente", "em_oracao", "respondido", "arquivado"],
