@@ -22,11 +22,12 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// ID do Pastor de Plantão (Fallback se não tiver líder)
-// OBS: Substitua pelo UUID real de um usuário "Pastor Plantão" na sua tabela profiles se quiser que apareça no painel dele
-const UUID_PASTOR_PLANTAO = "00000000-0000-0000-0000-000000000000"; 
-const TELEFONE_PASTOR_PLANTAO = "5517991985016"; // Para o Make mandar Whats
 const FUNCTION_NAME = 'chatbot-triagem';
+
+// ⚠️ CONFIGURAÇÃO DE PASTORAL
+// Substitua pelo UUID real de um usuário "Pastor Plantão" na tabela profiles
+const UUID_PASTOR_PLANTAO = "a4097879-f52a-4bf2-86e6-62ad02a06268"; 
+const TELEFONE_PASTOR_PLANTAO = "5517988216456"; // Para envio de alerta via Make
 
 const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -112,16 +113,21 @@ function extractJsonAndText(aiContent: string) {
   return { cleanText, parsedJson };
 }
 
-// --- ROTEAMENTO DE PASTOR (NOVA LÓGICA) ---
+// --- ROTEAMENTO DE PASTOR (LÓGICA DE INTELIGÊNCIA) ---
 async function definirPastorResponsavel(perfilUsuario: any) {
-  // 1. Se tem líder, tenta mandar pro líder
+  // 1. Se tem líder cadastrado, tenta mandar pro líder
   if (perfilUsuario?.lider_id) {
-      // Aqui você poderia checar se o lider_id tem role='PASTOR' na tabela profiles
-      // Por enquanto, vamos assumir que se tem líder, vai pra ele, ou retorna o ID
+      // Opcional: Você pode adicionar uma verificação aqui se o lider_id é realmente um pastor
+      // const { data: lider } = await supabase.from('profiles').select('role').eq('id', perfilUsuario.lider_id).single();
+      // if (lider?.role === 'PASTOR') return perfilUsuario.lider_id;
+      
+      // Por enquanto, assume que o líder cuida:
       return perfilUsuario.lider_id;
   }
-  // 2. Fallback: Pastor de Plantão
-  return UUID_PASTOR_PLANTAO;
+  // 2. Fallback: Pastor de Plantão (Gabinete Geral)
+  // Se o UUID for zero ou inválido, o banco pode rejeitar dependendo da FK.
+  // Retornamos null se for inválido para não quebrar o insert (se a coluna permitir null)
+  return UUID_PASTOR_PLANTAO !== "00000000-0000-0000-0000-000000000000" ? UUID_PASTOR_PLANTAO : null;
 }
 
 // --- ÁUDIO ---
@@ -157,17 +163,17 @@ serve(async (req) => {
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
     let { conteudo_texto } = body;
 
-    // 1. Config
+    // 1. Configuração
     const config = await getChatbotConfig();
 
-    // 2. Audio
+    // 2. Processamento de Áudio
     if (tipo_mensagem === 'audio' && media_id) {
       const transcricao = await processarAudio(media_id, config.audioModel);
       conteudo_texto = transcricao ? `[Áudio Transcrito]: ${transcricao}` : "[Erro áudio]";
     }
     const inputTexto = conteudo_texto || "";
 
-    // 3. Sessão
+    // 3. Gestão de Sessão
     let { data: sessao } = await supabase.from('atendimentos_bot')
       .select('*').eq('telefone', telefone).neq('status', 'CONCLUIDO')
       .gt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()).maybeSingle();
@@ -177,13 +183,14 @@ serve(async (req) => {
     if (!sessao) {
       const { data: nova, error } = await supabase.from('atendimentos_bot')
         .insert({ telefone, status: 'INICIADO', historico_conversa: [] }).select().single();
-      if (error || !nova) throw new Error("Erro DB Sessão");
+      if (error || !nova) throw new Error("Erro ao criar sessão no banco de dados.");
       sessao = nova;
     }
 
+    // Log de Entrada
     await supabase.from('logs_auditoria_chat').insert({ sessao_id: sessao.id, ator: 'USER', payload_raw: { texto: inputTexto } });
 
-    // 4. IA Call
+    // 4. Chamada IA
     const messages = [
       { role: "system", content: config.systemPrompt },
       { role: "system", content: `CTX: Tel ${telefone}, Nome ${nome_perfil}.` },
@@ -192,7 +199,7 @@ serve(async (req) => {
     ];
 
     let aiContent = "";
-    // Seletor simples de modelo
+    // Seletor de Modelo (Lovable vs OpenAI)
     if (config.textModel.startsWith('google/') && LOVABLE_API_KEY) {
        const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
          method: 'POST', headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
@@ -209,22 +216,23 @@ serve(async (req) => {
        aiContent = data.choices?.[0]?.message?.content || "";
     }
 
-    // 5. Limpeza
+    // 5. Limpeza e Extração
     const { cleanText, parsedJson } = extractJsonAndText(aiContent);
     let responseMessage = cleanText;
     let notificarAdmin = false;
 
-    // 6. Lógica de Negócio (DUAL WRITE)
+    // 6. Lógica de Negócio (DUAL WRITE: Legado + Novo Módulo Pastoral)
     if (parsedJson?.concluido) {
+      // Fecha Sessão
       await supabase.from('atendimentos_bot').update({
         status: 'CONCLUIDO',
         historico_conversa: [...historico, { role: 'user', content: inputTexto }, { role: 'assistant', content: aiContent }]
       }).eq('id', sessao.id);
 
-      // --- A. GESTÃO DE IDENTIDADE ---
+      // --- A. GESTÃO DE IDENTIDADE (QUEM É?) ---
       // Buscamos o profile completo (com lider_id se existir)
       const { data: profile } = await supabase.from('profiles')
-        .select('id, nome, lider_id') // Importante trazer o lider_id
+        .select('id, nome, lider_id') 
         .eq('telefone', telefone).maybeSingle();
         
       let visitanteId = null;
@@ -242,18 +250,18 @@ serve(async (req) => {
             }).select('id').single();
             visitanteId = newLead?.id;
         }
-        // Visitantes vão sempre pro plantão
-        pastorResponsavelId = UUID_PASTOR_PLANTAO;
+        // Visitantes não tem líder, vão para o Plantão/Gabinete Geral
+        pastorResponsavelId = UUID_PASTOR_PLANTAO !== "00000000-0000-0000-0000-000000000000" ? UUID_PASTOR_PLANTAO : null;
       } else {
-        // Membros: Roteamento inteligente
+        // Membros: Roteamento inteligente para o Líder ou Plantão
         pastorResponsavelId = await definirPastorResponsavel(profile);
       }
 
-      // --- B. GRAVAÇÃO DUPLA (LEGADO + NOVO) ---
+      // --- B. GRAVAÇÃO (LEGADO + NOVO) ---
 
       // CASO 1: PEDIDO DE ORAÇÃO
       if (parsedJson.intencao === 'PEDIDO_ORACAO') {
-        // Tabela Antiga
+        // 1. Tabela Antiga (Legado)
         await supabase.from('pedidos_oracao').insert({
           analise_ia_titulo: parsedJson.motivo_resumo,
           texto_na_integra: parsedJson.texto_na_integra,
@@ -262,7 +270,8 @@ serve(async (req) => {
           origem, membro_id: profile?.id, visitante_id: visitanteId
         });
         
-        // Tabela Nova (Gabinete Digital) - Só se não for anônimo (ou cria registro anonimo)
+        // 2. Tabela Nova (Gabinete Digital) 
+        // Só criamos atendimento pastoral se NÃO for anônimo (ou cria com flag oculta, dependendo da sua regra)
         if (!parsedJson.anonimo) {
             await supabase.from('atendimentos_pastorais').insert({
                 pessoa_id: profile?.id,
@@ -270,7 +279,7 @@ serve(async (req) => {
                 origem: 'CHATBOT',
                 motivo_resumo: `[ORAÇÃO] ${parsedJson.motivo_resumo}`,
                 conteudo_original: parsedJson.texto_na_integra,
-                gravidade: 'BAIXA', // Oração padrão geralmente é baixa, sentimentos ajusta depois
+                gravidade: 'BAIXA', 
                 pastor_responsavel_id: pastorResponsavelId,
                 status: 'PENDENTE'
             });
@@ -279,9 +288,9 @@ serve(async (req) => {
         responseMessage = parsedJson.anonimo ? "Anotado em sigilo. 🙏" : `Anotado, ${parsedJson.nome_final}! 🙏`;
       }
 
-      // CASO 2: SOLICITAÇÃO PASTORAL (Crítico)
+      // CASO 2: SOLICITAÇÃO PASTORAL (Crítico/Gabinete)
       else if (parsedJson.intencao === 'SOLICITACAO_PASTORAL') {
-        // Tabela Antiga (Mantendo histórico)
+        // 1. Tabela Antiga
         await supabase.from('pedidos_oracao').insert({
           analise_ia_titulo: `[PASTORAL] ${parsedJson.motivo_resumo}`,
           texto_na_integra: parsedJson.texto_na_integra,
@@ -290,14 +299,14 @@ serve(async (req) => {
           origem, membro_id: profile?.id, visitante_id: visitanteId
         });
 
-        // Tabela Nova (Aqui é o foco!)
+        // 2. Tabela Nova (Onde o Pastor/Secretária vai trabalhar)
         await supabase.from('atendimentos_pastorais').insert({
             pessoa_id: profile?.id,
             visitante_id: visitanteId,
             origem: 'CHATBOT',
             motivo_resumo: `[GABINETE] ${parsedJson.motivo_resumo}`,
             conteudo_original: parsedJson.texto_na_integra,
-            gravidade: 'MEDIA', // Começa média, pastor avalia
+            gravidade: 'MEDIA', // Começa média para triagem
             pastor_responsavel_id: pastorResponsavelId,
             status: 'PENDENTE'
         });
@@ -312,7 +321,7 @@ serve(async (req) => {
           titulo: parsedJson.motivo_resumo, mensagem: parsedJson.texto_na_integra, publicar: parsedJson.publicar || false,
           origem, autor_id: profile?.id, visitante_id: visitanteId
         });
-        // Testemunho geralmente não gera "Atendimento Pastoral", a menos que queira agradecer
+        // Testemunho não gera atendimento pastoral automático por enquanto
         responseMessage = parsedJson.publicar ? "Glória a Deus! 🙌" : "Amém! Salvo.";
       }
 
@@ -334,6 +343,7 @@ serve(async (req) => {
         });
     } catch (e) {}
 
+    // 7. Retorno para o Make
     return new Response(JSON.stringify({ 
       reply_message: responseMessage, 
       notificar_admin: notificarAdmin, 
