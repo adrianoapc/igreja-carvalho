@@ -16,8 +16,10 @@ const UUID_PASTOR_PLANTAO: string = "00000000-0000-0000-0000-000000000000";
 
 const FUNCTION_NAME = 'analise-sentimento-ia';
 
-// ============= SYSTEM PROMPT =============
-const SYSTEM_PROMPT = `Você é um Psicólogo Pastoral experiente de uma igreja cristã. Sua tarefa é analisar relatos de membros e visitantes com empatia profunda e discernimento espiritual.
+// ============= FALLBACK DEFAULTS =============
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
+
+const DEFAULT_PROMPT = `Você é um Psicólogo Pastoral experiente de uma igreja cristã. Sua tarefa é analisar relatos de membros e visitantes com empatia profunda e discernimento espiritual.
 
 ANÁLISE REQUERIDA:
 1. Avalie a gravidade emocional e espiritual do relato
@@ -38,8 +40,6 @@ RESPONDA APENAS com JSON válido no formato:
   "analise_profunda": "string (análise detalhada para o pastor, 2-3 parágrafos)"
 }`;
 
-const DEFAULT_MODEL = 'google/gemini-2.5-flash';
-
 // ============= TYPES =============
 interface AnaliseIA {
   gravidade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
@@ -53,7 +53,38 @@ interface RequestPayload {
   nome_perfil?: string;
 }
 
+interface ChatbotConfig {
+  textModel: string;
+  systemPrompt: string;
+}
+
 // ============= HELPER FUNCTIONS =============
+
+// Fetch chatbot config from database with fallback
+async function getChatbotConfig(supabase: any): Promise<ChatbotConfig> {
+  try {
+    const { data: config, error } = await supabase
+      .from('chatbot_configs')
+      .select('modelo_texto, role_texto')
+      .eq('edge_function_name', FUNCTION_NAME)
+      .eq('ativo', true)
+      .single();
+
+    if (error || !config) {
+      console.log(`[${FUNCTION_NAME}] No config found in database, using defaults`);
+      return { textModel: DEFAULT_MODEL, systemPrompt: DEFAULT_PROMPT };
+    }
+
+    console.log(`[${FUNCTION_NAME}] Config loaded from database`);
+    return {
+      textModel: config.modelo_texto || DEFAULT_MODEL,
+      systemPrompt: config.role_texto || DEFAULT_PROMPT
+    };
+  } catch (err) {
+    console.error(`[${FUNCTION_NAME}] Error fetching chatbot config:`, err);
+    return { textModel: DEFAULT_MODEL, systemPrompt: DEFAULT_PROMPT };
+  }
+}
 
 // Normalize phone number for comparison
 function normalizePhone(phone: string): string {
@@ -158,8 +189,8 @@ async function identificarUsuario(supabase: any, telefone: string, nomePerfil?: 
   };
 }
 
-// Analyze content with AI
-async function analisarComIA(conteudo: string, nomePessoa: string): Promise<AnaliseIA> {
+// Analyze content with AI using dynamic config
+async function analisarComIA(conteudo: string, nomePessoa: string, config: ChatbotConfig): Promise<AnaliseIA> {
   const defaultAnalysis: AnaliseIA = {
     gravidade: 'BAIXA',
     resumo_motivo: 'Análise não disponível',
@@ -179,6 +210,8 @@ Relato/Mensagem:
 Analise este relato e forneça sua avaliação pastoral.`;
 
   try {
+    console.log(`[${FUNCTION_NAME}] Calling AI with model: ${config.textModel}`);
+    
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -186,9 +219,9 @@ Analise este relato e forneça sua avaliação pastoral.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: DEFAULT_MODEL,
+        model: config.textModel,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: config.systemPrompt },
           { role: 'user', content: userPrompt }
         ],
       }),
@@ -269,12 +302,15 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // 0. Fetch dynamic config from database
+    const config = await getChatbotConfig(supabase);
+
     // 1. Identificar usuário
     const usuario = await identificarUsuario(supabase, telefone, nome_perfil);
     console.log(`Usuário identificado:`, usuario);
 
-    // 2. Analisar com IA
-    const analise = await analisarComIA(conteudo_texto, usuario.nome);
+    // 2. Analisar com IA (usando config dinâmica)
+    const analise = await analisarComIA(conteudo_texto, usuario.nome, config);
     console.log(`Análise da IA:`, analise);
 
     // 3. Verificar se deve gravar (apenas MEDIA, ALTA, CRITICA)
