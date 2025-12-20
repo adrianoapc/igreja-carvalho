@@ -8,6 +8,67 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Adicionado
+
+#### 🏛️ Módulo Gabinete Digital - Implementação Completa (20 de Dez/2025)
+- **Nova tela `/gabinete`** (`GabinetePastoral.tsx`): Kanban interativo com drag-and-drop via @dnd-kit, KPIs pastorais, highlights de casos críticos
+- **Componentes reutilizáveis**: `PastoralCard`, `PastoralDetailsDrawer`, `PastoralFilters`, `PastoralKPIs`, `PastoralListView`, `PastoralKanbanColumn`
+- **Prontuário com abas**: Informações gerais, histórico, notas de evolução, agendamento, análise IA
+- **Identificação automática de pastor responsável**: Sistema vincula atendimento ao líder direto do membro ou ao pastor de plantão
+- **Integração com análise de sentimentos**: Edge Functions (`analise-sentimento-ia`, `analise-pedido-ia`) criam automaticamente `atendimentos_pastorais` para casos com gravidade MÉDIA ou superior
+- **Roteamento inteligente**: Casos graves (CRITICA/ALTA) disparam notificações imediatas; casos passivosordenados por status e data
+
+**Decisão arquitetural:** ADR-014 - Gabinete Digital, Roteamento Pastoral e Unificação de Entradas
+
+**Impacto no usuário:** Pastores têm visibilidade centralizada do cuidado em andamento, secretaria pode operacionalizar agendas sem ler dados sensíveis (RLS em view `view_agenda_secretaria`), sistema proativo identifica casos em risco via IA.
+
+**Módulos afetados:** Gabinete (novo), Pastoral, Intercessão V2, Dashboard
+
+---
+
+#### 🔧 Refatoração de Edge Functions para Configuração Dinâmica (20 de Dez/2025)
+- **`analise-sentimento-ia` e `analise-pedido-ia` agora consultam `chatbot_configs`** para prompts e modelos, removendo hardcoding
+- **Fallback automático**: Se `chatbot_configs` não encontrado, usa `DEFAULT_PROMPT` e `DEFAULT_MODEL` evitando quebra de deploy
+- **getChatbotConfig()** unificado: Função reutilizável nas duas edge functions com cache em memória para performance
+
+**Impacto técnico:** Facilita fine-tuning de IA sem redeploy, maior flexibilidade na experimentação de prompts.
+
+**Módulos afetados:** Automações (Edge Functions), Intercessão IA, Análise de Dados
+
+---
+
+#### 📊 Integração de KPIs Pastorais no Dashboard Admin (20 de Dez/2025)
+- **Widget `GabinetePastoralWidget`**: Exibe status consolidado de atendimentos (Pendente, Em Acompanhamento, Agendado, Concluído) com contadores de abertos
+- **Card dedicado no DashboardAdmin** com atalho para `/gabinete` permitindo overview rápido da carga pastoral
+- **UX melhorada**: Status por linha, evita cramping, contador de "casos abertos" em destaque
+
+**Impacto no usuário:** Liderança vê saúde pastoral num relance ao acessar o Dashboard, sem necessidade de entrar no Gabinete.
+
+**Módulos afetados:** Dashboard (Admin), Pastoral
+
+---
+
+#### 🔄 Reorganização de Widgets no Dashboard - Vida Igreja (20 de Dez/2025)
+- **Consolidation Funnel widget movido**: De Finanças para seção "Vida Igreja" no Dashboard, refletindo prioridade ministerial
+- **Reordenação de layout**: Mantém Finanças compacta, dá destaque ao funil de evangelismo em contexto de "Vida da Igreja"
+
+**Impacto visual:** Dashboard reflete melhor a prioridade estratégica da evangelização.
+
+**Módulos afetados:** Dashboard, Finanças, Evangelismo
+
+---
+
+#### 📚 Documentação de Decisão Arquitetural (20 de Dez/2025)
+- **ADR-014 criada**: "Módulo Gabinete Digital, Roteamento Pastoral e Unificação de Entradas" documenta dual-write, matriz de alertas, privacidade RLS
+- **ADR-012 renomeada**: De ADR-013 para ADR-012 para consistência numerológica pós-arquivamento
+- **Catálogo de telas atualizado**: Adicionada `GabinetePastoral` na nova seção "PASTORAL & GABINETE"
+
+**Impacto documentação:** Decisões rastreáveis, futuros desenvolvedores entendem trade-offs da arquitetura.
+
+**Módulos afetados:** Documentação, Arquitetura
+
+---
+
 ### Melhorado
 
 #### 🔐 Melhorias na Autenticação Biométrica (19 de Dez/2025)

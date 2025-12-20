@@ -233,6 +233,120 @@ sequenceDiagram
     Bell-->>-User: Notificação desaparece
 ```
 
+## Fluxo de Sequência: Gabinete Digital & Atendimentos Pastorais
+
+> **Novo (ADR-014)**: Sequência de criação e notificação de atendimentos pastorais via Gabinete Digital.
+
+```mermaid
+sequenceDiagram
+    participant Origem as Sistema Origem<br/>(Sentimento/Pedido IA)
+    participant EdgeFunc as Edge Function<br/>analise-sentimento-ia<br/>analise-pedido-ia
+    participant DB as Supabase DB
+    participant Trigger as Database Trigger<br/>on INSERT atendimentos
+    participant Realtime as Supabase Realtime
+    participant Pastor as Frontend Pastor<br/>Gabinete
+    participant NotificationBell as NotificationBell
+    participant WhatsApp as WhatsApp API
+    
+    Note over Origem: Sentimento/Pedido detectado<br/>com conteúdo problema
+    
+    Origem->>+EdgeFunc: Dados para análise IA
+    
+    EdgeFunc->>EdgeFunc: Executa IA model<br/>extrai gravidade + tags
+    
+    EdgeFunc->>+DB: INSERT/UPDATE sentimentos_membros<br/>ou pedidos_oracao<br/>com análise_ia_*
+    DB-->>-EdgeFunc: Registro atualizado
+    
+    Note over EdgeFunc: Verifica gravidade >= MEDIA
+    
+    alt Gravidade >= MEDIA
+        EdgeFunc->>EdgeFunc: Prepara dados para<br/>atendimentos_pastorais
+        
+        EdgeFunc->>+DB: Busca lider_id via<br/>relacionamento grupo
+        DB-->>-EdgeFunc: lider_id (ou NULL)
+        
+        EdgeFunc->>+DB: INSERT INTO atendimentos_pastorais<br/>{pessoa_id, origem, gravidade,<br/>status: PENDENTE, pastor_responsavel_id,<br/>conteudo_original, historico_evolucao}
+        DB-->>-EdgeFunc: Atendimento criado {id: uuid}
+        
+        Note over Trigger: Trigger detecta novo<br/>atendimento_pastoral (gravidade CRÍTICA)
+        
+        Trigger->>+DB: SELECT perfil pastor_responsavel
+        DB-->>-Trigger: Dados do pastor
+        
+        Trigger->>+DB: INSERT INTO notifications<br/>tipo: 'atendimento_pastoral_critico'<br/>user_id: pastor_id<br/>related_id: atendimento_id
+        DB-->>-Trigger: Notificação criada
+        
+        alt Gravidade = CRÍTICA
+            Trigger->>+WhatsApp: Dispara WhatsApp<br/>para pastor<br/>(assíncrono via Edge Function)
+            WhatsApp-->>-Trigger: Mensagem enviada
+        end
+        
+        DB->>+Realtime: INSERT event atendimentos_pastorais
+        Realtime->>+Pastor: Realtime event (INSERT)
+        
+        DB->>+Realtime: INSERT event notifications
+        Realtime->>+NotificationBell: Realtime event (INSERT)
+        
+        Pastor->>Pastor: Kanban recarrega<br/>novo card em PENDENTE
+        Pastor->>Pastor: Atualiza KPI counters<br/>total_pendentes++
+        
+        NotificationBell->>NotificationBell: Badge atualiza<br/>unreadCount++<br/>Exibe urgência CRÍTICA
+        
+    else Gravidade < MEDIA
+        Trigger->>Trigger: Nenhuma ação<br/>(registro normal)
+    end
+    
+    EdgeFunc-->>Origem: Response {success: true}
+    
+    Note over Pastor: Pastor vê Gabinete<br/>com novo atendimento
+    
+    Pastor->>+Pastor: Clica card em PENDENTE
+    
+    Pastor->>+DB: SELECT * FROM atendimentos_pastorais<br/>WHERE id = atendimento_id
+    DB-->>-Pastor: Dados completos
+    
+    Pastor->>Pastor: Abre Prontuário Drawer<br/>5 Tabs: Geral/Histórico/Notas/Agendamento/IA
+    
+    Note over Pastor: Pastor marca como EM_ACOMPANHAMENTO
+    
+    Pastor->>+DB: UPDATE atendimentos_pastorais<br/>SET status = 'EM_ACOMPANHAMENTO'<br/>WHERE id = atendimento_id
+    DB-->>-Pastor: Registro atualizado
+    
+    Pastor->>+DB: INSERT INTO historico_evolucao (JSONB)<br/>{timestamp, acao: 'ASSUMIDO', pastor_id}
+    DB-->>-Pastor: Histórico registrado
+    
+    DB->>+Realtime: UPDATE event atendimentos_pastorais
+    Realtime->>+Pastor: Realtime event (UPDATE)
+    
+    Pastor->>Pastor: Card move para<br/>EM_ACOMPANHAMENTO column
+    Pastor->>Pastor: KPI pendentes-- acertos++
+    
+    Note over Pastor: Pastor agenda atendimento
+    
+    Pastor->>+Pastor: Clica "Agendar"
+    
+    Pastor->>+DB: INSERT INTO view_agenda_secretaria<br/>(criada via INSERT rule)<br/>{pessoa_id, pastor_id, data, descricao}
+    DB-->>-Pastor: Evento criado
+    
+    Pastor->>+DB: UPDATE atendimentos_pastorais<br/>SET status = 'AGENDADO',<br/>data_agendamento = now()
+    DB-->>-Pastor: Status atualizado
+    
+    DB->>+Realtime: UPDATE event
+    Realtime->>+Pastor: Realtime event (UPDATE)
+    
+    Pastor->>Pastor: Card move para<br/>AGENDADO column
+    
+    Note over Pastor: Após atendimento, marca CONCLUÍDO
+    
+    Pastor->>+DB: UPDATE atendimentos_pastorais<br/>SET status = 'CONCLUÍDO',<br/>data_conclusao = now()
+    DB-->>-Pastor: Status finalizado
+    
+    DB->>+Realtime: UPDATE event
+    Realtime->>+Pastor: Realtime event (UPDATE)
+    
+    Pastor->>Pastor: Card move para<br/>CONCLUÍDO column<br/>(opcionalmente arquivado)
+```
+
 ## Observações
 
 ### Componentes e Atores
@@ -260,5 +374,8 @@ sequenceDiagram
 ### Referências
 - **Arquitetura**: [docs/01-Arquitetura/01-arquitetura-geral.MD](../01-Arquitetura/01-arquitetura-geral.MD)
 - **Fluxo**: [fluxo-notificacoes.md](fluxo-notificacoes.md)
+- **Fluxo Gabinete**: [fluxo-gabinete-pastoral.md](fluxo-gabinete-pastoral.md)
 - **Funcionalidades**: [docs/funcionalidades.md](../funcionalidades.md#módulo-notificações)
+- **Gabinete Digital**: [docs/funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral](../funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral)
+- **ADR-014**: [docs/adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md](../adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
 - **Database**: [docs/database-er-diagram.md](../database-er-diagram.md)

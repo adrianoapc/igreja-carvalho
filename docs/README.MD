@@ -35,13 +35,12 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- Cultos — funcionalidades: [`funcionalidades.md#módulo-cultos`](funcionalidades.md#módulo-cultos)
 	- Intercessão — visão de produto: [`produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto`](produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto)
 	- Intercessão — manual do usuário: [`manual-usuario.md#6-intercessão`](manual-usuario.md#6-intercessão)
-	- Intercessão — funcionalidades: [`funcionalidades.md#4-intercessão-oração-e-testemunhos`](funcionalidades.md#4-intercessão-oração-e-testemunhos)
+	- Intercessão — funcionalidades: [`funcionalidades.md#5-intercessão-oração-e-testemunhos`](funcionalidades.md#5-intercessão-oração-e-testemunhos)
 	- Intercessão — próximos passos: [`PROXIMOS_PASSOS_INTERCESSAO.md`](PROXIMOS_PASSOS_INTERCESSAO.md)
+	- Gabinete Digital — visão funcional: [`funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral`](funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral)
  - Telas & Segurança
 	- Catálogo de Telas: [`telas/catalogo-telas.md`](telas/catalogo-telas.md)
 	- Matriz de Permissões (ACL): [`telas/matriz-permissoes.md`](telas/matriz-permissoes.md)
-	- Catálogo (Geral): [`catalogo/catalogo-telas.md`](catalogo/catalogo-telas.md) — canônico em `telas/`
-	- Matriz (Geral): [`catalogo/matriz-permissoes.md`](catalogo/matriz-permissoes.md) — canônico em `telas/`
 - Banco de Dados
 	- Esquema SQL: [`database-schema.sql`](database-schema.sql)
 	- Diagrama ER: [`database-er-diagram.md`](database-er-diagram.md)
@@ -59,6 +58,7 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
  	- Diagrama — Fluxo Cultos: [`diagramas/fluxo-cultos.md`](diagramas/fluxo-cultos.md)
 	- Diagrama — Sequência Cultos: [`diagramas/sequencia-cultos.md`](diagramas/sequencia-cultos.md)
 	- Diagrama — Fluxo Liturgia ↔ Escalas: [`diagramas/fluxo-liturgia-escalas.md`](diagramas/fluxo-liturgia-escalas.md)
+	- Diagrama — Fluxo Gabinete Digital: [`diagramas/fluxo-gabinete-pastoral.md`](diagramas/fluxo-gabinete-pastoral.md)
  	- Diagrama — Fluxo Intercessão: [`diagramas/fluxo-intercessao.md`](diagramas/fluxo-intercessao.md)
 	- Diagrama — Sequência Intercessão: [`diagramas/sequencia-intercessao.md`](diagramas/sequencia-intercessao.md)
 	- Diagrama — Fluxo Sentimentos IA: [`diagramas/fluxo-sentimentos-ia.md`](diagramas/fluxo-sentimentos-ia.md)
@@ -72,6 +72,8 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- ADR-007 (Estratégia de Entrega de Notificações): [`adr/ADR-007-estrategia-entrega-notificacoes.md`](adr/ADR-007-estrategia-entrega-notificacoes.md)
 	- ADR-008 (Uso de Eventos de Domínio): [`adr/ADR-008-eventos-dominio.md`](adr/ADR-008-eventos-dominio.md)
 	- ADR-010 (Intercessão: Redirecionamento Inteligente vs Automação): [`adr/ADR-010-intercessao-redirecionamento-inteligente.md`](adr/ADR-010-intercessao-redirecionamento-inteligente.md)
+	- ADR-012 (Intercessão V2, CRM de Evangelismo e Chatbot IA): [`adr/012-intercessao-v2-evangelismo.md`](adr/012-intercessao-v2-evangelismo.md)
+	- ADR-014 (Gabinete Digital, Roteamento Pastoral e Unificação de Entradas): [`adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md`](adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
 
 ## Como navegar
 - Use os links acima para chegar diretamente ao tópico.

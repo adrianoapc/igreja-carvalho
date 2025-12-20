@@ -34,6 +34,16 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Status:** Aceito
 - **Link:** [ADR-004](ADR-004-relacionamentos-bidirecionais-familias.md)
 
+### ADR-012
+- **Titulo:** Módulo Intercessão V2, CRM de Evangelismo e Chatbot Multimodal IA
+- **Status:** Aceito
+- **Link:** [ADR-012](012-intercessao-v2-evangelismo.md)
+
+### ADR-014
+- **Titulo:** Módulo Gabinete Digital, Roteamento Pastoral e Unificação de Entradas
+- **Status:** Aceito
+- **Link:** [ADR-014](ADR-014-gabinete-digital-e-roteamento-pastoral.md)
+
 ---
 
 ## 📐 Relacao com Diagramas

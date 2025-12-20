@@ -141,6 +141,58 @@ flowchart TD
     style DeleteNotif fill:#ffe1e1
 ```
 
+## Fluxo: Notificações Gabinete Digital (Atendimentos Pastorais)
+
+> **Novo (ADR-014)**: Notificações de atendimentos pastorais com integração ao Gabinete Digital.
+
+```mermaid
+flowchart TD
+    EventStart([Novo Atendimento em<br/>atendimentos_pastorais]) --> DetectGravidade{Gravidade?}
+    
+    DetectGravidade -->|CRÍTICA| CriticalPath["Dispatch Imediato:<br/>1. WhatsApp Pastor<br/>2. Notificação In-App<br/>3. Badge Urgente"]
+    DetectGravidade -->|MEDIA/ALTA| PassivePath["Dispatch Passivo:<br/>1. Notificação In-App<br/>2. Aparece no Gabinete<br/>3. Badge Normal"]
+    DetectGravidade -->|BAIXA| LowPath["Apenas Visibilidade<br/>no Gabinete"]
+    
+    CriticalPath --> SendWhatsApp["Meta API / Make<br/>→ Pastor via WhatsApp"]
+    SendWhatsApp --> InsertGabinetNotif["INSERT em notifications<br/>tipo=atendimento_pastoral<br/>related_id=atendimento_id"]
+    
+    PassivePath --> InsertGabinetNotif
+    LowPath --> UpdateGabinetOnly["Update atendimentos_pastorais<br/>notificado=false"]
+    
+    InsertGabinetNotif --> SyncRealtime["Realtime Sync<br/>para Pastor"]
+    SyncRealtime --> UpdateGabineteDashboard["Atualiza Gabinete Dashboard:<br/>1. Novo Card no Kanban<br/>2. Badge contador<br/>3. Status=PENDENTE"]
+    
+    UpdateGabinetOnly --> UpdateGabineteDashboard
+    
+    UpdateGabineteDashboard --> PastorReceives["Pastor Visualiza<br/>no Gabinete"]
+    PastorReceives --> PastorAction{Ação}
+    
+    PastorAction -->|Clica Card| OpenProntuario["Abre Prontuário<br/>5 Tabs: Geral/Histórico/Notas/Agendamento/IA"]
+    OpenProntuario --> UpdateStatus["Marca como<br/>EM_ACOMPANHAMENTO"]
+    
+    PastorAction -->|Agenda Atendimento| BookSchedule["Cria evento em<br/>view_agenda_secretaria"]
+    BookSchedule --> ChangeStatus2["Status → AGENDADO"]
+    
+    PastorAction -->|Finaliza| ChangeStatus3["Status → CONCLUÍDO<br/>Arquiva Prontuário"]
+    
+    UpdateStatus --> MarkNotifRead["UPDATE notifications<br/>read=true"]
+    BookSchedule --> MarkNotifRead
+    ChangeStatus3 --> MarkNotifRead
+    
+    MarkNotifRead --> End([Fim: Atendimento Processado])
+    
+    style EventStart fill:#ffe1e1
+    style DetectGravidade fill:#ffe1e1
+    style CriticalPath fill:#f8d7da
+    style PassivePath fill:#fff3cd
+    style LowPath fill:#e2e3e5
+    style SendWhatsApp fill:#f8d7da
+    style InsertGabinetNotif fill:#d1ecf1
+    style UpdateGabineteDashboard fill:#d4edda
+    style PastorReceives fill:#d4edda
+    style End fill:#e2e3e5
+```
+
 ## Observações
 
 ### Componentes Principais
@@ -165,4 +217,7 @@ flowchart TD
 - **Produto**: [docs/produto/README_PRODUTO.MD](../produto/README_PRODUTO.MD#notificações-visão-de-produto)
 - **Manual**: [docs/manual-usuario.md](../manual-usuario.md#10-notificações)
 - **Funcionalidades**: [docs/funcionalidades.md](../funcionalidades.md#módulo-notificações)
+- **Gabinete Digital**: [docs/funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral](../funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral)
+- **Fluxo Gabinete**: [fluxo-gabinete-pastoral.md](fluxo-gabinete-pastoral.md)
+- **ADR-014**: [docs/adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md](../adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
 - **Sequência**: [sequencia-notificacoes.md](sequencia-notificacoes.md)

@@ -327,7 +327,130 @@ Integrações Supabase (consultas confirmadas nos arquivos):
 
 ---
 
-## 4. Intercessão, Oração e Testemunhos
+## 4. Gabinete Digital e Cuidado Pastoral
+
+### Objetivo do Módulo
+Centralizar o cuidado pastoral dos membros através de um sistema de tickets (atendimentos), permitindo que pastores e liderança acompanhem sistematicamente cada necessidade espiritual, pastoral ou de aconselhamento, com histórico completo e segurança de privacidade (view RLS protege dados sensíveis para secretaria).
+
+### Visão Geral
+- **Rota principal**: `/gabinete` (`GabinetePastoral.tsx`)
+- **Destinatários**: Pastores, líderes, secretaria (com acesso restrito via RLS)
+- **Integração**: Recebe tickets de múltiplas origens (chatbot WhatsApp, análise de sentimentos IA, pedidos de ajuda no app)
+- **Estado**: Kanban interativo (Pendente → Em Acompanhamento → Agendado → Concluído)
+
+### 4.1 Estrutura de Dados
+
+#### Tabela: `atendimentos_pastorais`
+- `id` (UUID): Identificador único do ticket
+- `pessoa_id` (FK → profiles): Vinculação do membro ou visitante
+- `origem` (ENUM): CHATBOT, SENTIMENTOS, APP_ORACAO, DIRETO
+- `gravidade` (ENUM): BAIXA, MEDIA, ALTA, CRITICA (determinada por IA ou manual)
+- `status` (ENUM): PENDENTE, EM_ACOMPANHAMENTO, AGENDADO, CONCLUIDO
+- `pastor_responsavel_id` (FK → profiles): Líder/Pastor atribuído (auto-detectado via `lider_id` do membro ou plantão)
+- `conteudo_original` (TEXT): Relato completo do membro (protegido por RLS, invisível para secretaria)
+- `historico_evolucao` (JSONB): Array de notas {timestamp, autor, mensagem, status_anterior, status_novo}
+- `agendado_para` (TIMESTAMP): Data/hora do encontro pastoral (quando status = AGENDADO)
+- `observacoes` (TEXT): Análise/notas do pastor
+- `created_at`, `updated_at` (TIMESTAMP)
+
+#### View: `view_agenda_secretaria`
+- Exibe somente: `id`, `pessoa_id` (nome do membro), `status`, `pastor_responsavel_id`, `agendado_para`, `gravidade`
+- **Oculta**: `conteudo_original` (protege segredo de confissão/aconselhamento)
+- **Uso**: Secretaria pode agendar/operacionalizar sem ler dados sensíveis
+
+### 4.2 Fluxo de Criação (Automático)
+
+Atendimentos pastorais são criados automaticamente em 3 cenários:
+
+1. **Via Chatbot (`chatbot-triagem` Edge Function)**
+   - Membro ou visitante envia mensagem WhatsApp pedindo ajuda pastoral/encaminhamento
+   - Bot detecta intenção "SOLICITACAO_PASTORAL" ou conversa com índice de gravidade alto
+   - Sistema cria `atendimentos_pastorais` com `origem = 'CHATBOT'`, `gravidade` conforme análise IA
+
+2. **Via Análise de Sentimentos (`analise-sentimento-ia` Edge Function)**
+   - Membro registra sentimento negativo (triste, ansioso, angustiado) 3+ dias consecutivos
+   - IA detecta padrão crítico e marca `gravidade = CRITICA` ou `ALTA`
+   - Sistema cria `atendimentos_pastorais` com `origem = 'SENTIMENTOS'`
+
+3. **Via Pedido de Ajuda no App (a implementar)**
+   - Membro clica em botão "Chamar Pastor" na interface
+   - Sistema cria `atendimentos_pastorais` com `origem = 'APP_ORACAO'`, gravidade conforme seleção do membro
+
+### 4.3 Roteamento Inteligente (Algoritmo)
+
+Quando um atendimento é criado, o sistema determina `pastor_responsavel_id` automaticamente:
+
+1. **Membro com Líder**: Se `membro.lider_id IS NOT NULL`, atende-o como responsável
+2. **Sem Líder / Visitante**: Escala para "Pastor de Plantão" (ID configurável, gerenciar em `configuracoes_igreja.plantao_pastoral_id`)
+3. **Fallback**: Se nem um nem outro existir, cria como PENDENTE e notifica Admin
+
+### 4.4 Interface Kanban
+
+**Visualização**: Drag-and-drop via `@dnd-kit`
+- Coluna 1: PENDENTE (casos novos, aguardando alocação)
+- Coluna 2: EM_ACOMPANHAMENTO (em atendimento ativo)
+- Coluna 3: AGENDADO (com data e hora confirmadas)
+- Coluna 4: CONCLUIDO (encerrados)
+
+**Card de Atendimento**:
+- Nome do membro, idade (a confirmar), gravidade (badge colorida: verde/amarelo/vermelho/crítico)
+- Última interação (timestamp relativo, ex: "há 2 horas")
+- Botões rápidos: Abrir Prontuário, Agendar, Encerrar
+
+### 4.5 Prontuário (Drawer Detalhes)
+
+Ao clicar no card, abre drawer com abas:
+
+1. **Geral**
+   - Nome, contacto, status na igreja, líder direto
+   - Gravidade, origem do caso, histórico de criação
+2. **Histórico de Conversa** (se origem = CHATBOT)
+   - Exibe histórico completo da conversa `atendimentos_bot.historico_conversa` em timeline
+3. **Notas de Evolução**
+   - Array de `historico_evolucao` com timestamp, autor, mensagem
+   - Botão "Adicionar Nota" para registrar progresso
+4. **Agendamento**
+   - Seletor de data/hora; sincroniza com `agendado_para`
+   - Integração com calendário pessoal do pastor (a confirmar)
+5. **Análise IA**
+   - Se disponível: `analise_ia_titulo`, `analise_ia_motivo`, `analise_ia_gravidade`, `analise_ia_resposta` (campos em `sentimentos_membros` ou JSON em `historico_evolucao`)
+
+### 4.6 Notificações
+
+**Alertas Imediatos** (Eventos que acionam notifications)
+- Novo atendimento com `gravidade = CRITICA` → WhatsApp ao pastor responsável via Make
+- Status muda para `EM_ACOMPANHAMENTO` → Confirmação in-app ao pastor
+
+**Alertas Passivos** (Database Webhooks / Triggers, a implementar)
+- INSERT em `atendimentos_pastorais` com `gravidade >= ALTA` dispara trigger que chama `disparar-alerta`
+
+### 4.7 Permissões (RLS)
+
+- **Pastor/Líder**: Vê seus próprios atendimentos (onde `pastor_responsavel_id = auth.uid()`); pode editar status, notas, agendamento
+- **Secretaria**: Acesso via `view_agenda_secretaria` (sem ler `conteudo_original`); apenas agenda
+- **Admin**: CRUD completo em `atendimentos_pastorais`
+- **Membro**: Pode ver status do seu próprio atendimento (a confirmar via `view` específica)
+
+### 4.8 KPIs (Dashboard Admin)
+
+**Widget `GabinetePastoralWidget`** exibe:
+- Total de pendentes
+- Total em acompanhamento
+- Total agendados
+- Total concluídos (período: últimas 30 dias)
+- Tendência visual (sparkline ou gráfico simples)
+
+**Card no DashboardAdmin** redireciona para `/gabinete` ao clicar.
+
+### 4.9 Referências e Links
+- **ADR**: [`adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md`](adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
+- **Tabela**: `atendimentos_pastorais`, `view_agenda_secretaria` (em `database-schema.sql`)
+- **Edge Functions**: `analise-sentimento-ia`, `analise-pedido-ia`, `chatbot-triagem`
+- **UI**: `src/pages/GabinetePastoral.tsx`, `src/components/gabinete/*`
+
+---
+
+## 5. Intercessão, Oração e Testemunhos
 
 ### Objetivo do Módulo
 Centralizar gestão de pedidos de oração, intercessão organizada, registro de testemunhos e acompanhamento emocional dos membros, fortalecendo cuidado pastoral e resposta ágil a necessidades espirituais.
@@ -341,7 +464,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - `/intercessao/testemunhos`: Listagem, aprovação e publicação de testemunhos
 - `/intercessao/sentimentos`: Monitoramento de sentimentos e alertas críticos
 
-### 4.1 Pedidos de Oração
+### 5.1 Pedidos de Oração
 - **Criação**: Membro/visitante/anônimo cria pedido via dialog, com tipo (saúde, família, financeiro, trabalho, espiritual, outro)
 - **Fluxo de Status**: pendente → alocado → em_oracao → respondido/arquivado
 - **Alocação**: Admin aloca a intercessor(es) manualmente ou via "Alocar Automático" (balanceado por carga)

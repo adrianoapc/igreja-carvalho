@@ -10,23 +10,49 @@ flowchart TD
     A -->|Clica 'Novo Pedido'| B[Dialog: Novo Pedido]
     B -->|Preenche Dados| C["Pedido criado: status=pendente"]
     
-    C -->|Admin vê pendentes| D[Admin - Alocar Pedido]
-    D -->|Seleciona Intercessor| E["Pedido: status=alocado<br/>data_alocacao=now()"]
+    C -->|Sistema Analisa| D["Executa analise-pedido-ia<br/>(IA avalia conteúdo)"]
+    D -->|Calcula gravidade| E{Gravidade<br/>>= MEDIA?}
     
-    E -->|Intercessor recebe| F[Intercessor - Acompanha Pedido]
-    F -->|Registra observações| G["Pedido: status=em_oracao"]
+    E -->|Sim| F["Cria em atendimentos_pastorais<br/>(Gabinete Digital)"]
+    F -->|Detecta Líder| G["Atribui a Pastor<br/>ou Plantão"]
+    G -->|Notifica| H["Gabinete: entrada visível<br/>WhatsApp se CRÍTICA"]
     
-    G -->|Intercessor marca como respondido| H["Pedido: status=respondido<br/>data_resposta=now()"]
+    E -->|Não| I["Registro normal em<br/>pedidos_oracao"]
     
-    H -->|Admin pode| I[Arquivar Pedido]
-    I -->|Final| J["Pedido: status=arquivado"]
+    I -->|Admin vê pendentes| J[Admin - Alocar Pedido]
+    J -->|Seleciona Intercessor| K["Pedido: status=alocado<br/>data_alocacao=now()"]
+    
+    K -->|Intercessor recebe| L[Intercessor - Acompanha Pedido]
+    L -->|Registra observações| M["Pedido: status=em_oracao"]
+    
+    M -->|Intercessor marca como respondido| N["Pedido: status=respondido<br/>data_resposta=now()"]
+    
+    H -->|Pastor acompanha| O[Gabinete Digital - Prontuário]
+    O -->|Actualiza status| P["Atendimento: PENDENTE →<br/>EM_ACOMPANHAMENTO →<br/>AGENDADO → CONCLUÍDO"]
+    
+    N -->|Admin pode| Q[Arquivar Pedido]
+    Q -->|Final| R["Pedido: status=arquivado"]
+    
+    P -->|Finaliza| S["Atendimento em Gabinete<br/>arquivado/concluído"]
     
     style C fill:#fff3cd
-    style E fill:#d1ecf1
-    style G fill:#d4edda
-    style H fill:#d4edda
-    style J fill:#f8d7da
+    style E fill:#ffe6e6
+    style F fill:#f8d7da
+    style H fill:#f8d7da
+    style I fill:#fff3cd
+    style K fill:#d1ecf1
+    style M fill:#d4edda
+    style N fill:#d4edda
+    style P fill:#f8d7da
+    style R fill:#f8d7da
+    style S fill:#f8d7da
 ```
+
+**Integração Gabinete Digital (ADR-014)**:
+- Pedidos de oração com gravidade >= MEDIA são analisados pela IA (edge function `analise-pedido-ia`)
+- Se gravidade >= MEDIA: cria entrada em `atendimentos_pastorais` (Gabinete Digital)
+- Pastor acompanha em Gabinete (Prontuário) em paralelo à intercessão tradicional
+- Notificações: CRÍTICA → WhatsApp + In-App; MEDIA/ALTA → In-App (Gabinete)
 
 ## 2. Fluxo: Intercessores (Equipe) — Entrada no Ministério
 
@@ -161,5 +187,8 @@ graph LR
 
 **Referências**:
 - Manual do Usuário (Seção 6): [`../manual-usuario.md#6-intercessão`](../manual-usuario.md#6-intercessão)
-- Funcionalidades: [`../funcionalidades.md#4-intercessão-oração-e-testemunhos`](../funcionalidades.md#4-intercessão-oração-e-testemunhos)
+- Funcionalidades: [`../funcionalidades.md#5-intercessão-oração-e-testemunhos`](../funcionalidades.md#5-intercessão-oração-e-testemunhos)
+- Gabinete Digital: [`../funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral`](../funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral)
+- Diagrama Gabinete: [`./fluxo-gabinete-pastoral.md`](./fluxo-gabinete-pastoral.md)
+- ADR-014 (Gabinete Digital): [`../adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md`](../adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
 - Arquitetura: [`../01-Arquitetura/01-arquitetura-geral.MD#módulo-intercessão-oração-e-testemunhos-visão-técnica`](../01-Arquitetura/01-arquitetura-geral.MD#módulo-intercessão-oração-e-testemunhos-visão-técnica)

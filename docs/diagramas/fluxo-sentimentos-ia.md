@@ -25,41 +25,38 @@ flowchart TD
     ParseResult --> UpdateDB[UPDATE sentimentos_membros<br/>analise_ia_*]
     FallbackAnalysis --> UpdateDB
     
-    UpdateDB --> CheckCritical{Gravidade<br/>Crítica?}
+    UpdateDB --> CheckCritical{Gravidade<br/>Crítica ou<br/>Média+?}
     
-    CheckCritical -->|Não| End2([Fim:<br/>Análise Salva])
+    CheckCritical -->|Gravidade < MEDIA| End2([Fim:<br/>Análise Salva<br/>em Sentimentos])
     
-    CheckCritical -->|Sim| FindLeader[Buscar Líder<br/>do Time do Membro]
+    CheckCritical -->|Gravidade >= MEDIA| CreateGabinete["Cria em<br/>atendimentos_pastorais<br/>origem='SENTIMENTOS'"]
+    
+    CreateGabinete --> FindLeader[Detecta Líder<br/>do Membro]
     
     FindLeader --> HasLeader{Líder<br/>Encontrado?}
     
-    HasLeader -->|Sim| UseLeaderPhone[Usa Telefone<br/>do Líder]
-    HasLeader -->|Não| UsePlantao[Usa Telefone<br/>Plantão Pastoral]
+    HasLeader -->|Sim| AssignLeader["Atribui a Líder<br/>do Membro"]
+    HasLeader -->|Não| AssignPlantao["Atribui a Pastor<br/>de Plantão"]
     
-    UseLeaderPhone --> NotifyAdmins[notify_admins RPC<br/>Notificação In-App]
-    UsePlantao --> NotifyAdmins
+    AssignLeader --> Notify["Notifica Pastor<br/>Responsável"]
+    AssignPlantao --> Notify
     
-    NotifyAdmins --> CheckWebhook{Webhook<br/>Make Config?}
+    Notify --> CheckNotif{Gravidade<br/>CRÍTICA?}
     
-    CheckWebhook -->|Não| End3([Fim: Só In-App])
-    CheckWebhook -->|Sim| SendPrimary[Envia WhatsApp<br/>p/ Líder ou Plantão]
+    CheckNotif -->|Sim| NotifyImm["Notificação Imediata:<br/>WhatsApp + In-App"]
+    CheckNotif -->|Não| NotifyPassive["Notificação Passiva:<br/>In-App no Gabinete"]
     
-    SendPrimary --> CheckCopy{Plantão<br/>≠ Primary?}
-    
-    CheckCopy -->|Sim| SendCopy[Envia Cópia<br/>p/ Plantão Pastoral]
-    CheckCopy -->|Não| End4([Fim: Alertas Enviados])
-    
-    SendCopy --> End4
+    NotifyImm --> End3([Fim: Atendimento<br/>no Gabinete])
+    NotifyPassive --> End3
     
     style Start fill:#e1f5ff
-    style End1 fill:#fff4e1
-    style End2 fill:#e1ffe1
+    style End2 fill:#fff4e1
     style End3 fill:#e1ffe1
-    style End4 fill:#e1ffe1
+    style CreateGabinete fill:#fff3cd
     style CallAI fill:#f5e1ff
-    style CheckCritical fill:#ffe1e1
-    style SendPrimary fill:#fff9e1
-    style SendCopy fill:#fff9e1
+    style AssignLeader fill:#e6ffe6
+    style AssignPlantao fill:#e6ffe6
+    style NotifyImm fill:#ffe6e6
 ```
 
 ## Fluxo de Classificação da IA
@@ -107,8 +104,10 @@ flowchart TD
 | Edge Function | Backend | `supabase/functions/analise-sentimento-ia/index.ts` |
 | Dialog Registro | Frontend | `src/components/sentimentos/RegistrarSentimentoDialog.tsx` |
 | Lista Admin | Frontend | `src/pages/intercessao/Sentimentos.tsx` |
-| Tabela | Database | `sentimentos_membros` |
-| RPC | Database | `notify_admins()` |
+| Gabinete | Frontend | `src/pages/GabinetePastoral.tsx` |
+| Tabela Sentimentos | Database | `sentimentos_membros` |
+| Tabela Atendimentos | Database | `atendimentos_pastorais` |
+| RPC Notificação | Database | `notify_admins()` |
 
 ## Campos de Análise IA
 
@@ -119,23 +118,10 @@ flowchart TD
 | `analise_ia_gravidade` | TEXT | baixa, media, critica |
 | `analise_ia_resposta` | TEXT | Mensagem pastoral empática |
 
-## Payload do Webhook Make
-
-```json
-{
-  "membro_nome": "Nome do Membro",
-  "membro_telefone": "(11) 99999-9999",
-  "sentimento": "Angustiado",
-  "gravidade": "critica",
-  "ai_resumo": "Título - Motivo",
-  "ai_mensagem_membro": "Mensagem pastoral...",
-  "pastor_telefone": "(11) 88888-8888",
-  "link_admin": "https://app/intercessao/sentimentos"
-}
-```
-
 ## Referências
 
+- [Fluxo do Gabinete Digital](fluxo-gabinete-pastoral.md)
 - [Fluxo de Notificações](fluxo-notificacoes.md)
-- [Manual do Usuário - Intercessão](../manual-usuario.md#7-intercessão)
-- [Funcionalidades - Sentimentos](../funcionalidades.md#sentimentos)
+- [ADR-014: Gabinete Digital](../adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
+- [Manual do Usuário - Intercessão](../manual-usuario.md#5-intercessão-oração-e-testemunhos)
+- [Funcionalidades - Sentimentos](../funcionalidades.md#55-sentimentos)
