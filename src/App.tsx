@@ -101,6 +101,7 @@ import TurmaAtiva from "./pages/kids/TurmaAtiva";
 import NotificacoesAdmin from "./pages/admin/Notificacoes";
 import WebhooksAdmin from "./pages/admin/Webhooks";
 import ChatbotsAdmin from "./pages/admin/Chatbots";
+import GabinetePastoral from "./pages/GabinetePastoral";
 
 const queryClient = new QueryClient();
 
@@ -464,6 +465,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Sentimentos />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gabinete"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <GabinetePastoral />
                 </MainLayout>
               </ProtectedRoute>
             }

@@ -114,7 +114,7 @@ function extractJsonAndText(aiContent: string) {
 }
 
 // --- ROTEAMENTO DE PASTOR (LÓGICA DE INTELIGÊNCIA) ---
-async function definirPastorResponsavel(perfilUsuario: any) {
+async function definirPastorResponsavel(perfilUsuario: any): Promise<string | null> {
   // 1. Se tem líder cadastrado, tenta mandar pro líder
   if (perfilUsuario?.lider_id) {
       // Opcional: Você pode adicionar uma verificação aqui se o lider_id é realmente um pastor
@@ -125,9 +125,7 @@ async function definirPastorResponsavel(perfilUsuario: any) {
       return perfilUsuario.lider_id;
   }
   // 2. Fallback: Pastor de Plantão (Gabinete Geral)
-  // Se o UUID for zero ou inválido, o banco pode rejeitar dependendo da FK.
-  // Retornamos null se for inválido para não quebrar o insert (se a coluna permitir null)
-  return UUID_PASTOR_PLANTAO !== "00000000-0000-0000-0000-000000000000" ? UUID_PASTOR_PLANTAO : null;
+  return UUID_PASTOR_PLANTAO;
 }
 
 // --- ÁUDIO ---
@@ -251,7 +249,7 @@ serve(async (req) => {
             visitanteId = newLead?.id;
         }
         // Visitantes não tem líder, vão para o Plantão/Gabinete Geral
-        pastorResponsavelId = UUID_PASTOR_PLANTAO !== "00000000-0000-0000-0000-000000000000" ? UUID_PASTOR_PLANTAO : null;
+        pastorResponsavelId = UUID_PASTOR_PLANTAO;
       } else {
         // Membros: Roteamento inteligente para o Líder ou Plantão
         pastorResponsavelId = await definirPastorResponsavel(profile);
