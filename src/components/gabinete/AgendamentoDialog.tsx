@@ -200,6 +200,13 @@ export function AgendamentoDialog({
   const [telefonePessoa, setTelefonePessoa] = useState("");
   const [motivoResumo, setMotivoResumo] = useState("");
   const [gravidadeSelecionada, setGravidadeSelecionada] = useState<"BAIXA" | "MEDIA" | "ALTA" | "CRITICA">("BAIXA");
+  const [pessoaSelecionada, setPessoaSelecionada] = useState<{
+    id: string;
+    tipo: "membro" | "visitante";
+    nome: string;
+    telefone?: string;
+  } | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Reset quando abre
   useEffect(() => {
@@ -228,6 +235,41 @@ export function AgendamentoDialog({
       return data || [];
     },
     enabled: open,
+  });
+
+  // Busca de pessoas (membros e visitantes)
+  const { data: sugestoesPessoas = [] } = useQuery({
+    queryKey: ["busca-pessoas-agendamento", nomePessoa],
+    queryFn: async () => {
+      if (nomePessoa.trim().length < 2) return [];
+      
+      // Busca membros
+      const { data: membros } = await supabase
+        .from("profiles")
+        .select("id, nome, telefone")
+        .ilike("nome", `%${nomePessoa.trim()}%`)
+        .limit(5);
+      
+      // Busca visitantes
+      const { data: visitantes } = await supabase
+        .from("visitantes_leads")
+        .select("id, nome, telefone")
+        .ilike("nome", `%${nomePessoa.trim()}%`)
+        .limit(5);
+      
+      const resultado: { id: string; tipo: "membro" | "visitante"; nome: string; telefone?: string }[] = [];
+      
+      membros?.forEach(m => {
+        resultado.push({ id: m.id, tipo: "membro", nome: m.nome || "", telefone: m.telefone || undefined });
+      });
+      
+      visitantes?.forEach(v => {
+        resultado.push({ id: v.id, tipo: "visitante", nome: v.nome || "", telefone: v.telefone || undefined });
+      });
+      
+      return resultado;
+    },
+    enabled: open && isNovoAtendimento && nomePessoa.trim().length >= 2 && !pessoaSelecionada,
   });
 
   const pastorSelecionado = useMemo(() => {
@@ -366,11 +408,19 @@ export function AgendamentoDialog({
         : modalidadeLabels[modalidadeAtendimento];
 
       if (isNovoAtendimento) {
-        // Primeiro criar visitante_lead se não existir
+        // Determinar pessoa_id ou visitante_id
+        let pessoaId: string | null = null;
         let visitanteId: string | null = null;
         
-        if (telefonePessoa.trim()) {
-          // Verifica se já existe
+        if (pessoaSelecionada) {
+          // Pessoa selecionada do autocomplete
+          if (pessoaSelecionada.tipo === "membro") {
+            pessoaId = pessoaSelecionada.id;
+          } else {
+            visitanteId = pessoaSelecionada.id;
+          }
+        } else if (telefonePessoa.trim()) {
+          // Nome digitado manualmente, criar como visitante
           const { data: existente } = await supabase
             .from("visitantes_leads")
             .select("id")
@@ -399,6 +449,7 @@ export function AgendamentoDialog({
         const { error } = await supabase
           .from("atendimentos_pastorais")
           .insert({
+            pessoa_id: pessoaId,
             visitante_id: visitanteId,
             pastor_responsavel_id: selectedPastorId,
             data_agendamento: dataAgendamento.toISOString(),
@@ -456,6 +507,8 @@ export function AgendamentoDialog({
     setTelefonePessoa("");
     setMotivoResumo("");
     setGravidadeSelecionada("BAIXA");
+    setPessoaSelecionada(null);
+    setShowSuggestions(false);
     setCurrentStep(isNovoAtendimento ? "pessoa" : "pastor");
     if (!pastorPreSelecionadoId) {
       setSelectedPastorId(null);
@@ -532,14 +585,71 @@ export function AgendamentoDialog({
       </div>
       
       <div className="space-y-2">
-        <div className="space-y-1">
+        <div className="space-y-1 relative">
           <Label className="text-xs">Nome *</Label>
-          <Input
-            placeholder="Nome da pessoa"
-            value={nomePessoa}
-            onChange={(e) => setNomePessoa(e.target.value)}
-            className="h-8 text-sm"
-          />
+          {pessoaSelecionada ? (
+            <div className="flex items-center gap-2 p-2 border rounded-lg bg-muted/50">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{pessoaSelecionada.nome}</p>
+                <Badge variant="outline" className="text-[10px]">
+                  {pessoaSelecionada.tipo === "membro" ? "Membro" : "Visitante"}
+                </Badge>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => {
+                  setPessoaSelecionada(null);
+                  setNomePessoa("");
+                  setTelefonePessoa("");
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Input
+                placeholder="Digite o nome para buscar..."
+                value={nomePessoa}
+                onChange={(e) => {
+                  setNomePessoa(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                className="h-8 text-sm"
+              />
+              {showSuggestions && sugestoesPessoas.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg max-h-40 overflow-auto">
+                  {sugestoesPessoas.map((pessoa) => (
+                    <button
+                      key={`${pessoa.tipo}-${pessoa.id}`}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-muted flex items-center justify-between text-sm"
+                      onClick={() => {
+                        setPessoaSelecionada(pessoa);
+                        setNomePessoa(pessoa.nome);
+                        setTelefonePessoa(pessoa.telefone || "");
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <span>{pessoa.nome}</span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {pessoa.tipo === "membro" ? "Membro" : "Visitante"}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {nomePessoa.trim().length >= 2 && sugestoesPessoas.length === 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Pessoa não encontrada. Será cadastrada como visitante.
+                </p>
+              )}
+            </>
+          )}
         </div>
         
         <div className="space-y-1">
@@ -549,6 +659,7 @@ export function AgendamentoDialog({
             value={telefonePessoa}
             onChange={(e) => setTelefonePessoa(e.target.value)}
             className="h-8 text-sm"
+            disabled={!!pessoaSelecionada}
           />
         </div>
         
