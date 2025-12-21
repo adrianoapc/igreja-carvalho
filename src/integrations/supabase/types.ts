@@ -2974,6 +2974,7 @@ export type Database = {
           data_primeira_visita: string | null
           data_ultima_visita: string | null
           deseja_contato: boolean | null
+          disponibilidade_agenda: Json | null
           e_lider: boolean | null
           e_pastor: boolean | null
           email: string | null
@@ -3023,6 +3024,7 @@ export type Database = {
           data_primeira_visita?: string | null
           data_ultima_visita?: string | null
           deseja_contato?: boolean | null
+          disponibilidade_agenda?: Json | null
           e_lider?: boolean | null
           e_pastor?: boolean | null
           email?: string | null
@@ -3072,6 +3074,7 @@ export type Database = {
           data_primeira_visita?: string | null
           data_ultima_visita?: string | null
           deseja_contato?: boolean | null
+          disponibilidade_agenda?: Json | null
           e_lider?: boolean | null
           e_pastor?: boolean | null
           email?: string | null
