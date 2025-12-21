@@ -34,6 +34,8 @@ interface PastoralKanbanColumnProps {
   icon: React.ReactNode;
   atendimentos: AtendimentoPastoral[];
   onCardClick: (atendimento: AtendimentoPastoral) => void;
+  onAgendar: (atendimento: AtendimentoPastoral) => void;
+  onProntuario: (atendimento: AtendimentoPastoral) => void;
 }
 
 export function PastoralKanbanColumn({
@@ -42,6 +44,8 @@ export function PastoralKanbanColumn({
   icon,
   atendimentos,
   onCardClick,
+  onAgendar,
+  onProntuario,
 }: PastoralKanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
@@ -86,10 +90,12 @@ export function PastoralKanbanColumn({
           >
             <div className="space-y-2 pr-1">
               {sortedAtendimentos.map((atendimento) => (
-                <div key={atendimento.id} className="w-full overflow-hidden">
+                <div key={atendimento.id} className="w-full">
                   <PastoralCard
                     atendimento={atendimento}
                     onClick={() => onCardClick(atendimento)}
+                    onAgendar={() => onAgendar(atendimento)}
+                    onProntuario={() => onProntuario(atendimento)}
                   />
                 </div>
               ))}

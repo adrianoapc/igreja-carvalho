@@ -194,12 +194,12 @@ export function PastoralInboxTable({
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
+            <TableHead className="w-[80px]">Ações</TableHead>
             <TableHead className="w-[80px]">Data</TableHead>
             <TableHead>Nome</TableHead>
             <TableHead className="w-[90px]">Gravidade</TableHead>
             <TableHead className="w-[110px]">Status</TableHead>
             <TableHead className="w-[130px]">Pastor</TableHead>
-            <TableHead className="w-[90px] text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -219,6 +219,39 @@ export function PastoralInboxTable({
                 )}
                 onClick={() => navigate(`/gabinete/atendimento/${atendimento.id}`)}
               >
+                <TableCell>
+                  <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAgendar(atendimento);
+                          }}
+                        >
+                          <Calendar className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Agendar</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => navigate(`/gabinete/atendimento/${atendimento.id}`)}
+                        >
+                          <ClipboardList className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Prontuário</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     {isCritico && (
@@ -275,39 +308,6 @@ export function PastoralInboxTable({
                   <span className="text-sm text-muted-foreground truncate block">
                     {atendimento.pastor?.nome || "—"}
                   </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAgendar(atendimento);
-                          }}
-                        >
-                          <Calendar className="h-3.5 w-3.5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left">Agendar</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => navigate(`/gabinete/atendimento/${atendimento.id}`)}
-                        >
-                          <ClipboardList className="h-3.5 w-3.5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left">Prontuário</TooltipContent>
-                    </Tooltip>
-                  </div>
                 </TableCell>
               </TableRow>
             );

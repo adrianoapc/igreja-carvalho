@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -15,8 +16,8 @@ import {
 import { Clock, Calendar, MessageSquare, CheckCircle2 } from "lucide-react";
 
 import { PastoralKanbanColumn } from "./PastoralKanbanColumn";
-import { PastoralDetailsDrawer } from "./PastoralDetailsDrawer";
 import { PastoralCard } from "./PastoralCard";
+import { AgendamentoDialog } from "./AgendamentoDialog";
 
 type GravidadeEnum = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
 type StatusEnum = "PENDENTE" | "TRIAGEM" | "AGENDADO" | "EM_ACOMPANHAMENTO" | "CONCLUIDO";
@@ -54,10 +55,11 @@ interface PastoralKanbanViewProps {
 }
 
 export default function PastoralKanbanView({ atendimentos, allAtendimentos }: PastoralKanbanViewProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedAtendimento, setSelectedAtendimento] = useState<AtendimentoPastoral | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [agendamentoOpen, setAgendamentoOpen] = useState(false);
+  const [selectedForAgendamento, setSelectedForAgendamento] = useState<AtendimentoPastoral | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -124,9 +126,17 @@ export default function PastoralKanbanView({ atendimentos, allAtendimentos }: Pa
   );
 
   const handleCardClick = useCallback((atendimento: AtendimentoPastoral) => {
-    setSelectedAtendimento(atendimento);
-    setDrawerOpen(true);
+    navigate(`/gabinete/atendimento/${atendimento.id}`);
+  }, [navigate]);
+
+  const handleAgendar = useCallback((atendimento: AtendimentoPastoral) => {
+    setSelectedForAgendamento(atendimento);
+    setAgendamentoOpen(true);
   }, []);
+
+  const handleProntuario = useCallback((atendimento: AtendimentoPastoral) => {
+    navigate(`/gabinete/atendimento/${atendimento.id}`);
+  }, [navigate]);
 
   const activeAtendimento = useMemo(() => {
     if (!activeId || !allAtendimentos) return null;
@@ -150,6 +160,8 @@ export default function PastoralKanbanView({ atendimentos, allAtendimentos }: Pa
               icon={icon}
               atendimentos={atendimentosPorStatus[status] || []}
               onCardClick={handleCardClick}
+              onAgendar={handleAgendar}
+              onProntuario={handleProntuario}
             />
           ))}
         </div>
@@ -161,10 +173,10 @@ export default function PastoralKanbanView({ atendimentos, allAtendimentos }: Pa
         </DragOverlay>
       </DndContext>
 
-      <PastoralDetailsDrawer
-        atendimento={selectedAtendimento}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+      <AgendamentoDialog
+        open={agendamentoOpen}
+        onOpenChange={setAgendamentoOpen}
+        atendimentoId={selectedForAgendamento?.id || null}
       />
     </>
   );
