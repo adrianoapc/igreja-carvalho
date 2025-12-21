@@ -102,6 +102,7 @@ import NotificacoesAdmin from "./pages/admin/Notificacoes";
 import WebhooksAdmin from "./pages/admin/Webhooks";
 import ChatbotsAdmin from "./pages/admin/Chatbots";
 import GabinetePastoral from "./pages/GabinetePastoral";
+import AtendimentoProntuario from "./pages/gabinete/AtendimentoProntuario";
 
 const queryClient = new QueryClient();
 
@@ -475,6 +476,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <GabinetePastoral />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gabinete/atendimento/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AtendimentoProntuario />
                 </MainLayout>
               </ProtectedRoute>
             }

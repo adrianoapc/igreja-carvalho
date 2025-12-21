@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -14,7 +15,7 @@ import {
   DragOverlay,
   DragStartEvent,
 } from "@dnd-kit/core";
-import { Clock, Calendar, MessageSquare, CheckCircle2 } from "lucide-react";
+import { Clock, Calendar, MessageSquare, CheckCircle2, List, LayoutGrid } from "lucide-react";
 
 import { PastoralKPIs } from "@/components/gabinete/PastoralKPIs";
 import { PastoralFilters } from "@/components/gabinete/PastoralFilters";
@@ -22,6 +23,8 @@ import { PastoralKanbanColumn } from "@/components/gabinete/PastoralKanbanColumn
 import { PastoralDetailsDrawer } from "@/components/gabinete/PastoralDetailsDrawer";
 import { PastoralListView } from "@/components/gabinete/PastoralListView";
 import { PastoralCard } from "@/components/gabinete/PastoralCard";
+import { PastoralInboxTable } from "@/components/gabinete/PastoralInboxTable";
+import { AgendamentoDialog } from "@/components/gabinete/AgendamentoDialog";
 
 type GravidadeEnum = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
 type StatusEnum = "PENDENTE" | "TRIAGEM" | "AGENDADO" | "EM_ACOMPANHAMENTO" | "CONCLUIDO";
@@ -62,10 +65,12 @@ export default function GabinetePastoral() {
   const [filtroGravidade, setFiltroGravidade] = useState<GravidadeEnum | "TODAS">("TODAS");
   const [busca, setBusca] = useState("");
   const [filtroOrigem, setFiltroOrigem] = useState("TODAS");
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
   const [selectedAtendimento, setSelectedAtendimento] = useState<AtendimentoPastoral | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [agendamentoDialogOpen, setAgendamentoDialogOpen] = useState(false);
+  const [atendimentoParaAgendar, setAtendimentoParaAgendar] = useState<AtendimentoPastoral | null>(null);
 
   // DnD sensors
   const sensors = useSensors(
@@ -194,6 +199,11 @@ export default function GabinetePastoral() {
     setDrawerOpen(true);
   }, []);
 
+  const handleAgendar = useCallback((atendimento: AtendimentoPastoral) => {
+    setAtendimentoParaAgendar(atendimento);
+    setAgendamentoDialogOpen(true);
+  }, []);
+
   const activeAtendimento = useMemo(() => {
     if (!activeId || !atendimentos) return null;
     return atendimentos.find((a) => a.id === activeId) || null;
@@ -245,48 +255,72 @@ export default function GabinetePastoral() {
         setViewMode={setViewMode}
       />
 
-      {/* View Mode: Kanban ou Lista */}
-      {viewMode === "kanban" ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
-            {STATUS_COLUMNS.map(({ status, label, icon }) => (
-              <PastoralKanbanColumn
-                key={status}
-                status={status}
-                label={label}
-                icon={icon}
-                atendimentos={atendimentosPorStatus[status] || []}
-                onCardClick={handleCardClick}
-              />
-            ))}
-          </div>
+      {/* Tabs: Lista Inbox e Quadro Kanban */}
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list")}>
+        <TabsList className="grid w-full max-w-[300px] grid-cols-2">
+          <TabsTrigger value="list" className="flex items-center gap-2">
+            <List className="h-4 w-4" />
+            Inbox
+          </TabsTrigger>
+          <TabsTrigger value="kanban" className="flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            Quadro
+          </TabsTrigger>
+        </TabsList>
 
-          <DragOverlay>
-            {activeAtendimento && (
-              <PastoralCard
-                atendimento={activeAtendimento}
-                onClick={() => {}}
-              />
-            )}
-          </DragOverlay>
-        </DndContext>
-      ) : (
-        <PastoralListView
-          atendimentosPorStatus={atendimentosPorStatus}
-          onCardClick={handleCardClick}
-        />
-      )}
+        {/* Tab Inbox - Table View */}
+        <TabsContent value="list" className="mt-4">
+          <PastoralInboxTable
+            atendimentos={atendimentosFiltrados}
+            onAgendar={handleAgendar}
+          />
+        </TabsContent>
 
-      {/* Drawer de detalhes */}
+        {/* Tab Kanban - Board View */}
+        <TabsContent value="kanban" className="mt-4">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
+              {STATUS_COLUMNS.map(({ status, label, icon }) => (
+                <PastoralKanbanColumn
+                  key={status}
+                  status={status}
+                  label={label}
+                  icon={icon}
+                  atendimentos={atendimentosPorStatus[status] || []}
+                  onCardClick={handleCardClick}
+                />
+              ))}
+            </div>
+
+            <DragOverlay>
+              {activeAtendimento && (
+                <PastoralCard
+                  atendimento={activeAtendimento}
+                  onClick={() => {}}
+                />
+              )}
+            </DragOverlay>
+          </DndContext>
+        </TabsContent>
+      </Tabs>
+
+      {/* Drawer de detalhes (para Kanban view) */}
       <PastoralDetailsDrawer
         atendimento={selectedAtendimento}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
+      />
+
+      {/* Dialog de Agendamento */}
+      <AgendamentoDialog
+        atendimentoId={atendimentoParaAgendar?.id || null}
+        open={agendamentoDialogOpen}
+        onOpenChange={setAgendamentoDialogOpen}
       />
     </div>
   );
