@@ -6,10 +6,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// URL base do app para links
+const APP_URL = Deno.env.get("APP_URL") || "https://igreja.lovable.app";
+
 interface DisparadorPayload {
   evento: string;
   dados: Record<string, any>;
   user_id_alvo?: string;
+  // Suporte para webhook de banco (Database Webhook payload)
+  type?: string;
+  table?: string;
+  record?: Record<string, any>;
+  old_record?: Record<string, any>;
 }
 
 interface NotificacaoRegra {
@@ -298,6 +306,159 @@ async function dispararPush(
   return true;
 }
 
+// ============= HANDLERS ESPECÍFICOS POR TABELA =============
+
+interface AtendimentoPastoralRecord {
+  id: string;
+  pessoa_id?: string | null;
+  visitante_id?: string | null;
+  pastor_responsavel_id?: string | null;
+  gravidade?: string | null;
+  origem?: string | null;
+  conteudo_original?: string | null;
+  motivo_resumo?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+}
+
+// Handler para atendimentos_pastorais
+async function handleAtendimentoPastoral(
+  supabase: any,
+  record: AtendimentoPastoralRecord
+): Promise<{ sucesso: boolean; mensagem: string }> {
+  console.log(`🏥 Processando alerta de Gabinete Pastoral: ${record.id}`);
+  
+  // Só dispara para gravidade crítica ou alta
+  const gravidadesCriticas = ['critica', 'alta'];
+  if (!record.gravidade || !gravidadesCriticas.includes(record.gravidade)) {
+    console.log(`   Gravidade "${record.gravidade}" não requer alerta imediato`);
+    return { sucesso: true, mensagem: "Gravidade não crítica, alerta ignorado" };
+  }
+
+  // 1. Buscar nome da pessoa/visitante
+  let nomePessoa = "Pessoa não identificada";
+  
+  if (record.pessoa_id) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("nome")
+      .eq("id", record.pessoa_id)
+      .single();
+    if (profile?.nome) nomePessoa = profile.nome;
+  } else if (record.visitante_id) {
+    const { data: visitante } = await supabase
+      .from("visitantes_leads")
+      .select("nome, telefone")
+      .eq("id", record.visitante_id)
+      .single();
+    if (visitante?.nome) {
+      nomePessoa = visitante.nome;
+    } else if (visitante?.telefone) {
+      nomePessoa = `Visitante (${visitante.telefone})`;
+    }
+  }
+
+  // 2. Determinar destinatário (pastor responsável ou fallback)
+  let telefonePastor: string | null = null;
+  let pastorNome = "Pastor de Plantão";
+  
+  if (record.pastor_responsavel_id) {
+    const { data: pastor } = await supabase
+      .from("profiles")
+      .select("nome, telefone")
+      .eq("id", record.pastor_responsavel_id)
+      .single();
+    
+    if (pastor) {
+      telefonePastor = pastor.telefone;
+      pastorNome = pastor.nome || "Pastor Responsável";
+    }
+  }
+
+  // Fallback: telefone de plantão pastoral
+  if (!telefonePastor) {
+    telefonePastor = Deno.env.get("TELEFONE_PLANTAO") || null;
+    console.log(`   Usando telefone de plantão: ${telefonePastor ? "configurado" : "NÃO CONFIGURADO"}`);
+  }
+
+  if (!telefonePastor) {
+    console.warn("⚠️ Nenhum telefone disponível para alerta pastoral!");
+    return { sucesso: false, mensagem: "Nenhum telefone de pastor disponível" };
+  }
+
+  // 3. Formatar mensagem WhatsApp
+  const emojiGravidade = record.gravidade === 'critica' ? '🔴' : '🟠';
+  const gravidadeLabel = record.gravidade === 'critica' ? 'Crítica' : 'Alta';
+  
+  const origemLabel = record.origem === 'sentimentos_ia' 
+    ? '🤖 Sentimentos (IA)' 
+    : record.origem === 'chatbot'
+    ? '💬 Chatbot Triagem'
+    : '📱 App/Solicitação';
+
+  // Resumir conteúdo se muito longo
+  let conteudo = record.conteudo_original || record.motivo_resumo || "Sem detalhes";
+  if (conteudo.length > 200) {
+    conteudo = conteudo.substring(0, 197) + "...";
+  }
+
+  const linkProntuario = `${APP_URL}/gabinete/atendimento/${record.id}`;
+
+  const mensagem = `🚨 *Alerta de Gabinete Pastoral*
+
+${emojiGravidade} *Gravidade:* ${gravidadeLabel}
+📍 *Origem:* ${origemLabel}
+👤 *Quem:* ${nomePessoa}
+
+📝 *Motivo:*
+${conteudo}
+
+🔗 *Acessar Prontuário:*
+${linkProntuario}`;
+
+  // 4. Disparar WhatsApp
+  const sucesso = await dispararWhatsApp(
+    telefonePastor,
+    mensagem,
+    "alerta_gabinete_pastoral",
+    "make",
+    null
+  );
+
+  if (sucesso) {
+    console.log(`✅ Alerta pastoral enviado para ${pastorNome} (${telefonePastor})`);
+    
+    // Também criar notificação in-app para o pastor se tiver user_id
+    if (record.pastor_responsavel_id) {
+      const { data: pastorProfile } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("id", record.pastor_responsavel_id)
+        .single();
+      
+      if (pastorProfile?.user_id) {
+        await dispararInApp(
+          supabase,
+          pastorProfile.user_id,
+          `🚨 Atendimento ${gravidadeLabel}`,
+          `${nomePessoa} precisa de atenção pastoral urgente.`,
+          "alerta_gabinete_pastoral"
+        );
+      }
+    }
+  }
+
+  return { 
+    sucesso, 
+    mensagem: sucesso ? "Alerta pastoral enviado" : "Falha ao enviar alerta" 
+  };
+}
+
+// Detectar se é um webhook de banco de dados
+function isDbWebhook(payload: DisparadorPayload): boolean {
+  return !!(payload.type && payload.table && payload.record);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -305,6 +466,46 @@ serve(async (req) => {
 
   try {
     const payload: DisparadorPayload = await req.json();
+    
+    // Criar cliente Supabase com service role (para acessar dados de todos)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Variáveis de ambiente do Supabase não configuradas");
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // ============= HANDLER PARA DATABASE WEBHOOKS =============
+    if (isDbWebhook(payload)) {
+      console.log(`📡 Recebido webhook de banco: ${payload.type} em ${payload.table}`);
+      
+      // Handler para atendimentos_pastorais
+      if (payload.table === "atendimentos_pastorais" && payload.type === "INSERT") {
+        const resultado = await handleAtendimentoPastoral(supabase, payload.record as AtendimentoPastoralRecord);
+        
+        return new Response(
+          JSON.stringify(resultado),
+          {
+            status: resultado.sucesso ? 200 : 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      
+      // Outros handlers de tabela podem ser adicionados aqui
+      console.log(`   Tabela ${payload.table} não tem handler específico`);
+      return new Response(
+        JSON.stringify({ sucesso: true, mensagem: "Webhook recebido, sem handler" }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // ============= HANDLER PADRÃO (EVENTOS MANUAIS) =============
     const { evento, dados, user_id_alvo } = payload;
 
     if (!evento) {
@@ -320,15 +521,6 @@ serve(async (req) => {
     console.log(`🚀 Disparando alerta para evento: ${evento}`);
     console.log(`   Dados: ${JSON.stringify(dados)}`);
 
-    // Criar cliente Supabase com service role (para acessar dados de todos)
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error("Variáveis de ambiente do Supabase não configuradas");
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Buscar configuração do evento
     const eventoCfg = await buscarEvento(supabase, evento);
