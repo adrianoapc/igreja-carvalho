@@ -513,7 +513,7 @@ export function AgendamentoDialog({
           }}
           locale={ptBR}
           disabled={(date) => date < startOfDay(new Date())}
-          className="rounded-md border text-sm [&_.rdp-caption]:text-sm [&_.rdp-head_th]:text-xs [&_.rdp-cell]:p-0 [&_.rdp-button]:h-8 [&_.rdp-button]:w-8 [&_.rdp-button]:text-xs"
+          className="pointer-events-auto rounded-md border text-sm [&_.rdp-caption]:text-sm [&_.rdp-head_th]:text-xs [&_.rdp-cell]:p-0 [&_.rdp-button]:h-8 [&_.rdp-button]:w-8 [&_.rdp-button]:text-xs"
         />
       </div>
       
