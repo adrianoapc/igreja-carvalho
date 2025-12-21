@@ -64,7 +64,7 @@ export function PastoralKanbanColumn({
     <Card
       ref={setNodeRef}
       className={cn(
-        "bg-muted/20 transition-all min-h-[300px]",
+        "bg-muted/20 transition-all min-h-[300px] overflow-hidden",
         isOver && "ring-2 ring-primary bg-primary/5",
         hasCriticos && status === "PENDENTE" && "border-destructive/50"
       )}
@@ -78,7 +78,7 @@ export function PastoralKanbanColumn({
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-2 pt-0">
+      <CardContent className="p-2 pt-0 overflow-hidden">
         <ScrollArea className="h-[calc(100vh-420px)] min-h-[200px]">
           <SortableContext
             items={sortedAtendimentos.map((a) => a.id)}
@@ -86,11 +86,12 @@ export function PastoralKanbanColumn({
           >
             <div className="space-y-2 pr-1">
               {sortedAtendimentos.map((atendimento) => (
-                <PastoralCard
-                  key={atendimento.id}
-                  atendimento={atendimento}
-                  onClick={() => onCardClick(atendimento)}
-                />
+                <div key={atendimento.id} className="w-full overflow-hidden">
+                  <PastoralCard
+                    atendimento={atendimento}
+                    onClick={() => onCardClick(atendimento)}
+                  />
+                </div>
               ))}
 
               {atendimentos.length === 0 && (
