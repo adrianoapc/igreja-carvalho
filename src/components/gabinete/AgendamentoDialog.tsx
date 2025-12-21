@@ -209,6 +209,7 @@ export function AgendamentoDialog({
     return DIAS_SEMANA_NOMES[getDay(selectedDate)];
   }, [selectedDate]);
 
+  // Fetch atendimentos existentes
   const { data: agendamentosExistentes = [], isLoading: loadingAgendamentos } = useQuery({
     queryKey: ["agendamentos-pastor", selectedPastorId, selectedDate?.toISOString()],
     queryFn: async () => {
@@ -232,17 +233,53 @@ export function AgendamentoDialog({
     enabled: open && !!selectedPastorId && !!selectedDate && pastorTemConfiguracao && pastorAtendeNoDia,
   });
 
+  // Fetch compromissos administrativos (bloqueios, reuniões, etc.)
+  const { data: compromissosExistentes = [] } = useQuery({
+    queryKey: ["compromissos-pastor", selectedPastorId, selectedDate?.toISOString()],
+    queryFn: async () => {
+      if (!selectedPastorId || !selectedDate) return [];
+      
+      const startOfSelectedDay = startOfDay(selectedDate);
+      const endOfSelectedDay = new Date(startOfSelectedDay);
+      endOfSelectedDay.setHours(23, 59, 59, 999);
+      
+      const { data, error } = await supabase
+        .from("agenda_pastoral")
+        .select("id, titulo, data_inicio, data_fim, tipo")
+        .eq("pastor_id", selectedPastorId)
+        .gte("data_inicio", startOfSelectedDay.toISOString())
+        .lte("data_inicio", endOfSelectedDay.toISOString());
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!selectedPastorId && !!selectedDate && pastorTemConfiguracao && pastorAtendeNoDia,
+  });
+
+  // Combina slots ocupados de atendimentos e compromissos
   const occupiedSlots = useMemo(() => {
-    return agendamentosExistentes.map(ag => {
+    const atendimentoSlots = agendamentosExistentes.map(ag => {
       const start = parseISO(ag.data_agendamento);
       const end = addMinutes(start, 60);
       return {
         start,
         end,
-        info: ag.motivo_resumo || "Ocupado",
+        info: ag.motivo_resumo || "Atendimento",
       };
     });
-  }, [agendamentosExistentes]);
+
+    const compromissoSlots = compromissosExistentes.map(c => {
+      const start = parseISO(c.data_inicio);
+      const end = parseISO(c.data_fim);
+      return {
+        start,
+        end,
+        info: `🚫 ${c.titulo}` || "Bloqueado",
+      };
+    });
+
+    return [...atendimentoSlots, ...compromissoSlots];
+  }, [agendamentosExistentes, compromissosExistentes]);
 
   const timeSlots = useMemo(() => {
     if (!selectedDate || !pastorAtendeNoDia || !configDiaSelecionado) return [];

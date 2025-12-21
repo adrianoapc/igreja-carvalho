@@ -5,12 +5,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { List, LayoutGrid } from "lucide-react";
+import { List, LayoutGrid, CalendarDays } from "lucide-react";
 
 import { PastoralKPIs } from "@/components/gabinete/PastoralKPIs";
 import { PastoralFilters } from "@/components/gabinete/PastoralFilters";
 import { PastoralInboxTable } from "@/components/gabinete/PastoralInboxTable";
 import { AgendamentoDialog } from "@/components/gabinete/AgendamentoDialog";
+import { PastoralCalendarView } from "@/components/gabinete/PastoralCalendarView";
 
 // Lazy load Kanban (heavy with DnD)
 const PastoralKanbanView = lazy(() => import("@/components/gabinete/PastoralKanbanView"));
@@ -47,7 +48,7 @@ export default function GabinetePastoral() {
   const [filtroGravidade, setFiltroGravidade] = useState<GravidadeEnum | "TODAS">("TODAS");
   const [busca, setBusca] = useState("");
   const [filtroOrigem, setFiltroOrigem] = useState("TODAS");
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [viewMode, setViewMode] = useState<"list" | "kanban" | "agenda">("list");
   const [agendamentoDialogOpen, setAgendamentoDialogOpen] = useState(false);
   const [atendimentoParaAgendar, setAtendimentoParaAgendar] = useState<AtendimentoPastoral | null>(null);
 
@@ -148,8 +149,8 @@ export default function GabinetePastoral() {
       />
 
       {/* Tabs */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "list" | "kanban")}>
-        <TabsList className="grid w-full max-w-[200px] grid-cols-2 h-9">
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "list" | "kanban" | "agenda")}>
+        <TabsList className="grid w-full max-w-[300px] grid-cols-3 h-9">
           <TabsTrigger value="list" className="text-xs gap-1.5">
             <List className="h-3.5 w-3.5" />
             Lista
@@ -157,6 +158,10 @@ export default function GabinetePastoral() {
           <TabsTrigger value="kanban" className="text-xs gap-1.5">
             <LayoutGrid className="h-3.5 w-3.5" />
             Quadro
+          </TabsTrigger>
+          <TabsTrigger value="agenda" className="text-xs gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Agenda
           </TabsTrigger>
         </TabsList>
 
@@ -180,6 +185,10 @@ export default function GabinetePastoral() {
               allAtendimentos={atendimentos || []}
             />
           </Suspense>
+        </TabsContent>
+
+        <TabsContent value="agenda" className="mt-3">
+          <PastoralCalendarView />
         </TabsContent>
       </Tabs>
 
