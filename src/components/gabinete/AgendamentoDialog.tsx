@@ -317,8 +317,17 @@ export function AgendamentoDialog({
 
   const agendarMutation = useMutation({
     mutationFn: async () => {
-      if (!atendimentoId || !selectedDate || selectedTimes.length === 0 || !selectedPastorId) {
-        throw new Error("Dados incompletos");
+      if (!atendimentoId) {
+        throw new Error("Nenhum atendimento selecionado");
+      }
+      if (!selectedDate) {
+        throw new Error("Selecione uma data");
+      }
+      if (selectedTimes.length === 0) {
+        throw new Error("Selecione pelo menos um horário");
+      }
+      if (!selectedPastorId) {
+        throw new Error("Selecione um pastor");
       }
 
       const firstTime = selectedTimes.sort()[0];
