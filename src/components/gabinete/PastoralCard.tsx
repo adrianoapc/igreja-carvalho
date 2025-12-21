@@ -76,55 +76,57 @@ export function PastoralCard({ atendimento, onClick }: PastoralCardProps) {
       {...listeners}
       onClick={onClick}
       className={cn(
-        "cursor-grab active:cursor-grabbing hover:shadow-md transition-all touch-manipulation",
+        "cursor-grab active:cursor-grabbing hover:shadow-md transition-all touch-manipulation w-full overflow-hidden",
         isDragging && "opacity-50 shadow-lg scale-105",
         isCritico && "ring-2 ring-red-500 animate-pulse",
         isAlta && "ring-1 ring-orange-500"
       )}
     >
-      <CardContent className="p-3 space-y-2">
-        {/* Nome, Badge Novo e Gravidade */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+      <CardContent className="p-2.5 space-y-1.5">
+        {/* Nome e Gravidade */}
+        <div className="flex items-center justify-between gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {isCritico && (
-              <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 animate-bounce" />
+              <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
             )}
-            <span className="font-medium text-sm truncate">{nome}</span>
+            <span className="font-medium text-xs truncate">{nome}</span>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             {isNovo && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/20 text-primary shrink-0">
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-primary/20 text-primary">
                 Novo
               </Badge>
             )}
+            {atendimento.gravidade && (
+              <Badge
+                variant="outline"
+                className={cn("text-[9px] px-1 py-0 h-4", GRAVIDADE_COLORS[atendimento.gravidade])}
+              >
+                {GRAVIDADE_LABELS[atendimento.gravidade]}
+              </Badge>
+            )}
           </div>
-          {atendimento.gravidade && (
-            <Badge
-              variant="outline"
-              className={cn("text-xs shrink-0", GRAVIDADE_COLORS[atendimento.gravidade])}
-            >
-              {GRAVIDADE_LABELS[atendimento.gravidade]}
-            </Badge>
+        </div>
+
+        {/* Data e Agendamento compactos */}
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Clock className="h-2.5 w-2.5 shrink-0" />
+            <span>{format(new Date(atendimento.created_at), "dd/MM", { locale: ptBR })}</span>
+          </div>
+          {atendimento.data_agendamento && (
+            <div className="flex items-center gap-1 text-primary font-medium">
+              <Calendar className="h-2.5 w-2.5 shrink-0" />
+              <span>{format(new Date(atendimento.data_agendamento), "dd/MM HH:mm", { locale: ptBR })}</span>
+            </div>
           )}
         </div>
 
-        {/* Data de Criação */}
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          {format(new Date(atendimento.created_at), "dd/MM/yyyy", { locale: ptBR })}
-        </div>
-
-        {/* Motivo Resumo */}
+        {/* Motivo Resumo - apenas 1 linha */}
         {atendimento.motivo_resumo && (
-          <p className="text-xs text-muted-foreground line-clamp-2">
+          <p className="text-[10px] text-muted-foreground truncate">
             {atendimento.motivo_resumo}
           </p>
-        )}
-
-        {/* Data de Agendamento */}
-        {atendimento.data_agendamento && (
-          <div className="flex items-center gap-1 text-xs text-primary font-medium">
-            <Calendar className="h-3 w-3" />
-            {format(new Date(atendimento.data_agendamento), "dd/MM 'às' HH:mm", { locale: ptBR })}
-          </div>
         )}
       </CardContent>
     </Card>
