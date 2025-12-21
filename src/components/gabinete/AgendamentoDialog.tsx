@@ -71,11 +71,13 @@ interface DisponibilidadeAgenda {
   padrao?: boolean;
 }
 
-type WizardStep = "pastor" | "data" | "horario" | "modalidade";
+type WizardStep = "pessoa" | "pastor" | "data" | "horario" | "modalidade";
 
-const STEPS: WizardStep[] = ["pastor", "data", "horario", "modalidade"];
+const STEPS_NOVO: WizardStep[] = ["pessoa", "pastor", "data", "horario", "modalidade"];
+const STEPS_EXISTENTE: WizardStep[] = ["pastor", "data", "horario", "modalidade"];
 
 const STEP_LABELS: Record<WizardStep, string> = {
+  pessoa: "Pessoa",
   pastor: "Pastor",
   data: "Data",
   horario: "Horário",
@@ -179,8 +181,12 @@ export function AgendamentoDialog({
 }: AgendamentoDialogProps) {
   const queryClient = useQueryClient();
   
+  // Determina se é criação ou edição
+  const isNovoAtendimento = !atendimentoId;
+  const STEPS = isNovoAtendimento ? STEPS_NOVO : STEPS_EXISTENTE;
+  
   // Wizard state
-  const [currentStep, setCurrentStep] = useState<WizardStep>("pastor");
+  const [currentStep, setCurrentStep] = useState<WizardStep>(isNovoAtendimento ? "pessoa" : "pastor");
   
   // Form state
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -188,18 +194,25 @@ export function AgendamentoDialog({
   const [selectedPastorId, setSelectedPastorId] = useState<string | null>(pastorPreSelecionadoId || null);
   const [modalidadeAtendimento, setModalidadeAtendimento] = useState<string>("gabinete");
   const [localAtendimento, setLocalAtendimento] = useState("");
+  
+  // Estado para novo atendimento
+  const [nomePessoa, setNomePessoa] = useState("");
+  const [telefonePessoa, setTelefonePessoa] = useState("");
+  const [motivoResumo, setMotivoResumo] = useState("");
 
   // Reset quando abre
   useEffect(() => {
     if (open) {
-      if (pastorPreSelecionadoId) {
+      if (isNovoAtendimento) {
+        setCurrentStep("pessoa");
+      } else if (pastorPreSelecionadoId) {
         setSelectedPastorId(pastorPreSelecionadoId);
         setCurrentStep("data");
       } else {
         setCurrentStep("pastor");
       }
     }
-  }, [open, pastorPreSelecionadoId]);
+  }, [open, pastorPreSelecionadoId, isNovoAtendimento]);
 
   const { data: pastores = [] } = useQuery({
     queryKey: ["pastores-gabinete-agenda"],
@@ -317,9 +330,6 @@ export function AgendamentoDialog({
 
   const agendarMutation = useMutation({
     mutationFn: async () => {
-      if (!atendimentoId) {
-        throw new Error("Nenhum atendimento selecionado");
-      }
       if (!selectedDate) {
         throw new Error("Selecione uma data");
       }
@@ -328,6 +338,13 @@ export function AgendamentoDialog({
       }
       if (!selectedPastorId) {
         throw new Error("Selecione um pastor");
+      }
+      
+      // Validações para novo atendimento
+      if (isNovoAtendimento) {
+        if (!nomePessoa.trim()) {
+          throw new Error("Informe o nome da pessoa");
+        }
       }
 
       const firstTime = selectedTimes.sort()[0];
@@ -347,33 +364,85 @@ export function AgendamentoDialog({
         ? `${modalidadeLabels[modalidadeAtendimento]}: ${localAtendimento}`
         : modalidadeLabels[modalidadeAtendimento];
 
-      const { error } = await supabase
-        .from("atendimentos_pastorais")
-        .update({
-          data_agendamento: dataAgendamento.toISOString(),
-          local_atendimento: localCompleto,
-          pastor_responsavel_id: selectedPastorId,
-          status: "AGENDADO",
-          observacoes_internas: selectedTimes.length > 1 
-            ? `Duração: ${duracaoMinutos} minutos (${selectedTimes.sort().join(", ")})`
-            : null,
-        })
-        .eq("id", atendimentoId);
+      if (isNovoAtendimento) {
+        // Primeiro criar visitante_lead se não existir
+        let visitanteId: string | null = null;
+        
+        if (telefonePessoa.trim()) {
+          // Verifica se já existe
+          const { data: existente } = await supabase
+            .from("visitantes_leads")
+            .select("id")
+            .eq("telefone", telefonePessoa.replace(/\D/g, ""))
+            .maybeSingle();
+          
+          if (existente) {
+            visitanteId = existente.id;
+          } else {
+            const { data: novoVisitante, error: errVisitante } = await supabase
+              .from("visitantes_leads")
+              .insert({
+                nome: nomePessoa.trim(),
+                telefone: telefonePessoa.replace(/\D/g, ""),
+                origem: "AGENDA",
+              })
+              .select("id")
+              .single();
+            
+            if (errVisitante) throw errVisitante;
+            visitanteId = novoVisitante.id;
+          }
+        }
 
-      if (error) throw error;
+        // Criar o atendimento
+        const { error } = await supabase
+          .from("atendimentos_pastorais")
+          .insert({
+            visitante_id: visitanteId,
+            pastor_responsavel_id: selectedPastorId,
+            data_agendamento: dataAgendamento.toISOString(),
+            local_atendimento: localCompleto,
+            motivo_resumo: motivoResumo.trim() || `Atendimento com ${nomePessoa}`,
+            origem: "AGENDA",
+            gravidade: "BAIXA",
+            status: "AGENDADO",
+            observacoes_internas: selectedTimes.length > 1 
+              ? `Duração: ${duracaoMinutos} minutos (${selectedTimes.sort().join(", ")})`
+              : null,
+          });
+
+        if (error) throw error;
+      } else {
+        // Atualizar atendimento existente
+        const { error } = await supabase
+          .from("atendimentos_pastorais")
+          .update({
+            data_agendamento: dataAgendamento.toISOString(),
+            local_atendimento: localCompleto,
+            pastor_responsavel_id: selectedPastorId,
+            status: "AGENDADO",
+            observacoes_internas: selectedTimes.length > 1 
+              ? `Duração: ${duracaoMinutos} minutos (${selectedTimes.sort().join(", ")})`
+              : null,
+          })
+          .eq("id", atendimentoId);
+
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["atendimentos-pastorais"] });
       queryClient.invalidateQueries({ queryKey: ["agendamentos-pastor"] });
       queryClient.invalidateQueries({ queryKey: ["atendimento-pastoral"] });
-      toast.success("Agendamento confirmado!");
+      queryClient.invalidateQueries({ queryKey: ["compromissos-calendar"] });
+      toast.success(isNovoAtendimento ? "Atendimento criado e agendado!" : "Agendamento confirmado!");
       resetForm();
       onOpenChange(false);
       onSuccess?.();
     },
     onError: (error: Error) => {
       console.error("Erro ao salvar agendamento:", error);
-      toast.error(`Erro ao salvar agendamento: ${error.message}`);
+      toast.error(`Erro ao salvar: ${error.message}`);
     },
   });
 
@@ -382,7 +451,10 @@ export function AgendamentoDialog({
     setSelectedTimes([]);
     setModalidadeAtendimento("gabinete");
     setLocalAtendimento("");
-    setCurrentStep("pastor");
+    setNomePessoa("");
+    setTelefonePessoa("");
+    setMotivoResumo("");
+    setCurrentStep(isNovoAtendimento ? "pessoa" : "pastor");
     if (!pastorPreSelecionadoId) {
       setSelectedPastorId(null);
     }
@@ -410,6 +482,8 @@ export function AgendamentoDialog({
   
   const canGoNext = useMemo(() => {
     switch (currentStep) {
+      case "pessoa":
+        return nomePessoa.trim().length > 0;
       case "pastor":
         return !!selectedPastorId && pastorTemConfiguracao;
       case "data":
@@ -421,7 +495,7 @@ export function AgendamentoDialog({
       default:
         return false;
     }
-  }, [currentStep, selectedPastorId, pastorTemConfiguracao, selectedDate, pastorAtendeNoDia, selectedTimes]);
+  }, [currentStep, nomePessoa, selectedPastorId, pastorTemConfiguracao, selectedDate, pastorAtendeNoDia, selectedTimes]);
 
   const goToNextStep = () => {
     const nextIndex = currentStepIndex + 1;
@@ -448,6 +522,47 @@ export function AgendamentoDialog({
   }, [selectedTimes]);
 
   // ===== RENDER STEPS =====
+  const renderStepPessoa = () => (
+    <div className="space-y-3">
+      <div className="text-center space-y-1 pb-2">
+        <User className="h-6 w-6 mx-auto text-primary" />
+        <h3 className="font-medium text-sm">Quem será atendido?</h3>
+      </div>
+      
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Nome *</Label>
+          <Input
+            placeholder="Nome da pessoa"
+            value={nomePessoa}
+            onChange={(e) => setNomePessoa(e.target.value)}
+            className="h-8 text-sm"
+          />
+        </div>
+        
+        <div className="space-y-1">
+          <Label className="text-xs">Telefone</Label>
+          <Input
+            placeholder="(00) 00000-0000"
+            value={telefonePessoa}
+            onChange={(e) => setTelefonePessoa(e.target.value)}
+            className="h-8 text-sm"
+          />
+        </div>
+        
+        <div className="space-y-1">
+          <Label className="text-xs">Motivo/Assunto</Label>
+          <Input
+            placeholder="Resumo do atendimento"
+            value={motivoResumo}
+            onChange={(e) => setMotivoResumo(e.target.value)}
+            className="h-8 text-sm"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   const renderStepPastor = () => (
     <div className="space-y-3">
       <div className="text-center space-y-1 pb-2">
@@ -684,9 +799,15 @@ export function AgendamentoDialog({
       <div className="p-2.5 bg-muted/50 rounded-lg space-y-1.5">
         <h4 className="font-medium text-xs">Resumo</h4>
         <div className="text-xs space-y-0.5">
+          {isNovoAtendimento && nomePessoa && (
+            <div className="flex items-center gap-1.5 text-primary font-medium">
+              <User className="h-3 w-3 shrink-0" />
+              <span className="truncate">{nomePessoa}</span>
+            </div>
+          )}
           <div className="flex items-center gap-1.5">
             <User className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="truncate">{pastorSelecionado?.nome}</span>
+            <span className="truncate">Pastor: {pastorSelecionado?.nome}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <CalendarIcon className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -713,6 +834,8 @@ export function AgendamentoDialog({
 
   const renderCurrentStep = () => {
     switch (currentStep) {
+      case "pessoa":
+        return renderStepPessoa();
       case "pastor":
         return renderStepPastor();
       case "data":
@@ -732,7 +855,7 @@ export function AgendamentoDialog({
         <DialogHeader className="pb-1 shrink-0 space-y-1">
           <DialogTitle className="flex items-center gap-1.5 text-sm">
             <CalendarIcon className="h-4 w-4 text-primary" />
-            Agendar Atendimento
+            {isNovoAtendimento ? "Novo Atendimento" : "Agendar Atendimento"}
           </DialogTitle>
           <DialogDescription className="sr-only">
             Wizard para agendar atendimento pastoral
