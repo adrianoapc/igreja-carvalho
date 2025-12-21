@@ -12,8 +12,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, MapPin, Video, Loader2, Clock, User, AlertCircle, CalendarX } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Video, Loader2, Clock, User, AlertCircle, CalendarX, X } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -24,9 +25,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, parseISO, setHours, setMinutes, startOfDay, addMinutes, isAfter, isBefore, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AgendamentoDialogProps {
   atendimentoId: string | null;
@@ -76,7 +79,6 @@ function generateTimeSlotsFromConfig(
   const [startHour, startMinute] = startTime.split(":").map(Number);
   const [endHour, endMinute] = endTime.split(":").map(Number);
   
-  // Converte para minutos totais para facilitar a iteração
   const startTotalMinutes = startHour * 60 + startMinute;
   const endTotalMinutes = endHour * 60 + endMinute;
   
@@ -87,7 +89,6 @@ function generateTimeSlotsFromConfig(
     const slotTime = setMinutes(setHours(selectedDate, hour), minute);
     const slotEnd = addMinutes(slotTime, 30);
     
-    // Verifica se há conflito
     const conflict = occupiedSlots.find(occupied => {
       return (
         (isAfter(slotTime, occupied.start) || slotTime.getTime() === occupied.start.getTime()) &&
@@ -111,16 +112,13 @@ function generateTimeSlotsFromConfig(
   return slots;
 }
 
-// Valida se o pastor tem disponibilidade configurada
 function hasValidDisponibilidade(disponibilidade: DisponibilidadeAgenda | null | undefined): boolean {
   if (!disponibilidade) return false;
   
-  // Se tem a flag "padrao", não tem configuração real
   if (disponibilidade.padrao === true && Object.keys(disponibilidade).length === 1) {
     return false;
   }
   
-  // Verifica se tem pelo menos um dia ativo
   for (const key of Object.keys(disponibilidade)) {
     if (key !== "padrao") {
       const dia = disponibilidade[key];
@@ -133,11 +131,10 @@ function hasValidDisponibilidade(disponibilidade: DisponibilidadeAgenda | null |
   return false;
 }
 
-// Obtém a configuração do dia selecionado
 function getDayConfig(disponibilidade: DisponibilidadeAgenda | null | undefined, date: Date): DisponibilidadeDia | null {
   if (!disponibilidade) return null;
   
-  const dayOfWeek = getDay(date); // 0 = Domingo, 1 = Segunda, etc.
+  const dayOfWeek = getDay(date);
   const dayKey = dayOfWeek.toString();
   
   const config = disponibilidade[dayKey];
@@ -156,19 +153,19 @@ export function AgendamentoDialog({
   pastorPreSelecionadoId,
 }: AgendamentoDialogProps) {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]); // Agora é array para múltiplos slots
   const [selectedPastorId, setSelectedPastorId] = useState<string | null>(pastorPreSelecionadoId || null);
   const [localAtendimento, setLocalAtendimento] = useState("");
+  const [mobileTab, setMobileTab] = useState<string>("data");
 
-  // Reset pastor quando mudar o pre-selecionado
   useEffect(() => {
     if (open && pastorPreSelecionadoId) {
       setSelectedPastorId(pastorPreSelecionadoId);
     }
   }, [open, pastorPreSelecionadoId]);
 
-  // Buscar lista de pastores/líderes disponíveis COM disponibilidade_agenda
   const { data: pastores = [] } = useQuery({
     queryKey: ["pastores-gabinete-agenda"],
     queryFn: async () => {
@@ -184,40 +181,33 @@ export function AgendamentoDialog({
     enabled: open,
   });
 
-  // Pastor selecionado com suas configurações
   const pastorSelecionado = useMemo(() => {
     return pastores.find(p => p.id === selectedPastorId);
   }, [pastores, selectedPastorId]);
 
-  // Disponibilidade do pastor selecionado
   const disponibilidadePastor = useMemo(() => {
     if (!pastorSelecionado?.disponibilidade_agenda) return null;
     return pastorSelecionado.disponibilidade_agenda as unknown as DisponibilidadeAgenda;
   }, [pastorSelecionado]);
 
-  // Verifica se o pastor tem configuração válida
   const pastorTemConfiguracao = useMemo(() => {
     return hasValidDisponibilidade(disponibilidadePastor);
   }, [disponibilidadePastor]);
 
-  // Configuração do dia selecionado
   const configDiaSelecionado = useMemo(() => {
     if (!selectedDate || !disponibilidadePastor) return null;
     return getDayConfig(disponibilidadePastor, selectedDate);
   }, [selectedDate, disponibilidadePastor]);
 
-  // Verifica se o pastor atende no dia selecionado
   const pastorAtendeNoDia = useMemo(() => {
     return configDiaSelecionado?.ativo === true;
   }, [configDiaSelecionado]);
 
-  // Nome do dia da semana selecionado
   const nomeDiaSelecionado = useMemo(() => {
     if (!selectedDate) return "";
     return DIAS_SEMANA_NOMES[getDay(selectedDate)];
   }, [selectedDate]);
 
-  // Buscar agendamentos existentes do pastor selecionado na data selecionada
   const { data: agendamentosExistentes = [], isLoading: loadingAgendamentos } = useQuery({
     queryKey: ["agendamentos-pastor", selectedPastorId, selectedDate?.toISOString()],
     queryFn: async () => {
@@ -241,11 +231,10 @@ export function AgendamentoDialog({
     enabled: open && !!selectedPastorId && !!selectedDate && pastorTemConfiguracao && pastorAtendeNoDia,
   });
 
-  // Converter agendamentos existentes em slots ocupados
   const occupiedSlots = useMemo(() => {
     return agendamentosExistentes.map(ag => {
       const start = parseISO(ag.data_agendamento);
-      const end = addMinutes(start, 60); // Assume 1 hora por atendimento
+      const end = addMinutes(start, 60);
       return {
         start,
         end,
@@ -254,7 +243,6 @@ export function AgendamentoDialog({
     });
   }, [agendamentosExistentes]);
 
-  // Gerar time slots para o dia selecionado baseado na configuração do pastor
   const timeSlots = useMemo(() => {
     if (!selectedDate || !pastorAtendeNoDia || !configDiaSelecionado) return [];
     
@@ -266,14 +254,18 @@ export function AgendamentoDialog({
 
   const agendarMutation = useMutation({
     mutationFn: async () => {
-      if (!atendimentoId || !selectedDate || !selectedTime || !selectedPastorId) {
+      if (!atendimentoId || !selectedDate || selectedTimes.length === 0 || !selectedPastorId) {
         throw new Error("Dados incompletos");
       }
 
-      // Monta o datetime completo
-      const [hours, minutes] = selectedTime.split(":").map(Number);
+      // Usa o primeiro horário selecionado como início
+      const firstTime = selectedTimes.sort()[0];
+      const [hours, minutes] = firstTime.split(":").map(Number);
       const dataAgendamento = new Date(selectedDate);
       dataAgendamento.setHours(hours, minutes, 0, 0);
+
+      // Calcula duração baseada nos slots selecionados (cada slot = 30min)
+      const duracaoMinutos = selectedTimes.length * 30;
 
       const { error } = await supabase
         .from("atendimentos_pastorais")
@@ -282,6 +274,10 @@ export function AgendamentoDialog({
           local_atendimento: localAtendimento || null,
           pastor_responsavel_id: selectedPastorId,
           status: "AGENDADO",
+          // Podemos armazenar a duração em observações ou outro campo se necessário
+          observacoes_internas: selectedTimes.length > 1 
+            ? `Duração: ${duracaoMinutos} minutos (${selectedTimes.sort().join(", ")})`
+            : null,
         })
         .eq("id", atendimentoId);
 
@@ -303,11 +299,25 @@ export function AgendamentoDialog({
 
   const resetForm = () => {
     setSelectedDate(new Date());
-    setSelectedTime(null);
+    setSelectedTimes([]);
     setLocalAtendimento("");
+    setMobileTab("data");
     if (!pastorPreSelecionadoId) {
       setSelectedPastorId(null);
     }
+  };
+
+  const handleToggleTime = (time: string) => {
+    setSelectedTimes(prev => {
+      if (prev.includes(time)) {
+        return prev.filter(t => t !== time);
+      }
+      return [...prev, time].sort();
+    });
+  };
+
+  const handleRemoveTime = (time: string) => {
+    setSelectedTimes(prev => prev.filter(t => t !== time));
   };
 
   const handleSubmit = () => {
@@ -319,21 +329,27 @@ export function AgendamentoDialog({
       toast.error("Selecione uma data");
       return;
     }
-    if (!selectedTime) {
-      toast.error("Selecione um horário");
+    if (selectedTimes.length === 0) {
+      toast.error("Selecione pelo menos um horário");
       return;
     }
     agendarMutation.mutate();
   };
 
-  const canConfirm = selectedPastorId && selectedDate && selectedTime && pastorTemConfiguracao && pastorAtendeNoDia;
+  const canConfirm = selectedPastorId && selectedDate && selectedTimes.length > 0 && pastorTemConfiguracao && pastorAtendeNoDia;
 
-  // Renderiza a área de horários baseado no estado
+  // Calcula intervalo de horários selecionados para exibição
+  const horariosResumo = useMemo(() => {
+    if (selectedTimes.length === 0) return "";
+    const sorted = [...selectedTimes].sort();
+    if (sorted.length === 1) return sorted[0];
+    return `${sorted[0]} - ${sorted[sorted.length - 1]}`;
+  }, [selectedTimes]);
+
   const renderTimeSlots = () => {
-    // Sem pastor selecionado
     if (!selectedPastorId) {
       return (
-        <div className="flex items-center justify-center h-full text-muted-foreground">
+        <div className="flex items-center justify-center h-full text-muted-foreground p-4">
           <div className="text-center space-y-2">
             <User className="h-8 w-8 mx-auto opacity-50" />
             <p className="text-sm">Selecione um pastor</p>
@@ -342,7 +358,6 @@ export function AgendamentoDialog({
       );
     }
 
-    // Pastor sem configuração
     if (!pastorTemConfiguracao) {
       return (
         <Alert variant="destructive" className="m-2">
@@ -355,7 +370,6 @@ export function AgendamentoDialog({
       );
     }
 
-    // Pastor não atende no dia selecionado
     if (!pastorAtendeNoDia) {
       return (
         <div className="flex items-center justify-center h-full text-muted-foreground p-4">
@@ -368,7 +382,6 @@ export function AgendamentoDialog({
       );
     }
 
-    // Carregando agendamentos
     if (loadingAgendamentos) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -377,7 +390,6 @@ export function AgendamentoDialog({
       );
     }
 
-    // Sem slots disponíveis
     if (timeSlots.length === 0) {
       return (
         <div className="flex items-center justify-center h-full text-muted-foreground p-4">
@@ -389,32 +401,172 @@ export function AgendamentoDialog({
       );
     }
 
-    // Renderiza os slots
     return (
-      <ScrollArea className="h-full p-2">
-        <div className="grid grid-cols-3 gap-2">
-          {timeSlots.map((slot) => (
-            <Button
-              key={slot.time}
-              type="button"
-              size="sm"
-              variant={selectedTime === slot.time ? "default" : "outline"}
-              disabled={!slot.available}
-              onClick={() => setSelectedTime(slot.time)}
-              className={cn(
-                "text-xs",
-                !slot.available && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground",
-                selectedTime === slot.time && "ring-2 ring-primary"
-              )}
-              title={!slot.available ? slot.conflictInfo : undefined}
-            >
-              {slot.label}
-            </Button>
-          ))}
-        </div>
-      </ScrollArea>
+      <div className="p-2 space-y-3">
+        {/* Slots selecionados */}
+        {selectedTimes.length > 0 && (
+          <div className="flex flex-wrap gap-1 pb-2 border-b">
+            {selectedTimes.sort().map((time) => (
+              <Badge key={time} variant="default" className="gap-1">
+                {time}
+                <button 
+                  onClick={() => handleRemoveTime(time)}
+                  className="ml-1 hover:bg-primary-foreground/20 rounded-full"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+        
+        <ScrollArea className="h-48">
+          <div className="grid grid-cols-3 gap-2">
+            {timeSlots.map((slot) => {
+              const isSelected = selectedTimes.includes(slot.time);
+              return (
+                <Button
+                  key={slot.time}
+                  type="button"
+                  size="sm"
+                  variant={isSelected ? "default" : "outline"}
+                  disabled={!slot.available}
+                  onClick={() => handleToggleTime(slot.time)}
+                  className={cn(
+                    "text-xs",
+                    !slot.available && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground",
+                    isSelected && "ring-2 ring-primary"
+                  )}
+                  title={!slot.available ? slot.conflictInfo : "Clique para selecionar/desselecionar"}
+                >
+                  {slot.label}
+                </Button>
+              );
+            })}
+          </div>
+        </ScrollArea>
+
+        <p className="text-xs text-muted-foreground text-center">
+          Clique para selecionar múltiplos horários consecutivos
+        </p>
+      </div>
     );
   };
+
+  // Layout Desktop
+  const renderDesktopLayout = () => (
+    <div className="grid grid-cols-2 gap-4 h-full">
+      {/* Coluna Esquerda: Calendário */}
+      <div className="flex justify-center">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => {
+            setSelectedDate(date);
+            setSelectedTimes([]);
+          }}
+          locale={ptBR}
+          disabled={(date) => date < startOfDay(new Date())}
+          className="rounded-md border pointer-events-auto"
+        />
+      </div>
+
+      {/* Coluna Direita: Horários */}
+      <div className="flex flex-col">
+        <Label className="flex items-center gap-2 mb-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          Horários {selectedDate && `- ${format(selectedDate, "EEE, dd/MM", { locale: ptBR })}`}
+        </Label>
+        
+        <div className="flex-1 rounded-md border bg-muted/20 min-h-[280px]">
+          {renderTimeSlots()}
+        </div>
+
+        {selectedPastorId && pastorTemConfiguracao && pastorAtendeNoDia && timeSlots.length > 0 && (
+          <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded border bg-background" />
+              <span>Disponível</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-muted" />
+              <span>Ocupado</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Layout Mobile com Tabs
+  const renderMobileLayout = () => (
+    <Tabs value={mobileTab} onValueChange={setMobileTab} className="flex flex-col h-full">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="data" className="gap-1">
+          <CalendarIcon className="h-4 w-4" />
+          Data
+        </TabsTrigger>
+        <TabsTrigger value="horario" className="gap-1">
+          <Clock className="h-4 w-4" />
+          Horário
+          {selectedTimes.length > 0 && (
+            <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
+              {selectedTimes.length}
+            </Badge>
+          )}
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="data" className="flex-1 mt-4">
+        <div className="flex justify-center">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              setSelectedTimes([]);
+              // Navega para aba de horários automaticamente
+              if (date && pastorTemConfiguracao) {
+                setTimeout(() => setMobileTab("horario"), 300);
+              }
+            }}
+            locale={ptBR}
+            disabled={(date) => date < startOfDay(new Date())}
+            className="rounded-md border pointer-events-auto"
+          />
+        </div>
+        {selectedDate && (
+          <p className="text-center text-sm text-muted-foreground mt-3">
+            {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+          </p>
+        )}
+      </TabsContent>
+
+      <TabsContent value="horario" className="flex-1 mt-4">
+        <Label className="flex items-center gap-2 mb-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          Horários {selectedDate && `- ${format(selectedDate, "dd/MM", { locale: ptBR })}`}
+        </Label>
+        
+        <div className="rounded-md border bg-muted/20 min-h-[250px]">
+          {renderTimeSlots()}
+        </div>
+
+        {selectedPastorId && pastorTemConfiguracao && pastorAtendeNoDia && timeSlots.length > 0 && (
+          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-2">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded border bg-background" />
+              <span>Disponível</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-muted" />
+              <span>Ocupado</span>
+            </div>
+          </div>
+        )}
+      </TabsContent>
+    </Tabs>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -425,7 +577,7 @@ export function AgendamentoDialog({
             Agendar Atendimento
           </DialogTitle>
           <DialogDescription>
-            Selecione o pastor, data e horário disponível
+            Selecione o pastor, data e horário(s) disponível(is)
           </DialogDescription>
         </DialogHeader>
 
@@ -439,7 +591,7 @@ export function AgendamentoDialog({
             value={selectedPastorId || ""} 
             onValueChange={(value) => {
               setSelectedPastorId(value);
-              setSelectedTime(null); // Reset time when pastor changes
+              setSelectedTimes([]);
             }}
           >
             <SelectTrigger>
@@ -455,53 +607,12 @@ export function AgendamentoDialog({
           </Select>
         </div>
 
-        {/* Corpo: Calendário + Horários */}
+        {/* Corpo: Layout responsivo */}
         <div className="flex-1 overflow-hidden py-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-            {/* Coluna Esquerda: Calendário */}
-            <div className="flex justify-center">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => {
-                  setSelectedDate(date);
-                  setSelectedTime(null); // Reset time when date changes
-                }}
-                locale={ptBR}
-                disabled={(date) => date < startOfDay(new Date())}
-                className="rounded-md border pointer-events-auto"
-              />
-            </div>
-
-            {/* Coluna Direita: Horários ou Alertas */}
-            <div className="flex flex-col min-h-[280px]">
-              <Label className="flex items-center gap-2 mb-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                Horários {selectedDate && `- ${format(selectedDate, "EEEE, dd/MM", { locale: ptBR })}`}
-              </Label>
-              
-              <div className="flex-1 rounded-md border bg-muted/20">
-                {renderTimeSlots()}
-              </div>
-
-              {/* Legenda - só mostra se tiver slots */}
-              {selectedPastorId && pastorTemConfiguracao && pastorAtendeNoDia && timeSlots.length > 0 && (
-                <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded border bg-background" />
-                    <span>Disponível</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded bg-muted" />
-                    <span>Ocupado</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {isMobile ? renderMobileLayout() : renderDesktopLayout()}
         </div>
 
-        {/* Local (opcional) - só mostra se pastor tem config válida */}
+        {/* Local (opcional) */}
         {selectedPastorId && pastorTemConfiguracao && (
           <div className="py-3 border-t space-y-2">
             <Label className="flex items-center gap-2">
@@ -521,30 +632,35 @@ export function AgendamentoDialog({
         )}
 
         {/* Resumo e Confirmação */}
-        <DialogFooter className="border-t pt-4 flex-col sm:flex-row gap-3">
+        <DialogFooter className="border-t pt-4 flex-col gap-3">
           {canConfirm && (
-            <div className="flex-1 text-sm text-muted-foreground">
+            <div className="w-full text-sm text-muted-foreground">
               Agendando com <strong>{pastorSelecionado?.nome}</strong> para{" "}
               <strong>{format(selectedDate!, "dd/MM/yyyy", { locale: ptBR })}</strong> às{" "}
-              <strong>{selectedTime}</strong>
+              <strong>{horariosResumo}</strong>
+              {selectedTimes.length > 1 && (
+                <span className="text-xs ml-1">({selectedTimes.length * 30}min)</span>
+              )}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              className="flex-1 sm:flex-none"
             >
               Cancelar
             </Button>
             <Button 
               onClick={handleSubmit} 
               disabled={!canConfirm || agendarMutation.isPending}
+              className="flex-1 sm:flex-none"
             >
               {agendarMutation.isPending && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
-              Confirmar Agendamento
+              Confirmar
             </Button>
           </div>
         </DialogFooter>
