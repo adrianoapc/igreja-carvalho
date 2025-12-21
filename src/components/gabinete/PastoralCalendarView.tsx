@@ -98,14 +98,26 @@ export function PastoralCalendarView() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedCompromisso, setSelectedCompromisso] = useState<CompromissoCalendar | null>(null);
 
-  // Fetch pastores
+  // Fetch pastores (apenas quem tem role pastor)
   const { data: pastores = [] } = useQuery({
     queryKey: ["pastores-calendar"],
     queryFn: async () => {
+      // Buscar user_ids que tem role pastor
+      const { data: pastorRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "pastor");
+
+      if (rolesError) throw rolesError;
+
+      if (!pastorRoles || pastorRoles.length === 0) return [];
+
+      const userIds = pastorRoles.map((r) => r.user_id);
+
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, nome")
-        .or("e_pastor.eq.true,e_lider.eq.true")
+        .select("id, nome, user_id")
+        .in("user_id", userIds)
         .order("nome");
 
       if (error) throw error;
