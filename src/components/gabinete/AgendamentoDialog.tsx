@@ -513,22 +513,22 @@ export function AgendamentoDialog({
           }}
           locale={ptBR}
           disabled={(date) => date < startOfDay(new Date())}
-          className="pointer-events-auto rounded-md border text-sm [&_.rdp-caption]:text-sm [&_.rdp-head_th]:text-xs [&_.rdp-cell]:p-0 [&_.rdp-button]:h-8 [&_.rdp-button]:w-8 [&_.rdp-button]:text-xs"
+          className="pointer-events-auto rounded-md border text-xs scale-[0.85] origin-top [&_.rdp-caption]:text-xs [&_.rdp-head_th]:text-[10px] [&_.rdp-cell]:p-0 [&_.rdp-button]:h-7 [&_.rdp-button]:w-7 [&_.rdp-button]:text-[10px]"
         />
       </div>
       
       {selectedDate && !pastorAtendeNoDia && (
-        <Alert variant="destructive" className="py-2">
+        <Alert variant="destructive" className="py-1.5 px-2">
           <CalendarX className="h-3 w-3" />
-          <AlertDescription className="text-xs">
-            Não atende às {nomeDiaSelecionado}. Escolha outro dia.
+          <AlertDescription className="text-[10px]">
+            Não atende às {nomeDiaSelecionado}.
           </AlertDescription>
         </Alert>
       )}
       
       {selectedDate && pastorAtendeNoDia && (
-        <div className="text-center text-xs text-muted-foreground">
-          {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+        <div className="text-center text-xs text-primary font-medium">
+          {format(selectedDate, "EEEE, dd/MM", { locale: ptBR })}
         </div>
       )}
     </div>
@@ -753,9 +753,6 @@ export function AgendamentoDialog({
               );
             })}
           </div>
-          <p className="text-center text-[10px] text-muted-foreground">
-            {STEP_LABELS[currentStep]}
-          </p>
         </DialogHeader>
 
         <ScrollArea className="flex-1 min-h-0 py-2">
