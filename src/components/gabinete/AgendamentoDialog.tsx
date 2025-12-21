@@ -439,14 +439,13 @@ export function AgendamentoDialog({
 
   // ===== RENDER STEPS =====
   const renderStepPastor = () => (
-    <div className="space-y-4">
-      <div className="text-center space-y-2 pb-4">
-        <User className="h-12 w-12 mx-auto text-primary" />
-        <h3 className="font-semibold text-lg">Selecione o Pastor</h3>
-        <p className="text-sm text-muted-foreground">Escolha o pastor que irá realizar o atendimento</p>
+    <div className="space-y-3">
+      <div className="text-center space-y-1 pb-2">
+        <User className="h-8 w-8 mx-auto text-primary" />
+        <h3 className="font-medium text-sm">Selecione o Pastor</h3>
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {pastores.map((pastor) => {
           const disponibilidade = pastor.disponibilidade_agenda as unknown as DisponibilidadeAgenda;
           const temConfig = hasValidDisponibilidade(disponibilidade);
@@ -461,33 +460,33 @@ export function AgendamentoDialog({
               }}
               disabled={!temConfig}
               className={cn(
-                "w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
-                isSelected && "border-primary bg-primary/5 ring-2 ring-primary",
+                "w-full flex items-center gap-2 p-2 rounded-lg border transition-all text-left",
+                isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
                 !isSelected && temConfig && "hover:border-primary/50 hover:bg-muted/50",
                 !temConfig && "opacity-50 cursor-not-allowed"
               )}
             >
               <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center text-white font-medium",
+                "w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0",
                 isSelected ? "bg-primary" : "bg-muted-foreground"
               )}>
                 {pastor.nome?.charAt(0).toUpperCase()}
               </div>
-              <div className="flex-1">
-                <p className="font-medium">{pastor.nome}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{pastor.nome}</p>
                 {!temConfig && (
-                  <p className="text-xs text-destructive">Agenda não configurada</p>
+                  <p className="text-[10px] text-destructive">Agenda não configurada</p>
                 )}
               </div>
-              {isSelected && <Check className="h-5 w-5 text-primary" />}
+              {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
             </button>
           );
         })}
         
         {pastores.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>Nenhum pastor cadastrado</p>
+          <div className="text-center py-4 text-muted-foreground">
+            <User className="h-6 w-6 mx-auto mb-1 opacity-50" />
+            <p className="text-xs">Nenhum pastor cadastrado</p>
           </div>
         )}
       </div>
@@ -495,12 +494,12 @@ export function AgendamentoDialog({
   );
 
   const renderStepData = () => (
-    <div className="space-y-4">
-      <div className="text-center space-y-2 pb-2">
-        <CalendarIcon className="h-12 w-12 mx-auto text-primary" />
-        <h3 className="font-semibold text-lg">Escolha a Data</h3>
-        <p className="text-sm text-muted-foreground">
-          Agendando com <strong>{pastorSelecionado?.nome}</strong>
+    <div className="space-y-2">
+      <div className="text-center space-y-1">
+        <CalendarIcon className="h-6 w-6 mx-auto text-primary" />
+        <h3 className="font-medium text-sm">Escolha a Data</h3>
+        <p className="text-xs text-muted-foreground">
+          Com <strong>{pastorSelecionado?.nome}</strong>
         </p>
       </div>
       
@@ -514,22 +513,21 @@ export function AgendamentoDialog({
           }}
           locale={ptBR}
           disabled={(date) => date < startOfDay(new Date())}
-          className="rounded-md border"
+          className="rounded-md border text-sm [&_.rdp-caption]:text-sm [&_.rdp-head_th]:text-xs [&_.rdp-cell]:p-0 [&_.rdp-button]:h-8 [&_.rdp-button]:w-8 [&_.rdp-button]:text-xs"
         />
       </div>
       
       {selectedDate && !pastorAtendeNoDia && (
-        <Alert variant="destructive">
-          <CalendarX className="h-4 w-4" />
-          <AlertTitle>Não disponível</AlertTitle>
-          <AlertDescription>
-            {pastorSelecionado?.nome} não atende às {nomeDiaSelecionado}. Escolha outro dia.
+        <Alert variant="destructive" className="py-2">
+          <CalendarX className="h-3 w-3" />
+          <AlertDescription className="text-xs">
+            Não atende às {nomeDiaSelecionado}. Escolha outro dia.
           </AlertDescription>
         </Alert>
       )}
       
       {selectedDate && pastorAtendeNoDia && (
-        <div className="text-center text-sm text-muted-foreground">
+        <div className="text-center text-xs text-muted-foreground">
           {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
         </div>
       )}
@@ -537,48 +535,48 @@ export function AgendamentoDialog({
   );
 
   const renderStepHorario = () => (
-    <div className="space-y-4">
-      <div className="text-center space-y-2 pb-2">
-        <Clock className="h-12 w-12 mx-auto text-primary" />
-        <h3 className="font-semibold text-lg">Selecione o Horário</h3>
-        <p className="text-sm text-muted-foreground">
+    <div className="space-y-2">
+      <div className="text-center space-y-1">
+        <Clock className="h-6 w-6 mx-auto text-primary" />
+        <h3 className="font-medium text-sm">Selecione o Horário</h3>
+        <p className="text-xs text-muted-foreground">
           {selectedDate && format(selectedDate, "EEEE, dd/MM", { locale: ptBR })}
         </p>
       </div>
       
       {loadingAgendamentos ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : timeSlots.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p>Nenhum horário disponível</p>
+        <div className="text-center py-4 text-muted-foreground">
+          <Clock className="h-5 w-5 mx-auto mb-1 opacity-50" />
+          <p className="text-xs">Nenhum horário disponível</p>
         </div>
       ) : (
         <>
           {/* Slots selecionados */}
           {selectedTimes.length > 0 && (
-            <div className="flex flex-wrap gap-1 pb-2 border-b">
+            <div className="flex flex-wrap gap-1 pb-1.5 border-b">
               {selectedTimes.sort().map((time) => (
-                <Badge key={time} variant="default" className="gap-1">
+                <Badge key={time} variant="default" className="gap-0.5 text-xs h-5 px-1.5">
                   {time}
                   <button 
                     onClick={() => handleRemoveTime(time)}
-                    className="ml-1 hover:bg-primary-foreground/20 rounded-full"
+                    className="ml-0.5 hover:bg-primary-foreground/20 rounded-full"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-2.5 w-2.5" />
                   </button>
                 </Badge>
               ))}
-              <span className="text-xs text-muted-foreground self-center ml-2">
+              <span className="text-[10px] text-muted-foreground self-center ml-1">
                 ({selectedTimes.length * 30}min)
               </span>
             </div>
           )}
           
-          <ScrollArea className="h-48">
-            <div className="grid grid-cols-4 gap-2">
+          <ScrollArea className="h-32">
+            <div className="grid grid-cols-5 gap-1">
               {timeSlots.map((slot) => {
                 const isSelected = selectedTimes.includes(slot.time);
                 return (
@@ -590,9 +588,9 @@ export function AgendamentoDialog({
                     disabled={!slot.available}
                     onClick={() => handleToggleTime(slot.time)}
                     className={cn(
-                      "text-sm",
+                      "text-xs h-7 px-1",
                       !slot.available && "opacity-50 cursor-not-allowed bg-muted",
-                      isSelected && "ring-2 ring-primary"
+                      isSelected && "ring-1 ring-primary"
                     )}
                     title={!slot.available ? slot.conflictInfo : undefined}
                   >
@@ -603,13 +601,13 @@ export function AgendamentoDialog({
             </div>
           </ScrollArea>
           
-          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded border bg-background" />
-              <span>Disponível</span>
+              <div className="w-2 h-2 rounded border bg-background" />
+              <span>Livre</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-muted" />
+              <div className="w-2 h-2 rounded bg-muted" />
               <span>Ocupado</span>
             </div>
           </div>
@@ -619,14 +617,13 @@ export function AgendamentoDialog({
   );
 
   const renderStepModalidade = () => (
-    <div className="space-y-4">
-      <div className="text-center space-y-2 pb-2">
-        <Building2 className="h-12 w-12 mx-auto text-primary" />
-        <h3 className="font-semibold text-lg">Modalidade do Atendimento</h3>
-        <p className="text-sm text-muted-foreground">Como será o atendimento?</p>
+    <div className="space-y-3">
+      <div className="text-center space-y-1">
+        <Building2 className="h-6 w-6 mx-auto text-primary" />
+        <h3 className="font-medium text-sm">Modalidade</h3>
       </div>
       
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-4 gap-1.5">
         {[
           { id: "gabinete", icon: Building2, label: "Gabinete" },
           { id: "visita", icon: Home, label: "Visita" },
@@ -640,54 +637,65 @@ export function AgendamentoDialog({
               key={item.id}
               onClick={() => setModalidadeAtendimento(item.id)}
               className={cn(
-                "flex flex-col items-center gap-2 p-4 rounded-lg border transition-all",
-                isSelected && "border-primary bg-primary/5 ring-2 ring-primary",
+                "flex flex-col items-center gap-1 p-2 rounded-lg border transition-all",
+                isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
                 !isSelected && "hover:border-primary/50 hover:bg-muted/50"
               )}
             >
-              <Icon className={cn("h-8 w-8", isSelected ? "text-primary" : "text-muted-foreground")} />
-              <span className={cn("font-medium", isSelected && "text-primary")}>{item.label}</span>
+              <Icon className={cn("h-5 w-5", isSelected ? "text-primary" : "text-muted-foreground")} />
+              <span className={cn("text-[10px] font-medium", isSelected && "text-primary")}>{item.label}</span>
             </button>
           );
         })}
       </div>
       
       {(modalidadeAtendimento === "visita" || modalidadeAtendimento === "online") && (
-        <div className="space-y-2 pt-2">
-          <Label>
+        <div className="space-y-1">
+          <Label className="text-xs">
             {modalidadeAtendimento === "visita" ? "Endereço da visita" : "Link da reunião"}
           </Label>
           <Input
             placeholder={modalidadeAtendimento === "visita" ? "Rua, número, bairro..." : "https://meet.google.com/..."}
             value={localAtendimento}
             onChange={(e) => setLocalAtendimento(e.target.value)}
+            className="h-8 text-sm"
           />
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
             {modalidadeAtendimento === "visita" ? (
-              <><MapPin className="h-3 w-3" /> Informe o endereço completo</>
+              <><MapPin className="h-2.5 w-2.5" /> Informe o endereço completo</>
             ) : (
-              <><Video className="h-3 w-3" /> Cole o link do Meet, Zoom, etc.</>
+              <><Video className="h-2.5 w-2.5" /> Cole o link do Meet, Zoom, etc.</>
             )}
           </p>
         </div>
       )}
       
       {/* Resumo final */}
-      <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
-        <h4 className="font-medium text-sm">Resumo do Agendamento</h4>
-        <div className="text-sm space-y-1">
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <span>{pastorSelecionado?.nome}</span>
+      <div className="p-2.5 bg-muted/50 rounded-lg space-y-1.5">
+        <h4 className="font-medium text-xs">Resumo</h4>
+        <div className="text-xs space-y-0.5">
+          <div className="flex items-center gap-1.5">
+            <User className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="truncate">{pastorSelecionado?.nome}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-            <span>{selectedDate && format(selectedDate, "dd/MM/yyyy (EEEE)", { locale: ptBR })}</span>
+          <div className="flex items-center gap-1.5">
+            <CalendarIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span>{selectedDate && format(selectedDate, "dd/MM (EEE)", { locale: ptBR })}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
             <span>{horariosResumo} ({selectedTimes.length * 30}min)</span>
           </div>
+          {localAtendimento && (
+            <div className="flex items-start gap-1.5 pt-0.5 border-t mt-1">
+              {modalidadeAtendimento === "visita" ? (
+                <MapPin className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+              ) : (
+                <Video className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+              )}
+              <span className="text-[10px] break-all">{localAtendimento}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -710,10 +718,10 @@ export function AgendamentoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
-        <DialogHeader className="pb-2 shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-primary" />
+      <DialogContent className="sm:max-w-sm max-h-[85vh] flex flex-col p-4">
+        <DialogHeader className="pb-1 shrink-0 space-y-1">
+          <DialogTitle className="flex items-center gap-1.5 text-sm">
+            <CalendarIcon className="h-4 w-4 text-primary" />
             Agendar Atendimento
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -721,23 +729,23 @@ export function AgendamentoDialog({
           </DialogDescription>
           
           {/* Step indicator */}
-          <div className="flex items-center justify-center gap-2 pt-2">
+          <div className="flex items-center justify-center gap-1 pt-1">
             {STEPS.map((step, index) => {
               const isActive = step === currentStep;
               const isPast = index < currentStepIndex;
               return (
                 <div key={step} className="flex items-center">
                   <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors",
+                    "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors",
                     isActive && "bg-primary text-primary-foreground",
                     isPast && "bg-primary/20 text-primary",
                     !isActive && !isPast && "bg-muted text-muted-foreground"
                   )}>
-                    {isPast ? <Check className="h-4 w-4" /> : index + 1}
+                    {isPast ? <Check className="h-3 w-3" /> : index + 1}
                   </div>
                   {index < STEPS.length - 1 && (
                     <div className={cn(
-                      "w-8 h-0.5 mx-1",
+                      "w-6 h-0.5 mx-0.5",
                       index < currentStepIndex ? "bg-primary/50" : "bg-muted"
                     )} />
                   )}
@@ -745,27 +753,28 @@ export function AgendamentoDialog({
               );
             })}
           </div>
-          <p className="text-center text-xs text-muted-foreground pt-1">
+          <p className="text-center text-[10px] text-muted-foreground">
             {STEP_LABELS[currentStep]}
           </p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 py-4">
-          <div className="px-1">
+        <ScrollArea className="flex-1 min-h-0 py-2">
+          <div className="px-0.5">
             {renderCurrentStep()}
           </div>
         </ScrollArea>
 
-        <DialogFooter className="border-t pt-4 shrink-0">
-          <div className="flex w-full gap-2">
+        <DialogFooter className="border-t pt-2 shrink-0">
+          <div className="flex w-full gap-1.5">
             {currentStepIndex > 0 && (
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={goToPrevStep}
-                className="gap-1"
+                className="gap-0.5 h-8 text-xs"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3 w-3" />
                 Voltar
               </Button>
             )}
@@ -774,23 +783,25 @@ export function AgendamentoDialog({
             
             {!isLastStep ? (
               <Button
+                size="sm"
                 onClick={goToNextStep}
                 disabled={!canGoNext}
-                className="gap-1"
+                className="gap-0.5 h-8 text-xs"
               >
                 Próximo
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3 w-3" />
               </Button>
             ) : (
               <Button 
+                size="sm"
                 onClick={handleSubmit} 
                 disabled={agendarMutation.isPending}
-                className="gap-1"
+                className="gap-0.5 h-8 text-xs"
               >
                 {agendarMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Check className="h-4 w-4" />
+                  <Check className="h-3 w-3" />
                 )}
                 Confirmar
               </Button>
