@@ -165,7 +165,20 @@ export function PastoralInboxTable({
                     </div>
                   </div>
                   
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 self-center" />
+                  <div className="flex items-center gap-1 shrink-0 self-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAgendar(atendimento);
+                      }}
+                    >
+                      <Calendar className="h-4 w-4" />
+                    </Button>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
