@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, MapPin, Video, Loader2, Clock, User, AlertCircle, CalendarX, X } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Video, Loader2, Clock, User, AlertCircle, CalendarX, X, Phone, Home, Building2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -157,6 +157,7 @@ export function AgendamentoDialog({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]); // Agora é array para múltiplos slots
   const [selectedPastorId, setSelectedPastorId] = useState<string | null>(pastorPreSelecionadoId || null);
+  const [modalidadeAtendimento, setModalidadeAtendimento] = useState<string>("gabinete");
   const [localAtendimento, setLocalAtendimento] = useState("");
   const [mobileTab, setMobileTab] = useState<string>("data");
 
@@ -267,14 +268,24 @@ export function AgendamentoDialog({
       // Calcula duração baseada nos slots selecionados (cada slot = 30min)
       const duracaoMinutos = selectedTimes.length * 30;
 
+      // Monta o local com a modalidade
+      const modalidadeLabels: Record<string, string> = {
+        gabinete: "Gabinete",
+        visita: "Visita",
+        ligacao: "Ligação",
+        online: "Online",
+      };
+      const localCompleto = localAtendimento 
+        ? `${modalidadeLabels[modalidadeAtendimento]}: ${localAtendimento}`
+        : modalidadeLabels[modalidadeAtendimento];
+
       const { error } = await supabase
         .from("atendimentos_pastorais")
         .update({
           data_agendamento: dataAgendamento.toISOString(),
-          local_atendimento: localAtendimento || null,
+          local_atendimento: localCompleto,
           pastor_responsavel_id: selectedPastorId,
           status: "AGENDADO",
-          // Podemos armazenar a duração em observações ou outro campo se necessário
           observacoes_internas: selectedTimes.length > 1 
             ? `Duração: ${duracaoMinutos} minutos (${selectedTimes.sort().join(", ")})`
             : null,
@@ -300,6 +311,7 @@ export function AgendamentoDialog({
   const resetForm = () => {
     setSelectedDate(new Date());
     setSelectedTimes([]);
+    setModalidadeAtendimento("gabinete");
     setLocalAtendimento("");
     setMobileTab("data");
     if (!pastorPreSelecionadoId) {
@@ -614,22 +626,76 @@ export function AgendamentoDialog({
               {isMobile ? renderMobileLayout() : renderDesktopLayout()}
             </div>
 
-            {/* Local (opcional) */}
+            {/* Modalidade do Atendimento */}
             {selectedPastorId && pastorTemConfiguracao && (
-              <div className="py-3 border-t space-y-2">
+              <div className="py-3 border-t space-y-3">
                 <Label className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  Local ou Link (opcional)
+                  Modalidade do Atendimento
                 </Label>
-                <Input
-                  placeholder="Ex: Sala 1 ou https://meet.google.com/..."
-                  value={localAtendimento}
-                  onChange={(e) => setLocalAtendimento(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Video className="h-3 w-3" />
-                  Cole um link para atendimento online
-                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <Button
+                    type="button"
+                    variant={modalidadeAtendimento === "gabinete" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setModalidadeAtendimento("gabinete")}
+                    className="gap-2"
+                  >
+                    <Building2 className="h-4 w-4" />
+                    Gabinete
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={modalidadeAtendimento === "visita" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setModalidadeAtendimento("visita")}
+                    className="gap-2"
+                  >
+                    <Home className="h-4 w-4" />
+                    Visita
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={modalidadeAtendimento === "ligacao" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setModalidadeAtendimento("ligacao")}
+                    className="gap-2"
+                  >
+                    <Phone className="h-4 w-4" />
+                    Ligação
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={modalidadeAtendimento === "online" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setModalidadeAtendimento("online")}
+                    className="gap-2"
+                  >
+                    <Video className="h-4 w-4" />
+                    Online
+                  </Button>
+                </div>
+
+                {/* Campo adicional baseado na modalidade */}
+                {(modalidadeAtendimento === "visita" || modalidadeAtendimento === "online") && (
+                  <div className="space-y-1">
+                    <Input
+                      placeholder={
+                        modalidadeAtendimento === "visita" 
+                          ? "Endereço da visita..." 
+                          : "Link do Meet, Zoom, etc..."
+                      }
+                      value={localAtendimento}
+                      onChange={(e) => setLocalAtendimento(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      {modalidadeAtendimento === "visita" ? (
+                        <><MapPin className="h-3 w-3" /> Informe o endereço para a visita</>
+                      ) : (
+                        <><Video className="h-3 w-3" /> Cole o link da reunião online</>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
