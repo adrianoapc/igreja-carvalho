@@ -1,7 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, MapPin, Video, Loader2, Clock, User, AlertCircle } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Video, Loader2, Clock, User, AlertCircle, CalendarX } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { format, parseISO, isSameDay, setHours, setMinutes, startOfDay, addMinutes, isAfter, isBefore } from "date-fns";
+import { format, parseISO, setHours, setMinutes, startOfDay, addMinutes, isAfter, isBefore, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -43,48 +43,109 @@ interface TimeSlot {
   conflictInfo?: string;
 }
 
-// Gera slots de 30 em 30 minutos das 08:00 às 22:00
-function generateTimeSlots(
+interface DisponibilidadeDia {
+  ativo: boolean;
+  inicio?: string;
+  fim?: string;
+}
+
+interface DisponibilidadeAgenda {
+  [key: string]: DisponibilidadeDia | boolean | undefined;
+  padrao?: boolean;
+}
+
+const DIAS_SEMANA_NOMES = [
+  "Domingos",
+  "Segundas-feiras",
+  "Terças-feiras",
+  "Quartas-feiras",
+  "Quintas-feiras",
+  "Sextas-feiras",
+  "Sábados",
+];
+
+// Gera slots de 30 em 30 minutos dentro do intervalo configurado
+function generateTimeSlotsFromConfig(
   selectedDate: Date,
+  startTime: string,
+  endTime: string,
   occupiedSlots: { start: Date; end: Date; info: string }[]
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  const startHour = 8;
-  const endHour = 22;
   
-  for (let hour = startHour; hour < endHour; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-      const slotTime = setMinutes(setHours(selectedDate, hour), minute);
-      const slotEnd = addMinutes(slotTime, 30);
-      
-      // Verifica se há conflito
-      const conflict = occupiedSlots.find(occupied => {
-        // Slot conflita se começa durante outro agendamento ou se outro agendamento começa durante o slot
-        return (
-          (isAfter(slotTime, occupied.start) || isSameTime(slotTime, occupied.start)) &&
-          isBefore(slotTime, occupied.end)
-        ) || (
-          isAfter(occupied.start, slotTime) &&
-          isBefore(occupied.start, slotEnd)
-        );
-      });
-      
-      const timeStr = format(slotTime, "HH:mm");
-      
-      slots.push({
-        time: timeStr,
-        label: timeStr,
-        available: !conflict,
-        conflictInfo: conflict?.info,
-      });
-    }
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
+  
+  // Converte para minutos totais para facilitar a iteração
+  const startTotalMinutes = startHour * 60 + startMinute;
+  const endTotalMinutes = endHour * 60 + endMinute;
+  
+  for (let totalMinutes = startTotalMinutes; totalMinutes < endTotalMinutes; totalMinutes += 30) {
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    
+    const slotTime = setMinutes(setHours(selectedDate, hour), minute);
+    const slotEnd = addMinutes(slotTime, 30);
+    
+    // Verifica se há conflito
+    const conflict = occupiedSlots.find(occupied => {
+      return (
+        (isAfter(slotTime, occupied.start) || slotTime.getTime() === occupied.start.getTime()) &&
+        isBefore(slotTime, occupied.end)
+      ) || (
+        isAfter(occupied.start, slotTime) &&
+        isBefore(occupied.start, slotEnd)
+      );
+    });
+    
+    const timeStr = format(slotTime, "HH:mm");
+    
+    slots.push({
+      time: timeStr,
+      label: timeStr,
+      available: !conflict,
+      conflictInfo: conflict?.info,
+    });
   }
   
   return slots;
 }
 
-function isSameTime(date1: Date, date2: Date): boolean {
-  return date1.getTime() === date2.getTime();
+// Valida se o pastor tem disponibilidade configurada
+function hasValidDisponibilidade(disponibilidade: DisponibilidadeAgenda | null | undefined): boolean {
+  if (!disponibilidade) return false;
+  
+  // Se tem a flag "padrao", não tem configuração real
+  if (disponibilidade.padrao === true && Object.keys(disponibilidade).length === 1) {
+    return false;
+  }
+  
+  // Verifica se tem pelo menos um dia ativo
+  for (const key of Object.keys(disponibilidade)) {
+    if (key !== "padrao") {
+      const dia = disponibilidade[key];
+      if (typeof dia === "object" && dia?.ativo) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+// Obtém a configuração do dia selecionado
+function getDayConfig(disponibilidade: DisponibilidadeAgenda | null | undefined, date: Date): DisponibilidadeDia | null {
+  if (!disponibilidade) return null;
+  
+  const dayOfWeek = getDay(date); // 0 = Domingo, 1 = Segunda, etc.
+  const dayKey = dayOfWeek.toString();
+  
+  const config = disponibilidade[dayKey];
+  if (typeof config === "object" && config !== null) {
+    return config;
+  }
+  
+  return null;
 }
 
 export function AgendamentoDialog({
@@ -100,13 +161,20 @@ export function AgendamentoDialog({
   const [selectedPastorId, setSelectedPastorId] = useState<string | null>(pastorPreSelecionadoId || null);
   const [localAtendimento, setLocalAtendimento] = useState("");
 
-  // Buscar lista de pastores/líderes disponíveis
+  // Reset pastor quando mudar o pre-selecionado
+  useEffect(() => {
+    if (open && pastorPreSelecionadoId) {
+      setSelectedPastorId(pastorPreSelecionadoId);
+    }
+  }, [open, pastorPreSelecionadoId]);
+
+  // Buscar lista de pastores/líderes disponíveis COM disponibilidade_agenda
   const { data: pastores = [] } = useQuery({
-    queryKey: ["pastores-gabinete"],
+    queryKey: ["pastores-gabinete-agenda"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, nome, avatar_url")
+        .select("id, nome, avatar_url, disponibilidade_agenda")
         .or("e_pastor.eq.true,e_lider.eq.true")
         .order("nome");
       
@@ -115,6 +183,39 @@ export function AgendamentoDialog({
     },
     enabled: open,
   });
+
+  // Pastor selecionado com suas configurações
+  const pastorSelecionado = useMemo(() => {
+    return pastores.find(p => p.id === selectedPastorId);
+  }, [pastores, selectedPastorId]);
+
+  // Disponibilidade do pastor selecionado
+  const disponibilidadePastor = useMemo(() => {
+    if (!pastorSelecionado?.disponibilidade_agenda) return null;
+    return pastorSelecionado.disponibilidade_agenda as unknown as DisponibilidadeAgenda;
+  }, [pastorSelecionado]);
+
+  // Verifica se o pastor tem configuração válida
+  const pastorTemConfiguracao = useMemo(() => {
+    return hasValidDisponibilidade(disponibilidadePastor);
+  }, [disponibilidadePastor]);
+
+  // Configuração do dia selecionado
+  const configDiaSelecionado = useMemo(() => {
+    if (!selectedDate || !disponibilidadePastor) return null;
+    return getDayConfig(disponibilidadePastor, selectedDate);
+  }, [selectedDate, disponibilidadePastor]);
+
+  // Verifica se o pastor atende no dia selecionado
+  const pastorAtendeNoDia = useMemo(() => {
+    return configDiaSelecionado?.ativo === true;
+  }, [configDiaSelecionado]);
+
+  // Nome do dia da semana selecionado
+  const nomeDiaSelecionado = useMemo(() => {
+    if (!selectedDate) return "";
+    return DIAS_SEMANA_NOMES[getDay(selectedDate)];
+  }, [selectedDate]);
 
   // Buscar agendamentos existentes do pastor selecionado na data selecionada
   const { data: agendamentosExistentes = [], isLoading: loadingAgendamentos } = useQuery({
@@ -137,7 +238,7 @@ export function AgendamentoDialog({
       if (error) throw error;
       return data || [];
     },
-    enabled: open && !!selectedPastorId && !!selectedDate,
+    enabled: open && !!selectedPastorId && !!selectedDate && pastorTemConfiguracao && pastorAtendeNoDia,
   });
 
   // Converter agendamentos existentes em slots ocupados
@@ -153,14 +254,15 @@ export function AgendamentoDialog({
     });
   }, [agendamentosExistentes]);
 
-  // Gerar time slots para o dia selecionado
+  // Gerar time slots para o dia selecionado baseado na configuração do pastor
   const timeSlots = useMemo(() => {
-    if (!selectedDate) return [];
-    return generateTimeSlots(selectedDate, occupiedSlots);
-  }, [selectedDate, occupiedSlots]);
-
-  // Nome do pastor selecionado
-  const pastorSelecionado = pastores.find(p => p.id === selectedPastorId);
+    if (!selectedDate || !pastorAtendeNoDia || !configDiaSelecionado) return [];
+    
+    const { inicio, fim } = configDiaSelecionado;
+    if (!inicio || !fim) return [];
+    
+    return generateTimeSlotsFromConfig(selectedDate, inicio, fim, occupiedSlots);
+  }, [selectedDate, pastorAtendeNoDia, configDiaSelecionado, occupiedSlots]);
 
   const agendarMutation = useMutation({
     mutationFn: async () => {
@@ -188,6 +290,7 @@ export function AgendamentoDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["atendimentos-pastorais"] });
       queryClient.invalidateQueries({ queryKey: ["agendamentos-pastor"] });
+      queryClient.invalidateQueries({ queryKey: ["atendimento-pastoral"] });
       toast.success("Agendamento confirmado!");
       resetForm();
       onOpenChange(false);
@@ -223,7 +326,95 @@ export function AgendamentoDialog({
     agendarMutation.mutate();
   };
 
-  const canConfirm = selectedPastorId && selectedDate && selectedTime;
+  const canConfirm = selectedPastorId && selectedDate && selectedTime && pastorTemConfiguracao && pastorAtendeNoDia;
+
+  // Renderiza a área de horários baseado no estado
+  const renderTimeSlots = () => {
+    // Sem pastor selecionado
+    if (!selectedPastorId) {
+      return (
+        <div className="flex items-center justify-center h-full text-muted-foreground">
+          <div className="text-center space-y-2">
+            <User className="h-8 w-8 mx-auto opacity-50" />
+            <p className="text-sm">Selecione um pastor</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Pastor sem configuração
+    if (!pastorTemConfiguracao) {
+      return (
+        <Alert variant="destructive" className="m-2">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Agenda não configurada</AlertTitle>
+          <AlertDescription>
+            Este pastor não possui horários de atendimento configurados.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    // Pastor não atende no dia selecionado
+    if (!pastorAtendeNoDia) {
+      return (
+        <div className="flex items-center justify-center h-full text-muted-foreground p-4">
+          <div className="text-center space-y-2">
+            <CalendarX className="h-8 w-8 mx-auto opacity-50" />
+            <p className="text-sm font-medium">Não atende às {nomeDiaSelecionado}</p>
+            <p className="text-xs">Selecione outro dia no calendário</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Carregando agendamentos
+    if (loadingAgendamentos) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+
+    // Sem slots disponíveis
+    if (timeSlots.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full text-muted-foreground p-4">
+          <div className="text-center space-y-2">
+            <Clock className="h-8 w-8 mx-auto opacity-50" />
+            <p className="text-sm">Nenhum horário configurado para este dia</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Renderiza os slots
+    return (
+      <ScrollArea className="h-full p-2">
+        <div className="grid grid-cols-3 gap-2">
+          {timeSlots.map((slot) => (
+            <Button
+              key={slot.time}
+              type="button"
+              size="sm"
+              variant={selectedTime === slot.time ? "default" : "outline"}
+              disabled={!slot.available}
+              onClick={() => setSelectedTime(slot.time)}
+              className={cn(
+                "text-xs",
+                !slot.available && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground",
+                selectedTime === slot.time && "ring-2 ring-primary"
+              )}
+              title={!slot.available ? slot.conflictInfo : undefined}
+            >
+              {slot.label}
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -246,7 +437,10 @@ export function AgendamentoDialog({
           </Label>
           <Select 
             value={selectedPastorId || ""} 
-            onValueChange={setSelectedPastorId}
+            onValueChange={(value) => {
+              setSelectedPastorId(value);
+              setSelectedTime(null); // Reset time when pastor changes
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione um pastor..." />
@@ -262,71 +456,36 @@ export function AgendamentoDialog({
         </div>
 
         {/* Corpo: Calendário + Horários */}
-        <div className="flex-1 overflow-hidden">
-          {!selectedPastorId ? (
-            <div className="flex items-center justify-center h-64 text-muted-foreground">
-              <div className="text-center space-y-2">
-                <AlertCircle className="h-8 w-8 mx-auto opacity-50" />
-                <p>Selecione um pastor para ver a agenda</p>
-              </div>
+        <div className="flex-1 overflow-hidden py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+            {/* Coluna Esquerda: Calendário */}
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  setSelectedTime(null); // Reset time when date changes
+                }}
+                locale={ptBR}
+                disabled={(date) => date < startOfDay(new Date())}
+                className="rounded-md border pointer-events-auto"
+              />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-              {/* Coluna Esquerda: Calendário */}
-              <div className="flex justify-center">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date);
-                    setSelectedTime(null); // Reset time when date changes
-                  }}
-                  locale={ptBR}
-                  disabled={(date) => date < startOfDay(new Date())}
-                  className="rounded-md border pointer-events-auto"
-                />
+
+            {/* Coluna Direita: Horários ou Alertas */}
+            <div className="flex flex-col min-h-[280px]">
+              <Label className="flex items-center gap-2 mb-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                Horários {selectedDate && `- ${format(selectedDate, "EEEE, dd/MM", { locale: ptBR })}`}
+              </Label>
+              
+              <div className="flex-1 rounded-md border bg-muted/20">
+                {renderTimeSlots()}
               </div>
 
-              {/* Coluna Direita: Horários */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  Horários {selectedDate && `- ${format(selectedDate, "dd/MM", { locale: ptBR })}`}
-                </Label>
-                
-                {loadingAgendamentos ? (
-                  <div className="flex items-center justify-center h-48">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <ScrollArea className="h-64 rounded-md border p-2">
-                    <div className="grid grid-cols-3 gap-2">
-                      {timeSlots.map((slot) => (
-                        <Button
-                          key={slot.time}
-                          type="button"
-                          size="sm"
-                          variant={selectedTime === slot.time ? "default" : "outline"}
-                          disabled={!slot.available}
-                          onClick={() => setSelectedTime(slot.time)}
-                          className={cn(
-                            "text-xs",
-                            !slot.available && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground",
-                            selectedTime === slot.time && "ring-2 ring-primary"
-                          )}
-                          title={!slot.available ? slot.conflictInfo : undefined}
-                        >
-                          {slot.label}
-                          {!slot.available && (
-                            <span className="sr-only">- Ocupado</span>
-                          )}
-                        </Button>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-                
-                {/* Legenda */}
+              {/* Legenda - só mostra se tiver slots */}
+              {selectedPastorId && pastorTemConfiguracao && pastorAtendeNoDia && timeSlots.length > 0 && (
                 <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded border bg-background" />
@@ -337,13 +496,13 @@ export function AgendamentoDialog({
                     <span>Ocupado</span>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Local (opcional) */}
-        {selectedPastorId && (
+        {/* Local (opcional) - só mostra se pastor tem config válida */}
+        {selectedPastorId && pastorTemConfiguracao && (
           <div className="py-3 border-t space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
