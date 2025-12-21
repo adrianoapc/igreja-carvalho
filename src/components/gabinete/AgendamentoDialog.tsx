@@ -173,7 +173,7 @@ export function AgendamentoDialog({
       const { data, error } = await supabase
         .from("profiles")
         .select("id, nome, avatar_url, disponibilidade_agenda")
-        .or("e_pastor.eq.true,e_lider.eq.true")
+        .eq("e_pastor", true)
         .order("nome");
       
       if (error) throw error;
