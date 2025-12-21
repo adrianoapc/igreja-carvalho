@@ -2,7 +2,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Calendar, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, Calendar, AlertTriangle, ClipboardList } from "lucide-react";
 import { format, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -46,9 +47,11 @@ const GRAVIDADE_LABELS: Record<GravidadeEnum, string> = {
 interface PastoralCardProps {
   atendimento: AtendimentoPastoral;
   onClick: () => void;
+  onAgendar?: () => void;
+  onProntuario?: () => void;
 }
 
-export function PastoralCard({ atendimento, onClick }: PastoralCardProps) {
+export function PastoralCard({ atendimento, onClick, onAgendar, onProntuario }: PastoralCardProps) {
   const {
     attributes,
     listeners,
@@ -72,61 +75,100 @@ export function PastoralCard({ atendimento, onClick }: PastoralCardProps) {
     <Card
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      onClick={onClick}
       className={cn(
-        "cursor-grab active:cursor-grabbing hover:shadow-md transition-all touch-manipulation max-w-full",
+        "hover:shadow-md transition-all touch-manipulation w-full",
         isDragging && "opacity-50 shadow-lg scale-105",
         isCritico && "ring-2 ring-red-500 animate-pulse",
         isAlta && "ring-1 ring-orange-500"
       )}
     >
-      <CardContent className="p-2.5 space-y-1.5 overflow-hidden">
-        {/* Nome e Gravidade */}
-        <div className="flex items-center justify-between gap-1 overflow-hidden">
-          <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-            {isCritico && (
-              <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
-            )}
-            <span className="font-medium text-xs truncate block">{nome}</span>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {isNovo && (
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-primary/20 text-primary">
-                Novo
-              </Badge>
-            )}
-            {atendimento.gravidade && (
-              <Badge
-                variant="outline"
-                className={cn("text-[9px] px-1 py-0 h-4 whitespace-nowrap", GRAVIDADE_COLORS[atendimento.gravidade])}
-              >
-                {GRAVIDADE_LABELS[atendimento.gravidade]}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* Data e Agendamento compactos */}
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Clock className="h-2.5 w-2.5 flex-shrink-0" />
-            <span>{format(new Date(atendimento.created_at), "dd/MM", { locale: ptBR })}</span>
-          </div>
-          {atendimento.data_agendamento && (
-            <div className="flex items-center gap-1 text-primary font-medium">
-              <Calendar className="h-2.5 w-2.5 flex-shrink-0" />
-              <span>{format(new Date(atendimento.data_agendamento), "dd/MM HH:mm", { locale: ptBR })}</span>
+      <CardContent className="p-2.5 space-y-2">
+        {/* Header com drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          onClick={onClick}
+          className="cursor-grab active:cursor-grabbing"
+        >
+          {/* Nome e Gravidade */}
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1 min-w-0 flex-1">
+              {isCritico && (
+                <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+              )}
+              <span className="font-medium text-xs truncate">{nome}</span>
             </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {isNovo && (
+                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-primary/20 text-primary">
+                  Novo
+                </Badge>
+              )}
+              {atendimento.gravidade && (
+                <Badge
+                  variant="outline"
+                  className={cn("text-[9px] px-1 py-0 h-4 whitespace-nowrap", GRAVIDADE_COLORS[atendimento.gravidade])}
+                >
+                  {GRAVIDADE_LABELS[atendimento.gravidade]}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Data e Agendamento */}
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1">
+            <div className="flex items-center gap-1">
+              <Clock className="h-2.5 w-2.5 flex-shrink-0" />
+              <span>{format(new Date(atendimento.created_at), "dd/MM", { locale: ptBR })}</span>
+            </div>
+            {atendimento.data_agendamento && (
+              <div className="flex items-center gap-1 text-primary font-medium">
+                <Calendar className="h-2.5 w-2.5 flex-shrink-0" />
+                <span>{format(new Date(atendimento.data_agendamento), "dd/MM HH:mm", { locale: ptBR })}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Motivo Resumo */}
+          {atendimento.motivo_resumo && (
+            <p className="text-[10px] text-muted-foreground truncate mt-1">
+              {atendimento.motivo_resumo}
+            </p>
           )}
         </div>
 
-        {/* Motivo Resumo - apenas 1 linha */}
-        {atendimento.motivo_resumo && (
-          <p className="text-[10px] text-muted-foreground truncate block w-full">
-            {atendimento.motivo_resumo}
-          </p>
+        {/* Botões de Ação - sempre visíveis */}
+        {(onAgendar || onProntuario) && (
+          <div className="flex items-center gap-1 pt-1 border-t border-border/50">
+            {onAgendar && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 flex-1 text-xs gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAgendar();
+                }}
+              >
+                <Calendar className="h-3 w-3" />
+                Agendar
+              </Button>
+            )}
+            {onProntuario && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 flex-1 text-xs gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProntuario();
+                }}
+              >
+                <ClipboardList className="h-3 w-3" />
+                Prontuário
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
