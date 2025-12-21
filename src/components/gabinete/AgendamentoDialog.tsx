@@ -14,7 +14,23 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, MapPin, Video, Loader2, Clock, User, AlertCircle, CalendarX, X, Phone, Home, Building2 } from "lucide-react";
+import { 
+  Calendar as CalendarIcon, 
+  MapPin, 
+  Video, 
+  Loader2, 
+  Clock, 
+  User, 
+  AlertCircle, 
+  CalendarX, 
+  X, 
+  Phone, 
+  Home, 
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  Check
+} from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -25,11 +41,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, parseISO, setHours, setMinutes, startOfDay, addMinutes, isAfter, isBefore, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AgendamentoDialogProps {
   atendimentoId: string | null;
@@ -56,6 +70,17 @@ interface DisponibilidadeAgenda {
   [key: string]: DisponibilidadeDia | boolean | undefined;
   padrao?: boolean;
 }
+
+type WizardStep = "pastor" | "data" | "horario" | "modalidade";
+
+const STEPS: WizardStep[] = ["pastor", "data", "horario", "modalidade"];
+
+const STEP_LABELS: Record<WizardStep, string> = {
+  pastor: "Pastor",
+  data: "Data",
+  horario: "Horário",
+  modalidade: "Modalidade",
+};
 
 const DIAS_SEMANA_NOMES = [
   "Domingos",
@@ -153,17 +178,26 @@ export function AgendamentoDialog({
   pastorPreSelecionadoId,
 }: AgendamentoDialogProps) {
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
+  
+  // Wizard state
+  const [currentStep, setCurrentStep] = useState<WizardStep>("pastor");
+  
+  // Form state
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedTimes, setSelectedTimes] = useState<string[]>([]); // Agora é array para múltiplos slots
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [selectedPastorId, setSelectedPastorId] = useState<string | null>(pastorPreSelecionadoId || null);
   const [modalidadeAtendimento, setModalidadeAtendimento] = useState<string>("gabinete");
   const [localAtendimento, setLocalAtendimento] = useState("");
-  const [mobileTab, setMobileTab] = useState<string>("data");
 
+  // Reset quando abre
   useEffect(() => {
-    if (open && pastorPreSelecionadoId) {
-      setSelectedPastorId(pastorPreSelecionadoId);
+    if (open) {
+      if (pastorPreSelecionadoId) {
+        setSelectedPastorId(pastorPreSelecionadoId);
+        setCurrentStep("data");
+      } else {
+        setCurrentStep("pastor");
+      }
     }
   }, [open, pastorPreSelecionadoId]);
 
@@ -233,7 +267,7 @@ export function AgendamentoDialog({
     enabled: open && !!selectedPastorId && !!selectedDate && pastorTemConfiguracao && pastorAtendeNoDia,
   });
 
-  // Fetch compromissos administrativos (bloqueios, reuniões, etc.)
+  // Fetch compromissos administrativos
   const { data: compromissosExistentes = [] } = useQuery({
     queryKey: ["compromissos-pastor", selectedPastorId, selectedDate?.toISOString()],
     queryFn: async () => {
@@ -256,26 +290,17 @@ export function AgendamentoDialog({
     enabled: open && !!selectedPastorId && !!selectedDate && pastorTemConfiguracao && pastorAtendeNoDia,
   });
 
-  // Combina slots ocupados de atendimentos e compromissos
   const occupiedSlots = useMemo(() => {
     const atendimentoSlots = agendamentosExistentes.map(ag => {
       const start = parseISO(ag.data_agendamento);
       const end = addMinutes(start, 60);
-      return {
-        start,
-        end,
-        info: ag.motivo_resumo || "Atendimento",
-      };
+      return { start, end, info: ag.motivo_resumo || "Atendimento" };
     });
 
     const compromissoSlots = compromissosExistentes.map(c => {
       const start = parseISO(c.data_inicio);
       const end = parseISO(c.data_fim);
-      return {
-        start,
-        end,
-        info: `🚫 ${c.titulo}` || "Bloqueado",
-      };
+      return { start, end, info: `🚫 ${c.titulo}` };
     });
 
     return [...atendimentoSlots, ...compromissoSlots];
@@ -296,16 +321,13 @@ export function AgendamentoDialog({
         throw new Error("Dados incompletos");
       }
 
-      // Usa o primeiro horário selecionado como início
       const firstTime = selectedTimes.sort()[0];
       const [hours, minutes] = firstTime.split(":").map(Number);
       const dataAgendamento = new Date(selectedDate);
       dataAgendamento.setHours(hours, minutes, 0, 0);
 
-      // Calcula duração baseada nos slots selecionados (cada slot = 30min)
       const duracaoMinutos = selectedTimes.length * 30;
 
-      // Monta o local com a modalidade
       const modalidadeLabels: Record<string, string> = {
         gabinete: "Gabinete",
         visita: "Visita",
@@ -350,7 +372,7 @@ export function AgendamentoDialog({
     setSelectedTimes([]);
     setModalidadeAtendimento("gabinete");
     setLocalAtendimento("");
-    setMobileTab("data");
+    setCurrentStep("pastor");
     if (!pastorPreSelecionadoId) {
       setSelectedPastorId(null);
     }
@@ -370,24 +392,44 @@ export function AgendamentoDialog({
   };
 
   const handleSubmit = () => {
-    if (!selectedPastorId) {
-      toast.error("Selecione um pastor");
-      return;
-    }
-    if (!selectedDate) {
-      toast.error("Selecione uma data");
-      return;
-    }
-    if (selectedTimes.length === 0) {
-      toast.error("Selecione pelo menos um horário");
-      return;
-    }
     agendarMutation.mutate();
   };
 
-  const canConfirm = selectedPastorId && selectedDate && selectedTimes.length > 0 && pastorTemConfiguracao && pastorAtendeNoDia;
+  // Navegação do wizard
+  const currentStepIndex = STEPS.indexOf(currentStep);
+  
+  const canGoNext = useMemo(() => {
+    switch (currentStep) {
+      case "pastor":
+        return !!selectedPastorId && pastorTemConfiguracao;
+      case "data":
+        return !!selectedDate && pastorAtendeNoDia;
+      case "horario":
+        return selectedTimes.length > 0;
+      case "modalidade":
+        return true;
+      default:
+        return false;
+    }
+  }, [currentStep, selectedPastorId, pastorTemConfiguracao, selectedDate, pastorAtendeNoDia, selectedTimes]);
 
-  // Calcula intervalo de horários selecionados para exibição
+  const goToNextStep = () => {
+    const nextIndex = currentStepIndex + 1;
+    if (nextIndex < STEPS.length) {
+      setCurrentStep(STEPS[nextIndex]);
+    }
+  };
+
+  const goToPrevStep = () => {
+    const prevIndex = currentStepIndex - 1;
+    if (prevIndex >= 0) {
+      setCurrentStep(STEPS[prevIndex]);
+    }
+  };
+
+  const isLastStep = currentStep === "modalidade";
+
+  // Resumo para o final
   const horariosResumo = useMemo(() => {
     if (selectedTimes.length === 0) return "";
     const sorted = [...selectedTimes].sort();
@@ -395,117 +437,73 @@ export function AgendamentoDialog({
     return `${sorted[0]} - ${sorted[sorted.length - 1]}`;
   }, [selectedTimes]);
 
-  const renderTimeSlots = () => {
-    if (!selectedPastorId) {
-      return (
-        <div className="flex items-center justify-center h-full text-muted-foreground p-4">
-          <div className="text-center space-y-2">
-            <User className="h-8 w-8 mx-auto opacity-50" />
-            <p className="text-sm">Selecione um pastor</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (!pastorTemConfiguracao) {
-      return (
-        <Alert variant="destructive" className="m-2">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Agenda não configurada</AlertTitle>
-          <AlertDescription>
-            Este pastor não possui horários de atendimento configurados.
-          </AlertDescription>
-        </Alert>
-      );
-    }
-
-    if (!pastorAtendeNoDia) {
-      return (
-        <div className="flex items-center justify-center h-full text-muted-foreground p-4">
-          <div className="text-center space-y-2">
-            <CalendarX className="h-8 w-8 mx-auto opacity-50" />
-            <p className="text-sm font-medium">Não atende às {nomeDiaSelecionado}</p>
-            <p className="text-xs">Selecione outro dia no calendário</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (loadingAgendamentos) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      );
-    }
-
-    if (timeSlots.length === 0) {
-      return (
-        <div className="flex items-center justify-center h-full text-muted-foreground p-4">
-          <div className="text-center space-y-2">
-            <Clock className="h-8 w-8 mx-auto opacity-50" />
-            <p className="text-sm">Nenhum horário configurado para este dia</p>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="p-2 space-y-3">
-        {/* Slots selecionados */}
-        {selectedTimes.length > 0 && (
-          <div className="flex flex-wrap gap-1 pb-2 border-b">
-            {selectedTimes.sort().map((time) => (
-              <Badge key={time} variant="default" className="gap-1">
-                {time}
-                <button 
-                  onClick={() => handleRemoveTime(time)}
-                  className="ml-1 hover:bg-primary-foreground/20 rounded-full"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
+  // ===== RENDER STEPS =====
+  const renderStepPastor = () => (
+    <div className="space-y-4">
+      <div className="text-center space-y-2 pb-4">
+        <User className="h-12 w-12 mx-auto text-primary" />
+        <h3 className="font-semibold text-lg">Selecione o Pastor</h3>
+        <p className="text-sm text-muted-foreground">Escolha o pastor que irá realizar o atendimento</p>
+      </div>
+      
+      <div className="space-y-2">
+        {pastores.map((pastor) => {
+          const disponibilidade = pastor.disponibilidade_agenda as unknown as DisponibilidadeAgenda;
+          const temConfig = hasValidDisponibilidade(disponibilidade);
+          const isSelected = selectedPastorId === pastor.id;
+          
+          return (
+            <button
+              key={pastor.id}
+              onClick={() => {
+                setSelectedPastorId(pastor.id);
+                setSelectedTimes([]);
+              }}
+              disabled={!temConfig}
+              className={cn(
+                "w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
+                isSelected && "border-primary bg-primary/5 ring-2 ring-primary",
+                !isSelected && temConfig && "hover:border-primary/50 hover:bg-muted/50",
+                !temConfig && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center text-white font-medium",
+                isSelected ? "bg-primary" : "bg-muted-foreground"
+              )}>
+                {pastor.nome?.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">{pastor.nome}</p>
+                {!temConfig && (
+                  <p className="text-xs text-destructive">Agenda não configurada</p>
+                )}
+              </div>
+              {isSelected && <Check className="h-5 w-5 text-primary" />}
+            </button>
+          );
+        })}
+        
+        {pastores.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>Nenhum pastor cadastrado</p>
           </div>
         )}
-        
-        <ScrollArea className="h-48">
-          <div className="grid grid-cols-3 gap-2">
-            {timeSlots.map((slot) => {
-              const isSelected = selectedTimes.includes(slot.time);
-              return (
-                <Button
-                  key={slot.time}
-                  type="button"
-                  size="sm"
-                  variant={isSelected ? "default" : "outline"}
-                  disabled={!slot.available}
-                  onClick={() => handleToggleTime(slot.time)}
-                  className={cn(
-                    "text-xs",
-                    !slot.available && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground",
-                    isSelected && "ring-2 ring-primary"
-                  )}
-                  title={!slot.available ? slot.conflictInfo : "Clique para selecionar/desselecionar"}
-                >
-                  {slot.label}
-                </Button>
-              );
-            })}
-          </div>
-        </ScrollArea>
+      </div>
+    </div>
+  );
 
-        <p className="text-xs text-muted-foreground text-center">
-          Clique para selecionar múltiplos horários consecutivos
+  const renderStepData = () => (
+    <div className="space-y-4">
+      <div className="text-center space-y-2 pb-2">
+        <CalendarIcon className="h-12 w-12 mx-auto text-primary" />
+        <h3 className="font-semibold text-lg">Escolha a Data</h3>
+        <p className="text-sm text-muted-foreground">
+          Agendando com <strong>{pastorSelecionado?.nome}</strong>
         </p>
       </div>
-    );
-  };
-
-  // Layout Desktop
-  const renderDesktopLayout = () => (
-    <div className="grid grid-cols-2 gap-4 h-full">
-      {/* Coluna Esquerda: Calendário */}
+      
       <div className="flex justify-center">
         <Calendar
           mode="single"
@@ -516,23 +514,96 @@ export function AgendamentoDialog({
           }}
           locale={ptBR}
           disabled={(date) => date < startOfDay(new Date())}
-          className="rounded-md border pointer-events-auto"
+          className="rounded-md border"
         />
       </div>
-
-      {/* Coluna Direita: Horários */}
-      <div className="flex flex-col">
-        <Label className="flex items-center gap-2 mb-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          Horários {selectedDate && `- ${format(selectedDate, "EEE, dd/MM", { locale: ptBR })}`}
-        </Label>
-        
-        <div className="flex-1 rounded-md border bg-muted/20 min-h-[280px]">
-          {renderTimeSlots()}
+      
+      {selectedDate && !pastorAtendeNoDia && (
+        <Alert variant="destructive">
+          <CalendarX className="h-4 w-4" />
+          <AlertTitle>Não disponível</AlertTitle>
+          <AlertDescription>
+            {pastorSelecionado?.nome} não atende às {nomeDiaSelecionado}. Escolha outro dia.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {selectedDate && pastorAtendeNoDia && (
+        <div className="text-center text-sm text-muted-foreground">
+          {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
         </div>
+      )}
+    </div>
+  );
 
-        {selectedPastorId && pastorTemConfiguracao && pastorAtendeNoDia && timeSlots.length > 0 && (
-          <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
+  const renderStepHorario = () => (
+    <div className="space-y-4">
+      <div className="text-center space-y-2 pb-2">
+        <Clock className="h-12 w-12 mx-auto text-primary" />
+        <h3 className="font-semibold text-lg">Selecione o Horário</h3>
+        <p className="text-sm text-muted-foreground">
+          {selectedDate && format(selectedDate, "EEEE, dd/MM", { locale: ptBR })}
+        </p>
+      </div>
+      
+      {loadingAgendamentos ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : timeSlots.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p>Nenhum horário disponível</p>
+        </div>
+      ) : (
+        <>
+          {/* Slots selecionados */}
+          {selectedTimes.length > 0 && (
+            <div className="flex flex-wrap gap-1 pb-2 border-b">
+              {selectedTimes.sort().map((time) => (
+                <Badge key={time} variant="default" className="gap-1">
+                  {time}
+                  <button 
+                    onClick={() => handleRemoveTime(time)}
+                    className="ml-1 hover:bg-primary-foreground/20 rounded-full"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              <span className="text-xs text-muted-foreground self-center ml-2">
+                ({selectedTimes.length * 30}min)
+              </span>
+            </div>
+          )}
+          
+          <ScrollArea className="h-48">
+            <div className="grid grid-cols-4 gap-2">
+              {timeSlots.map((slot) => {
+                const isSelected = selectedTimes.includes(slot.time);
+                return (
+                  <Button
+                    key={slot.time}
+                    type="button"
+                    size="sm"
+                    variant={isSelected ? "default" : "outline"}
+                    disabled={!slot.available}
+                    onClick={() => handleToggleTime(slot.time)}
+                    className={cn(
+                      "text-sm",
+                      !slot.available && "opacity-50 cursor-not-allowed bg-muted",
+                      isSelected && "ring-2 ring-primary"
+                    )}
+                    title={!slot.available ? slot.conflictInfo : undefined}
+                  >
+                    {slot.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+          
+          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded border bg-background" />
               <span>Disponível</span>
@@ -542,233 +613,188 @@ export function AgendamentoDialog({
               <span>Ocupado</span>
             </div>
           </div>
-        )}
+        </>
+      )}
+    </div>
+  );
+
+  const renderStepModalidade = () => (
+    <div className="space-y-4">
+      <div className="text-center space-y-2 pb-2">
+        <Building2 className="h-12 w-12 mx-auto text-primary" />
+        <h3 className="font-semibold text-lg">Modalidade do Atendimento</h3>
+        <p className="text-sm text-muted-foreground">Como será o atendimento?</p>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { id: "gabinete", icon: Building2, label: "Gabinete" },
+          { id: "visita", icon: Home, label: "Visita" },
+          { id: "ligacao", icon: Phone, label: "Ligação" },
+          { id: "online", icon: Video, label: "Online" },
+        ].map((item) => {
+          const Icon = item.icon;
+          const isSelected = modalidadeAtendimento === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setModalidadeAtendimento(item.id)}
+              className={cn(
+                "flex flex-col items-center gap-2 p-4 rounded-lg border transition-all",
+                isSelected && "border-primary bg-primary/5 ring-2 ring-primary",
+                !isSelected && "hover:border-primary/50 hover:bg-muted/50"
+              )}
+            >
+              <Icon className={cn("h-8 w-8", isSelected ? "text-primary" : "text-muted-foreground")} />
+              <span className={cn("font-medium", isSelected && "text-primary")}>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      
+      {(modalidadeAtendimento === "visita" || modalidadeAtendimento === "online") && (
+        <div className="space-y-2 pt-2">
+          <Label>
+            {modalidadeAtendimento === "visita" ? "Endereço da visita" : "Link da reunião"}
+          </Label>
+          <Input
+            placeholder={modalidadeAtendimento === "visita" ? "Rua, número, bairro..." : "https://meet.google.com/..."}
+            value={localAtendimento}
+            onChange={(e) => setLocalAtendimento(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            {modalidadeAtendimento === "visita" ? (
+              <><MapPin className="h-3 w-3" /> Informe o endereço completo</>
+            ) : (
+              <><Video className="h-3 w-3" /> Cole o link do Meet, Zoom, etc.</>
+            )}
+          </p>
+        </div>
+      )}
+      
+      {/* Resumo final */}
+      <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
+        <h4 className="font-medium text-sm">Resumo do Agendamento</h4>
+        <div className="text-sm space-y-1">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span>{pastorSelecionado?.nome}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <span>{selectedDate && format(selectedDate, "dd/MM/yyyy (EEEE)", { locale: ptBR })}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span>{horariosResumo} ({selectedTimes.length * 30}min)</span>
+          </div>
+        </div>
       </div>
     </div>
   );
 
-  // Layout Mobile com Tabs
-  const renderMobileLayout = () => (
-    <Tabs value={mobileTab} onValueChange={setMobileTab} className="flex flex-col h-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="data" className="gap-1">
-          <CalendarIcon className="h-4 w-4" />
-          Data
-        </TabsTrigger>
-        <TabsTrigger value="horario" className="gap-1">
-          <Clock className="h-4 w-4" />
-          Horário
-          {selectedTimes.length > 0 && (
-            <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
-              {selectedTimes.length}
-            </Badge>
-          )}
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="data" className="flex-1 mt-4">
-        <div className="flex justify-center">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={(date) => {
-              setSelectedDate(date);
-              setSelectedTimes([]);
-              // Navega para aba de horários automaticamente
-              if (date && pastorTemConfiguracao) {
-                setTimeout(() => setMobileTab("horario"), 300);
-              }
-            }}
-            locale={ptBR}
-            disabled={(date) => date < startOfDay(new Date())}
-            className="rounded-md border pointer-events-auto"
-          />
-        </div>
-        {selectedDate && (
-          <p className="text-center text-sm text-muted-foreground mt-3">
-            {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-          </p>
-        )}
-      </TabsContent>
-
-      <TabsContent value="horario" className="flex-1 mt-4">
-        <Label className="flex items-center gap-2 mb-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          Horários {selectedDate && `- ${format(selectedDate, "dd/MM", { locale: ptBR })}`}
-        </Label>
-        
-        <div className="rounded-md border bg-muted/20 min-h-[250px]">
-          {renderTimeSlots()}
-        </div>
-
-        {selectedPastorId && pastorTemConfiguracao && pastorAtendeNoDia && timeSlots.length > 0 && (
-          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-2">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded border bg-background" />
-              <span>Disponível</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-muted" />
-              <span>Ocupado</span>
-            </div>
-          </div>
-        )}
-      </TabsContent>
-    </Tabs>
-  );
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case "pastor":
+        return renderStepPastor();
+      case "data":
+        return renderStepData();
+      case "horario":
+        return renderStepHorario();
+      case "modalidade":
+        return renderStepModalidade();
+      default:
+        return null;
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="pb-4 border-b shrink-0">
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+        <DialogHeader className="pb-2 shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5 text-primary" />
             Agendar Atendimento
           </DialogTitle>
-          <DialogDescription>
-            Selecione o pastor, data e horário(s) disponível(is)
+          <DialogDescription className="sr-only">
+            Wizard para agendar atendimento pastoral
           </DialogDescription>
+          
+          {/* Step indicator */}
+          <div className="flex items-center justify-center gap-2 pt-2">
+            {STEPS.map((step, index) => {
+              const isActive = step === currentStep;
+              const isPast = index < currentStepIndex;
+              return (
+                <div key={step} className="flex items-center">
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors",
+                    isActive && "bg-primary text-primary-foreground",
+                    isPast && "bg-primary/20 text-primary",
+                    !isActive && !isPast && "bg-muted text-muted-foreground"
+                  )}>
+                    {isPast ? <Check className="h-4 w-4" /> : index + 1}
+                  </div>
+                  {index < STEPS.length - 1 && (
+                    <div className={cn(
+                      "w-8 h-0.5 mx-1",
+                      index < currentStepIndex ? "bg-primary/50" : "bg-muted"
+                    )} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-center text-xs text-muted-foreground pt-1">
+            {STEP_LABELS[currentStep]}
+          </p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="pr-4">
-            {/* Seletor de Pastor */}
-            <div className="py-3 border-b">
-              <Label className="flex items-center gap-2 mb-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                Pastor Responsável
-              </Label>
-              <Select 
-                value={selectedPastorId || ""} 
-                onValueChange={(value) => {
-                  setSelectedPastorId(value);
-                  setSelectedTimes([]);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um pastor..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {pastores.map((pastor) => (
-                    <SelectItem key={pastor.id} value={pastor.id}>
-                      {pastor.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Corpo: Layout responsivo */}
-            <div className="py-4">
-              {isMobile ? renderMobileLayout() : renderDesktopLayout()}
-            </div>
-
-            {/* Modalidade do Atendimento */}
-            {selectedPastorId && pastorTemConfiguracao && (
-              <div className="py-3 border-t space-y-3">
-                <Label className="flex items-center gap-2">
-                  Modalidade do Atendimento
-                </Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <Button
-                    type="button"
-                    variant={modalidadeAtendimento === "gabinete" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setModalidadeAtendimento("gabinete")}
-                    className="gap-2"
-                  >
-                    <Building2 className="h-4 w-4" />
-                    Gabinete
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={modalidadeAtendimento === "visita" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setModalidadeAtendimento("visita")}
-                    className="gap-2"
-                  >
-                    <Home className="h-4 w-4" />
-                    Visita
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={modalidadeAtendimento === "ligacao" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setModalidadeAtendimento("ligacao")}
-                    className="gap-2"
-                  >
-                    <Phone className="h-4 w-4" />
-                    Ligação
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={modalidadeAtendimento === "online" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setModalidadeAtendimento("online")}
-                    className="gap-2"
-                  >
-                    <Video className="h-4 w-4" />
-                    Online
-                  </Button>
-                </div>
-
-                {/* Campo adicional baseado na modalidade */}
-                {(modalidadeAtendimento === "visita" || modalidadeAtendimento === "online") && (
-                  <div className="space-y-1">
-                    <Input
-                      placeholder={
-                        modalidadeAtendimento === "visita" 
-                          ? "Endereço da visita..." 
-                          : "Link do Meet, Zoom, etc..."
-                      }
-                      value={localAtendimento}
-                      onChange={(e) => setLocalAtendimento(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      {modalidadeAtendimento === "visita" ? (
-                        <><MapPin className="h-3 w-3" /> Informe o endereço para a visita</>
-                      ) : (
-                        <><Video className="h-3 w-3" /> Cole o link da reunião online</>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+        <ScrollArea className="flex-1 min-h-0 py-4">
+          <div className="px-1">
+            {renderCurrentStep()}
           </div>
         </ScrollArea>
 
-        {/* Resumo e Confirmação */}
-        <DialogFooter className="border-t pt-4 flex-col gap-3 shrink-0">
-          {canConfirm && (
-            <div className="w-full text-sm text-muted-foreground">
-              Agendando com <strong>{pastorSelecionado?.nome}</strong> para{" "}
-              <strong>{format(selectedDate!, "dd/MM/yyyy", { locale: ptBR })}</strong> às{" "}
-              <strong>{horariosResumo}</strong>
-              {selectedTimes.length > 1 && (
-                <span className="text-xs ml-1">({selectedTimes.length * 30}min)</span>
-              )}
-            </div>
-          )}
-          <div className="flex gap-2 w-full sm:w-auto sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="flex-1 sm:flex-none"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSubmit} 
-              disabled={!canConfirm || agendarMutation.isPending}
-              className="flex-1 sm:flex-none"
-            >
-              {agendarMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              Confirmar
-            </Button>
+        <DialogFooter className="border-t pt-4 shrink-0">
+          <div className="flex w-full gap-2">
+            {currentStepIndex > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={goToPrevStep}
+                className="gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Voltar
+              </Button>
+            )}
+            
+            <div className="flex-1" />
+            
+            {!isLastStep ? (
+              <Button
+                onClick={goToNextStep}
+                disabled={!canGoNext}
+                className="gap-1"
+              >
+                Próximo
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleSubmit} 
+                disabled={agendarMutation.isPending}
+                className="gap-1"
+              >
+                {agendarMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Confirmar
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
