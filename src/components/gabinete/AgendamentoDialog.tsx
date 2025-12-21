@@ -199,6 +199,7 @@ export function AgendamentoDialog({
   const [nomePessoa, setNomePessoa] = useState("");
   const [telefonePessoa, setTelefonePessoa] = useState("");
   const [motivoResumo, setMotivoResumo] = useState("");
+  const [gravidadeSelecionada, setGravidadeSelecionada] = useState<"BAIXA" | "MEDIA" | "ALTA" | "CRITICA">("BAIXA");
 
   // Reset quando abre
   useEffect(() => {
@@ -404,7 +405,7 @@ export function AgendamentoDialog({
             local_atendimento: localCompleto,
             motivo_resumo: motivoResumo.trim() || `Atendimento com ${nomePessoa}`,
             origem: "AGENDA",
-            gravidade: "BAIXA",
+            gravidade: gravidadeSelecionada,
             status: "AGENDADO",
             observacoes_internas: selectedTimes.length > 1 
               ? `Duração: ${duracaoMinutos} minutos (${selectedTimes.sort().join(", ")})`
@@ -454,6 +455,7 @@ export function AgendamentoDialog({
     setNomePessoa("");
     setTelefonePessoa("");
     setMotivoResumo("");
+    setGravidadeSelecionada("BAIXA");
     setCurrentStep(isNovoAtendimento ? "pessoa" : "pastor");
     if (!pastorPreSelecionadoId) {
       setSelectedPastorId(null);
@@ -558,6 +560,24 @@ export function AgendamentoDialog({
             onChange={(e) => setMotivoResumo(e.target.value)}
             className="h-8 text-sm"
           />
+        </div>
+        
+        <div className="space-y-1">
+          <Label className="text-xs">Gravidade</Label>
+          <Select
+            value={gravidadeSelecionada}
+            onValueChange={(v) => setGravidadeSelecionada(v as "BAIXA" | "MEDIA" | "ALTA" | "CRITICA")}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="BAIXA">Baixa</SelectItem>
+              <SelectItem value="MEDIA">Média</SelectItem>
+              <SelectItem value="ALTA">Alta</SelectItem>
+              <SelectItem value="CRITICA">Crítica</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>
