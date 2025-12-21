@@ -228,10 +228,42 @@ serve(async (req) => {
       }).eq('id', sessao.id);
 
       // --- A. GESTÃO DE IDENTIDADE (QUEM É?) ---
-      // Buscamos o profile completo (com lider_id se existir)
-      const { data: profile } = await supabase.from('profiles')
-        .select('id, nome, lider_id') 
-        .eq('telefone', telefone).maybeSingle();
+      // Buscamos profiles que compartilham o mesmo telefone (pode haver duplicatas: pai e filho, etc.)
+      const { data: perfis, error: perfilError } = await supabase
+        .from('profiles')
+        .select('id, nome, lider_id, data_nascimento, created_at') 
+        .eq('telefone', telefone)
+        .limit(5);
+      
+      let profile: { id: string; nome: string; lider_id?: string; data_nascimento?: string; created_at?: string } | null = null;
+      
+      if (perfis && perfis.length > 0) {
+        if (perfis.length > 1) {
+          // DUPLICIDADE DETECTADA - Aplicar lógica de "Melhor Candidato"
+          console.warn(`Alerta: Telefone ${telefone} vinculado a múltiplos perfis (IDs: ${perfis.map(p => p.id).join(', ')})`);
+          
+          // Ordena: Prioriza quem tem data_nascimento mais antiga (assume-se ser pai/mãe, não criança)
+          // Em seguida, prioriza cadastro mais antigo (created_at)
+          perfis.sort((a, b) => {
+            // Se ambos têm data de nascimento, quem nasceu antes (mais velho) tem prioridade
+            const dataA = a.data_nascimento ? new Date(a.data_nascimento).getTime() : Infinity;
+            const dataB = b.data_nascimento ? new Date(b.data_nascimento).getTime() : Infinity;
+            
+            if (dataA !== dataB) {
+              return dataA - dataB; // Mais velho primeiro
+            }
+            
+            // Empate: quem foi cadastrado primeiro
+            const createdA = a.created_at ? new Date(a.created_at).getTime() : Infinity;
+            const createdB = b.created_at ? new Date(b.created_at).getTime() : Infinity;
+            return createdA - createdB;
+          });
+          
+          console.warn(`Selecionado perfil ID: ${perfis[0].id} (${perfis[0].nome})`);
+        }
+        
+        profile = perfis[0];
+      }
         
       let visitanteId = null;
       let origem = 'WABA_INTERNO';
