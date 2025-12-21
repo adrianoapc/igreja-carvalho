@@ -14,6 +14,91 @@ export type Database = {
   }
   public: {
     Tables: {
+      agenda_pastoral: {
+        Row: {
+          cor: string | null
+          created_at: string | null
+          criado_por: string | null
+          data_fim: string
+          data_inicio: string
+          descricao: string | null
+          id: string
+          pastor_id: string
+          tipo: string | null
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          data_fim: string
+          data_inicio: string
+          descricao?: string | null
+          id?: string
+          pastor_id: string
+          tipo?: string | null
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          data_fim?: string
+          data_inicio?: string
+          descricao?: string | null
+          id?: string
+          pastor_id?: string
+          tipo?: string | null
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_pastoral_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_pastor_id_fkey"
+            columns: ["pastor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_pastor_id_fkey"
+            columns: ["pastor_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_pastor_id_fkey"
+            columns: ["pastor_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       alteracoes_perfil_pendentes: {
         Row: {
           aprovado_por: string | null
