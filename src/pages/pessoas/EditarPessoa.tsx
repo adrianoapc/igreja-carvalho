@@ -15,8 +15,19 @@ import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog"
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
-import { ArrowLeft, Check, Edit, Mail, MapPin, Phone, Shield, Sparkles, User } from "lucide-react";
+import { ConfigurarDisponibilidadeDialog } from "@/components/membros/ConfigurarDisponibilidadeDialog";
+import { ArrowLeft, Check, Clock, Edit, Mail, MapPin, Phone, Shield, Sparkles, User } from "lucide-react";
 import { formatarCEP, formatarTelefone } from "@/lib/validators";
+
+interface DisponibilidadeDia {
+  ativo: boolean;
+  inicio?: string;
+  fim?: string;
+}
+
+interface DisponibilidadeAgenda {
+  [key: string]: DisponibilidadeDia;
+}
 
 interface Pessoa {
   id: string;
@@ -54,7 +65,18 @@ interface Pessoa {
   cadastrado_por: string | null;
   tipo_sanguineo: string | null;
   observacoes: string | null;
+  disponibilidade_agenda: DisponibilidadeAgenda | null;
 }
+
+const DIAS_SEMANA_LABELS: Record<string, string> = {
+  "0": "Dom",
+  "1": "Seg",
+  "2": "Ter",
+  "3": "Qua",
+  "4": "Qui",
+  "5": "Sex",
+  "6": "Sáb",
+};
 
 export default function EditarPessoa() {
   const { id } = useParams();
@@ -66,7 +88,7 @@ export default function EditarPessoa() {
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
   const [editarStatusOpen, setEditarStatusOpen] = useState(false);
-
+  const [disponibilidadeOpen, setDisponibilidadeOpen] = useState(false);
   const fetchPessoa = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -77,7 +99,10 @@ export default function EditarPessoa() {
       .single();
 
     if (!error && data) {
-      setPessoa(data as Pessoa);
+      setPessoa({
+        ...data,
+        disponibilidade_agenda: data.disponibilidade_agenda as unknown as DisponibilidadeAgenda | null,
+      } as Pessoa);
     }
     setLoading(false);
   }, [id]);
@@ -247,6 +272,38 @@ export default function EditarPessoa() {
             </CardContent>
           </Card>
 
+          {/* Card de Disponibilidade Pastoral - Apenas para pastores/líderes */}
+          {(pessoa.e_pastor || pessoa.e_lider) && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" /> Disponibilidade para Atendimento
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setDisponibilidadeOpen(true)}>
+                  <Edit className="w-4 h-4 mr-2" /> Configurar
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {pessoa.disponibilidade_agenda && Object.values(pessoa.disponibilidade_agenda).some(d => d.ativo) ? (
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(pessoa.disponibilidade_agenda)
+                      .filter(([_, config]) => config.ativo)
+                      .sort(([a], [b]) => Number(a) - Number(b))
+                      .map(([diaKey, config]) => (
+                        <Badge key={diaKey} variant="secondary" className="text-xs">
+                          {DIAS_SEMANA_LABELS[diaKey]}: {config.inicio} - {config.fim}
+                        </Badge>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Nenhum horário de atendimento configurado
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4" /> Funções & Times</CardTitle>
@@ -358,6 +415,14 @@ export default function EditarPessoa() {
         pessoaId={pessoa.id}
         statusAtual={pessoa.status}
         nome={pessoa.nome}
+        onSuccess={fetchPessoa}
+      />
+
+      <ConfigurarDisponibilidadeDialog
+        open={disponibilidadeOpen}
+        onOpenChange={setDisponibilidadeOpen}
+        profileId={pessoa.id}
+        initialData={pessoa.disponibilidade_agenda}
         onSuccess={fetchPessoa}
       />
     </div>
