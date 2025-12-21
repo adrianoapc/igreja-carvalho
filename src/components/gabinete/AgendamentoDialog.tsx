@@ -570,8 +570,8 @@ export function AgendamentoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="pb-4 border-b">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="pb-4 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5 text-primary" />
             Agendar Atendimento
@@ -581,58 +581,62 @@ export function AgendamentoDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Seletor de Pastor */}
-        <div className="py-3 border-b">
-          <Label className="flex items-center gap-2 mb-2">
-            <User className="h-4 w-4 text-muted-foreground" />
-            Pastor Responsável
-          </Label>
-          <Select 
-            value={selectedPastorId || ""} 
-            onValueChange={(value) => {
-              setSelectedPastorId(value);
-              setSelectedTimes([]);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione um pastor..." />
-            </SelectTrigger>
-            <SelectContent>
-              {pastores.map((pastor) => (
-                <SelectItem key={pastor.id} value={pastor.id}>
-                  {pastor.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="pr-4">
+            {/* Seletor de Pastor */}
+            <div className="py-3 border-b">
+              <Label className="flex items-center gap-2 mb-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                Pastor Responsável
+              </Label>
+              <Select 
+                value={selectedPastorId || ""} 
+                onValueChange={(value) => {
+                  setSelectedPastorId(value);
+                  setSelectedTimes([]);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um pastor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {pastores.map((pastor) => (
+                    <SelectItem key={pastor.id} value={pastor.id}>
+                      {pastor.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        {/* Corpo: Layout responsivo */}
-        <div className="flex-1 overflow-hidden py-4">
-          {isMobile ? renderMobileLayout() : renderDesktopLayout()}
-        </div>
+            {/* Corpo: Layout responsivo */}
+            <div className="py-4">
+              {isMobile ? renderMobileLayout() : renderDesktopLayout()}
+            </div>
 
-        {/* Local (opcional) */}
-        {selectedPastorId && pastorTemConfiguracao && (
-          <div className="py-3 border-t space-y-2">
-            <Label className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              Local ou Link (opcional)
-            </Label>
-            <Input
-              placeholder="Ex: Sala 1 ou https://meet.google.com/..."
-              value={localAtendimento}
-              onChange={(e) => setLocalAtendimento(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Video className="h-3 w-3" />
-              Cole um link para atendimento online
-            </p>
+            {/* Local (opcional) */}
+            {selectedPastorId && pastorTemConfiguracao && (
+              <div className="py-3 border-t space-y-2">
+                <Label className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  Local ou Link (opcional)
+                </Label>
+                <Input
+                  placeholder="Ex: Sala 1 ou https://meet.google.com/..."
+                  value={localAtendimento}
+                  onChange={(e) => setLocalAtendimento(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Video className="h-3 w-3" />
+                  Cole um link para atendimento online
+                </p>
+              </div>
+            )}
           </div>
-        )}
+        </ScrollArea>
 
         {/* Resumo e Confirmação */}
-        <DialogFooter className="border-t pt-4 flex-col gap-3">
+        <DialogFooter className="border-t pt-4 flex-col gap-3 shrink-0">
           {canConfirm && (
             <div className="w-full text-sm text-muted-foreground">
               Agendando com <strong>{pastorSelecionado?.nome}</strong> para{" "}
