@@ -103,6 +103,7 @@ import WebhooksAdmin from "./pages/admin/Webhooks";
 import ChatbotsAdmin from "./pages/admin/Chatbots";
 import GabinetePastoral from "./pages/GabinetePastoral";
 import AtendimentoProntuario from "./pages/gabinete/AtendimentoProntuario";
+import Configuracoes from "./pages/Configuracoes";  
 
 const queryClient = new QueryClient();
 
@@ -917,6 +918,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/configuracoes" element={<Configuracoes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
               </AuthGate>
