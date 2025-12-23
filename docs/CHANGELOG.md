@@ -10,6 +10,15 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 🧭 Agendamento Pastoral e Identidade do Chatbot (23 de Dez/2025)
+- **Wizard de agendamento**: Etapa "Pessoa" com autocomplete de membros/visitantes, deduplicação por telefone e criação automática de lead quando necessário; grava `pessoa_id` ou `visitante_id`, `gravidade`, `data_agendamento` e `local_atendimento`
+- **Bloqueio de conflitos**: Slots de 30min com seleção múltipla, respeitando compromissos existentes em `atendimentos_pastorais` e na nova tabela `agenda_pastoral` (compromissos administrativos do pastor)
+- **Deduplicação no chatbot-triagem**: Para telefones com múltiplos perfis, escolhe o candidato mais antigo (data de nascimento > criação) e registra alerta; fallback cria/recupera `visitantes_leads`
+
+**Impacto no usuário:** Pastores evitam conflitos de agenda e conseguem agendar visitas/online/ligação com dados completos do atendido; chatbot reduz erros de vinculação quando há números compartilhados.
+
+**Módulos afetados:** Gabinete, Chatbot Triagem, Integrações Supabase
+
 #### 🏛️ Módulo Gabinete Digital - Implementação Completa (20 de Dez/2025)
 - **Nova tela `/gabinete`** (`GabinetePastoral.tsx`): Kanban interativo com drag-and-drop via @dnd-kit, KPIs pastorais, highlights de casos críticos
 - **Componentes reutilizáveis**: `PastoralCard`, `PastoralDetailsDrawer`, `PastoralFilters`, `PastoralKPIs`, `PastoralListView`, `PastoralKanbanColumn`

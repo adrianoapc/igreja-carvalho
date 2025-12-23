@@ -341,17 +341,27 @@ Centralizar o cuidado pastoral dos membros através de um sistema de tickets (at
 ### 4.1 Estrutura de Dados
 
 #### Tabela: `atendimentos_pastorais`
-- `id` (UUID): Identificador único do ticket
-- `pessoa_id` (FK → profiles): Vinculação do membro ou visitante
-- `origem` (ENUM): CHATBOT, SENTIMENTOS, APP_ORACAO, DIRETO
-- `gravidade` (ENUM): BAIXA, MEDIA, ALTA, CRITICA (determinada por IA ou manual)
+- `id` (UUID): Identificador único do atendimento
+- `pessoa_id` (FK → profiles) ou `visitante_id` (FK → visitantes_leads): Vinculação do atendido
+- `origem` (ENUM): CHATBOT, SENTIMENTOS, APP_ORACAO, AGENDA, MANUAL
+- `motivo_resumo` (TEXT): Resumo curto do motivo
+- `conteudo_original` (TEXT): Relato completo (protegido por RLS, invisível para secretaria)
+- `gravidade` (ENUM): BAIXA, MEDIA, ALTA, CRITICA (manual ou IA)
 - `status` (ENUM): PENDENTE, EM_ACOMPANHAMENTO, AGENDADO, CONCLUIDO
-- `pastor_responsavel_id` (FK → profiles): Líder/Pastor atribuído (auto-detectado via `lider_id` do membro ou plantão)
-- `conteudo_original` (TEXT): Relato completo do membro (protegido por RLS, invisível para secretaria)
+- `data_agendamento` (TIMESTAMP) e `local_atendimento` (TEXT): Quando/onde acontecerá o encontro
+- `observacoes_internas` (TEXT): Observação interna (ex: duração, slots)
 - `historico_evolucao` (JSONB): Array de notas {timestamp, autor, mensagem, status_anterior, status_novo}
-- `agendado_para` (TIMESTAMP): Data/hora do encontro pastoral (quando status = AGENDADO)
-- `observacoes` (TEXT): Análise/notas do pastor
+- `sessao_bot_id` (FK → atendimentos_bot): vínculo com a sessão do chatbot (quando origem = CHATBOT)
+- `pastor_responsavel_id` (FK → profiles): Líder/Pastor atribuído
 - `created_at`, `updated_at` (TIMESTAMP)
+
+#### Tabela: `agenda_pastoral`
+- `id` (UUID): Evento administrativo ou compromisso pastoral
+- `pastor_id` (FK → profiles): Dono da agenda
+- `titulo`, `descricao`, `tipo`: Identificação do compromisso (ex: culto, reunião, bloqueio)
+- `data_inicio`, `data_fim`: Janela do compromisso
+- `cor`: Cor opcional para exibição
+- `criado_por`, `created_at`, `updated_at`
 
 #### View: `view_agenda_secretaria`
 - Exibe somente: `id`, `pessoa_id` (nome do membro), `status`, `pastor_responsavel_id`, `agendado_para`, `gravidade`
@@ -364,6 +374,7 @@ Atendimentos pastorais são criados automaticamente em 3 cenários:
 
 1. **Via Chatbot (`chatbot-triagem` Edge Function)**
    - Membro ou visitante envia mensagem WhatsApp pedindo ajuda pastoral/encaminhamento
+   - Se o telefone corresponde a múltiplos `profiles`, o bot escolhe o candidato mais antigo (data de nascimento > data de criação); se nenhum existir, cria/recupera `visitantes_leads`
    - Bot detecta intenção "SOLICITACAO_PASTORAL" ou conversa com índice de gravidade alto
    - Sistema cria `atendimentos_pastorais` com `origem = 'CHATBOT'`, `gravidade` conforme análise IA
 
@@ -410,7 +421,8 @@ Ao clicar no card, abre drawer com abas:
    - Array de `historico_evolucao` com timestamp, autor, mensagem
    - Botão "Adicionar Nota" para registrar progresso
 4. **Agendamento**
-   - Seletor de data/hora; sincroniza com `agendado_para`
+   - Seletor de data/hora/modo (gabinete, visita, ligação, online); grava `data_agendamento` e `local_atendimento`
+   - Sugere duração multi-slot (30min cada) e bloqueia conflitos considerando atendimentos existentes e `agenda_pastoral`
    - Integração com calendário pessoal do pastor (a confirmar)
 5. **Análise IA**
    - Se disponível: `analise_ia_titulo`, `analise_ia_motivo`, `analise_ia_gravidade`, `analise_ia_resposta` (campos em `sentimentos_membros` ou JSON em `historico_evolucao`)

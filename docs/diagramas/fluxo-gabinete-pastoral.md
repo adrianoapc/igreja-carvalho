@@ -91,7 +91,7 @@ flowchart TD
     DrawerOpen --> Aba1["<b>Aba: Geral</b><br/>Nome, status, gravidade<br/>data criação, líder direto"]
     DrawerOpen --> Aba2["<b>Aba: Histórico</b><br/>Se origem=CHATBOT:<br/>Exibe conversa WhatsApp"]
     DrawerOpen --> Aba3["<b>Aba: Notas</b><br/>Array de evolução<br/>timestamp, autor, msg"]
-    DrawerOpen --> Aba4["<b>Aba: Agendamento</b><br/>Seletor de data/hora<br/>sincroniza agendado_para"]
+    DrawerOpen --> Aba4["<b>Aba: Agendamento</b><br/>Data/hora + modalidade<br/>grava data_agendamento<br/>e local_atendimento"]
     DrawerOpen --> Aba5["<b>Aba: Análise IA</b><br/>Resumo da IA:<br/>gravidade, motivo,<br/>resposta sugerida"]
     
     Aba1 --> Action1["Pastor pode editar<br/>status aqui"]
@@ -214,6 +214,8 @@ flowchart LR
 ## Notas de Implementação
 
 - **Dual-Write**: `analise-sentimento-ia` e `analise-pedido-ia` continuam escrevendo em `sentimentos_membros` e `pedidos_oracao` (compatibilidade legado) **E** criam `atendimentos_pastorais` para casos >= MÉDIA
+- **Agendamento guiado**: Wizard exige nome/telefone e sugere membro/visitante existentes; grava `pessoa_id` ou `visitante_id`, `data_agendamento`, `local_atendimento` e `gravidade` manual; evita conflitos considerando `atendimentos_pastorais` e `agenda_pastoral`
+- **Resolução de identidade no chatbot**: Se o telefone tem múltiplos `profiles`, ordena por data de nascimento mais antiga e criação mais antiga antes de vincular; caso não exista, cria `visitantes_leads`
 - **Configuração Dinâmica**: Prompts e modelos buscados em `chatbot_configs`, não hardcoded nas edge functions
 - **RLS Privacidade**: View `view_agenda_secretaria` permite secretaria agendar sem ler `conteudo_original`
 - **Notificações Híbridas**: Imediatas para CRITICA, passivas para MEDIA/ALTA (só in-app, sem WhatsApp automático)

@@ -17,26 +17,30 @@ Era necessária uma estrutura que centralizasse o "Cuidado Pastoral" (conceito d
 ## Decisão
 Implementámos o conceito de **Gabinete Digital** através de uma nova arquitetura de dados e lógica de roteamento nas Edge Functions.
 
-### 1. Nova Estrutura de Dados (`atendimentos_pastorais`)
-Criámos uma tabela centralizada para gerir "Tickets de Cuidado".
+### 1. Nova Estrutura de Dados (`atendimentos_pastorais` e `agenda_pastoral`)
+Criámos uma tabela centralizada para gerir "Tickets de Cuidado" e uma tabela de agenda administrativa dos pastores.
 * **Objetivo:** Separar o fluxo de trabalho pastoral (que exige ação/agendamento) do fluxo de intercessão (que exige oração).
-* **Campos Chave:**
-    * `origem`: CHATBOT, SENTIMENTOS, APP_ORACAO.
-    * `gravidade`: BAIXA, MEDIA, ALTA, CRITICA (Definido por IA).
+* **Campos Chave de `atendimentos_pastorais`:**
+    * `origem`: CHATBOT, SENTIMENTOS, APP_ORACAO, AGENDA, MANUAL.
+    * `gravidade`: BAIXA, MEDIA, ALTA, CRITICA (Definido por IA ou manual).
     * `status`: PENDENTE, EM_ACOMPANHAMENTO, AGENDADO, CONCLUIDO.
     * `pastor_responsavel_id`: O dono do caso (Líder ou Plantão).
+    * `pessoa_id` ou `visitante_id`: Vinculação do atendido.
     * `conteudo_original`: O relato completo (Protegido por RLS).
+    * `data_agendamento` e `local_atendimento`: Data/local do encontro (ex: Gabinete, Online, Visita, Ligação).
     * `historico_evolucao`: JSONB para notas de progresso e análise técnica da IA.
+* **Nova tabela `agenda_pastoral`:** Compromissos administrativos (reuniões, cultos, bloqueios); usada para evitar conflitos ao agendar atendimentos.
 
 ### 2. Estratégia de "Dual-Write" (Escrita Dupla)
 Para manter a compatibilidade com o sistema legado e garantir segurança na transição:
 * **Tabela Legada (`pedidos_oracao`):** Continua a receber todos os pedidos para alimentar a lista pública de intercessão e estatísticas gerais.
 * **Tabela Nova (`atendimentos_pastorais`):** Recebe apenas casos que demandam ação (solicitações pastorais diretas ou casos com gravidade >= MÉDIA detectada pela IA).
 
-### 3. Roteamento Inteligente de Liderança
+### 3. Roteamento Inteligente de Liderança e Deduplicação de Identidade
 As Edge Functions (`chatbot-triagem`, `analise-sentimento-ia` e `analise-pedido-ia`) agora executam a lógica de atribuição de responsabilidade antes de gravar na base de dados:
 * **Regra 1 (Membro com Líder):** Se o utilizador tem `lider_id` no seu perfil, o atendimento é atribuído automaticamente a esse líder.
 * **Regra 2 (Visitante/Sem Líder):** O atendimento é atribuído ao "Pastor de Plantão" (ID configurável via constantes ou base de dados).
+* **Deduplicação de Identidade (Chatbot):** Quando o telefone corresponde a múltiplos `profiles` (ex: pai/filho com mesmo número), ordena por `data_nascimento` mais antiga (assume adulto) e depois por `created_at` mais antiga; seleciona o primeiro e registra alerta no console. Se nenhum perfil existir, cria/recupera `visitantes_leads`.
 
 ### 4. Gestão de Configuração de IA (Base de Dados)
 Removemos os prompts *hardcoded* (fixos no código).
@@ -63,7 +67,18 @@ Removemos os prompts *hardcoded* (fixos no código).
 * **Complexidade de Dados:** A lógica de roteamento exige que o cadastro de membros (`lider_id`) esteja sempre atualizado para ser eficaz.
 * **Dependência de IDs:** É crítico garantir que o ID do "Pastor de Plantão" esteja sempre válido nas configurações das Edge Functions.
 
+### 7. Wizard de Agendamento Guiado (23/Dez/2025)
+Implementado wizard multi-step em `AgendamentoDialog.tsx` para criar atendimentos com agendamento:
+* **Etapa Pessoa:** Autocomplete de membros/visitantes por nome, deduplicação por telefone; se não encontrado, cria visitante automaticamente.
+* **Etapa Pastor:** Seleção com validação de disponibilidade configurada em `profiles.disponibilidade_agenda`.
+* **Etapa Data:** Calendário com bloqueio de dias não atendidos pelo pastor.
+* **Etapa Horário:** Slots de 30min com seleção múltipla; bloqueia conflitos considerando `atendimentos_pastorais` e `agenda_pastoral`.
+* **Etapa Modalidade:** Escolhe entre Gabinete, Visita, Ligação, Online; grava `local_atendimento` completo.
+* **Gravação:** INSERT em `atendimentos_pastorais` com `pessoa_id` ou `visitante_id`, `data_agendamento`, `gravidade`, `local_atendimento` e `observacoes_internas` (duração total).
+
 ## Próximos Passos (Evolução)
-* Criar Interface UI no Lovable para o "Painel Pastoral" (Kanban de atendimentos).
+* ✅ ~~Criar Interface UI no Lovable para o "Painel Pastoral" (Kanban de atendimentos).~~ (Implementado)
+* ✅ ~~Wizard de Agendamento com bloqueio de conflitos.~~ (Implementado)
 * Implementar botão de "Chamada Pastoral" no App.
 * Criar alertas de anomalia para tendências coletivas de sentimentos (ex: "A igreja está 30% mais ansiosa esta semana").
+* Tratar erros `perfilError` em `chatbot-triagem` e melhorar lógica de tie-breaker quando `data_nascimento`/`created_at` faltam.

@@ -62,7 +62,7 @@
 | `MinhasEscalas.tsx` | `/minhas-escalas` | `/minhas-escalas` | Voluntariado | Pessoal | Membro | Aceitar/Recusar | Voluntário |
 | `Agenda.tsx` | `/agenda` | `/agenda` | Agenda | Eventos | Híbrido | Calendário | Todos |
 | **PASTORAL & GABINETE** | | | | | | | |
-| `GabinetePastoral.tsx` | `/gabinete` | `/gabinete` | Gabinete | Cuidado Pastoral | Admin | Kanban de Atendimentos, KPIs, Prontuário | Pastor/Secretaria |
+| `GabinetePastoral.tsx` | `/gabinete` | `/gabinete` | Gabinete | Cuidado Pastoral | Admin | Kanban, Prontuário, Agendamento guiado, KPIs | Pastor/Secretaria |
 | **INTERCESSÃO** | | | | | | | |
 | `Intercessao.tsx` | `/intercessao` | `/intercessao` | Intercessao | Gestão | Admin | Painel Geral | Lider Oração |
 | `intercessao/PedidosOracao.tsx` | `/intercessao/pedidos` | `/intercessao/pedidos` | Intercessao | Operação | Híbrido | Ver/Criar Pedidos | Intercessor |
