@@ -15,7 +15,7 @@
 | `admin/Notificacoes.tsx` | `/admin/notificacoes` | `/admin/notificacoes` | Admin | Comunicação | Admin | Enviar Push | Admin |
 | `admin/Chatbots.tsx` | `/admin/chatbots` | `/admin/chatbots` | Admin | IA & Automações | Admin | Gerir Chatbots, modelos e prompts | Admin |
 | **DASHBOARD & PERFIL** | | | | | | | |
-| `Dashboard.tsx` | `/dashboard` | `/` | Core | Home | Híbrido | KPIs e Atalhos | Todos |
+| `Dashboard.tsx` | `/` | `/` | Core | Home | Híbrido | KPIs e Atalhos | Todos |
 | `Perfil.tsx` | `/perfil` | `/perfil` | Core | Eu | Membro | Editar Dados | Logado |
 | `MinhaFamilia.tsx` (`FamilyWallet.tsx`) | `/perfil/familia` | `/perfil/familia` | Core | Família | Membro | Gerir Dependentes | Logado |
 | **PESSOAS (CRM)** | | | | | | | |
@@ -50,6 +50,7 @@
 | `financas/Reembolsos.tsx` | `/financas/reembolsos` | `/financas/reembolsos` | Finanças | Processo | Híbrido | Solicitar/Aprovar | Lider/Tesoureiro |
 | `financas/DRE.tsx` | `/financas/dre` | `/financas/dre` | Finanças | Relatório | Admin | Relatório Gerencial | Conselho |
 | `financas/DashboardOfertas.tsx` | `/financas/dashboard-ofertas` | `/financas/ofertas (sugestão)` | Finanças | Receita | Admin | Conferência Culto | Tesouraria |
+| `financas/ContasManutencao.tsx` | `/financas/contas` | `/financas/contas` | Finanças | Manutenção | Admin | Gerir Contas Bancárias/Físicas | Tesouraria |
 | `financas/Projecao.tsx` | `/financas/projecao` | `/financas/projecao` | Finanças | Planejamento | Admin | Orçamento | Tesouraria |
 | **KIDS & CHECK-IN** | | | | | | | |
 | `Kids.tsx` | `/kids` | `/kids` | Kids | Gestão | Admin | Visão Geral | Lider Kids |

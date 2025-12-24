@@ -440,7 +440,95 @@ Use quando o pagamento foi feito por engano mas o fato gerador é válido:
 
 > **Dica**: Estornos são auditados e registrados em log. Use com cautela e sempre informe uma justificativa clara.
 
-### 4.10 Visualizando o DRE (Demonstrativo de Resultado)
+### 4.10 Manutenção de Cadastros Financeiros
+
+#### 4.10.1 Bases Ministeriais
+
+Gerencie as grandes áreas de atuação da igreja:
+
+1. Acesse **Finanças > Manutenção > Bases Ministeriais**
+2. Clique em **"+ Nova Base"** para criar
+3. Preencha:
+   - **Título**: Nome da base (ex: "Base de Adoração")
+   - **Descrição**: Descrição opcional
+4. Use a busca para filtrar bases existentes
+5. Edite ou remova conforme necessário
+
+#### 4.10.2 Categorias e Subcategorias
+
+Organize o plano de contas por tipo de movimentação:
+
+1. Acesse **Finanças > Manutenção > Plano de Contas**
+2. Escolha a aba **Entradas** ou **Saídas**
+3. Para criar categoria:
+   - Clique em **"+ Nova Categoria"**
+   - Preencha nome e tipo (fixo pela aba atual)
+4. Para criar subcategoria:
+   - Clique no botão **"+ Sub"** ao lado da categoria pai
+   - Preencha o nome
+5. Expanda/recolha categorias com o ícone de seta
+6. Use a busca para localizar rapidamente
+
+**Exemplos de estrutura:**
+- **Entradas**: Dízimos > Dízimo Mensal, Ofertas > Oferta de Missões
+- **Saídas**: Pessoal > Salários, Infraestrutura > Aluguel
+
+#### 4.10.3 Centros de Custo
+
+Defina unidades orçamentárias e projetos:
+
+1. Acesse **Finanças > Manutenção > Centros de Custo**
+2. Clique em **"+ Novo"**
+3. Preencha:
+   - **Código**: Identificador opcional (ex: "CC001")
+   - **Nome**: Nome do centro (ex: "Projeto Missões África")
+4. Use a busca por código ou nome
+
+#### 4.10.4 Formas de Pagamento
+
+Configure os meios aceitos pela igreja:
+
+1. Acesse **Finanças > Manutenção > Formas de Pagamento**
+2. Clique em **"+ Nova Forma"**
+3. Preencha o nome (ex: "PIX", "Cartão de Crédito")
+4. Use os botões para:
+   - **Ativar/Desativar**: Habilita ou desabilita temporariamente
+   - **Editar**: Altera o nome
+   - **Excluir**: Remove permanentemente (só se não houver transações)
+
+#### 4.10.5 Fornecedores e Parceiros
+
+Cadastre prestadores de serviço:
+
+1. Acesse **Finanças > Manutenção > Fornecedores**
+2. Clique em **"+ Novo Fornecedor"**
+3. Preencha:
+   - **Nome**: Nome fantasia ou nome da pessoa
+   - **Razão Social**: Razão social (opcional)
+   - **CNPJ/CPF**: Documento (opcional)
+   - **Telefone**: Contato (opcional)
+   - **Email**: Email (opcional)
+4. Use a busca para localizar por nome ou documento
+
+#### 4.10.6 Contas Bancárias e Caixas
+
+Gerencie contas onde o dinheiro transita:
+
+1. Acesse **Finanças > Manutenção > Contas**
+2. Clique em **"+ Nova Conta"**
+3. Selecione o tipo:
+   - **Bancária**: Conta em banco
+   - **Física**: Caixa físico ou cofre
+   - **Virtual**: Carteiras digitais
+4. Preencha os dados conforme o tipo
+5. O saldo atual é calculado automaticamente
+6. **⚠️ Atenção**: Contas com movimentações não podem ser excluídas (apenas desativadas)
+
+> **Dica**: Configure todas as categorias, fornecedores e contas antes de lançar transações para evitar inconsistências.
+
+---
+
+### 4.11 Visualizando o DRE (Demonstrativo de Resultado)
 
 1. Acesse **Finanças > Painéis > DRE**
 2. Selecione o **ano** desejado

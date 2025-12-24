@@ -82,6 +82,17 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 ### Objetivo do Módulo
 Prover controle financeiro completo e transparente para igrejas, separando claramente os conceitos de **Fato Gerador**, **Fluxo de Caixa** e **DRE** para garantir relatórios contábeis precisos e rastreabilidade fiscal. O sistema permite gestão de receitas, despesas, reembolsos e relatórios gerenciais sem perder a integridade contábil.
 
+### 2.1 Telas de Manutenção (Refatoradas em Dez/2024)
+As telas de manutenção financeira foram modernizadas com layout tabular consistente:
+- **Bases Ministeriais** (`BasesMinisteriais.tsx`): Gestão de grandes áreas de atuação com busca e edição rápida
+- **Categorias Financeiras** (`Categorias.tsx`): Plano de contas com árvore expansível de categorias e subcategorias, separadas por entrada/saída
+- **Centros de Custo** (`CentrosCusto.tsx`): Unidades orçamentárias com código opcional
+- **Formas de Pagamento** (`FormasPagamento.tsx`): Meios de pagamento aceitos com ativação/desativação
+- **Fornecedores** (`Fornecedores.tsx`): Cadastro de prestadores e parceiros com CNPJ/CPF e contatos
+- **Contas Bancárias** (`ContasManutencao.tsx`): Gestão de contas bancárias e caixas físicos, com proteção contra exclusão de contas com movimentações
+
+**Padrão de UX:** Todas as telas seguem modelo de card com tabela, busca integrada no header, botões de ação alinhados à direita e feedback visual para operações vazias.
+
 ### Conceitos Fundamentais
 
 #### Fato Gerador (Competência)

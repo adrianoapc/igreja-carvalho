@@ -10,6 +10,21 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 🔧 Refatoração de Telas Financeiras e Navegação (24 de Dez/2025)
+- **Modernização de UX financeira**: Telas `BasesMinisteriais`, `Categorias`, `CentrosCusto`, `FormasPagamento` e `Fornecedores` refatoradas com layout tabular consistente, busca integrada e cards minimalistas
+- **Nova tela de Manutenção de Contas**: `ContasManutencao.tsx` permite gestão de contas bancárias e físicas com validação de movimentações antes da exclusão
+- **Modernização Admin**: `Chatbots.tsx` e `Webhooks.tsx` com nova interface compacta e agrupamento visual de configurações
+- **Breadcrumb navegacional**: Novo componente `AppBreadcrumb.tsx` com tradução de rotas e proteção contra links inválidos (rotas como `/admin` não são clicáveis)
+- **Correção de redirects de autenticação**: Todos os redirects de `/dashboard` corrigidos para `/` (rota real do Dashboard), evitando 404 após login
+- **Logs de diagnóstico**: Console logs adicionados em `FormasPagamento`, `ContasManutencao` e `Categorias` para depuração de dados vazios
+- **Correção de AuthGate**: Agora redireciona para `/auth` quando não há sessão ativa, eliminando comportamento de "auto-login" fantasma
+
+**Impacto no usuário:** Experiência mais consistente no módulo financeiro, navegação breadcrumb clara, login funciona corretamente sem 404s.
+
+**Módulos afetados:** Financeiro (6 telas), Admin (2 telas), Auth (3 arquivos), Layout (breadcrumb)
+
+---
+
 #### 🧭 Agendamento Pastoral e Identidade do Chatbot (23 de Dez/2025)
 - **Wizard de agendamento**: Etapa "Pessoa" com autocomplete de membros/visitantes, deduplicação por telefone e criação automática de lead quando necessário; grava `pessoa_id` ou `visitante_id`, `gravidade`, `data_agendamento` e `local_atendimento`
 - **Bloqueio de conflitos**: Slots de 30min com seleção múltipla, respeitando compromissos existentes em `atendimentos_pastorais` e na nova tabela `agenda_pastoral` (compromissos administrativos do pastor)
