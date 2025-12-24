@@ -30,14 +30,48 @@ export default function AtencaoPastoralWidget() {
         return [];
       }
 
-      const { data, error } = await supabase.rpc("get_ovelhas_em_risco");
-      if (error) {
-        console.error('Erro ao buscar ovelhas em risco:', error);
+      try {
+        // Tentar usar a RPC se disponível
+        const { data, error } = await supabase.rpc("get_ovelhas_em_risco");
+        if (error) {
+          console.warn('RPC get_ovelhas_em_risco indisponível, usando fallback:', error);
+          // Fallback: Buscar sentimentos recentes com gravidade alta
+          const { data: sentimentos, error: sentimentoError } = await supabase
+            .from('sentimentos_membros')
+            .select(`
+              id,
+              pessoa_id,
+              tipo,
+              created_at,
+              profiles!sentimentos_membros_pessoa_id_fkey(id, nome, avatar_url, telefone)
+            `)
+            .in('tipo', ['angustiado', 'triste', 'sozinho', 'com_medo', 'com_pouca_fe'])
+            .order('created_at', { ascending: false })
+            .limit(10);
+          
+          if (sentimentoError) {
+            console.error('Erro ao buscar sentimentos:', sentimentoError);
+            return [];
+          }
+
+          return (sentimentos || []).map((s: any) => ({
+            id: s.id,
+            nome: s.profiles?.nome || 'Desconhecido',
+            avatar_url: s.profiles?.avatar_url,
+            telefone: s.profiles?.telefone,
+            tipo_risco: "sentimento",
+            detalhe: s.tipo.replace(/_/g, ' '),
+            gravidade: 8,
+          }));
+        }
+
+        return (data as OvelhaEmRisco[] || [])
+          .sort((a, b) => b.gravidade - a.gravidade)
+          .slice(0, 10);
+      } catch (err) {
+        console.error('Erro inesperado ao buscar ovelhas em risco:', err);
         return [];
       }
-      return (data as OvelhaEmRisco[] || [])
-        .sort((a, b) => b.gravidade - a.gravidade)
-        .slice(0, 10);
     },
     retry: false,
   });
