@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, AlertCircle, Loader2, RotateCcw, CheckCircle2, XCircle, Users } from 'lucide-react';
+import { Shield, AlertCircle, Loader2, RotateCcw, CheckCircle2, XCircle, Users, History } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ToastAction } from '@/components/ui/toast';
 import { useToast } from '@/hooks/use-toast';
+import { PermissionsHistoryTab } from '@/components/admin/PermissionsHistoryTab';
 
 // Tipos baseados nas tabelas do Supabase
 interface AppRole {
@@ -39,6 +40,7 @@ export default function AdminPermissions() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeMainTab, setActiveMainTab] = useState<'matrix' | 'history'>('matrix');
 
   // Estados de Dados
   const [roles, setRoles] = useState<AppRole[]>([]);
@@ -213,7 +215,7 @@ export default function AdminPermissions() {
           changes: PendingChange[],
           rId: number,
           pId: number
-        ) => {
+        ): PendingChange[] => {
           const filtered = changes.filter(
             (c) => !(c.roleId === rId && c.permissionId === pId)
           );
@@ -223,8 +225,8 @@ export default function AdminPermissions() {
           const nextHas = next.some(
             (p) => p.role_id === rId && p.permission_id === pId
           );
-          if (originalHas && !nextHas) return [...filtered, { roleId: rId, permissionId: pId, action: 'remove' }];
-          if (!originalHas && nextHas) return [...filtered, { roleId: rId, permissionId: pId, action: 'add' }];
+          if (originalHas && !nextHas) return [...filtered, { roleId: rId, permissionId: pId, action: 'remove' as const }];
+          if (!originalHas && nextHas) return [...filtered, { roleId: rId, permissionId: pId, action: 'add' as const }];
           return filtered;
         };
 
@@ -319,12 +321,32 @@ export default function AdminPermissions() {
     return map;
   }, [pendingChanges, permissions, selectedRoleId, roles, modules]);
 
-  // Função para salvar mudanças em batch
+  // Gerar UUID v4 para request_id
+  const generateUUID = () => {
+    return crypto.randomUUID();
+  };
+
+  // Função para salvar mudanças em batch (com auditoria)
   const handleSaveChanges = async () => {
     if (pendingChanges.length === 0 || saving) return;
     
     try {
       setSaving(true);
+      
+      // Gerar request_id único para agrupar as alterações
+      const requestId = generateUUID();
+      
+      // Definir contexto de auditoria via RPC
+      const { error: contextError } = await supabase.rpc('set_audit_context', {
+        p_request_id: requestId,
+        p_source: 'admin-ui'
+      });
+      
+      if (contextError) {
+        console.warn('Aviso: não foi possível definir contexto de auditoria:', contextError);
+        // Continua mesmo se falhar (auditoria ficará sem request_id)
+      }
+      
       // Snapshot anterior para possível desfazer
       const previousSnapshot = [...originalMatrix];
       
@@ -368,7 +390,7 @@ export default function AdminPermissions() {
       
       const t = toast({
         title: "Salvo com sucesso",
-        description: `${toAdd.length + toRemove.length} permissão(ões) atualizada(s).`,
+        description: `${toAdd.length + toRemove.length} permissão(ões) atualizada(s). ID: ${requestId.slice(0, 8)}...`,
         action: (
           <ToastAction altText="Desfazer" onClick={() => { handleUndoLastSave(); t.dismiss(); }}>
             Desfazer
@@ -398,6 +420,14 @@ export default function AdminPermissions() {
     if (!lastSavedMatrix || saving) return;
     try {
       setSaving(true);
+      
+      // Gerar request_id para undo também
+      const requestId = generateUUID();
+      await supabase.rpc('set_audit_context', {
+        p_request_id: requestId,
+        p_source: 'admin-ui-undo'
+      });
+      
       // Estado atual salvo (originalMatrix) deve ser revertido para lastSavedMatrix
       const current = originalMatrix;
       const previous = lastSavedMatrix;
@@ -509,281 +539,312 @@ export default function AdminPermissions() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Botão Salvar (Primário) */}
-          <Button 
-            onClick={handleSaveChanges}
-            disabled={pendingChanges.length === 0 || saving}
-            className="min-w-max"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              `Salvar alterações (${pendingChanges.length})`
-            )}
-          </Button>
-          
-          {/* Botão Descartar (Secundário) */}
-          {pendingChanges.length > 0 && (
-            <Button 
-              variant="outline"
-              onClick={handleDiscardChanges}
-              disabled={saving}
-              className="min-w-max"
+          {/* Abas principais: Matriz / Histórico */}
+          <div className="flex bg-muted rounded-lg p-1 mr-2">
+            <Button
+              variant={activeMainTab === 'matrix' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveMainTab('matrix')}
+              className="gap-1.5"
             >
-              Descartar
+              <Shield className="h-4 w-4" />
+              Matriz
             </Button>
+            <Button
+              variant={activeMainTab === 'history' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveMainTab('history')}
+              className="gap-1.5"
+            >
+              <History className="h-4 w-4" />
+              Histórico
+            </Button>
+          </div>
+
+          {activeMainTab === 'matrix' && (
+            <>
+              {/* Botão Salvar (Primário) */}
+              <Button 
+                onClick={handleSaveChanges}
+                disabled={pendingChanges.length === 0 || saving}
+                className="min-w-max"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  `Salvar alterações (${pendingChanges.length})`
+                )}
+              </Button>
+              
+              {/* Botão Descartar (Secundário) */}
+              {pendingChanges.length > 0 && (
+                <Button 
+                  variant="outline"
+                  onClick={handleDiscardChanges}
+                  disabled={saving}
+                  className="min-w-max"
+                >
+                  Descartar
+                </Button>
+              )}
+              
+              {/* Botão Recarregar dados */}
+              <Button 
+                variant="ghost"
+                size="sm"
+                onClick={fetchData}
+                disabled={saving}
+                title="Recarregar dados do servidor"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </>
           )}
-          
-          {/* Botão Recarregar dados */}
-          <Button 
-            variant="ghost"
-            size="sm"
-            onClick={fetchData}
-            disabled={saving}
-            title="Recarregar dados do servidor"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
-      <Card className="border shadow-sm overflow-hidden">
-        <Tabs defaultValue={modules[0] || 'system'} className="w-full">
-            
-            {/* Lista de Abas (Módulos) - Com scroll horizontal em mobile */}
-            <div className="px-3 sm:px-4 pt-4 pb-2 border-b bg-muted/5">
-              <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-                <TabsList className="inline-flex h-9 items-center justify-start gap-1 bg-transparent p-0 w-max sm:w-auto">
-                  {modules.map(modKey => (
-                    <TabsTrigger 
-                      key={modKey} 
-                      value={modKey}
-                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-1.5 text-xs sm:text-sm whitespace-nowrap transition-all inline-flex items-center gap-2"
-                    >
-                      {modKey === 'finance' ? '💰 Financeiro' : 
-                       modKey === 'members' ? '👥 Membros' : 
-                       modKey === 'worship' ? '🎵 Cultos' : 
-                       modKey === 'kids' ? '👶 Kids' :
-                       modKey === 'system' ? '⚙️ Sistema' : modKey}
-                      {pendingCountsByModule[modKey] > 0 && (
-                        <Badge 
-                          variant="outline" 
-                          className="h-5 px-1.5 text-[10px] bg-amber-100 text-amber-700 border-amber-200"
-                          title={`${pendingCountsByModule[modKey]} alteração(ões) pendente(s) neste módulo`}
-                        >
-                          {pendingCountsByModule[modKey]}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+      {/* Conteúdo baseado na aba principal */}
+      {activeMainTab === 'history' ? (
+        <PermissionsHistoryTab roles={roles} permissions={permissions} />
+      ) : (
+        <Card className="border shadow-sm overflow-hidden">
+          <Tabs defaultValue={modules[0] || 'system'} className="w-full">
+              
+              {/* Lista de Abas (Módulos) - Com scroll horizontal em mobile */}
+              <div className="px-3 sm:px-4 pt-4 pb-2 border-b bg-muted/5">
+                <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+                  <TabsList className="inline-flex h-9 items-center justify-start gap-1 bg-transparent p-0 w-max sm:w-auto">
+                    {modules.map(modKey => (
+                      <TabsTrigger 
+                        key={modKey} 
+                        value={modKey}
+                        className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-1.5 text-xs sm:text-sm whitespace-nowrap transition-all inline-flex items-center gap-2"
+                      >
+                        {modKey === 'finance' ? '💰 Financeiro' : 
+                         modKey === 'members' ? '👥 Membros' : 
+                         modKey === 'worship' ? '🎵 Cultos' : 
+                         modKey === 'kids' ? '👶 Kids' :
+                         modKey === 'system' ? '⚙️ Sistema' : modKey}
+                        {pendingCountsByModule[modKey] > 0 && (
+                          <Badge 
+                            variant="outline" 
+                            className="h-5 px-1.5 text-[10px] bg-amber-100 text-amber-700 border-amber-200"
+                            title={`${pendingCountsByModule[modKey]} alteração(ões) pendente(s) neste módulo`}
+                          >
+                            {pendingCountsByModule[modKey]}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
               </div>
-            </div>
 
-            {/* Barra de filtros */}
-            <div className="px-3 sm:px-4 py-2 border-b bg-muted/10 flex flex-wrap items-center gap-2">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nome, chave ou descrição"
-                className="flex-1 min-w-[200px] rounded-md border bg-background px-3 py-2 text-sm"
-              />
-              <select
-                value={selectedRoleId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedRoleId(val === 'all' ? 'all' : Number(val));
-                }}
-                className="rounded-md border bg-background px-3 py-2 text-sm"
-                title="Filtrar por cargo"
-              >
-                <option value="all">Todos os cargos</option>
-                {roles.map(r => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
-              <select
-                value={reviewMode}
-                onChange={(e) => setReviewMode(e.target.value as 'all' | 'enabledOnly' | 'pendingOnly')}
-                className="rounded-md border bg-background px-3 py-2 text-sm"
-                title="Modo de revisão"
-              >
-                <option value="all">Todas as permissões</option>
-                <option value="enabledOnly">Somente ativadas</option>
-                <option value="pendingOnly">Somente pendentes</option>
-              </select>
-            </div>
+              {/* Barra de filtros */}
+              <div className="px-3 sm:px-4 py-2 border-b bg-muted/10 flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar por nome, chave ou descrição"
+                  className="flex-1 min-w-[200px] rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <select
+                  value={selectedRoleId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedRoleId(val === 'all' ? 'all' : Number(val));
+                  }}
+                  className="rounded-md border bg-background px-3 py-2 text-sm"
+                  title="Filtrar por cargo"
+                >
+                  <option value="all">Todos os cargos</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={reviewMode}
+                  onChange={(e) => setReviewMode(e.target.value as 'all' | 'enabledOnly' | 'pendingOnly')}
+                  className="rounded-md border bg-background px-3 py-2 text-sm"
+                  title="Modo de revisão"
+                >
+                  <option value="all">Todas as permissões</option>
+                  <option value="enabledOnly">Somente ativadas</option>
+                  <option value="pendingOnly">Somente pendentes</option>
+                </select>
+              </div>
 
-            {/* Conteúdo das Abas */}
-            {modules.map(moduleKey => (
-              <TabsContent key={moduleKey} value={moduleKey} className="m-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left border-collapse min-w-[700px]">
-                    <thead className="bg-muted/50 text-muted-foreground uppercase font-medium text-[10px] sm:text-xs">
-                      <tr>
-                        <th className="px-3 sm:px-6 py-3 w-[200px] sm:w-[300px] sticky left-0 bg-muted/50 z-10">Permissão</th>
-                        {(selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId)).map(role => (
-                          <th key={role.id} className="px-2 sm:px-4 py-3 text-center min-w-[100px]">
-                            <div className="flex flex-col items-center gap-1">
-                              <Badge 
-                                variant={role.name === 'admin' ? "default" : "outline"} 
-                                className="capitalize whitespace-nowrap text-[10px] h-5 px-1.5"
-                              >
-                                {role.name}
-                              </Badge>
-                              <div className="flex items-center gap-1 mt-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  disabled={role.name === 'admin'}
-                                  title="Ativar tudo neste módulo para este cargo"
-                                  onClick={() => handleBulkToggleModule(role.id, moduleKey, 'activate')}
+              {/* Conteúdo das Abas */}
+              {modules.map(moduleKey => (
+                <TabsContent key={moduleKey} value={moduleKey} className="m-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left border-collapse min-w-[700px]">
+                      <thead className="bg-muted/50 text-muted-foreground uppercase font-medium text-[10px] sm:text-xs">
+                        <tr>
+                          <th className="px-3 sm:px-6 py-3 w-[200px] sm:w-[300px] sticky left-0 bg-muted/50 z-10">Permissão</th>
+                          {(selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId)).map(role => (
+                            <th key={role.id} className="px-2 sm:px-4 py-3 text-center min-w-[100px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <Badge 
+                                  variant={role.name === 'admin' ? "default" : "outline"} 
+                                  className="capitalize whitespace-nowrap text-[10px] h-5 px-1.5"
                                 >
-                                  <CheckCircle2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  disabled={role.name === 'admin'}
-                                  title="Desativar tudo neste módulo para este cargo"
-                                  onClick={() => handleBulkToggleModule(role.id, moduleKey, 'deactivate')}
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
+                                  {role.name}
+                                </Badge>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    disabled={role.name === 'admin'}
+                                    title="Ativar tudo neste módulo para este cargo"
+                                    onClick={() => handleBulkToggleModule(role.id, moduleKey, 'activate')}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    disabled={role.name === 'admin'}
+                                    title="Desativar tudo neste módulo para este cargo"
+                                    onClick={() => handleBulkToggleModule(role.id, moduleKey, 'deactivate')}
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/50">
-                      {groupedPermissions[moduleKey]
-                        .filter((perm) => {
-                          // Filtro por busca
-                          if (searchTerm) {
-                            const q = searchTerm.toLowerCase();
-                            const matches = (
-                              perm.name.toLowerCase().includes(q) ||
-                              perm.key.toLowerCase().includes(q) ||
-                              (perm.description ? perm.description.toLowerCase().includes(q) : false)
-                            );
-                            if (!matches) return false;
-                          }
-
-                          // Filtro por reviewMode
-                          const targetRoles = (selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId));
-                          if (reviewMode === 'enabledOnly') {
-                            const anyOn = targetRoles.some(r => getEffectiveState(r.id, perm.id));
-                            if (!anyOn) return false;
-                          } else if (reviewMode === 'pendingOnly') {
-                            const anyPending = targetRoles.some(r => isCellPending(r.id, perm.id));
-                            if (!anyPending) return false;
-                          }
-
-                          return true;
-                        })
-                        .map((perm) => (
-                        <tr key={perm.id} className="hover:bg-muted/30 transition-colors group">
-                          <td className="px-3 sm:px-6 py-3 sticky left-0 bg-background group-hover:bg-muted/30 z-10">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex flex-col gap-0.5">
-                                <span className="font-medium text-foreground text-xs sm:text-sm line-clamp-2">{perm.name}</span>
-                                <span className="text-[10px] text-muted-foreground font-mono hidden sm:block">{perm.key}</span>
-                                {perm.description && (
-                                  <span className="text-[10px] text-muted-foreground/70 line-clamp-1 hidden md:block">
-                                    {perm.description}
-                                  </span>
-                                )}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                title="Aplicar a todos os cargos (exceto admin)"
-                                onClick={() => {
-                                  const targetRoles = (selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId))
-                                    .filter(r => r.name !== 'admin');
-                                  const allActive = targetRoles.every(r => getEffectiveState(r.id, perm.id));
-                                  if (allActive) {
-                                    // Desativar para todos
-                                    targetRoles.forEach(r => {
-                                      if (getEffectiveState(r.id, perm.id)) {
-                                        handleToggle(r.id, perm.id);
-                                      }
-                                    });
-                                  } else {
-                                    // Ativar para todos
-                                    targetRoles.forEach(r => {
-                                      if (!getEffectiveState(r.id, perm.id)) {
-                                        handleToggle(r.id, perm.id);
-                                      }
-                                    });
-                                  }
-                                }}
-                              >
-                                <Users className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                          {(selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId)).map(role => {
-                            const isActive = getEffectiveState(role.id, perm.id);
-                            const pending = isCellPending(role.id, perm.id);
-                            const isAdmin = role.name === 'admin';
-                            
-                            return (
-                              <td key={role.id} className="px-2 sm:px-4 py-3 text-center">
-                                <button
-                                  onClick={() => handleToggle(role.id, perm.id)}
-                                  disabled={isAdmin}
-                                  className={`
-                                    relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-                                    ${isAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                                    ${isActive || isAdmin ? 'bg-primary' : 'bg-input'}
-                                    ${pending ? 'ring-2 ring-amber-500' : ''}
-                                  `}
-                                  title={pending ? 'Alteração pendente' : undefined}
-                                  aria-label={`${isActive ? 'Desativar' : 'Ativar'} permissão ${perm.name} para ${role.name}`}
-                                >
-                                  <span
-                                    className={`
-                                      inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition-transform duration-200
-                                      ${isActive || isAdmin ? 'translate-x-6' : 'translate-x-1'}
-                                    `}
-                                  />
-                                </button>
-                              </td>
-                            );
-                          })}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {groupedPermissions[moduleKey]
+                          .filter((perm) => {
+                            // Filtro por busca
+                            if (searchTerm) {
+                              const q = searchTerm.toLowerCase();
+                              const matches = (
+                                perm.name.toLowerCase().includes(q) ||
+                                perm.key.toLowerCase().includes(q) ||
+                                (perm.description ? perm.description.toLowerCase().includes(q) : false)
+                              );
+                              if (!matches) return false;
+                            }
 
-                {/* Aviso de Rodapé */}
-                <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-100 dark:border-amber-900/50 flex items-start gap-2 sm:gap-3 text-xs sm:text-sm text-amber-700 dark:text-amber-400">
-                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <span>
-                      Alterações ficam pendentes até você clicar em <strong>Salvar alterações</strong>.
-                    </span>
-                    {pendingChanges.length > 0 && (
-                      <span>
-                        Você tem <strong>{pendingChanges.length}</strong> alterações pendentes.
-                      </span>
-                    )}
+                            // Filtro por reviewMode
+                            const targetRoles = (selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId));
+                            if (reviewMode === 'enabledOnly') {
+                              const anyOn = targetRoles.some(r => getEffectiveState(r.id, perm.id));
+                              if (!anyOn) return false;
+                            } else if (reviewMode === 'pendingOnly') {
+                              const anyPending = targetRoles.some(r => isCellPending(r.id, perm.id));
+                              if (!anyPending) return false;
+                            }
+
+                            return true;
+                          })
+                          .map((perm) => (
+                          <tr key={perm.id} className="hover:bg-muted/30 transition-colors group">
+                            <td className="px-3 sm:px-6 py-3 sticky left-0 bg-background group-hover:bg-muted/30 z-10">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-medium text-foreground text-xs sm:text-sm line-clamp-2">{perm.name}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono hidden sm:block">{perm.key}</span>
+                                  {perm.description && (
+                                    <span className="text-[10px] text-muted-foreground/70 line-clamp-1 hidden md:block">
+                                      {perm.description}
+                                    </span>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  title="Aplicar a todos os cargos (exceto admin)"
+                                  onClick={() => {
+                                    const targetRoles = (selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId))
+                                      .filter(r => r.name !== 'admin');
+                                    const allActive = targetRoles.every(r => getEffectiveState(r.id, perm.id));
+                                    if (allActive) {
+                                      // Desativar para todos
+                                      targetRoles.forEach(r => {
+                                        if (getEffectiveState(r.id, perm.id)) {
+                                          handleToggle(r.id, perm.id);
+                                        }
+                                      });
+                                    } else {
+                                      // Ativar para todos
+                                      targetRoles.forEach(r => {
+                                        if (!getEffectiveState(r.id, perm.id)) {
+                                          handleToggle(r.id, perm.id);
+                                        }
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Users className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                            {(selectedRoleId === 'all' ? roles : roles.filter(r => r.id === selectedRoleId)).map(role => {
+                              const isActive = getEffectiveState(role.id, perm.id);
+                              const pending = isCellPending(role.id, perm.id);
+                              const isAdmin = role.name === 'admin';
+                              
+                              return (
+                                <td key={role.id} className="px-2 sm:px-4 py-3 text-center">
+                                  <button
+                                    onClick={() => handleToggle(role.id, perm.id)}
+                                    disabled={isAdmin}
+                                    className={`
+                                      relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                                      ${isAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                                      ${isActive || isAdmin ? 'bg-primary' : 'bg-input'}
+                                      ${pending ? 'ring-2 ring-amber-500' : ''}
+                                    `}
+                                    title={pending ? 'Alteração pendente' : undefined}
+                                    aria-label={`${isActive ? 'Desativar' : 'Ativar'} permissão ${perm.name} para ${role.name}`}
+                                  >
+                                    <span
+                                      className={`
+                                        inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition-transform duration-200
+                                        ${isActive || isAdmin ? 'translate-x-6' : 'translate-x-1'}
+                                      `}
+                                    />
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </Card>
+
+                  {/* Aviso de Rodapé */}
+                  <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-100 dark:border-amber-900/50 flex items-start gap-2 sm:gap-3 text-xs sm:text-sm text-amber-700 dark:text-amber-400">
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span>
+                        Alterações ficam pendentes até você clicar em <strong>Salvar alterações</strong>.
+                      </span>
+                      {pendingChanges.length > 0 && (
+                        <span>
+                          Você tem <strong>{pendingChanges.length}</strong> alterações pendentes.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          </Card>
+      )}
     </div>
   );
 }

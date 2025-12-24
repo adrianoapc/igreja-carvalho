@@ -3335,6 +3335,48 @@ export type Database = {
           },
         ]
       }
+      role_permissions_audit: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          new_row: Json | null
+          old_row: Json | null
+          permission_id: number
+          request_id: string | null
+          role_id: number
+          source: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_row?: Json | null
+          old_row?: Json | null
+          permission_id: number
+          request_id?: string | null
+          role_id: number
+          source?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_row?: Json | null
+          old_row?: Json | null
+          permission_id?: number
+          request_id?: string | null
+          role_id?: number
+          source?: string | null
+        }
+        Relationships: []
+      }
       salas: {
         Row: {
           ativo: boolean | null
@@ -4658,6 +4700,10 @@ export type Database = {
           p_title: string
           p_type: string
         }
+        Returns: undefined
+      }
+      set_audit_context: {
+        Args: { p_request_id: string; p_source?: string }
         Returns: undefined
       }
     }
