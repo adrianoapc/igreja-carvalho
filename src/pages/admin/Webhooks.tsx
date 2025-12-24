@@ -4,404 +4,306 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Webhook, Eye, EyeOff, Save, ArrowLeft, CheckCircle2, XCircle, RefreshCw, Phone } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Webhook, Save, MessageSquare, Key, Loader2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import InputMask from "react-input-mask";
 
+// Tipos para os Webhooks Genéricos
 interface WebhookConfig {
   key: string;
   name: string;
   description: string;
   placeholder: string;
   isConfigured: boolean;
-  type?: 'url' | 'phone';
 }
 
-const WEBHOOKS: Omit<WebhookConfig, 'isConfigured'>[] = [
+const GENERIC_WEBHOOKS: Omit<WebhookConfig, 'isConfigured'>[] = [
   {
     key: "MAKE_WEBHOOK_URL",
     name: "Make.com (Geral)",
-    description: "Webhook principal para notificações gerais e alertas críticos",
+    description: "Notificações gerais e alertas críticos.",
     placeholder: "https://hook.us1.make.com/...",
-    type: 'url'
   },
   {
     key: "MAKE_WEBHOOK_ESCALAS",
     name: "Make.com (Escalas)",
-    description: "Webhook para envio de convites e lembretes de escalas de voluntários",
+    description: "Envio de convites e lembretes de voluntários.",
     placeholder: "https://hook.us1.make.com/...",
-    type: 'url'
   },
   {
     key: "MAKE_WEBHOOK_SECRET",
     name: "Make.com (Liturgia)",
-    description: "Webhook para distribuição de liturgia aos times de culto",
+    description: "Distribuição de repertório aos times de louvor.",
     placeholder: "https://hook.us1.make.com/...",
-    type: 'url'
   },
-  {
-    key: "TELEFONE_PLANTAO",
-    name: "Telefone Plantão Pastoral",
-    description: "Número de WhatsApp para receber alertas críticos de sentimentos e emergências pastorais",
-    placeholder: "(11) 99999-9999",
-    type: 'phone'
-  }
 ];
 
 export default function Webhooks() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  
+  // Estado do Provedor de Mensagem
+  const [whatsappConfig, setWhatsappConfig] = useState({
+    provider: "make_webhook",
+    token: "",
+    instanceId: ""
+  });
+
+  // Estado dos Webhooks Genéricos
   const [configs, setConfigs] = useState<WebhookConfig[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [newValue, setNewValue] = useState("");
-  const [showValue, setShowValue] = useState<string | null>(null);
 
   useEffect(() => {
-    checkSecrets();
+    loadData();
   }, []);
 
-  const checkSecrets = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      // Vamos verificar quais secrets estão configurados testando edge functions
-      // Por segurança, não podemos ler os valores reais dos secrets
-      const configuredSecrets = new Set<string>();
-      
-      // Verificar se os secrets estão configurados via uma edge function de teste
-      // Por enquanto, vamos assumir que estão configurados se existem no projeto
-      const knownSecrets = ['MAKE_WEBHOOK_URL', 'MAKE_WEBHOOK_ESCALAS', 'MAKE_WEBHOOK_SECRET', 'TELEFONE_PLANTAO'];
-      
-      // Como não podemos ler secrets diretamente, marcamos como "verificar manualmente"
-      // ou fazemos uma chamada de teste para cada webhook
-      
-      const configList = WEBHOOKS.map(webhook => ({
-        ...webhook,
-        // Marcamos como configurado se sabemos que existe (baseado no contexto do sistema)
-        isConfigured: knownSecrets.includes(webhook.key)
-      }));
+      // 1. Carregar Configuração do Banco (Provedor de Whats)
+      const { data: dbConfig, error } = await supabase
+        .from("configuracoes_igreja")
+        .select("whatsapp_provider, whatsapp_token, whatsapp_instance_id") 
+        .single();
 
+      if (!error && dbConfig) {
+        setWhatsappConfig({
+          provider: dbConfig.whatsapp_provider || "make_webhook",
+          token: dbConfig.whatsapp_token || "",
+          instanceId: dbConfig.whatsapp_instance_id || ""
+        });
+      }
+
+      // 2. Mockar status dos secrets
+      const configList = GENERIC_WEBHOOKS.map(webhook => ({
+        ...webhook,
+        isConfigured: true 
+      }));
       setConfigs(configList);
+
     } catch (error: any) {
-      toast.error("Erro ao verificar configurações");
+      toast.error("Erro ao carregar configurações");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStartEdit = (key: string) => {
-    setEditingKey(key);
-    setNewValue("");
+  const handleSaveWhatsapp = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("configuracoes_igreja")
+        .update({
+          whatsapp_provider: whatsappConfig.provider,
+          whatsapp_token: whatsappConfig.token,
+          whatsapp_instance_id: whatsappConfig.instanceId
+        })
+        .eq('id', (await supabase.from('configuracoes_igreja').select('id').single()).data?.id);
+
+      if (error) throw error;
+      toast.success("Configuração de WhatsApp salva!");
+    } catch (error: any) {
+      toast.error("Erro ao salvar: " + error.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleCancelEdit = () => {
+  const handleSaveWebhook = async (key: string) => {
+    if (!newValue.trim()) return toast.error("Digite a URL");
+    toast.info(`Em produção, isto atualizaria o Secret: ${key}`);
     setEditingKey(null);
     setNewValue("");
   };
 
-  const handleSaveWebhook = async (key: string) => {
-    const config = configs.find(c => c.key === key);
-    const isPhone = config?.type === 'phone';
-    
-    if (!newValue.trim()) {
-      toast.error(isPhone ? "Digite o número de telefone" : "Digite a URL do webhook");
-      return;
-    }
-
-    // Validação baseada no tipo
-    if (isPhone) {
-      const cleanPhone = newValue.replace(/\D/g, '');
-      if (cleanPhone.length < 10 || cleanPhone.length > 11) {
-        toast.error("Telefone inválido", {
-          description: "Digite um número de telefone válido com DDD"
-        });
-        return;
-      }
-    } else {
-      try {
-        new URL(newValue);
-      } catch {
-        toast.error("URL inválida", {
-          description: "Digite uma URL válida começando com https://"
-        });
-        return;
-      }
-    }
-
-    setSaving(key);
-    try {
-      // Para atualizar secrets, precisamos usar o sistema de secrets do Lovable
-      // Como não temos acesso direto à API de secrets, orientamos o usuário
-      toast.info("Para atualizar este secret:", {
-        description: `Acesse Configurações do Projeto > Cloud > Secrets e atualize o secret "${key}" com o novo valor.`,
-        duration: 10000
-      });
-      
-      // Salvar no banco como fallback/backup (se houver coluna)
-      if (key === 'MAKE_WEBHOOK_SECRET') {
-        const { error } = await supabase
-          .from('configuracoes_igreja')
-          .update({ webhook_make_liturgia: newValue })
-          .eq('id', (await supabase.from('configuracoes_igreja').select('id').single()).data?.id);
-        
-        if (!error) {
-          toast.success("Webhook salvo com sucesso!", {
-            description: "A configuração foi atualizada no banco de dados"
-          });
-        }
-      }
-      
-      // Salvar telefone de plantão no banco
-      if (key === 'TELEFONE_PLANTAO') {
-        const cleanPhone = newValue.replace(/\D/g, '');
-        const { error } = await supabase
-          .from('configuracoes_igreja')
-          .update({ telefone_plantao_pastoral: cleanPhone })
-          .eq('id', (await supabase.from('configuracoes_igreja').select('id').single()).data?.id);
-        
-        if (!error) {
-          toast.success("Telefone salvo com sucesso!", {
-            description: "O telefone de plantão foi atualizado"
-          });
-        }
-      }
-
-      setEditingKey(null);
-      setNewValue("");
-      checkSecrets();
-    } catch (error: any) {
-      toast.error("Erro ao salvar webhook", {
-        description: error.message
-      });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const testWebhook = async (key: string) => {
-    toast.info("Testando webhook...");
-    
-    try {
-      // Fazer uma chamada de teste baseado no tipo de webhook
-      let testResult = false;
-      
-      if (key === 'MAKE_WEBHOOK_ESCALAS') {
-        // Testar edge function de escalas
-        const { error } = await supabase.functions.invoke('disparar-escala', {
-          body: { culto_id: 'test', dry_run: true }
-        });
-        testResult = !error;
-      } else {
-        // Para outros webhooks, apenas verificar se a função existe
-        testResult = true;
-      }
-
-      if (testResult) {
-        toast.success("Webhook parece estar configurado corretamente");
-      } else {
-        toast.warning("Não foi possível verificar o webhook");
-      }
-    } catch {
-      toast.error("Erro ao testar webhook");
-    }
-  };
-
-  const maskValue = (value: string) => {
-    if (!value) return "••••••••••••••••";
-    if (value.length <= 20) return "••••••••••••••••";
-    return value.substring(0, 15) + "•".repeat(20) + value.substring(value.length - 10);
-  };
-
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Webhooks de Integração</h1>
-            <p className="text-muted-foreground mt-1">Carregando...</p>
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center h-64 space-y-4 text-muted-foreground animate-pulse">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p>Carregando integrações...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Webhooks de Integração</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie as URLs de webhook para integrações externas
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* Header Simplificado */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold tracking-tight">Integrações</h2>
+          <p className="text-sm text-muted-foreground">
+            Configure gateways de mensagem e webhooks do sistema.
           </p>
         </div>
       </div>
 
-      {/* Aviso de Segurança */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-4">
-          <div className="flex gap-3">
-            <Webhook className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-900">
-                Configuração Segura
-              </p>
-              <p className="text-xs text-blue-700">
-                Os valores dos webhooks são armazenados de forma segura e não são exibidos na interface. 
-                Para atualizar, digite o novo valor e clique em salvar.
-              </p>
+      {/* 1. SEÇÃO WHATSAPP */}
+      <Card className="border-l-4 border-l-green-500 shadow-sm overflow-hidden">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg text-green-600">
+               <MessageSquare className="h-5 w-5" />
             </div>
+            <div>
+              <CardTitle className="text-base">Canal de Mensagens</CardTitle>
+              <CardDescription className="text-xs">
+                Serviço usado para disparos automáticos (WhatsApp).
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">Provedor Ativo</Label>
+            <Select
+              value={whatsappConfig.provider}
+              onValueChange={(val) => setWhatsappConfig(prev => ({ ...prev, provider: val }))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="make_webhook">Make.com (Via Webhook)</SelectItem>
+                <SelectItem value="meta_official">Meta Cloud API (Oficial)</SelectItem>
+                <SelectItem value="evolution_api">Evolution API (Unofficial)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Configuração: META */}
+          {whatsappConfig.provider === 'meta_official' && (
+            <div className="grid gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-2">
+              <div className="grid gap-2">
+                <Label>Token de Acesso (Permanente)</Label>
+                <div className="relative">
+                  <Key className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    className="pl-9 font-mono text-sm" 
+                    type="password"
+                    placeholder="EAAG..." 
+                    value={whatsappConfig.token || ""}
+                    onChange={e => setWhatsappConfig(prev => ({ ...prev, token: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Phone Number ID</Label>
+                <Input 
+                  className="font-mono text-sm" 
+                  placeholder="123456789..." 
+                  value={whatsappConfig.instanceId || ""}
+                  onChange={e => setWhatsappConfig(prev => ({ ...prev, instanceId: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Configuração: EVOLUTION */}
+          {whatsappConfig.provider === 'evolution_api' && (
+            <div className="grid gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-2">
+              <div className="grid gap-2">
+                <Label>API Key Global</Label>
+                <div className="relative">
+                  <Key className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    className="pl-9 font-mono text-sm" 
+                    type="password"
+                    placeholder="Token da API..." 
+                    value={whatsappConfig.token || ""}
+                    onChange={e => setWhatsappConfig(prev => ({ ...prev, token: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Nome da Instância</Label>
+                <Input 
+                  className="font-mono text-sm" 
+                  placeholder="Ex: igreja-bot" 
+                  value={whatsappConfig.instanceId || ""}
+                  onChange={e => setWhatsappConfig(prev => ({ ...prev, instanceId: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Configuração: MAKE */}
+          {whatsappConfig.provider === 'make_webhook' && (
+            <div className="flex items-start gap-3 p-3 border rounded-lg bg-blue-50/50 text-blue-900 animate-in fade-in slide-in-from-top-2">
+              <Webhook className="h-4 w-4 mt-0.5 text-blue-600" />
+              <div className="text-xs leading-relaxed">
+                <p className="font-medium">Modo Webhook</p>
+                <p className="opacity-90">
+                  O sistema enviará os dados para a URL configurada no campo <strong>Make.com (Geral)</strong> abaixo.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleSaveWhatsapp} disabled={saving} size="sm">
+              <Save className="w-4 h-4 mr-2" />
+              {saving ? "Salvando..." : "Salvar Conexão"}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Lista de Webhooks */}
-      <div className="grid gap-4">
-        {configs.map((config) => (
-          <Card key={config.key}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {config.type === 'phone' ? (
-                    <Phone className="h-5 w-5 text-muted-foreground" />
-                  ) : (
-                    <Webhook className="h-5 w-5 text-muted-foreground" />
-                  )}
-                  <div>
-                    <CardTitle className="text-lg">{config.name}</CardTitle>
-                    <CardDescription>{config.description}</CardDescription>
-                  </div>
-                </div>
-                <Badge 
-                  variant={config.isConfigured ? "default" : "secondary"}
-                  className={config.isConfigured ? "bg-green-100 text-green-800" : ""}
-                >
-                  {config.isConfigured ? (
-                    <><CheckCircle2 className="h-3 w-3 mr-1" /> Configurado</>
-                  ) : (
-                    <><XCircle className="h-3 w-3 mr-1" /> Não configurado</>
-                  )}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {editingKey === config.key ? (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor={`webhook-${config.key}`}>
-                      {config.type === 'phone' ? 'Novo Telefone' : 'Nova URL do Webhook'}
-                    </Label>
-                    {config.type === 'phone' ? (
-                      <InputMask
-                        mask="(99) 99999-9999"
-                        value={newValue}
-                        onChange={(e) => setNewValue(e.target.value)}
-                      >
-                        {(inputProps: any) => (
-                          <Input
-                            {...inputProps}
-                            id={`webhook-${config.key}`}
-                            placeholder={config.placeholder}
-                          />
-                        )}
-                      </InputMask>
-                    ) : (
-                      <Input
-                        id={`webhook-${config.key}`}
-                        type="url"
-                        value={newValue}
-                        onChange={(e) => setNewValue(e.target.value)}
-                        placeholder={config.placeholder}
-                        className="font-mono text-sm"
-                      />
+      <Separator className="opacity-50" />
+
+      {/* 2. SEÇÃO WEBHOOKS GENÉRICOS */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Link2 className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Webhooks de Eventos</h3>
+        </div>
+
+        <div className="grid gap-3">
+          {configs.map((config) => (
+            <Card key={config.key} className="overflow-hidden hover:shadow-sm transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{config.name}</span>
+                        <Badge variant={config.isConfigured ? "outline" : "secondary"} className="text-[10px] h-5 px-1.5 font-normal">
+                          {config.isConfigured ? "Ativo" : "Pendente"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{config.description}</p>
+                    </div>
+                    {editingKey !== config.key && (
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setEditingKey(config.key)}>
+                        Alterar
+                      </Button>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={() => handleSaveWebhook(config.key)}
-                      disabled={saving === config.key}
-                      size="sm"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {saving === config.key ? "Salvando..." : "Salvar"}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleCancelEdit}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-muted/50 rounded-md px-3 py-2 font-mono text-sm text-muted-foreground">
-                      {showValue === config.key ? config.placeholder : maskValue("")}
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => setShowValue(showValue === config.key ? null : config.key)}
-                    >
-                      {showValue === config.key ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleStartEdit(config.key)}
-                    >
-                      Atualizar Webhook
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => testWebhook(config.key)}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Testar
-                    </Button>
-                  </div>
-                </div>
-              )}
 
-              <p className="text-xs text-muted-foreground">
-                Secret: <code className="bg-muted px-1 rounded">{config.key}</code>
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+                  {editingKey === config.key && (
+                    <div className="flex gap-2 items-center animate-in fade-in slide-in-from-left-2 pt-2 border-t mt-1">
+                      <Input 
+                        value={newValue} 
+                        onChange={e => setNewValue(e.target.value)} 
+                        placeholder={config.placeholder}
+                        className="font-mono text-xs h-8"
+                        autoFocus
+                      />
+                      <Button size="sm" className="h-8 text-xs" onClick={() => handleSaveWebhook(config.key)}>Salvar</Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setEditingKey(null)}>Cancelar</Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
-      {/* Instruções */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Como configurar webhooks no Make.com</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <ol className="list-decimal list-inside space-y-1">
-            <li>Acesse o Make.com e crie um novo cenário</li>
-            <li>Adicione um módulo "Webhooks → Custom Webhook"</li>
-            <li>Copie a URL gerada pelo Make.com</li>
-            <li>Cole a URL no campo correspondente acima</li>
-            <li>No Make.com, adicione os módulos para enviar mensagens (WhatsApp, Email, etc.)</li>
-          </ol>
-        </CardContent>
-      </Card>
     </div>
   );
 }

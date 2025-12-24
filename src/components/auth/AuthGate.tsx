@@ -1,52 +1,60 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { BiometricUnlockScreen } from './BiometricUnlockScreen';
 import { useAppConfig } from '@/hooks/useAppConfig';
+import { usePermissions, Permission } from '@/hooks/usePermissions'; // <--- NOVO
 
 interface AuthGateProps {
   children: React.ReactNode;
+  requiredPermission?: Permission; // <--- NOVO: Prop opcional
 }
 
 const LAST_ACTIVITY_KEY = 'last_activity_timestamp';
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos de inatividade
 
-export function AuthGate({ children }: AuthGateProps) {
+export function AuthGate({ children, requiredPermission }: AuthGateProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Hooks existentes preservados
   const { isEnabled, isLoading: biometricLoading, getStoredUserId, disableBiometric } = useBiometricAuth();
+  const { config, isLoading: isLoadingMaintenanceConfig } = useAppConfig();
+  
+  // Hook de Permissões (NOVO)
+  const { checkPermission, loading: permissionsLoading, isAdmin } = usePermissions();
+
+  // Estados locais existentes
   const [isLocked, setIsLocked] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [userName, setUserName] = useState<string | undefined>();
-  const { config, isLoading: isLoadingMaintenanceConfig } = useAppConfig();
   const [isAdminOrTecnico, setIsAdminOrTecnico] = useState<boolean | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState<boolean>(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [hasAuthRedirected, setHasAuthRedirected] = useState(false);
+  
+  // Estado para controle de permissão da rota (NOVO)
+  const [isPermissionAuthorized, setIsPermissionAuthorized] = useState(true);
+  const [isCheckingPermission, setIsCheckingPermission] = useState(!!requiredPermission);
 
+  // --- 1. BLOCO DE BIOMETRIA (Preservado) ---
   useEffect(() => {
-    // Só verificar lock state quando biometria terminar de carregar
     if (!biometricLoading) {
       checkLockState();
     }
   }, [biometricLoading, isEnabled]);
 
-  // Atualizar timestamp de atividade
   useEffect(() => {
     if (!isLocked) {
       const updateActivity = () => {
         localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
       };
-
-      // Atualizar na montagem
       updateActivity();
-
-      // Atualizar em interações
       const events = ['click', 'keydown', 'scroll', 'touchstart'];
       events.forEach(event => {
         window.addEventListener(event, updateActivity, { passive: true });
       });
-
       return () => {
         events.forEach(event => {
           window.removeEventListener(event, updateActivity);
@@ -56,56 +64,36 @@ export function AuthGate({ children }: AuthGateProps) {
   }, [isLocked]);
 
   const checkLockState = async () => {
-    // Se biometria não está habilitada, não bloquear
     if (!isEnabled) {
       setIsChecking(false);
       return;
     }
-
-    // Verificar se há sessão ativa
     const { data: { session } } = await supabase.auth.getSession();
-    
     if (!session) {
-      // Sem sessão (logout), não desabilitar biometria - deixar para próxima entrada
       setIsChecking(false);
       return;
     }
-
-    // Verificar se o user_id armazenado corresponde à sessão atual
     const storedUserId = getStoredUserId();
     if (storedUserId !== session.user.id) {
-      // User diferente, desabilitar biometria e não bloquear
       disableBiometric();
       setIsChecking(false);
       return;
     }
-
-    // Buscar nome do usuário
     const { data: profile } = await supabase
       .from('profiles')
       .select('nome')
       .eq('user_id', session.user.id)
       .single();
+    if (profile) setUserName(profile.nome);
 
-    if (profile) {
-      setUserName(profile.nome);
-    }
-
-    // Verificar timeout de inatividade
     const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
     const now = Date.now();
-
     if (lastActivity) {
       const elapsed = now - parseInt(lastActivity, 10);
-      if (elapsed > LOCK_TIMEOUT_MS) {
-        // Inativo por muito tempo, bloquear
-        setIsLocked(true);
-      }
+      if (elapsed > LOCK_TIMEOUT_MS) setIsLocked(true);
     } else {
-      // Primeira visita com biometria - bloquear para verificar
       setIsLocked(true);
     }
-
     setIsChecking(false);
   };
 
@@ -115,12 +103,11 @@ export function AuthGate({ children }: AuthGateProps) {
   };
 
   const handleUsePassword = async () => {
-    // Fazer logout e ir para tela de login
     await supabase.auth.signOut();
     navigate('/auth');
   };
 
-  // 1) Carregar usuário atual (para regras de manutenção)
+  // --- 2. BLOCO DE USUÁRIO E MANUTENÇÃO (Preservado) ---
   useEffect(() => {
     let isMounted = true;
     const loadUser = async () => {
@@ -133,19 +120,36 @@ export function AuthGate({ children }: AuthGateProps) {
       }
     };
     loadUser();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setCurrentUserId(session?.user?.id ?? null);
-      setIsAdminOrTecnico(null); // força recálculo de roles
+      setIsAdminOrTecnico(null);
     });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { isMounted = false; subscription.unsubscribe(); };
   }, []);
 
-  // 2) Checar roles quando em manutenção e houver usuário
+  const isPublicRoute = useMemo(() => {
+    const path = location.pathname;
+    const publicPatterns = [
+      /^\/auth(\/.*)?$/,
+      /^\/biometric-login$/,
+      /^\/cadastro(\/.*)?$/,
+      /^\/telao(\/.*)?$/,
+      /^\/checkin\//,
+      /^\/maintenance$/,
+      /^\/public(\/.*)?$/,
+    ];
+    return publicPatterns.some((re) => re.test(path));
+  }, [location.pathname]);
+
+  // Redireciona para login se não autenticado em rota não pública
+  useEffect(() => {
+    if (isLoadingUser || isPublicRoute) return;
+    if (!currentUserId && !hasAuthRedirected) {
+      setHasAuthRedirected(true);
+      navigate('/auth', { replace: true });
+    }
+  }, [isLoadingUser, isPublicRoute, currentUserId, navigate, hasAuthRedirected]);
+
   useEffect(() => {
     let active = true;
     const checkRoles = async () => {
@@ -170,66 +174,74 @@ export function AuthGate({ children }: AuthGateProps) {
         if (active) setIsAdminOrTecnico(false);
       }
     };
-
     checkRoles();
     return () => { active = false; };
   }, [config.maintenance_mode, currentUserId]);
 
-  // 3) Determinar se rota atual é pública
-  const isPublicRoute = useMemo(() => {
-    const path = location.pathname;
-    const publicPatterns = [
-      /^\/auth(\/.*)?$/,
-      /^\/biometric-login$/,
-      /^\/cadastro(\/.*)?$/,
-      /^\/telao(\/.*)?$/,
-      /^\/checkin\//,
-      /^\/maintenance$/,
-      /^\/public(\/.*)?$/,
-    ];
-    return publicPatterns.some((re) => re.test(path));
-  }, [location.pathname]);
-
-  // 4) Regras de redirecionamento para manutenção (sem loops)
+  // --- 3. BLOCO DE VERIFICAÇÃO DE PERMISSÃO (NOVO) ---
   useEffect(() => {
-    if (isLoadingUser || isLoadingMaintenanceConfig) return; // Regra 1: apenas loading
+    const checkRequiredPermission = async () => {
+      // Se não exige permissão ou está carregando user, ignora
+      if (!requiredPermission || isLoadingUser || !currentUserId) {
+        setIsCheckingPermission(false);
+        return;
+      }
 
+      // Se é admin (vindo do hook usePermissions), libera direto
+      if (isAdmin) {
+        setIsPermissionAuthorized(true);
+        setIsCheckingPermission(false);
+        return;
+      }
+
+      // Verifica a permissão específica no banco
+      const hasPerm = await checkPermission(requiredPermission);
+      
+      if (!hasPerm) {
+        console.warn(`⛔ Acesso negado. Requer: ${requiredPermission}`);
+        // Opcional: Redirecionar para dashboard se não tiver acesso
+        // navigate('/dashboard'); 
+        setIsPermissionAuthorized(false);
+      } else {
+        setIsPermissionAuthorized(true);
+      }
+      setIsCheckingPermission(false);
+    };
+
+    checkRequiredPermission();
+  }, [requiredPermission, currentUserId, isLoadingUser, isAdmin, checkPermission]);
+
+
+  // --- 4. RENDERIZAÇÃO E REDIRECIONAMENTOS ---
+
+  // Redirecionamento de Manutenção
+  useEffect(() => {
+    if (isLoadingUser || isLoadingMaintenanceConfig) return;
     const path = location.pathname;
     const onMaintenance = config.maintenance_mode;
     const allowPublic = config.allow_public_access;
 
-    // Rotas públicas liberadas se allow_public_access estiver ativo
     if (isPublicRoute && allowPublic) return;
 
     if (onMaintenance) {
-      // Se ainda não sabemos o papel e rota não é pública, aguardar
       if (isAdminOrTecnico === null && !isPublicRoute) return;
-
       const isMaintenancePage = path === '/maintenance';
       if (!isAdminOrTecnico && !isMaintenancePage) {
         navigate('/maintenance', { replace: true });
       }
     }
-  }, [
-    isLoadingUser,
-    isLoadingMaintenanceConfig,
-    location.pathname,
-    config.maintenance_mode,
-    config.allow_public_access,
-    isAdminOrTecnico,
-    isPublicRoute,
-    navigate,
-  ]);
+  }, [isLoadingUser, isLoadingMaintenanceConfig, location.pathname, config.maintenance_mode, config.allow_public_access, isAdminOrTecnico, isPublicRoute, navigate]);
 
-  // Regra 1: Loading de usuário/biometria/config
-  if (biometricLoading || isChecking || isLoadingUser || isLoadingMaintenanceConfig) {
+  // Loading Geral
+  if (biometricLoading || isChecking || isLoadingUser || isLoadingMaintenanceConfig || (requiredPermission && isCheckingPermission)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
+        <p className="text-muted-foreground animate-pulse">Verificando credenciais...</p>
       </div>
     );
   }
 
+  // Tela de Bloqueio
   if (isLocked && isEnabled) {
     return (
       <BiometricUnlockScreen
@@ -240,21 +252,38 @@ export function AuthGate({ children }: AuthGateProps) {
     );
   }
 
-  // Regra 2: Rotas públicas com acesso liberado
+  // Rotas Públicas
   if (isPublicRoute && config.allow_public_access) {
     return <>{children}</>;
   }
 
-  // Regra 3: Em manutenção, somente admin/tecnico acessa
+  // Tela de Manutenção
   if (config.maintenance_mode && isAdminOrTecnico === false) {
-    // Se chegar aqui e estiver na /maintenance, apenas renderiza children
-    if (location.pathname === '/maintenance') {
-      return <>{children}</>;
-    }
-    // Caso contrário, tela vazia enquanto redireciona no efeito
+    if (location.pathname === '/maintenance') return <>{children}</>;
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Redirecionando…</p>
+        <p className="text-muted-foreground">Redirecionando para manutenção...</p>
+      </div>
+    );
+  }
+
+  // Bloqueio por Permissão (RBAC)
+  if (requiredPermission && !isPermissionAuthorized) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-destructive">Acesso Negado</h1>
+          <p className="text-muted-foreground">
+            Você não tem permissão para acessar esta área.<br/>
+            Necessário: <code className="bg-muted px-1 rounded">{requiredPermission}</code>
+          </p>
+          <button 
+            onClick={() => navigate('/')}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+          >
+            Voltar ao Início
+          </button>
+        </div>
       </div>
     );
   }

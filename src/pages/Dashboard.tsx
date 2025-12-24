@@ -6,6 +6,7 @@ import DashboardAdmin from "@/components/dashboard/DashboardAdmin";
 import DashboardLeader from "@/components/dashboard/DashboardLeader";
 import DashboardMember from "@/components/dashboard/DashboardMember";
 import DashboardVisitante from "@/components/dashboard/DashboardVisitante";
+import { usePermissions } from "@/hooks/usePermissions"; // <--- Importe o novo hook
 
 type UserRole = 'admin' | 'pastor' | 'lider' | 'secretario' | 'tesoureiro' | 'membro' | 'basico';
 
@@ -14,6 +15,31 @@ export default function Dashboard() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
 
+    // --- INÍCIO DO BLOCO DE TESTE RBAC ---
+  const { checkPermission, isAdmin } = usePermissions();
+
+  useEffect(() => {
+    const testarPermissoes = async () => {
+      if (!user) return;
+      
+      console.log("🔍 TESTE RBAC INICIADO para:", user.email);
+      console.log("👑 É Admin?", isAdmin);
+
+      // Teste de permissões variadas
+      const podeVerFinanceiro = await checkPermission('financeiro.view');
+      const podeVerGabinete = await checkPermission('gabinete.view');
+      const podeVerConfig = await checkPermission('configuracoes.view');
+
+      console.table({
+        'Financeiro View': podeVerFinanceiro,
+        'Gabinete View': podeVerGabinete,
+        'Config View': podeVerConfig
+      });
+    };
+
+    testarPermissoes();
+  }, [user, isAdmin, checkPermission]);
+  // --- FIM DO BLOCO DE TESTE RBAC ---
   useEffect(() => {
     if (user) {
       fetchUserRoles();

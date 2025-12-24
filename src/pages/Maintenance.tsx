@@ -23,7 +23,7 @@ export default function Maintenance({ message }: MaintenanceProps) {
 
   useEffect(() => {
     if (canBypassMaintenance) {
-      navigate("/dashboard", { replace: true });
+      navigate("/", { replace: true });
     }
   }, [canBypassMaintenance, navigate]);
 

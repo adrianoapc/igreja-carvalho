@@ -91,8 +91,7 @@ const Announcements = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <PublicHeader showBackButton title="Anúncios" subtitle="Fique por dentro das novidades" />
-
+    
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         {/* Header com contador */}
         {!loading && comunicados.length > 0 && (

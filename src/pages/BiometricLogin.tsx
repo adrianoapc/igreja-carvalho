@@ -82,7 +82,7 @@ export default function BiometricLogin() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          navigate("/dashboard", { replace: true });
+          navigate("/", { replace: true });
           return;
         }
       } catch (error) {
@@ -262,7 +262,7 @@ export default function BiometricLogin() {
         });
         
         setTimeout(() => {
-          navigate("/dashboard", { replace: true });
+          navigate("/", { replace: true });
         }, 500);
       } else {
         // Falha na biometria com erro específico

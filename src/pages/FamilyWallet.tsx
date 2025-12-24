@@ -469,7 +469,7 @@ export default function FamilyWallet() {
       
       {/* 1. HEADER */}
       <div className="bg-white sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm border-b border-gray-100">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="-ml-2 hover:bg-gray-100 rounded-full">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="-ml-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft className="h-6 w-6 text-gray-700" />
         </Button>
         <h1 className="text-lg font-semibold text-gray-800">Carteira da Família</h1>

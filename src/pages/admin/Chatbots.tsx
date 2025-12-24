@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Bot, ArrowLeft, Save, Plus, Pencil, Trash2, Eye, EyeOff, MessageSquare, Mic, Image } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Bot, Save, Plus, Pencil, Trash2, Eye, EyeOff, MessageSquare, Mic, Image, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -65,7 +64,6 @@ const MODELOS_VISAO = [
 ];
 
 export default function Chatbots() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chatbots, setChatbots] = useState<ChatbotConfig[]>([]);
@@ -225,111 +223,81 @@ export default function Chatbots() {
     setExpandedRoles(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const truncateText = (text: string | null, maxLength: number = 100) => {
-    if (!text) return "Não configurado";
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
-  };
-
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Chatbots & IAs</h1>
-            <p className="text-muted-foreground mt-1">Carregando...</p>
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center h-64 space-y-4 text-muted-foreground animate-pulse">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p>Carregando agentes inteligentes...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* Header Simplificado (Sem botão de voltar) */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Chatbots & IAs</h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie as configurações dos chatbots e modelos de IA
-            </p>
-          </div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold tracking-tight">Agentes & Chatbots</h2>
+          <p className="text-sm text-muted-foreground">
+            Gerencie os cérebros de IA que operam no sistema.
+          </p>
         </div>
-        <Button onClick={handleOpenNew}>
+        <Button onClick={handleOpenNew} size="sm">
           <Plus className="h-4 w-4 mr-2" />
-          Novo Chatbot
+          Novo Agente
         </Button>
       </div>
 
-      {/* Aviso Informativo */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-4">
-          <div className="flex gap-3">
-            <Bot className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-900">
-                Configuração de Chatbots
-              </p>
-              <p className="text-xs text-blue-700">
-                Cada chatbot está vinculado a uma Edge Function. Configure os modelos de IA e os prompts (roles) 
-                para texto, áudio e visão de forma independente.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Lista de Chatbots */}
       {chatbots.length === 0 ? (
-        <Card>
+        <Card className="border-dashed shadow-sm">
           <CardContent className="py-12 text-center">
-            <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <Bot className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-medium mb-2">Nenhum chatbot configurado</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Crie seu primeiro chatbot para começar a usar IA no sistema.
+            <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+              Crie seu primeiro agente para habilitar funcionalidades de IA como análise de sentimentos ou transcrição.
             </p>
-            <Button onClick={handleOpenNew}>
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Chatbot
+            <Button onClick={handleOpenNew} variant="outline">
+              Criar Primeiro Chatbot
             </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
           {chatbots.map((chatbot) => (
-            <Card key={chatbot.id}>
-              <CardHeader className="pb-3">
+            <Card key={chatbot.id} className="overflow-hidden hover:shadow-md transition-shadow duration-200">
+              <CardHeader className="pb-3 bg-muted/5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Bot className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Bot className="h-6 w-6" />
+                    </div>
                     <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
+                      <CardTitle className="text-base flex items-center gap-2">
                         {chatbot.nome}
-                        <Badge variant={chatbot.ativo ? "default" : "secondary"}>
+                        <Badge variant={chatbot.ativo ? "default" : "secondary"} className="text-[10px] h-5 px-1.5">
                           {chatbot.ativo ? "Ativo" : "Inativo"}
                         </Badge>
                       </CardTitle>
-                      <CardDescription>{chatbot.descricao || "Sem descrição"}</CardDescription>
+                      <CardDescription className="line-clamp-1 text-xs mt-0.5">
+                        {chatbot.descricao || "Sem descrição"} • {chatbot.edge_function_name}
+                      </CardDescription>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <Switch
                       checked={chatbot.ativo}
                       onCheckedChange={() => handleToggleActive(chatbot)}
+                      className="scale-75 mr-2"
                     />
-                    <Button variant="outline" size="icon" onClick={() => handleOpenEdit(chatbot)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(chatbot)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button 
-                      variant="outline" 
+                      variant="ghost" 
                       size="icon" 
-                      className="text-destructive"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={() => {
                         setSelectedChatbot(chatbot);
                         setDeleteDialogOpen(true);
@@ -340,74 +308,46 @@ export default function Chatbots() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Edge Function */}
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Edge Function:</span>
-                  <code className="bg-muted px-2 py-1 rounded text-xs">{chatbot.edge_function_name}</code>
-                </div>
-
+              
+              <CardContent className="pt-4 space-y-4">
                 {/* Modelos */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-blue-500" />
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Texto: </span>
-                      <span className="font-medium">{chatbot.modelo_texto}</span>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="flex items-center gap-2 p-2 rounded bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/20">
+                    <MessageSquare className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="truncate text-xs font-medium">{chatbot.modelo_texto}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Mic className="h-4 w-4 text-green-500" />
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Áudio: </span>
-                      <span className="font-medium">{chatbot.modelo_audio}</span>
-                    </div>
+                  <div className="flex items-center gap-2 p-2 rounded bg-green-50/50 dark:bg-green-950/10 border border-green-100 dark:border-green-900/20">
+                    <Mic className="h-3.5 w-3.5 text-green-500" />
+                    <span className="truncate text-xs font-medium">{chatbot.modelo_audio}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Image className="h-4 w-4 text-purple-500" />
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Visão: </span>
-                      <span className="font-medium">{chatbot.modelo_visao}</span>
-                    </div>
+                  <div className="flex items-center gap-2 p-2 rounded bg-purple-50/50 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/20">
+                    <Image className="h-3.5 w-3.5 text-purple-500" />
+                    <span className="truncate text-xs font-medium">{chatbot.modelo_visao}</span>
                   </div>
                 </div>
 
                 {/* Roles Preview */}
-                <div className="space-y-2">
+                <div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 text-sm text-muted-foreground hover:text-foreground"
+                    className="h-6 px-0 text-xs text-muted-foreground hover:text-primary"
                     onClick={() => toggleRoleExpanded(chatbot.id)}
                   >
                     {expandedRoles[chatbot.id] ? (
-                      <><EyeOff className="h-3 w-3 mr-1" /> Ocultar prompts</>
+                      <><EyeOff className="h-3 w-3 mr-1.5" /> Ocultar prompts</>
                     ) : (
-                      <><Eye className="h-3 w-3 mr-1" /> Ver prompts</>
+                      <><Eye className="h-3 w-3 mr-1.5" /> Ver system prompts</>
                     )}
                   </Button>
                   
                   {expandedRoles[chatbot.id] && (
-                    <div className="grid gap-2 mt-2">
-                      <div className="bg-muted/50 p-3 rounded-md">
-                        <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                          <MessageSquare className="h-3 w-3" /> Role Texto
-                        </p>
-                        <p className="text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
-                          {chatbot.role_texto || "Não configurado"}
-                        </p>
-                      </div>
-                      <div className="bg-muted/50 p-3 rounded-md">
-                        <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                          <Mic className="h-3 w-3" /> Role Áudio
-                        </p>
-                        <p className="text-xs">{chatbot.role_audio || "Não configurado"}</p>
-                      </div>
-                      <div className="bg-muted/50 p-3 rounded-md">
-                        <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                          <Image className="h-3 w-3" /> Role Visão
-                        </p>
-                        <p className="text-xs">{chatbot.role_visao || "Não configurado"}</p>
+                    <div className="grid gap-3 mt-3 animate-in slide-in-from-top-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Texto</span>
+                        <div className="bg-muted p-2 rounded text-xs font-mono text-muted-foreground max-h-24 overflow-y-auto">
+                          {chatbot.role_texto || "Padrão"}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -422,9 +362,9 @@ export default function Chatbots() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedChatbot ? "Editar Chatbot" : "Novo Chatbot"}</DialogTitle>
+            <DialogTitle>{selectedChatbot ? "Editar Agente" : "Novo Agente de IA"}</DialogTitle>
             <DialogDescription>
-              Configure os modelos e prompts do chatbot
+              Configure os modelos, funções e personalidade do chatbot.
             </DialogDescription>
           </DialogHeader>
 
@@ -437,59 +377,65 @@ export default function Chatbots() {
             </TabsList>
 
             <TabsContent value="geral" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="nome">Nome *</Label>
-                <Input
-                  id="nome"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  placeholder="Ex: Chatbot Intercessão"
-                />
-              </div>
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="nome">Nome Identificador</Label>
+                  <Input
+                    id="nome"
+                    value={formData.nome}
+                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    placeholder="Ex: Pastor Virtual"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="descricao">Descrição</Label>
-                <Input
-                  id="descricao"
-                  value={formData.descricao}
-                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                  placeholder="Breve descrição do chatbot"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="descricao">Descrição (Interna)</Label>
+                  <Input
+                    id="descricao"
+                    value={formData.descricao}
+                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                    placeholder="Para que serve este agente?"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edge_function_name">Nome da Edge Function *</Label>
-                <Input
-                  id="edge_function_name"
-                  value={formData.edge_function_name}
-                  onChange={(e) => setFormData({ ...formData, edge_function_name: e.target.value })}
-                  placeholder="Ex: chatbot-triagem"
-                  disabled={!!selectedChatbot}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Nome da função em supabase/functions/
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edge_function_name">Edge Function Vinculada</Label>
+                  <div className="relative">
+                    <Bot className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="edge_function_name"
+                      value={formData.edge_function_name}
+                      onChange={(e) => setFormData({ ...formData, edge_function_name: e.target.value })}
+                      placeholder="chatbot-triagem"
+                      className="pl-9 font-mono"
+                      disabled={!!selectedChatbot}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Nome da pasta em <code>supabase/functions/</code> que executa este bot.
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="ativo"
-                  checked={formData.ativo}
-                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
-                />
-                <Label htmlFor="ativo">Chatbot ativo</Label>
+                <div className="flex items-center justify-between border rounded-lg p-3 bg-muted/20">
+                  <Label htmlFor="ativo" className="cursor-pointer">Status Ativo</Label>
+                  <Switch
+                    id="ativo"
+                    checked={formData.ativo}
+                    onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+                  />
+                </div>
               </div>
             </TabsContent>
 
             <TabsContent value="texto" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="modelo_texto">Modelo de Texto</Label>
+                <Label>Modelo de Linguagem (LLM)</Label>
                 <Select
                   value={formData.modelo_texto}
                   onValueChange={(value) => setFormData({ ...formData, modelo_texto: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o modelo" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {MODELOS_TEXTO.map((modelo) => (
@@ -502,29 +448,25 @@ export default function Chatbots() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role_texto">System Prompt (Role)</Label>
+                <Label>System Prompt (Personalidade)</Label>
                 <Textarea
-                  id="role_texto"
                   value={formData.role_texto}
                   onChange={(e) => setFormData({ ...formData, role_texto: e.target.value })}
-                  placeholder="Instruções para o modelo de texto..."
+                  placeholder="Você é um assistente útil..."
                   className="min-h-[200px] font-mono text-sm"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Define o comportamento e personalidade do chatbot
-                </p>
               </div>
             </TabsContent>
 
             <TabsContent value="audio" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="modelo_audio">Modelo de Áudio</Label>
+                <Label>Modelo de Transcrição (STT)</Label>
                 <Select
                   value={formData.modelo_audio}
                   onValueChange={(value) => setFormData({ ...formData, modelo_audio: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o modelo" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {MODELOS_AUDIO.map((modelo) => (
@@ -537,29 +479,25 @@ export default function Chatbots() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role_audio">Instruções de Transcrição</Label>
+                <Label>Prompt de Contexto para Áudio</Label>
                 <Textarea
-                  id="role_audio"
                   value={formData.role_audio}
                   onChange={(e) => setFormData({ ...formData, role_audio: e.target.value })}
-                  placeholder="Instruções para transcrição de áudio..."
+                  placeholder="Instruções para melhorar a transcrição..."
                   className="min-h-[100px] font-mono text-sm"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Orienta como o áudio deve ser transcrito
-                </p>
               </div>
             </TabsContent>
 
             <TabsContent value="visao" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="modelo_visao">Modelo de Visão</Label>
+                <Label>Modelo de Visão Computacional</Label>
                 <Select
                   value={formData.modelo_visao}
                   onValueChange={(value) => setFormData({ ...formData, modelo_visao: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o modelo" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {MODELOS_VISAO.map((modelo) => (
@@ -572,28 +510,24 @@ export default function Chatbots() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role_visao">Instruções de Análise Visual</Label>
+                <Label>Prompt de Análise Visual</Label>
                 <Textarea
-                  id="role_visao"
                   value={formData.role_visao}
                   onChange={(e) => setFormData({ ...formData, role_visao: e.target.value })}
-                  placeholder="Instruções para análise de imagens..."
+                  placeholder="O que procurar nas imagens..."
                   className="min-h-[100px] font-mono text-sm"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Define como as imagens devem ser analisadas
-                </p>
               </div>
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>
               Cancelar
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando..." : "Salvar Configuração"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -603,16 +537,16 @@ export default function Chatbots() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogTitle>Excluir Agente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o chatbot "{selectedChatbot?.nome}"? 
-              Esta ação não pode ser desfeita.
+              Esta ação removerá permanentemente a configuração do bot <strong>{selectedChatbot?.nome}</strong>. 
+              Edge Functions vinculadas não serão deletadas do servidor.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              Excluir
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmar Exclusão
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

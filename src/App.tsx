@@ -1,933 +1,291 @@
-import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ThemeProvider } from "next-themes";
-import { HideValuesProvider } from "@/hooks/useHideValues";
-import { useAuth } from "@/hooks/useAuth";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { canAccessDuringMaintenance } from "@/utils/roles";
-import { AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import MainLayout from "./components/layout/MainLayout";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import {MainLayout} from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
-import BiometricLogin from "./pages/BiometricLogin";
+import { ThemeProvider } from "next-themes";
+
+// Pages Imports
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
+import ResetPassword from "./pages/auth/ResetPassword";
+import NotFound from "./pages/NotFound";
 import Maintenance from "./pages/Maintenance";
+import Install from "./pages/Install";
+import BiometricLogin from "./pages/BiometricLogin";
+
+// Módulos
 import Dashboard from "./pages/Dashboard";
-import Comunicados from "./pages/Comunicados";
+import Public from "./pages/Public";
+import Perfil from "./pages/Perfil";
+import MinhaFamilia from "./pages/MinhaFamilia";
+import FamilyWallet from "./pages/FamilyWallet";
+import Biblia from "./pages/Biblia";
+import Agenda from "./pages/Agenda";
+import Chamada from "./pages/Chamada";
+import Escalas from "./pages/Escalas";
+import MinhasEscalas from "./pages/MinhasEscalas";
 import Publicacao from "./pages/Publicacao";
-import Pessoas from "./pages/pessoas";
+import Comunicados from "./pages/Comunicados";
+import Announcements from "./pages/Announcements";
+import AnnouncementsAdmin from "./pages/AnnouncementsAdmin";
+
+// Cadastro Publico
+import CadastroIndex from "./pages/cadastro/Index";
+import CadastroVisitante from "./pages/cadastro/Visitante";
+import CadastroMembro from "./pages/cadastro/Membro";
+
+// Pessoas
+import PessoasIndex from "./pages/pessoas/index";
+import PessoasTodos from "./pages/pessoas/Todos";
+import PessoasMembros from "./pages/pessoas/Membros";
+import PessoasVisitantes from "./pages/pessoas/Visitantes";
+import PessoasFrequentadores from "./pages/pessoas/Frequentadores";
+import PessoasContatos from "./pages/pessoas/Contatos";
+import PessoasAlteracoes from "./pages/pessoas/AlteracoesPendentes";
 import PessoaDetalhes from "./pages/PessoaDetalhes";
-import EditarPessoa from "./pages/pessoas/EditarPessoa";
-import TodosPessoas from "./pages/pessoas/Todos";
-import Frequentadores from "./pages/pessoas/Frequentadores";
-import Membros from "./pages/pessoas/Membros";
-import Visitantes from "./pages/pessoas/Visitantes";
-import ContatosDashboard from "./pages/pessoas/Contatos";
-import AlteracoesPendentes from "./pages/pessoas/AlteracoesPendentes";
-import Kids from "./pages/Kids";
+
+// Gabinete
+import GabinetePastoral from "./pages/GabinetePastoral";
+import AtendimentoProntuario from "./pages/gabinete/AtendimentoProntuario";
+
+// Intercessão
 import Intercessao from "./pages/Intercessao";
 import PedidosOracao from "./pages/intercessao/PedidosOracao";
 import Intercessores from "./pages/intercessao/Intercessores";
-import TestemunhosIntercessao from "./pages/intercessao/Testemunhos";
+import Testemunhos from "./pages/intercessao/Testemunhos";
 import Sentimentos from "./pages/intercessao/Sentimentos";
-import Cultos from "./pages/Cultos";
+
+// Ministério Kids
+import KidsDashboard from "./pages/kids/Dashboard";
+import KidsCriancas from "./pages/kids/Criancas";
+import KidsScanner from "./pages/kids/Scanner";
+import KidsTurmaAtiva from "./pages/kids/TurmaAtiva";
+import KidsConfig from "./pages/kids/Config";
+import Kids from "./pages/Kids";
+
+// Ensino
+import EnsinoDashboard from "./pages/ensino/Dashboard";
+import Ensino from "./pages/Ensino";
+import Jornadas from "./pages/Jornadas";
+import DetalhesJornada from "./pages/ensino/DetalhesJornada";
+import JornadaBoard from "./pages/JornadaBoard";
+import Ensinamentos from "./pages/Ensinamentos";
+import MeusCursos from "./pages/MeusCursos";
+import CursoPlayer from "./pages/CursoPlayer";
+
+// Cultos
 import CultosGeral from "./pages/cultos/Geral";
 import CultosEventos from "./pages/cultos/Eventos";
 import CultosTimes from "./pages/cultos/Times";
 import CultosCategorias from "./pages/cultos/Categorias";
 import CultosPosicoes from "./pages/cultos/Posicoes";
-import LiturgiaDashboard from "./pages/cultos/LiturgiaDashboard";
-import MidiasGeral from "./pages/cultos/MidiasGeral";
-import Templates from "./pages/cultos/Templates";
+import CultosTemplates from "./pages/cultos/Templates";
+import CultosMidias from "./pages/cultos/MidiasGeral";
+import CultosLiturgia from "./pages/cultos/LiturgiaDashboard";
 import CultoDetalhes from "./pages/CultoDetalhes";
-import Midias from "./pages/Midias";
-import Financas from "./pages/Financas";
-import DRE from "./pages/financas/DRE";
-import FinancasDashboard from "./pages/financas/Dashboard";
-import FinancasProjecao from "./pages/financas/Projecao";
-import Entradas from "./pages/financas/Entradas";
-import Saidas from "./pages/financas/Saidas";
-import Insights from "./pages/financas/Insights";
-import RelatorioOferta from "./pages/financas/RelatorioOferta";
-import DashboardOfertas from "./pages/financas/DashboardOfertas";
-import Contas from "./pages/financas/Contas";
-import BasesMinisteriais from "./pages/financas/BasesMinisteriais";
-import CentrosCusto from "./pages/financas/CentrosCusto";
-import Categorias from "./pages/financas/Categorias";
-import Fornecedores from "./pages/financas/Fornecedores";
-import FormasPagamento from "./pages/financas/FormasPagamento";
-import Reembolsos from "./pages/financas/Reembolsos";
-import Ensinamentos from "./pages/Ensinamentos";
-import Ensino from "./pages/Ensino";
-import MeusCursos from "./pages/MeusCursos";
-import CursoPlayer from "./pages/CursoPlayer";
-import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
-import Auth from "./pages/Auth";
-import ResetPassword from "./pages/auth/ResetPassword";
-import Public from "./pages/Public";
-import Announcements from "./pages/Announcements";
-import AnnouncementsAdmin from "./pages/AnnouncementsAdmin";
-import Agenda from "./pages/Agenda";
-import Biblia from "./pages/Biblia";
-import Install from "./pages/Install";
-import Admin from "./pages/Admin";
-import Perfil from "./pages/Perfil";
-import NotFound from "./pages/NotFound";
-import CadastroIndex from "./pages/cadastro/Index";
-import CadastroVisitante from "./pages/cadastro/Visitante";
-import CadastroMembro from "./pages/cadastro/Membro";
-import Chamada from "./pages/Chamada";
-import Jornadas from "./pages/Jornadas";
-import JornadaBoard from "./pages/JornadaBoard";
-import DetalhesJornada from "./pages/ensino/DetalhesJornada";
-import Projetos from "./pages/Projetos";
-import ProjetoDetalhes from "./pages/ProjetoDetalhes";
+
+// Telão & Checkin
 import Telao from "./pages/Telao";
 import TelaoLiturgia from "./pages/TelaoLiturgia";
-import Escalas from "./pages/Escalas";
-import MinhasEscalas from "./pages/MinhasEscalas";
 import Checkin from "./pages/Checkin";
-import PermissionMatrixPrototype from "./pages/AdminPermissions";
-import FamilyWallet from "./pages/FamilyWallet";
-import KidsCheckinScanner from "./pages/kids/Scanner";
-import KidsDashboard from "./pages/kids/Dashboard";
-import KidsConfig from "./pages/kids/Config";
-import KidsCriancas from "./pages/kids/Criancas";
-import EnsinoDashboard from "./pages/ensino/Dashboard";
-import TurmaAtiva from "./pages/kids/TurmaAtiva";
-import NotificacoesAdmin from "./pages/admin/Notificacoes";
-import WebhooksAdmin from "./pages/admin/Webhooks";
-import ChatbotsAdmin from "./pages/admin/Chatbots";
-import GabinetePastoral from "./pages/GabinetePastoral";
-import AtendimentoProntuario from "./pages/gabinete/AtendimentoProntuario";
-import Configuracoes from "./pages/Configuracoes";  
+
+// Mídias
+import Midias from "./pages/Midias";
+
+// Financeiro
+import FinancasDashboard from "./pages/financas/Dashboard";
+import Financas from "./pages/Financas";
+import FinancasEntradas from "./pages/financas/Entradas";
+import FinancasSaidas from "./pages/financas/Saidas";
+import FinancasContas from "./pages/financas/Contas";
+import FinancasCategorias from "./pages/financas/Categorias";
+import FinancasCentrosCusto from "./pages/financas/CentrosCusto";
+import FinancasFornecedores from "./pages/financas/Fornecedores";
+import FinancasBases from "./pages/financas/BasesMinisteriais";
+import FinancasFormas from "./pages/financas/FormasPagamento";
+import FinancasDRE from "./pages/financas/DRE";
+import FinancasRelatorioOferta from "./pages/financas/RelatorioOferta";
+import FinancasDashboardOfertas from "./pages/financas/DashboardOfertas";
+import FinancasProjecao from "./pages/financas/Projecao";
+import FinancasInsights from "./pages/financas/Insights";
+import FinancasReembolsos from "./pages/financas/Reembolsos";
+
+// Projetos
+import Projetos from "./pages/Projetos";
+import ProjetoDetalhes from "./pages/ProjetoDetalhes";
+
+// Admin
+import Admin from "./pages/Admin";
+import AdminPermissions from "./pages/AdminPermissions";
+import AdminWebhooks from "./pages/admin/Webhooks";
+import AdminNotificacoes from "./pages/admin/Notificacoes";
+import AdminChatbots from "./pages/admin/Chatbots";
+import Configuracoes from "./pages/Configuracoes";
+import ConfiguracoesIgreja from "./pages/ConfiguracoesIgreja";
 
 const queryClient = new QueryClient();
 
-// Barra de aviso de manutenção
-function MaintenanceBar() {
-  const { config } = useAppConfig();
-  const { user } = useAuth();
-  const [isPrivileged, setIsPrivileged] = React.useState<boolean>(false);
+// ScrollToTop component
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  
+  // Não rola para o topo em telas de apresentação
+  if (pathname.includes('/telao')) return null;
 
-  React.useEffect(() => {
-    let active = true;
-    const resolve = async () => {
-      if (!user) { setIsPrivileged(false); return; }
-      // Primeiro tenta via user_metadata
-      const metaRole = (user as any)?.user_metadata?.role as string | undefined;
-      if (metaRole && canAccessDuringMaintenance(metaRole)) {
-        setIsPrivileged(true);
-        return;
-      }
-      // Fallback: consultar user_roles
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
-        if (error) throw error;
-        const roles = (data || []).map(r => r.role);
-        if (active) setIsPrivileged(roles.includes('admin') || roles.includes('tecnico'));
-      } catch {
-        if (active) setIsPrivileged(false);
-      }
-    };
-    resolve();
-    return () => { active = false; };
-  }, [user]);
+  window.scrollTo(0, 0);
+  return null;
+};
 
-  if (!config.maintenance_mode || !isPrivileged) return null;
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <ScrollToTop />
+          <Routes>
+            {/* --- ROTAS PÚBLICAS (Sem AuthGate ou AuthGate liberado) --- */}
+            <Route path="/auth/*" element={<Auth />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/biometric-login" element={<BiometricLogin />} />
+            <Route path="/maintenance" element={<Maintenance />} />
+            <Route path="/install" element={<Install />} />
+            <Route path="/public/:slug" element={<Public />} />
+            
+            {/* Telão e Check-in (Públicos ou tokenizados) */}
+            <Route path="/telao/:id" element={<Telao />} />
+            <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
+            <Route path="/checkin/:tipo/:id" element={<Checkin />} />
 
-  return (
-    <div className="bg-orange-500 text-white px-4 py-3">
-      <div className="flex items-center justify-center gap-2 text-center">
-        <AlertTriangle className="w-5 h-5" />
-        <p className="font-semibold text-sm">⚠️ MODO MANUTENÇÃO ATIVO - Acesso Privilegiado</p>
-      </div>
-      <p className="text-xs opacity-90 text-center mt-1">
-        {config.maintenance_message || "O sistema está passando por manutenção"}
-      </p>
-    </div>
-  );
-}
+            {/* Cadastro Público */}
+            <Route path="/cadastro" element={<CadastroIndex />} />
+            <Route path="/cadastro/visitante" element={<CadastroVisitante />} />
+            <Route path="/cadastro/membro" element={<CadastroMembro />} />
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { loading, isAuthenticated } = useAuth();
-  const biometricEnabled = typeof window !== 'undefined' && localStorage.getItem('biometric_enabled') === 'true';
-  const { config: maintenanceConfig } = useAppConfig();
+            {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<AuthGate><Dashboard /></AuthGate>} />
+              
+              {/* Perfil & Família */}
+              <Route path="/perfil" element={<AuthGate><Perfil /></AuthGate>} />
+              <Route path="/perfil/familia" element={<AuthGate><MinhaFamilia /></AuthGate>} />
+              <Route path="/perfil/wallet" element={<AuthGate><FamilyWallet /></AuthGate>} />
+              <Route path="/biblia" element={<AuthGate><Biblia /></AuthGate>} />
+              <Route path="/agenda" element={<AuthGate><Agenda /></AuthGate>} />
+              <Route path="/chamada" element={<AuthGate><Chamada /></AuthGate>} />
+              
+              {/* Comunicação */}
+              <Route path="/publicacao" element={<AuthGate><Publicacao /></AuthGate>} />
+              <Route path="/comunicados" element={<AuthGate><Comunicados /></AuthGate>} />
+              <Route path="/mural" element={<AuthGate><Announcements /></AuthGate>} />
+              <Route path="/admin/mural" element={<AuthGate><AnnouncementsAdmin /></AuthGate>} />
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
+              {/* Pessoas */}
+              <Route path="/pessoas" element={<AuthGate><PessoasIndex /></AuthGate>} />
+              <Route path="/pessoas/todos" element={<AuthGate><PessoasTodos /></AuthGate>} />
+              <Route path="/pessoas/membros" element={<AuthGate><PessoasMembros /></AuthGate>} />
+              <Route path="/pessoas/visitantes" element={<AuthGate><PessoasVisitantes /></AuthGate>} />
+              <Route path="/pessoas/frequentadores" element={<AuthGate><PessoasFrequentadores /></AuthGate>} />
+              <Route path="/pessoas/contatos" element={<AuthGate><PessoasContatos /></AuthGate>} />
+              <Route path="/pessoas/pendentes" element={<AuthGate><PessoasAlteracoes /></AuthGate>} />
+              <Route path="/pessoas/:id" element={<AuthGate><PessoaDetalhes /></AuthGate>} />
 
-  // Permite acesso se estiver autenticado (membro ou visitante)
-  // A distinção de permissões é feita no menu lateral
-  if (!isAuthenticated) {
-    return <Navigate to={biometricEnabled ? "/auth?mode=biometric" : "/auth"} replace />;
-  }
+              {/* Gabinete */}
+              <Route path="/gabinete" element={<AuthGate><GabinetePastoral /></AuthGate>} />
+              <Route path="/gabinete/atendimento/:id" element={<AuthGate><AtendimentoProntuario /></AuthGate>} />
 
-  // A lógica de manutenção agora está centralizada no AuthGate.
+              {/* Intercessão */}
+              <Route path="/intercessao" element={<AuthGate><Intercessao /></AuthGate>} />
+              <Route path="/intercessao/pedidos" element={<AuthGate><PedidosOracao /></AuthGate>} />
+              <Route path="/intercessao/intercessores" element={<AuthGate><Intercessores /></AuthGate>} />
+              <Route path="/intercessao/testemunhos" element={<AuthGate><Testemunhos /></AuthGate>} />
+              <Route path="/intercessao/sentimentos" element={<AuthGate><Sentimentos /></AuthGate>} />
 
-  return <>{children}</>;
-}
+              {/* Ministério Kids */}
+              <Route path="/kids" element={<AuthGate><Kids /></AuthGate>} />
+              <Route path="/kids/dashboard" element={<AuthGate><KidsDashboard /></AuthGate>} />
+              <Route path="/kids/criancas" element={<AuthGate><KidsCriancas /></AuthGate>} />
+              <Route path="/kids/scanner" element={<AuthGate><KidsScanner /></AuthGate>} />
+              <Route path="/kids/turma-ativa" element={<AuthGate><KidsTurmaAtiva /></AuthGate>} />
+              <Route path="/kids/config" element={<AuthGate><KidsConfig /></AuthGate>} />
 
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} forcedTheme="light">
-        <HideValuesProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AuthGate>
-                <MaintenanceBar />
-                <Routes>
-          {/* Rota raiz redireciona para /biometric-login */}
-          <Route path="/" element={<Navigate to="/biometric-login" replace />} />
-          
-          {/* Tela de login com biometria */}
-          <Route path="/biometric-login" element={<BiometricLogin />} />
-          
-          {/* Rota de autenticação */}
-          <Route path="/auth" element={<Auth />} />
-          {/* Rotas públicas */}
-         
-          <Route path="/auth/reset" element={<ResetPassword />} />
-          
-          {/* Rotas públicas de cadastro externo */}
-          <Route path="/cadastro" element={<CadastroIndex />} />
-          <Route path="/cadastro/visitante" element={<CadastroVisitante />} />
-          <Route path="/cadastro/membro" element={<CadastroMembro />} />
-          
-          {/* Rotas públicas do Telão */}
-          <Route path="/telao" element={<Telao />} />
-          <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
-          <Route path="/telao/:id" element={<TelaoLiturgia />} />
-          
-          {/* Rota pública de Check-in por QR Code */}
-          <Route path="/checkin/:tipo/:id" element={<Checkin />} />
+              {/* Ensino */}
+              <Route path="/ensino" element={<AuthGate><Ensino /></AuthGate>} />
+              <Route path="/ensino/dashboard" element={<AuthGate><EnsinoDashboard /></AuthGate>} />
+              <Route path="/jornadas" element={<AuthGate><Jornadas /></AuthGate>} />
+              <Route path="/jornadas/:id" element={<AuthGate><DetalhesJornada /></AuthGate>} />
+              <Route path="/jornadas/:id/board" element={<AuthGate><JornadaBoard /></AuthGate>} />
+              <Route path="/ensinamentos" element={<AuthGate><Ensinamentos /></AuthGate>} />
+              <Route path="/cursos" element={<AuthGate><MeusCursos /></AuthGate>} />
+              <Route path="/cursos/:id/aula/:aulaId" element={<AuthGate><CursoPlayer /></AuthGate>} />
 
-          {/* Página pública de manutenção */}
-          <Route path="/maintenance" element={<Maintenance />} />
+              {/* Cultos & Escalas */}
+              <Route path="/cultos" element={<AuthGate><CultosGeral /></AuthGate>} />
+              <Route path="/cultos/geral" element={<AuthGate><CultosGeral /></AuthGate>} />
+              <Route path="/cultos/eventos" element={<AuthGate><CultosEventos /></AuthGate>} />
+              <Route path="/cultos/times" element={<AuthGate><CultosTimes /></AuthGate>} />
+              <Route path="/cultos/categorias" element={<AuthGate><CultosCategorias /></AuthGate>} />
+              <Route path="/cultos/posicoes" element={<AuthGate><CultosPosicoes /></AuthGate>} />
+              <Route path="/cultos/templates" element={<AuthGate><CultosTemplates /></AuthGate>} />
+              <Route path="/cultos/midias" element={<AuthGate><CultosMidias /></AuthGate>} />
+              <Route path="/cultos/liturgia" element={<AuthGate><CultosLiturgia /></AuthGate>} />
+              <Route path="/cultos/:id" element={<AuthGate><CultoDetalhes /></AuthGate>} />
+              <Route path="/escalas" element={<AuthGate><Escalas /></AuthGate>} />
+              <Route path="/minhas-escalas" element={<AuthGate><MinhasEscalas /></AuthGate>} />
 
-          {/* Rota de Prototipação Novo Admin */}
-          <Route path="/teste-permissoes" element={<PermissionMatrixPrototype />} />
-          
-          {/* Rotas protegidas para membros */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Dashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Dashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/comunicados"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Comunicados />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/comunicados/announcements"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <AnnouncementsAdmin />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/publicacao"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Publicacao />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Pessoas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PessoaDetalhes />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/:id/editar"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <EditarPessoa />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/todos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <TodosPessoas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/frequentadores"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Frequentadores />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/membros"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Membros />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/visitantes"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Visitantes />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/contatos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ContatosDashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pessoas/alteracoes-pendentes"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <AlteracoesPendentes />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kids"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Kids />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kids/dashboard"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <KidsDashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kids/config"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <KidsConfig />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kids/criancas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <KidsCriancas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kids/scanner"
-            element={
-              <ProtectedRoute>
-                <KidsCheckinScanner />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kids/turma-ativa"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <TurmaAtiva />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/intercessao"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Intercessao />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/intercessao/pedidos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PedidosOracao />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/intercessao/intercessores"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Intercessores />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/intercessao/testemunhos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <TestemunhosIntercessao />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/intercessao/sentimentos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Sentimentos />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/gabinete"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <GabinetePastoral />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/gabinete/atendimento/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <AtendimentoProntuario />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cultos/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <CultoDetalhes />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cultos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Cultos />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          >
-            <Route path="geral" element={<CultosGeral />} />
-            <Route path="eventos" element={<CultosEventos />} />
-            <Route path="times" element={<CultosTimes />} />
-            <Route path="categorias" element={<CultosCategorias />} />
-            <Route path="posicoes" element={<CultosPosicoes />} />
-            <Route path="liturgia-dashboard" element={<LiturgiaDashboard />} />
-            <Route path="midias" element={<MidiasGeral />} />
-            <Route path="templates" element={<Templates />} />
-          </Route>
-          <Route
-            path="/escalas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Escalas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/minhas-escalas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <MinhasEscalas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/midias"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Midias />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/midias/geral"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <MidiasGeral />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
+              {/* Mídias */}
+              <Route path="/midias" element={<AuthGate><Midias /></AuthGate>} />
+              <Route path="/midias/geral" element={<AuthGate><Midias /></AuthGate>} />
+
+              {/* Financeiro */}
+              {/* 🥥 PROVA DE CONCEITO RBAC: Bloqueio da rota principal */}
+              <Route path="/financas" element={
+                <AuthGate requiredPermission="financeiro.view">
                   <Financas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/dashboard"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <FinancasDashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/projecao"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <FinancasProjecao />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/relatorio-oferta"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <RelatorioOferta />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/dashboard-ofertas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <DashboardOfertas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/entradas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Entradas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/saidas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Saidas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/insights"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Insights />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/contas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Contas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/bases-ministeriais"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <BasesMinisteriais />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/centros-custo"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <CentrosCusto />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/categorias"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Categorias />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/fornecedores"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Fornecedores />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/reembolsos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Reembolsos />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/formas-pagamento"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <FormasPagamento />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/financas/dre"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <DRE />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ensinamentos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Ensinamentos />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ensino"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Ensino />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ensino/dashboard"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <EnsinoDashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cursos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <MeusCursos />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cursos/:id"
-            element={
-              <ProtectedRoute>
-                <CursoPlayer />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Admin />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/notificacoes"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <NotificacoesAdmin />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/webhooks"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <WebhooksAdmin />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/chatbots"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ChatbotsAdmin />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/perfil"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Perfil />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/perfil/familia"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <FamilyWallet />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/configuracoes-igreja"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ConfiguracoesIgreja />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/chamada"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Chamada />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/agenda"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Agenda />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/biblia"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Biblia />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/jornadas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Jornadas />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/jornadas/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <DetalhesJornada />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/jornadas/:id/board"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <JornadaBoard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/projetos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Projetos />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/projetos/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ProjetoDetalhes />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/configuracoes" element={<Configuracoes />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-              </AuthGate>
-            </BrowserRouter>
-          </TooltipProvider>
-        </HideValuesProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
-}
+                </AuthGate>
+              } />
+              
+              <Route path="/financas/dashboard" element={<AuthGate><FinancasDashboard /></AuthGate>} />
+              <Route path="/financas/dashboard-ofertas" element={<AuthGate><FinancasDashboardOfertas /></AuthGate>} />
+              <Route path="/financas/projecao" element={<AuthGate><FinancasProjecao /></AuthGate>} />
+              <Route path="/financas/insights" element={<AuthGate><FinancasInsights /></AuthGate>} />
+              <Route path="/financas/entradas" element={<AuthGate><FinancasEntradas /></AuthGate>} />
+              <Route path="/financas/saidas" element={<AuthGate><FinancasSaidas /></AuthGate>} />
+              <Route path="/financas/contas" element={<AuthGate><FinancasContas /></AuthGate>} />
+              <Route path="/financas/reembolsos" element={<AuthGate><FinancasReembolsos /></AuthGate>} />
+              <Route path="/financas/categorias" element={<AuthGate><FinancasCategorias /></AuthGate>} />
+              <Route path="/financas/centros-custo" element={<AuthGate><FinancasCentrosCusto /></AuthGate>} />
+              <Route path="/financas/fornecedores" element={<AuthGate><FinancasFornecedores /></AuthGate>} />
+              <Route path="/financas/bases-ministeriais" element={<AuthGate><FinancasBases /></AuthGate>} />
+              <Route path="/financas/formas-pagamento" element={<AuthGate><FinancasFormas /></AuthGate>} />
+              <Route path="/financas/dre" element={<AuthGate><FinancasDRE /></AuthGate>} />
+              <Route path="/financas/relatorios/ofertas" element={<AuthGate><FinancasRelatorioOferta /></AuthGate>} />
+
+              {/* Projetos */}
+              <Route path="/projetos" element={<AuthGate><Projetos /></AuthGate>} />
+              <Route path="/projetos/:id" element={<AuthGate><ProjetoDetalhes /></AuthGate>} />
+
+              {/* Admin & Configurações */}
+              <Route path="/admin" element={<AuthGate><Admin /></AuthGate>} />
+              <Route path="/admin/permissoes" element={<AuthGate><AdminPermissions /></AuthGate>} />
+              <Route path="/admin/webhooks" element={<AuthGate><AdminWebhooks /></AuthGate>} />
+              <Route path="/admin/notificacoes" element={<AuthGate><AdminNotificacoes /></AuthGate>} />
+              <Route path="/admin/chatbots" element={<AuthGate><AdminChatbots /></AuthGate>} />
+              <Route path="/configuracoes-igreja" element={<AuthGate><ConfiguracoesIgreja /></AuthGate>} />
+              <Route path="/configuracoes" element={<AuthGate><Configuracoes /></AuthGate>} />
+            </Route>
+
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
+);
 
 export default App;

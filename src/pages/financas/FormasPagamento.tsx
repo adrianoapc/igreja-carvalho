@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowLeft, Edit, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Input } from "@/components/ui/input";
+import { Plus, Edit, Trash2, Search, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { FormaPagamentoDialog } from "@/components/financas/FormaPagamentoDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,17 +18,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function FormasPagamento() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingForma, setEditingForma] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [formaToDelete, setFormaToDelete] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: formasPagamento, isLoading } = useQuery({
+  const { data: formasPagamento, isLoading, error } = useQuery({
     queryKey: ['formas-pagamento'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -36,7 +44,16 @@ export default function FormasPagamento() {
         .select('*')
         .order('nome');
       if (error) throw error;
+      console.info('[formas_pagamento] total', data?.length || 0, data);
       return data;
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Erro ao carregar formas",
+        description: err.message,
+        variant: "destructive",
+      });
+      console.error("Erro formas_pagamento:", err);
     },
   });
 
@@ -82,100 +99,117 @@ export default function FormasPagamento() {
     },
   });
 
+  const filteredFormas = (formasPagamento || []).filter((forma) =>
+    forma.nome?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/financas')}
-          className="w-fit"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Formas de Pagamento</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Gerencie as formas de pagamento disponíveis
-            </p>
-          </div>
-          <Button 
-            className="bg-gradient-primary shadow-soft"
-            onClick={() => {
-              setEditingForma(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Nova Forma</span>
-            <span className="sm:hidden">Nova</span>
-          </Button>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Formas de Pagamento</h2>
+          <p className="text-sm text-muted-foreground">Gerencie os meios aceitos.</p>
         </div>
+        <Button 
+          className="bg-gradient-primary shadow-soft"
+          size="sm"
+          onClick={() => {
+            setEditingForma(null);
+            setDialogOpen(true);
+          }}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          <span className="hidden sm:inline">Nova Forma</span>
+          <span className="sm:hidden">Nova</span>
+        </Button>
       </div>
 
-      <Card className="shadow-soft">
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">Lista de Formas de Pagamento</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
-          ) : formasPagamento && formasPagamento.length > 0 ? (
-            <div className="space-y-3">
-              {formasPagamento.map((forma) => (
-                <Card key={forma.id} className="border">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div>
-                          <h3 className="font-semibold text-sm">{forma.nome}</h3>
-                        </div>
+      <Card className="border shadow-sm overflow-hidden">
+        <div className="p-3 border-b bg-muted/5 flex items-center gap-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar forma de pagamento..." 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+            className="max-w-xs h-8 text-sm"
+          />
+        </div>
+
+        {isLoading ? (
+          <div className="p-8 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2"/>
+            Carregando formas...
+          </div>
+        ) : error ? (
+          <div className="p-6 text-center text-destructive text-sm">
+            Falha ao carregar formas. Verifique conexão ou permissões.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent bg-muted/5">
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredFormas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                      {formasPagamento?.length === 0 ? "Nenhuma forma cadastrada." : "Nenhuma forma encontrada."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredFormas.map((forma) => (
+                    <TableRow key={forma.id} className="hover:bg-muted/50">
+                      <TableCell className="font-medium">{forma.nome}</TableCell>
+                      <TableCell>
                         <Badge variant={forma.ativo ? "default" : "secondary"}>
                           {forma.ativo ? "Ativo" : "Inativo"}
                         </Badge>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleAtivoMutation.mutate({ id: forma.id, ativo: forma.ativo })}
-                        >
-                          {forma.ativo ? "Desativar" : "Ativar"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingForma(forma);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setFormaToDelete(forma);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm md:text-base text-muted-foreground text-center py-4">
-              Nenhuma forma de pagamento cadastrada.
-            </p>
-          )}
-        </CardContent>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleAtivoMutation.mutate({ id: forma.id, ativo: forma.ativo })}
+                          >
+                            {forma.ativo ? "Desativar" : "Ativar"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              setEditingForma(forma);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => {
+                              setFormaToDelete(forma);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
 
       <FormaPagamentoDialog

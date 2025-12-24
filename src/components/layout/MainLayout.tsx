@@ -1,7 +1,8 @@
 import * as React from "react";
 import { ReactNode, useRef, useEffect, useState } from "react";
+import { Outlet } from "react-router-dom"; 
 import { AppSidebar } from "./Sidebar";
-import UserMenu from "./UserMenu";
+// Removed: UserMenu import is no longer needed here
 import NotificationsBell from "./NotificationsBell";
 import { SidebarProvider, SidebarTrigger, SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import { Menu } from "lucide-react";
@@ -10,67 +11,64 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay } from "date-fns";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
-
+import { HideValuesProvider } from "@/hooks/useHideValues"; 
+import { Separator } from "@/components/ui/separator"; // Importe o Separator
+import { AppBreadcrumb } from "./AppBreadcrumb"; // Importe o novo componente
 interface MainLayoutProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 function MainLayoutContent({ children }: MainLayoutProps) {
   const { open, setOpen } = useSidebar();
   const mainRef = useRef<HTMLDivElement>(null);
 
-  // Gesto de swipe para abrir/fechar sidebar
   useSwipeElement(mainRef, {
     onSwipeRight: () => {
-      if (!open) {
-        setOpen(true);
-      }
+      if (!open) setOpen(true);
     },
     onSwipeLeft: () => {
-      if (open) {
-        setOpen(false);
-      }
+      if (open) setOpen(false);
     },
     threshold: 80,
   });
 
   return (
     <>
-      {/* Sidebar com z-index alto para ficar sempre acima */}
       <div className="relative z-50">
         <AppSidebar />
       </div>
       
-      {/* Conteúdo principal com z-index inferior e overflow isolado */}
       <SidebarInset className="flex-1 min-w-0 relative z-0">
         <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex h-14 md:h-16 items-center justify-between gap-4 px-4 md:px-8">
-            <SidebarTrigger>
-              <Menu className="h-5 w-5" />
-            </SidebarTrigger>
+            <div className="flex items-center gap-4">
+                  <SidebarTrigger />
+                  <Separator orientation="vertical" className="h-6 hidden md:block" />
+                  <AppBreadcrumb />
+                </div>
             
             <div className="flex items-center gap-2 md:gap-4">
               <NotificationsBell />
-              <UserMenu />
+              {/* UserMenu removido daqui pois já está na Sidebar */}
             </div>
           </div>
         </header>
         
         <main ref={mainRef} className="p-4 md:p-8 min-w-0 overflow-x-hidden">
           {children}
+          <Outlet /> 
         </main>
       </SidebarInset>
     </>
   );
 }
 
-export default function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ children }: MainLayoutProps) {
   const { profile, isAuthenticated, loading } = useAuth();
   const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
   const [checkedToday, setCheckedToday] = useState(false);
 
   useEffect(() => {
-    // Verificar se o usuário já registrou sentimento hoje
     const checkTodaySentimento = async () => {
       if (!isAuthenticated || !profile?.id || loading || checkedToday) return;
 
@@ -94,7 +92,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
         setCheckedToday(true);
 
-        // Se não votou hoje, abre o dialog
         if (!data || data.length === 0) {
           setSentimentoDialogOpen(true);
         }
@@ -108,15 +105,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <MainLayoutContent>{children}</MainLayoutContent>
-      </div>
-      
-      {/* Dialog de verificação diária de sentimento */}
-      <RegistrarSentimentoDialog 
-        open={sentimentoDialogOpen} 
-        onOpenChange={setSentimentoDialogOpen} 
-      />
+      <HideValuesProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <MainLayoutContent>{children}</MainLayoutContent>
+        </div>
+        
+        <RegistrarSentimentoDialog 
+          open={sentimentoDialogOpen} 
+          onOpenChange={setSentimentoDialogOpen} 
+        />
+      </HideValuesProvider>
     </SidebarProvider>
   );
 }

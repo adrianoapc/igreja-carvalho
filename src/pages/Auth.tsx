@@ -137,7 +137,7 @@ export default function Auth() {
         return false;
       }
 
-      navigate('/dashboard', { replace: true });
+      navigate('/', { replace: true });
       return true;
     } catch {
       setBiometricFailed(true);
@@ -154,7 +154,7 @@ export default function Auth() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          navigate("/dashboard", { replace: true });
+          navigate("/", { replace: true });
           return;
         }
       } catch {
@@ -280,7 +280,7 @@ export default function Auth() {
         setLoginEmail(email);
         setShowBiometricDialog(true);
       } else {
-        navigate("/dashboard", { replace: true });
+        navigate("/", { replace: true });
       }
     } catch (error: unknown) {
       const authError = parseAuthError(error);
@@ -352,7 +352,7 @@ export default function Auth() {
         setLoginEmail(email);
         setShowBiometricDialog(true);
       } else {
-        navigate("/dashboard", { replace: true });
+        navigate("/", { replace: true });
       }
     } catch (error: unknown) {
       const authError = parseAuthError(error);
@@ -450,7 +450,7 @@ export default function Auth() {
         setPendingUserId(data.user.id);
         setShowBiometricDialog(true);
       } else {
-        navigate("/dashboard");
+        navigate("/");
       }
     } catch (error: unknown) {
       const authError = parseAuthError(error);
@@ -559,7 +559,7 @@ export default function Auth() {
   };
 
   const handleBiometricComplete = () => {
-    navigate("/dashboard", { replace: true });
+    navigate("/", { replace: true });
   };
 
   const handleBackFromLogin = () => {

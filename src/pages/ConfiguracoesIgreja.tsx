@@ -2,40 +2,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Save, X, AlertTriangle, Bell, Phone, MessageSquare, Webhook, Bot, CheckCircle2, ExternalLink } from "lucide-react";
+import { Upload, Save, X, Phone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import InputMask from "react-input-mask";
-import { useNavigate } from "react-router-dom";
+
 export default function ConfiguracoesIgreja() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
   const [config, setConfig] = useState({
     id: "",
     nome_igreja: "Igreja App",
     subtitulo: "Gestão Completa",
     logo_url: null as string | null,
-    whatsapp_provider: "make_webhook" as string,
-    whatsapp_token: null as string | null,
-    whatsapp_instance_id: null as string | null,
     telefone_plantao_pastoral: null as string | null
   });
+  
   const [novoLogo, setNovoLogo] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  
-  // Hook para gerenciar modo de manutenção
-  const { 
-    config: maintenanceConfig, 
-    isLoading: maintenanceLoading, 
-    updateConfig: updateMaintenanceConfig 
-  } = useAppConfig();
 
   useEffect(() => {
     loadConfig();
@@ -53,7 +40,7 @@ export default function ConfiguracoesIgreja() {
     try {
       const { data, error } = await supabase
         .from("configuracoes_igreja")
-        .select("*")
+        .select("id, nome_igreja, subtitulo, logo_url, telefone_plantao_pastoral")
         .single();
 
       if (error) throw error;
@@ -93,41 +80,6 @@ export default function ConfiguracoesIgreja() {
     setNovoLogo(null);
     setPreviewUrl(null);
     setConfig(prev => ({ ...prev, logo_url: null }));
-  };
-
-  const handleMaintenanceModeChange = async (enabled: boolean) => {
-    const success = await updateMaintenanceConfig({ maintenance_mode: enabled });
-    if (success) {
-      toast.success(
-        enabled ? "Modo de manutenção ativado" : "Modo de manutenção desativado",
-        {
-          description: enabled 
-            ? "O sistema está bloqueado para usuários comuns" 
-            : "O sistema voltou ao normal"
-        }
-      );
-    }
-  };
-
-  const handlePublicAccessChange = async (enabled: boolean) => {
-    const success = await updateMaintenanceConfig({ allow_public_access: enabled });
-    if (success) {
-      toast.success(
-        enabled ? "Acesso público liberado" : "Acesso público bloqueado",
-        {
-          description: enabled
-            ? "Formulários de cadastro estão acessíveis"
-            : "Formulários de cadastro foram bloqueados"
-        }
-      );
-    }
-  };
-
-  const handleMaintenanceMessageChange = async (message: string) => {
-    const success = await updateMaintenanceConfig({ maintenance_message: message });
-    if (success) {
-      toast.success("Mensagem atualizada");
-    }
   };
 
   const handleSave = async () => {
@@ -176,22 +128,22 @@ export default function ConfiguracoesIgreja() {
           nome_igreja: config.nome_igreja,
           subtitulo: config.subtitulo,
           logo_url: logoUrl,
-          whatsapp_provider: config.whatsapp_provider,
-          whatsapp_token: config.whatsapp_token,
-          whatsapp_instance_id: config.whatsapp_instance_id,
           telefone_plantao_pastoral: config.telefone_plantao_pastoral?.replace(/\D/g, '') || null
         })
         .eq("id", config.id);
 
       if (error) throw error;
 
-      toast.success("Configurações salvas com sucesso!");
+      toast.success("Dados da igreja atualizados!");
       setNovoLogo(null);
       setPreviewUrl(null);
       loadConfig();
       
-      // Recarregar a página para atualizar a sidebar
-      setTimeout(() => window.location.reload(), 1000);
+      // Recarregar a página para atualizar a sidebar se mudou o logo
+      if (novoLogo || !logoUrl) {
+         setTimeout(() => window.location.reload(), 1000);
+      }
+
     } catch (error: any) {
       toast.error("Erro ao salvar configurações", {
         description: error.message
@@ -203,400 +155,148 @@ export default function ConfiguracoesIgreja() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Configurações da Igreja</h1>
-          <p className="text-muted-foreground mt-1">Carregando...</p>
-        </div>
-      </div>
-    );
+    return <div className="p-4 text-muted-foreground">Carregando dados institucionais...</div>;
   }
 
   const displayLogoUrl = previewUrl || config.logo_url;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Configurações da Igreja</h1>
-        <p className="text-muted-foreground mt-1">
-          Personalize as informações da sua igreja
-        </p>
-      </div>
-
-      {/* Painel de Modo de Manutenção */}
-      <Card className={maintenanceConfig.maintenance_mode ? "border-orange-500 border-2" : ""}>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className={maintenanceConfig.maintenance_mode ? "text-orange-500" : "text-muted-foreground"} />
-            <CardTitle>Modo de Manutenção</CardTitle>
-          </div>
+      {/* Dados de Identidade */}
+      <Card className="border-0 shadow-none">
+        <CardHeader className="px-0 pt-0">
+          <CardTitle>Identidade Visual</CardTitle>
           <CardDescription>
-            Controle o acesso ao sistema durante manutenções e atualizações
+            Como a igreja aparece no aplicativo e nos relatórios.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Ativar/Desativar Manutenção */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="maintenance-mode" className="text-base">
-                Ativar Modo de Manutenção
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Bloqueia o acesso para usuários comuns. Administradores e técnicos continuam com acesso total.
-              </p>
-            </div>
-            <Switch
-              id="maintenance-mode"
-              checked={maintenanceConfig.maintenance_mode}
-              onCheckedChange={handleMaintenanceModeChange}
-              disabled={maintenanceLoading}
-            />
-          </div>
-
-          {/* Liberar Formulários Públicos (só aparece se manutenção ativa) */}
-          {maintenanceConfig.maintenance_mode && (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="public-access" className="text-base">
-                    Liberar Formulários Públicos
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Mantém acessíveis as páginas de cadastro de visitantes e membros
-                  </p>
-                </div>
-                <Switch
-                  id="public-access"
-                  checked={maintenanceConfig.allow_public_access}
-                  onCheckedChange={handlePublicAccessChange}
-                  disabled={maintenanceLoading}
-                />
-              </div>
-
-              {/* Mensagem Personalizada */}
-              <div className="space-y-2">
-                <Label htmlFor="maintenance-message">Mensagem de Manutenção</Label>
-                <Textarea
-                  id="maintenance-message"
-                  value={maintenanceConfig.maintenance_message || ""}
-                  onChange={(e) => {
-                    // Update local state for preview
-                  }}
-                  onBlur={(e) => handleMaintenanceMessageChange(e.target.value)}
-                  placeholder="Digite uma mensagem personalizada para os usuários..."
-                  rows={3}
-                  disabled={maintenanceLoading}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Esta mensagem será exibida na tela de manutenção
-                </p>
-              </div>
-
-              {/* Aviso de Status */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <div className="flex gap-2">
-                  <AlertTriangle className="text-orange-500 w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-orange-900">
-                      Sistema em Manutenção
-                    </p>
-                    <p className="text-xs text-orange-700">
-                      Você está vendo o sistema normalmente porque é {" "}
-                      <strong>administrador/técnico</strong>. 
-                      Usuários comuns estão vendo a tela de manutenção.
-                      {maintenanceConfig.allow_public_access && (
-                        <span className="block mt-1">
-                          ✓ Formulários públicos de cadastro estão liberados
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações Básicas</CardTitle>
-          <CardDescription>
-            Configure o nome, subtítulo e logo da igreja
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="px-0 space-y-6">
           {/* Logo */}
-          <div className="space-y-2">
-            <Label>Logo da Igreja</Label>
-            {displayLogoUrl && (
-              <div className="relative w-32 h-32 border rounded-lg p-2">
-                <img
-                  src={displayLogoUrl}
-                  alt="Logo"
-                  className="w-full h-full object-contain"
-                />
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6"
-                  onClick={handleRemoverLogo}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+          <div className="flex flex-col sm:flex-row gap-6 items-start">
+            <div className="space-y-2">
+              <Label>Logotipo</Label>
+              <div className="relative w-32 h-32 border rounded-lg p-2 bg-muted/10 flex items-center justify-center">
+                {displayLogoUrl ? (
+                  <>
+                    <img
+                      src={displayLogoUrl}
+                      alt="Logo"
+                      className="w-full h-full object-contain"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                      onClick={handleRemoverLogo}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground text-center">Sem Logo</span>
+                )}
               </div>
-            )}
-            <div className="flex gap-2">
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={handleLogoChange}
-                className="hidden"
-                id="logo-upload"
-              />
-              <Label htmlFor="logo-upload" className="cursor-pointer">
-                <Button variant="outline" asChild>
-                  <span>
-                    <Upload className="w-4 h-4 mr-2" />
-                    {displayLogoUrl ? "Trocar Logo" : "Fazer Upload"}
-                  </span>
-                </Button>
-              </Label>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Formatos aceitos: JPG, PNG, SVG. Tamanho máximo: 2MB
-            </p>
-          </div>
 
-          {/* Nome da Igreja */}
-          <div className="space-y-2">
-            <Label htmlFor="nome">Nome da Igreja</Label>
-            <Input
-              id="nome"
-              value={config.nome_igreja}
-              onChange={(e) => setConfig(prev => ({ ...prev, nome_igreja: e.target.value }))}
-              placeholder="Nome da Igreja"
-            />
-          </div>
-
-          {/* Subtítulo */}
-          <div className="space-y-2">
-            <Label htmlFor="subtitulo">Subtítulo</Label>
-            <Input
-              id="subtitulo"
-              value={config.subtitulo || ""}
-              onChange={(e) => setConfig(prev => ({ ...prev, subtitulo: e.target.value }))}
-              placeholder="Subtítulo ou slogan"
-            />
-          </div>
-
-
-          {/* Botão Salvar */}
-          <Button 
-            onClick={handleSave} 
-            disabled={saving || uploading}
-            className="w-full"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {uploading ? "Fazendo upload..." : saving ? "Salvando..." : "Salvar Alterações"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Card de Webhooks */}
-      <Card className="border-dashed">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Webhook className="text-primary" />
-            <CardTitle>Webhooks de Integração</CardTitle>
-          </div>
-          <CardDescription>
-            Gerencie URLs de webhook para Make.com e outras integrações
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/admin/webhooks')}
-            className="w-full"
-          >
-            <Webhook className="w-4 h-4 mr-2" />
-            Gerenciar Webhooks
-          </Button>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Configure de forma segura os webhooks de escalas, liturgia e notificações
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Card de Configuração de IA/Chatbot */}
-      <Card className="border-dashed">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Bot className="text-primary" />
-            <CardTitle>Chatbots & Inteligência Artificial</CardTitle>
-          </div>
-          <CardDescription>
-            Gerencie configurações de chatbots, modelos de IA e prompts
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Status OpenAI API */}
-          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-              <div>
-                <p className="font-medium text-green-900 dark:text-green-100 text-sm">OpenAI API Configurada</p>
-                <p className="text-xs text-green-700 dark:text-green-300">
-                  Pronto para uso com modelos GPT e Whisper
+            <div className="flex-1 space-y-4 w-full">
+               <div className="space-y-2">
+                <Label htmlFor="logo-upload">Alterar Imagem</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <Label htmlFor="logo-upload" className="cursor-pointer">
+                    <Button variant="outline" asChild size="sm">
+                      <span>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Escolher Arquivo
+                      </span>
+                    </Button>
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Recomendado: PNG Transparente ou JPG. Máx 2MB.
                 </p>
               </div>
             </div>
           </div>
 
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/admin/chatbots')}
-            className="w-full"
-          >
-            <Bot className="w-4 h-4 mr-2" />
-            Gerenciar Chatbots & IAs
-          </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            Configure modelos, prompts e roles para cada chatbot
-          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Nome da Igreja */}
+            <div className="space-y-2">
+              <Label htmlFor="nome">Nome da Igreja</Label>
+              <Input
+                id="nome"
+                value={config.nome_igreja}
+                onChange={(e) => setConfig(prev => ({ ...prev, nome_igreja: e.target.value }))}
+                placeholder="Ex: Igreja Batista Central"
+              />
+            </div>
+
+            {/* Subtítulo */}
+            <div className="space-y-2">
+              <Label htmlFor="subtitulo">Slogan / Subtítulo</Label>
+              <Input
+                id="subtitulo"
+                value={config.subtitulo || ""}
+                onChange={(e) => setConfig(prev => ({ ...prev, subtitulo: e.target.value }))}
+                placeholder="Ex: Um lugar de novos começos"
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Bell className="text-primary" />
-            <CardTitle>Notificações & Plantão Pastoral</CardTitle>
-          </div>
+      {/* Contato Institucional */}
+      <Card className="border-0 shadow-none border-t pt-6 rounded-none">
+        <CardHeader className="px-0 pt-0">
+          <CardTitle>Contato Institucional</CardTitle>
           <CardDescription>
-            Configure alertas críticos e integrações de WhatsApp
+            Canais oficiais de atendimento.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Telefone Plantão */}
-          <div className="space-y-2">
-            <Label htmlFor="telefone-plantao" className="flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              Telefone do Plantão Pastoral
-            </Label>
-            <InputMask
-              mask="(99) 99999-9999"
-              value={config.telefone_plantao_pastoral || ""}
-              onChange={(e) => setConfig(prev => ({ ...prev, telefone_plantao_pastoral: e.target.value }))}
-            >
-              {(inputProps: any) => (
-                <Input
-                  {...inputProps}
-                  id="telefone-plantao"
-                  placeholder="(11) 99999-9999"
-                />
-              )}
-            </InputMask>
-            <p className="text-xs text-muted-foreground">
-              Número que receberá alertas críticos de sentimentos negativos
-            </p>
-          </div>
-
-          {/* Provedor WhatsApp */}
-          <div className="space-y-2">
-            <Label htmlFor="whatsapp-provider" className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Provedor WhatsApp
-            </Label>
-            <Select
-              value={config.whatsapp_provider}
-              onValueChange={(value) => setConfig(prev => ({ ...prev, whatsapp_provider: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o provedor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="make_webhook">Make.com (Webhook)</SelectItem>
-                <SelectItem value="meta_official">Meta Official API</SelectItem>
-                <SelectItem value="evolution_api">Evolution API</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Escolha como os alertas serão enviados via WhatsApp
-            </p>
-          </div>
-
-          {/* Campos condicionais baseados no provedor */}
-          {config.whatsapp_provider === 'meta_official' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp-token">Token de Acesso (Meta)</Label>
-                <Input
-                  id="whatsapp-token"
-                  type="password"
-                  value={config.whatsapp_token || ""}
-                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_token: e.target.value }))}
-                  placeholder="EAAxxxxxx..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp-instance">Phone Number ID</Label>
-                <Input
-                  id="whatsapp-instance"
-                  value={config.whatsapp_instance_id || ""}
-                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_instance_id: e.target.value }))}
-                  placeholder="1234567890123456"
-                />
-              </div>
-            </>
-          )}
-
-          {config.whatsapp_provider === 'evolution_api' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp-token">API Key (Evolution)</Label>
-                <Input
-                  id="whatsapp-token"
-                  type="password"
-                  value={config.whatsapp_token || ""}
-                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_token: e.target.value }))}
-                  placeholder="B6D711FCDE4D4FD5936544120E713976"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp-instance">Nome da Instância</Label>
-                <Input
-                  id="whatsapp-instance"
-                  value={config.whatsapp_instance_id || ""}
-                  onChange={(e) => setConfig(prev => ({ ...prev, whatsapp_instance_id: e.target.value }))}
-                  placeholder="minha-instancia"
-                />
-              </div>
-            </>
-          )}
-
-          {config.whatsapp_provider === 'make_webhook' && (
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                📌 Usando webhook Make.com configurado acima para envios de WhatsApp.
+        <CardContent className="px-0">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="telefone-plantao" className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Plantão Pastoral (Whatsapp/Tel)
+              </Label>
+              <InputMask
+                mask="(99) 99999-9999"
+                value={config.telefone_plantao_pastoral || ""}
+                onChange={(e) => setConfig(prev => ({ ...prev, telefone_plantao_pastoral: e.target.value }))}
+              >
+                {(inputProps: any) => (
+                  <Input
+                    {...inputProps}
+                    id="telefone-plantao"
+                    placeholder="(11) 99999-9999"
+                  />
+                )}
+              </InputMask>
+              <p className="text-xs text-muted-foreground">
+                Este número será exibido aos membros em caso de urgência.
               </p>
             </div>
-          )}
-
-          {/* Botão Salvar Notificações */}
-          <Button 
-            onClick={handleSave} 
-            disabled={saving}
-            variant="outline"
-            className="w-full"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Salvar Configurações de Notificação
-          </Button>
+          </div>
         </CardContent>
       </Card>
+
+      <div className="flex justify-end pt-4">
+        <Button 
+          onClick={handleSave} 
+          disabled={saving || uploading}
+          className="w-full sm:w-auto min-w-[150px]"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          {uploading ? "Enviando logo..." : saving ? "Salvando..." : "Salvar Dados"}
+        </Button>
+      </div>
     </div>
   );
 }
