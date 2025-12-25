@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -203,16 +203,15 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{time ? "Editar Time" : "Novo Time"}</DialogTitle>
-          <DialogDescription>
-            {time ? "Atualize as informações do time" : "Crie um novo time para os cultos"}
-          </DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">{time ? "Editar Time" : "Novo Time"}</h2>
+          <p className="text-sm text-muted-foreground">{time ? "Atualize as informações do time" : "Crie um novo time para os cultos"}</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nome */}
           <div className="space-y-2">
             <Label htmlFor="nome">Nome do Time *</Label>
@@ -411,8 +410,9 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
               )}
             </Button>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

@@ -1,4 +1,5 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -370,10 +371,10 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+            <h2 className="flex items-center gap-3 text-lg font-semibold leading-none tracking-tight">
               <div 
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{ backgroundColor: time.cor || '#8B5CF6' }}
@@ -381,11 +382,12 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                 <Users className="w-5 h-5 text-white" />
               </div>
               {time.nome}
-            </DialogTitle>
-            <DialogDescription>
-              Gerencie as posições e membros deste time
-            </DialogDescription>
-          </DialogHeader>
+            </h2>
+            <p className="text-sm text-muted-foreground">Gerencie os membros e informações deste time</p>
+          </div>
+
+          <ScrollArea className="flex-1 overflow-hidden">
+            <div className="px-4 py-4 md:px-6 md:py-5">
 
           <Tabs defaultValue="posicoes" className="flex-1 overflow-hidden flex flex-col">
             <TabsList className="grid w-full grid-cols-2">
@@ -673,8 +675,7 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
               </ScrollArea>
             </TabsContent>
           </Tabs>
-        </DialogContent>
-      </Dialog>
+            </div>\n          </ScrollArea>\n        </div>\n      </ResponsiveDialog>
 
       {/* Confirmação de Deletar Posição */}
       <AlertDialog open={!!posicaoParaDeletar} onOpenChange={() => setPosicaoParaDeletar(null)}>

@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle } from "lucide-react";
 import * as React from "react";
@@ -49,14 +49,14 @@ export function ConferirOfertaDialog({
       >
         Conferir
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Conferência de Oferta</DialogTitle>
-            <DialogDescription>
-              Revise os valores e confirme o lançamento
-            </DialogDescription>
-          </DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={setOpen}>
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Conferência de Oferta</h2>
+            <p className="text-sm text-muted-foreground">Revise os valores e confirme o lançamento</p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -103,7 +103,7 @@ export function ConferirOfertaDialog({
             </div>
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 border-t bg-muted/50 px-4 py-3 md:px-6">
             <Button
               type="button"
               variant="outline"
@@ -129,9 +129,10 @@ export function ConferirOfertaDialog({
               <CheckCircle2 className="w-4 h-4 mr-2" />
               {loading ? 'Confirmando...' : 'Confirmar Valores'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+          </div>
+        </div>
+      </ResponsiveDialog>
     </>
   );
 }
