@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface NovoPedidoDialogProps {
   open: boolean;
@@ -119,11 +119,13 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Novo Pedido de Oração</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">Novo Pedido de Oração</h2>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="tipo">Tipo de Pedido</Label>
@@ -218,7 +220,9 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        </div>
+    </ResponsiveDialog>
   );
 }
