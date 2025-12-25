@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -125,13 +125,13 @@ export default function TarefaDialog({ open, onOpenChange, projetoId, tarefa, on
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{tarefa ? "Editar Tarefa" : "Nova Tarefa"}</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">{tarefa ? "Editar Tarefa" : "Nova Tarefa"}</h2>
+        </div>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
           <div className="space-y-2">
             <Label>Título *</Label>
             <Input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Nome da tarefa" />
@@ -203,8 +203,10 @@ export default function TarefaDialog({ open, onOpenChange, projetoId, tarefa, on
               </Popover>
             </div>
           </div>
+      </div>
 
-          <div className="flex justify-between pt-4">
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6">
+          <div className="flex justify-between pt-0">
             {tarefa && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -237,7 +239,7 @@ export default function TarefaDialog({ open, onOpenChange, projetoId, tarefa, on
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

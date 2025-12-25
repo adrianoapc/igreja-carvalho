@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -213,14 +213,13 @@ export function VisitanteDetailsDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Visitante</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Detalhes do Visitante</h2>
+          </div>
 
-          <ScrollArea className="max-h-[calc(90vh-8rem)]">
-            <div className="space-y-4 pr-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
               <Card>
                 <CardContent className="pt-6">
                   <div className="space-y-4">
@@ -368,10 +367,9 @@ export function VisitanteDetailsDialog({
                   ))}
                 </div>
               )}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </ResponsiveDialog>
 
       <AlertDialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
         <AlertDialogContent>

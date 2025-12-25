@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { useState } from "react";
@@ -293,17 +293,17 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
   };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
+    <ResponsiveDialog open={open} onOpenChange={(open) => {
       onOpenChange(open);
       if (!open) resetForm();
     }}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Importar {tipo === "entrada" ? "Entradas" : "Saídas"} via Excel/CSV</DialogTitle>
-        </DialogHeader>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">Importar {tipo === "entrada" ? "Entradas" : "Saídas"} via Excel/CSV</h2>
+        </div>
 
-        <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
-          <div className="space-y-4">
+        <ScrollArea className="flex-1 overflow-hidden">
+          <div className="px-4 py-4 md:px-6 md:py-5 space-y-4">
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
@@ -534,7 +534,7 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
           </div>
         </ScrollArea>
 
-        <div className="flex gap-2 justify-end border-t pt-4">
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
           <Button
             variant="outline"
             onClick={() => {
@@ -551,7 +551,7 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
             {loading ? "Importando..." : `Importar ${preview.length} transações`}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }
