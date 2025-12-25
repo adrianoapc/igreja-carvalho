@@ -1,10 +1,5 @@
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -80,15 +75,14 @@ export function ConfirmarPagamentoDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            Confirmar {tipo === "entrada" ? "Recebimento" : "Pagamento"}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title={`Confirmar ${tipo === "entrada" ? "Recebimento" : "Pagamento"}`}
+    >
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <div className="space-y-4">
           <div className="space-y-2">
             <Label>Data de {tipo === "entrada" ? "Recebimento" : "Pagamento"}</Label>
             <Popover>
@@ -164,9 +158,10 @@ export function ConfirmarPagamentoDialog({
               />
             </div>
           </div>
+          </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-3">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -183,7 +178,7 @@ export function ConfirmarPagamentoDialog({
             {loading ? "Confirmando..." : "Confirmar"}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

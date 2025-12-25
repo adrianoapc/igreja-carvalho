@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
@@ -131,16 +131,20 @@ export default function ProcessarNotaFiscalDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Processar Nota Fiscal com IA</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Processar Nota Fiscal com IA"
+    >
+      <div className="flex flex-col h-full">
+        <div className="px-4 pt-2 pb-0 md:px-6">
+          <p className="text-sm text-muted-foreground">
             Envie uma foto ou PDF da nota fiscal. A IA irá extrair automaticamente os dados do fornecedor, valor e outras informações.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <div className="space-y-4">
           {loading && (
             <div className="flex items-center justify-center gap-2 p-4">
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -168,8 +172,9 @@ export default function ProcessarNotaFiscalDialog({
               <li>• PDFs de notas eletrônicas funcionam melhor</li>
             </ul>
           </div>
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

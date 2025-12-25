@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
@@ -130,12 +130,13 @@ export function AplicarTemplateDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Aplicar Template de Liturgia</DialogTitle>
-        </DialogHeader>
-
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Aplicar Template de Liturgia"
+    >
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -185,13 +186,14 @@ export function AplicarTemplateDialog({
             </div>
           </ScrollArea>
         )}
+        </div>
 
-        <div className="flex justify-end pt-4 border-t">
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }
