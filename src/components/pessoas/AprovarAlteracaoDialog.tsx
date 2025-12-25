@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -200,16 +201,17 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
   if (!alteracao) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight">
             <span className="w-1 h-6 bg-primary rounded-full" />
             Aprovar Alteração de Perfil
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+        </div>
 
-        <div className="space-y-6">
+        <ScrollArea className="flex-1 overflow-hidden">
+          <div className="space-y-6 px-4 py-4 md:px-6 md:py-5">
           {/* Cabeçalho com info do perfil */}
           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-4">
@@ -296,8 +298,9 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
               Aprovar perfil
             </Button>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+        </ScrollArea>
+      </div>
+    </ResponsiveDialog>
   );
 }

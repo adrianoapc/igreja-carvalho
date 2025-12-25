@@ -1,14 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,7 +26,6 @@ import {
   Check
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -981,16 +974,16 @@ export function AgendamentoDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm max-h-[85vh] flex flex-col p-4">
-        <DialogHeader className="pb-1 shrink-0 space-y-1">
-          <DialogTitle className="flex items-center gap-1.5 text-sm">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4 space-y-1 shrink-0">
+          <h2 className="flex items-center gap-1.5 text-lg font-semibold leading-none tracking-tight">
             <CalendarIcon className="h-4 w-4 text-primary" />
             {isNovoAtendimento ? "Novo Atendimento" : "Agendar Atendimento"}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
+          </h2>
+          <p className="sr-only">
             Wizard para agendar atendimento pastoral
-          </DialogDescription>
+          </p>
           
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-1 pt-1">
@@ -1017,7 +1010,7 @@ export function AgendamentoDialog({
               );
             })}
           </div>
-        </DialogHeader>
+        </div>
 
         <ScrollArea className="flex-1 min-h-0 py-2">
           <div className="px-0.5">
@@ -1025,7 +1018,7 @@ export function AgendamentoDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="border-t pt-2 shrink-0">
+        <div className="border-t pt-2 shrink-0">
           <div className="flex w-full gap-1.5">
             {currentStepIndex > 0 && (
               <Button
@@ -1068,8 +1061,8 @@ export function AgendamentoDialog({
               </Button>
             )}
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

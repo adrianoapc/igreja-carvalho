@@ -1,10 +1,6 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,13 +134,14 @@ export function GerenciarFuncoesDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Gerenciar Funções da Igreja</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">Gerenciar Funções da Igreja</h2>
+        </div>
 
-        <div className="space-y-4">
+        <ScrollArea className="flex-1 overflow-hidden">
+          <div className="space-y-4 px-4 py-4 md:px-6 md:py-5">
           {!showForm && (
             <Button onClick={() => setShowForm(true)} className="w-full">
               <Plus className="w-4 h-4 mr-2" />
@@ -248,7 +245,8 @@ export function GerenciarFuncoesDialog({
             ))}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </ScrollArea>
+      </div>
+    </ResponsiveDialog>
   );
 }

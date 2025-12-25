@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Fingerprint, Loader2, ScanFace, CheckCircle2, XCircle } from 'lucide-react';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -109,9 +110,9 @@ export function EnableBiometricDialog({
   const isEnrolling = enrollState === 'enrolling';
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-sm">
-        <AlertDialogHeader className="text-center">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="text-center space-y-4">
           <div className="flex justify-center mb-4">
             <div className={cn(
               "p-4 rounded-full transition-colors duration-300",
@@ -131,16 +132,16 @@ export function EnableBiometricDialog({
             </div>
           </div>
           
-          <AlertDialogTitle>
+          <h2 className="text-lg font-semibold">
             {enrollState === 'success' 
               ? `${biometricLabel} ativado!` 
               : enrollState === 'error'
               ? 'Não foi possível ativar'
               : `Ativar ${biometricLabel}?`
             }
-          </AlertDialogTitle>
+          </h2>
           
-          <AlertDialogDescription className="text-center">
+          <p className="text-center text-sm text-muted-foreground">
             {enrollState === 'success' ? (
               'Você poderá usar sua biometria para desbloquear o app.'
             ) : enrollState === 'error' ? (
@@ -155,10 +156,10 @@ export function EnableBiometricDialog({
                 o app rapidamente nas próximas vezes.
               </>
             )}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </p>
+        </div>
         
-        <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+        <div className="flex flex-col gap-2">
           {enrollState === 'error' ? (
             <>
               <Button
@@ -204,8 +205,8 @@ export function EnableBiometricDialog({
               </Button>
             </>
           )}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
