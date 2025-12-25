@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { z } from "zod";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface AlterarSenhaDialogProps {
   open: boolean;
@@ -108,16 +108,16 @@ export function AlterarSenhaDialog({ open, onOpenChange }: AlterarSenhaDialogPro
   };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
+    <ResponsiveDialog open={open} onOpenChange={(open) => {
       if (!open) resetForm();
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Alterar Senha</DialogTitle>
-        </DialogHeader>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">Alterar Senha</h2>
+        </div>
         
-        <div className="space-y-4 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5"><div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="senhaAtual">Senha Atual</Label>
             <div className="relative">
@@ -210,9 +210,9 @@ export function AlterarSenhaDialog({ open, onOpenChange }: AlterarSenhaDialogPro
               <p className="text-sm text-destructive">{errors.confirmarSenha}</p>
             )}
           </div>
-        </div>
+        </div></div>
 
-        <DialogFooter>
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancelar
           </Button>
@@ -220,8 +220,8 @@ export function AlterarSenhaDialog({ open, onOpenChange }: AlterarSenhaDialogPro
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Alterar Senha
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

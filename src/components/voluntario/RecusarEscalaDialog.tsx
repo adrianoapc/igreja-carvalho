@@ -1,17 +1,10 @@
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface Escala {
   id: string;
@@ -57,22 +50,20 @@ export function RecusarEscalaDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Recusar Escala</DialogTitle>
-          <DialogDescription>
-            {escala && (
-              <>
-                Você está recusando a escala de <strong>{escala.time.nome}</strong> para{" "}
-                <strong>{escala.culto.titulo}</strong> em{" "}
-                {format(new Date(escala.culto.data_culto), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.
-              </>
-            )}
-          </DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={handleClose}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">Recusar Escala</h2>
+          {escala && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Escala de <strong>{escala.time.nome}</strong> para <strong>{escala.culto.titulo}</strong> em{" "}
+              {format(new Date(escala.culto.data_culto), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.
+            </p>
+          )}
+        </div>
 
-        <div className="space-y-4 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="motivo">Motivo da recusa *</Label>
             <Textarea
@@ -86,9 +77,10 @@ export function RecusarEscalaDialog({
               O líder do ministério será notificado para encontrar um substituto.
             </p>
           </div>
+          </div>
         </div>
 
-        <DialogFooter>
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
           <Button variant="outline" onClick={() => handleClose(false)}>
             Cancelar
           </Button>
@@ -99,8 +91,8 @@ export function RecusarEscalaDialog({
           >
             {loading ? "Enviando..." : "Confirmar Recusa"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
