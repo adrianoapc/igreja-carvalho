@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface TagMidiaDialogProps {
   open: boolean;
@@ -79,61 +79,65 @@ export function TagMidiaDialog({ open, onOpenChange, tag, onSuccess }: TagMidiaD
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{tag ? "Editar" : "Nova"} Tag</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="nome">Nome *</Label>
-            <Input
-              id="nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Abertura"
-            />
-          </div>
-
-          <div>
-            <Label>Cor</Label>
-            <div className="grid grid-cols-3 gap-2 mt-2">
-              {CORES_PREDEFINIDAS.map((corPredefinida) => (
-                <button
-                  key={corPredefinida.valor}
-                  type="button"
-                  onClick={() => setCor(corPredefinida.valor)}
-                  className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all hover:scale-105 ${
-                    cor === corPredefinida.valor 
-                      ? 'border-primary shadow-md' 
-                      : 'border-transparent hover:border-border'
-                  }`}
-                >
-                  <div
-                    className="w-6 h-6 rounded-full"
-                    style={{ backgroundColor: corPredefinida.valor }}
-                  />
-                  <span className="text-xs font-medium">{corPredefinida.nome}</span>
-                </button>
-              ))}
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title={`${tag ? "Editar" : "Nova"} Tag`}
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="nome">Nome *</Label>
+              <Input
+                id="nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex: Abertura"
+              />
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <Label htmlFor="cor-custom">Cor personalizada:</Label>
-            <input
-              id="cor-custom"
-              type="color"
-              value={cor}
-              onChange={(e) => setCor(e.target.value)}
-              className="w-12 h-10 rounded cursor-pointer"
-            />
-            <span className="text-sm text-muted-foreground">{cor}</span>
+            <div>
+              <Label>Cor</Label>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {CORES_PREDEFINIDAS.map((corPredefinida) => (
+                  <button
+                    key={corPredefinida.valor}
+                    type="button"
+                    onClick={() => setCor(corPredefinida.valor)}
+                    className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all hover:scale-105 ${
+                      cor === corPredefinida.valor 
+                        ? 'border-primary shadow-md' 
+                        : 'border-transparent hover:border-border'
+                    }`}
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full"
+                      style={{ backgroundColor: corPredefinida.valor }}
+                    />
+                    <span className="text-xs font-medium">{corPredefinida.nome}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label htmlFor="cor-custom">Cor personalizada:</Label>
+              <input
+                id="cor-custom"
+                type="color"
+                value={cor}
+                onChange={(e) => setCor(e.target.value)}
+                className="w-12 h-10 rounded cursor-pointer"
+              />
+              <span className="text-sm text-muted-foreground">{cor}</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-2 justify-end mt-6">
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
@@ -142,7 +146,7 @@ export function TagMidiaDialog({ open, onOpenChange, tag, onSuccess }: TagMidiaD
             Salvar
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

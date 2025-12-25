@@ -1,11 +1,4 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface Funcao {
   id: string;
@@ -120,62 +114,67 @@ export function AtribuirFuncaoDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Atribuir Função</DialogTitle>
-          <p className="text-sm text-muted-foreground">
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Atribuir Função"
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <p className="text-sm text-muted-foreground mb-4">
             Atribuir função para: <strong>{membroNome}</strong>
           </p>
-        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="funcao">Função</Label>
-            <Select value={selectedFuncao} onValueChange={setSelectedFuncao}>
-              <SelectTrigger id="funcao">
-                <SelectValue placeholder="Selecione uma função" />
-              </SelectTrigger>
-              <SelectContent>
-                {funcoes.map((funcao) => (
-                  <SelectItem key={funcao.id} value={funcao.id}>
-                    {funcao.nome}
-                    {funcao.descricao && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        - {funcao.descricao}
-                      </span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="funcao">Função</Label>
+              <Select value={selectedFuncao} onValueChange={setSelectedFuncao}>
+                <SelectTrigger id="funcao">
+                  <SelectValue placeholder="Selecione uma função" />
+                </SelectTrigger>
+                <SelectContent>
+                  {funcoes.map((funcao) => (
+                    <SelectItem key={funcao.id} value={funcao.id}>
+                      {funcao.nome}
+                      {funcao.descricao && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          - {funcao.descricao}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="dataInicio">Data de Início</Label>
-            <Input
-              id="dataInicio"
-              type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="dataInicio">Data de Início</Label>
+              <Input
+                id="dataInicio"
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+              />
+            </div>
+          </form>
+        </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Atribuir
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Atribuir
+          </Button>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

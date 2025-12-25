@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface SalvarLiturgiaTemplateDialogProps {
   open: boolean;
@@ -98,41 +98,45 @@ export function SalvarLiturgiaTemplateDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Salvar como Template</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Salvar como Template"
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="nome">Nome do Template *</Label>
+              <Input
+                id="nome"
+                placeholder="Ex: Culto de Santa Ceia"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                autoFocus
+              />
+            </div>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="nome">Nome do Template *</Label>
-            <Input
-              id="nome"
-              placeholder="Ex: Culto de Santa Ceia"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              autoFocus
-            />
+            <div className="space-y-2">
+              <Label htmlFor="descricao">Descrição (opcional)</Label>
+              <Textarea
+                id="descricao"
+                placeholder="Descreva este template..."
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Os itens da liturgia atual serão salvos como template para reutilização em outros cultos.
+            </p>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="descricao">Descrição (opcional)</Label>
-            <Textarea
-              id="descricao"
-              placeholder="Descreva este template..."
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <p className="text-sm text-muted-foreground">
-            Os itens da liturgia atual serão salvos como template para reutilização em outros cultos.
-          </p>
         </div>
 
-        <DialogFooter>
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancelar
           </Button>
@@ -144,8 +148,8 @@ export function SalvarLiturgiaTemplateDialog({
             )}
             Salvar Template
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
