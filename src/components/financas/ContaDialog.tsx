@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface ContaDialogProps {
   open: boolean;
@@ -77,14 +77,26 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{conta ? "Editar Conta" : "Nova Conta"}</DialogTitle>
-        </DialogHeader>
+  const title = conta ? "Editar Conta" : "Nova Conta";
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+  return (
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dialogContentProps={{
+        className: "max-w-2xl max-h-[90vh] overflow-hidden flex flex-col",
+      }}
+      drawerContentProps={{
+        className: "max-h-[95vh]",
+      }}
+    >
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium mb-2 block">Tipo de conta *</Label>
@@ -187,7 +199,8 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
