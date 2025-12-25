@@ -53,19 +53,16 @@ type MenuGroup = {
 };
 
 const MENU_GROUPS: MenuGroup[] = [
-  // 1. Visão Geral (Para Todos)
   {
     label: "Visão Geral",
     items: [
       { title: "Dashboard", url: "/", icon: LayoutDashboard },
-      { title: "Mural & Avisos", url: "/mural", icon: MonitorPlay }, // ✅ Movidor para cá e público
+      { title: "Mural & Avisos", url: "/mural", icon: MonitorPlay },
       { title: "Minha Família", url: "/perfil/familia", icon: Home },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },
       { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
     ],
   },
-  
-  // 2. Cuidado de Pessoas
   {
     label: "Pessoas & Cuidado",
     items: [
@@ -74,20 +71,15 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Pedidos de Oração", url: "/intercessao", icon: MessageSquareHeart }, 
     ],
   },
-
-  // 3. Comunicação & Mídia (Gestão)
   {
     label: "Comunicação & Mídia",
     items: [
-      // Mural saiu daqui
       { title: "Comunicados (Push)", url: "/comunicados", icon: Megaphone, permission: "ministerio.view" },
       { title: "Publicação Social", url: "/publicacao", icon: Share2, permission: "ministerio.view" },
       { title: "Arquivos & Mídias", url: "/midias", icon: Video, permission: "ministerio.view" },
     ],
     permission: "ministerio.view"
   },
-
-  // 4. Operação Ministerial
   {
     label: "Ministérios & Operação",
     items: [
@@ -98,8 +90,6 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Ensino (Gestão)", url: "/ensino", icon: BookOpen, permission: "ensino.view" },
     ],
   },
-
-  // 5. Backoffice
   {
     label: "Gestão Administrativa",
     items: [
@@ -113,7 +103,7 @@ const MENU_GROUPS: MenuGroup[] = [
 export function AppSidebar() {
   const location = useLocation();
   const { checkPermission, isAdmin, loading } = usePermissions();
-  const { config } = useAppConfig();
+  const { igrejaConfig } = useAppConfig();
   
   const [filteredGroups, setFilteredGroups] = useState<MenuGroup[]>([]);
   const [isFiltering, setIsFiltering] = useState(true);
@@ -152,30 +142,45 @@ export function AppSidebar() {
     filterMenu();
   }, [loading, isAdmin, checkPermission]);
 
+  const isActive = (url: string) => {
+    if (url === "/") return location.pathname === "/";
+    return location.pathname.startsWith(url);
+  };
+
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-2 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-lg shrink-0">
-            {config?.logo_url ? (
-              <img src={config.logo_url} alt="Logo" className="w-full h-full object-cover rounded-lg" />
-            ) : (
-              "IC"
+    <Sidebar>
+      <SidebarHeader className="border-b border-border/40 px-4 py-3">
+        <Link to="/" className="flex items-center gap-3">
+          {igrejaConfig?.logo_url ? (
+            <img 
+              src={igrejaConfig.logo_url} 
+              alt="Logo" 
+              className="h-8 w-8 rounded-lg object-contain"
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <span className="text-primary font-bold text-sm">
+                {igrejaConfig?.nome_igreja?.charAt(0) || 'I'}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-col">
+            <span className="font-semibold text-sm text-foreground">
+              {igrejaConfig?.nome_igreja || 'Igreja'}
+            </span>
+            {igrejaConfig?.subtitulo && (
+              <span className="text-xs text-muted-foreground">{igrejaConfig.subtitulo}</span>
             )}
           </div>
-          <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate font-semibold">{config?.nome_igreja || "Igreja App"}</span>
-            <span className="truncate text-xs text-muted-foreground">Gestão Ministerial</span>
-          </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
-      <SidebarContent>
-        {(loading || isFiltering) ? (
-          <div className="p-4 space-y-4">
+      <SidebarContent className="px-2">
+        {isFiltering || loading ? (
+          <div className="space-y-4 p-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
               </div>
@@ -184,25 +189,25 @@ export function AppSidebar() {
         ) : (
           filteredGroups.map((group) => (
             <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">
+                {group.label}
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {group.items.map((item) => {
-                    const isActive = 
-                      location.pathname === item.url || 
-                      (item.url !== "/" && location.pathname.startsWith(item.url));
-
-                    return (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                          <Link to={item.url}>
-                            <item.icon className="h-4 w-4" />
-                            <span>{item.title}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item.url)}
+                        className="transition-colors"
+                      >
+                        <Link to={item.url} className="flex items-center gap-3">
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -210,9 +215,10 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-2">
+      <SidebarFooter className="border-t border-border/40 p-4">
         <UserMenu />
       </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   );

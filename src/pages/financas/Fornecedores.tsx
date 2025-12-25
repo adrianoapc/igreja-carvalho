@@ -1,261 +1,329 @@
 import { useState, useEffect } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Loader2, Building2, Phone, Mail, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Plus, Pencil, Trash2, Search, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-// Interface ajustada para o padrão mais provável
 interface Fornecedor {
   id: string;
-  nome: string; // ✅ Ajustado de 'nome_fantasia' para 'nome'
-  razao_social: string | null;
-  cnpj_cpf: string | null;
+  nome: string;
+  cpf_cnpj: string | null;
+  tipo_pessoa: string;
   telefone: string | null;
   email: string | null;
   ativo: boolean;
+  endereco: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  observacoes: string | null;
 }
 
-export default function Fornecedores() {
-  const [items, setItems] = useState<Fornecedor[]>([]);
+interface Props {
+  onBack?: () => void;
+}
+
+export default function Fornecedores({ onBack }: Props) {
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<Fornecedor | null>(null);
-  
-  // Form simplificado para garantir
-  const [formData, setFormData] = useState({ 
-    nome: "", 
-    razao_social: "", 
-    cnpj_cpf: "", 
-    telefone: "", 
-    email: "" 
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingFornecedor, setEditingFornecedor] = useState<Fornecedor | null>(null);
+  const [formData, setFormData] = useState({
+    nome: "",
+    cpf_cnpj: "",
+    tipo_pessoa: "juridica",
+    telefone: "",
+    email: "",
+    ativo: true,
   });
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchItems();
+    fetchFornecedores();
   }, []);
 
-  const fetchItems = async () => {
-    setLoading(true);
+  const fetchFornecedores = async () => {
     try {
-      // Tenta buscar na tabela 'fornecedores' ordenando por 'nome'
+      setLoading(true);
       const { data, error } = await supabase
-        .from("fornecedores") 
+        .from("fornecedores")
         .select("*")
-        .order("nome"); // ✅ Ordenação corrigida
-
+        .order("nome");
+      
       if (error) throw error;
-      setItems(data || []);
+      setFornecedores(data || []);
     } catch (error: any) {
-      console.error("Erro fetch:", error);
-      // O Toast vai te dizer exatamente qual coluna falta (ex: "column fornecedores.nome does not exist")
-      toast.error("Erro ao carregar dados", { description: error.message });
+      toast.error("Erro ao carregar fornecedores", { description: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    if (!formData.nome.trim()) return toast.error("Nome é obrigatório");
+  const handleSubmit = async () => {
+    if (!formData.nome.trim()) {
+      toast.error("Nome é obrigatório");
+      return;
+    }
 
-    setSaving(true);
     try {
-      const payload = {
-        nome: formData.nome, // ✅ Payload usa 'nome'
-        razao_social: formData.razao_social || null,
-        cnpj_cpf: formData.cnpj_cpf || null,
-        telefone: formData.telefone || null,
-        email: formData.email || null,
-        ativo: true
-      };
-
-      if (editingItem) {
-        const { error } = await supabase.from("fornecedores").update(payload).eq("id", editingItem.id);
+      if (editingFornecedor) {
+        const { error } = await supabase
+          .from("fornecedores")
+          .update({
+            nome: formData.nome,
+            cpf_cnpj: formData.cpf_cnpj || null,
+            tipo_pessoa: formData.tipo_pessoa,
+            telefone: formData.telefone || null,
+            email: formData.email || null,
+            ativo: formData.ativo,
+          })
+          .eq("id", editingFornecedor.id);
+        
         if (error) throw error;
-        toast.success("Atualizado com sucesso");
+        toast.success("Fornecedor atualizado");
       } else {
-        const { error } = await supabase.from("fornecedores").insert([payload]);
+        const { error } = await supabase
+          .from("fornecedores")
+          .insert({
+            nome: formData.nome,
+            cpf_cnpj: formData.cpf_cnpj || null,
+            tipo_pessoa: formData.tipo_pessoa,
+            telefone: formData.telefone || null,
+            email: formData.email || null,
+            ativo: formData.ativo,
+          });
+        
         if (error) throw error;
-        toast.success("Criado com sucesso");
+        toast.success("Fornecedor criado");
       }
-      setIsDialogOpen(false);
-      fetchItems();
+
+      setDialogOpen(false);
+      resetForm();
+      fetchFornecedores();
     } catch (error: any) {
       toast.error("Erro ao salvar", { description: error.message });
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Excluir este fornecedor?")) return;
+    if (!confirm("Deseja excluir este fornecedor?")) return;
+
     try {
-      const { error } = await supabase.from("fornecedores").delete().eq("id", id);
+      const { error } = await supabase
+        .from("fornecedores")
+        .delete()
+        .eq("id", id);
+      
       if (error) throw error;
-      toast.success("Removido com sucesso");
-      fetchItems();
+      toast.success("Fornecedor excluído");
+      fetchFornecedores();
     } catch (error: any) {
       toast.error("Erro ao excluir", { description: error.message });
     }
   };
 
-  const openNew = () => {
-    setEditingItem(null);
-    setFormData({ nome: "", razao_social: "", cnpj_cpf: "", telefone: "", email: "" });
-    setIsDialogOpen(true);
-  };
-
-  const openEdit = (item: Fornecedor) => {
-    setEditingItem(item);
-    setFormData({ 
-      nome: item.nome, 
-      razao_social: item.razao_social || "", 
-      cnpj_cpf: item.cnpj_cpf || "", 
-      telefone: item.telefone || "", 
-      email: item.email || "" 
+  const openEdit = (fornecedor: Fornecedor) => {
+    setEditingFornecedor(fornecedor);
+    setFormData({
+      nome: fornecedor.nome,
+      cpf_cnpj: fornecedor.cpf_cnpj || "",
+      tipo_pessoa: fornecedor.tipo_pessoa,
+      telefone: fornecedor.telefone || "",
+      email: fornecedor.email || "",
+      ativo: fornecedor.ativo,
     });
-    setIsDialogOpen(true);
+    setDialogOpen(true);
   };
 
-  const filteredItems = items.filter(i => 
-    i.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (i.razao_social && i.razao_social.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (i.cnpj_cpf && i.cnpj_cpf.includes(searchTerm))
+  const resetForm = () => {
+    setEditingFornecedor(null);
+    setFormData({
+      nome: "",
+      cpf_cnpj: "",
+      tipo_pessoa: "juridica",
+      telefone: "",
+      email: "",
+      ativo: true,
+    });
+  };
+
+  const filteredFornecedores = fornecedores.filter((f) =>
+    f.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    f.cpf_cnpj?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2"/>Carregando parceiros...</div>;
-
-  return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+  const content = (
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Fornecedores & Parceiros</h2>
-          <p className="text-sm text-muted-foreground">Cadastro de prestadores de serviço e credores.</p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Fornecedores</h1>
+            <p className="text-muted-foreground">Gerencie os fornecedores</p>
+          </div>
         </div>
-        <Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-2"/> Novo Fornecedor</Button>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Fornecedor
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingFornecedor ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome *</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  placeholder="Nome do fornecedor"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="tipo_pessoa">Tipo</Label>
+                  <Select value={formData.tipo_pessoa} onValueChange={(v) => setFormData({ ...formData, tipo_pessoa: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fisica">Pessoa Física</SelectItem>
+                      <SelectItem value="juridica">Pessoa Jurídica</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cpf_cnpj">{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'}</Label>
+                  <Input
+                    id="cpf_cnpj"
+                    value={formData.cpf_cnpj}
+                    onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value })}
+                    placeholder={formData.tipo_pessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="telefone">Telefone</Label>
+                  <Input
+                    id="telefone"
+                    value={formData.telefone}
+                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ativo">Ativo</Label>
+                <Switch
+                  id="ativo"
+                  checked={formData.ativo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+                />
+              </div>
+              <Button onClick={handleSubmit} className="w-full">
+                {editingFornecedor ? "Salvar Alterações" : "Criar Fornecedor"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Tabela Card */}
-      <Card className="border shadow-sm overflow-hidden">
-        <div className="p-3 border-b bg-muted/5 flex items-center gap-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar por nome ou documento..." 
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
-            className="max-w-xs h-8 text-sm"
-          />
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent bg-muted/5">
-                <TableHead>Nome / Razão</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Documento</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredItems.length === 0 ? (
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar fornecedor..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Fornecedores ({filteredFornecedores.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Carregando...</p>
+          ) : filteredFornecedores.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Nenhum fornecedor encontrado</p>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <AlertCircle className="h-8 w-8 opacity-20" />
-                      <p>Nenhum fornecedor encontrado.</p>
-                    </div>
-                  </TableCell>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>CPF/CNPJ</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
-              ) : (
-                filteredItems.map((item) => (
-                  <TableRow key={item.id} className="hover:bg-muted/50">
+              </TableHeader>
+              <TableBody>
+                {filteredFornecedores.map((fornecedor) => (
+                  <TableRow key={fornecedor.id}>
+                    <TableCell className="font-medium">{fornecedor.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{fornecedor.cpf_cnpj || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground">{fornecedor.telefone || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground">{fornecedor.email || "-"}</TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{item.nome}</span>
-                        {item.razao_social && item.razao_social !== item.nome && (
-                          <span className="text-xs text-muted-foreground">{item.razao_social}</span>
-                        )}
-                      </div>
+                      <Badge variant={fornecedor.ativo ? "default" : "secondary"}>
+                        {fornecedor.ativo ? "Ativo" : "Inativo"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        {item.email && <div className="flex items-center gap-1"><Mail className="h-3 w-3"/> {item.email}</div>}
-                        {item.telefone && <div className="flex items-center gap-1"><Phone className="h-3 w-3"/> {item.telefone}</div>}
-                        {!item.email && !item.telefone && <span>-</span>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {item.cnpj_cpf ? <Badge variant="outline" className="font-mono text-[10px]">{item.cnpj_cpf}</Badge> : <span className="text-xs text-muted-foreground">-</span>}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)}><Pencil className="h-3.5 w-3.5"/></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(item.id)}><Trash2 className="h-3.5 w-3.5"/></Button>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(fornecedor)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(fornecedor.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
       </Card>
-
-      {/* Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader><DialogTitle>{editingItem ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 space-y-2">
-                <label className="text-sm font-medium">Nome *</label>
-                <Input value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} placeholder="Ex: Padaria do Zé" />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <label className="text-sm font-medium">Razão Social</label>
-                <Input value={formData.razao_social} onChange={e => setFormData({...formData, razao_social: e.target.value})} placeholder="Ex: José Silva LTDA" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">CNPJ / CPF</label>
-                <Input value={formData.cnpj_cpf} onChange={e => setFormData({...formData, cnpj_cpf: e.target.value})} placeholder="00.000.000/0001-91" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Telefone</label>
-                <Input value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} placeholder="(11) 99999-9999" />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <Input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="contato@empresa.com" type="email" />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : "Salvar"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
+
+  return onBack ? content : <MainLayout>{content}</MainLayout>;
 }

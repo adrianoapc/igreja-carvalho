@@ -1,102 +1,99 @@
 import { useState } from "react";
-import { 
-  Shield, Users, CreditCard, Church, 
-  Bot, Bell, Globe, Hammer, Baby, ChevronRight, 
-  Wallet, FileText, ArrowLeft, Info, Landmark, PieChart
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  ArrowLeft,
+  Bell,
+  Bot,
+  Building2,
+  ChevronRight,
+  CreditCard,
+  DollarSign,
+  FileText,
+  LayoutList,
+  Settings,
+  Shield,
+  Users,
+  Webhook,
 } from "lucide-react";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// --- IMPORTS ---
-import ConfiguracoesIgreja from "./ConfiguracoesIgreja";
-import AdminPermissions from "./AdminPermissions";
-import Webhooks from "./admin/Webhooks";
-import Notificacoes from "./admin/Notificacoes";
-import Chatbots from "./admin/Chatbots";
-import BasesMinisteriais from "./financas/BasesMinisteriais";
-import FinancasCategorias from "./financas/Categorias";
-import FinancasCentrosCusto from "./financas/CentrosCusto";
-import FinancasContas from "./financas/Contas";
-import ContasManutencao from "./financas/ContasManutencao";
-import FinancasFormas from "./financas/FormasPagamento";
-import FinancasFornecedores from "./financas/Fornecedores";
-import KidsConfig from "./kids/Config";
+// Sub-pages
+import BasesMinisteriais from "@/pages/financas/BasesMinisteriais";
+import Categorias from "@/pages/financas/Categorias";
+import CentrosCusto from "@/pages/financas/CentrosCusto";
+import FormasPagamento from "@/pages/financas/FormasPagamento";
+import Fornecedores from "@/pages/financas/Fornecedores";
+import ConfiguracoesIgreja from "@/pages/ConfiguracoesIgreja";
+import AdminPermissions from "@/pages/AdminPermissions";
+import Webhooks from "@/pages/admin/Webhooks";
+import Chatbots from "@/pages/admin/Chatbots";
+import Notificacoes from "@/pages/admin/Notificacoes";
+import ContasManutencao from "@/pages/financas/ContasManutencao";
 
-// --- NOVOS ESTADOS ---
-type ViewState = 
+type ViewState =
   | "MENU"
-  | "INSTITUCIONAL"
+  | "IGREJA"
   | "PERMISSOES"
-  | "KIDS"
-  | "FINANCEIRO_BASES"     // Separado
-  | "FINANCEIRO_CENTROS"   // Separado
-  | "FINANCEIRO_PLANO"
-  | "FINANCEIRO_TESOURARIA"
-  | "FINANCEIRO_CONTAS_MANUTENCAO"
-  | "FINANCEIRO_PARCEIROS"
-  | "SISTEMA_NOTIFICACOES"
-  | "SISTEMA_IA"
-  | "SISTEMA_WEBHOOKS"
-  | "SISTEMA_MANUTENCAO";
+  | "WEBHOOKS"
+  | "CHATBOTS"
+  | "NOTIFICACOES"
+  | "FINANCEIRO_BASES"
+  | "FINANCEIRO_CATEGORIAS"
+  | "FINANCEIRO_CENTROS"
+  | "FINANCEIRO_CONTAS"
+  | "FINANCEIRO_FORMAS"
+  | "FINANCEIRO_FORNECEDORES";
 
-// --- COMPONENTE DE LINHA ---
-interface SettingsRowProps {
-  icon: any;
+type ConfigItem = {
+  id: ViewState;
   title: string;
   description: string;
-  onClick: () => void;
-  danger?: boolean;
-  action?: React.ReactNode;
-}
+  icon: React.ElementType;
+};
 
-function SettingsRow({ icon: Icon, title, description, onClick, danger, action }: SettingsRowProps) {
+const GERAL_ITEMS: ConfigItem[] = [
+  { id: "IGREJA", title: "Dados da Igreja", description: "Nome, logo e informações de contato", icon: Building2 },
+  { id: "PERMISSOES", title: "Permissões de Acesso", description: "Funções e acessos por módulo", icon: Shield },
+  { id: "NOTIFICACOES", title: "Notificações", description: "Regras e canais de notificação", icon: Bell },
+  { id: "WEBHOOKS", title: "Webhooks", description: "Integrações externas (Make, etc.)", icon: Webhook },
+  { id: "CHATBOTS", title: "Chatbots IA", description: "Configuração de agentes de IA", icon: Bot },
+];
+
+const FINANCEIRO_ITEMS: ConfigItem[] = [
+  { id: "FINANCEIRO_BASES", title: "Bases Ministeriais", description: "Unidades de receita e despesa", icon: Users },
+  { id: "FINANCEIRO_CATEGORIAS", title: "Categorias Financeiras", description: "Tipos de receita/despesa", icon: LayoutList },
+  { id: "FINANCEIRO_CENTROS", title: "Centros de Custo", description: "Classificação por centro", icon: FileText },
+  { id: "FINANCEIRO_CONTAS", title: "Contas Bancárias", description: "Caixa, bancos e carteiras", icon: CreditCard },
+  { id: "FINANCEIRO_FORMAS", title: "Formas de Pagamento", description: "Dinheiro, PIX, cartão…", icon: DollarSign },
+  { id: "FINANCEIRO_FORNECEDORES", title: "Fornecedores", description: "Cadastro de fornecedores", icon: Users },
+];
+
+// Wrapper component to add back button
+function SubPageWrapper({ children, onBack, title }: { children: React.ReactNode; onBack: () => void; title: string }) {
   return (
-    <div 
-      onClick={onClick}
-      className={cn(
-        "flex items-center justify-between p-4 cursor-pointer group transition-all duration-200",
-        "hover:bg-accent/50 border-b last:border-0 bg-card",
-        danger ? "hover:bg-red-50 dark:hover:bg-red-950/10" : ""
-      )}
-    >
-      <div className="flex items-center gap-4 flex-1">
-        <div className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 transition-colors group-hover:bg-background border",
-          danger ? "text-red-500 bg-red-100/20 border-red-200" : "text-primary"
-        )}>
-          <Icon className="h-5 w-5" />
+    <MainLayout>
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         </div>
-        <div className="space-y-1">
-          <p className={cn("font-medium leading-none", danger && "text-red-600")}>{title}</p>
-          <p className="text-sm text-muted-foreground line-clamp-1">{description}</p>
-        </div>
+        {children}
       </div>
-      
-      <div className="flex items-center gap-3">
-        {action && <div onClick={(e) => e.stopPropagation()}>{action}</div>}
-        <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-      </div>
-    </div>
+    </MainLayout>
   );
 }
 
-// ... (MaintenanceDetailView permanece igual ao anterior) ...
-function MaintenanceDetailView() {
-    // ... código do componente de manutenção anterior ...
-    return <div>Componente Manutenção</div>; 
-}
-
-
 export default function Configuracoes() {
   const [currentView, setCurrentView] = useState<ViewState>("MENU");
-  const { config, loading, refetch } = useAppConfig();
+  const { config, isLoading, refetch } = useAppConfig();
 
   const goBack = () => setCurrentView("MENU");
 
@@ -105,7 +102,7 @@ export default function Configuracoes() {
       const { error } = await supabase
         .from('app_config')
         .update({ maintenance_mode: checked })
-        .eq('id', config?.id);
+        .eq('id', 1);
       if (error) throw error;
       await refetch();
       toast.success(checked ? "Manutenção ATIVADA" : "Manutenção DESATIVADA");
@@ -114,147 +111,100 @@ export default function Configuracoes() {
     }
   };
 
-  const renderContent = () => {
-    switch (currentView) {
-      case "INSTITUCIONAL": return <ConfiguracoesIgreja />;
-      case "PERMISSOES": return <AdminPermissions />;
-      case "KIDS": return <KidsConfig />;
-      
-      // --- SEPARAÇÃO REALIZADA AQUI ---
-      case "FINANCEIRO_BASES":
-        return <BasesMinisteriais />;
-      
-      case "FINANCEIRO_CENTROS":
-        return <FinancasCentrosCusto />;
-
-      case "FINANCEIRO_PLANO":
-        return <FinancasCategorias />;
-      
-      case "FINANCEIRO_TESOURARIA":
-        return <ContasManutencao />;
-      
-      case "FINANCEIRO_FORMAS":
-        return <FinancasFormas />;
-      
-      case "FINANCEIRO_CONTAS_MANUTENCAO":
-        return <ContasManutencao />;
-      
-      case "FINANCEIRO_PARCEIROS": return <FinancasFornecedores />;
-      case "SISTEMA_NOTIFICACOES": return <Notificacoes />;
-      case "SISTEMA_IA": return <Chatbots />;
-      case "SISTEMA_WEBHOOKS": return <Webhooks />;
-      case "SISTEMA_MANUTENCAO": return <MaintenanceDetailView />; // Ajustar import se necessário
-      default: return null;
-    }
-  };
+  // Render sub-pages with onBack prop where supported
+  if (currentView === "FINANCEIRO_BASES") return <BasesMinisteriais />;
+  if (currentView === "FINANCEIRO_CATEGORIAS") return <Categorias onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CENTROS") return <CentrosCusto onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CONTAS") return <ContasManutencao onBack={goBack} />;
+  if (currentView === "FINANCEIRO_FORMAS") return <FormasPagamento onBack={goBack} />;
+  if (currentView === "FINANCEIRO_FORNECEDORES") return <Fornecedores onBack={goBack} />;
+  
+  // Pages without onBack - render as-is (they have their own navigation)
+  if (currentView === "IGREJA") return <ConfiguracoesIgreja />;
+  if (currentView === "PERMISSOES") return <AdminPermissions />;
+  if (currentView === "WEBHOOKS") return <Webhooks />;
+  if (currentView === "CHATBOTS") return <Chatbots />;
+  if (currentView === "NOTIFICACOES") return <Notificacoes />;
 
   return (
-    <div className="container max-w-5xl mx-auto p-4 md:p-8 pb-24 animate-in fade-in duration-500">
-      
-      <div className="flex flex-col gap-2 mb-6">
-        {currentView === "MENU" ? (
-          <>
-            <h1 className="text-3xl font-bold tracking-tight">Ajustes</h1>
-            <p className="text-muted-foreground">Gerencie as preferências globais do sistema.</p>
-          </>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={goBack} className="-ml-3 gap-1 text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </Button>
+    <MainLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
+            <p className="text-muted-foreground">Gerencie as configurações do sistema</p>
           </div>
-        )}
+          <div className="flex items-center gap-3">
+            <Label htmlFor="maintenance-toggle" className="text-sm text-muted-foreground">
+              Modo Manutenção
+            </Label>
+            <Switch
+              id="maintenance-toggle"
+              checked={config?.maintenance_mode ?? false}
+              onCheckedChange={quickToggleMaintenance}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Geral
+            </CardTitle>
+            <CardDescription>Configurações principais do sistema</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {GERAL_ITEMS.map((item) => (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className="w-full justify-between h-auto py-3 px-4"
+                onClick={() => setCurrentView(item.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-5 w-5 text-muted-foreground" />
+                  <div className="text-left">
+                    <div className="font-medium">{item.title}</div>
+                    <div className="text-xs text-muted-foreground">{item.description}</div>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Financeiro
+            </CardTitle>
+            <CardDescription>Configurações do módulo financeiro</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {FINANCEIRO_ITEMS.map((item) => (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className="w-full justify-between h-auto py-3 px-4"
+                onClick={() => setCurrentView(item.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-5 w-5 text-muted-foreground" />
+                  <div className="text-left">
+                    <div className="font-medium">{item.title}</div>
+                    <div className="text-xs text-muted-foreground">{item.description}</div>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
       </div>
-
-      {currentView === "MENU" ? (
-        <div className="space-y-6 animate-in slide-in-from-left-4 duration-300">
-          
-          {/* INSTITUCIONAL */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">Institucional</h3>
-            <div className="rounded-xl border shadow-sm overflow-hidden bg-card">
-              <SettingsRow icon={Church} title="Dados da Igreja" description="Logo, nome, endereço e redes sociais." onClick={() => setCurrentView("INSTITUCIONAL")} />
-              <SettingsRow icon={Users} title="Equipe & Permissões" description="Gerenciar pastores, líderes e níveis de acesso." onClick={() => setCurrentView("PERMISSOES")} />
-            </div>
-          </div>
-
-          {/* MINISTÉRIOS */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">Ministérios</h3>
-            <div className="rounded-xl border shadow-sm overflow-hidden bg-card">
-              <SettingsRow 
-                icon={Landmark} 
-                title="Bases Ministeriais" 
-                description="Grandes áreas de atuação (Ex: Missões, Adoração)."
-                onClick={() => setCurrentView("FINANCEIRO_BASES")}
-              />
-            <div className="rounded-xl border shadow-sm overflow-hidden bg-card">
-              <SettingsRow icon={Baby} title="Ministério Kids" description="Salas, etiquetas e regras de check-in." onClick={() => setCurrentView("KIDS")} />
-            </div>
-          </div>
-
-          {/* FINANCEIRO - SEPARADO */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">Financeiro</h3>
-              <SettingsRow 
-                icon={Wallet} 
-                title="Formas de Pagamento" 
-                description="Cadastro de Formas de pagamento."
-                onClick={() => setCurrentView("FINANCEIRO_FORMAS")}
-              />
-                            <SettingsRow 
-                icon={PieChart} 
-                title="Centros de Custo" 
-                description="Unidades orçamentárias e projetos específicos."
-                onClick={() => setCurrentView("FINANCEIRO_CENTROS")}
-              />
-              <SettingsRow 
-                icon={FileText} 
-                title="Plano de Contas" 
-                description="Categorias de receitas e despesas."
-                onClick={() => setCurrentView("FINANCEIRO_PLANO")}
-              />
-              <SettingsRow 
-                icon={Wallet} 
-                title="Tesouraria" 
-                description="Cadastro de Contas bancárias."
-                onClick={() => setCurrentView("FINANCEIRO_TESOURARIA")}
-              />
-              <SettingsRow 
-                icon={Users} 
-                title="Fornecedores" 
-                description="Cadastro de parceiros."
-                onClick={() => setCurrentView("FINANCEIRO_PARCEIROS")}
-              />
-            </div>
-          </div>
-
-          {/* SISTEMA */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">Sistema</h3>
-            <div className="rounded-xl border shadow-sm overflow-hidden bg-card">
-              <SettingsRow icon={Bell} title="Notificações" description="Templates de mensagens." onClick={() => setCurrentView("SISTEMA_NOTIFICACOES")} />
-              <SettingsRow icon={Bot} title="Inteligência Artificial" description="Configuração dos agentes." onClick={() => setCurrentView("SISTEMA_IA")} />
-              <SettingsRow icon={Globe} title="Webhooks (API)" description="Integrações externas." onClick={() => setCurrentView("SISTEMA_WEBHOOKS")} />
-              <SettingsRow 
-                icon={Hammer} 
-                title="Modo Manutenção" 
-                description="Controle de acesso global."
-                onClick={() => setCurrentView("SISTEMA_MANUTENCAO")}
-                action={<Switch checked={config?.maintenance_mode || false} onCheckedChange={quickToggleMaintenance} disabled={loading} />}
-              />
-            </div>
-          </div>
-
-        </div>
-      ) : (
-        <div className="animate-in slide-in-from-right-8 duration-300">
-          <div className="bg-card rounded-xl border shadow-sm p-6 min-h-[500px]">
-            {renderContent()}
-          </div>
-        </div>
-      )}
-    </div>
+    </MainLayout>
   );
 }

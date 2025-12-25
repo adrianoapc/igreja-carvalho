@@ -1,42 +1,40 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Plus, Edit, Trash2, Search, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { FormaPagamentoDialog } from "@/components/financas/FormaPagamentoDialog";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, Plus, Pencil, Trash2, Search, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-export default function FormasPagamento() {
-  const { toast } = useToast();
+interface FormaPagamento {
+  id: string;
+  nome: string;
+  ativo: boolean;
+}
+
+interface Props {
+  onBack?: () => void;
+}
+
+export default function FormasPagamento({ onBack }: Props) {
   const queryClient = useQueryClient();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingForma, setEditingForma] = useState<any>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [formaToDelete, setFormaToDelete] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingForma, setEditingForma] = useState<FormaPagamento | null>(null);
+  const [formData, setFormData] = useState({
+    nome: "",
+    ativo: true,
+  });
 
-  const { data: formasPagamento, isLoading, error } = useQuery({
+  // Query formas
+  const { data: formas = [], isLoading, error: formasError } = useQuery({
     queryKey: ['formas-pagamento'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -44,203 +42,220 @@ export default function FormasPagamento() {
         .select('*')
         .order('nome');
       if (error) throw error;
-      console.info('[formas_pagamento] total', data?.length || 0, data);
-      return data;
-    },
-    onError: (err: any) => {
-      toast({
-        title: "Erro ao carregar formas",
-        description: err.message,
-        variant: "destructive",
-      });
-      console.error("Erro formas_pagamento:", err);
+      return data as FormaPagamento[];
     },
   });
 
-  const toggleAtivoMutation = useMutation({
-    mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
+  // Show error toast if query fails
+  if (formasError) {
+    toast.error("Erro ao carregar formas de pagamento", { description: (formasError as Error).message });
+  }
+
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
       const { error } = await supabase
         .from('formas_pagamento')
-        .update({ ativo: !ativo })
+        .insert({ nome: data.nome, ativo: data.ativo });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Forma de pagamento criada");
+      queryClient.invalidateQueries({ queryKey: ['formas-pagamento'] });
+      setDialogOpen(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao criar", { description: error.message });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
+      const { error } = await supabase
+        .from('formas_pagamento')
+        .update({ nome: data.nome, ativo: data.ativo })
         .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
+      toast.success("Forma de pagamento atualizada");
       queryClient.invalidateQueries({ queryKey: ['formas-pagamento'] });
-      toast({
-        title: "Status atualizado",
-        description: "A forma de pagamento foi atualizada com sucesso.",
-      });
+      setDialogOpen(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atualizar", { description: error.message });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('formas_pagamento')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('formas_pagamento').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
+      toast.success("Forma de pagamento excluída");
       queryClient.invalidateQueries({ queryKey: ['formas-pagamento'] });
-      toast({
-        title: "Forma de pagamento excluída",
-        description: "A operação foi concluída com sucesso.",
-      });
-      setDeleteDialogOpen(false);
     },
     onError: (error: any) => {
-      toast({
-        title: "Erro ao excluir",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Erro ao excluir", { description: error.message });
     },
   });
 
-  const filteredFormas = (formasPagamento || []).filter((forma) =>
-    forma.nome?.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleSubmit = () => {
+    if (!formData.nome.trim()) {
+      toast.error("Nome é obrigatório");
+      return;
+    }
+
+    if (editingForma) {
+      updateMutation.mutate({ id: editingForma.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm("Deseja excluir esta forma de pagamento?")) return;
+    deleteMutation.mutate(id);
+  };
+
+  const openEdit = (forma: FormaPagamento) => {
+    setEditingForma(forma);
+    setFormData({
+      nome: forma.nome,
+      ativo: forma.ativo,
+    });
+    setDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setEditingForma(null);
+    setFormData({ nome: "", ativo: true });
+  };
+
+  const filteredFormas = formas.filter((f) =>
+    f.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+  const content = (
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Formas de Pagamento</h2>
-          <p className="text-sm text-muted-foreground">Gerencie os meios aceitos.</p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Formas de Pagamento</h1>
+            <p className="text-muted-foreground">Gerencie as formas de pagamento</p>
+          </div>
         </div>
-        <Button 
-          className="bg-gradient-primary shadow-soft"
-          size="sm"
-          onClick={() => {
-            setEditingForma(null);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          <span className="hidden sm:inline">Nova Forma</span>
-          <span className="sm:hidden">Nova</span>
-        </Button>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Forma
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingForma ? "Editar Forma de Pagamento" : "Nova Forma de Pagamento"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome *</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  placeholder="Ex: PIX, Cartão de Crédito"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ativo">Ativo</Label>
+                <Switch
+                  id="ativo"
+                  checked={formData.ativo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+                />
+              </div>
+              <Button 
+                onClick={handleSubmit} 
+                className="w-full"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {editingForma ? "Salvar Alterações" : "Criar Forma"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Card className="border shadow-sm overflow-hidden">
-        <div className="p-3 border-b bg-muted/5 flex items-center gap-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar forma de pagamento..." 
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
-            className="max-w-xs h-8 text-sm"
-          />
-        </div>
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar forma de pagamento..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
+      </div>
 
-        {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2"/>
-            Carregando formas...
-          </div>
-        ) : error ? (
-          <div className="p-6 text-center text-destructive text-sm">
-            Falha ao carregar formas. Verifique conexão ou permissões.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Formas de Pagamento ({filteredFormas.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-center text-muted-foreground py-8">Carregando...</p>
+          ) : filteredFormas.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Nenhuma forma encontrada</p>
+          ) : (
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent bg-muted/5">
+                <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredFormas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                      {formasPagamento?.length === 0 ? "Nenhuma forma cadastrada." : "Nenhuma forma encontrada."}
+                {filteredFormas.map((forma) => (
+                  <TableRow key={forma.id}>
+                    <TableCell className="font-medium">{forma.nome}</TableCell>
+                    <TableCell>
+                      <Badge variant={forma.ativo ? "default" : "secondary"}>
+                        {forma.ativo ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(forma)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(forma.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredFormas.map((forma) => (
-                    <TableRow key={forma.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">{forma.nome}</TableCell>
-                      <TableCell>
-                        <Badge variant={forma.ativo ? "default" : "secondary"}>
-                          {forma.ativo ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleAtivoMutation.mutate({ id: forma.id, ativo: forma.ativo })}
-                          >
-                            {forma.ativo ? "Desativar" : "Ativar"}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                              setEditingForma(forma);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => {
-                              setFormaToDelete(forma);
-                              setDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+          )}
+        </CardContent>
       </Card>
-
-      <FormaPagamentoDialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) setEditingForma(null);
-        }}
-        formaPagamento={editingForma}
-      />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir a forma de pagamento "{formaToDelete?.nome}"?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteMutation.mutate(formaToDelete?.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
+
+  return onBack ? content : <MainLayout>{content}</MainLayout>;
 }
