@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -157,16 +157,23 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess, initialCon
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Compartilhar Testemunho</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Compartilhar Testemunho"
+    >
+      <div className="flex flex-col h-full">
+        {/* Header Description */}
+        <div className="px-4 pt-2 pb-0 md:px-6">
+          <p className="text-sm text-muted-foreground">
             Compartilhe como Deus tem agido em sua vida
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+            <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="titulo">Título *</Label>
             <Input
@@ -294,8 +301,11 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess, initialCon
               </p>
             </div>
           </div>
+            </div>
+          </div>
 
-          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+          {/* Footer */}
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
             <Button
               type="button"
               variant="outline"
@@ -309,7 +319,7 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess, initialCon
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

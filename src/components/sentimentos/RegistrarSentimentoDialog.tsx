@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -207,14 +207,16 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
-        {step === 'select' && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="text-center">Como você está se sentindo hoje?</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-3 gap-3 py-4">
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={handleClose}
+      title={step === 'select' ? 'Como você está se sentindo hoje?' : step === 'message' ? 'Quer compartilhar mais?' : ''}
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          {step === 'select' && (
+            <div className="grid grid-cols-3 gap-3">
               {(Object.entries(sentimentosConfig) as [SentimentoTipo, SentimentoConfig][]).map(([key, config]) => (
                 <Button
                   key={key}
@@ -228,17 +230,10 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
                 </Button>
               ))}
             </div>
-          </>
-        )}
+          )}
 
-        {step === 'message' && selectedSentimento && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="text-center">
-                Quer compartilhar mais?
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
+          {step === 'message' && selectedSentimento && (
+            <div className="space-y-4">
               <div className="text-center">
                 <span className="text-6xl">{sentimentosConfig[selectedSentimento].emoji}</span>
               </div>
@@ -266,11 +261,11 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
                 </Button>
               </div>
             </div>
-          </>
-        )}
+          )}
 
-        {step === 'result' && renderResultMessage()}
-      </DialogContent>
-    </Dialog>
+          {step === 'result' && renderResultMessage()}
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

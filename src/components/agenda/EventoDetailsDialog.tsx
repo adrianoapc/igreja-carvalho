@@ -1,5 +1,5 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, ExternalLink, Share2, User, FileText } from "lucide-react";
 import { format, parseISO } from "date-fns";
@@ -83,9 +83,14 @@ ${locationText}${addressText}${themeText}${preacherText}
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title=""
+    >
+      <div className="flex flex-col h-full">
+        {/* Header with Badge and Title */}
+        <div className="border-b px-4 py-4 md:px-6">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -94,14 +99,20 @@ ${locationText}${addressText}${themeText}${preacherText}
             <Badge className={`${getTipoColor(evento.tipo)} mb-2 text-xs`}>
               {evento.tipo}
             </Badge>
-            <DialogTitle className="text-xl font-bold text-primary uppercase tracking-wide">
+            <h2 className="text-xl font-bold text-primary uppercase tracking-wide">
               {evento.titulo}
-            </DialogTitle>
+            </h2>
           </motion.div>
-        </DialogHeader>
+        </div>
 
+        {/* Content */}
         <motion.div 
-          className="space-y-4 mt-4"
+          className="flex-1 overflow-y-auto px-4 py-4 md:px-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
+          <div className="space-y-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.3 }}
@@ -174,17 +185,18 @@ ${locationText}${addressText}${themeText}${preacherText}
             </div>
           )}
 
-          {/* Share Button */}
-          <Button 
-            onClick={handleShareWhatsApp}
-            className="w-full gap-2"
-            variant="default"
-          >
-            <Share2 className="w-4 h-4" />
-            Compartilhar no WhatsApp
-          </Button>
+            {/* Share Button */}
+            <Button 
+              onClick={handleShareWhatsApp}
+              className="w-full gap-2"
+              variant="default"
+            >
+              <Share2 className="w-4 h-4" />
+              Compartilhar no WhatsApp
+            </Button>
+          </div>
         </motion.div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }
