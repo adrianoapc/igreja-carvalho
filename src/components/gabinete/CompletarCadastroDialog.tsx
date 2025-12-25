@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,20 +67,26 @@ export function CompletarCadastroDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              Completar Cadastro
-            </DialogTitle>
-            <DialogDescription>
-              Preencha os dados básicos do visitante para facilitar o acompanhamento.
-            </DialogDescription>
-          </DialogHeader>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Completar Cadastro"
+    >
+      <div className="flex flex-col h-full">
+        {/* Description */}
+        <div className="px-4 pt-2 pb-0 md:px-6">
+          <div className="flex items-center gap-2 mb-2">
+            <UserPlus className="h-5 w-5 text-primary" />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Preencha os dados básicos do visitante para facilitar o acompanhamento.
+          </p>
+        </div>
 
-          <div className="grid gap-4 py-4">
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+            <div className="grid gap-4">
             <div className="space-y-2">
               <Label htmlFor="nome-completo">
                 Nome Completo <span className="text-destructive">*</span>
@@ -122,8 +121,10 @@ export function CompletarCadastroDialog({
               />
             </div>
           </div>
+          </div>
 
-          <DialogFooter>
+          {/* Footer */}
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -137,9 +138,9 @@ export function CompletarCadastroDialog({
               )}
               Salvar
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

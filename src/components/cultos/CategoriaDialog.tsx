@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,16 +106,23 @@ export default function CategoriaDialog({ open, onOpenChange, categoria, onSucce
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{categoria ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title={categoria ? "Editar Categoria" : "Nova Categoria"}
+    >
+      <div className="flex flex-col h-full">
+        {/* Description */}
+        <div className="px-4 pt-2 pb-0 md:px-6">
+          <p className="text-sm text-muted-foreground">
             {categoria ? "Atualize as informações da categoria" : "Crie uma nova categoria para os times"}
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+            <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="nome">Nome da Categoria *</Label>
             <Input
@@ -168,7 +175,11 @@ export default function CategoriaDialog({ open, onOpenChange, categoria, onSucce
             />
           </div>
 
-          <div className="flex gap-2 pt-4">
+          </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2">
             <Button
               type="button"
               variant="outline"
@@ -194,7 +205,7 @@ export default function CategoriaDialog({ open, onOpenChange, categoria, onSucce
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

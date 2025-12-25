@@ -1,11 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -85,16 +79,22 @@ export default function EdgeFunctionConfigDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Configurar Horário de Execução</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Configurar Horário de Execução"
+    >
+      <div className="flex flex-col h-full">
+        {/* Description */}
+        <div className="px-4 pt-2 pb-0 md:px-6">
+          <p className="text-sm text-muted-foreground">
             Escolha o horário em que esta função será executada automaticamente.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4 py-4">
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="schedule">Horário de Execução</Label>
             <Select value={selectedSchedule} onValueChange={setSelectedSchedule}>
@@ -114,8 +114,10 @@ export default function EdgeFunctionConfigDialog({
             </p>
           </div>
         </div>
+        </div>
 
-        <div className="flex justify-end gap-2">
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -134,7 +136,7 @@ export default function EdgeFunctionConfigDialog({
             )}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }
