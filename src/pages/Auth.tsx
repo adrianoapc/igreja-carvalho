@@ -884,7 +884,7 @@ export default function Auth() {
       {/* Aviso de manutenção */}
       {!isConfigLoading && config.maintenance_mode && (
         <div className="w-full max-w-md mb-4">
-          <div className="bg-orange-500 text-white rounded-lg px-3 py-2 shadow-sm flex gap-2 items-start">
+          <div className="bg-destructive text-destructive-foreground rounded-lg px-3 py-2 shadow-sm flex gap-2 items-start">
             <AlertTriangle className="w-4 h-4 mt-0.5" />
             <div className="space-y-0.5">
               <p className="text-sm font-semibold">Modo de manutenção ativo</p>
