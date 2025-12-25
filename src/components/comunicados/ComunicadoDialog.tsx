@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -215,13 +215,14 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{comunicado ? "Editar Comunicado" : "Novo Comunicado"}</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">{comunicado ? "Editar Comunicado" : "Novo Comunicado"}</h2>
+        </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <div className="grid md:grid-cols-2 gap-6">
           {/* Formulário */}
           <div className="space-y-4">
             {/* Tipo */}
@@ -462,10 +463,10 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
               )}
             </div>
           </div>
+          </div>
         </div>
 
-        {/* Ações */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancelar
           </Button>
@@ -473,7 +474,7 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
             {isLoading ? "Salvando..." : comunicado ? "Atualizar" : "Criar Comunicado"}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

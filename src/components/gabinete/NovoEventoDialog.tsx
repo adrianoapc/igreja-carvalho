@@ -2,14 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -286,10 +279,10 @@ export function NovoEventoDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+            <h2 className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2">
               {step === "escolha" ? (
                 <>
                   <Calendar className="h-5 w-5 text-primary" />
@@ -301,18 +294,20 @@ export function NovoEventoDialog({
                   Novo Compromisso
                 </>
               )}
-            </DialogTitle>
-            <DialogDescription>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
               {step === "escolha"
                 ? "Escolha o tipo de evento para adicionar"
                 : "Preencha os dados do compromisso"}
-            </DialogDescription>
-          </DialogHeader>
+            </p>
+          </div>
 
-          {step === "escolha" ? renderEscolha() : renderCompromissoForm()}
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+            {step === "escolha" ? renderEscolha() : renderCompromissoForm()}
+          </div>
 
           {step === "compromisso" && (
-            <DialogFooter className="gap-2">
+            <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
               <Button variant="outline" onClick={handleBack}>
                 Voltar
               </Button>
@@ -325,10 +320,10 @@ export function NovoEventoDialog({
                 )}
                 Salvar
               </Button>
-            </DialogFooter>
+            </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      </ResponsiveDialog>
 
       {/* Dialog de Agendamento de Atendimento (reaproveitado) */}
       <AgendamentoDialog
