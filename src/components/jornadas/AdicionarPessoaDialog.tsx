@@ -2,12 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Search, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -112,15 +107,16 @@ export default function AdicionarPessoaDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Adicionar Pessoa à Jornada</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Adicionar Pessoa à Jornada"
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
           {/* Search */}
-          <div className="relative">
+          <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={search}
@@ -179,22 +175,22 @@ export default function AdicionarPessoaDialog({
               </div>
             )}
           </ScrollArea>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => selectedPessoa && addMutation.mutate(selectedPessoa.id)}
-              disabled={!selectedPessoa || addMutation.isPending}
-            >
-              {addMutation.isPending ? "Adicionando..." : "Adicionar"}
-            </Button>
-          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => selectedPessoa && addMutation.mutate(selectedPessoa.id)}
+            disabled={!selectedPessoa || addMutation.isPending}
+          >
+            {addMutation.isPending ? "Adicionando..." : "Adicionar"}
+          </Button>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

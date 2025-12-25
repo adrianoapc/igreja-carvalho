@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -91,14 +91,16 @@ export function MediaPickerDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh]">
-        <DialogHeader>
-          <DialogTitle>Selecionar Mídia do Acervo</DialogTitle>
-        </DialogHeader>
-
-        {/* Search */}
-        <div className="relative">
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Selecionar Mídia do Acervo"
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          {/* Search */}
+          <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome ou tag..."
@@ -182,8 +184,10 @@ export function MediaPickerDialog({
             </div>
           )}
         </ScrollArea>
+        </div>
 
-        <div className="flex justify-between items-center pt-2 border-t">
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-between items-center">
           <p className="text-sm text-muted-foreground">
             {filteredMidias.length} mídia{filteredMidias.length !== 1 ? "s" : ""} disponíve{filteredMidias.length !== 1 ? "is" : "l"}
           </p>
@@ -191,7 +195,7 @@ export function MediaPickerDialog({
             Cancelar
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

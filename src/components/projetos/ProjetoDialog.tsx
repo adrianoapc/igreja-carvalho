@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,13 +106,15 @@ export default function ProjetoDialog({ open, onOpenChange, projeto, onSuccess }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{projeto ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title={projeto ? "Editar Projeto" : "Novo Projeto"}
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <div className="space-y-4">
           <div className="space-y-2">
             <Label>Título *</Label>
             <Input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Nome do projeto" />
@@ -185,16 +187,18 @@ export default function ProjetoDialog({ open, onOpenChange, projeto, onSuccess }
               </Popover>
             </div>
           </div>
-
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {projeto ? "Salvar" : "Criar"}
-            </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {projeto ? "Salvar" : "Criar"}
+          </Button>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
