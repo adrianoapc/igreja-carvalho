@@ -1,12 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -153,16 +146,19 @@ export function EditarStatusDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Alterar Status</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Alterar Status"
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <p className="text-sm text-muted-foreground mb-4">
             Mudança de status de {nome}
-          </DialogDescription>
-        </DialogHeader>
+          </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-sm">
@@ -205,23 +201,25 @@ export function EditarStatusDialog({
               {observacoes.length}/500 caracteres
             </p>
           </div>
+          </form>
+        </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading || novoStatus === statusAtual}>
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Alterar Status
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        {/* Footer */}
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <Button type="submit" onClick={handleSubmit} disabled={loading || novoStatus === statusAtual}>
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Alterar Status
+          </Button>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

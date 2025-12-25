@@ -1,11 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -124,14 +118,16 @@ export function EditarContatosDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Contatos</DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title="Editar Contatos"
+    >
+      <div className="flex flex-col h-full">
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cep">CEP</Label>
               <InputMask
@@ -233,8 +229,10 @@ export function EditarContatosDialog({
               </InputMask>
             </div>
           </div>
+          </div>
 
-          <DialogFooter>
+          {/* Footer */}
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
             <Button
               type="button"
               variant="outline"
@@ -246,9 +244,9 @@ export function EditarContatosDialog({
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Salvar
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }
