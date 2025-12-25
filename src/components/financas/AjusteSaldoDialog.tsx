@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,16 +69,23 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Ajuste de saldo - {conta?.nome}</DialogTitle>
+    <ResponsiveDialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+      title={`Ajuste de saldo - ${conta?.nome}`}
+    >
+      <div className="flex flex-col h-full">
+        {/* Description */}
+        <div className="px-4 pt-2 pb-0 md:px-6">
           <p className="text-sm text-muted-foreground">
             Um ajuste de saldo é necessário sempre que houver uma disparidade significativa entre o saldo contábil e o saldo real da conta.
           </p>
-        </DialogHeader>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+            <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="valor">Valor do ajuste *</Label>
@@ -143,8 +150,11 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
               rows={3}
             />
           </div>
+          </div>
+          </div>
 
-          <div className="flex justify-end gap-2 pt-4">
+          {/* Footer */}
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
@@ -153,7 +163,7 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }
