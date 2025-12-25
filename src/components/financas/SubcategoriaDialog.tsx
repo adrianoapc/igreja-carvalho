@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface SubcategoriaDialogProps {
   open: boolean;
@@ -66,39 +66,48 @@ export function SubcategoriaDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dialogContentProps={{
+        className: "max-w-lg max-h-[90vh] overflow-hidden flex flex-col",
+      }}
+      drawerContentProps={{
+        className: "max-h-[95vh]",
+      }}
+    >
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">
             {subcategoria ? "Editar Subcategoria" : "Nova Subcategoria"}
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Categoria: {categoriaNome}
-          </p>
-        </DialogHeader>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">Categoria: {categoriaNome}</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="nome">Nome da subcategoria *</Label>
-            <Input
-              id="nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Aluguel, Gratificações, Energia Elétrica"
-              required
-            />
-          </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="nome">Nome da subcategoria *</Label>
+              <Input
+                id="nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex: Aluguel, Gratificações, Energia Elétrica"
+                required
+              />
+            </div>
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-primary">
-              {loading ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading} className="bg-gradient-primary">
+                {loading ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

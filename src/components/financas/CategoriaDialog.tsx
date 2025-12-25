@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface CategoriaDialogProps {
   open: boolean;
@@ -81,74 +81,87 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
     }
   };
 
+  const title = categoria ? "Editar Categoria" : "Nova Categoria";
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{categoria ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dialogContentProps={{
+        className: "max-w-2xl max-h-[90vh] overflow-hidden flex flex-col",
+      }}
+      drawerContentProps={{
+        className: "max-h-[95vh]",
+      }}
+    >
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium mb-2 block">Tipo de categoria *</Label>
-              <RadioGroup value={tipo} onValueChange={(value: any) => setTipo(value)}>
-                <div className="flex gap-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="entrada" id="entrada" />
-                    <Label htmlFor="entrada" className="cursor-pointer">Recebimento</Label>
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Tipo de categoria *</Label>
+                <RadioGroup value={tipo} onValueChange={(value: any) => setTipo(value)}>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="entrada" id="entrada" />
+                      <Label htmlFor="entrada" className="cursor-pointer">Recebimento</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="saida" id="saida" />
+                      <Label htmlFor="saida" className="cursor-pointer">Pagamento</Label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="saida" id="saida" />
-                    <Label htmlFor="saida" className="cursor-pointer">Pagamento</Label>
-                  </div>
-                </div>
-              </RadioGroup>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label htmlFor="nome">Nome da categoria *</Label>
+                <Input
+                  id="nome"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Ex: Doação, Despesas Administrativas"
+                  required
+                  maxLength={150}
+                />
+                <p className="text-xs text-muted-foreground mt-1">{nome.length}/150</p>
+              </div>
+
+              <div>
+                <Label htmlFor="secao-dre">Seção do DRE</Label>
+                <Select value={secaoDre} onValueChange={setSecaoDre}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {secoesDRE.map((secao) => (
+                      <SelectItem key={secao.value} value={secao.value}>
+                        {secao.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  As categorias organizam todo o financeiro da igreja, facilitando acompanhamento e análise.
+                </p>
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="nome">Nome da categoria *</Label>
-              <Input
-                id="nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex: Doação, Despesas Administrativas"
-                required
-                maxLength={150}
-              />
-              <p className="text-xs text-muted-foreground mt-1">{nome.length}/150</p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading} className="bg-gradient-primary">
+                {loading ? "Salvando..." : "Salvar"}
+              </Button>
             </div>
-
-            <div>
-              <Label htmlFor="secao-dre">Seção do DRE</Label>
-              <Select value={secaoDre} onValueChange={setSecaoDre}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {secoesDRE.map((secao) => (
-                    <SelectItem key={secao.value} value={secao.value}>
-                      {secao.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                As categorias organizam todo o financeiro da igreja, facilitando acompanhamento e análise.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-primary">
-              {loading ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

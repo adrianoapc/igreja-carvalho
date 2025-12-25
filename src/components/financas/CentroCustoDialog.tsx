@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface CentroCustoDialogProps {
   open: boolean;
@@ -82,65 +82,76 @@ export function CentroCustoDialog({ open, onOpenChange, centro }: CentroCustoDia
     }
   };
 
+  const title = centro ? "Editar Centro de Custo" : "Novo Centro de Custo";
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {centro ? "Editar Centro de Custo" : "Novo Centro de Custo"}
-          </DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dialogContentProps={{
+        className: "max-w-2xl max-h-[90vh] overflow-hidden flex flex-col",
+      }}
+      drawerContentProps={{
+        className: "max-h-[95vh]",
+      }}
+    >
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="nome">Nome *</Label>
-            <Input
-              id="nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Ministério Infantil, Mídia"
-              required
-            />
-          </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="nome">Nome *</Label>
+              <Input
+                id="nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex: Ministério Infantil, Mídia"
+                required
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="descricao">Descrição</Label>
-            <Textarea
-              id="descricao"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Descreva este centro de custo"
-              rows={3}
-            />
-          </div>
+            <div>
+              <Label htmlFor="descricao">Descrição</Label>
+              <Textarea
+                id="descricao"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                placeholder="Descreva este centro de custo"
+                rows={3}
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="base">Base Ministerial</Label>
-            <Select value={baseMinisterialId} onValueChange={setBaseMinisterialId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma base" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Nenhuma</SelectItem>
-                {bases?.map((base) => (
-                  <SelectItem key={base.id} value={base.id}>
-                    {base.titulo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <div>
+              <Label htmlFor="base">Base Ministerial</Label>
+              <Select value={baseMinisterialId} onValueChange={setBaseMinisterialId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma base" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhuma</SelectItem>
+                  {bases?.map((base) => (
+                    <SelectItem key={base.id} value={base.id}>
+                      {base.titulo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-primary">
-              {loading ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading} className="bg-gradient-primary">
+                {loading ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
