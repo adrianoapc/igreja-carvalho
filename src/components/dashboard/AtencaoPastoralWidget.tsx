@@ -38,14 +38,8 @@ export default function AtencaoPastoralWidget() {
           // Fallback: Buscar sentimentos recentes com gravidade alta
           const { data: sentimentos, error: sentimentoError } = await supabase
             .from('sentimentos_membros')
-            .select(`
-              id,
-              pessoa_id,
-              tipo,
-              created_at,
-              profiles!sentimentos_membros_pessoa_id_fkey(id, nome, avatar_url, telefone)
-            `)
-            .in('tipo', ['angustiado', 'triste', 'sozinho', 'com_medo', 'com_pouca_fe'])
+            .select('id, pessoa_id, sentimento, created_at')
+            .in('sentimento', ['angustiado', 'triste', 'sozinho', 'com_pouca_fe', 'doente'])
             .order('created_at', { ascending: false })
             .limit(10);
           
@@ -54,15 +48,27 @@ export default function AtencaoPastoralWidget() {
             return [];
           }
 
-          return (sentimentos || []).map((s: any) => ({
-            id: s.id,
-            nome: s.profiles?.nome || 'Desconhecido',
-            avatar_url: s.profiles?.avatar_url,
-            telefone: s.profiles?.telefone,
-            tipo_risco: "sentimento",
-            detalhe: s.tipo.replace(/_/g, ' '),
-            gravidade: 8,
-          }));
+          // Fetch profile data separately to avoid deep type instantiation
+          const pessoaIds = (sentimentos || []).map(s => s.pessoa_id).filter(Boolean) as string[];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, nome, avatar_url, telefone')
+            .in('id', pessoaIds.length > 0 ? pessoaIds : ['00000000-0000-0000-0000-000000000000']);
+          
+          const profilesMap = new Map((profiles || []).map(p => [p.id, p]));
+
+          return (sentimentos || []).map((s) => {
+            const profile = profilesMap.get(s.pessoa_id || '');
+            return {
+              id: s.id,
+              nome: profile?.nome || 'Desconhecido',
+              avatar_url: profile?.avatar_url || null,
+              telefone: profile?.telefone || null,
+              tipo_risco: "sentimento" as const,
+              detalhe: (s.sentimento || '').replace(/_/g, ' '),
+              gravidade: 8,
+            };
+          });
         }
 
         return (data as OvelhaEmRisco[] || [])
