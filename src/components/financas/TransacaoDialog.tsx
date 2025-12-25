@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { generatePdfThumbnail } from "@/lib/pdfUtils";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 interface TransacaoDialogProps {
   open: boolean;
@@ -1392,35 +1392,29 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     </form>
   );
 
-  // Renderização condicional: Drawer no mobile, Dialog no desktop
-  if (isMobile) {
-    return (
-      <>
-        <Drawer open={open} onOpenChange={onOpenChange}>
-          <DrawerContent className="max-h-[95vh]">
-            <DrawerHeader className="border-b pb-3">
-              <DrawerTitle>{transacao ? "Editar" : tipo === "entrada" ? "Nova Entrada" : "Nova Saída"}</DrawerTitle>
-            </DrawerHeader>
-            <div className="flex-1 overflow-y-auto px-4 py-4">
-              <DialogContentInner />
-            </div>
-          </DrawerContent>
-        </Drawer>
-        <DocumentViewerModal />
-      </>
-    );
-  }
+  const title = transacao ? "Editar" : tipo === "entrada" ? "Nova Entrada" : "Nova Saída";
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{transacao ? "Editar" : tipo === "entrada" ? "Nova Entrada" : "Nova Saída"}</DialogTitle>
-          </DialogHeader>
-          <DialogContentInner />
-        </DialogContent>
-      </Dialog>
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        dialogContentProps={{
+          className: "max-w-4xl max-h-[90vh] overflow-hidden flex flex-col",
+        }}
+        drawerContentProps={{
+          className: "max-h-[95vh]",
+        }}
+      >
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+            <DialogContentInner />
+          </div>
+        </div>
+      </ResponsiveDialog>
       <DocumentViewerModal />
     </>
   );
