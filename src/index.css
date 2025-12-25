@@ -44,6 +44,10 @@ All colors MUST be HSL.
 
     --radius: 0.375rem;
 
+    /* Safe areas */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 35%), hsl(217 91% 45%));
     --gradient-accent: linear-gradient(135deg, hsl(43 96% 56%), hsl(43 96% 66%));
     --gradient-subtle: linear-gradient(180deg, hsl(210 40% 98%), hsl(0 0% 100%));
@@ -163,6 +167,15 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@media (max-width: 480px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
   }
 }
 

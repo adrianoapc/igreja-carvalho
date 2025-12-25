@@ -5,7 +5,6 @@ import { AppSidebar } from "./Sidebar";
 // Removed: UserMenu import is no longer needed here
 import NotificationsBell from "./NotificationsBell";
 import { SidebarProvider, SidebarTrigger, SidebarInset, useSidebar } from "@/components/ui/sidebar";
-import { Menu } from "lucide-react";
 import { useSwipeElement } from "@/hooks/useSwipe";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +38,10 @@ function MainLayoutContent({ children }: MainLayoutProps) {
       </div>
       
       <SidebarInset className="flex-1 min-w-0 relative z-0">
-        <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header
+          className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+          style={{ paddingTop: "var(--safe-area-top)" }}
+        >
           <div className="flex h-14 md:h-16 items-center justify-between gap-4 px-4 md:px-8">
             <div className="flex items-center gap-4">
                   <SidebarTrigger />
@@ -54,7 +56,11 @@ function MainLayoutContent({ children }: MainLayoutProps) {
           </div>
         </header>
         
-        <main ref={mainRef} className="p-4 md:p-8 min-w-0 overflow-x-hidden">
+        <main
+          ref={mainRef}
+          className="p-4 md:p-8 min-w-0"
+          style={{ paddingBottom: "var(--safe-area-bottom)" }}
+        >
           {children}
           <Outlet /> 
         </main>
@@ -106,7 +112,10 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <SidebarProvider>
       <HideValuesProvider>
-        <div className="min-h-screen flex w-full bg-background">
+        <div
+          className="min-h-screen flex w-full bg-background"
+          style={{ paddingTop: "var(--safe-area-top)", paddingBottom: "var(--safe-area-bottom)" }}
+        >
           <MainLayoutContent>{children}</MainLayoutContent>
         </div>
         
