@@ -1,14 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -171,20 +164,20 @@ export function ConfigurarDisponibilidadeDialog({
   const diasAtivosCount = Object.values(disponibilidade).filter(d => d.ativo).length;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <DialogHeader className="pb-4 border-b">
-            <DialogTitle className="flex items-center gap-2">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+            <h2 className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
               Configurar Disponibilidade
-            </DialogTitle>
-            <DialogDescription>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Defina os dias e horários disponíveis para atendimento pastoral
-            </DialogDescription>
-          </DialogHeader>
+            </p>
+          </div>
 
-          <div className="flex-1 overflow-y-auto py-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5 space-y-3">
             <div className="space-y-3">
               {DIAS_SEMANA.map((dia) => {
                 const config = disponibilidade[dia.key];
@@ -258,7 +251,7 @@ export function ConfigurarDisponibilidadeDialog({
             </div>
           </div>
 
-          <DialogFooter className="border-t pt-4 flex-col sm:flex-row gap-3">
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex flex-col sm:flex-row gap-3">
             <div className="flex-1 text-sm text-muted-foreground">
               {diasAtivosCount === 0 ? (
                 <span className="text-amber-600">Nenhum dia configurado</span>
@@ -281,9 +274,9 @@ export function ConfigurarDisponibilidadeDialog({
                 Salvar
               </Button>
             </div>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

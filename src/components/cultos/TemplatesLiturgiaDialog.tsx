@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -161,15 +161,16 @@ export function TemplatesLiturgiaDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">
             {template ? "Editar Template" : "Novo Template de Culto"}
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="nome">Nome do Template *</Label>
             <Input
@@ -294,7 +295,9 @@ export function TemplatesLiturgiaDialog({
             </Label>
           </div>
 
-          <div className="flex gap-2 justify-end pt-4 border-t">
+          </div>
+
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
             <Button
               type="button"
               variant="outline"
@@ -309,7 +312,7 @@ export function TemplatesLiturgiaDialog({
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

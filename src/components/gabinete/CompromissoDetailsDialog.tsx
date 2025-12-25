@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,20 +161,21 @@ export function CompromissoDetailsDialog({
   const dataFim = parseISO(compromisso.data_fim);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2">
             <Calendar className="h-5 w-5 text-primary" />
             {isEditing ? "Editar Compromisso" : "Detalhes do Compromisso"}
-          </DialogTitle>
-          <DialogDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
             {format(dataInicio, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
         {isEditing ? (
-          <div className="grid gap-4 py-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+            <div className="grid gap-4">
             <div className="space-y-2">
               <Label>Título</Label>
               <Input
@@ -237,9 +231,11 @@ export function CompromissoDetailsDialog({
                 rows={2}
               />
             </div>
+            </div>
           </div>
         ) : (
-          <div className="py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+            <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">{compromisso.titulo}</h3>
               <Badge className={TIPO_COLORS[compromisso.tipo || "COMPROMISSO"]}>
@@ -265,10 +261,11 @@ export function CompromissoDetailsDialog({
                 <p className="mt-1">{compromisso.descricao}</p>
               </div>
             )}
+            </div>
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex gap-2 justify-end">
           {isEditing ? (
             <>
               <Button variant="outline" onClick={cancelEditing}>
@@ -322,8 +319,8 @@ export function CompromissoDetailsDialog({
               </Button>
             </>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
