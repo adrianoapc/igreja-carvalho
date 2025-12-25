@@ -1,66 +1,68 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Trash2, AlertCircle, Search, Loader2, Pencil } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { ContaDialog } from "@/components/financas/ContaDialog";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useHideValues } from "@/hooks/useHideValues";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Plus, Pencil, Trash2, Search, Building2, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Textarea } from "@/components/ui/textarea";
 
-export default function ContasManutencao() {
-  const navigate = useNavigate();
-  const { formatValue } = useHideValues();
+interface Conta {
+  id: string;
+  nome: string;
+  tipo: string;
+  banco: string | null;
+  agencia: string | null;
+  conta_numero: string | null;
+  saldo_inicial: number;
+  saldo_atual: number;
+  ativo: boolean;
+  observacoes: string | null;
+}
+
+interface Props {
+  onBack?: () => void;
+}
+
+export default function ContasManutencao({ onBack }: Props) {
   const queryClient = useQueryClient();
-  const [contaDialogOpen, setContaDialogOpen] = useState(false);
-  const [selectedConta, setSelectedConta] = useState<any>(null);
-  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
-  const [contaToDelete, setContaToDelete] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingConta, setEditingConta] = useState<Conta | null>(null);
+  const [formData, setFormData] = useState({
+    nome: "",
+    tipo: "corrente",
+    banco: "",
+    agencia: "",
+    conta_numero: "",
+    saldo_inicial: 0,
+    ativo: true,
+    observacoes: "",
+  });
 
-  // Buscar todas as contas
-  const { data: contas, isLoading, error: contasError } = useQuery({
-    queryKey: ['contas'],
+  // Query contas
+  const { data: contas = [], isLoading, error: contasError } = useQuery({
+    queryKey: ['contas-manutencao'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contas')
         .select('*')
-        .eq('ativo', true)
         .order('nome');
-      
       if (error) throw error;
-      console.info('[contas] total', data?.length || 0, data);
-      return data;
-    },
-    onError: (err: any) => {
-      toast.error("Erro ao carregar contas", { description: err.message });
-      console.error("Erro contas:", err);
+      return data as Conta[];
     },
   });
 
-  // Buscar transações para validação de exclusão
-  const { data: transacoesPorConta, error: transacoesError } = useQuery({
+  // Query transações por conta
+  const { data: transacoesPorConta = {} } = useQuery({
     queryKey: ['transacoes-por-conta'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -70,243 +72,360 @@ export default function ContasManutencao() {
       
       if (error) throw error;
       
-      // Contar por conta
       const contagem: Record<string, number> = {};
       data?.forEach(t => {
         contagem[t.conta_id] = (contagem[t.conta_id] || 0) + 1;
       });
       return contagem;
     },
-    onError: (err: any) => {
-      console.error("Erro transacoes_financeiras:", err);
-    },
   });
 
-  // Mutation para deletar conta
-  const deleteMutation = useMutation({
-    mutationFn: async (contaId: string) => {
+  // Show error toast if query fails
+  if (contasError) {
+    toast.error("Erro ao carregar contas", { description: (contasError as Error).message });
+  }
+
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
       const { error } = await supabase
         .from('contas')
-        .update({ ativo: false })
-        .eq('id', contaId);
-      
+        .insert({
+          nome: data.nome,
+          tipo: data.tipo,
+          banco: data.banco || null,
+          agencia: data.agencia || null,
+          conta_numero: data.conta_numero || null,
+          saldo_inicial: data.saldo_inicial,
+          saldo_atual: data.saldo_inicial,
+          ativo: data.ativo,
+          observacoes: data.observacoes || null,
+        });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contas'] });
-      toast.success('Conta deletada com sucesso');
-      setDeleteAlertOpen(false);
-      setContaToDelete(null);
+      toast.success("Conta criada com sucesso");
+      queryClient.invalidateQueries({ queryKey: ['contas-manutencao'] });
+      setDialogOpen(false);
+      resetForm();
     },
     onError: (error: any) => {
-      toast.error(`Erro ao deletar conta: ${error.message}`);
+      toast.error("Erro ao criar conta", { description: error.message });
     },
   });
 
-  const getTipoIcon = (tipo: string) => {
-    switch (tipo) {
-      case 'bancaria': return <Landmark className="w-4 h-4" />;
-      case 'fisica': return <Wallet className="w-4 h-4" />;
-      case 'virtual': return <Building2 className="w-4 h-4" />;
-      default: return <Wallet className="w-4 h-4" />;
-    }
-  };
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
+      const { error } = await supabase
+        .from('contas')
+        .update({
+          nome: data.nome,
+          tipo: data.tipo,
+          banco: data.banco || null,
+          agencia: data.agencia || null,
+          conta_numero: data.conta_numero || null,
+          saldo_inicial: data.saldo_inicial,
+          ativo: data.ativo,
+          observacoes: data.observacoes || null,
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Conta atualizada");
+      queryClient.invalidateQueries({ queryKey: ['contas-manutencao'] });
+      setDialogOpen(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atualizar", { description: error.message });
+    },
+  });
 
-  const getTipoLabel = (tipo: string) => {
-    switch (tipo) {
-      case 'bancaria': return 'Bancária';
-      case 'fisica': return 'Física';
-      case 'virtual': return 'Virtual';
-      default: return tipo;
-    }
-  };
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('contas').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Conta excluída");
+      queryClient.invalidateQueries({ queryKey: ['contas-manutencao'] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao excluir", { description: error.message });
+    },
+  });
 
-  const handleDeleteClick = (conta: any) => {
-    const temMovimentacoes = (transacoesPorConta?.[conta.id] || 0) > 0;
-    
-    if (temMovimentacoes) {
-      toast.error('Não é possível deletar conta com movimentações financeiras');
+  const handleSubmit = () => {
+    if (!formData.nome.trim()) {
+      toast.error("Nome é obrigatório");
       return;
     }
 
-    setContaToDelete(conta);
-    setDeleteAlertOpen(true);
-  };
-
-  const handleConfirmDelete = () => {
-    if (contaToDelete) {
-      deleteMutation.mutate(contaToDelete.id);
+    if (editingConta) {
+      updateMutation.mutate({ id: editingConta.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
     }
   };
 
-  const temMovimentacoes = (contaId: string) => {
-    return (transacoesPorConta?.[contaId] || 0) > 0;
+  const handleDelete = (conta: Conta) => {
+    const transacoesCount = transacoesPorConta[conta.id] || 0;
+    if (transacoesCount > 0) {
+      toast.error("Não é possível excluir", { 
+        description: `Esta conta possui ${transacoesCount} transações vinculadas` 
+      });
+      return;
+    }
+    if (!confirm("Deseja excluir esta conta?")) return;
+    deleteMutation.mutate(conta.id);
   };
 
-  // Filtrar contas por busca
-  const contasFiltradas = contas?.filter(c =>
-    c.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.banco?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const openEdit = (conta: Conta) => {
+    setEditingConta(conta);
+    setFormData({
+      nome: conta.nome,
+      tipo: conta.tipo,
+      banco: conta.banco || "",
+      agencia: conta.agencia || "",
+      conta_numero: conta.conta_numero || "",
+      saldo_inicial: conta.saldo_inicial,
+      ativo: conta.ativo,
+      observacoes: conta.observacoes || "",
+    });
+    setDialogOpen(true);
+  };
 
-  return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+  const resetForm = () => {
+    setEditingConta(null);
+    setFormData({
+      nome: "",
+      tipo: "corrente",
+      banco: "",
+      agencia: "",
+      conta_numero: "",
+      saldo_inicial: 0,
+      ativo: true,
+      observacoes: "",
+    });
+  };
+
+  const filteredContas = contas.filter((c) =>
+    c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.banco?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getTipoLabel = (tipo: string) => {
+    const tipos: Record<string, string> = {
+      corrente: "Conta Corrente",
+      poupanca: "Poupança",
+      caixa: "Caixa",
+      investimento: "Investimento",
+    };
+    return tipos[tipo] || tipo;
+  };
+
+  const content = (
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Manutenção de Contas</h2>
-          <p className="text-sm text-muted-foreground">Gerenciar contas bancárias e caixas.</p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Contas Bancárias</h1>
+            <p className="text-muted-foreground">Gerencie contas e caixas</p>
+          </div>
         </div>
-        <Button 
-          className="bg-gradient-primary shadow-soft"
-          size="sm"
-          onClick={() => {
-            setSelectedConta(null);
-            setContaDialogOpen(true);
-          }}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          <span className="hidden sm:inline">Nova Conta</span>
-          <span className="sm:hidden">Nova</span>
-        </Button>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Conta
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingConta ? "Editar Conta" : "Nova Conta"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome *</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  placeholder="Ex: Bradesco Principal"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tipo">Tipo</Label>
+                <Select value={formData.tipo} onValueChange={(v) => setFormData({ ...formData, tipo: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="corrente">Conta Corrente</SelectItem>
+                    <SelectItem value="poupanca">Poupança</SelectItem>
+                    <SelectItem value="caixa">Caixa</SelectItem>
+                    <SelectItem value="investimento">Investimento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="banco">Banco</Label>
+                  <Input
+                    id="banco"
+                    value={formData.banco}
+                    onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
+                    placeholder="Bradesco"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agencia">Agência</Label>
+                  <Input
+                    id="agencia"
+                    value={formData.agencia}
+                    onChange={(e) => setFormData({ ...formData, agencia: e.target.value })}
+                    placeholder="1234"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="conta_numero">Nº Conta</Label>
+                  <Input
+                    id="conta_numero"
+                    value={formData.conta_numero}
+                    onChange={(e) => setFormData({ ...formData, conta_numero: e.target.value })}
+                    placeholder="12345-6"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="saldo_inicial">Saldo Inicial</Label>
+                  <Input
+                    id="saldo_inicial"
+                    type="number"
+                    step="0.01"
+                    value={formData.saldo_inicial}
+                    onChange={(e) => setFormData({ ...formData, saldo_inicial: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="observacoes">Observações</Label>
+                <Textarea
+                  id="observacoes"
+                  value={formData.observacoes}
+                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                  placeholder="Observações opcionais"
+                  rows={2}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ativo">Ativo</Label>
+                <Switch
+                  id="ativo"
+                  checked={formData.ativo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+                />
+              </div>
+              <Button 
+                onClick={handleSubmit} 
+                className="w-full"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {editingConta ? "Salvar Alterações" : "Criar Conta"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Card com Tabela */}
-      <Card className="border shadow-sm overflow-hidden">
-        <div className="p-3 border-b bg-muted/5 flex items-center gap-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar conta..." 
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
-            className="max-w-xs h-8 text-sm"
-          />
-        </div>
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar conta..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
+      </div>
 
-        {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2"/>
-            Carregando contas...
-          </div>
-        ) : contasError ? (
-          <div className="p-6 text-center text-destructive text-sm">
-            Falha ao carregar contas. Verifique conexão ou permissões.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Contas ({filteredContas.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-center text-muted-foreground py-8">Carregando...</p>
+          ) : filteredContas.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Nenhuma conta encontrada</p>
+          ) : (
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent bg-muted/5">
+                <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Saldo Atual</TableHead>
+                  <TableHead>Banco</TableHead>
+                  <TableHead className="text-right">Saldo Atual</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contasFiltradas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                      {contas?.length === 0 ? "Nenhuma conta cadastrada." : "Nenhuma conta encontrada."}
+                {filteredContas.map((conta) => (
+                  <TableRow key={conta.id}>
+                    <TableCell className="font-medium">{conta.nome}</TableCell>
+                    <TableCell>{getTipoLabel(conta.tipo)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {conta.banco ? `${conta.banco} ${conta.agencia || ''}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.saldo_atual)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={conta.ativo ? "default" : "secondary"}>
+                        {conta.ativo ? "Ativa" : "Inativa"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(conta)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDelete(conta)}
+                          disabled={(transacoesPorConta[conta.id] || 0) > 0}
+                        >
+                          {(transacoesPorConta[conta.id] || 0) > 0 ? (
+                            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  contasFiltradas.map((conta) => {
-                    const hasTransactions = temMovimentacoes(conta.id);
-                    
-                    return (
-                      <TableRow key={conta.id} className="hover:bg-muted/50">
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {getTipoIcon(conta.tipo)}
-                            {conta.nome}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {getTipoLabel(conta.tipo)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className={cn(
-                          "font-medium",
-                          conta.saldo_atual >= 0 ? "text-foreground" : "text-destructive"
-                        )}>
-                          {formatValue(conta.saldo_atual)}
-                        </TableCell>
-                        <TableCell>
-                          {hasTransactions ? (
-                            <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 text-xs">
-                              <AlertCircle className="w-3.5 h-3.5" />
-                              Com movimentações
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Sem movimentações</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={() => {
-                                setSelectedConta(conta);
-                                setContaDialogOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5"/>
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-destructive"
-                              disabled={hasTransactions || deleteMutation.isPending}
-                              onClick={() => handleDeleteClick(conta)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5"/>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
+                ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+          )}
+        </CardContent>
       </Card>
-
-      {/* Dialog de Criação/Edição */}
-      <ContaDialog 
-        open={contaDialogOpen}
-        onOpenChange={setContaDialogOpen}
-        conta={selectedConta}
-      />
-
-      {/* Alert Dialog de Confirmação de Exclusão */}
-      <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Deletar Conta</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja deletar a conta <strong>{contaToDelete?.nome}</strong>?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-3 justify-end">
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? 'Deletando...' : 'Deletar'}
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
+
+  return onBack ? content : <MainLayout>{content}</MainLayout>;
 }

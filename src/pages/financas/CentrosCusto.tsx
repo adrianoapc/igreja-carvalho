@@ -1,194 +1,262 @@
 import { useState, useEffect } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Loader2, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, Plus, Pencil, Trash2, Search, FolderOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface CentroCusto {
   id: string;
   nome: string;
-  codigo: string | null;
+  descricao: string | null;
   ativo: boolean;
+  base_ministerial_id: string | null;
 }
 
-export default function CentrosCusto() {
-  const [items, setItems] = useState<CentroCusto[]>([]);
+interface Props {
+  onBack?: () => void;
+}
+
+export default function CentrosCusto({ onBack }: Props) {
+  const [centros, setCentros] = useState<CentroCusto[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<CentroCusto | null>(null);
-  const [formData, setFormData] = useState({ nome: "", codigo: "" });
-  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCentro, setEditingCentro] = useState<CentroCusto | null>(null);
+  const [formData, setFormData] = useState({
+    nome: "",
+    descricao: "",
+    ativo: true,
+  });
 
   useEffect(() => {
-    fetchItems();
+    fetchCentros();
   }, []);
 
-  const fetchItems = async () => {
-    setLoading(true);
+  const fetchCentros = async () => {
     try {
-      // TENTATIVA 1: Nome padrão "centros_custo"
+      setLoading(true);
       const { data, error } = await supabase
-        .from("centros_custo") 
+        .from("centros_custo")
         .select("*")
         .order("nome");
-
+      
       if (error) throw error;
-      setItems(data || []);
+      setCentros(data || []);
     } catch (error: any) {
-      console.error("Erro fetch:", error);
-      toast.error("Erro ao carregar centros de custo", { description: "Verifique se a tabela 'centros_custo' existe." });
+      toast.error("Erro ao carregar centros de custo", { description: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    if (!formData.nome.trim()) return toast.error("O nome é obrigatório");
+  const handleSubmit = async () => {
+    if (!formData.nome.trim()) {
+      toast.error("Nome é obrigatório");
+      return;
+    }
 
-    setSaving(true);
     try {
-      const payload = {
-        nome: formData.nome,
-        codigo: formData.codigo || null,
-        ativo: true
-      };
-
-      if (editingItem) {
-        const { error } = await supabase.from("centros_custo").update(payload).eq("id", editingItem.id);
+      if (editingCentro) {
+        const { error } = await supabase
+          .from("centros_custo")
+          .update({
+            nome: formData.nome,
+            descricao: formData.descricao || null,
+            ativo: formData.ativo,
+          })
+          .eq("id", editingCentro.id);
+        
         if (error) throw error;
-        toast.success("Atualizado com sucesso");
+        toast.success("Centro de custo atualizado");
       } else {
-        const { error } = await supabase.from("centros_custo").insert([payload]);
+        const { error } = await supabase
+          .from("centros_custo")
+          .insert({
+            nome: formData.nome,
+            descricao: formData.descricao || null,
+            ativo: formData.ativo,
+          });
+        
         if (error) throw error;
-        toast.success("Criado com sucesso");
+        toast.success("Centro de custo criado");
       }
-      setIsDialogOpen(false);
-      fetchItems();
+
+      setDialogOpen(false);
+      resetForm();
+      fetchCentros();
     } catch (error: any) {
       toast.error("Erro ao salvar", { description: error.message });
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Excluir este centro de custo?")) return;
+    if (!confirm("Deseja excluir este centro de custo?")) return;
+
     try {
-      const { error } = await supabase.from("centros_custo").delete().eq("id", id);
+      const { error } = await supabase
+        .from("centros_custo")
+        .delete()
+        .eq("id", id);
+      
       if (error) throw error;
-      toast.success("Removido com sucesso");
-      fetchItems();
+      toast.success("Centro de custo excluído");
+      fetchCentros();
     } catch (error: any) {
       toast.error("Erro ao excluir", { description: error.message });
     }
   };
 
-  const openNew = () => {
-    setEditingItem(null);
-    setFormData({ nome: "", codigo: "" });
-    setIsDialogOpen(true);
+  const openEdit = (centro: CentroCusto) => {
+    setEditingCentro(centro);
+    setFormData({
+      nome: centro.nome,
+      descricao: centro.descricao || "",
+      ativo: centro.ativo,
+    });
+    setDialogOpen(true);
   };
 
-  const openEdit = (item: CentroCusto) => {
-    setEditingItem(item);
-    setFormData({ nome: item.nome, codigo: item.codigo || "" });
-    setIsDialogOpen(true);
+  const resetForm = () => {
+    setEditingCentro(null);
+    setFormData({ nome: "", descricao: "", ativo: true });
   };
 
-  const filteredItems = items.filter(i => 
-    i.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (i.codigo && i.codigo.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredCentros = centros.filter((c) =>
+    c.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2"/>Carregando dados...</div>;
-
-  return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+  const content = (
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Centros de Custo</h2>
-          <p className="text-sm text-muted-foreground">Unidades orçamentárias e projetos.</p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Centros de Custo</h1>
+            <p className="text-muted-foreground">Gerencie os centros de custo</p>
+          </div>
         </div>
-        <Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-2"/> Novo</Button>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Centro
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingCentro ? "Editar Centro de Custo" : "Novo Centro de Custo"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome *</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  placeholder="Ex: Marketing"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="descricao">Descrição</Label>
+                <Input
+                  id="descricao"
+                  value={formData.descricao}
+                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                  placeholder="Descrição opcional"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ativo">Ativo</Label>
+                <Switch
+                  id="ativo"
+                  checked={formData.ativo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+                />
+              </div>
+              <Button onClick={handleSubmit} className="w-full">
+                {editingCentro ? "Salvar Alterações" : "Criar Centro"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Card className="border shadow-sm overflow-hidden">
-        <div className="p-3 border-b bg-muted/5 flex items-center gap-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar..." 
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
-            className="max-w-xs h-8 text-sm"
-          />
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent bg-muted/5">
-                <TableHead className="w-[100px]">Código</TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredItems.length === 0 ? (
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar centro de custo..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Centros de Custo ({filteredCentros.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Carregando...</p>
+          ) : filteredCentros.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Nenhum centro encontrado</p>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">Nenhum registro encontrado.</TableCell>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
-              ) : (
-                filteredItems.map((item) => (
-                  <TableRow key={item.id} className="hover:bg-muted/50">
-                    <TableCell>{item.codigo ? <Badge variant="outline" className="font-mono text-[10px]">{item.codigo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}</TableCell>
-                    <TableCell className="font-medium">{item.nome}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)}><Pencil className="h-3.5 w-3.5"/></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(item.id)}><Trash2 className="h-3.5 w-3.5"/></Button>
+              </TableHeader>
+              <TableBody>
+                {filteredCentros.map((centro) => (
+                  <TableRow key={centro.id}>
+                    <TableCell className="font-medium">{centro.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{centro.descricao || "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant={centro.ativo ? "default" : "secondary"}>
+                        {centro.ativo ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(centro)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(centro.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
       </Card>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editingItem ? "Editar Centro" : "Novo Centro"}</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 gap-4">
-              <div className="col-span-1 space-y-2"><label className="text-sm font-medium">Código</label><Input value={formData.codigo} onChange={e => setFormData({...formData, codigo: e.target.value})} className="font-mono"/></div>
-              <div className="col-span-3 space-y-2"><label className="text-sm font-medium">Nome</label><Input value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} /></div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : "Salvar"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
+
+  return onBack ? content : <MainLayout>{content}</MainLayout>;
 }
