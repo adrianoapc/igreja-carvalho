@@ -254,7 +254,7 @@ export default function Categorias() {
                       </Button>
                       <FolderTree className={cn(
                         "h-4 w-4",
-                        cat.tipo_normalizado === 'RECEITA' ? "text-green-600" : "text-red-600"
+                        cat.tipo === 'entrada' ? "text-green-600" : "text-red-600"
                       )} />
                       {cat.nome}
                     </div>
