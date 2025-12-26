@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -180,17 +173,16 @@ export default function RegistrarVisitanteFamiliaDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-4 px-6 pt-6"><h2 className="text-lg font-semibold">
             <Baby className="w-5 h-5 text-primary" />
             Cadastro Rápido - Visitante
-          </DialogTitle>
+          </h2>
           <DialogDescription>
             Cadastre o responsável e as crianças para o check-in
-          </DialogDescription>
-        </DialogHeader>
+          </DialogDescription></div>
+<div className="flex-1 overflow-y-auto px-6 py-4">
 
         <div className="space-y-6 py-4">
           {/* Block 1: Parent */}
@@ -330,7 +322,8 @@ export default function RegistrarVisitanteFamiliaDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        </div>
+<div className="border-t pt-4 px-6 pb-6 flex justify-end gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -358,8 +351,8 @@ export default function RegistrarVisitanteFamiliaDialog({
               </>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
