@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon,
-  Camera,
-  Upload,
-  Eye,
   X,
   Loader2,
   ZoomIn,
@@ -32,7 +29,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { generatePdfThumbnail } from "@/lib/pdfUtils";
-import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { TransacaoUploadSection } from "./TransacaoUploadSection";
+import { TransacaoDocumentViewer } from "./TransacaoDocumentViewer";
 
 interface TransacaoDialogProps {
   open: boolean;
@@ -44,7 +42,6 @@ interface TransacaoDialogProps {
 export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: TransacaoDialogProps) {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
@@ -680,131 +677,6 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Upload/Capture Section
-  const UploadSection = () => (
-    <div className="space-y-3">
-      {!anexoPreview && !anexoUrl && !anexoFile ? (
-        <div className="border-2 border-dashed border-primary/30 rounded-xl p-4 md:p-6 bg-primary/5 hover:bg-primary/10 transition-colors">
-          {aiProcessing ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-4">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Processando com IA...</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="default"
-                  size="lg"
-                  className="w-full gap-2"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Camera className="w-5 h-5" />
-                  {isMobile ? "Tirar Foto da Nota" : "Fotografar ou Enviar Nota"}
-                </Button>
-                <p className="text-xs text-center text-muted-foreground">A IA irá extrair os dados automaticamente</p>
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
-                capture="environment"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileSelected(file);
-                }}
-              />
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="relative">
-          {/* Container com aspect ratio fixo para garantir visibilidade */}
-          <div
-            className={cn(
-              "relative rounded-lg overflow-hidden border cursor-pointer group bg-muted/20",
-              isMobile ? "h-[120px]" : "aspect-[3/4] w-full",
-            )}
-            onClick={handleViewDocument}
-          >
-            {/* Mostrar thumbnail/preview se disponível */}
-            {anexoPreview ? (
-              <>
-                <img
-                  src={anexoPreview}
-                  alt={anexoIsPdf ? "Preview do PDF" : "Nota fiscal"}
-                  className="w-full h-full object-contain"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Eye className="w-8 h-8 text-white" />
-                </div>
-                {anexoIsPdf && (
-                  <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
-                    <FileText className="w-3 h-3" />
-                    PDF
-                  </div>
-                )}
-              </>
-            ) : anexoUrl && !anexoIsPdf ? (
-              <>
-                <img src={anexoUrl} alt="Nota fiscal" className="w-full h-full object-contain" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Eye className="w-8 h-8 text-white" />
-                </div>
-              </>
-            ) : anexoIsPdf || (anexoFile && !anexoPreview) ? (
-              // Fallback genérico para arquivo sem preview
-              <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
-                <FileText className="w-16 h-16 text-muted-foreground" />
-                <p className="text-sm font-medium text-foreground text-center truncate max-w-full">
-                  {anexoFile?.name || "Documento anexado"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {anexoIsPdf ? "Clique para abrir em nova aba" : "Clique para visualizar"}
-                </p>
-              </div>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <p className="text-muted-foreground">Arquivo anexado</p>
-              </div>
-            )}
-          </div>
-
-          {/* Botão de remover */}
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon"
-            className="absolute top-2 right-2 h-8 w-8 z-10"
-            onClick={(e) => {
-              e.stopPropagation();
-              clearAnexo();
-            }}
-          >
-            <X className="w-4 h-4" />
-          </Button>
-
-          {/* Botão flutuante para ver (mobile) */}
-          {isMobile && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="absolute bottom-2 right-2 gap-1 shadow-lg"
-              onClick={handleViewDocument}
-            >
-              <Eye className="w-4 h-4" />
-              {anexoIsPdf ? "Abrir PDF" : "Ver Nota"}
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
   // Formulário principal
   const FormContent = () => (
     <div className="space-y-4">
@@ -1210,119 +1082,6 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     </div>
   );
 
-  // Modal Universal de Visualização de Documentos (Imagem ou PDF)
-  const DocumentViewerModal = () => {
-    if (!imagePreviewOpen) return null;
-
-    const currentUrl = anexoUrl || anexoPreview;
-    if (!currentUrl) return null;
-
-    // Detecção robusta de PDF
-    const isPdf = currentUrl?.toLowerCase().includes(".pdf") || anexoIsPdf || anexoFile?.type === "application/pdf";
-
-    const handleDownload = () => {
-      if (!currentUrl) return;
-      const link = document.createElement("a");
-      link.href = currentUrl;
-      link.download = anexoFile?.name || "documento";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    };
-
-    return (
-      <Dialog open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
-        <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 outline-none overflow-hidden">
-          {/* Header do Visualizador */}
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-background z-10 shrink-0">
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setImagePreviewOpen(false)}
-                className="h-10 w-10 shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-              {isPdf ? (
-                <FileText className="w-5 h-5 text-destructive" />
-              ) : (
-                <ImageIcon className="w-5 h-5 text-primary" />
-              )}
-              <h3 className="font-semibold text-base md:text-lg truncate">{isPdf ? "Documento PDF" : "Imagem"}</h3>
-            </div>
-            <div className="flex items-center gap-1 md:gap-2">
-              {/* Zoom controls apenas para imagens */}
-              {!isPdf && (
-                <div className="flex items-center gap-1 mr-1 md:mr-2">
-                  <Button variant="ghost" size="sm" onClick={() => setImageZoom((prev) => Math.max(0.5, prev - 0.25))}>
-                    <ZoomOut className="w-4 h-4" />
-                  </Button>
-                  <span className="text-xs md:text-sm text-muted-foreground min-w-[2.5rem] md:min-w-[3rem] text-center">
-                    {Math.round(imageZoom * 100)}%
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={() => setImageZoom((prev) => Math.min(3, prev + 0.25))}>
-                    <ZoomIn className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-              <Button variant="outline" size="sm" onClick={handleDownload} className="hidden md:flex">
-                <Download className="w-4 h-4 mr-2" />
-                Baixar
-              </Button>
-              <Button variant="outline" size="icon" onClick={handleDownload} className="md:hidden h-9 w-9">
-                <Download className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Área de Conteúdo (Viewer) */}
-          <div className="flex-1 bg-muted/50 relative w-full h-full flex items-center justify-center p-4 overflow-hidden">
-            {isPdf ? (
-              // Google Docs Viewer - funciona com qualquer URL pública/assinada
-              <div className="w-full h-full relative bg-card rounded shadow-sm overflow-hidden">
-                <iframe
-                  src={`https://docs.google.com/gview?url=${encodeURIComponent(currentUrl)}&embedded=true`}
-                  className="w-full h-full border-0"
-                  frameBorder={0}
-                  title="Visualizador de PDF"
-                />
-                {/* Botão de Fallback flutuante caso o Google falhe */}
-                <div className="absolute bottom-4 right-4 flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => {
-                      const link = document.createElement("a");
-                      link.href = currentUrl;
-                      link.target = "_blank";
-                      link.rel = "noopener noreferrer";
-                      link.click();
-                    }}
-                    className="shadow-lg"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Abrir Externamente
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              // Imagens com zoom
-              <div className="flex items-center justify-center h-full w-full overflow-auto">
-                <img
-                  src={currentUrl}
-                  alt="Documento"
-                  className="max-w-full max-h-full object-contain transition-transform duration-200"
-                  style={{ transform: `scale(${imageZoom})` }}
-                />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
   // Handler para abrir visualização - Abre modal interno para tudo
   const handleViewDocument = () => {
     setImagePreviewOpen(true);
@@ -1336,7 +1095,17 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         {/* Coluna esquerda: Imagem */}
         <div className="w-[340px] shrink-0 flex flex-col gap-4">
           <h3 className="font-semibold text-sm">Documento</h3>
-          <UploadSection />
+          <TransacaoUploadSection
+            anexoPreview={anexoPreview}
+            anexoUrl={anexoUrl}
+            anexoFile={anexoFile}
+            anexoIsPdf={anexoIsPdf}
+            isMobile={isMobile}
+            aiProcessing={aiProcessing}
+            onFileSelected={handleFileSelected}
+            onClear={clearAnexo}
+            onViewDocument={handleViewDocument}
+          />
 
           {!anexoPreview && !anexoUrl && !anexoFile && (
             <div className="bg-muted/50 p-3 rounded-lg">
@@ -1361,7 +1130,19 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       {/* Mobile: Coluna única */}
       <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 pb-20">
         {/* Upload em destaque no topo */}
-        {tipo === "saida" && !transacao && <UploadSection />}
+        {tipo === "saida" && !transacao && (
+          <TransacaoUploadSection
+            anexoPreview={anexoPreview}
+            anexoUrl={anexoUrl}
+            anexoFile={anexoFile}
+            anexoIsPdf={anexoIsPdf}
+            isMobile={isMobile}
+            aiProcessing={aiProcessing}
+            onFileSelected={handleFileSelected}
+            onClear={clearAnexo}
+            onViewDocument={handleViewDocument}
+          />
+        )}
 
         <FormContent />
       </div>
@@ -1415,7 +1196,15 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           </div>
         </div>
       </ResponsiveDialog>
-      <DocumentViewerModal />
+      <TransacaoDocumentViewer
+        open={imagePreviewOpen}
+        onOpenChange={setImagePreviewOpen}
+        url={anexoUrl || anexoPreview}
+        isPdf={anexoIsPdf || anexoFile?.type === "application/pdf"}
+        fileName={anexoFile?.name}
+        imageZoom={imageZoom}
+        setImageZoom={setImageZoom}
+      />
     </>
   );
 }
