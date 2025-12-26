@@ -1,4 +1,3 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Video, FileText } from "lucide-react";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { DialogTitle } from "@/components/ui/dialog";
 import {
   DndContext,
   closestCenter,
@@ -81,14 +82,19 @@ export function SeletorMidiasDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Selecionar Mídias</DialogTitle>
-        </DialogHeader>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden">
-          {/* Lista de mídias disponíveis */}
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dialogContentProps={{ className: "max-w-4xl p-0" }}
+      drawerContentProps={{ className: "p-0" }}
+    >
+      <div className="flex flex-col h-full max-h-[90vh]">
+        <DialogTitle className="sr-only">Selecionar Mídias</DialogTitle>
+        <div className="border-b px-6 pt-6 pb-4">
+          <h2 className="text-lg font-semibold">Selecionar Mídias</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden px-6 py-4">
           <div className="space-y-2">
             <Label className="text-sm font-medium">Mídias Disponíveis</Label>
             <ScrollArea className="h-[400px] pr-4">
@@ -115,7 +121,6 @@ export function SeletorMidiasDialog({
                       >
                         <CardContent className="p-3">
                           <div className="flex items-center gap-3">
-                            {/* Thumbnail */}
                             <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
                               {isImage ? (
                                 <img 
@@ -193,7 +198,6 @@ export function SeletorMidiasDialog({
             </ScrollArea>
           </div>
           
-          {/* Mídias selecionadas com drag and drop */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">
               Mídias Selecionadas ({midiasSelecionadas.length})
@@ -229,8 +233,8 @@ export function SeletorMidiasDialog({
             </ScrollArea>
           </div>
         </div>
-        
-        <div className="flex justify-end gap-2 pt-4 border-t">
+
+        <div className="flex justify-end gap-2 border-t px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
@@ -238,7 +242,7 @@ export function SeletorMidiasDialog({
             Confirmar ({midiasSelecionadas.length})
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ResponsiveDialog>
   );
 }

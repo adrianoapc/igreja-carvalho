@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -1188,6 +1189,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         }}
       >
         <div className="flex flex-col h-full">
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          <DialogDescription className="sr-only">Formulário de {tipo === "entrada" ? "entrada" : "saída"} financeira</DialogDescription>
           <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
             <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
           </div>

@@ -1,18 +1,13 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { DialogTitle } from "@/components/ui/dialog";
 import { Baby, Smile, Frown, Zap, Meh, Cloud, Droplets, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -186,10 +181,16 @@ export function KidsObservationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex flex-col sm:flex-row sm:items-center gap-3 pb-2">
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dialogContentProps={{ className: "max-w-2xl p-0" }}
+      drawerContentProps={{ className: "p-0" }}
+    >
+      <div className="flex flex-col max-h-[90vh] h-full">
+        <DialogTitle className="sr-only">Diário de {crianca.nome}</DialogTitle>
+        <div className="border-b px-6 pt-6 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 pb-2">
             <Avatar className="w-12 h-12 shrink-0">
               <AvatarImage src={crianca.avatar_url || undefined} />
               <AvatarFallback className="bg-primary/10">
@@ -202,19 +203,18 @@ export function KidsObservationDialog({
                 {format(new Date(), "dd 'de' MMMM 'de' yyyy")}
               </p>
             </div>
-          </DialogTitle>
-          <DialogDescription className="text-sm">
+          </div>
+          <p className="text-sm text-muted-foreground">
             {diarioId ? "Edite as observações do dia" : "Registre as observações do dia"}
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex-1 flex items-center justify-center px-6 py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-6 py-4">
-            {/* Humor */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
             <div className="space-y-3">
               <Label className="text-sm sm:text-base font-semibold">Como estava hoje? *</Label>
               <ToggleGroup
@@ -239,7 +239,6 @@ export function KidsObservationDialog({
               </ToggleGroup>
             </div>
 
-            {/* Comportamento */}
             <div className="space-y-3">
               <Label className="text-sm sm:text-base font-semibold">Comportamento Positivo</Label>
               <ToggleGroup
@@ -260,7 +259,6 @@ export function KidsObservationDialog({
               </ToggleGroup>
             </div>
 
-            {/* Necessidades */}
             <div className="space-y-3">
               <Label className="text-sm sm:text-base font-semibold">Necessidades Atendidas</Label>
               <ToggleGroup
@@ -281,7 +279,6 @@ export function KidsObservationDialog({
               </ToggleGroup>
             </div>
 
-            {/* Observações */}
             <div className="space-y-3">
               <Label htmlFor="observacoes" className="text-base font-semibold">
                 Recado para os Pais
@@ -295,37 +292,36 @@ export function KidsObservationDialog({
                 className="resize-none"
               />
             </div>
-
-            {/* Botões */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="flex-1"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSalvar}
-                disabled={salvarDiario.isPending}
-                className="flex-1"
-              >
-                {salvarDiario.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    {diarioId ? "Atualizar" : "Salvar"}
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+
+        <div className="border-t px-6 py-4 flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSalvar}
+            disabled={salvarDiario.isPending}
+            className="flex-1"
+          >
+            {salvarDiario.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {diarioId ? "Atualizar" : "Salvar"}
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

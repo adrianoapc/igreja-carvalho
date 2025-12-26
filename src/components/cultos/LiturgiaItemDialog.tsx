@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,16 +103,16 @@ export function LiturgiaItemDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
+    <ResponsiveDialog open={open} onOpenChange={(isOpen) => {
       if (!isOpen) resetForm();
       onOpenChange(isOpen);
     }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Adicionar Item à Liturgia</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
+      <div className="flex flex-col h-full">
+        <DialogTitle className="sr-only">Adicionar Item à Liturgia</DialogTitle>
+        <div className="border-b pb-4 px-6 pt-6">
+          <h2 className="text-lg font-semibold">Adicionar Item à Liturgia</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tipo *</Label>
@@ -190,16 +191,15 @@ export function LiturgiaItemDialog({
             </div>
           )}
         </div>
-
-        <DialogFooter>
+        <div className="border-t pt-4 px-6 pb-6 flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Salvando..." : "Adicionar"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

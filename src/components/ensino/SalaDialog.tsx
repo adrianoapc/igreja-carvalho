@@ -10,13 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Baby, Users, MapPin, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -136,16 +131,24 @@ export default function SalaDialog({ open, onOpenChange, sala, onSuccess }: Sala
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-primary" />
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dialogContentProps={{ className: "sm:max-w-md p-0" }}
+      drawerContentProps={{ className: "p-0" }}
+    >
+      <div className="flex flex-col h-full">
+        <DialogTitle className="sr-only">
+          {sala ? "Editar Sala" : "Nova Sala"}
+        </DialogTitle>
+        <div className="flex items-center gap-2 border-b px-6 pt-6 pb-4">
+          <MapPin className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-semibold">
             {sala ? "Editar Sala" : "Nova Sala"}
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+        </div>
 
-        <div className="space-y-4 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           <div className="space-y-2">
             <Label>Nome da Sala *</Label>
             <Input
@@ -231,7 +234,7 @@ export default function SalaDialog({ open, onOpenChange, sala, onSuccess }: Sala
           </div>
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <div className="border-t px-6 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {sala && (
             <Button
               variant="destructive"
@@ -255,8 +258,8 @@ export default function SalaDialog({ open, onOpenChange, sala, onSuccess }: Sala
               {loading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

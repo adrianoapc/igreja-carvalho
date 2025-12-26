@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, FileText, Image as ImageIcon, X, ZoomIn, ZoomOut } from "lucide-react";
 import React from "react";
@@ -39,6 +39,8 @@ export function TransacaoDocumentViewer({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 outline-none overflow-hidden">
+        <DialogTitle className="sr-only">Visualizador de documento</DialogTitle>
+        <DialogDescription className="sr-only">Exibe anexo da transação</DialogDescription>
         <div className="flex items-center justify-between px-4 py-3 border-b bg-background z-10 shrink-0">
           <div className="flex items-center gap-2">
             <Button 

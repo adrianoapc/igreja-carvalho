@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -165,6 +166,8 @@ export function TemplatePreviewDialog({
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <div className="flex flex-col h-full">
+        <DialogTitle className="sr-only">Preview do Template</DialogTitle>
+        <DialogDescription className="sr-only">Visualização detalhada do template de culto antes de aplicar</DialogDescription>
         <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
           <h2 className="text-lg font-semibold leading-none tracking-tight">Preview do Template</h2>
         </div>

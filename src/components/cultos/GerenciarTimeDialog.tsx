@@ -1,4 +1,5 @@
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Time {
@@ -373,6 +373,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
     <>
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
         <div className="flex flex-col h-full">
+          <DialogTitle className="sr-only">
+            {time ? `Gerenciar time ${time.nome}` : "Gerenciar time"}
+          </DialogTitle>
           <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
             <h2 className="flex items-center gap-3 text-lg font-semibold leading-none tracking-tight">
               <div 
@@ -675,7 +678,10 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
               </ScrollArea>
             </TabsContent>
           </Tabs>
-            </div>\n          </ScrollArea>\n        </div>\n      </ResponsiveDialog>
+        </div>
+      </ScrollArea>
+    </div>
+      </ResponsiveDialog>
 
       {/* Confirmação de Deletar Posição */}
       <AlertDialog open={!!posicaoParaDeletar} onOpenChange={() => setPosicaoParaDeletar(null)}>

@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -144,6 +144,8 @@ export default function SlideshowPreview({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 bg-black border-none overflow-hidden">
+        <DialogTitle className="sr-only">Pré-visualização do slideshow</DialogTitle>
+        <DialogDescription className="sr-only">Controles de reprodução e navegação das mídias do culto</DialogDescription>
         {/* Header overlay */}
         <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/80 to-transparent p-4">
           <div className="flex items-center justify-between">
