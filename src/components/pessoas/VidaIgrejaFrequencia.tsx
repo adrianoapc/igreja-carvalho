@@ -100,38 +100,38 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
   return (
     <div className="space-y-4">
       {/* Estatísticas */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-2 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-xs text-muted-foreground">Presenças</p>
-                <p className="text-2xl font-bold">{presencas.length}</p>
+                <p className="text-xl sm:text-2xl font-bold">{presencas.length}</p>
               </div>
-              <CalendarDays className="w-8 h-8 text-primary/50" />
+              <CalendarDays className="w-7 h-7 sm:w-8 sm:h-8 text-primary/50 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-2 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-xs text-muted-foreground">Total de Cultos</p>
-                <p className="text-2xl font-bold">{totalCultos}</p>
+                <p className="text-xl sm:text-2xl font-bold">{totalCultos}</p>
               </div>
-              <CalendarDays className="w-8 h-8 text-muted-foreground/50" />
+              <CalendarDays className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground/50 flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <Card className="sm:col-span-2 lg:col-span-1">
+          <CardContent className="p-2 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-xs text-muted-foreground">Frequência</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-2xl font-bold">{frequenciaPercentual}%</p>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <p className="text-xl sm:text-2xl font-bold">{frequenciaPercentual}%</p>
                   <Badge 
                     variant={frequenciaPercentual >= 70 ? "default" : frequenciaPercentual >= 50 ? "secondary" : "destructive"}
                     className="text-xs"
@@ -141,9 +141,9 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
                 </div>
               </div>
               {frequenciaPercentual >= 50 ? (
-                <TrendingUp className="w-8 h-8 text-green-500/50" />
+                <TrendingUp className="w-7 h-7 sm:w-8 sm:h-8 text-green-500/50 flex-shrink-0" />
               ) : (
-                <TrendingDown className="w-8 h-8 text-red-500/50" />
+                <TrendingDown className="w-7 h-7 sm:w-8 sm:h-8 text-red-500/50 flex-shrink-0" />
               )}
             </div>
           </CardContent>
@@ -152,22 +152,22 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
 
       {/* Heatmap */}
       <Card>
-        <CardHeader className="p-4">
-          <CardTitle className="text-base">Histórico de Presenças (6 meses)</CardTitle>
+        <CardHeader className="p-3 sm:p-4">
+          <CardTitle className="text-sm sm:text-base">Histórico de Presenças (6 meses)</CardTitle>
         </CardHeader>
-        <CardContent className="p-4 pt-0">
-          <div className="space-y-3 overflow-x-auto">
+        <CardContent className="p-3 sm:p-4 pt-0 overflow-x-auto pb-2">
+          <div className="space-y-2 sm:space-y-3">
             {heatmapData.map((monthData, idx) => (
               <div key={idx} className="min-w-fit">
-                <p className="text-xs font-medium text-muted-foreground mb-2 capitalize">
+                <p className="text-xs font-medium text-muted-foreground mb-1.5 sm:mb-2 capitalize">
                   {monthData.month} {monthData.year}
                 </p>
-                <div className="flex gap-1 flex-wrap">
+                <div className="flex gap-0.5 sm:gap-1 flex-wrap">
                   {monthData.days.map((day, dayIdx) => (
                     <div
                       key={dayIdx}
                       title={format(day.date, "dd/MM/yyyy")}
-                      className={`w-4 h-4 rounded-sm transition-colors ${
+                      className={`w-3 h-3 sm:w-4 sm:h-4 rounded-sm transition-colors ${
                         day.hasPresenca
                           ? "bg-green-500 hover:bg-green-600"
                           : day.dayOfWeek === 0 // Domingo
@@ -180,17 +180,17 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-4 mt-3 sm:mt-4 text-xs text-muted-foreground flex-wrap">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-green-500" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-green-500" />
               <span>Presente</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-muted border border-dashed border-muted-foreground/30" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-muted border border-dashed border-muted-foreground/30" />
               <span>Domingo</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-muted/50" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-muted/50" />
               <span>Outros dias</span>
             </div>
           </div>

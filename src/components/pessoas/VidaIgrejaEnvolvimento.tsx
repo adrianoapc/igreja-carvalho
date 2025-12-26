@@ -8,7 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Users, Calendar, Clock, MapPin, Crown, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, Calendar, Clock, MapPin, Crown, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -179,15 +179,18 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
       <Collapsible open={funcoesOpen} onOpenChange={setFuncoesOpen}>
         <Card className="shadow-soft">
           <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
                   <Crown className="w-5 h-5 text-primary" />
                 </div>
-                <CardTitle className="text-base md:text-lg">Funções na Igreja ({funcoes.length})</CardTitle>
+                <div className="min-w-0">
+                  <CardTitle className="text-base md:text-lg truncate">Funções na Igreja</CardTitle>
+                  <p className="text-xs text-muted-foreground">{funcoes.length} ativa{funcoes.length !== 1 ? 's' : ''}</p>
+                </div>
               </div>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="flex-shrink-0">
                   {funcoesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
               </CollapsibleTrigger>
@@ -204,15 +207,15 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
                   {funcoes.map((funcao) => (
                     <div
                       key={funcao.id}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 sm:p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-semibold text-sm">{funcao.nome}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           Desde: {format(new Date(funcao.data_inicio), "dd/MM/yyyy", { locale: ptBR })}
                         </p>
                       </div>
-                      <Badge variant={funcao.ativo ? "default" : "secondary"} className="text-xs">
+                      <Badge variant={funcao.ativo ? "default" : "secondary"} className="text-xs whitespace-nowrap">
                         {funcao.ativo ? "Ativa" : "Inativa"}
                       </Badge>
                     </div>
@@ -228,15 +231,18 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
       <Collapsible open={timesOpen} onOpenChange={setTimesOpen}>
         <Card className="shadow-soft">
           <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
                   <Users className="w-5 h-5 text-primary" />
                 </div>
-                <CardTitle className="text-base md:text-lg">Times ({times.length})</CardTitle>
+                <div className="min-w-0">
+                  <CardTitle className="text-base md:text-lg truncate">Times</CardTitle>
+                  <p className="text-xs text-muted-foreground">{times.length} time{times.length !== 1 ? 's' : ''}</p>
+                </div>
               </div>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="flex-shrink-0">
                   {timesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
               </CollapsibleTrigger>
@@ -244,51 +250,51 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="p-4 md:p-5">
-          {times.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Não participa de nenhum time
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {times.map((time) => (
-                <div
-                  key={time.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border"
-                  style={{ borderLeftColor: time.cor || undefined, borderLeftWidth: time.cor ? 4 : undefined }}
-                >
-                  <Avatar className="w-10 h-10" style={{ backgroundColor: time.cor || undefined }}>
-                    <AvatarFallback className="text-white text-sm">
-                      {time.nome.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm truncate">{time.nome}</p>
-                      {time.isLider && (
-                        <Badge className="text-xs bg-amber-500 hover:bg-amber-600">
-                          <Crown className="w-3 h-3 mr-1" />
-                          Líder
-                        </Badge>
-                      )}
-                      {time.isSublider && (
-                        <Badge variant="secondary" className="text-xs">
-                          Sub-líder
-                        </Badge>
-                      )}
+              {times.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Não participa de nenhum time
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {times.map((time) => (
+                    <div
+                      key={time.id}
+                      className="flex items-center gap-3 p-3 sm:p-4 rounded-lg bg-muted/50 border transition-colors hover:bg-muted"
+                      style={{ borderLeftColor: time.cor || undefined, borderLeftWidth: time.cor ? 4 : undefined }}
+                    >
+                      <Avatar className="w-10 h-10 flex-shrink-0" style={{ backgroundColor: time.cor || undefined }}>
+                        <AvatarFallback className="text-white text-sm font-semibold">
+                          {time.nome.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-sm truncate">{time.nome}</p>
+                          {time.isLider && (
+                            <Badge className="text-xs bg-amber-500 hover:bg-amber-600 flex-shrink-0">
+                              <Crown className="w-3 h-3 mr-1" />
+                              Líder
+                            </Badge>
+                          )}
+                          {time.isSublider && (
+                            <Badge variant="secondary" className="text-xs flex-shrink-0">
+                              Sub-líder
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs whitespace-nowrap">
+                            {time.categoria}
+                          </Badge>
+                          {time.posicao && (
+                            <span className="text-xs text-muted-foreground">{time.posicao}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
-                        {time.categoria}
-                      </Badge>
-                      {time.posicao && (
-                        <span className="text-xs text-muted-foreground">{time.posicao}</span>
-                      )}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
             </CardContent>
           </CollapsibleContent>
         </Card>
@@ -298,15 +304,18 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
       <Collapsible open={escalasOpen} onOpenChange={setEscalasOpen}>
         <Card className="shadow-soft">
           <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
                   <Calendar className="w-5 h-5 text-primary" />
                 </div>
-                <CardTitle className="text-base md:text-lg">Escalas Futuras ({escalas.length})</CardTitle>
+                <div className="min-w-0">
+                  <CardTitle className="text-base md:text-lg truncate">Escalas Futuras</CardTitle>
+                  <p className="text-xs text-muted-foreground">{escalas.length} escalada{escalas.length !== 1 ? 's' : ''}</p>
+                </div>
               </div>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="flex-shrink-0">
                   {escalasOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
               </CollapsibleTrigger>
@@ -314,58 +323,58 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="p-4 md:p-5">
-          {escalas.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Nenhuma escala futura agendada
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {escalas.map((escala) => (
-                <div
-                  key={escala.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/50"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+              {escalas.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma escala futura agendada
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {escalas.map((escala) => (
                     <div
-                      className="w-2 h-12 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: escala.time_cor || "#8B5CF6" }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{escala.culto_titulo}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="w-3 h-3" />
-                          {format(new Date(escala.culto_data), "dd/MM 'às' HH:mm", { locale: ptBR })}
-                        </div>
-                        {escala.culto_local && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="w-3 h-3" />
-                            {escala.culto_local}
+                      key={escala.id}
+                      className="flex flex-col sm:flex-row sm:items-start gap-3 p-3 sm:p-4 rounded-lg bg-muted/50 border hover:bg-muted/70 transition-colors"
+                    >
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div
+                          className="w-1.5 h-12 rounded-full flex-shrink-0 mt-1"
+                          style={{ backgroundColor: escala.time_cor || "#8B5CF6" }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{escala.culto_titulo}</p>
+                          <div className="flex flex-col gap-2 mt-2">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="w-3 h-3 flex-shrink-0" />
+                              {format(new Date(escala.culto_data), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                            </div>
+                            {escala.culto_local && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                {escala.culto_local}
+                              </div>
+                            )}
                           </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap sm:flex-col sm:gap-1">
+                        <Badge variant="outline" className="text-xs whitespace-nowrap">
+                          {escala.time_nome}
+                        </Badge>
+                        {escala.posicao && (
+                          <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                            {escala.posicao}
+                          </Badge>
                         )}
+                        <Badge
+                          variant={escala.confirmado ? "default" : "outline"}
+                          className={`text-xs whitespace-nowrap ${escala.confirmado ? "bg-green-600" : ""}`}
+                        >
+                          {escala.confirmado ? "✓ Confirmado" : "○ Pendente"}
+                        </Badge>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 pl-5 sm:pl-0">
-                    <Badge variant="outline" className="text-xs">
-                      {escala.time_nome}
-                    </Badge>
-                    {escala.posicao && (
-                      <Badge variant="secondary" className="text-xs">
-                        {escala.posicao}
-                      </Badge>
-                    )}
-                    <Badge
-                      variant={escala.confirmado ? "default" : "outline"}
-                      className={`text-xs ${escala.confirmado ? "bg-green-600" : ""}`}
-                    >
-                      {escala.confirmado ? "Confirmado" : "Pendente"}
-                    </Badge>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
             </CardContent>
           </CollapsibleContent>
         </Card>

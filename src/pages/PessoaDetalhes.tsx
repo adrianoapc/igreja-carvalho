@@ -4,6 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -123,6 +130,7 @@ export default function PessoaDetalhes() {
   const [pessoa, setPessoa] = useState<PessoaDetalhesData | null>(null);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("perfil");
   const [editarPessoaisOpen, setEditarPessoaisOpen] = useState(false);
   const [editarContatosOpen, setEditarContatosOpen] = useState(false);
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
@@ -264,8 +272,8 @@ export default function PessoaDetalhes() {
 
       {/* NOVO HEADER UNIFICADO PREMIUM */}
       <Card className="shadow-lg border-0 bg-gradient-to-br from-background to-muted/20">
-        <CardContent className="p-6 md:p-8">
-          <div className="flex flex-col md:flex-row gap-6">
+        <CardContent className="p-4 sm:p-6 md:p-8">
+          <div className="flex flex-col items-center md:flex-row md:items-start gap-4 md:gap-6">
             {/* Avatar interativo */}
             <div className="flex-shrink-0">
               <AvatarUpload
@@ -277,42 +285,43 @@ export default function PessoaDetalhes() {
             </div>
 
             {/* Dados principais reorganizados */}
-            <div className="flex-1 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex-1 space-y-3 text-center md:text-left">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                 <h1 className="text-2xl md:text-3xl font-bold leading-tight">{pessoa.nome}</h1>
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="gap-2 self-start"
+                  className="gap-2 self-center md:self-start"
                   onClick={() => navigate(`/pessoas/${pessoa.id}/editar`)}
                 >
                   <Edit className="w-4 h-4" />
-                  Editar perfil
+                  <span className="hidden sm:inline">Editar perfil</span>
+                  <span className="sm:hidden">Editar</span>
                 </Button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:gap-2 text-xs md:text-sm text-muted-foreground gap-1">
                 {pessoa.email && (
-                  <span className="flex items-center gap-1 truncate">
-                    <Mail className="w-4 h-4" />
+                  <span className="flex items-center gap-1 justify-center md:justify-start truncate">
+                    <Mail className="w-4 h-4 flex-shrink-0" />
                     {pessoa.email}
                   </span>
                 )}
-                {pessoa.email && pessoa.telefone && <span>•</span>}
+                {pessoa.email && pessoa.telefone && <span className="hidden md:inline">•</span>}
                 {pessoa.telefone && (
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-4 h-4" />
+                  <span className="flex items-center gap-1 justify-center md:justify-start">
+                    <Phone className="w-4 h-4 flex-shrink-0" />
                     {formatarTelefone(pessoa.telefone)}
                   </span>
                 )}
-                {(pessoa.email || pessoa.telefone) && <span>•</span>}
-                <span className="flex items-center gap-1">
-                  <IdCard className="w-4 h-4" />
+                {(pessoa.email || pessoa.telefone) && <span className="hidden md:inline">•</span>}
+                <span className="flex items-center gap-1 justify-center md:justify-start">
+                  <IdCard className="w-4 h-4 flex-shrink-0" />
                   ID: {pessoa.id.slice(0, 8)}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 justify-center md:justify-start">
                 <Badge
                   variant={getStatusBadgeVariant(pessoa.status)}
                   className="text-xs font-semibold px-3 py-1 capitalize"
@@ -352,8 +361,8 @@ export default function PessoaDetalhes() {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="hidden md:grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
           <TabsTrigger value="perfil" className="flex-col gap-1 py-2 px-1 text-xs">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Perfil</span>
@@ -375,6 +384,22 @@ export default function PessoaDetalhes() {
             <span className="hidden sm:inline">Sentimentos</span>
           </TabsTrigger>
         </TabsList>
+
+        {/* Mobile Navigation - Select */}
+        <div className="md:hidden mb-4">
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione uma seção" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="perfil">Perfil</SelectItem>
+              <SelectItem value="mais">Dados Adicionais</SelectItem>
+              <SelectItem value="envolvimento">Envolvimento</SelectItem>
+              <SelectItem value="frequencia">Frequência</SelectItem>
+              <SelectItem value="intercessao">Sentimentos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Tab: Perfil */}
         <TabsContent value="perfil" className="space-y-4 md:space-y-6">
@@ -399,11 +424,24 @@ export default function PessoaDetalhes() {
                         <User className="w-5 h-5 text-primary" />
                         Dados Civis
                       </div>
-                      {dadosCivisOpen ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditarPessoaisOpen(true);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        {dadosCivisOpen ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
                     </CardTitle>
                   </CardHeader>
                 </CollapsibleTrigger>
@@ -463,11 +501,24 @@ export default function PessoaDetalhes() {
                         <Phone className="w-5 h-5 text-primary" />
                         Contatos
                       </div>
-                      {dadosContatosOpen ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditarContatosOpen(true);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        {dadosContatosOpen ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
                     </CardTitle>
                   </CardHeader>
                 </CollapsibleTrigger>
@@ -531,11 +582,24 @@ export default function PessoaDetalhes() {
                         <Church className="w-5 h-5 text-primary" />
                         Dados Eclesiásticos
                       </div>
-                      {dadosEclesiasticosOpen ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditarEclesiasticosOpen(true);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        {dadosEclesiasticosOpen ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
                     </CardTitle>
                   </CardHeader>
                 </CollapsibleTrigger>

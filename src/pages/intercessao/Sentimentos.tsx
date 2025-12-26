@@ -72,6 +72,7 @@ export default function Sentimentos() {
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [historico, setHistorico] = useState<SentimentoRecord[]>([]);
   const [expandedComment, setExpandedComment] = useState<string | null>(null);
+  const [filtroSentimento, setFiltroSentimento] = useState<"all" | "positivos" | "negativos">("all");
 
   useEffect(() => {
     fetchStats();
@@ -114,13 +115,13 @@ export default function Sentimentos() {
 
       // Preparar dados de tendência
       const trend: Record<string, { positivos: number; negativos: number }> = {};
-      
+
       data?.forEach(item => {
         const dia = format(new Date(item.data_registro), 'dd/MM', { locale: ptBR });
         if (!trend[dia]) {
           trend[dia] = { positivos: 0, negativos: 0 };
         }
-        
+
         const config = sentimentosConfig[item.sentimento as SentimentoTipo];
         if (config.type === 'positive') {
           trend[dia].positivos++;
@@ -249,6 +250,36 @@ export default function Sentimentos() {
       {/* Alertas Críticos */}
       <AlertasCriticos />
 
+      {/* Filtro Visual de Sentimentos */}
+      <Card>
+        <CardHeader className="p-4 md:p-6 border-b">
+          <CardTitle className="text-base md:text-lg mb-4">Filtrar por Sentimento</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={filtroSentimento === "all" ? "default" : "outline"}
+              onClick={() => setFiltroSentimento("all")}
+              className="text-xs sm:text-sm"
+            >
+              Todos ({totalRegistros})
+            </Button>
+            <Button
+              variant={filtroSentimento === "positivos" ? "default" : "outline"}
+              onClick={() => setFiltroSentimento("positivos")}
+              className="text-xs sm:text-sm bg-green-50 hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400"
+            >
+              ✓ Positivos ({totalPositivos})
+            </Button>
+            <Button
+              variant={filtroSentimento === "negativos" ? "default" : "outline"}
+              onClick={() => setFiltroSentimento("negativos")}
+              className="text-xs sm:text-sm bg-red-50 hover:bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400"
+            >
+              ⚠ Negativos ({totalNegativos})
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
       {/* Histórico de Sentimentos com Comentários */}
       <Card>
         <CardHeader className="p-4 md:p-6">
@@ -277,12 +308,20 @@ export default function Sentimentos() {
             </p>
           ) : (
             <div className="space-y-3">
-              {historico.map((registro) => {
+              {historico
+                .filter((registro) => {
+                  if (filtroSentimento === "all") return true;
+                  const config = sentimentosConfig[registro.sentimento];
+                  if (filtroSentimento === "positivos") return config.type === "positive";
+                  if (filtroSentimento === "negativos") return config.type === "negative";
+                  return true;
+                })
+                .map((registro) => {
                 const config = sentimentosConfig[registro.sentimento];
                 const hasComment = !!registro.mensagem;
                 const isExpanded = expandedComment === registro.id;
                 const hasAiAnalysis = !!registro.analise_ia_titulo;
-                
+
                 // Severity badge styling
                 const getSeverityBadge = (gravidade: string | null) => {
                   switch (gravidade) {
@@ -372,7 +411,7 @@ export default function Sentimentos() {
                           </TooltipProvider>
                         )}
                       </div>
-                      
+
                       {/* Subinfo: Member name (when AI title is shown) + timestamp */}
                       <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                         {hasAiAnalysis && (
@@ -387,7 +426,7 @@ export default function Sentimentos() {
                           {format(new Date(registro.data_registro), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                         </span>
                       </div>
-                      
+
                       {/* Expanded comment */}
                       {hasComment && isExpanded && (
                         <div className="mt-2 p-2 bg-muted rounded text-sm space-y-2">
