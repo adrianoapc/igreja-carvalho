@@ -44,9 +44,11 @@ All colors MUST be HSL.
 
     --radius: 0.375rem;
 
-    /* Safe areas */
-    --safe-area-top: env(safe-area-inset-top, 0px);
-    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    /* Safe Area Insets para iOS */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
 
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 35%), hsl(217 91% 45%));
     --gradient-accent: linear-gradient(135deg, hsl(43 96% 56%), hsl(43 96% 66%));
@@ -166,16 +168,16 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-hidden;
   }
 }
 
-@media (max-width: 480px) {
+/* Prevenção de zoom no iOS em inputs */
+@media (max-width: 767px) {
   input,
   select,
-  textarea,
-  button {
-    font-size: 16px;
+  textarea {
+    font-size: 16px !important;
   }
 }
 

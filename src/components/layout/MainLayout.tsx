@@ -40,7 +40,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
       <SidebarInset className="flex-1 min-w-0 relative z-0">
         <header
           className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-          style={{ paddingTop: "var(--safe-area-top)" }}
+          style={{ paddingTop: "var(--safe-area-inset-top)" }}
         >
           <div className="flex h-14 md:h-16 items-center justify-between gap-4 px-4 md:px-8">
             <div className="flex items-center gap-4">
@@ -58,8 +58,12 @@ function MainLayoutContent({ children }: MainLayoutProps) {
         
         <main
           ref={mainRef}
-          className="p-4 md:p-8 min-w-0"
-          style={{ paddingBottom: "var(--safe-area-bottom)" }}
+          className="overflow-x-hidden p-4 md:p-8 min-w-0"
+          style={{ 
+            paddingBottom: `calc(1rem + var(--safe-area-inset-bottom))`,
+            paddingLeft: "max(1rem, var(--safe-area-inset-left))",
+            paddingRight: "max(1rem, var(--safe-area-inset-right))"
+          }}
         >
           {children}
           <Outlet /> 
