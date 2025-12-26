@@ -3,7 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isThisWeek, isThisMonth, isSameDay, parseISO } from "date-fns";
@@ -221,12 +227,38 @@ export function AniversariosDashboard() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <CardTitle className="flex items-center gap-2">
             <Cake className="w-5 h-5" />
             Aniversários
           </CardTitle>
           <div className="flex flex-col sm:flex-row gap-2">
+            <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as typeof tipoFilter)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="nascimento">
+                  <div className="flex items-center gap-2">
+                    <Cake className="w-3 h-3" />
+                    Nascimento
+                  </div>
+                </SelectItem>
+                <SelectItem value="casamento">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-3 h-3" />
+                    Casamento
+                  </div>
+                </SelectItem>
+                <SelectItem value="batismo">
+                  <div className="flex items-center gap-2">
+                    <Droplets className="w-3 h-3" />
+                    Batismo
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="w-full sm:w-auto">
@@ -260,25 +292,7 @@ export function AniversariosDashboard() {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs value={tipoFilter} onValueChange={(v) => setTipoFilter(v as typeof tipoFilter)} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="todos" className="text-xs md:text-sm">
-              Todos
-            </TabsTrigger>
-            <TabsTrigger value="nascimento" className="text-xs md:text-sm">
-              <Cake className="w-3 h-3 mr-1" />
-              Nascimento
-            </TabsTrigger>
-            <TabsTrigger value="casamento" className="text-xs md:text-sm">
-              <Heart className="w-3 h-3 mr-1" />
-              Casamento
-            </TabsTrigger>
-            <TabsTrigger value="batismo" className="text-xs md:text-sm">
-              <Droplets className="w-3 h-3 mr-1" />
-              Batismo
-            </TabsTrigger>
-          </TabsList>
-
+        <div className="space-y-4">
           {selectedDate ? (
             <div className="space-y-3">
               <h3 className="font-semibold text-sm">
@@ -342,7 +356,7 @@ export function AniversariosDashboard() {
               )}
             </div>
           )}
-        </Tabs>
+        </div>
       </CardContent>
     </Card>
   );

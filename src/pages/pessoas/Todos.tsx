@@ -1,12 +1,29 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Phone, Mail, Calendar, User, ArrowLeft, Download } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Search, Phone, Mail, Calendar, User, ArrowLeft, Download, Filter } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -33,16 +50,20 @@ export default function TodosPessoas() {
   const [allPessoas, setAllPessoas] = useState<Pessoa[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "visitante" | "frequentador" | "membro">("todos");
-  const {
-    toast
-  } = useToast();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterHasPhone, setFilterHasPhone] = useState(false);
+  const [filterHasEmail, setFilterHasEmail] = useState(false);
+  const { toast } = useToast();
   const navigate = useNavigate();
   const fetchPessoas = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.from("profiles").select("id, nome, telefone, email, status, avatar_url, data_primeira_visita, numero_visitas, user_id").order("nome");
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "id, nome, telefone, email, status, avatar_url, data_primeira_visita, numero_visitas, user_id"
+        )
+        .order("nome");
+
       if (error) throw error;
       setAllPessoas(data || []);
       setDisplayedPessoas((data || []).slice(0, ITEMS_PER_PAGE));
@@ -90,11 +111,14 @@ export default function TodosPessoas() {
     setIsLoading(false);
   }, [page, allPessoas, setHasMore, setIsLoading]);
 
-  const filteredPessoas = displayedPessoas.filter(p => {
-    const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.telefone?.includes(searchTerm) || p.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "todos" || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredPessoas = displayedPessoas
+    .filter(p => {
+      const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.telefone?.includes(searchTerm) || p.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "todos" || p.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .filter(p => (filterHasPhone ? !!p.telefone : true))
+    .filter(p => (filterHasEmail ? !!p.email : true));
   const countByStatus = {
     todos: allPessoas.length,
     visitante: allPessoas.filter(p => p.status === "visitante").length,
@@ -148,7 +172,9 @@ export default function TodosPessoas() {
       });
     }
   };
-  return <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
+  
+  return (
+    <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div className="flex items-center gap-2 md:gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate("/pessoas")}>
           <ArrowLeft className="w-5 h-5" />
@@ -168,91 +194,260 @@ export default function TodosPessoas() {
       </div>
 
       <Card className="shadow-soft">
-        <CardHeader className="p-4 md:p-6 space-y-4">
-          <Tabs value={statusFilter} onValueChange={value => setStatusFilter(value as typeof statusFilter)} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-auto">
-              <TabsTrigger value="todos" className="text-xs md:text-sm">
-                Todos ({countByStatus.todos})
-              </TabsTrigger>
-              <TabsTrigger value="visitante" className="text-xs md:text-sm">
-                Visitantes ({countByStatus.visitante})
-              </TabsTrigger>
-              <TabsTrigger value="frequentador" className="text-xs md:text-sm">
-                Frequentadores ({countByStatus.frequentador})
-              </TabsTrigger>
-              <TabsTrigger value="membro" className="text-xs md:text-sm">
-                Membros ({countByStatus.membro})
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nome, telefone ou email..." className="pl-10 text-sm md:text-base" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input 
+                placeholder="Buscar por nome, telefone ou email..." 
+                className="pl-10 text-base md:text-lg" 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+              <SelectTrigger className="w-full md:w-[200px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos ({countByStatus.todos})</SelectItem>
+                <SelectItem value="visitante">Visitantes ({countByStatus.visitante})</SelectItem>
+                <SelectItem value="frequentador">Frequentadores ({countByStatus.frequentador})</SelectItem>
+                <SelectItem value="membro">Membros ({countByStatus.membro})</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="md:w-auto" onClick={() => setFiltersOpen(true)}>
+              <Filter className="w-4 h-4 mr-2" />
+              Filtros
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-3 md:p-6">
-          <div className="space-y-3 md:space-y-4">
-            {filteredPessoas.map((pessoa, index) => <div key={pessoa.id} ref={index === filteredPessoas.length - 1 ? loadMoreRef : null} onClick={() => navigate(`/pessoas/${pessoa.id}`)} className="flex flex-col gap-3 p-3 md:p-4 rounded-lg transition-colors cursor-pointer bg-[#eff0cf]">
+          <div className="space-y-5">
+            {/* Desktop Table */}
+            <Table className="hidden md:table table-auto w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Visitas</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPessoas.map((pessoa, index) => (
+                  <TableRow key={pessoa.id} ref={index === filteredPessoas.length - 1 ? loadMoreRef : null}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src={pessoa.avatar_url || undefined} alt={pessoa.nome} />
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold">
+                            {pessoa.nome.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-foreground">{pessoa.nome}</p>
+                          {pessoa.user_id && (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                              <User className="w-3 h-3" /> Usuário da plataforma
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <div className="flex flex-col gap-1">
+                        {pessoa.telefone && (
+                          <span className="flex items-center gap-2">
+                            <Phone className="w-4 h-4" />
+                            {formatarTelefone(pessoa.telefone)}
+                          </span>
+                        )}
+                        {pessoa.email && (
+                          <span className="flex items-center gap-2">
+                            <Mail className="w-4 h-4" />
+                            <span className="truncate">{pessoa.email}</span>
+                          </span>
+                        )}
+                        {pessoa.data_primeira_visita && (
+                          <span className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            {format(new Date(pessoa.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(pessoa.status)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs bg-primary/10">
+                        {pessoa.numero_visitas} {pessoa.numero_visitas === 1 ? "visita" : "visitas"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => navigate(`/pessoas/${pessoa.id}`)}>
+                        Detalhes
+                      </Button>
+                      <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(`/cultos/nova-agenda?membroId=${pessoa.id}`)}>
+                        Agendar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="w-10 h-10 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-48" />
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {!isLoading && filteredPessoas.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                      {searchTerm ? "Nenhuma pessoa encontrada" : "Nenhuma pessoa cadastrada"}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="block md:hidden space-y-4">
+            {filteredPessoas.map((pessoa, index) => (
+              <div
+                key={pessoa.id}
+                ref={index === filteredPessoas.length - 1 ? loadMoreRef : null}
+                className="flex flex-col gap-3 p-3 rounded-lg bg-[#eff0cf]"
+              >
                 <div className="flex items-start gap-3">
-                  <Avatar className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+                  <Avatar className="w-10 h-10 flex-shrink-0">
                     <AvatarImage src={pessoa.avatar_url || undefined} alt={pessoa.nome} />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold text-base md:text-lg">
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold">
                       {pessoa.nome.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm md:text-base text-foreground truncate">{pessoa.nome}</p>
+                    <p className="font-medium text-foreground truncate">{pessoa.nome}</p>
                     <div className="flex flex-col gap-1 mt-1">
-                      {pessoa.telefone && <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground">
-                          <Phone className="w-3 h-3 flex-shrink-0" />
+                      {pessoa.telefone && (
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Phone className="w-4 h-4" />
                           {formatarTelefone(pessoa.telefone)}
-                        </span>}
-                      {pessoa.email && <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground truncate">
-                          <Mail className="w-3 h-3 flex-shrink-0" />
+                        </span>
+                      )}
+                      {pessoa.email && (
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground truncate">
+                          <Mail className="w-4 h-4" />
                           <span className="truncate">{pessoa.email}</span>
-                        </span>}
-                      {pessoa.data_primeira_visita && <span className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground">
-                          <Calendar className="w-3 h-3 flex-shrink-0" />
-                          Cadastrado em: {format(new Date(pessoa.data_primeira_visita), "dd/MM/yyyy", {
-                      locale: ptBR
-                    })}
-                        </span>}
+                        </span>
+                      )}
+                      {pessoa.data_primeira_visita && (
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="w-4 h-4" />
+                          {format(new Date(pessoa.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-2">
                   {getStatusBadge(pessoa.status)}
                   <Badge variant="outline" className="text-xs bg-primary/10">
-                    {pessoa.numero_visitas} {pessoa.numero_visitas === 1 ? 'visita' : 'visitas'}
+                    {pessoa.numero_visitas} {pessoa.numero_visitas === 1 ? "visita" : "visitas"}
                   </Badge>
-                  {pessoa.user_id && <Badge variant="outline" className="text-xs">
-                      <User className="w-3 h-3 mr-1" />
-                      Usuário da plataforma
-                    </Badge>}
+                  {pessoa.user_id && (
+                    <Badge variant="outline" className="text-xs">
+                      <User className="w-3 h-3 mr-1" /> Usuário da plataforma
+                    </Badge>
+                  )}
                 </div>
-              </div>)}
-            
-            {isLoading && <div className="space-y-3">
-                {[1, 2].map(i => <div key={i} className="flex items-center gap-3 p-3 md:p-4 rounded-lg bg-secondary">
-                    <Skeleton className="w-10 h-10 md:w-12 md:h-12 rounded-full" />
+
+                <div className="flex gap-2">
+                  <Button className="flex-1 min-h-[44px]" onClick={() => navigate(`/pessoas/${pessoa.id}`)}>
+                    Detalhes
+                  </Button>
+                  <Button variant="outline" className="flex-1 min-h-[44px]" onClick={() => navigate(`/cultos/nova-agenda?membroId=${pessoa.id}`)}>
+                    Agendar
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {isLoading && (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
+                    <Skeleton className="w-10 h-10 rounded-full" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-32" />
                       <Skeleton className="h-3 w-48" />
                     </div>
-                  </div>)}
-              </div>}
-            
-            {!hasMore && filteredPessoas.length > 0 && <div className="text-center py-4 text-sm text-muted-foreground">
-                Todas as pessoas foram carregadas
-              </div>}
-            
-            {filteredPessoas.length === 0 && !isLoading && <div className="text-center py-8 text-sm text-muted-foreground">
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {filteredPessoas.length === 0 && !isLoading && (
+              <div className="text-center py-8 text-sm text-muted-foreground">
                 {searchTerm ? "Nenhuma pessoa encontrada" : "Nenhuma pessoa cadastrada"}
-              </div>}
+              </div>
+            )}
           </div>
+
+          {!hasMore && filteredPessoas.length > 0 && (
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              Todas as pessoas foram carregadas
+            </div>
+          )}
         </CardContent>
       </Card>
-    </div>;
+
+      <ResponsiveDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        dialogContentProps={{ className: "sm:max-w-[420px]" }}
+        drawerContentProps={{ className: "max-h-[90vh]" }}
+      >
+        <div className="p-4 sm:p-6 space-y-4">
+          <h2 className="text-base font-semibold">Filtros</h2>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm">Somente com telefone</Label>
+                <p className="text-xs text-muted-foreground">Oculta pessoas sem número cadastrado.</p>
+              </div>
+              <Switch checked={filterHasPhone} onCheckedChange={setFilterHasPhone} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm">Somente com e-mail</Label>
+                <p className="text-xs text-muted-foreground">Oculta pessoas sem e-mail cadastrado.</p>
+              </div>
+              <Switch checked={filterHasEmail} onCheckedChange={setFilterHasEmail} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => {
+              setFilterHasPhone(false);
+              setFilterHasEmail(false);
+            }}>
+              Limpar
+            </Button>
+            <Button onClick={() => setFiltersOpen(false)}>
+              Aplicar
+            </Button>
+          </div>
+        </div>
+      </ResponsiveDialog>
+    </div>
+  );
 }

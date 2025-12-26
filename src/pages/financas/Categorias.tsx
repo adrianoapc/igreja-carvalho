@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,13 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { 
   Plus, Pencil, Trash2, Search, Loader2, 
   ChevronRight, ChevronDown, FolderTree, CornerDownRight, 
@@ -208,19 +203,23 @@ export default function Categorias() {
   };
 
   // --- RENDER DA TABELA ---
-  const renderTable = (tipoFiltro: string) => {
-    const filteredTree = categorias
+  const getFilteredTree = (tipoFiltro: string) => (
+    categorias
       .filter((c: any) => c.tipo_normalizado === tipoFiltro)
       .filter(c => 
         c.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.subcategorias?.some(s => s.nome?.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
+      )
+  );
+
+  const renderTable = (tipoFiltro: string) => {
+    const filteredTree = getFilteredTree(tipoFiltro);
 
     if (filteredTree.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
           <AlertCircle className="h-8 w-8 opacity-20" />
-          <p>Nenhuma categoria de {tipoFiltro === 'RECEITA' ? 'entrada' : 'saída'} encontrada.</p>
+          <p>Nenhuma categoria de {tipoFiltro === 'entrada' ? 'entrada' : 'saída'} encontrada.</p>
         </div>
       );
     }
@@ -239,7 +238,7 @@ export default function Categorias() {
             const isExpanded = expandedCats[cat.id] || searchTerm.length > 0;
             
             return (
-              <>
+                <Fragment key={cat.id}>
                 {/* Categoria Pai */}
                 <TableRow key={cat.id} className="group hover:bg-muted/50 border-b-0">
                   <TableCell className="font-medium py-3">
@@ -301,11 +300,102 @@ export default function Categorias() {
                     </TableCell>
                   </TableRow>
                 ))}
-              </>
+                </Fragment>
             );
           })}
         </TableBody>
       </Table>
+    );
+  };
+
+  const renderMobileCards = (tipoFiltro: string) => {
+    const filteredTree = getFilteredTree(tipoFiltro);
+
+    if (filteredTree.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+          <AlertCircle className="h-8 w-8 opacity-20" />
+          <p className="text-sm">Nenhuma categoria de {tipoFiltro === 'entrada' ? 'entrada' : 'saída'} encontrada.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {filteredTree.map(cat => (
+          <Card key={cat.id} className="border shadow-sm p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <FolderTree className={cn(
+                  "h-4 w-4 mt-1",
+                  cat.tipo === 'entrada' ? "text-green-600" : "text-red-600"
+                )} />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold leading-tight">{cat.nome}</p>
+                    <Badge variant="outline" className="text-[10px] px-2">
+                      {cat.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                    </Badge>
+                  </div>
+                  <Badge variant="secondary" className="text-[11px] font-normal h-5 px-2 text-muted-foreground">
+                    {cat.subcategorias?.length || 0} itens
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(cat, 'CATEGORIA')}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive"
+                  onClick={() => deleteItem(cat.id, 'CATEGORIA')}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2 mt-3">
+              {cat.subcategorias?.length ? (
+                cat.subcategorias.map((sub: any) => (
+                  <div key={sub.id} className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <CornerDownRight className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-sm">{sub.nome}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(sub, 'SUBCATEGORIA')}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => deleteItem(sub.id, 'SUBCATEGORIA')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">Nenhuma subcategoria cadastrada.</p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-3">
+              <Button variant="secondary" size="sm" onClick={() => openNewSub(cat.id, cat.tipo)}>
+                <Plus className="h-3 w-3 mr-1" /> Subcategoria
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => openEdit(cat, 'CATEGORIA')}>
+                <Pencil className="h-3 w-3 mr-1" /> Editar categoria
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
     );
   };
 
@@ -315,7 +405,7 @@ export default function Categorias() {
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Plano de Contas</h2>
           <p className="text-sm text-muted-foreground">Categorização de receitas e despesas.</p>
@@ -326,9 +416,9 @@ export default function Categorias() {
         </Button>
       </div>
 
-      <Tabs defaultValue="saida" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex items-center justify-between mb-4">
-          <TabsList>
+      <Tabs defaultValue="saida" value={activeTab} onValueChange={setActiveTab} className="w-full space-y-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <TabsList className="w-full md:w-auto">
             <TabsTrigger value="entrada" className="gap-2">
               <ArrowUpCircle className="h-4 w-4 text-green-600" />
               Entradas
@@ -339,7 +429,7 @@ export default function Categorias() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="relative w-64">
+          <div className="relative w-full md:w-64">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Filtrar..." 
@@ -350,30 +440,41 @@ export default function Categorias() {
           </div>
         </div>
 
-        <Card className="border shadow-sm overflow-hidden min-h-[300px]">
-          <TabsContent value="entrada" className="m-0 border-none p-0">
+        <TabsContent value="entrada" className="m-0 border-none p-0 space-y-3">
+          <Card className="border shadow-sm overflow-hidden min-h-[300px] hidden md:block">
             <div className="overflow-x-auto">
               {renderTable("entrada")}
             </div>
-          </TabsContent>
-          
-          <TabsContent value="saida" className="m-0 border-none p-0">
+          </Card>
+          <div className="md:hidden">
+            {renderMobileCards("entrada")}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="saida" className="m-0 border-none p-0 space-y-3">
+          <Card className="border shadow-sm overflow-hidden min-h-[300px] hidden md:block">
             <div className="overflow-x-auto">
               {renderTable("saida")}
             </div>
-          </TabsContent>
-        </Card>
+          </Card>
+          <div className="md:hidden">
+            {renderMobileCards("saida")}
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingItem ? "Editar" : "Nova"} {dialogType === 'CATEGORIA' ? "Categoria" : "Subcategoria"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+      <ResponsiveDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        dialogContentProps={{ className: "sm:max-w-[480px]" }}
+        drawerContentProps={{ className: "max-h-[90vh]" }}
+      >
+        <div className="p-4 sm:p-6 space-y-4">
+          <DialogTitle className="text-base font-semibold">
+            {editingItem ? "Editar" : "Nova"} {dialogType === 'CATEGORIA' ? "Categoria" : "Subcategoria"}
+          </DialogTitle>
+          <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Nome</label>
               <Input 
@@ -408,14 +509,14 @@ export default function Categorias() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin"/> : "Salvar"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </ResponsiveDialog>
     </div>
   );
 }
