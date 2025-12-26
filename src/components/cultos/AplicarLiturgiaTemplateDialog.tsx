@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
@@ -202,12 +202,13 @@ export function AplicarLiturgiaTemplateDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Aplicar Template de Liturgia</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-4 px-6 pt-6"><h2 className="text-lg font-semibold">
+            Aplicar Template de Liturgia</h2>
+          </div>
 
+          <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -279,13 +280,14 @@ export function AplicarLiturgiaTemplateDialog({
             </ScrollArea>
           )}
 
-          <DialogFooter>
+          </div>
+          <div className="border-t pt-4 px-6 pb-6 flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Fechar
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </ResponsiveDialog>
 
       {/* Confirmação de Exclusão */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
