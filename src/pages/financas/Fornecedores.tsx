@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Pencil, Trash2, Search, Users } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Search, Users, Mail, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -176,85 +176,10 @@ export default function Fornecedores({ onBack }: Props) {
             <p className="text-muted-foreground">Gerencie os fornecedores</p>
           </div>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Fornecedor
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingFornecedor ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="nome">Nome *</Label>
-                <Input
-                  id="nome"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  placeholder="Nome do fornecedor"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="tipo_pessoa">Tipo</Label>
-                  <Select value={formData.tipo_pessoa} onValueChange={(v) => setFormData({ ...formData, tipo_pessoa: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fisica">Pessoa Física</SelectItem>
-                      <SelectItem value="juridica">Pessoa Jurídica</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cpf_cnpj">{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'}</Label>
-                  <Input
-                    id="cpf_cnpj"
-                    value={formData.cpf_cnpj}
-                    onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value })}
-                    placeholder={formData.tipo_pessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="telefone">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={formData.telefone}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                    placeholder="(00) 00000-0000"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="email@exemplo.com"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="ativo">Ativo</Label>
-                <Switch
-                  id="ativo"
-                  checked={formData.ativo}
-                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
-                />
-              </div>
-              <Button onClick={handleSubmit} className="w-full">
-                {editingFornecedor ? "Salvar Alterações" : "Criar Fornecedor"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Fornecedor
+        </Button>
       </div>
 
       {/* Search */}
@@ -264,12 +189,12 @@ export default function Fornecedores({ onBack }: Props) {
           placeholder="Buscar fornecedor..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
+          className="pl-9 text-base h-10"
         />
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Table - Desktop */}
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4" />
@@ -322,6 +247,154 @@ export default function Fornecedores({ onBack }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Cards - Mobile */}
+      <div className="block md:hidden space-y-3">
+        {loading ? (
+          <p className="text-center text-muted-foreground py-8">Carregando...</p>
+        ) : filteredFornecedores.length === 0 ? (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-muted-foreground">Nenhum fornecedor encontrado</p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredFornecedores.map((fornecedor) => (
+            <Card key={fornecedor.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-base truncate">{fornecedor.nome}</h3>
+                    <div className="space-y-1 mt-2">
+                      {fornecedor.cpf_cnpj && (
+                        <p className="text-sm text-muted-foreground">
+                          {fornecedor.tipo_pessoa === 'fisica' ? 'CPF: ' : 'CNPJ: '}{fornecedor.cpf_cnpj}
+                        </p>
+                      )}
+                      {fornecedor.telefone && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {fornecedor.telefone}
+                        </p>
+                      )}
+                      {fornecedor.email && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 truncate">
+                          <Mail className="h-3 w-3 flex-shrink-0" />
+                          {fornecedor.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant={fornecedor.ativo ? "default" : "secondary"} className="flex-shrink-0">
+                    {fornecedor.ativo ? "Ativo" : "Inativo"}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => openEdit(fornecedor)}
+                    className="flex-1"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDelete(fornecedor.id)}
+                    className="flex-1"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                    Excluir
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Dialog de Criação/Edição */}
+      <ResponsiveDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+        title={editingFornecedor ? "Editar Fornecedor" : "Novo Fornecedor"}
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="nome">Nome *</Label>
+            <Input
+              id="nome"
+              value={formData.nome}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+              placeholder="Nome do fornecedor"
+              className="text-base h-10"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="tipo_pessoa">Tipo</Label>
+              <Select value={formData.tipo_pessoa} onValueChange={(v) => setFormData({ ...formData, tipo_pessoa: v })}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fisica">Pessoa Física</SelectItem>
+                  <SelectItem value="juridica">Pessoa Jurídica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cpf_cnpj">{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'}</Label>
+              <Input
+                id="cpf_cnpj"
+                value={formData.cpf_cnpj}
+                onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value })}
+                placeholder={formData.tipo_pessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                className="text-base h-10"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="telefone">Telefone</Label>
+              <Input
+                id="telefone"
+                value={formData.telefone}
+                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                placeholder="(00) 00000-0000"
+                className="text-base h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="email@exemplo.com"
+                className="text-base h-10"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="ativo">Ativo</Label>
+            <Switch
+              id="ativo"
+              checked={formData.ativo}
+              onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+            />
+          </div>
+          <Button onClick={handleSubmit} className="w-full">
+            {editingFornecedor ? "Salvar Alterações" : "Criar Fornecedor"}
+          </Button>
+        </div>
+      </ResponsiveDialog>
     </div>
   );
 

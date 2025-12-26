@@ -582,24 +582,11 @@ export default function PessoaDetalhes() {
                         <Church className="w-5 h-5 text-primary" />
                         Dados Eclesiásticos
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditarEclesiasticosOpen(true);
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        {dadosEclesiasticosOpen ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
+                      {dadosEclesiasticosOpen ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
                     </CardTitle>
                   </CardHeader>
                 </CollapsibleTrigger>

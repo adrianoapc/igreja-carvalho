@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Plus, Pencil, Trash2, Search, FolderOpen } from "lucide-react";
@@ -148,50 +148,10 @@ export default function CentrosCusto({ onBack }: Props) {
             <p className="text-muted-foreground">Gerencie os centros de custo</p>
           </div>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Centro
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingCentro ? "Editar Centro de Custo" : "Novo Centro de Custo"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="nome">Nome *</Label>
-                <Input
-                  id="nome"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  placeholder="Ex: Marketing"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="descricao">Descrição</Label>
-                <Input
-                  id="descricao"
-                  value={formData.descricao}
-                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                  placeholder="Descrição opcional"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="ativo">Ativo</Label>
-                <Switch
-                  id="ativo"
-                  checked={formData.ativo}
-                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
-                />
-              </div>
-              <Button onClick={handleSubmit} className="w-full">
-                {editingCentro ? "Salvar Alterações" : "Criar Centro"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Centro
+        </Button>
       </div>
 
       {/* Search */}
@@ -201,12 +161,12 @@ export default function CentrosCusto({ onBack }: Props) {
           placeholder="Buscar centro de custo..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
+          className="pl-9 text-base h-10"
         />
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Table - Desktop */}
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <FolderOpen className="h-4 w-4" />
@@ -255,6 +215,101 @@ export default function CentrosCusto({ onBack }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Cards - Mobile */}
+      <div className="block md:hidden space-y-3">
+        {loading ? (
+          <p className="text-center text-muted-foreground py-8">Carregando...</p>
+        ) : filteredCentros.length === 0 ? (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-muted-foreground">Nenhum centro encontrado</p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredCentros.map((centro) => (
+            <Card key={centro.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-base truncate">{centro.nome}</h3>
+                    {centro.descricao && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{centro.descricao}</p>
+                    )}
+                  </div>
+                  <Badge variant={centro.ativo ? "default" : "secondary"} className="flex-shrink-0">
+                    {centro.ativo ? "Ativo" : "Inativo"}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => openEdit(centro)}
+                    className="flex-1"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDelete(centro.id)}
+                    className="flex-1"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                    Excluir
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Dialog de Criação/Edição */}
+      <ResponsiveDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+        title={editingCentro ? "Editar Centro de Custo" : "Novo Centro de Custo"}
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="nome">Nome *</Label>
+            <Input
+              id="nome"
+              value={formData.nome}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+              placeholder="Ex: Marketing"
+              className="text-base h-10"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="descricao">Descrição</Label>
+            <Input
+              id="descricao"
+              value={formData.descricao}
+              onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+              placeholder="Descrição opcional"
+              className="text-base h-10"
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="ativo">Ativo</Label>
+            <Switch
+              id="ativo"
+              checked={formData.ativo}
+              onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+            />
+          </div>
+          <Button onClick={handleSubmit} className="w-full">
+            {editingCentro ? "Salvar Alterações" : "Criar Centro"}
+          </Button>
+        </div>
+      </ResponsiveDialog>
     </div>
   );
 
