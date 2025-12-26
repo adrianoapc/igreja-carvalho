@@ -2,12 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, X, GripVertical, Trash2, Play, FileText, Users, Settings2, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -258,13 +253,13 @@ export default function EditarJornadaDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Jornada</DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-4 px-6 pt-6">
+            <h2 className="text-lg font-semibold">Editar Jornada</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="titulo">Título *</Label>
               <Input
@@ -491,9 +486,10 @@ export default function EditarJornadaDialog({
                 </Button>
               </div>
             </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </form>
+          </div>
+        </div>
+      </ResponsiveDialog>
 
       {selectedEtapa && (
         <EtapaContentDialog
