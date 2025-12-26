@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -262,13 +262,14 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto px-4 sm:px-6 z-50">
-        <DialogHeader>
-          <DialogTitle>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-4 px-6 pt-6">
+          <h2 className="text-lg font-semibold">
             {isEditing ? "Editar Evento" : "Novo Evento"}
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
 
         {/* Seleção de Template (apenas para novos cultos) */}
         {!isEditing && !templateApplied && templates.length > 0 && (
@@ -563,7 +564,8 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
             </div>
           </form>
         </Form>
-      </DialogContent>
+        </div>
+      </div>
 
       {/* Preview Dialog */}
       <TemplatePreviewDialog
@@ -572,6 +574,6 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
         templateId={selectedTemplateId}
         onConfirm={handleApplyTemplate}
       />
-    </Dialog>
+    </ResponsiveDialog>
   );
 }
