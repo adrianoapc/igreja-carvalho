@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -390,13 +390,15 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{midia ? "Editar" : "Nova"} Mídia</DialogTitle>
-        </DialogHeader>
+    <>
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <div className="flex flex-col h-full">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">{midia ? "Editar" : "Nova"} Mídia</h2>
+          </div>
 
-        <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+            <div className="space-y-4">
           {/* Upload de Arquivo */}
           <div>
             <Label>Arquivo</Label>
@@ -616,14 +618,16 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             {(saving || uploading) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {uploading ? "Enviando..." : saving ? "Salvando..." : "Salvar"}
           </Button>
+            </div>
+          </div>
         </div>
-      </DialogContent>
-      
+      </ResponsiveDialog>
+
       <TagMidiaDialog
         open={showTagDialog}
         onOpenChange={setShowTagDialog}
         onSuccess={loadTags}
       />
-    </Dialog>
+    </>
   );
 }

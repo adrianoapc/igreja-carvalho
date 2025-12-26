@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -163,14 +163,15 @@ export function TemplatePreviewDialog({
   if (!template) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="text-xl">Preview do Template</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">Preview do Template</h2>
+        </div>
 
-        <ScrollArea className="h-[60vh] pr-4">
-          <div className="space-y-6">
+        <ScrollArea className="flex-1 overflow-hidden">
+          <div className="px-4 py-4 md:px-6 md:py-5">
+            <div className="space-y-6">
             {/* Informações do Template */}
             <Card>
               <CardHeader>
@@ -328,11 +329,10 @@ export function TemplatePreviewDialog({
               </Card>
             )}
           </div>
+          </div>
         </ScrollArea>
 
-        <Separator />
-
-        <DialogFooter className="gap-2">
+        <div className="flex gap-2 border-t bg-muted/50 px-4 py-3 md:px-6">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
@@ -340,8 +340,8 @@ export function TemplatePreviewDialog({
             <CheckCircle2 className="mr-2 h-4 w-4" />
             Usar Este Template
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }

@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,16 +141,15 @@ export default function PosicaoDialog({ open, onOpenChange, posicao, timeId, onS
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{posicao ? "Editar Posição" : "Nova Posição"}</DialogTitle>
-          <DialogDescription>
-            {posicao ? "Atualize as informações da posição" : "Crie uma nova posição para o time"}
-          </DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">{posicao ? "Editar Posição" : "Nova Posição"}</h2>
+          <p className="text-sm text-muted-foreground">{posicao ? "Atualize as informações da posição" : "Crie uma nova posição para o time"}</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
           {/* Time */}
           <div className="space-y-2">
             <Label htmlFor="time">Time *</Label>
@@ -249,8 +248,9 @@ export default function PosicaoDialog({ open, onOpenChange, posicao, timeId, onS
               )}
             </Button>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
