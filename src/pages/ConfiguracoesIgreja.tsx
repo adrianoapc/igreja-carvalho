@@ -2,13 +2,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, Save, X, Phone } from "lucide-react";
+import { Upload, Save, X, Phone, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InputMask from "react-input-mask";
 
-export default function ConfiguracoesIgreja() {
+interface Props {
+  onBack?: () => void;
+}
+
+export default function ConfiguracoesIgreja({ onBack }: Props) {
+  const navigate = useNavigate();
+  const handleBack = onBack ?? (() => navigate(-1));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -162,6 +169,33 @@ export default function ConfiguracoesIgreja() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">Configurações da Igreja</h1>
+            <p className="text-muted-foreground text-sm">Dados institucionais e identidade visual.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 justify-end w-full md:w-auto">
+          <Button 
+            onClick={handleSave} 
+            disabled={saving || uploading}
+            className="text-xs"
+            size="sm"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {uploading ? "Enviando logo..." : saving ? "Salvando..." : "Salvar Dados"}
+          </Button>
+        </div>
+      </div>
       {/* Dados de Identidade */}
       <Card className="border-0 shadow-none">
         <CardHeader className="px-0 pt-0">
@@ -288,6 +322,7 @@ export default function ConfiguracoesIgreja() {
       </Card>
 
       <div className="flex justify-end pt-4">
+        {/* Botão de salvar permanece no rodapé para mobile; header já tem ação compacta */}
         <Button 
           onClick={handleSave} 
           disabled={saving || uploading}

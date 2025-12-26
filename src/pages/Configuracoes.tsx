@@ -112,15 +112,15 @@ export default function Configuracoes() {
   };
 
   // Render sub-pages - these components don't accept onBack prop
-  if (currentView === "FINANCEIRO_BASES") return <BasesMinisteriais />;
-  if (currentView === "FINANCEIRO_CATEGORIAS") return <Categorias />;
-  if (currentView === "FINANCEIRO_CENTROS") return <CentrosCusto />;
-  if (currentView === "FINANCEIRO_CONTAS") return <ContasManutencao />;
-  if (currentView === "FINANCEIRO_FORMAS") return <FormasPagamento />;
-  if (currentView === "FINANCEIRO_FORNECEDORES") return <Fornecedores />;
+  if (currentView === "FINANCEIRO_BASES") return <BasesMinisteriais onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CATEGORIAS") return <Categorias onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CENTROS") return <CentrosCusto onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CONTAS") return <ContasManutencao onBack={goBack} />;
+  if (currentView === "FINANCEIRO_FORMAS") return <FormasPagamento onBack={goBack} />;
+  if (currentView === "FINANCEIRO_FORNECEDORES") return <Fornecedores onBack={goBack} />;
   
   // Pages without onBack - render as-is (they have their own navigation)
-  if (currentView === "IGREJA") return <ConfiguracoesIgreja />;
+  if (currentView === "IGREJA") return <ConfiguracoesIgreja onBack={goBack} />;
   if (currentView === "PERMISSOES") return <AdminPermissions />;
   if (currentView === "WEBHOOKS") return <Webhooks />;
   if (currentView === "CHATBOTS") return <Chatbots />;

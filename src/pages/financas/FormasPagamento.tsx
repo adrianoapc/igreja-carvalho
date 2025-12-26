@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,8 @@ interface Props {
 }
 
 export default function FormasPagamento({ onBack }: Props) {
+  const navigate = useNavigate();
+  const handleBack = onBack ?? (() => navigate('/financas'));
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -141,34 +143,32 @@ export default function FormasPagamento({ onBack }: Props) {
 
   const content = (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {onBack && (
-            <Button variant="ghost" size="icon" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
-          <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="ghost" size="sm" onClick={handleBack} className="flex-shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Formas de Pagamento</h1>
-            <p className="text-muted-foreground">Gerencie as formas de pagamento</p>
+            <p className="text-muted-foreground text-sm">Gerencie as formas de pagamento</p>
           </div>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+      </div>
+
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full md:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar forma de pagamento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 text-base h-10"
+          />
+        </div>
+        <Button onClick={() => setDialogOpen(true)} size="sm" className="text-xs">
           <Plus className="h-4 w-4 mr-2" />
           Nova Forma
         </Button>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar forma de pagamento..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9 text-base h-10"
-        />
       </div>
 
       {/* Table - Desktop */}
@@ -309,5 +309,5 @@ export default function FormasPagamento({ onBack }: Props) {
     </div>
   );
 
-  return onBack ? content : <MainLayout>{content}</MainLayout>;
+  return content;
 }
