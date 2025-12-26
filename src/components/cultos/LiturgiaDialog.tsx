@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -575,11 +575,11 @@ Qualquer dúvida, entre em contato conosco.`;
   if (!culto) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Liturgia - {culto.titulo}</span>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-4 px-6 pt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Liturgia - {culto.titulo}</h2>
             <Button
               variant="outline"
               size="sm"
@@ -589,10 +589,10 @@ Qualquer dúvida, entre em contato conosco.`;
               <Send className="w-4 h-4 mr-2" />
               Enviar via Make
             </Button>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-4">
           {/* Resumo */}
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-2">
@@ -1011,6 +1011,9 @@ Qualquer dúvida, entre em contato conosco.`;
               )}
             </div>
           </ScrollArea>
+                </div>
+                </div>
+              </div>
         </div>
 
         {/* Dialog de seleção de mídias */}
@@ -1047,7 +1050,6 @@ Qualquer dúvida, entre em contato conosco.`;
           item={itemParaRecursos}
           onResourcesUpdate={loadRecursosCount}
         />
-      </DialogContent>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }
