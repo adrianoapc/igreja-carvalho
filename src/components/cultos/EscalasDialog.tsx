@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -356,14 +356,15 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
   if (!culto) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Escalas - {culto.titulo}</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <div className="flex flex-col h-full">
+        <div className="border-b pb-4 px-6 pt-6">
+          <h2 className="text-lg font-semibold">Escalas - {culto.titulo}</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             {format(new Date(culto.data_culto), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
 
         <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
           {/* Seletor de Time */}
@@ -582,7 +583,8 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
             </CardContent>
           </Card>
         </div>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </ResponsiveDialog>
   );
 }
