@@ -46,6 +46,7 @@ import PessoasFrequentadores from "./pages/pessoas/Frequentadores";
 import PessoasContatos from "./pages/pessoas/Contatos";
 import PessoasAlteracoes from "./pages/pessoas/AlteracoesPendentes";
 import PessoaDetalhes from "./pages/PessoaDetalhes";
+import EditarPessoa from "./pages/pessoas/EditarPessoa";
 
 // Gabinete
 import GabinetePastoral from "./pages/GabinetePastoral";
@@ -192,6 +193,7 @@ const App = () => (
               <Route path="/pessoas/frequentadores" element={<AuthGate><PessoasFrequentadores /></AuthGate>} />
               <Route path="/pessoas/contatos" element={<AuthGate><PessoasContatos /></AuthGate>} />
               <Route path="/pessoas/pendentes" element={<AuthGate><PessoasAlteracoes /></AuthGate>} />
+              <Route path="/pessoas/:id/editar" element={<AuthGate><EditarPessoa /></AuthGate>} />
               <Route path="/pessoas/:id" element={<AuthGate><PessoaDetalhes /></AuthGate>} />
 
               {/* Gabinete */}

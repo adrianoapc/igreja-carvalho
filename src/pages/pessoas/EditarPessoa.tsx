@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AvatarUpload } from "@/components/perfil/AvatarUpload";
 import { FamiliaresSection } from "@/components/pessoas/FamiliaresSection";
 import { VidaIgrejaEnvolvimento } from "@/components/pessoas/VidaIgrejaEnvolvimento";
@@ -16,7 +15,8 @@ import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDados
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
 import { ConfigurarDisponibilidadeDialog } from "@/components/membros/ConfigurarDisponibilidadeDialog";
-import { ArrowLeft, Check, Clock, Edit, Mail, MapPin, Phone, Shield, Sparkles, User } from "lucide-react";
+import { ArrowLeft, Check, Clock, Edit, Mail, MapPin, Phone, Shield, Sparkles, User, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatarCEP, formatarTelefone } from "@/lib/validators";
 
 interface DisponibilidadeDia {
@@ -78,17 +78,27 @@ const DIAS_SEMANA_LABELS: Record<string, string> = {
   "6": "Sáb",
 };
 
+const TABS = [
+  { id: "pessoais", label: "Pessoais", icon: User },
+  { id: "contatos", label: "Contatos", icon: Phone },
+  { id: "igreja", label: "Igreja", icon: Shield },
+  { id: "familia", label: "Família", icon: "👨‍👩‍👧" },
+  { id: "extras", label: "Extras", icon: Sparkles },
+];
+
 export default function EditarPessoa() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [pessoa, setPessoa] = useState<Pessoa | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("pessoais");
   const [editarPessoaisOpen, setEditarPessoaisOpen] = useState(false);
   const [editarContatosOpen, setEditarContatosOpen] = useState(false);
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
   const [editarStatusOpen, setEditarStatusOpen] = useState(false);
   const [disponibilidadeOpen, setDisponibilidadeOpen] = useState(false);
+
   const fetchPessoa = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -125,31 +135,20 @@ export default function EditarPessoa() {
 
   if (loading) {
     return (
-      <div className="p-4 md:p-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <div className="space-y-2 flex-1">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-4 w-24" />
-          </div>
-        </div>
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardContent>
-        </Card>
+      <div className="p-3 sm:p-4 md:p-6 space-y-4">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <Skeleton className="h-40 rounded-lg" />
+        <Skeleton className="h-96 rounded-lg" />
       </div>
     );
   }
 
   if (!pessoa) {
     return (
-      <div className="p-4 md:p-6">
+      <div className="p-3 sm:p-4 md:p-6">
         <Card>
           <CardContent className="p-6 flex items-center gap-3 text-muted-foreground">
-            <Shield className="w-5 h-5" />
+            <Shield className="w-5 h-5 flex-shrink-0" />
             Não encontramos os dados dessa pessoa.
           </CardContent>
         </Card>
@@ -158,187 +157,313 @@ export default function EditarPessoa() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-9 w-9 flex-shrink-0">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Edição</p>
-          <h1 className="text-2xl font-bold">Editar Pessoa</h1>
+          <h1 className="text-xl md:text-2xl font-bold truncate">Editar Pessoa</h1>
         </div>
       </div>
 
+      {/* Card do Perfil */}
       <Card className="shadow-soft">
-        <CardContent className="p-4 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 items-start">
-          <div className="flex-shrink-0">
-            <AvatarUpload
-              userId={pessoa.id}
-              currentAvatarUrl={pessoa.avatar_url}
-              userName={pessoa.nome}
-              onAvatarUpdated={fetchPessoa}
-            />
-          </div>
-
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl md:text-2xl font-semibold truncate">{pessoa.nome}</h2>
-              <Badge variant={statusVariant} className="text-xs">{pessoa.status}</Badge>
-              <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setEditarStatusOpen(true)}>
-                <Edit className="w-4 h-4 mr-1" />
-                Status
-              </Button>
+        <CardContent className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-start">
+            <div className="flex-shrink-0 flex justify-center sm:block">
+              <AvatarUpload
+                userId={pessoa.id}
+                currentAvatarUrl={pessoa.avatar_url}
+                userName={pessoa.nome}
+                onAvatarUpdated={fetchPessoa}
+              />
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Check className="w-4 h-4 text-green-500" />
-                Dados centralizados para edição
-              </span>
-              <Separator orientation="vertical" className="h-4" />
-              <span className="flex items-center gap-1">
-                <Sparkles className="w-4 h-4 text-yellow-500" />
-                Fluxo simplificado
-              </span>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <h2 className="text-lg md:text-xl font-semibold truncate">{pessoa.nome}</h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ID: {pessoa.id.substring(0, 8)}...
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={statusVariant} className="text-xs whitespace-nowrap">
+                    {pessoa.status}
+                  </Badge>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setEditarStatusOpen(true)}
+                    className="text-xs h-8"
+                  >
+                    <Edit className="w-3 h-3 mr-1" />
+                    Mudar status
+                  </Button>
+                </div>
+
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3 h-3 text-green-500 flex-shrink-0" />
+                    <span>Edição centralizada</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="pessoais" className="space-y-4">
-        <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 bg-muted/60">
-          <TabsTrigger value="pessoais" className="text-sm">Pessoais</TabsTrigger>
-          <TabsTrigger value="contatos" className="text-sm">Contatos</TabsTrigger>
-          <TabsTrigger value="igreja" className="text-sm">Igreja</TabsTrigger>
-          <TabsTrigger value="familia" className="text-sm">Família</TabsTrigger>
-          <TabsTrigger value="extras" className="text-sm">Extras</TabsTrigger>
-        </TabsList>
+      {/* Navegação Mobile via Select */}
+      <div className="block md:hidden">
+        <Select value={activeTab} onValueChange={setActiveTab}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Selecione uma seção" />
+          </SelectTrigger>
+          <SelectContent>
+            {TABS.map((tab) => (
+              <SelectItem key={tab.id} value={tab.id}>
+                {tab.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-        <TabsContent value="pessoais" className="space-y-4">
+      {/* Navegação Desktop via Buttons */}
+      <div className="hidden md:grid grid-cols-5 gap-2 bg-muted/30 p-2 rounded-lg">
+        {TABS.map((tab) => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab(tab.id)}
+            className="text-xs"
+          >
+            {tab.label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Conteúdo das Abas */}
+      <div className="space-y-4">
+        {/* Pessoais */}
+        {activeTab === "pessoais" && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><User className="w-4 h-4" /> Dados pessoais</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => setEditarPessoaisOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" /> Editar
+            <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Dados Pessoais
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setEditarPessoaisOpen(true)}
+                className="w-full sm:w-auto text-xs"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Editar
               </Button>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Info label="Sexo" value={pessoa.sexo} />
-              <Info label="Data de nascimento" value={pessoa.data_nascimento} />
-              <Info label="Estado civil" value={pessoa.estado_civil} />
-              <Info label="Data de casamento" value={pessoa.data_casamento} />
-              <Info label="RG" value={pessoa.rg} />
-              <Info label="CPF" value={pessoa.cpf} />
-              <Info label="Necessidades especiais" value={pessoa.necessidades_especiais} />
+            <CardContent className="p-4 md:p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Info label="Sexo" value={pessoa.sexo} />
+                <Info label="Data de nascimento" value={pessoa.data_nascimento} />
+                <Info label="Estado civil" value={pessoa.estado_civil} />
+                <Info label="Data de casamento" value={pessoa.data_casamento} />
+                <Info label="RG" value={pessoa.rg} />
+                <Info label="CPF" value={pessoa.cpf} />
+                <Info label="Necessidades especiais" value={pessoa.necessidades_especiais} />
+              </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        <TabsContent value="contatos" className="space-y-4">
+        {/* Contatos */}
+        {activeTab === "contatos" && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><Phone className="w-4 h-4" /> Contatos</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => setEditarContatosOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" /> Editar
+            <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <Phone className="w-5 h-5 text-primary" />
+                Contatos
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setEditarContatosOpen(true)}
+                className="w-full sm:w-auto text-xs"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Editar
               </Button>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Info label="Telefone" value={pessoa.telefone ? formatarTelefone(pessoa.telefone) : null} icon={<Phone className="w-4 h-4 text-muted-foreground" />} />
-              <Info label="E-mail" value={pessoa.email} icon={<Mail className="w-4 h-4 text-muted-foreground" />} />
-              <Info label="CEP" value={pessoa.cep ? formatarCEP(pessoa.cep) : null} icon={<MapPin className="w-4 h-4 text-muted-foreground" />} />
-              <Info label="Endereço" value={pessoa.endereco} />
-              <Info label="Bairro" value={pessoa.bairro} />
-              <Info label="Cidade/UF" value={pessoa.cidade ? `${pessoa.cidade}${pessoa.estado ? ` - ${pessoa.estado}` : ""}` : null} />
+            <CardContent className="p-4 md:p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Info 
+                  label="Telefone" 
+                  value={pessoa.telefone ? formatarTelefone(pessoa.telefone) : null}
+                  icon={<Phone className="w-4 h-4 text-muted-foreground" />} 
+                />
+                <Info 
+                  label="E-mail" 
+                  value={pessoa.email}
+                  icon={<Mail className="w-4 h-4 text-muted-foreground" />} 
+                />
+                <Info 
+                  label="CEP" 
+                  value={pessoa.cep ? formatarCEP(pessoa.cep) : null}
+                  icon={<MapPin className="w-4 h-4 text-muted-foreground" />} 
+                />
+                <Info label="Endereço" value={pessoa.endereco} />
+                <Info label="Bairro" value={pessoa.bairro} />
+                <Info 
+                  label="Cidade/UF" 
+                  value={pessoa.cidade ? `${pessoa.cidade}${pessoa.estado ? ` - ${pessoa.estado}` : ""}` : null} 
+                />
+              </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        <TabsContent value="igreja" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4" /> Dados eclesiásticos</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => setEditarEclesiasticosOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" /> Editar
-              </Button>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Info label="Status igreja" value={pessoa.status_igreja} />
-              <Info label="Entrou por" value={pessoa.entrou_por} />
-              <Info label="Data de entrada" value={pessoa.data_entrada} />
-              <Info label="Conversão" value={pessoa.data_conversao} />
-              <Info label="Batizado" value={pessoa.batizado ? "Sim" : "Não"} />
-              <Info label="Data batismo" value={pessoa.data_batismo} />
-              <Info label="Líder" value={pessoa.e_lider ? "Sim" : "Não"} />
-              <Info label="Pastor" value={pessoa.e_pastor ? "Sim" : "Não"} />
-            </CardContent>
-          </Card>
-
-          {/* Card de Disponibilidade Pastoral - Apenas para pastores/líderes */}
-          {(pessoa.e_pastor || pessoa.e_lider) && (
+        {/* Igreja */}
+        {activeTab === "igreja" && (
+          <div className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Disponibilidade para Atendimento
+              <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  Dados Eclesiásticos
                 </CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setDisponibilidadeOpen(true)}>
-                  <Edit className="w-4 h-4 mr-2" /> Configurar
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setEditarEclesiasticosOpen(true)}
+                  className="w-full sm:w-auto text-xs"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar
                 </Button>
               </CardHeader>
-              <CardContent>
-                {pessoa.disponibilidade_agenda && Object.values(pessoa.disponibilidade_agenda).some(d => d.ativo) ? (
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(pessoa.disponibilidade_agenda)
-                      .filter(([_, config]) => config.ativo)
-                      .sort(([a], [b]) => Number(a) - Number(b))
-                      .map(([diaKey, config]) => (
-                        <Badge key={diaKey} variant="secondary" className="text-xs">
-                          {DIAS_SEMANA_LABELS[diaKey]}: {config.inicio} - {config.fim}
-                        </Badge>
-                      ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    Nenhum horário de atendimento configurado
-                  </p>
-                )}
+              <CardContent className="p-4 md:p-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Info label="Status igreja" value={pessoa.status_igreja} />
+                  <Info label="Entrou por" value={pessoa.entrou_por} />
+                  <Info label="Data de entrada" value={pessoa.data_entrada} />
+                  <Info label="Conversão" value={pessoa.data_conversao} />
+                  <Info label="Batizado" value={pessoa.batizado ? "Sim" : "Não"} />
+                  <Info label="Data batismo" value={pessoa.data_batismo} />
+                  <Info label="Líder" value={pessoa.e_lider ? "Sim" : "Não"} />
+                  <Info label="Pastor" value={pessoa.e_pastor ? "Sim" : "Não"} />
+                </div>
               </CardContent>
             </Card>
-          )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4" /> Funções & Times</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VidaIgrejaEnvolvimento pessoaId={pessoa.id} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+            {/* Disponibilidade - Apenas para pastores/líderes */}
+            {(pessoa.e_pastor || pessoa.e_lider) && (
+              <Card>
+                <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-primary" />
+                    Disponibilidade
+                  </CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setDisponibilidadeOpen(true)}
+                    className="w-full sm:w-auto text-xs"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Configurar
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-4 md:p-5">
+                  {pessoa.disponibilidade_agenda && Object.values(pessoa.disponibilidade_agenda).some(d => d.ativo) ? (
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(pessoa.disponibilidade_agenda)
+                        .filter(([_, config]) => config.ativo)
+                        .sort(([a], [b]) => Number(a) - Number(b))
+                        .map(([diaKey, config]) => (
+                          <Badge key={diaKey} variant="secondary" className="text-xs whitespace-nowrap">
+                            {DIAS_SEMANA_LABELS[diaKey]}: {config.inicio} - {config.fim}
+                          </Badge>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">
+                      Nenhum horário de atendimento configurado
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-        <TabsContent value="familia" className="space-y-4">
+            {/* Funções & Times */}
+            <Collapsible defaultOpen>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="p-4 md:p-5 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardTitle className="text-base md:text-lg flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-primary" />
+                        Funções & Times
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="p-4 md:p-5">
+                    <VidaIgrejaEnvolvimento pessoaId={pessoa.id} />
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          </div>
+        )}
+
+        {/* Família */}
+        {activeTab === "familia" && (
           <FamiliaresSection pessoaId={pessoa.id} pessoaNome={pessoa.nome} />
-        </TabsContent>
+        )}
 
-        <TabsContent value="extras" className="space-y-4">
+        {/* Extras */}
+        {activeTab === "extras" && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Informações adicionais</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => setEditarAdicionaisOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" /> Editar
+            <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Informações Adicionais
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setEditarAdicionaisOpen(true)}
+                className="w-full sm:w-auto text-xs"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Editar
               </Button>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Info label="Escolaridade" value={pessoa.escolaridade} />
-              <Info label="Profissão" value={pessoa.profissao} />
-              <Info label="Nacionalidade" value={pessoa.nacionalidade} />
-              <Info label="Naturalidade" value={pessoa.naturalidade} />
-              <Info label="Entrevistado por" value={pessoa.entrevistado_por} />
-              <Info label="Cadastrado por" value={pessoa.cadastrado_por} />
-              <Info label="Tipo sanguíneo" value={pessoa.tipo_sanguineo} />
-              <Info label="Observações" value={pessoa.observacoes} />
+            <CardContent className="p-4 md:p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Info label="Escolaridade" value={pessoa.escolaridade} />
+                <Info label="Profissão" value={pessoa.profissao} />
+                <Info label="Nacionalidade" value={pessoa.nacionalidade} />
+                <Info label="Naturalidade" value={pessoa.naturalidade} />
+                <Info label="Entrevistado por" value={pessoa.entrevistado_por} />
+                <Info label="Cadastrado por" value={pessoa.cadastrado_por} />
+                <Info label="Tipo sanguíneo" value={pessoa.tipo_sanguineo} />
+                <Info label="Alergias" value={pessoa.alergias} />
+                <Info label="Observações" value={pessoa.observacoes} />
+              </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
 
       {/* Dialogs */}
       <EditarDadosPessoaisDialog
@@ -429,7 +554,15 @@ export default function EditarPessoa() {
   );
 }
 
-function Info({ label, value, icon }: { label: string; value: string | null; icon?: React.ReactNode }) {
+function Info({ 
+  label, 
+  value, 
+  icon 
+}: { 
+  label: string; 
+  value: string | null; 
+  icon?: React.ReactNode 
+}) {
   return (
     <div className="space-y-1">
       <p className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
