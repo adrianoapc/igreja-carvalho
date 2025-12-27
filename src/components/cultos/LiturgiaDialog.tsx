@@ -1011,9 +1011,7 @@ Qualquer dúvida, entre em contato conosco.`;
               )}
             </div>
           </ScrollArea>
-                </div>
-                </div>
-              </div>
+          </div>
         </div>
 
         {/* Dialog de seleção de mídias */}
@@ -1050,6 +1048,7 @@ Qualquer dúvida, entre em contato conosco.`;
           item={itemParaRecursos}
           onResourcesUpdate={loadRecursosCount}
         />
+      </div>
     </ResponsiveDialog>
   );
 }

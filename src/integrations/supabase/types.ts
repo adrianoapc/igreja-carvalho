@@ -4702,6 +4702,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_permissions_batch: {
+        Args: { p_deletes: Json; p_inserts: Json; p_request_id: string }
+        Returns: undefined
+      }
       set_audit_context: {
         Args: { p_request_id: string; p_source?: string }
         Returns: undefined
