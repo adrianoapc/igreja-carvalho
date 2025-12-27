@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { ToastAction } from '@/components/ui/toast';
 import { useToast } from '@/hooks/use-toast';
 import { PermissionsHistoryTab } from '@/components/admin/PermissionsHistoryTab';
-import { useNavigate } from 'react-router-dom';
 
 // Tipos baseados nas tabelas do Supabase
 interface AppRole {
@@ -37,14 +36,8 @@ interface PendingChange {
   action: 'add' | 'remove';
 }
 
-interface Props {
-  onBack?: () => void;
-}
-
-export default function AdminPermissions({ onBack }: Props) {
+export default function AdminPermissions() {
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const handleBack = onBack ?? (() => navigate(-1));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'matrix' | 'history'>('matrix');
@@ -511,20 +504,11 @@ export default function AdminPermissions({ onBack }: Props) {
     <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="flex-shrink-0"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold">Matriz de Permissões</h1>
-            <p className="text-muted-foreground">Gerencie permissões por módulo e cargo de forma centralizada e escalável.</p>
-          </div>
+        <div className="flex items-center gap-3">
+          <Shield className="h-6 w-6 text-primary" />
+          <h1 className="text-3xl font-bold">Matriz de Permissões</h1>
         </div>
+        <p className="text-muted-foreground">Gerencie permissões por módulo e cargo de forma centralizada e escalável.</p>
       </div>
 
       {/* Abas: Matrix | History */}

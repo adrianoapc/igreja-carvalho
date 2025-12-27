@@ -61,19 +61,22 @@ export default function ContasManutencao({ onBack }: Props) {
   });
 
   // Query transações por conta
-  const { data: transacoesPorConta = {} } = useQuery({
+  const { data: transacoesPorConta = {}, error: transacoesError } = useQuery({
     queryKey: ['transacoes-por-conta'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select('conta_id')
+        .not('conta_id', 'is', null)
         .eq('status', 'pago');
       
       if (error) throw error;
       
       const contagem: Record<string, number> = {};
       data?.forEach(t => {
-        contagem[t.conta_id] = (contagem[t.conta_id] || 0) + 1;
+        if (t.conta_id) {
+          contagem[t.conta_id] = (contagem[t.conta_id] || 0) + 1;
+        }
       });
       return contagem;
     },
@@ -82,6 +85,10 @@ export default function ContasManutencao({ onBack }: Props) {
   // Show error toast if query fails
   if (contasError) {
     toast.error("Erro ao carregar contas", { description: (contasError as Error).message });
+  }
+  
+  if (transacoesError) {
+    toast.error("Erro ao carregar transações", { description: (transacoesError as Error).message });
   }
 
   // Mutations
@@ -226,34 +233,34 @@ export default function ContasManutencao({ onBack }: Props) {
 
   const content = (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {onBack && (
+      {onBack && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+          <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={onBack}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-          )}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Contas Bancárias</h1>
-            <p className="text-muted-foreground">Gerencie contas e caixas</p>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Contas Bancárias</h1>
+              <p className="text-muted-foreground text-sm">Gerencie contas e caixas</p>
+            </div>
           </div>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+      )}
+
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full md:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar conta..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 text-base h-10"
+          />
+        </div>
+        <Button onClick={() => setDialogOpen(true)} size="sm" className="text-xs">
           <Plus className="h-4 w-4 mr-2" />
           Nova Conta
         </Button>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar conta..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9 text-base h-10"
-        />
       </div>
 
       {/* Table - Desktop */}

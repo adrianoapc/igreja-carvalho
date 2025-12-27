@@ -190,37 +190,40 @@ export default function Contas() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/financas')}
-          className="w-fit"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contas</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie contas bancárias e caixas</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <HideValuesToggle />
+      {/* Header Principal */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        {/* Lado Esquerdo: Voltar + Título + HideValues */}
+        <div className="flex items-center justify-between gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-3 min-w-0">
             <Button
-            className="bg-gradient-primary shadow-soft"
-            onClick={() => {
-              setSelectedConta(null);
-              setContaDialogOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Nova Conta</span>
-            <span className="sm:hidden">Nova</span>
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/financas')}
+              className="flex-shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
             </Button>
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contas</h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-0.5">Gerencie contas bancárias e caixas</p>
+            </div>
           </div>
+          <HideValuesToggle />
         </div>
+
+        {/* Lado Direito: Novo */}
+        <Button
+          className="bg-gradient-primary shadow-soft whitespace-nowrap w-full md:w-auto"
+          onClick={() => {
+            setSelectedConta(null);
+            setContaDialogOpen(true);
+          }}
+          size="sm"
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          <span className="hidden sm:inline text-xs">Nova Conta</span>
+          <span className="sm:hidden text-xs">Nova</span>
+        </Button>
       </div>
 
       {/* Filtro de Período Global */}

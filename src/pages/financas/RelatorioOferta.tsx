@@ -566,14 +566,18 @@ export default function RelatorioOferta() {
               };
 
               return (
-                <div key={notif.id} className="p-4 border rounded-lg space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <p className="font-medium">{notif.title}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{notif.message}</p>
+                <div key={notif.id} className="p-3 md:p-4 border rounded-lg space-y-3 bg-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm md:text-base truncate">{notif.title}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground mt-1 line-clamp-2">{notif.message}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs text-muted-foreground">Total:</span>
+                        <span className="text-sm md:text-base font-bold text-primary">{formatCurrency(total)}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
                     <Button
                       variant="outline"
                       size="sm"

@@ -235,23 +235,29 @@ export default function Saidas() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/financas')}
-          className="w-fit"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Saídas</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie os pagamentos da igreja</p>
+      {/* Header Principal */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        {/* Lado Esquerdo: Voltar + Título + HideValues */}
+        <div className="flex items-center justify-between gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/financas')}
+              className="flex-shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Saídas</h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-0.5">Gerencie os pagamentos da igreja</p>
+            </div>
           </div>
-          <div className="flex gap-2 items-center">
-            <HideValuesToggle />
+          <HideValuesToggle />
+        </div>
+
+        {/* Lado Direito: Filtros + Novo */}
+        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end flex-wrap">
             <FiltrosSheet
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
@@ -284,28 +290,32 @@ export default function Saidas() {
             <Button 
               variant="outline"
               onClick={handleExportar}
+              size="sm"
             >
-              <Download className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Exportar</span>
+              <Download className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline text-xs">Exportar</span>
             </Button>
             <Button 
               variant="outline"
               onClick={() => setImportDialogOpen(true)}
+              size="sm"
             >
-              <Upload className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Importar</span>
+              <Upload className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline text-xs">Importar</span>
             </Button>
             <Button 
-              className="bg-gradient-primary shadow-soft"
+              className="bg-gradient-primary shadow-soft whitespace-nowrap"
               onClick={() => setDialogOpen(true)}
+              size="sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Nova Saída</span>
-              <span className="sm:hidden">Nova</span>
+              <Plus className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline text-xs">Nova Saída</span>
+              <span className="sm:hidden text-xs">Nova</span>
             </Button>
           </div>
-        </div>
+      </div>
 
+      <div>
         {/* Active Filters Display */}
         <div className="flex flex-wrap gap-2 mt-3">
           <Badge variant="outline" className="gap-1.5">
@@ -436,82 +446,88 @@ export default function Saidas() {
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {transacoesFiltradas.map((transacao) => (
-                <Card key={transacao.id} className="border">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          <h3 className="font-semibold text-sm truncate">{transacao.descricao}</h3>
-                        </div>
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                          {transacao.conta && (
-                            <div className="flex items-center gap-1">
-                              <Building2 className="w-3 h-3" />
-                              <span>{transacao.conta.nome}</span>
-                            </div>
-                          )}
-                          {transacao.categoria && (
-                            <div className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: transacao.categoria.cor || '#666' }} />
-                              <span>{transacao.categoria.nome}</span>
-                              {transacao.subcategoria && <span> • {transacao.subcategoria.nome}</span>}
-                            </div>
-                          )}
-                          {transacao.fornecedor && (
-                            <div className="flex items-center gap-1">
-                              <span>Fornecedor: {transacao.fornecedor.nome}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>Venc: {format(new Date(transacao.data_vencimento), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                            {transacao.data_pagamento && (
-                              <span> • Pago: {format(new Date(transacao.data_pagamento), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="text-right flex-shrink-0">
-                          <div className="flex items-center gap-1.5 justify-end">
-                            <p className="text-lg font-bold text-red-600">{formatCurrency(Number(transacao.valor))}</p>
-                            {transacao.solicitacao_reembolso_id && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="text-xs gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400">
-                                      <ReceiptText className="w-3 h-3" />
-                                      Reembolso
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Gerado automaticamente pelo módulo de Reembolsos</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                          </div>
-                          <Badge className={`text-xs mt-1 ${getStatusColorDynamic(transacao)}`}>
-                            {getStatusDisplay(transacao)}
-                          </Badge>
-                        </div>
-                        <TransacaoActionsMenu
-                          transacaoId={transacao.id}
-                          status={transacao.status}
-                          tipo="saida"
-                          isReembolso={!!transacao.solicitacao_reembolso_id}
-                          onEdit={() => {
-                            setEditingTransacao(transacao);
-                            setDialogOpen(true);
-                          }}
-                        />
-                      </div>
+                <div 
+                  key={transacao.id} 
+                  className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  {/* Data Compact - Mobile */}
+                  <div className="flex-shrink-0 text-center w-12 md:w-14">
+                    <div className="text-xs md:text-sm font-bold text-foreground">
+                      {format(new Date(transacao.data_vencimento), 'dd', { locale: ptBR })}
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
+                      {format(new Date(transacao.data_vencimento), 'MMM', { locale: ptBR })}
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-10 w-px bg-border" />
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm md:text-base truncate">{transacao.descricao}</h3>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                      {transacao.fornecedor && (
+                        <>
+                          <span className="truncate">{transacao.fornecedor.nome}</span>
+                          {transacao.categoria && <span>•</span>}
+                        </>
+                      )}
+                      {transacao.categoria && (
+                        <>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: transacao.categoria.cor || '#666' }} />
+                          <span className="truncate">{transacao.categoria.nome}</span>
+                        </>
+                      )}
+                      {transacao.conta && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate">{transacao.conta.nome}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Value & Actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="text-right">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
+                          {formatCurrency(Number(transacao.valor))}
+                        </p>
+                        {transacao.solicitacao_reembolso_id && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400">
+                                  <ReceiptText className="w-2.5 h-2.5" />
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Reembolso</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      <Badge className={`text-[10px] md:text-xs ${getStatusColorDynamic(transacao)}`}>
+                        {getStatusDisplay(transacao)}
+                      </Badge>
+                    </div>
+                    <TransacaoActionsMenu
+                      transacaoId={transacao.id}
+                      status={transacao.status}
+                      tipo="saida"
+                      isReembolso={!!transacao.solicitacao_reembolso_id}
+                      onEdit={() => {
+                        setEditingTransacao(transacao);
+                        setDialogOpen(true);
+                      }}
+                    />
+                  </div>
+                </div>
               ))}
             </div>
           ) : (

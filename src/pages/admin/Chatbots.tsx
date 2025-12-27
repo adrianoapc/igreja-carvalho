@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Bot, Save, Plus, Pencil, Trash2, Eye, EyeOff, MessageSquare, Mic, Image, Loader2 } from "lucide-react";
+import { Bot, Save, Plus, Pencil, Trash2, Eye, EyeOff, MessageSquare, Mic, Image, Loader2, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -63,7 +64,11 @@ const MODELOS_VISAO = [
   { value: "gpt-4-turbo", label: "GPT-4 Turbo (Vision)" },
 ];
 
-export default function Chatbots() {
+interface Props {
+  onBack?: () => void;
+}
+
+export default function Chatbots({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chatbots, setChatbots] = useState<ChatbotConfig[]>([]);
@@ -235,13 +240,21 @@ export default function Chatbots() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Header Simplificado (Sem botão de voltar) */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">Agentes & Chatbots</h2>
-          <p className="text-sm text-muted-foreground">
-            Gerencie os cérebros de IA que operam no sistema.
-          </p>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold">Agentes & Chatbots</h1>
+            <p className="text-muted-foreground">Gerencie os cérebros de IA que operam no sistema.</p>
+          </div>
         </div>
         <Button onClick={handleOpenNew} size="sm">
           <Plus className="h-4 w-4 mr-2" />
