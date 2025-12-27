@@ -153,7 +153,7 @@ export default function Financas() {
       iconColor: "text-purple-600",
     },
     {
-      title: "Categorias",
+      title: "Plano de Contas",
       description: "Classificação de transações",
       icon: FolderTree,
       path: "/financas/categorias",

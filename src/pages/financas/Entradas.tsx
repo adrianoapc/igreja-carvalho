@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, ArrowLeft, Calendar, TrendingUp, Building2, FileText, Upload, Paperclip, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { exportToExcel, formatDateForExport, formatCurrencyForExport, formatBooleanForExport } from "@/lib/exportUtils";
@@ -208,23 +209,29 @@ export default function Entradas() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/financas')}
-          className="w-fit"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Entradas</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">Gerencie os recebimentos da igreja</p>
+      {/* Header Principal */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        {/* Lado Esquerdo: Voltar + Título + HideValues */}
+        <div className="flex items-center justify-between gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/financas')}
+              className="flex-shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Entradas</h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-0.5">Gerencie os recebimentos da igreja</p>
+            </div>
           </div>
-          <div className="flex gap-2 items-center">
-            <HideValuesToggle />
+          <HideValuesToggle />
+        </div>
+
+        {/* Lado Direito: Filtros + Novo */}
+        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end flex-wrap">
             <FiltrosSheet
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
@@ -254,28 +261,32 @@ export default function Entradas() {
             <Button 
               variant="outline"
               onClick={handleExportar}
+              size="sm"
             >
-              <Download className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Exportar</span>
+              <Download className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline text-xs">Exportar</span>
             </Button>
             <Button 
               variant="outline"
               onClick={() => setImportDialogOpen(true)}
+              size="sm"
             >
-              <Upload className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Importar</span>
+              <Upload className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline text-xs">Importar</span>
             </Button>
             <Button 
-              className="bg-gradient-primary shadow-soft"
+              className="bg-gradient-primary shadow-soft whitespace-nowrap"
               onClick={() => setDialogOpen(true)}
+              size="sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Nova Entrada</span>
-              <span className="sm:hidden">Nova</span>
+              <Plus className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline text-xs">Nova Entrada</span>
+              <span className="sm:hidden text-xs">Nova</span>
             </Button>
           </div>
-        </div>
+      </div>
 
+      <div>
         {/* Active Filters Display */}
         <div className="flex flex-wrap gap-2 mt-3">
           <Badge variant="outline" className="gap-1.5">
@@ -391,79 +402,129 @@ export default function Entradas() {
         <CardHeader className="p-4 md:p-6">
           <CardTitle className="text-lg md:text-xl">Lista de Entradas</CardTitle>
         </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
+        <CardContent className="p-0">
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
-            <div className="space-y-3">
-              {transacoesFiltradas.map((transacao) => (
-                <Card key={transacao.id} className="border">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          <h3 className="font-semibold text-sm truncate">{transacao.descricao}</h3>
-                        </div>
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                          {transacao.conta && (
-                            <div className="flex items-center gap-1">
-                              <Building2 className="w-3 h-3" />
-                              <span>{transacao.conta.nome}</span>
-                            </div>
-                          )}
-                          {transacao.categoria && (
+            <>
+              {/* Tabela Desktop */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs">Descrição</TableHead>
+                      <TableHead className="text-xs">Conta</TableHead>
+                      <TableHead className="text-xs">Categoria</TableHead>
+                      <TableHead className="text-xs">Vencimento</TableHead>
+                      <TableHead className="text-xs text-right">Valor</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs text-center">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transacoesFiltradas.map((transacao) => (
+                      <TableRow key={transacao.id} className="hover:bg-muted/50">
+                        <TableCell className="text-sm font-medium">{transacao.descricao}</TableCell>
+                        <TableCell className="text-sm">{transacao.conta?.nome || '-'}</TableCell>
+                        <TableCell className="text-sm">
+                          {transacao.categoria ? (
                             <div className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: transacao.categoria.cor || '#666' }} />
                               <span>{transacao.categoria.nome}</span>
-                              {transacao.subcategoria && <span> • {transacao.subcategoria.nome}</span>}
                             </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>Venc: {format(new Date(transacao.data_vencimento), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                            {transacao.data_pagamento && (
-                              <span> • Recebido: {format(new Date(transacao.data_pagamento), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                            )}
-                          </div>
-                          {transacao.anexo_url && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <Paperclip className="w-3 h-3" />
-                              <a 
-                                href={transacao.anexo_url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-xs text-primary hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Ver anexo
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-lg font-bold text-green-600">{formatCurrency(Number(transacao.valor))}</p>
-                          <Badge className={`text-xs mt-1 ${getStatusColorDynamic(transacao)}`}>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {format(new Date(transacao.data_vencimento), 'dd/MM/yyyy', { locale: ptBR })}
+                        </TableCell>
+                        <TableCell className="text-sm font-semibold text-right text-green-600">
+                          {formatCurrency(Number(transacao.valor))}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <Badge className={`text-xs ${getStatusColorDynamic(transacao)}`}>
                             {getStatusDisplay(transacao)}
                           </Badge>
-                        </div>
-                        <TransacaoActionsMenu
-                          transacaoId={transacao.id}
-                          status={transacao.status}
-                          tipo="entrada"
-                          onEdit={() => {
-                            setEditingTransacao(transacao);
-                            setDialogOpen(true);
-                          }}
-                        />
+                        </TableCell>
+                        <TableCell className="text-sm text-center">
+                          <TransacaoActionsMenu
+                            transacaoId={transacao.id}
+                            status={transacao.status}
+                            tipo="entrada"
+                            onEdit={() => {
+                              setEditingTransacao(transacao);
+                              setDialogOpen(true);
+                            }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Cards Mobile */}
+              <div className="md:hidden space-y-2 p-4">
+                {transacoesFiltradas.map((transacao) => (
+                  <div 
+                    key={transacao.id} 
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    {/* Data Compact - Mobile */}
+                    <div className="flex-shrink-0 text-center w-12">
+                      <div className="text-xs font-bold text-foreground">
+                        {format(new Date(transacao.data_vencimento), 'dd', { locale: ptBR })}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground uppercase">
+                        {format(new Date(transacao.data_vencimento), 'MMM', { locale: ptBR })}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+
+                    {/* Divider */}
+                    <div className="h-10 w-px bg-border" />
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm truncate">{transacao.descricao}</h3>
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                        {transacao.categoria && (
+                          <>
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: transacao.categoria.cor || '#666' }} />
+                            <span className="truncate">{transacao.categoria.nome}</span>
+                          </>
+                        )}
+                        {transacao.conta && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate">{transacao.conta.nome}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Value & Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <p className="text-base font-bold text-green-600 whitespace-nowrap">
+                          {formatCurrency(Number(transacao.valor))}
+                        </p>
+                        <Badge className={`text-[10px] ${getStatusColorDynamic(transacao)}`}>
+                          {getStatusDisplay(transacao)}
+                        </Badge>
+                      </div>
+                      <TransacaoActionsMenu
+                        transacaoId={transacao.id}
+                        status={transacao.status}
+                        tipo="entrada"
+                        onEdit={() => {
+                          setEditingTransacao(transacao);
+                          setDialogOpen(true);
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <p className="text-sm md:text-base text-muted-foreground text-center py-4">
               Nenhuma entrada encontrada para o período selecionado.

@@ -19,6 +19,7 @@ import {
   Users,
   Webhook,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ const GERAL_ITEMS: ConfigItem[] = [
 
 const FINANCEIRO_ITEMS: ConfigItem[] = [
   { id: "FINANCEIRO_BASES", title: "Bases Ministeriais", description: "Unidades de receita e despesa", icon: Users },
-  { id: "FINANCEIRO_CATEGORIAS", title: "Categorias Financeiras", description: "Tipos de receita/despesa", icon: LayoutList },
+  { id: "FINANCEIRO_CATEGORIAS", title: "Plano de Contas", description: "Categorias Financeiras e tipos de receita/despesa", icon: LayoutList },
   { id: "FINANCEIRO_CENTROS", title: "Centros de Custo", description: "Classificação por centro", icon: FileText },
   { id: "FINANCEIRO_CONTAS", title: "Contas Bancárias", description: "Caixa, bancos e carteiras", icon: CreditCard },
   { id: "FINANCEIRO_FORMAS", title: "Formas de Pagamento", description: "Dinheiro, PIX, cartão…", icon: DollarSign },
@@ -112,23 +113,22 @@ export default function Configuracoes() {
   };
 
   // Render sub-pages - these components don't accept onBack prop
-  if (currentView === "FINANCEIRO_BASES") return <BasesMinisteriais />;
-  if (currentView === "FINANCEIRO_CATEGORIAS") return <Categorias />;
-  if (currentView === "FINANCEIRO_CENTROS") return <CentrosCusto />;
-  if (currentView === "FINANCEIRO_CONTAS") return <ContasManutencao />;
-  if (currentView === "FINANCEIRO_FORMAS") return <FormasPagamento />;
-  if (currentView === "FINANCEIRO_FORNECEDORES") return <Fornecedores />;
+  if (currentView === "FINANCEIRO_BASES") return <BasesMinisteriais onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CATEGORIAS") return <Categorias onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CENTROS") return <CentrosCusto onBack={goBack} />;
+  if (currentView === "FINANCEIRO_CONTAS") return <ContasManutencao onBack={goBack} />;
+  if (currentView === "FINANCEIRO_FORMAS") return <FormasPagamento onBack={goBack} />;
+  if (currentView === "FINANCEIRO_FORNECEDORES") return <Fornecedores onBack={goBack} />;
   
   // Pages without onBack - render as-is (they have their own navigation)
-  if (currentView === "IGREJA") return <ConfiguracoesIgreja />;
-  if (currentView === "PERMISSOES") return <AdminPermissions />;
-  if (currentView === "WEBHOOKS") return <Webhooks />;
-  if (currentView === "CHATBOTS") return <Chatbots />;
-  if (currentView === "NOTIFICACOES") return <Notificacoes />;
+  if (currentView === "IGREJA") return <ConfiguracoesIgreja onBack={goBack} />;
+  if (currentView === "PERMISSOES") return <AdminPermissions onBack={goBack} />;
+  if (currentView === "WEBHOOKS") return <Webhooks onBack={goBack} />;
+  if (currentView === "CHATBOTS") return <Chatbots onBack={goBack} />;
+  if (currentView === "NOTIFICACOES") return <Notificacoes onBack={goBack} />;
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
@@ -205,6 +205,5 @@ export default function Configuracoes() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 }

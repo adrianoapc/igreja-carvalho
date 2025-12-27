@@ -2,13 +2,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, Save, X, Phone } from "lucide-react";
+import { Upload, Save, X, Phone, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InputMask from "react-input-mask";
 
-export default function ConfiguracoesIgreja() {
+interface Props {
+  onBack?: () => void;
+}
+
+export default function ConfiguracoesIgreja({ onBack }: Props) {
+  const navigate = useNavigate();
+  const handleBack = onBack ?? (() => navigate(-1));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -162,17 +169,34 @@ export default function ConfiguracoesIgreja() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">Configurações da Igreja</h1>
+            <p className="text-muted-foreground text-sm">Dados institucionais e identidade visual.</p>
+          </div>
+        </div>
+      </div>
+      
       {/* Dados de Identidade */}
-      <Card className="border-0 shadow-none">
-        <CardHeader className="px-0 pt-0">
+      <Card>
+        <CardHeader>
           <CardTitle>Identidade Visual</CardTitle>
           <CardDescription>
             Como a igreja aparece no aplicativo e nos relatórios.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-0 space-y-6">
+        <CardContent className="space-y-6">
           {/* Logo */}
-          <div className="flex flex-col sm:flex-row gap-6 items-start">
+          <div className="flex flex-col md:flex-row gap-6 items-start">
             <div className="space-y-2">
               <Label>Logotipo</Label>
               <div className="relative w-32 h-32 border rounded-lg p-2 bg-muted/10 flex items-center justify-center">
@@ -225,7 +249,7 @@ export default function ConfiguracoesIgreja() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             {/* Nome da Igreja */}
             <div className="space-y-2">
               <Label htmlFor="nome">Nome da Igreja</Label>
@@ -252,46 +276,45 @@ export default function ConfiguracoesIgreja() {
       </Card>
 
       {/* Contato Institucional */}
-      <Card className="border-0 shadow-none border-t pt-6 rounded-none">
-        <CardHeader className="px-0 pt-0">
+      <Card>
+        <CardHeader>
           <CardTitle>Contato Institucional</CardTitle>
           <CardDescription>
             Canais oficiais de atendimento.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-0">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="telefone-plantao" className="flex items-center gap-2">
-                <Phone className="w-4 h-4" />
-                Plantão Pastoral (Whatsapp/Tel)
-              </Label>
-              <InputMask
-                mask="(99) 99999-9999"
-                value={config.telefone_plantao_pastoral || ""}
-                onChange={(e) => setConfig(prev => ({ ...prev, telefone_plantao_pastoral: e.target.value }))}
-              >
-                {(inputProps: any) => (
-                  <Input
-                    {...inputProps}
-                    id="telefone-plantao"
-                    placeholder="(11) 99999-9999"
-                  />
-                )}
-              </InputMask>
-              <p className="text-xs text-muted-foreground">
-                Este número será exibido aos membros em caso de urgência.
-              </p>
-            </div>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="telefone-plantao" className="flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              Plantão Pastoral (Whatsapp/Tel)
+            </Label>
+            <InputMask
+              mask="(99) 99999-9999"
+              value={config.telefone_plantao_pastoral || ""}
+              onChange={(e) => setConfig(prev => ({ ...prev, telefone_plantao_pastoral: e.target.value }))}
+            >
+              {(inputProps: any) => (
+                <Input
+                  {...inputProps}
+                  id="telefone-plantao"
+                  placeholder="(11) 99999-9999"
+                />
+              )}
+            </InputMask>
+            <p className="text-xs text-muted-foreground">
+              Este número será exibido aos membros em caso de urgência.
+            </p>
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end pt-4">
+      {/* Botão de Salvar */}
+      <div className="flex justify-end pt-2">
         <Button 
           onClick={handleSave} 
           disabled={saving || uploading}
-          className="w-full sm:w-auto min-w-[150px]"
+          className="w-full md:w-auto min-w-[150px]"
         >
           <Save className="w-4 h-4 mr-2" />
           {uploading ? "Enviando logo..." : saving ? "Salvando..." : "Salvar Dados"}

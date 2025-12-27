@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Webhook, Save, MessageSquare, Key, Loader2, Link2 } from "lucide-react";
+import { Webhook, Save, MessageSquare, Key, Loader2, Link2, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -40,7 +41,13 @@ const GENERIC_WEBHOOKS: Omit<WebhookConfig, 'isConfigured'>[] = [
   },
 ];
 
-export default function Webhooks() {
+interface Props {
+  onBack?: () => void;
+}
+
+export default function Webhooks({ onBack }: Props) {
+  const navigate = useNavigate();
+  const handleBack = onBack ?? (() => navigate(-1));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -131,13 +138,19 @@ export default function Webhooks() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Header Simplificado */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">Integrações</h2>
-          <p className="text-sm text-muted-foreground">
-            Configure gateways de mensagem e webhooks do sistema.
-          </p>
+      {/* Header */}
+      <div className="flex items-center gap-3 min-w-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleBack}
+          className="flex-shrink-0"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold">Integrações</h1>
+          <p className="text-muted-foreground">Configure gateways de mensagem e webhooks do sistema.</p>
         </div>
       </div>
 

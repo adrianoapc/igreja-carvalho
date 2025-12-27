@@ -3,13 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Bell, Loader2, MessageCircle, Plus, Smartphone, Trash2, Users } from "lucide-react";
+import { AlertTriangle, Bell, Loader2, MessageCircle, Plus, Smartphone, Trash2, Users, ArrowLeft, RefreshCw, ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // --- TIPOS ---
@@ -194,14 +196,22 @@ const NotificationEventCard = ({
 };
 
 // --- COMPONENTE PRINCIPAL ---
-export default function NotificacoesAdmin() {
+interface Props {
+  onBack?: () => void;
+}
+
+export default function NotificacoesAdmin({ onBack }: Props) {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const handleBack = onBack ?? (() => navigate(-1));
   const supa = supabase as any;
   
   const [eventos, setEventos] = useState<NotificacaoEvento[]>([]);
   const [regras, setRegras] = useState<NotificacaoRegra[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingOps, setLoadingOps] = useState<Record<string, boolean>>({});
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Dialog State
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -311,15 +321,45 @@ export default function NotificacoesAdmin() {
     }
   };
 
+  const filteredEventos = useMemo(() => {
+    if (!searchTerm) return eventos;
+    const q = searchTerm.toLowerCase();
+    return eventos.filter(ev => {
+      const nome = ev.nome || formatEventoNome(ev.slug);
+      return (
+        nome.toLowerCase().includes(q) ||
+        (ev.descricao || "").toLowerCase().includes(q) ||
+        (ev.categoria || "").toLowerCase().includes(q) ||
+        ev.slug.toLowerCase().includes(q)
+      );
+    });
+  }, [eventos, searchTerm]);
+
   const eventosPorCategoria = useMemo(() => {
     const groups: Record<string, NotificacaoEvento[]> = {};
-    eventos.forEach(ev => {
+    filteredEventos.forEach(ev => {
       const cat = ev.categoria || "Geral";
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(ev);
     });
     return groups;
-  }, [eventos]);
+  }, [filteredEventos]);
+
+  // Auto-expand categories when search matches
+  useEffect(() => {
+    if (!searchTerm) return;
+    const next = new Set<string>();
+    Object.keys(eventosPorCategoria).forEach(cat => next.add(cat));
+    setExpandedCategories(next);
+  }, [searchTerm, eventosPorCategoria]);
+
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  };
 
   if (loading) return <div className="h-[80vh] flex flex-col items-center justify-center gap-4 text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p>Carregando central...</p></div>;
 
@@ -328,9 +368,19 @@ export default function NotificacoesAdmin() {
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-xl border shadow-sm">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-primary">Central de Notificações</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Configure as regras de disparo automático para toda a igreja.</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight text-primary">Central de Notificações</h1>
+            <p className="text-muted-foreground mt-1 text-sm">Configure as regras de disparo automático para toda a igreja.</p>
+          </div>
         </div>
         <TooltipProvider>
           <Tooltip>
@@ -347,33 +397,67 @@ export default function NotificacoesAdmin() {
         </TooltipProvider>
       </div>
 
-      {/* Grid de Categorias */}
-      {Object.entries(eventosPorCategoria).map(([categoria, listaEventos]) => (
-        <section key={categoria} className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-1 bg-primary rounded-full" />
-            <h2 className="text-lg font-semibold tracking-tight text-foreground/80 capitalize">{categoria}</h2>
-            <div className="h-px bg-border flex-1 opacity-50" />
-          </div>
+      {/* Filtros */}
+      <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+        <div className="w-full md:max-w-sm">
+          <Input
+            placeholder="Buscar evento, categoria ou descrição"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setSearchTerm(""); loadDados(); }} disabled={loading}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Recarregar
+          </Button>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {listaEventos.map(evento => (
-              <NotificationEventCard
-                key={evento.slug}
-                evento={evento}
-                regras={regras.filter(r => r.evento_slug === evento.slug)}
-                onAddRegra={(slug) => {
-                  setSelectedEventSlug(slug);
-                  setDialogOpen(true);
-                }}
-                onDeleteRegra={handleDeleteRegra}
-                onToggleCanal={handleToggleCanal}
-                loadingIds={loadingOps}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      {/* Grid de Categorias */}
+      {Object.keys(eventosPorCategoria).length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center text-muted-foreground space-y-2">
+            <Bell className="h-6 w-6 mx-auto" />
+            <p>Nenhum evento encontrado para esse filtro.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        Object.entries(eventosPorCategoria).map(([categoria, listaEventos]) => {
+          const expanded = expandedCategories.has(categoria);
+          return (
+            <section key={categoria} className="border border-border/60 rounded-lg overflow-hidden">
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 bg-muted/50 hover:bg-muted transition"
+                onClick={() => toggleCategory(categoria)}
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+                <span className="font-semibold uppercase text-xs tracking-wider">{categoria}</span>
+                <span className="text-xs text-muted-foreground">{listaEventos.length} evento(s)</span>
+              </button>
+
+              {expanded && (
+                <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-6 bg-card/40">
+                  {listaEventos.map(evento => (
+                    <NotificationEventCard
+                      key={evento.slug}
+                      evento={evento}
+                      regras={regras.filter(r => r.evento_slug === evento.slug)}
+                      onAddRegra={(slug) => {
+                        setSelectedEventSlug(slug);
+                        setDialogOpen(true);
+                      }}
+                      onDeleteRegra={handleDeleteRegra}
+                      onToggleCanal={handleToggleCanal}
+                      loadingIds={loadingOps}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })
+      )}
 
       {/* Dialog Nova Regra */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

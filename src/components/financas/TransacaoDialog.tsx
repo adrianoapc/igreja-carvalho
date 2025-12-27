@@ -800,20 +800,31 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label htmlFor="valor">Valor *</Label>
-            <Input
-              id="valor"
-              type="text"
-              inputMode="decimal"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              placeholder="0,00"
-              required
-            />
-          </div>
+        <div>
+          <Label htmlFor="valor">Valor *</Label>
+          <Input
+            id="valor"
+            type="text"
+            inputMode="decimal"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            placeholder="0,00"
+            required
+            className="md:hidden text-lg h-12 border-2 border-primary bg-primary/5"
+          />
+          <Input
+            id="valor-desktop"
+            type="text"
+            inputMode="decimal"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            placeholder="0,00"
+            required
+            className="hidden md:block text-base h-10"
+          />
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label>Forma de pgto</Label>
             <Select value={formaPagamento} onValueChange={setFormaPagamento}>
@@ -827,6 +838,24 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   .map((f) => (
                     <SelectItem key={f.id} value={f.nome}>
                       {f.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Conta *</Label>
+            <Select value={contaId} onValueChange={setContaId} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a conta" />
+              </SelectTrigger>
+              <SelectContent>
+                {contas
+                  ?.filter((c) => c.id)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -852,7 +881,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label>Vencimento *</Label>
             <Popover>
@@ -899,7 +928,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       <div className="border-t pt-3 space-y-3">
         <h4 className="font-medium text-sm">Classificação</h4>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label>Categoria</Label>
             <Select
@@ -949,7 +978,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label>Base Ministerial</Label>
             <Select value={baseMinisterialId} onValueChange={setBaseMinisterialId}>

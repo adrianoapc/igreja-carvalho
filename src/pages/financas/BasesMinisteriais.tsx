@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -30,7 +31,13 @@ interface BaseMinisterial {
   // Se existirem no banco, podemos readicionar.
 }
 
-export default function BasesMinisteriais() {
+interface Props {
+  onBack?: () => void;
+}
+
+export default function BasesMinisteriais({ onBack }: Props) {
+  const navigate = useNavigate();
+  const handleBack = onBack ?? (() => navigate('/financas'));
   const [bases, setBases] = useState<BaseMinisterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -129,24 +136,39 @@ export default function BasesMinisteriais() {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Bases Ministeriais</h2>
-          <p className="text-sm text-muted-foreground">Grandes áreas de atuação.</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="flex-shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <h2 className="text-lg md:text-xl font-semibold tracking-tight">Bases Ministeriais</h2>
+            <p className="text-sm text-muted-foreground">Grandes áreas de atuação.</p>
+          </div>
         </div>
-        <Button onClick={openNew} size="sm"><Plus className="h-4 w-4 mr-2"/> Nova Base</Button>
       </div>
 
-      <Card className="border shadow-sm overflow-hidden">
-        <div className="p-3 border-b bg-muted/5 flex items-center gap-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full md:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Buscar base..." 
             value={searchTerm} 
             onChange={e => setSearchTerm(e.target.value)} 
-            className="max-w-xs h-8 text-sm"
+            className="pl-9 text-base h-10"
           />
         </div>
+        <Button onClick={openNew} size="sm" className="text-xs">
+          <Plus className="h-4 w-4 mr-2"/> Nova Base
+        </Button>
+      </div>
+
+      <Card className="border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
