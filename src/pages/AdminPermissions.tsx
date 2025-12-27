@@ -12,6 +12,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { PermissionsHistoryTab } from '@/components/admin/PermissionsHistoryTab';
 import { useNavigate } from 'react-router-dom';
@@ -64,6 +72,7 @@ export default function AdminPermissions({ onBack }: Props) {
   
   // Controle de mudanças pendentes
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   // Filtros e seleção
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -424,7 +433,7 @@ export default function AdminPermissions({ onBack }: Props) {
   const generateUUID = () => crypto.randomUUID();
 
   // Salvar mudanças
-  const handleSaveChanges = async () => {
+  const executeSave = async () => {
     if (pendingChanges.length === 0 || saving) return;
     
     try {
@@ -498,6 +507,53 @@ export default function AdminPermissions({ onBack }: Props) {
       setSaving(false);
     }
   };
+
+  // Função para abrir modal de confirmação
+  const handlePreSave = () => {
+    if (pendingChanges.length === 0) return;
+    setIsConfirmOpen(true);
+  };
+
+  // Função para confirmar e executar salvamento
+  const handleConfirmSave = async () => {
+    setIsConfirmOpen(false);
+    await executeSave();
+  };
+
+  // Agrupar alterações por cargo para exibição no modal
+  const groupedChanges = useMemo(() => {
+    const groups: Record<number, {
+      roleName: string;
+      additions: { permName: string; permId: number }[];
+      removals: { permName: string; permId: number }[];
+    }> = {};
+
+    pendingChanges.forEach(change => {
+      const role = roles.find(r => r.id === change.roleId);
+      const perm = permissions.find(p => p.id === change.permissionId);
+      
+      if (!role || !perm) return;
+
+      if (!groups[change.roleId]) {
+        groups[change.roleId] = {
+          roleName: role.name,
+          additions: [],
+          removals: [],
+        };
+      }
+
+      if (change.action === 'add') {
+        groups[change.roleId].additions.push({ permName: perm.name, permId: perm.id });
+      } else {
+        groups[change.roleId].removals.push({ permName: perm.name, permId: perm.id });
+      }
+    });
+
+    return Object.entries(groups).map(([roleId, data]) => ({
+      roleId: Number(roleId),
+      ...data,
+    }));
+  }, [pendingChanges, roles, permissions]);
 
   // Desfazer
   const handleUndoLastSave = async () => {
@@ -951,7 +1007,7 @@ export default function AdminPermissions({ onBack }: Props) {
               Recarregar
             </Button>
             <Button
-              onClick={handleSaveChanges}
+              onClick={handlePreSave}
               disabled={pendingChanges.length === 0 || saving}
               className="w-full sm:w-auto"
             >
@@ -970,6 +1026,93 @@ export default function AdminPermissions({ onBack }: Props) {
           </div>
         </div>
       )}
+
+      {/* Dialog de Confirmação de Salvamento */}
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Confirmar Alterações</DialogTitle>
+            <DialogDescription>
+              Você está prestes a salvar {pendingChanges.length} alteração(ões) de permissões.
+              Revise as mudanças abaixo antes de confirmar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-2 max-h-[60vh]">
+            {groupedChanges.map((group) => (
+              <div key={group.roleId} className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-semibold text-lg">{group.roleName}</h3>
+                  <Badge variant="outline">
+                    {group.additions.length + group.removals.length} alterações
+                  </Badge>
+                </div>
+
+                {/* Adições */}
+                {group.additions.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">
+                      Adicionar ({group.additions.length}):
+                    </div>
+                    <div className="space-y-1 pl-4">
+                      {group.additions.map((add) => (
+                        <div key={add.permId} className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                          <span className="text-foreground">{add.permName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Remoções */}
+                {group.removals.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium text-destructive mb-2">
+                      Remover ({group.removals.length}):
+                    </div>
+                    <div className="space-y-1 pl-4">
+                      {group.removals.map((rem) => (
+                        <div key={rem.permId} className="flex items-center gap-2 text-sm">
+                          <XCircle className="h-3.5 w-3.5 text-destructive" />
+                          <span className="text-foreground">{rem.permName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmOpen(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Confirmar Salvar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
