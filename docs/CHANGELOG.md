@@ -10,6 +10,67 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 🔐 Gestão de Permissões — Controles Avançados (26 de Dez/2025)
+- **Controles tri-state em massa**: Headers do accordion de módulos agora exibem células individuais por cargo com indicadores visuais (✅ todas ativas, ➖ parcial, ⭕ nenhuma); click alterna entre ativar/desativar todas as permissões do módulo para aquele cargo
+- **Clonagem de permissões**: Botão Copy no cabeçalho de cada cargo abre dropdown para selecionar cargo de origem; função `handleCloneRole` calcula diff baseado em estado efetivo (inclui `pendingChanges`), sincroniza totalmente (adiciona/remove) para deixar Target idêntico ao Source via batch update
+- **Dialog de confirmação com diff visual**: Botão "Salvar Alterações" interceptado por `handlePreSave` → abre modal com resumo agrupado por cargo; exibe adições (verde ✅) e remoções (vermelhas ❌) com lookup de nomes; lista scrollável (max-h-60vh); botões Cancelar/Confirmar; execução real movida para `executeSave`
+- **Validações**: Bloqueio de clonagem para cargos sistema (admin); Admin permanece read-only nos controles tri-state
+
+**Impacto no usuário:** Administradores copiam rapidamente permissões entre cargos similares (ex: "Líder Júnior" clona "Líder"), ativam/desativam módulos inteiros com 1 click, e revisam todas as mudanças antes de persistir no banco.  
+**Módulos afetados:** Admin (AdminPermissions.tsx)  
+**Arquivos alterados:** `src/pages/AdminPermissions.tsx` (+317 linhas)
+
+---
+
+#### 💰 UX Financeiro — Correções de Navegação (26 de Dez/2025)
+- **Fix navegação Categorias**: Tela dentro de Configurações agora retorna corretamente para `/configuracoes` via prop `onBack`, corrigindo redirecionamento incorreto para `/financas`
+- **Melhorias em ContasManutencao**: Adiciona filtro `.not('conta_id', 'is', null)` na query de transações; tratamento de erro `transacoesError` com toast; validação `if (t.conta_id)` antes de processar
+- **Remoção campo obsoleto**: Remove exibição de `saldo_atual` de ContasManutencao (cálculo deve vir de transações agregadas)
+- **Headers consistentes**: Padronização de headers em telas de manutenção financeira
+
+**Impacto no usuário:** Navegação breadcrumb funciona corretamente em Categorias; erros de query não quebram ContasManutencao; interface mais limpa.  
+**Módulos afetados:** Financeiro (Categorias, ContasManutencao)  
+**Arquivos alterados:** `src/pages/financas/Categorias.tsx`, `src/pages/financas/ContasManutencao.tsx`, `src/pages/Configuracoes.tsx`
+
+---
+
+#### 📱 FASE 1: Mobile UX Refactor — Safe Areas e iOS (25-26 de Dez/2025)
+- **Infraestrutura CSS mobile**: Variáveis `--safe-area-inset-*` aplicadas em `MainLayout` (header/wrapper com padding seguro); `font-size: 16px` em inputs/selects mobile para evitar zoom automático no iOS
+- **ResponsiveDialog base**: Novo componente `src/components/ui/responsive-dialog.tsx` que renderiza Dialog (desktop) ou Drawer (mobile) baseado em `useMediaQuery`; migração sistemática de 72 dialogs/drawers do sistema
+- **UX EditarPessoa mobile**: Revisão completa com sections colapsáveis, campos otimizados para toque, scroll suave
+- **UX mobile em componentes**: Família, escalas, envolvimento e sentimentos adaptados com safe-areas e touch-friendly
+- **Substituição de tabs por select**: Visitantes, Todos e AniversariosDashboard agora usam Select no mobile para economizar espaço vertical
+- **Safe area fixes**: Remoção de `overflow-x: hidden` fixo, aplicação consistente de `pb-safe` em wrappers
+
+**Impacto no usuário:** Interface adaptada para notch/island do iPhone, sem zoom acidental em inputs, dialogs se transformam em drawers no mobile (melhor uso de tela pequena), navegação por abas otimizada.  
+**Módulos afetados:** Layout (MainLayout), UI (72 dialogs), Pessoas (EditarPessoa), Dashboard (Visitantes, Todos, Aniversariantes)  
+**Arquivos alterados:** `src/index.css`, `src/components/layout/MainLayout.tsx`, `src/components/ui/responsive-dialog.tsx`, 72 arquivos de dialogs, `src/pages/pessoas/EditarPessoa.tsx`, componentes de família/escalas/envolvimento/sentimentos
+
+---
+
+#### 🎨 ResponsiveDialog Migration — Padrão Unificado (25 de Dez/2025)
+- **72 dialogs migrados**: Substituição sistemática de `Dialog` (desktop-only) e `Drawer` (mobile-only) por `ResponsiveDialog` que adapta automaticamente baseado em viewport
+- **Componentização**: Extração de `SeletorMidiasDialog` de `LiturgiaDialog`; componentização de upload/viewer em `TransacaoDialog`
+- **Accessibility fixes**: Atributos ARIA corrigidos, foco gerenciado, navegação por teclado preservada
+- **Dialogs migrados incluem**: TransacaoDialog, LiturgiaDialog, EditarJornadaDialog, NovaJornadaDialog, VincularResponsavelDialog, EscalasDialog, CultoDialog, CheckinManualDialog, NovoPedidoDialog, ContaDialog, FormaPagamentoDialog, FornecedorDialog, e 60+ outros
+
+**Impacto no usuário:** Experiência consistente entre desktop (modal centralizado) e mobile (drawer bottom sheet); melhor uso de espaço em telas pequenas; UX nativa mobile.  
+**Módulos afetados:** Todos os módulos do sistema (Financeiro, Cultos, Jornadas, Kids, Pessoas, Projetos, Ensino, Testemunhos, Intercessão, etc.)  
+**Arquivos alterados:** 72 arquivos de components/dialogs
+
+---
+
+#### 📖 Documentação UX Mobile (25 de Dez/2025)
+- **PLANO_UX_MOBILE_BASE_GEMINI.md**: Plano base de UX mobile gerado com Gemini, documentando estratégias de safe-areas, responsive dialogs e touch optimization
+- **PLANO_UX_MOBILE_RESPONSIVO.md**: Documentação completa do plano de responsividade mobile com roadmap, prioridades e checklist
+- **plano-ux-roadmap.md**: Roadmap expandido com avaliação inicial de UX e próximos passos
+
+**Impacto no usuário:** Documentação técnica atualizada para referência futura.  
+**Módulos afetados:** Documentação  
+**Arquivos alterados:** `docs/PLANO_UX_MOBILE_BASE_GEMINI.md`, `docs/PLANO_UX_MOBILE_RESPONSIVO.md`, `docs/plano-ux-roadmap.md`
+
+---
+
 #### 🔧 Refatoração de Telas Financeiras e Navegação (24 de Dez/2025)
 - **Modernização de UX financeira**: Telas `BasesMinisteriais`, `Categorias`, `CentrosCusto`, `FormasPagamento` e `Fornecedores` refatoradas com layout tabular consistente, busca integrada e cards minimalistas
 - **Nova tela de Manutenção de Contas**: `ContasManutencao.tsx` permite gestão de contas bancárias e físicas com validação de movimentações antes da exclusão

@@ -1577,7 +1577,70 @@ Página dedicada em `/admin/webhooks` para gerenciar webhooks de forma segura:
 4. Edite prompts (roles) por canal diretamente no modal e ative/desative bots via toggle
 5. Exclusões pedem confirmação em diálogo para evitar remoções acidentais
 
-### 11.4 Links Externos e QR Codes
+### 11.4 Gestão de Permissões (Admin)
+
+#### Visão Geral
+Acesse **Admin > Permissões** para gerenciar a matriz de permissões por cargo. A interface exibe uma tabela com permissões agrupadas por módulo em accordion expansível.
+
+![Matriz de Permissões](./screenshots/placeholder-admin-permissions.png)
+> *Screenshot: Matriz de permissões com controles tri-state*
+
+#### Controles Tri-State por Módulo
+
+No cabeçalho de cada módulo (ex: Financeiro, Comunicados, Kids), você verá indicadores por cargo:
+
+- **✅ Verde (CheckCircle)**: Todas as permissões do módulo estão ativas para aquele cargo
+- **➖ Amarelo (traço horizontal)**: Algumas permissões ativas, outras não (estado parcial)
+- **⭕ Cinza (XCircle)**: Nenhuma permissão ativa
+
+**Como usar:**
+1. Clique no indicador para alternar entre ativar/desativar todas as permissões do módulo
+2. Se estado for "nenhuma" ou "parcial" → Ativa todas
+3. Se estado for "todas ativas" → Desativa todas
+4. Cargos sistema (admin) não podem ser editados
+
+#### Clonagem de Permissões
+
+Economize tempo copiando permissões de um cargo existente:
+
+1. Localize o cabeçalho da coluna do cargo destino (ex: "Líder Júnior")
+2. Clique no botão **Copy** (ícone de copiar)
+3. Dropdown exibe cargos disponíveis como origem
+4. Selecione o cargo fonte (ex: "Líder")
+5. Sistema calcula diferenças e sincroniza automaticamente:
+   - Adiciona permissões ausentes
+   - Remove permissões extras
+6. Toast confirma operação: "Permissões de 'Líder' copiadas para 'Líder Júnior'. 12 alterações pendentes."
+
+**Dica:** Use esta funcionalidade ao criar cargos similares (ex: Líder → Líder Júnior, Secretário → Secretário Assistente).
+
+#### Dialog de Confirmação Visual
+
+Antes de salvar, revise todas as alterações:
+
+1. Faça alterações na matriz (tri-state, clonagem, toggles individuais)
+2. Clique em **Salvar Alterações (X)** no canto superior
+3. Modal exibe resumo agrupado por cargo:
+   - **Adicionar (verde)**: ✅ Financeiro View, ✅ Comunicados Manage
+   - **Remover (vermelho)**: ❌ Kids Manage, ❌ Ensino Editar
+4. Revise a lista (scrollável se houver muitas alterações)
+5. Escolha:
+   - **Cancelar**: Fecha modal, mantém alterações pendentes
+   - **Confirmar Salvar**: Persiste no banco de dados
+
+![Confirmação de Permissões](./screenshots/placeholder-permissions-confirm.png)
+> *Screenshot: Dialog de confirmação com diff visual*
+
+#### Dicas de Uso
+
+- **Estado efetivo**: A interface considera alterações não salvas ao calcular tri-state e clonagem
+- **Batch operations**: Controles em massa evitam cliques repetitivos
+- **Auditoria**: Todas as alterações são registradas com timestamp e autor
+- **Undo**: Após salvar, botão "Desfazer" aparece no toast por 10 segundos
+
+---
+
+### 11.5 Links Externos e QR Codes
 
 Na página de Pessoas:
 
@@ -1623,7 +1686,42 @@ Na página de Pessoas:
 
 ---
 
-## Apêndice C: Suporte
+## Apêndice C: Experiência Mobile
+
+### Dialogs Responsivos
+
+O sistema adapta automaticamente a interface para dispositivos móveis:
+
+- **Desktop (≥768px)**: Dialogs aparecem como modais centralizados
+- **Mobile (<768px)**: Dialogs se transformam em drawers (bottom sheet) que deslizam de baixo para cima
+
+**Vantagens no mobile:**
+- Melhor uso do espaço vertical limitado
+- Interação nativa (deslizar para fechar)
+- Conteúdo mais acessível sem scroll excessivo
+
+### Safe Areas (iPhone)
+
+A interface respeita as áreas seguras do dispositivo:
+- **Notch/Dynamic Island**: Conteúdo não fica oculto pela área do sensor
+- **Home indicator**: Botões e controles ficam acima da barra de gesto
+- **Margens laterais**: Respeitadas em dispositivos com bordas arredondadas
+
+### Otimizações iOS
+
+- **Zoom automático desabilitado**: Campos de texto não disparam zoom ao focar (fonte 16px)
+- **Scroll suave**: Listas e cards otimizados para toque
+- **Touch targets**: Botões e links com área mínima de 44x44px
+
+### Navegação Mobile
+
+- **Select em vez de Tabs**: Em telas como Visitantes e Aniversariantes, abas são substituídas por dropdown para economizar espaço
+- **Collapsible sections**: Seções podem ser colapsadas para facilitar navegação vertical
+- **Cards compactos**: Layout adaptado para exibir informações essenciais sem excesso de whitespace
+
+---
+
+## Apêndice D: Suporte
 
 Em caso de dúvidas ou problemas:
 

@@ -761,7 +761,45 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - Aprovar/Gerenciar
 - Acesso Total
 
-### 13.3 Autenticação Biométrica
+### 13.3 Gestão Avançada de Permissões (Admin)
+
+#### Controles Tri-State por Módulo
+A matriz de permissões (`AdminPermissions.tsx`) agrupa permissões por módulo em accordion expansível. Cada cabeçalho de módulo exibe células individuais por cargo com indicadores visuais:
+- ✅ **Verde (todas ativas)**: Todas as permissões do módulo estão ativas para aquele cargo
+- ➖ **Amarelo (parcial)**: Algumas permissões ativas, outras não
+- ⭕ **Cinza (nenhuma)**: Nenhuma permissão ativa
+
+**Ação em massa**: Click no indicador alterna entre ativar todas ou desativar todas as permissões do módulo para aquele cargo. Cargos sistema (admin) não podem ser editados.
+
+#### Clonagem de Permissões
+Botão **Copy** no cabeçalho de cada coluna de cargo abre dropdown listando outros cargos como origem. Ao selecionar:
+- Sistema calcula diff baseado no estado efetivo (inclui alterações pendentes)
+- Sincronização total: adiciona permissões ausentes, remove permissões extras
+- Batch update: atualiza `matrix` e `pendingChanges` de uma vez (sem rerenders)
+- Toast confirma operação com quantidade de alterações pendentes
+
+**Caso de uso**: Criar cargo "Líder Júnior" → Copiar permissões de "Líder" → Ajustar diferenças específicas → Salvar.
+
+#### Dialog de Confirmação Visual
+Botão "Salvar Alterações" interceptado por modal de confirmação que exibe:
+- Resumo agrupado por cargo
+- Adições em verde (✅ Adicionar: Financeiro View)
+- Remoções em vermelho (❌ Remover: Kids Manage)
+- Contador de alterações por cargo e total
+- Lista scrollável (max-height 60vh) para muitas alterações
+
+**Fluxo**: Revisar diff → Cancelar ou Confirmar → Persistência no Supabase via `executeSave`.
+
+#### Estado Efetivo e Pending Changes
+A interface mantém dois estados:
+- `originalMatrix`: Estado persistido no banco (role_permissions)
+- `pendingChanges`: Array de `{roleId, permissionId, action: 'add'|'remove'}`
+
+Função `getEffectiveState(roleId, permId)` calcula estado real considerando ambos. Todas as operações (tri-state, clonagem, diff) respeitam alterações não salvas.
+
+---
+
+### 13.4 Autenticação Biométrica
 - WebAuthn/Passkeys
 - Desbloqueio rápido por biometria do dispositivo
 
@@ -839,6 +877,24 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Gráficos**: Recharts
 - **PWA**: Instalável como aplicativo
 - **Realtime**: Supabase Realtime para atualizações ao vivo
+
+### Mobile UX e ResponsiveDialog Pattern
+
+#### Safe Areas e iOS Optimization
+- **CSS Variables**: `--safe-area-inset-top/bottom/left/right` aplicadas em `MainLayout` para respeitar notch/island do iPhone
+- **Input zoom prevention**: `font-size: 16px` em inputs/selects mobile evita zoom automático no iOS
+- **Overflow fixes**: Remoção de `overflow-x: hidden` fixo, aplicação consistente de `pb-safe` em wrappers
+
+#### ResponsiveDialog Component
+Componente unificado (`src/components/ui/responsive-dialog.tsx`) que adapta automaticamente baseado em viewport:
+- **Desktop (≥768px)**: Renderiza `Dialog` do shadcn/ui (modal centralizado)
+- **Mobile (<768px)**: Renderiza `Drawer` do shadcn/ui (bottom sheet)
+- **API unificada**: Mesmas props para ambos os modos
+- **Accessibility**: Atributos ARIA, foco gerenciado, navegação por teclado preservada
+
+**72 dialogs migrados** incluem: TransacaoDialog, LiturgiaDialog, CultoDialog, CheckinManualDialog, NovoPedidoDialog, ContaDialog, FormaPagamentoDialog, dialogs de Jornadas, Pessoas, Projetos, Ensino, Testemunhos, Intercessão, etc.
+
+**Impacto**: Experiência consistente e nativa mobile; melhor uso de espaço em telas pequenas; drawer bottom sheet substitui modais sobrepostos.
 
 ---
 
