@@ -435,73 +435,44 @@ export default function AdminPermissions({ onBack }: Props) {
   // Salvar mudanças
   const executeSave = async () => {
     if (pendingChanges.length === 0 || saving) return;
-    
+
     try {
       setSaving(true);
       const requestId = generateUUID();
-      
-      const { error: contextError } = await supabase.rpc('set_audit_context', {
+
+      // Prepara os dados para enviar como JSON
+      const toAdd = pendingChanges
+        .filter(c => c.action === 'add')
+        .map(c => ({ role_id: c.roleId, permission_id: c.permissionId }));
+
+      const toRemove = pendingChanges
+        .filter(c => c.action === 'remove')
+        .map(c => ({ role_id: c.roleId, permission_id: c.permissionId }));
+
+      // CHAMADA ÚNICA (RPC) - Muito mais performática e segura
+      const { error } = await supabase.rpc('save_permissions_batch', {
         p_request_id: requestId,
-        p_source: 'admin-ui'
+        p_inserts: toAdd,
+        p_deletes: toRemove,
       });
-      
-      if (contextError) {
-        console.warn('Aviso: não foi possível definir contexto de auditoria:', contextError);
-      }
-      
-      const previousSnapshot = [...originalMatrix];
-      const toAdd = pendingChanges.filter(c => c.action === 'add');
-      const toRemove = pendingChanges.filter(c => c.action === 'remove');
-      
-      // Remover
-      if (toRemove.length > 0) {
-        for (const condition of toRemove) {
-          const { error } = await supabase
-            .from('role_permissions')
-            .delete()
-            .match({ role_id: condition.roleId, permission_id: condition.permissionId });
-          if (error) throw error;
-        }
-      }
-      
-      // Adicionar
-      if (toAdd.length > 0) {
-        const insertData = toAdd.map(c => ({
-          role_id: c.roleId,
-          permission_id: c.permissionId
-        }));
-        
-        const { error } = await supabase
-          .from('role_permissions')
-          .insert(insertData);
-        if (error) throw error;
-      }
-      
+
+      if (error) throw error;
+
+      // Sucesso! Atualiza estados locais
       setOriginalMatrix([...matrix]);
-      setLastSavedMatrix(previousSnapshot);
+      setLastSavedMatrix([...originalMatrix]); // Snapshot para undo
       setPendingChanges([]);
-      
-      const t = toast({
-        title: "Salvo com sucesso",
-        description: `${toAdd.length + toRemove.length} permissão(ões) atualizada(s). ID: ${requestId.slice(0, 8)}...`,
-        action: (
-          <ToastAction altText="Desfazer" onClick={() => { handleUndoLastSave(); t.dismiss(); }}>
-            Desfazer
-          </ToastAction>
-        ),
+
+      toast({
+        title: 'Salvo com sucesso',
+        description: `${toAdd.length + toRemove.length} alterações registradas no lote.`,
       });
-      
     } catch (error: any) {
-      console.error('Erro ao salvar permissões:', error);
-      const t = toast({
-        variant: "destructive",
-        title: "Erro ao salvar",
-        description: "Não foi possível salvar as alterações. Tente novamente.",
-        action: (
-          <ToastAction altText="Fechar" onClick={() => t.dismiss()}>
-            Fechar
-          </ToastAction>
-        ),
+      console.error('Erro ao salvar:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar',
+        description: error.message || 'Falha na transação.',
       });
     } finally {
       setSaving(false);
@@ -676,7 +647,7 @@ export default function AdminPermissions({ onBack }: Props) {
         </button>
       </div>
 
-      {activeTab === 'history' && <PermissionsHistoryTab roles={roles} permissions={permissions} />}
+      {activeTab === 'history' && <PermissionsHistoryTab roles={roles} permissions={permissions} onRollbackSuccess={fetchData} />}
 
       {activeTab === 'matrix' && (
         <div className="space-y-4">

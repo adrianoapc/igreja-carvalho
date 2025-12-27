@@ -1637,6 +1637,20 @@ Antes de salvar, revise todas as alterações:
 - **Batch operations**: Controles em massa evitam cliques repetitivos
 - **Auditoria**: Todas as alterações são registradas com timestamp e autor
 - **Undo**: Após salvar, botão "Desfazer" aparece no toast por 10 segundos
+#### Desfazendo Alterações de Permissões (Rollback)
+
+Se você cometeu um erro ao alterar permissões, pode desfazer facilmente:
+
+1. **Abra a aba "Histórico"** na tela de Permissões
+2. **Localize o grupo de alterações** que deseja reverter (data/hora é exibida)
+3. **Clique no botão Undo2** (ícone de seta para trás) à direita do grupo
+4. **Confirme** no dialog que aparece
+5. **Pronto!** As alterações foram desfeitas e a matriz é recarregada
+
+O histórico mostra quem fez cada mudança, quando, e que permissões foram alteradas. Todas as operações ficam registradas para auditoria, mesmo as reversões.
+
+**Nota:** Você só pode desfazer suas próprias alterações (ou as de outros admins, se tiver permissão de auditoria).
+
 
 ---
 

@@ -797,6 +797,46 @@ A interface mantém dois estados:
 
 Função `getEffectiveState(roleId, permId)` calcula estado real considerando ambos. Todas as operações (tri-state, clonagem, diff) respeitam alterações não salvas.
 
+
+#### Histórico de Permissões e Rollback
+A aba "Histórico" em AdminPermissions implementa auditoria completa com capacidade de reversão:
+
+**Visualização de Histórico:**
+- Query agrupa `role_permissions_audit` por `request_id` (transação)
+- Cada grupo exibe:
+  - Timestamp e usuário que fez a alteração (`created_at`, `actor`)
+  - Ações agrupadas e codificadas por cor: ✅ (verde, adição), ❌ (vermelho, remoção)
+  - Nomes dos cargos e permissões afetados
+  - IDs de módulo e informações técnicas
+- Collapse automático para economia de espaço (expansível por clique)
+
+**Rollback de Transações:**
+- Cada grupo possui botão Undo2 que abre `AlertDialog` de confirmação
+- Confirmação exibe: `request_id`, data/hora, quantidade de mudanças
+- Ao confirmar: chama RPC `rollback_audit_batch(request_id)`
+  - RPC reverte todas as mudanças daquela transação em `role_permissions`
+  - Marca operação como "undone" na auditoria (não deleta, apenas registra revertimento)
+- Callback `onRollbackSuccess` recarrega: histórico (refetch) + matriz de permissões
+- Toast exibe sucesso/erro com mensagem descritiva
+
+**Rastreabilidade:**
+- Nenhuma operação é "silenciosa": toda mudança em permissões registra:
+  - `request_id` (agrupa mudanças da mesma transação)
+  - `actor` (usuário que fez)
+  - `action` (insert/update/delete)
+  - `old_value` e `new_value` (antes/depois)
+  - `timestamp` (quando)
+  - `metadata` (contexto adicional)
+
+**Fluxo Completo:**
+1. Admin faz mudanças (tri-state, clonagem) → `pendingChanges`
+2. Clica "Salvar" → Dialog confirmação → `executeSave`
+3. `save_permissions_batch()` cria transação com `request_id` no `set_audit_context`
+4. Alterações persistem com `request_id` em `role_permissions_audit`
+5. Meses depois, Admin vê histórico, clica Undo2 em um grupo antigo
+6. `rollback_audit_batch()` reverte apenas aquele request_id
+7. Auditoria mostra reversão (novo registro com `action: 'rollback'`)
+
 ---
 
 ### 13.4 Autenticação Biométrica

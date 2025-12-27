@@ -8,14 +8,26 @@ import {
   AlertCircle,
   Clock,
   User,
+  Undo2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface AppRole {
   id: number;
@@ -53,13 +65,20 @@ interface GroupedAudit {
 interface Props {
   roles: AppRole[];
   permissions: AppPermission[];
+  onRollbackSuccess?: () => void;
 }
 
-export function PermissionsHistoryTab({ roles, permissions }: Props) {
+export function PermissionsHistoryTab({ roles, permissions, onRollbackSuccess }: Props) {
   const [auditLog, setAuditLog] = useState<GroupedAudit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [rollbackDialog, setRollbackDialog] = useState<{ open: boolean; requestId: string | null }>({
+    open: false,
+    requestId: null,
+  });
+  const [rollingBack, setRollingBack] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchAuditLog();
@@ -116,6 +135,42 @@ export function PermissionsHistoryTab({ roles, permissions }: Props) {
       setError('Não foi possível carregar o histórico. Tente novamente.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRollback = async () => {
+    if (!rollbackDialog.requestId) return;
+
+    try {
+      setRollingBack(true);
+
+      const { error } = await supabase.rpc('rollback_audit_batch', {
+        target_request_id: rollbackDialog.requestId,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Lote revertido com sucesso',
+        description: 'As alterações foram desfeitas e uma nova entrada de auditoria foi gerada.',
+      });
+
+      setRollbackDialog({ open: false, requestId: null });
+
+      // Recarregar histórico e chamar callback do pai
+      await fetchAuditLog();
+      if (onRollbackSuccess) {
+        onRollbackSuccess();
+      }
+    } catch (err: any) {
+      console.error('Erro ao desfazer lote:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao desfazer',
+        description: err.message || 'Não foi possível reverter este lote.',
+      });
+    } finally {
+      setRollingBack(false);
     }
   };
 
@@ -237,9 +292,24 @@ export function PermissionsHistoryTab({ roles, permissions }: Props) {
                   </Badge>
                 </div>
 
+                {/* Botão Rollback */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRollbackDialog({ open: true, requestId: group.request_id });
+                  }}
+                  className="mr-2"
+                  disabled={rollingBack}
+                  title="Desfazer este lote de alterações"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+
                 {/* Chevron */}
                 <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform ml-2 ${
+                  className={`h-4 w-4 text-muted-foreground transition-transform ${
                     expandedGroups.has(group.request_id) ? 'rotate-180' : ''
                   }`}
                 />
@@ -314,6 +384,51 @@ export function PermissionsHistoryTab({ roles, permissions }: Props) {
           </Card>
         </Collapsible>
       ))}
+
+      {/* AlertDialog de Confirmação de Rollback */}
+      <AlertDialog open={rollbackDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setRollbackDialog({ open: false, requestId: null });
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desfazer alterações deste lote?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso reverterá todas as permissões alteradas nesta transação específica. Uma nova entrada
+              de auditoria será gerada para rastrear o rollback.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              <strong>Request ID:</strong> {rollbackDialog.requestId?.slice(0, 8)}...
+            </p>
+            <p className="text-sm text-destructive">
+              Esta ação não pode ser desfeita diretamente. A auditoria registrará o rollback.
+            </p>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <AlertDialogCancel disabled={rollingBack}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRollback}
+              disabled={rollingBack}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {rollingBack ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Desfeito...
+                </>
+              ) : (
+                <>
+                  <Undo2 className="h-4 w-4 mr-2" />
+                  Desfazer Lote
+                </>
+              )}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

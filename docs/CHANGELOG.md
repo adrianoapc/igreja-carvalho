@@ -22,6 +22,26 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+#### 🔐 Gestão de Permissões — Rollback de Transações (27 de Dez/2025)
+- **Histórico de Permissões**: Nova aba "Histórico" em AdminPermissions exibe timeline de todas as alterações agrupadas por transação (request_id), mostrando:
+  - Data/hora e usuário autor da mudança
+  - Ações agrupadas: adições (verde ✅ com ícone Plus) e remoções (vermelho ❌ com ícone Trash2)
+  - Nomes dos cargos e permissões afetados
+  - Identificadores de módulo para contexto
+- **Rollback de Transações**: Botão Undo2 em cada grupo de histórico abre AlertDialog de confirmação; ao confirmar, chama RPC `rollback_audit_batch(request_id)` que desfaz todas as mudanças daquela transação no banco e em `role_permissions`; callback `onRollbackSuccess` recarrega ambas as abas (história + matriz)
+- **Rastreabilidade Completa**: `role_permissions_audit` registra todas as operações com timestamp, usuário, ação (insert/update/delete), valores antes/depois, e request_id para agrupamento
+
+**Impacto no usuário:** Administradores podem desfazer alterações erradas de permissões com segurança via confirmação visual, com rastreamento completo de quem fez o quê e quando.
+
+**Módulos afetados:** Admin (PermissionsHistoryTab.tsx)  
+**Arquivos alterados:** `src/components/admin/PermissionsHistoryTab.tsx` (+242 linhas)
+**Funções Supabase (RPC):** `rollback_audit_batch(uuid)`
+**Tabelas:** `role_permissions_audit` com query grouping por request_id
+
+---
+
+
+
 #### 💰 UX Financeiro — Correções de Navegação (26 de Dez/2025)
 - **Fix navegação Categorias**: Tela dentro de Configurações agora retorna corretamente para `/configuracoes` via prop `onBack`, corrigindo redirecionamento incorreto para `/financas`
 - **Melhorias em ContasManutencao**: Adiciona filtro `.not('conta_id', 'is', null)` na query de transações; tratamento de erro `transacoesError` com toast; validação `if (t.conta_id)` antes de processar
