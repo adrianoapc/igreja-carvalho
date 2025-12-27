@@ -4702,6 +4702,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      rollback_audit_batch: {
+        Args: { target_request_id: string }
+        Returns: undefined
+      }
       save_permissions_batch: {
         Args: { p_deletes: Json; p_inserts: Json; p_request_id: string }
         Returns: undefined
