@@ -1,11 +1,17 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, AlertCircle, Loader2, RotateCcw, CheckCircle2, XCircle, Users, History, ChevronDown, ArrowLeft } from 'lucide-react';
+import { Shield, AlertCircle, Loader2, RotateCcw, CheckCircle2, XCircle, Users, History, ChevronDown, ArrowLeft, Copy, MoreHorizontal } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ToastAction } from '@/components/ui/toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { PermissionsHistoryTab } from '@/components/admin/PermissionsHistoryTab';
 import { useNavigate } from 'react-router-dom';
@@ -290,6 +296,68 @@ export default function AdminPermissions({ onBack }: Props) {
         }
       }
     }, [roles, permissions, getEffectiveState, handleToggle]
+  );
+
+  // Função para clonar permissões de um cargo para outro
+  const handleCloneRole = useCallback(
+    (targetRoleId: number, sourceRoleId: number) => {
+      const targetRole = roles.find(r => r.id === targetRoleId);
+      const sourceRole = roles.find(r => r.id === sourceRoleId);
+      
+      if (!targetRole || !sourceRole) return;
+      if (targetRole.is_system) {
+        toast({
+          title: "Operação não permitida",
+          description: "Não é possível clonar permissões para cargos de sistema.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Calcular diferenças baseadas no estado efetivo (incluindo pendingChanges)
+      const newMatrix = { ...matrix };
+      const newPendingChanges = { ...pendingChanges };
+      let changesCount = 0;
+
+      permissions.forEach(perm => {
+        const sourceHasPerm = getEffectiveState(sourceRoleId, perm.id);
+        const targetHasPerm = getEffectiveState(targetRoleId, perm.id);
+        
+        // Se estados diferem, precisa ajustar
+        if (sourceHasPerm !== targetHasPerm) {
+          const key = `${targetRoleId}-${perm.id}`;
+          const wasOriginallyActive = originalMatrix[key] || false;
+          
+          if (sourceHasPerm) {
+            // Source tem, Target não tem -> Adicionar ao Target
+            newMatrix[key] = true;
+            if (!wasOriginallyActive) {
+              newPendingChanges[key] = 'add';
+            } else {
+              delete newPendingChanges[key];
+            }
+          } else {
+            // Source não tem, Target tem -> Remover do Target
+            newMatrix[key] = false;
+            if (wasOriginallyActive) {
+              newPendingChanges[key] = 'remove';
+            } else {
+              delete newPendingChanges[key];
+            }
+          }
+          changesCount++;
+        }
+      });
+
+      setMatrix(newMatrix);
+      setPendingChanges(newPendingChanges);
+
+      toast({
+        title: "Permissões copiadas",
+        description: `Permissões de "${sourceRole.name}" copiadas para "${targetRole.name}". ${changesCount} alterações pendentes.`,
+      });
+    },
+    [roles, permissions, matrix, pendingChanges, originalMatrix, getEffectiveState, toast]
   );
 
   // Agrupar permissões por módulo
@@ -653,6 +721,36 @@ export default function AdminPermissions({ onBack }: Props) {
                                 >
                                   <XCircle className="h-3 w-3" />
                                 </button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      title="Copiar permissões de outro cargo"
+                                      className="hover:bg-accent/10 p-1 rounded transition"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="center">
+                                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                                      Copiar permissões de:
+                                    </div>
+                                    {targetRoles
+                                      .filter(sourceRole => 
+                                        sourceRole.id !== role.id && 
+                                        !sourceRole.is_system
+                                      )
+                                      .map(sourceRole => (
+                                        <DropdownMenuItem
+                                          key={sourceRole.id}
+                                          onClick={() => handleCloneRole(role.id, sourceRole.id)}
+                                          className="cursor-pointer"
+                                        >
+                                          <Copy className="h-3 w-3 mr-2" />
+                                          {sourceRole.name}
+                                        </DropdownMenuItem>
+                                      ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             )}
                           </div>
