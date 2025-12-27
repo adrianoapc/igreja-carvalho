@@ -668,24 +668,82 @@ export default function AdminPermissions({ onBack }: Props) {
                       return (
                         <React.Fragment key={moduleName}>
                           {/* Linha do Módulo (Cabeçalho do Accordion) */}
-                          <tr
-                            onClick={() => toggleModule(moduleName)}
-                            className="bg-muted/50 cursor-pointer hover:bg-muted border-b border-border transition-colors"
-                          >
+                          <tr className="bg-muted/50 hover:bg-muted border-b border-border transition-colors">
+                            {/* Primeira célula: Nome do módulo (sticky, clicável para expandir) */}
                             <td
-                              colSpan={targetRoles.length + 1}
-                              className="sticky left-0 z-10 bg-muted/50 hover:bg-muted px-4 py-3 flex items-center gap-2 border-r border-border"
+                              onClick={() => toggleModule(moduleName)}
+                              className="sticky left-0 z-10 bg-muted/50 hover:bg-muted px-4 py-3 cursor-pointer border-r border-border"
                             >
-                              <ChevronDown
-                                className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
-                              />
-                              <span className="font-bold uppercase text-xs tracking-wider text-foreground">
-                                {moduleName}
-                              </span>
-                              <Badge variant="outline" className="ml-auto">
-                                {perms.length}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <ChevronDown
+                                  className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
+                                />
+                                <span className="font-bold uppercase text-xs tracking-wider text-foreground">
+                                  {moduleName}
+                                </span>
+                                <Badge variant="outline" className="ml-auto">
+                                  {perms.length}
+                                </Badge>
+                              </div>
                             </td>
+
+                            {/* Células de controle em massa para cada cargo */}
+                            {targetRoles.map((role) => {
+                              // Calcular estado tri-state do módulo para este cargo
+                              const modulePerms = perms.filter(p => p.module === moduleName);
+                              const activeCount = modulePerms.filter(p => getEffectiveState(role.id, p.id)).length;
+                              const totalCount = modulePerms.length;
+                              
+                              const state = activeCount === 0 ? 'none' : 
+                                           activeCount === totalCount ? 'all' : 
+                                           'some';
+                              
+                              const isAdmin = role.name === 'admin';
+
+                              return (
+                                <td
+                                  key={role.id}
+                                  className="bg-muted/50 hover:bg-muted px-4 py-3 text-center border-r border-border/50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isAdmin) return;
+                                    
+                                    // Se vazio ou parcial -> ativar todas
+                                    // Se cheio -> desativar todas
+                                    const action = state === 'all' ? 'deactivate' : 'activate';
+                                    handleBulkToggleModule(role.id, moduleName, action);
+                                  }}
+                                >
+                                  <button
+                                    className={`inline-flex items-center justify-center w-6 h-6 rounded transition-colors ${
+                                      isAdmin 
+                                        ? 'opacity-50 cursor-not-allowed' 
+                                        : 'cursor-pointer hover:bg-background/80'
+                                    }`}
+                                    disabled={isAdmin}
+                                    title={
+                                      isAdmin 
+                                        ? 'Admin tem todas as permissões' 
+                                        : state === 'all' 
+                                          ? 'Desativar todas' 
+                                          : state === 'some' 
+                                            ? 'Ativar todas (parcial)' 
+                                            : 'Ativar todas'
+                                    }
+                                  >
+                                    {state === 'all' ? (
+                                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                    ) : state === 'some' ? (
+                                      <div className="w-5 h-5 rounded border-2 border-yellow-600 flex items-center justify-center">
+                                        <div className="w-2.5 h-0.5 bg-yellow-600" />
+                                      </div>
+                                    ) : (
+                                      <XCircle className="h-5 w-5 text-muted-foreground/40" />
+                                    )}
+                                  </button>
+                                </td>
+                              );
+                            })}
                           </tr>
 
                           {/* Linhas de Permissões (Expandidas) */}
