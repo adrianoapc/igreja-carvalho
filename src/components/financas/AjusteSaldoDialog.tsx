@@ -18,7 +18,12 @@ import { cn } from "@/lib/utils";
 interface AjusteSaldoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  conta: any;
+  conta: {
+    id: string | number;
+    nome: string;
+    saldo_atual: number;
+    observacoes?: string | null;
+  };
 }
 
 export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDialogProps) {
@@ -61,8 +66,8 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
       setTipoAjuste("entrada");
       setData(new Date());
       setDescricao("");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao ajustar saldo");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao ajustar saldo");
     } finally {
       setLoading(false);
     }
@@ -102,7 +107,7 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
 
             <div>
               <Label htmlFor="tipo">Tipo do ajuste *</Label>
-              <Select value={tipoAjuste} onValueChange={(value: any) => setTipoAjuste(value)}>
+              <Select value={tipoAjuste} onValueChange={(value: "entrada" | "saida") => setTipoAjuste(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

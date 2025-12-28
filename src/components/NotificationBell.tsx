@@ -9,11 +9,20 @@ import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
+type UINotification = {
+  id: string;
+  title: string;
+  message: string;
+  type?: string;
+  read: boolean;
+  created_at: string;
+};
+
 export function NotificationBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const navigate = useNavigate();
 
-  const handleNotificationClick = (notification: any) => {
+  const handleNotificationClick = (notification: UINotification) => {
     if (!notification.read) {
       markAsRead(notification.id);
     }

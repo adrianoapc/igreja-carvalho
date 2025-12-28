@@ -91,7 +91,7 @@ export default function Webhooks({ onBack }: Props) {
       }));
       setConfigs(configList);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar configurações");
     } finally {
       setLoading(false);
@@ -112,8 +112,8 @@ export default function Webhooks({ onBack }: Props) {
 
       if (error) throw error;
       toast.success("Configuração de WhatsApp salva!");
-    } catch (error: any) {
-      toast.error("Erro ao salvar: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar: " + error instanceof Error ? error.message : String(error));
     } finally {
       setSaving(false);
     }

@@ -66,11 +66,12 @@ export default function EdgeFunctionConfigDialog({
 
       onUpdate();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao atualizar horário:', error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível atualizar o horário",
+        description: message || "Não foi possível atualizar o horário",
         variant: "destructive",
       });
     } finally {

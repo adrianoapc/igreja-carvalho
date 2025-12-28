@@ -63,8 +63,8 @@ export default function Fornecedores({ onBack }: Props) {
       
       if (error) throw error;
       setFornecedores(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar fornecedores", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar fornecedores", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -111,8 +111,8 @@ export default function Fornecedores({ onBack }: Props) {
       setDialogOpen(false);
       resetForm();
       fetchFornecedores();
-    } catch (error: any) {
-      toast.error("Erro ao salvar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -128,8 +128,8 @@ export default function Fornecedores({ onBack }: Props) {
       if (error) throw error;
       toast.success("Fornecedor excluído");
       fetchFornecedores();
-    } catch (error: any) {
-      toast.error("Erro ao excluir", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao excluir", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 

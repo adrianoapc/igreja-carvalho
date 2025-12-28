@@ -394,7 +394,7 @@ export default function FamilyWallet() {
       refetchCheckins();
       toast.success("Criança retirada do Kids com sucesso!");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Erro ao fazer checkout:", error);
       toast.error("Erro ao retirar criança do Kids");
     },
@@ -432,13 +432,13 @@ export default function FamilyWallet() {
       queryClient.invalidateQueries({ queryKey: ["responsaveis-autorizados"] });
       queryClient.invalidateQueries({ queryKey: ["family-members"] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Erro ao remover responsável:", error);
       toast.error("Erro ao remover responsável");
     },
   });
 
-  const handleRemoverResponsavel = (responsavel: any) => {
+  const handleRemoverResponsavel = (responsavel: { id: string; nome: string }) => {
     if (confirm(`Remover acesso de ${responsavel.nome}?`)) {
       removerResponsavelMutation.mutate(responsavel.id);
     }

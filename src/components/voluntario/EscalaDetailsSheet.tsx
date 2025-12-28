@@ -22,7 +22,7 @@ interface Escala {
   culto: {
     id: string;
     titulo: string;
-    data_culto: string;
+    data_evento: string;
     tipo: string;
     tema: string | null;
     local: string | null;
@@ -84,7 +84,7 @@ export function EscalaDetailsSheet({ open, onOpenChange, escala }: EscalaDetails
     if (open && escala) {
       loadDetails();
     }
-  }, [open, escala]);
+  }, [open, escala?.id]);
 
   const loadDetails = async () => {
     if (!escala) return;
@@ -96,7 +96,7 @@ export function EscalaDetailsSheet({ open, onOpenChange, escala }: EscalaDetails
         const { data: cancoesData } = await supabase
           .from("cancoes_culto")
           .select("*")
-          .eq("culto_id", escala.culto.id)
+          .eq("evento_id", escala.culto.id)
           .order("ordem", { ascending: true });
         
         setCancoes(cancoesData || []);
@@ -104,7 +104,7 @@ export function EscalaDetailsSheet({ open, onOpenChange, escala }: EscalaDetails
 
       // Carregar aulas se for Kids
       if (isKids) {
-        const cultoDate = new Date(escala.culto.data_culto);
+        const cultoDate = new Date(escala.culto.data_evento);
         const startOfDay = new Date(cultoDate);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(cultoDate);
@@ -146,7 +146,7 @@ export function EscalaDetailsSheet({ open, onOpenChange, escala }: EscalaDetails
             {escala.time.nome}
           </SheetTitle>
           <SheetDescription>
-            {escala.culto.titulo} • {format(new Date(escala.culto.data_culto), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            {escala.culto.titulo} • {format(new Date(escala.culto.data_evento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
           </SheetDescription>
         </SheetHeader>
 

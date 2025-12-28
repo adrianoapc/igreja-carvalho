@@ -112,10 +112,10 @@ export default function ResetPassword() {
 
       // Redirecionar para o dashboard
       navigate("/");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar senha",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });
     } finally {

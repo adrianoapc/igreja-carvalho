@@ -21,7 +21,12 @@ export default function Contas() {
   const { formatValue } = useHideValues();
   const [contaDialogOpen, setContaDialogOpen] = useState(false);
   const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
-  const [selectedConta, setSelectedConta] = useState<any>(null);
+  const [selectedConta, setSelectedConta] = useState<{
+    id: string;
+    nome: string;
+    tipo: string;
+    saldo_atual: number;
+  } | null>(null);
   const [selectedContaIds, setSelectedContaIds] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
@@ -144,7 +149,17 @@ export default function Contas() {
   const totalSaidas = transacoes?.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const saldoPeriodo = totalEntradas - totalSaidas;
 
-  const renderTransactionList = (filteredTransacoes: any[]) => (
+  type TransacaoLista = {
+    id: string;
+    tipo: string;
+    descricao: string;
+    valor: number | string;
+    data_pagamento?: string | Date | null;
+    contas?: { nome?: string } | null;
+    categorias_financeiras?: { nome?: string } | null;
+  };
+
+  const renderTransactionList = (filteredTransacoes: TransacaoLista[]) => (
     <div className="space-y-2">
       {isLoadingTransacoes ? (
         <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>

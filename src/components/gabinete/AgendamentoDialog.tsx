@@ -487,7 +487,7 @@ export function AgendamentoDialog({
     },
     onError: (error: Error) => {
       console.error("Erro ao salvar agendamento:", error);
-      toast.error(`Erro ao salvar: ${error.message}`);
+      toast.error(`Erro ao salvar: ${error instanceof Error ? error.message : String(error)}`);
     },
   });
 

@@ -37,10 +37,10 @@ export default function TurmaAtiva() {
       const fimDia = new Date(hoje.setHours(23, 59, 59, 999));
 
       const { data, error } = await supabase
-        .from("cultos")
+        .from("eventos")
         .select("*")
-        .gte("data_culto", inicioDia.toISOString())
-        .lte("data_culto", fimDia.toISOString())
+        .gte("data_evento", inicioDia.toISOString())
+        .lte("data_evento", fimDia.toISOString())
         .maybeSingle();
 
       if (error) throw error;
@@ -57,9 +57,9 @@ export default function TurmaAtiva() {
 
       // Buscar o culto de hoje
       const { data: culto } = await supabase
-        .from("cultos")
+        .from("eventos")
         .select("id")
-        .eq("data_culto", dataHoje)
+        .eq("data_evento", dataHoje)
         .maybeSingle();
 
       if (!culto) {
@@ -70,7 +70,7 @@ export default function TurmaAtiva() {
       const { data: presencas, error: presencasError } = await supabase
         .from("presencas_culto")
         .select("pessoa_id")
-        .eq("culto_id", culto.id);
+        .eq("evento_id", culto.id);
 
       if (presencasError) {
         console.error("Erro ao buscar presenças:", presencasError);
@@ -126,7 +126,7 @@ export default function TurmaAtiva() {
       const { data: diarios } = await supabase
         .from("kids_diario")
         .select("crianca_id")
-        .eq("culto_id", culto.id)
+        .eq("evento_id", culto.id)
         .in("crianca_id", criancaIds);
 
       const diariosSet = new Set(diarios?.map(d => d.crianca_id) || []);
@@ -195,7 +195,7 @@ export default function TurmaAtiva() {
                 <div>
                   <p className="font-medium text-primary">{cultoAtivo.titulo}</p>
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(cultoAtivo.data_culto), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                    {format(new Date(cultoAtivo.data_evento), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
                   </p>
                 </div>
               </div>

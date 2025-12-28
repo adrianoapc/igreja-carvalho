@@ -56,7 +56,7 @@ export function ImageCaptureInput({
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao acessar câmera:", error);
       toast.error("Não foi possível acessar a câmera", {
         description: "Verifique as permissões do navegador",

@@ -93,7 +93,22 @@ export function ConverterFamiliarDialog({
 
     try {
       // Criar novo perfil
-      const profileData: any = {
+      const profileData: {
+        nome: string;
+        status: string;
+        email?: string | null;
+        telefone?: string | null;
+        sexo?: string | null;
+        data_nascimento?: string | null;
+        estado_civil?: string | null;
+        cpf?: string | null;
+        cep?: string | null;
+        cidade?: string | null;
+        estado?: string | null;
+        endereco?: string | null;
+        data_primeira_visita?: string;
+        numero_visitas?: number;
+      } = {
         nome: formData.nome,
         status: formData.status,
         email: formData.email || null,
@@ -184,7 +199,7 @@ export function ConverterFamiliarDialog({
             <Label htmlFor="status" className="text-base font-semibold">
               Status no Sistema *
             </Label>
-            <Select value={formData.status} onValueChange={(value: any) => handleChange("status", value)}>
+            <Select value={formData.status} onValueChange={(value: "visitante" | "frequentador" | "membro") => handleChange("status", value)}>
               <SelectTrigger id="status" className={errors.status ? "border-destructive" : ""}>
                 <SelectValue />
               </SelectTrigger>

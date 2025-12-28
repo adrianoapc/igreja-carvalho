@@ -73,7 +73,9 @@ export function LinksExternosCard() {
         try {
           await navigator.share({ title, text: title, url });
           return;
-        } catch {}
+        } catch {
+          // Usuário cancelou o compartilhamento
+        }
       }
       toast({
         title: "Erro",

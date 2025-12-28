@@ -180,9 +180,9 @@ export default function VincularResponsavelDialog({
 
       onSuccess?.();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Erro ao vincular responsável:", error);
-      toast.error(error.message || "Erro ao vincular responsável");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao vincular responsável");
     },
   });
 

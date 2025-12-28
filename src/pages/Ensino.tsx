@@ -39,7 +39,7 @@ interface Aula {
   status: string;
   sala_id: string | null;
   jornada_id: string | null;
-  culto_id: string | null;
+  evento_id: string | null;
   professor_id: string | null;
   sala?: { id: string; nome: string } | null;
   jornada?: { id: string; titulo: string } | null;
@@ -285,7 +285,7 @@ export default function Ensino() {
                               Copiar Link
                             </Button>
                           )}
-                          {aula.culto_id && (
+                          {aula.evento_id && (
                             <Badge className="gap-1 bg-primary/10 text-primary border-primary/20">
                               <Church className="w-3 h-3" />
                               Vinculado ao Culto

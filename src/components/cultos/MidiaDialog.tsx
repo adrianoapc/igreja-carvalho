@@ -34,7 +34,7 @@ interface MidiaDialogProps {
     canal: string;
     ordem: number;
     ativo: boolean;
-    culto_id?: string;
+    evento_id?: string;
     scheduled_at?: string | null;
     expires_at?: string | null;
   };
@@ -102,7 +102,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
       
       if (error) throw error;
       setTags(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar tags:', error);
     }
   };
@@ -118,7 +118,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
       
       if (error) throw error;
       setTagsSelecionadas(data?.map(t => t.tag_id) || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar tags da mídia:', error);
     }
   };
@@ -266,7 +266,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             canal,
             ordem: novaOrdem,
             ativo,
-            culto_id: null,
+            evento_id: null,
             scheduled_at: scheduledAt?.toISOString() || null,
             expires_at: expiresAt?.toISOString() || null
           })
@@ -306,9 +306,9 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
       onSuccess();
       onOpenChange(false);
       resetForm();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar mídia:', error);
-      toast.error(error.message || "Erro ao salvar mídia");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar mídia");
     } finally {
       setSaving(false);
       setUploading(false);

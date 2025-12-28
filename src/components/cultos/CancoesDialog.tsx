@@ -13,10 +13,10 @@ import { toast } from "sonner";
 import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Music2, User, Guitar, Mic } from "lucide-react";
 import { z } from "zod";
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  data_culto: string;
+  data_evento: string;
 }
 
 interface Membro {
@@ -46,7 +46,7 @@ interface Cancao {
 interface CancoesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  culto: Culto | null;
+  culto: Evento | null;
 }
 
 const cancaoSchema = z.object({
@@ -100,9 +100,9 @@ export default function CancoesDialog({ open, onOpenChange, culto }: CancoesDial
 
       if (error) throw error;
       setMembros(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar membros", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     }
   };
@@ -119,14 +119,14 @@ export default function CancoesDialog({ open, onOpenChange, culto }: CancoesDial
           solista:profiles!solista_id(nome),
           ministro:profiles!ministro_id(nome)
         `)
-        .eq("culto_id", culto.id)
+        .eq("evento_id", culto.id)
         .order("ordem", { ascending: true });
 
       if (error) throw error;
       setCancoes(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar canções", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -221,7 +221,7 @@ export default function CancoesDialog({ open, onOpenChange, culto }: CancoesDial
         const { error } = await supabase
           .from("cancoes_culto")
           .insert([{
-            culto_id: culto.id,
+            evento_id: culto.id,
             ...dadosCancao,
             ordem: novaOrdem,
           }]);
@@ -232,7 +232,7 @@ export default function CancoesDialog({ open, onOpenChange, culto }: CancoesDial
 
       await loadCancoes();
       resetForm();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const firstError = error.issues[0];
         toast.error("Erro de validação", {
@@ -240,7 +240,7 @@ export default function CancoesDialog({ open, onOpenChange, culto }: CancoesDial
         });
       } else {
         toast.error("Erro ao salvar canção", {
-          description: error.message
+          description: error instanceof Error ? error.message : String(error)
         });
       }
     } finally {
@@ -261,9 +261,9 @@ export default function CancoesDialog({ open, onOpenChange, culto }: CancoesDial
       if (error) throw error;
       toast.success("Canção removida com sucesso!");
       await loadCancoes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao remover canção", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -293,9 +293,9 @@ export default function CancoesDialog({ open, onOpenChange, culto }: CancoesDial
 
       if (error1 || error2) throw error1 || error2;
       await loadCancoes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao reordenar canção", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

@@ -65,9 +65,9 @@ export function TagMidiaDialog({ open, onOpenChange, tag, onSuccess }: TagMidiaD
       onSuccess();
       onOpenChange(false);
       resetForm();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar tag:', error);
-      toast.error(error.message || "Erro ao salvar tag");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar tag");
     } finally {
       setSaving(false);
     }

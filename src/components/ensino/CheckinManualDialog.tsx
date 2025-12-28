@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertCircle, Baby, Loader2, Search } from "lucide-react";
@@ -33,7 +33,13 @@ export function CheckinManualDialog({ open, onOpenChange, sala, onSuccess }: Che
   const [loadingAula, setLoadingAula] = useState(false);
   const [aulaAtiva, setAulaAtiva] = useState<AulaAtiva | null>(null);
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  interface ProfileKid {
+    id: string;
+    nome: string;
+    avatar_url?: string | null;
+    data_nascimento?: string | null;
+  }
+  const [results, setResults] = useState<ProfileKid[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,9 +49,9 @@ export function CheckinManualDialog({ open, onOpenChange, sala, onSuccess }: Che
       setSearch("");
       loadAulaAtiva();
     }
-  }, [open, sala]);
+  }, [open, sala, loadAulaAtiva]);
 
-  const loadAulaAtiva = async () => {
+  const loadAulaAtiva = useCallback(async () => {
     if (!sala) return;
     setLoadingAula(true);
     try {
@@ -81,7 +87,7 @@ export function CheckinManualDialog({ open, onOpenChange, sala, onSuccess }: Che
     } finally {
       setLoadingAula(false);
     }
-  };
+  }, [sala]);
 
   const handleSearch = async () => {
     if (!search.trim()) return;
@@ -135,7 +141,7 @@ export function CheckinManualDialog({ open, onOpenChange, sala, onSuccess }: Che
       });
 
       if (error) {
-        if (error.message?.toLowerCase().includes("constraint") || error.code === "23505") {
+        if (error instanceof Error ? error.message : String(error)?.toLowerCase().includes("constraint") || error.code === "23505") {
           toast.error("Esta criança já possui um check-in aberto nesta aula.");
         } else {
           toast.error("Erro ao realizar check-in");

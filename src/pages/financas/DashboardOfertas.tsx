@@ -302,7 +302,14 @@ export default function DashboardOfertas() {
           <CardContent>
             <div className="space-y-3">
               {rejeicoes.map((rejeicao) => {
-                const metadata = rejeicao.metadata as any;
+                type RejeicaoMeta = {
+                  data_evento?: string;
+                  lancado_por?: string;
+                  conferente?: string;
+                  total?: number;
+                  valores?: string;
+                } | null;
+                const metadata = rejeicao.metadata as RejeicaoMeta;
                 return (
                   <div
                     key={rejeicao.id}
@@ -310,7 +317,7 @@ export default function DashboardOfertas() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{metadata?.data_culto}</p>
+                        <p className="font-medium text-sm">{metadata?.data_evento}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           Lançado por: {metadata?.lancado_por}
                         </p>

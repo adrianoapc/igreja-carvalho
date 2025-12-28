@@ -44,6 +44,18 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Status:** Aceito
 - **Link:** [ADR-014](ADR-014-gabinete-digital-e-roteamento-pastoral.md)
 
+### ADR-017
+- **Titulo:** Refatoração para Hub de Eventos e Hub de Voluntariado
+- **Status:** Aceito (Em Implementação)
+- **Link:** [ADR-017](ADR-017-refatoracao-hub-eventos-voluntariado.md)
+- **Resumo:** Generalização da entidade `cultos` para `eventos` com polimorfismo via tipos discriminados, permitindo gerenciar cultos, relógios de oração, tarefas operacionais e eventos gerais em uma única estrutura.
+
+### ADR-018
+- **Titulo:** Estratégia de Migração Cultos → Eventos
+- **Status:** Implementado
+- **Link:** [ADR-018](ADR-018-estrategia-migracao-cultos-eventos.md)
+- **Resumo:** Documentação detalhada da migração em 5 fases (Schema → FKs → Frontend → Edge Functions → Features) com pontos de validação e rollback.
+
 ---
 
 ## 📐 Relacao com Diagramas

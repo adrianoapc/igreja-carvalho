@@ -72,7 +72,11 @@ export function EditarStatusDialog({
     setLoading(true);
 
     try {
-      const updateData: any = {
+      const updateData: {
+        status: string;
+        data_cadastro_membro?: string;
+        observacoes?: string;
+      } = {
         status: novoStatus,
       };
 
@@ -133,11 +137,11 @@ export function EditarStatusDialog({
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao atualizar status:", error);
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível atualizar o status",
+        description: error instanceof Error ? error.message : String(error) || "Não foi possível atualizar o status",
         variant: "destructive",
       });
     } finally {

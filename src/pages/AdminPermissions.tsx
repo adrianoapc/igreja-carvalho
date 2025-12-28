@@ -129,7 +129,7 @@ export default function AdminPermissions({ onBack }: Props) {
       setOriginalMatrix(matrixData ? [...matrixData] : []);
       setPendingChanges([]);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar permissões:', error);
       const t = toast({
         variant: "destructive",
@@ -467,12 +467,12 @@ export default function AdminPermissions({ onBack }: Props) {
         title: 'Salvo com sucesso',
         description: `${toAdd.length + toRemove.length} alterações registradas no lote.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar:', error);
       toast({
         variant: 'destructive',
         title: 'Erro ao salvar',
-        description: error.message || 'Falha na transação.',
+        description: error instanceof Error ? error.message : String(error) || 'Falha na transação.',
       });
     } finally {
       setSaving(false);
@@ -582,7 +582,7 @@ export default function AdminPermissions({ onBack }: Props) {
           </ToastAction>
         ),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao desfazer alterações:', error);
       const t = toast({
         variant: 'destructive',

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +50,7 @@ interface Aula {
   status: string;
   sala_id: string | null;
   jornada_id: string | null;
-  culto_id: string | null;
+  evento_id: string | null;
   professor_id: string | null;
   sala?: { id: string; nome: string } | null;
   jornada?: { id: string; titulo: string } | null;
@@ -130,9 +130,9 @@ export default function AulaDetailsSheet({
         fetchResponsaveis();
       }
     }
-  }, [open, aula]);
+  }, [open, aula, isKids, fetchAlunos, fetchPresencas, fetchResponsaveis]);
 
-  const fetchAlunos = async () => {
+  const fetchAlunos = useCallback(async () => {
     if (!aula?.jornada_id) return;
 
     // Buscar alunos inscritos na jornada
@@ -150,19 +150,30 @@ export default function AulaDetailsSheet({
       return;
     }
 
-    const alunosList = (data || []).map((item: any) => ({
+    interface InscricaoRow {
+      pessoa_id: string;
+      pessoa?: {
+        id: string;
+        nome: string | null;
+        avatar_url: string | null;
+        necessidades_especiais?: string | null;
+        telefone?: string | null;
+      } | null;
+    }
+
+    const alunosList = ((data || []) as InscricaoRow[]).map((item) => ({
       id: item.pessoa_id,
       nome: item.pessoa?.nome || "Sem nome",
       avatar_url: item.pessoa?.avatar_url,
       presente: false,
-      necessidades_especiais: item.pessoa?.necessidades_especiais,
-      telefone: item.pessoa?.telefone,
+      necessidades_especiais: (item.pessoa?.necessidades_especiais as string | null) || undefined,
+      telefone: (item.pessoa?.telefone as string | null) || undefined,
     }));
 
     setAlunos(alunosList);
-  };
+  }, [aula]);
 
-  const fetchPresencas = async () => {
+  const fetchPresencas = useCallback(async () => {
     if (!aula) return;
 
     const { data, error } = await supabase
@@ -178,19 +189,20 @@ export default function AulaDetailsSheet({
       return;
     }
 
-    setPresencas(data || []);
+    const presencasData = (data || []) as Presenca[];
+    setPresencas(presencasData);
 
     // Atualizar status de presença nos alunos
     setAlunos((prev) =>
       prev.map((aluno) => ({
         ...aluno,
-        presente: (data || []).some((p: any) => p.aluno_id === aluno.id),
-        presenca_id: (data || []).find((p: any) => p.aluno_id === aluno.id)?.id,
+        presente: presencasData.some((p: Presenca) => p.aluno_id === aluno.id),
+        presenca_id: presencasData.find((p: Presenca) => p.aluno_id === aluno.id)?.id,
       }))
     );
-  };
+  }, [aula]);
 
-  const fetchResponsaveis = async () => {
+  const fetchResponsaveis = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
       .select("id, nome, telefone")
@@ -198,7 +210,7 @@ export default function AulaDetailsSheet({
       .order("nome");
     
     setResponsaveis(data || []);
-  };
+  }, []);
 
   const togglePresenca = async (alunoId: string, presente: boolean, responsavelId?: string, attendanceMode?: "presencial" | "online") => {
     if (!aula) return;
@@ -348,7 +360,7 @@ export default function AulaDetailsSheet({
   };
 
   const importarPresencasCulto = async () => {
-    if (!aula?.culto_id) return;
+    if (!aula?.evento_id) return;
 
     setLoading(true);
 
@@ -356,7 +368,7 @@ export default function AulaDetailsSheet({
     const { data: presencasCulto, error: fetchError } = await supabase
       .from("presencas_culto")
       .select("pessoa_id")
-      .eq("culto_id", aula.culto_id);
+      .eq("evento_id", aula.evento_id);
 
     if (fetchError) {
       toast.error("Erro ao buscar presenças do culto");
@@ -437,7 +449,7 @@ export default function AulaDetailsSheet({
             {aula.jornada && (
               <Badge variant="secondary">{aula.jornada.titulo}</Badge>
             )}
-            {aula.culto_id && (
+            {aula.evento_id && (
               <Badge className="gap-1 bg-primary/10 text-primary">
                 <Church className="w-3 h-3" />
                 Vinculado ao Culto
@@ -452,7 +464,7 @@ export default function AulaDetailsSheet({
           </div>
 
           {/* Ação de Importar Presenças do Culto */}
-          {aula.culto_id && (
+          {aula.evento_id && (
             <Button 
               variant="outline" 
               className="w-full gap-2"
@@ -501,7 +513,7 @@ export default function AulaDetailsSheet({
                 {/* Mostrar alunos inscritos */}
                 {alunos.map((aluno) => {
                   const presencaAluno = presencas.find(p => p.aluno_id === aluno.id);
-                  const hasPendingMode = pendingAttendanceMode.hasOwnProperty(aluno.id);
+                  const hasPendingMode = Object.prototype.hasOwnProperty.call(pendingAttendanceMode, aluno.id);
 
                   return (
                     <div

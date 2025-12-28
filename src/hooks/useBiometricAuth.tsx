@@ -95,7 +95,7 @@ function detectBiometricType(): 'face' | 'fingerprint' | 'unknown' {
 }
 
 // Mapeia erros WebAuthn para tipos específicos
-function parseWebAuthnError(error: any): { type: BiometricErrorType; message: string } {
+function parseWebAuthnError(error: unknown): { type: BiometricErrorType; message: string } {
   const errorName = error?.name || '';
   const errorMessage = error?.message || 'Erro desconhecido';
   
@@ -296,7 +296,7 @@ export function useBiometricAuth() {
       setState(prev => ({ ...prev, isEnabled: true }));
       triggerHapticFeedback('success');
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error enabling biometric:', error);
       const parsed = parseWebAuthnError(error);
       triggerHapticFeedback('error');
@@ -358,7 +358,7 @@ export function useBiometricAuth() {
       
       triggerHapticFeedback('error');
       return { success: false, errorType: 'NOT_RECOGNIZED', errorMessage: 'Biometria não reconhecida.' };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Biometric verification error:', error);
       const parsed = parseWebAuthnError(error);
       triggerHapticFeedback('error');

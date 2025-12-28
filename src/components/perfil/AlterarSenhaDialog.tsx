@@ -99,7 +99,7 @@ export function AlterarSenhaDialog({ open, onOpenChange }: AlterarSenhaDialogPro
       toast.success("Senha alterada com sucesso!");
       resetForm();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao alterar senha:", error);
       toast.error("Erro ao alterar senha");
     } finally {

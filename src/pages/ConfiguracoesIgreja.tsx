@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, Save, X, Phone, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type InputHTMLAttributes } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InputMask from "react-input-mask";
@@ -55,9 +55,9 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
       if (data) {
         setConfig(data);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar configurações", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -151,9 +151,9 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
          setTimeout(() => window.location.reload(), 1000);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao salvar configurações", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setSaving(false);
@@ -294,7 +294,7 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
               value={config.telefone_plantao_pastoral || ""}
               onChange={(e) => setConfig(prev => ({ ...prev, telefone_plantao_pastoral: e.target.value }))}
             >
-              {(inputProps: any) => (
+              {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
                 <Input
                   {...inputProps}
                   id="telefone-plantao"

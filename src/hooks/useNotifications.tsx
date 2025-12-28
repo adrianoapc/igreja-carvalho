@@ -10,7 +10,7 @@ interface Notification {
   type: string;
   read: boolean;
   created_at: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   related_user_id?: string;
 }
 
@@ -82,8 +82,8 @@ export function useNotifications() {
     if (pushEnabled && "Notification" in window && Notification.permission === "granted") {
       try {
         // Determinar ícone baseado no tipo de notificação
-        let icon = "/icon-192x192.png";
-        let badge = "/badge-72x72.png";
+        const icon = "/icon-192x192.png";
+        const badge = "/badge-72x72.png";
         
         const notificationOptions: NotificationOptions = {
           body: notification.message,
@@ -201,7 +201,7 @@ export function useNotifications() {
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload: any) => {
+        (payload: { new: Notification }) => {
           const newNotification = payload.new as Notification;
           
           // Adicionar à lista
@@ -220,7 +220,7 @@ export function useNotifications() {
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload: any) => {
+        (payload: { new: Notification }) => {
           const updatedNotification = payload.new as Notification;
           
           setNotifications(prev =>

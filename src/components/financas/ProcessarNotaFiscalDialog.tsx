@@ -114,10 +114,10 @@ export default function ProcessarNotaFiscalDialog({
       };
 
       reader.readAsDataURL(file);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao processar nota fiscal:', error);
       toast.error('Erro ao processar nota fiscal', {
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         id: 'processing'
       });
     } finally {

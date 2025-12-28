@@ -10,11 +10,11 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { EventoDetailsDialog } from "@/components/agenda/EventoDetailsDialog";
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  tipo: string;
-  data_culto: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
+  data_evento: string;
   local: string | null;
   endereco: string | null;
   tema: string | null;
@@ -26,7 +26,7 @@ interface Culto {
 interface CultosGrouped {
   month: Date;
   monthLabel: string;
-  cultos: Culto[];
+  cultos: Evento[];
 }
 
 // Animation variants
@@ -120,9 +120,9 @@ const timelineVariants = {
 
 export default function Agenda() {
   const navigate = useNavigate();
-  const [cultos, setCultos] = useState<Culto[]>([]);
+  const [cultos, setCultos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEvento, setSelectedEvento] = useState<Culto | null>(null);
+  const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);
 
   useEffect(() => {
     fetchCultos();
@@ -135,12 +135,12 @@ export default function Agenda() {
       const threeMonthsLater = endOfMonth(addMonths(today, 3));
       
       const { data, error } = await supabase
-        .from("cultos")
-        .select("id, titulo, tipo, data_culto, local, endereco, tema, descricao, pregador, exibir_preletor")
-        .gte("data_culto", today.toISOString())
-        .lte("data_culto", threeMonthsLater.toISOString())
+        .from("eventos")
+        .select("id, titulo, tipo, data_evento, local, endereco, tema, descricao, pregador, exibir_preletor")
+        .gte("data_evento", today.toISOString())
+        .lte("data_evento", threeMonthsLater.toISOString())
         .eq("status", "confirmado")
-        .order("data_culto", { ascending: true });
+        .order("data_evento", { ascending: true });
 
       if (error) throw error;
       setCultos(data || []);
@@ -208,7 +208,7 @@ export default function Agenda() {
 
   // Group cultos by month
   const groupedCultos: CultosGrouped[] = cultos.reduce((acc: CultosGrouped[], culto) => {
-    const cultoDate = parseISO(culto.data_culto);
+    const cultoDate = parseISO(culto.data_evento);
     const existingGroup = acc.find(group => isSameMonth(group.month, cultoDate));
     
     if (existingGroup) {
@@ -350,7 +350,7 @@ export default function Agenda() {
                   {/* Events Timeline */}
                   <div className="space-y-4">
                     {group.cultos.map((culto, index) => {
-                      const cultoDate = parseISO(culto.data_culto);
+                      const cultoDate = parseISO(culto.data_evento);
                       const day = format(cultoDate, "d");
                       const weekDay = format(cultoDate, "EEEE", { locale: ptBR });
                       const time = format(cultoDate, "HH:mm");

@@ -292,7 +292,7 @@ export default function BiometricLogin() {
           setLoadingState('idle');
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[BiometricLogin] Erro:", error);
       incrementAttempts();
       const newCount = getAttemptCount();

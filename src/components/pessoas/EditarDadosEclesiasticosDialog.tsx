@@ -109,7 +109,7 @@ export function EditarDadosEclesiasticosDialog({
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         toast({
           title: "Erro de validação",
@@ -119,7 +119,7 @@ export function EditarDadosEclesiasticosDialog({
       } else {
         toast({
           title: "Erro",
-          description: error.message || "Não foi possível atualizar os dados",
+          description: error instanceof Error ? error.message : String(error) || "Não foi possível atualizar os dados",
           variant: "destructive",
         });
       }

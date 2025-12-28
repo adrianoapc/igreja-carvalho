@@ -50,21 +50,21 @@ export default function LiturgiaDashboard() {
     try {
       // Buscar todos os itens de liturgia com responsáveis
       const { data: liturgiaItens, error: liturgiaError } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select(`
           id,
           tipo,
           duracao_minutos,
           responsavel_id,
           responsavel_externo,
-          culto_id,
+          evento_id,
           profiles:responsavel_id(nome)
         `);
 
       if (liturgiaError) throw liturgiaError;
 
       // Calcular estatísticas gerais
-      const cultosUnicos = new Set(liturgiaItens?.map(item => item.culto_id) || []).size;
+      const cultosUnicos = new Set(liturgiaItens?.map(item => item.evento_id) || []).size;
       const totalItens = liturgiaItens?.length || 0;
       const duracaoTotal = liturgiaItens?.reduce((sum, item) => sum + (item.duracao_minutos || 0), 0) || 0;
       const duracaoMedia = totalItens > 0 ? Math.round(duracaoTotal / cultosUnicos) : 0;
@@ -123,9 +123,9 @@ export default function LiturgiaDashboard() {
 
       setTiposDistribuicao(distribuicao);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar dashboard", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

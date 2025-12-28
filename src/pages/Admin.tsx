@@ -147,7 +147,7 @@ export default function Admin() {
 
       setUsers(usersWithRoles);
       setFilteredUsers(usersWithRoles);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
         description: "Não foi possível carregar os usuários",
@@ -168,7 +168,7 @@ export default function Admin() {
       setPermissions(data || []);
       const uniqueModules = [...new Set(data?.map(p => p.module_name) || [])];
       setModules(uniqueModules);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
         description: "Não foi possível carregar as permissões",
@@ -182,7 +182,7 @@ export default function Admin() {
       const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
       if (error) throw error;
       setUserRoles(data?.map((r: UserRole) => r.role) || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading roles:", error);
     }
   };
@@ -194,7 +194,7 @@ export default function Admin() {
       if (!validation.success) {
         throw new Error(validation.error.issues[0].message);
       }
-      const updateData: any = { status: newStatus };
+      const updateData: { status: string; data_cadastro_membro?: string } = { status: newStatus };
       if (newStatus === "membro") {
         updateData.data_cadastro_membro = new Date().toISOString();
       }
@@ -206,10 +206,10 @@ export default function Admin() {
         description: `Usuário promovido para ${newStatus}`
       });
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     } finally {
@@ -252,10 +252,10 @@ export default function Admin() {
 
       loadUserRoles(userId);
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     } finally {
@@ -290,10 +290,10 @@ export default function Admin() {
 
       loadUserRoles(userId);
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     } finally {
@@ -332,10 +332,10 @@ export default function Admin() {
 
       loadUserRoles(userId);
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     } finally {
@@ -357,10 +357,10 @@ export default function Admin() {
         description: "Permissão atualizada"
       });
       loadPermissions();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     }
@@ -380,10 +380,10 @@ export default function Admin() {
         description: "Permissão removida"
       });
       loadPermissions();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     }
@@ -417,10 +417,10 @@ export default function Admin() {
       setNewPermission({ module_name: "", role: "", access_level: "" });
       setShowAddPermission(false);
       loadPermissions();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive"
       });
     }

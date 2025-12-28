@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type InputHTMLAttributes } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,19 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 interface FornecedorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  fornecedor?: any;
+  fornecedor?: {
+    id: string | number;
+    nome: string;
+    tipo_pessoa: "fisica" | "juridica";
+    cpf_cnpj?: string | null;
+    email?: string | null;
+    telefone?: string | null;
+    endereco?: string | null;
+    cidade?: string | null;
+    estado?: string | null;
+    cep?: string | null;
+    observacoes?: string | null;
+  };
 }
 
 export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorDialogProps) {
@@ -89,8 +101,8 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
         setCep("");
         setObservacoes("");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao salvar fornecedor");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar fornecedor");
     } finally {
       setLoading(false);
     }
@@ -119,7 +131,7 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium mb-2 block">Tipo de pessoa *</Label>
-              <RadioGroup value={tipoPessoa} onValueChange={(value: any) => setTipoPessoa(value)}>
+              <RadioGroup value={tipoPessoa} onValueChange={(value: "fisica" | "juridica") => setTipoPessoa(value)}>
                 <div className="flex gap-4">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="juridica" id="juridica" />
@@ -152,7 +164,7 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
                   value={cpfCnpj}
                   onChange={(e) => setCpfCnpj(e.target.value)}
                 >
-                  {(inputProps: any) => (
+                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
                     <Input
                       {...inputProps}
                       id="cpf-cnpj"
@@ -169,7 +181,7 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
                 >
-                  {(inputProps: any) => (
+                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
                     <Input
                       {...inputProps}
                       id="telefone"
@@ -207,7 +219,7 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
                   value={cep}
                   onChange={(e) => setCep(e.target.value)}
                 >
-                  {(inputProps: any) => (
+                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
                     <Input
                       {...inputProps}
                       id="cep"

@@ -36,7 +36,7 @@ export function SalvarComoTemplateDialog({
   const loadCultoData = async () => {
     try {
       const { data: culto } = await supabase
-        .from("cultos")
+        .from("eventos")
         .select("*")
         .eq("id", cultoId)
         .single();
@@ -44,7 +44,7 @@ export function SalvarComoTemplateDialog({
       if (culto) {
         setNome(`Template - ${culto.titulo}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar dados do culto:", error);
     }
   };
@@ -62,7 +62,7 @@ export function SalvarComoTemplateDialog({
     try {
       // Buscar dados do culto
       const { data: culto, error: cultoError } = await supabase
-        .from("cultos")
+        .from("eventos")
         .select("*")
         .eq("id", cultoId)
         .single();
@@ -71,9 +71,9 @@ export function SalvarComoTemplateDialog({
 
       // Buscar itens da liturgia atual
       const { data: itensLiturgia, error: itensError } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select("*")
-        .eq("culto_id", cultoId)
+        .eq("evento_id", cultoId)
         .order("ordem");
 
       if (itensError) throw itensError;
@@ -125,9 +125,9 @@ export function SalvarComoTemplateDialog({
       // Salvar escalas se solicitado
       if (incluirEscalas) {
         const { data: escalas, error: escalasError } = await supabase
-          .from("escalas_culto")
+          .from("escalas")
           .select("time_id, posicao_id, pessoa_id, observacoes")
-          .eq("culto_id", cultoId);
+          .eq("evento_id", cultoId);
 
         if (escalasError) throw escalasError;
 
@@ -154,9 +154,9 @@ export function SalvarComoTemplateDialog({
       setNome("");
       setDescricao("");
       setIncluirEscalas(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao salvar template:", error);
-      toast.error(error.message || "Erro ao salvar template");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar template");
     } finally {
       setLoading(false);
     }

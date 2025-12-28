@@ -9,15 +9,15 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import CalendarioMensal from "@/components/cultos/CalendarioMensal";
-import CultoDialog from "@/components/cultos/CultoDialog";
+import EventoDialog from "@/components/cultos/EventoDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface Culto {
+interface Evento {
   id: string;
-  tipo: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
   titulo: string;
   descricao: string | null;
-  data_culto: string;
+  data_evento: string;
   duracao_minutos: number | null;
   local: string | null;
   endereco: string | null;
@@ -35,10 +35,10 @@ const STATUS_CONFIG = {
 
 export default function Eventos() {
   const navigate = useNavigate();
-  const [cultos, setCultos] = useState<Culto[]>([]);
+  const [cultos, setCultos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
   const [escalasCount, setEscalasCount] = useState<Record<string, number>>({});
-  const [cultoDialogOpen, setCultoDialogOpen] = useState(false);
+  const [eventoDialogOpen, setEventoDialogOpen] = useState(false);
 
   useEffect(() => {
     loadCultos();
@@ -47,9 +47,9 @@ export default function Eventos() {
   const loadCultos = async () => {
     try {
       const { data, error } = await supabase
-        .from("cultos")
+        .from("eventos")
         .select("*")
-        .order("data_culto", { ascending: true });
+        .order("data_evento", { ascending: true });
 
       if (error) throw error;
       setCultos(data || []);
@@ -57,20 +57,20 @@ export default function Eventos() {
       // Carregar contagem de escalas para cada culto
       if (data && data.length > 0) {
         const { data: escalasData } = await supabase
-          .from("escalas_culto")
-          .select("culto_id");
+          .from("escalas")
+          .select("evento_id");
         
         if (escalasData) {
           const counts: Record<string, number> = {};
           escalasData.forEach((escala) => {
-            counts[escala.culto_id] = (counts[escala.culto_id] || 0) + 1;
+            counts[escala.evento_id] = (counts[escala.evento_id] || 0) + 1;
           });
           setEscalasCount(counts);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar eventos", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -78,11 +78,11 @@ export default function Eventos() {
   };
 
   const handleNovoCulto = () => {
-    setCultoDialogOpen(true);
+    setEventoDialogOpen(true);
   };
 
-  const handleAbrirCulto = (culto: Culto) => {
-    navigate(`/cultos/${culto.id}`);
+  const handleAbrirCulto = (culto: Evento) => {
+    navigate(`/eventos/${culto.id}`);
   };
 
   if (loading) {
@@ -134,7 +134,7 @@ export default function Eventos() {
           {/* Lista de Cultos/Eventos */}
           <div className="grid gap-4 md:gap-6">
             {cultos.map((culto) => {
-              const dataCulto = new Date(culto.data_culto);
+              const dataCulto = new Date(culto.data_evento);
               const statusConfig = STATUS_CONFIG[culto.status as keyof typeof STATUS_CONFIG];
               
               return (
@@ -251,10 +251,10 @@ export default function Eventos() {
         </TabsContent>
       </Tabs>
 
-      <CultoDialog
-        open={cultoDialogOpen}
-        onOpenChange={setCultoDialogOpen}
-        culto={null}
+      <EventoDialog
+        open={eventoDialogOpen}
+        onOpenChange={setEventoDialogOpen}
+        evento={null}
         onSuccess={loadCultos}
       />
     </div>

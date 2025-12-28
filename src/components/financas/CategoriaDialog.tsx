@@ -12,7 +12,12 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 interface CategoriaDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  categoria?: any;
+  categoria?: {
+    id: string | number;
+    nome: string;
+    tipo: "entrada" | "saida";
+    secao_dre?: string | null;
+  };
 }
 
 const secoesDRE = [
@@ -74,8 +79,8 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
         setTipo("entrada");
         setSecaoDre("Não faz parte do DRE");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao salvar categoria");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar categoria");
     } finally {
       setLoading(false);
     }
@@ -104,7 +109,7 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
             <div className="space-y-4">
               <div>
                 <Label className="text-sm font-medium mb-2 block">Tipo de categoria *</Label>
-                <RadioGroup value={tipo} onValueChange={(value: any) => setTipo(value)}>
+                <RadioGroup value={tipo} onValueChange={(value: "entrada" | "saida") => setTipo(value)}>
                   <div className="flex gap-4">
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="entrada" id="entrada" />

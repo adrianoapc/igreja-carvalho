@@ -104,11 +104,12 @@ export default function EdgeFunctionMonitoring() {
         loadConfigs(),
         loadRecentLogs()
       ]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar dados:", error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar dados de monitoramento",
+        description: message || "Não foi possível carregar dados de monitoramento",
         variant: "destructive"
       });
     } finally {
@@ -185,7 +186,7 @@ export default function EdgeFunctionMonitoring() {
         });
       }
       return acc;
-    }, [] as any[])
+    }, [] as { date: string; dateLabel: string; successful: number; errors: number; total: number }[])
     .slice(-parseInt(timeRange));
 
   // Lista de funções para filtro

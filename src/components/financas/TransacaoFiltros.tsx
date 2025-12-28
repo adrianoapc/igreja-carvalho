@@ -17,9 +17,9 @@ interface TransacaoFiltrosProps {
   setFornecedorId?: (value: string) => void;
   status: string;
   setStatus: (value: string) => void;
-  contas: any[];
-  categorias: any[];
-  fornecedores?: any[];
+  contas: Array<{ id: string; nome: string }>;
+  categorias: Array<{ id: string; nome: string }>;
+  fornecedores?: Array<{ id: string; nome: string }>;
   onLimpar: () => void;
 }
 

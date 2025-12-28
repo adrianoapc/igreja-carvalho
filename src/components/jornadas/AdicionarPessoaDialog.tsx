@@ -26,7 +26,12 @@ export default function AdicionarPessoaDialog({
   onSuccess,
 }: AdicionarPessoaDialogProps) {
   const [search, setSearch] = useState("");
-  const [selectedPessoa, setSelectedPessoa] = useState<any>(null);
+  const [selectedPessoa, setSelectedPessoa] = useState<{
+    id: string;
+    nome: string;
+    avatar_url?: string | null;
+    status: string;
+  } | null>(null);
 
   // Fetch pessoas que ainda não estão nesta jornada
   const { data: pessoas, isLoading } = useQuery({
@@ -76,9 +81,9 @@ export default function AdicionarPessoaDialog({
       setSearch("");
       onSuccess();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error adding pessoa:", error);
-      if (error.code === "23505") {
+      if (error && typeof error === 'object' && 'code' in error && error.code === "23505") {
         toast.error("Esta pessoa já está inscrita nesta jornada");
       } else {
         toast.error("Erro ao adicionar pessoa");

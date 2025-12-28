@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import {MainLayout} from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "next-themes";
@@ -77,16 +77,16 @@ import Ensinamentos from "./pages/Ensinamentos";
 import MeusCursos from "./pages/MeusCursos";
 import CursoPlayer from "./pages/CursoPlayer";
 
-// Cultos
-import CultosGeral from "./pages/cultos/Geral";
-import CultosEventos from "./pages/cultos/Eventos";
-import CultosTimes from "./pages/cultos/Times";
-import CultosCategorias from "./pages/cultos/Categorias";
-import CultosPosicoes from "./pages/cultos/Posicoes";
-import CultosTemplates from "./pages/cultos/Templates";
-import CultosMidias from "./pages/cultos/MidiasGeral";
-import CultosLiturgia from "./pages/cultos/LiturgiaDashboard";
-import CultoDetalhes from "./pages/CultoDetalhes";
+// Eventos (Hub)
+import EventosGeral from "./pages/eventos/Geral";
+import EventosLista from "./pages/eventos/Eventos";
+import EventosTimes from "./pages/eventos/Times";
+import EventosCategorias from "./pages/eventos/Categorias";
+import EventosPosicoes from "./pages/eventos/Posicoes";
+import EventosTemplates from "./pages/eventos/Templates";
+import EventosMidias from "./pages/eventos/MidiasGeral";
+import EventosLiturgia from "./pages/eventos/LiturgiaDashboard";
+import EventoDetalhes from "./pages/EventoDetalhes";
 
 // Telão & Checkin
 import Telao from "./pages/Telao";
@@ -225,17 +225,24 @@ const App = () => (
               <Route path="/cursos" element={<AuthGate><MeusCursos /></AuthGate>} />
               <Route path="/cursos/:id/aula/:aulaId" element={<AuthGate><CursoPlayer /></AuthGate>} />
 
-              {/* Cultos & Escalas */}
-              <Route path="/cultos" element={<AuthGate><CultosGeral /></AuthGate>} />
-              <Route path="/cultos/geral" element={<AuthGate><CultosGeral /></AuthGate>} />
-              <Route path="/cultos/eventos" element={<AuthGate><CultosEventos /></AuthGate>} />
-              <Route path="/cultos/times" element={<AuthGate><CultosTimes /></AuthGate>} />
-              <Route path="/cultos/categorias" element={<AuthGate><CultosCategorias /></AuthGate>} />
-              <Route path="/cultos/posicoes" element={<AuthGate><CultosPosicoes /></AuthGate>} />
-              <Route path="/cultos/templates" element={<AuthGate><CultosTemplates /></AuthGate>} />
-              <Route path="/cultos/midias" element={<AuthGate><CultosMidias /></AuthGate>} />
-              <Route path="/cultos/liturgia" element={<AuthGate><CultosLiturgia /></AuthGate>} />
-              <Route path="/cultos/:id" element={<AuthGate><CultoDetalhes /></AuthGate>} />
+              {/* Eventos & Escalas */}
+              <Route path="/eventos" element={<AuthGate><EventosGeral /></AuthGate>} />
+              <Route path="/eventos/geral" element={<AuthGate><EventosGeral /></AuthGate>} />
+              <Route path="/eventos/lista" element={<AuthGate><EventosLista /></AuthGate>} />
+              <Route path="/eventos/times" element={<AuthGate><EventosTimes /></AuthGate>} />
+              <Route path="/eventos/categorias" element={<AuthGate><EventosCategorias /></AuthGate>} />
+              <Route path="/eventos/posicoes" element={<AuthGate><EventosPosicoes /></AuthGate>} />
+              <Route path="/eventos/templates" element={<AuthGate><EventosTemplates /></AuthGate>} />
+              <Route path="/eventos/midias" element={<AuthGate><EventosMidias /></AuthGate>} />
+              <Route path="/eventos/liturgia" element={<AuthGate><EventosLiturgia /></AuthGate>} />
+              <Route path="/eventos/:id" element={<AuthGate><EventoDetalhes /></AuthGate>} />
+
+              {/* Redirects legado de /cultos para /eventos */}
+              <Route path="/cultos" element={<AuthGate><Navigate to="/eventos" replace /></AuthGate>} />
+              <Route path="/cultos/geral" element={<AuthGate><Navigate to="/eventos/geral" replace /></AuthGate>} />
+              <Route path="/cultos/lista" element={<AuthGate><Navigate to="/eventos/lista" replace /></AuthGate>} />
+              <Route path="/cultos/liturgia" element={<AuthGate><Navigate to="/eventos/liturgia" replace /></AuthGate>} />
+              <Route path="/cultos/:id" element={<AuthGate><EventoDetalhes /></AuthGate>} />
               <Route path="/escalas" element={<AuthGate><Escalas /></AuthGate>} />
               <Route path="/minhas-escalas" element={<AuthGate><MinhasEscalas /></AuthGate>} />
 

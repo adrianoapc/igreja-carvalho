@@ -22,7 +22,7 @@ interface Escala {
   culto: {
     id: string;
     titulo: string;
-    data_culto: string;
+    data_evento: string;
     tipo: string;
     tema: string | null;
     local: string | null;
@@ -59,40 +59,41 @@ export default function MinhasEscalas() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .select(`
           id,
           confirmado,
           status_confirmacao,
           motivo_recusa,
           observacoes,
-          culto:cultos!escalas_culto_culto_id_fkey (
+          culto:eventos!escalas_evento_id_fkey (
             id,
             titulo,
-            data_culto,
+            data_evento,
             tipo,
             tema,
             local
           ),
-          time:times_culto!escalas_culto_time_id_fkey (
+          time:times!escalas_time_id_fkey (
             id,
             nome,
             cor,
             categoria
           ),
-          posicao:posicoes_time!escalas_culto_posicao_id_fkey (
+          posicao:posicoes_time!escalas_posicao_id_fkey (
             id,
             nome
           )
         `)
-        .eq("pessoa_id", profile.id)
-        .gte("culto.data_culto", new Date().toISOString())
-        .order("culto(data_culto)", { ascending: true });
+        .eq("pessoa_id", profile.id);
 
       if (error) throw error;
       
-      // Filter out escalas with null culto (past dates filtered by gte)
-      const validEscalas = (data || []).filter(e => e.culto !== null) as Escala[];
+      // Filtrar e ordenar manualmente no frontend (Supabase não suporta filtro/order em relacionamentos aliasados)
+      const validEscalas = (data || [])
+        .filter(e => e.culto !== null)
+        .filter(e => new Date(e.culto.data_evento) >= new Date())
+        .sort((a, b) => new Date(a.culto.data_evento).getTime() - new Date(b.culto.data_evento).getTime()) as Escala[];
       setEscalas(validEscalas);
     } catch (error) {
       console.error("Erro ao carregar escalas:", error);
@@ -105,7 +106,7 @@ export default function MinhasEscalas() {
   const handleConfirmar = async (escala: Escala) => {
     try {
       const { error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .update({
           confirmado: true,
           status_confirmacao: "aceito",
@@ -126,7 +127,7 @@ export default function MinhasEscalas() {
   const handleRecusar = async (escalaId: string, motivo: string) => {
     try {
       const { error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .update({
           confirmado: false,
           status_confirmacao: "recusado",
@@ -216,10 +217,10 @@ export default function MinhasEscalas() {
                         <div>
                           <p className="font-medium">{escala.culto.titulo}</p>
                           <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_culto), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                            {format(new Date(escala.culto.data_evento), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_culto), "HH:mm")}
+                            {format(new Date(escala.culto.data_evento), "HH:mm")}
                             {escala.culto.local && ` • ${escala.culto.local}`}
                           </p>
                         </div>
@@ -282,10 +283,10 @@ export default function MinhasEscalas() {
                         <div>
                           <p className="font-medium">{escala.culto.titulo}</p>
                           <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_culto), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                            {format(new Date(escala.culto.data_evento), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_culto), "HH:mm")}
+                            {format(new Date(escala.culto.data_evento), "HH:mm")}
                             {escala.culto.local && ` • ${escala.culto.local}`}
                           </p>
                         </div>
@@ -325,7 +326,7 @@ export default function MinhasEscalas() {
                         <div>
                           <p className="font-medium">{escala.culto.titulo}</p>
                           <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_culto), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                            {format(new Date(escala.culto.data_evento), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                           </p>
                         </div>
                         {escala.motivo_recusa && (

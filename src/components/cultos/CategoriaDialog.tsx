@@ -96,9 +96,9 @@ export default function CategoriaDialog({ open, onOpenChange, categoria, onSucce
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao salvar categoria", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

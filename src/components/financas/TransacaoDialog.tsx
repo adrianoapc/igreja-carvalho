@@ -37,7 +37,29 @@ interface TransacaoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tipo: "entrada" | "saida";
-  transacao?: any;
+  transacao?: {
+    id?: string | number;
+    descricao?: string | null;
+    valor?: number | null;
+    data_vencimento?: string | null;
+    data_competencia?: string | null;
+    data_pagamento?: string | null;
+    conta_id?: string | null;
+    categoria_id?: string | null;
+    subcategoria_id?: string | null;
+    centro_custo_id?: string | null;
+    base_ministerial_id?: string | null;
+    fornecedor_id?: string | null;
+    forma_pagamento?: string | null;
+    observacoes?: string | null;
+    tipo_lancamento?: "unico" | "recorrente" | "parcelado";
+    anexo_url?: string | null;
+    status?: string | null;
+    juros?: number | null;
+    multas?: number | null;
+    desconto?: number | null;
+    taxas_administrativas?: number | null;
+  };
 }
 
 export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: TransacaoDialogProps) {
@@ -430,15 +452,25 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       await handleDadosNotaFiscal({ ...data.dados, anexo_url: publicUrl });
 
       toast.success("Nota fiscal processada!", { id: "processing" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao processar nota fiscal:", error);
-      toast.error("Erro ao processar", { description: error.message, id: "processing" });
+      toast.error("Erro ao processar", { description: error instanceof Error ? error.message : String(error), id: "processing" });
     } finally {
       setAiProcessing(false);
     }
   };
 
-  const handleDadosNotaFiscal = async (dados: any) => {
+  const handleDadosNotaFiscal = async (dados: {
+    descricao?: string;
+    valor_total?: number;
+    data_emissao?: string;
+    data_vencimento?: string;
+    numero_nota?: string;
+    tipo_documento?: string;
+    anexo_url?: string;
+    fornecedor_nome?: string;
+    fornecedor_cnpj_cpf?: string;
+  }) => {
     try {
       console.log("Processando dados da nota fiscal:", dados);
 
@@ -489,7 +521,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       // Buscar fornecedor existente - priorizar CNPJ/CPF
       if (dados.fornecedor_nome || dados.fornecedor_cnpj_cpf) {
         const cnpjCpfLimpo = dados.fornecedor_cnpj_cpf?.replace(/\D/g, "") || null;
-        let fornecedorEncontrado: any = null;
+        let fornecedorEncontrado: { id: string } | null = null;
 
         // Primeiro: tentar encontrar por CNPJ/CPF (mais preciso)
         if (cnpjCpfLimpo) {
@@ -546,7 +578,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       }
 
       console.log("Dados da nota fiscal processados com sucesso");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao processar dados da nota fiscal:", error);
     }
   };
@@ -663,8 +695,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
       onOpenChange(false);
       resetForm();
-    } catch (error: any) {
-      toast.error(error.message || `Erro ao ${transacao ? "atualizar" : "cadastrar"} transação`);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || `Erro ao ${transacao ? "atualizar" : "cadastrar"} transação`);
     } finally {
       setLoading(false);
     }
@@ -684,7 +716,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       {/* Tipo de lançamento */}
       <div>
         <Label className="text-sm font-medium mb-2 block">Tipo de {tipo === "entrada" ? "entrada" : "saída"} *</Label>
-        <RadioGroup value={tipoLancamento} onValueChange={(value: any) => setTipoLancamento(value)}>
+        <RadioGroup value={tipoLancamento} onValueChange={(value: "unico" | "recorrente" | "parcelado") => setTipoLancamento(value)}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="unico" id="unico" />
@@ -729,7 +761,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         <div className="border-t pt-3 space-y-3">
           <div>
             <Label>Frequência *</Label>
-            <Select value={recorrencia} onValueChange={(value: any) => setRecorrencia(value)}>
+            <Select value={recorrencia} onValueChange={(value: "diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral") => setRecorrencia(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

@@ -62,7 +62,7 @@ export function AplicarTemplateDialog({
       );
 
       setTemplates(templatesWithCount);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar templates:", error);
       toast.error("Erro ao carregar templates");
     } finally {
@@ -90,9 +90,9 @@ export function AplicarTemplateDialog({
 
       // Buscar ordem máxima atual
       const { data: itensExistentes } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select("ordem")
-        .eq("culto_id", cultoId)
+        .eq("evento_id", cultoId)
         .order("ordem", { ascending: false })
         .limit(1);
 
@@ -102,7 +102,7 @@ export function AplicarTemplateDialog({
 
       // Criar itens de liturgia baseados no template
       const novosItens = itensTemplate.map((item, index) => ({
-        culto_id: cultoId,
+        evento_id: cultoId,
         ordem: ordemInicial + index,
         tipo: item.tipo,
         titulo: item.titulo,
@@ -113,7 +113,7 @@ export function AplicarTemplateDialog({
       }));
 
       const { error: insertError } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .insert(novosItens);
 
       if (insertError) throw insertError;
@@ -121,9 +121,9 @@ export function AplicarTemplateDialog({
       toast.success("Template aplicado com sucesso");
       onSuccess?.();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao aplicar template:", error);
-      toast.error(error.message || "Erro ao aplicar template");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao aplicar template");
     } finally {
       setApplying(null);
     }

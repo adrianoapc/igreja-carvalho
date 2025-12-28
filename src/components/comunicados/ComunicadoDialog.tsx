@@ -123,7 +123,7 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
         .getPublicUrl(fileName);
 
       return urlData.publicUrl;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error uploading image:", error);
       return null;
     }
@@ -186,8 +186,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "Erro", description: message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

@@ -11,7 +11,7 @@ interface Props {
 }
 
 interface Presenca {
-  culto_id: string;
+  evento_id: string;
   created_at: string;
 }
 
@@ -31,16 +31,16 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
       // Buscar presenças do membro nos últimos 6 meses
       const { data: presencasData } = await supabase
         .from("presencas_culto")
-        .select("culto_id, created_at")
+        .select("evento_id, created_at")
         .eq("pessoa_id", pessoaId)
         .gte("created_at", sixMonthsAgo.toISOString());
 
       // Buscar total de cultos realizados nos últimos 6 meses
       const { count: cultosCount } = await supabase
-        .from("cultos")
+        .from("eventos")
         .select("id", { count: "exact", head: true })
-        .gte("data_culto", sixMonthsAgo.toISOString())
-        .lte("data_culto", new Date().toISOString())
+        .gte("data_evento", sixMonthsAgo.toISOString())
+        .lte("data_evento", new Date().toISOString())
         .in("status", ["confirmado", "realizado"]);
 
       setPresencas(presencasData || []);

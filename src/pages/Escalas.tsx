@@ -33,16 +33,16 @@ interface MembroTime {
   posicoes_time: { nome: string } | null;
 }
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  data_culto: string;
-  tipo: string;
+  data_evento: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
 }
 
 interface Escala {
   id: string;
-  culto_id: string;
+  evento_id: string;
   time_id: string;
   pessoa_id: string;
   posicao_id: string | null;
@@ -53,7 +53,7 @@ export default function Escalas() {
   const [times, setTimes] = useState<Time[]>([]);
   const [timeSelecionado, setTimeSelecionado] = useState<string>("");
   const [membros, setMembros] = useState<MembroTime[]>([]);
-  const [cultos, setCultos] = useState<Culto[]>([]);
+  const [cultos, setCultos] = useState<Evento[]>([]);
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -85,7 +85,7 @@ export default function Escalas() {
   const loadTimes = async () => {
     try {
       const { data, error } = await supabase
-        .from("times_culto")
+        .from("times")
         .select("*")
         .eq("ativo", true)
         .order("categoria")
@@ -96,8 +96,8 @@ export default function Escalas() {
       if (data && data.length > 0) {
         setTimeSelecionado(data[0].id);
       }
-    } catch (error: any) {
-      toast.error("Erro ao carregar times", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar times", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -112,8 +112,8 @@ export default function Escalas() {
 
       if (error) throw error;
       setMembros(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar membros", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar membros", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -121,16 +121,16 @@ export default function Escalas() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from("cultos")
-        .select("id, titulo, data_culto, tipo")
-        .gte("data_culto", inicioMes.toISOString())
-        .lte("data_culto", fimMes.toISOString())
-        .order("data_culto", { ascending: true });
+        .from("eventos")
+        .select("id, titulo, data_evento, tipo")
+        .gte("data_evento", inicioMes.toISOString())
+        .lte("data_evento", fimMes.toISOString())
+        .order("data_evento", { ascending: true });
 
       if (error) throw error;
       setCultos(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar cultos", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar cultos", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -141,24 +141,24 @@ export default function Escalas() {
     try {
       const cultoIds = cultos.map(c => c.id);
       const { data, error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .select("*")
         .eq("time_id", timeSelecionado)
-        .in("culto_id", cultoIds);
+        .in("evento_id", cultoIds);
 
       if (error) throw error;
       setEscalas(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar escalas", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar escalas", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
   const isEscalado = (pessoaId: string, cultoId: string) => {
-    return escalas.some(e => e.pessoa_id === pessoaId && e.culto_id === cultoId);
+    return escalas.some(e => e.pessoa_id === pessoaId && e.evento_id === cultoId);
   };
 
   const isConfirmado = (pessoaId: string, cultoId: string) => {
-    return escalas.find(e => e.pessoa_id === pessoaId && e.culto_id === cultoId)?.confirmado || false;
+    return escalas.find(e => e.pessoa_id === pessoaId && e.evento_id === cultoId)?.confirmado || false;
   };
 
   const navigateMonth = (direction: "prev" | "next") => {
@@ -172,11 +172,11 @@ export default function Escalas() {
   const timeAtual = times.find(t => t.id === timeSelecionado);
 
   const handleToggleEscala = async (pessoaId: string, cultoId: string, posicaoId: string | null) => {
-    const existente = escalas.find(e => e.pessoa_id === pessoaId && e.culto_id === cultoId);
+    const existente = escalas.find(e => e.pessoa_id === pessoaId && e.evento_id === cultoId);
 
     if (existente) {
       const { error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .delete()
         .eq("id", existente.id);
 
@@ -186,9 +186,9 @@ export default function Escalas() {
       }
     } else {
       const { error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .insert({
-          culto_id: cultoId,
+          evento_id: cultoId,
           time_id: timeSelecionado,
           pessoa_id: pessoaId,
           posicao_id: posicaoId,
@@ -319,10 +319,10 @@ export default function Escalas() {
                     {cultos.map((culto) => (
                       <th key={culto.id} className="p-2 md:p-3 text-center font-semibold min-w-[80px] md:min-w-[100px]">
                         <div className="text-muted-foreground text-xs">
-                          {format(parseISO(culto.data_culto), "EEE", { locale: ptBR })}
+                          {format(parseISO(culto.data_evento), "EEE", { locale: ptBR })}
                         </div>
                         <div className="font-bold">
-                          {format(parseISO(culto.data_culto), "dd/MM")}
+                          {format(parseISO(culto.data_evento), "dd/MM")}
                         </div>
                       </th>
                     ))}
@@ -379,7 +379,7 @@ export default function Escalas() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/50 font-semibold border-t">
-                    <td className="p-2 md:p-3 text-xs">Total por Culto</td>
+                    <td className="p-2 md:p-3 text-xs">Total por Evento</td>
                     {cultos.map((culto) => {
                       const total = membros.filter(m => isEscalado(m.pessoa_id, culto.id)).length;
                       return (

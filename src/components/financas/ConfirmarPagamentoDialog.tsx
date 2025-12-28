@@ -37,7 +37,14 @@ export function ConfirmarPagamentoDialog({
     try {
       setLoading(true);
 
-      const updateData: any = {
+      const updateData: {
+        status: "pago";
+        data_pagamento: string;
+        juros: number;
+        multas: number;
+        desconto: number;
+        taxas_administrativas: number;
+      } = {
         status: "pago",
         data_pagamento: format(dataPagamento, "yyyy-MM-dd"),
         juros: juros ? parseFloat(juros) : 0,

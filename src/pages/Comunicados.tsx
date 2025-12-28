@@ -52,10 +52,10 @@ export default function Comunicados() {
 
       if (error) throw error;
       setComunicados(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar comunicados",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });
     } finally {
@@ -84,8 +84,8 @@ export default function Comunicados() {
 
       toast({ title: "Status atualizado!" });
       loadComunicados();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     }
   };
 
@@ -114,8 +114,8 @@ export default function Comunicados() {
 
       toast({ title: "Comunicado removido!" });
       loadComunicados();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally {
       setDeleteDialogOpen(false);
       setDeletingId(null);

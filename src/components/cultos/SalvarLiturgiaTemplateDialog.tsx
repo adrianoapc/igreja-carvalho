@@ -47,9 +47,9 @@ export function SalvarLiturgiaTemplateDialog({
     try {
       // Buscar todos os itens da liturgia do culto atual
       const { data: itensLiturgia, error: fetchError } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select("titulo, tipo, ordem, duracao_minutos, descricao, responsavel_id, responsavel_externo")
-        .eq("culto_id", cultoId)
+        .eq("evento_id", cultoId)
         .order("ordem");
 
       if (fetchError) throw fetchError;
@@ -89,9 +89,9 @@ export function SalvarLiturgiaTemplateDialog({
       setDescricao("");
       onOpenChange(false);
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao salvar template:", error);
-      toast.error("Erro ao salvar template", { description: error.message });
+      toast.error("Erro ao salvar template", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,11 @@ export default function QuizPlayer({ etapa, inscricaoId, onAprovado }: QuizPlaye
   } | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [tentativaAtual, setTentativaAtual] = useState(1);
-  const [ultimaTentativa, setUltimaTentativa] = useState<any>(null);
+  interface TentativaRecord {
+    tentativa_numero?: number | null;
+    [key: string]: unknown;
+  }
+  const [ultimaTentativa, setUltimaTentativa] = useState<TentativaRecord | null>(null);
 
   const quizConfig = etapa.quiz_config;
   const perguntas = quizConfig?.perguntas || [];
@@ -59,9 +63,9 @@ export default function QuizPlayer({ etapa, inscricaoId, onAprovado }: QuizPlaye
 
   useEffect(() => {
     carregarUltimaTentativa();
-  }, [etapa.id, inscricaoId]);
+  }, [carregarUltimaTentativa]);
 
-  const carregarUltimaTentativa = async () => {
+  const carregarUltimaTentativa = useCallback(async () => {
     if (!inscricaoId) return;
 
     try {
@@ -83,7 +87,7 @@ export default function QuizPlayer({ etapa, inscricaoId, onAprovado }: QuizPlaye
     } catch (error) {
       console.error("Erro ao carregar tentativa:", error);
     }
-  };
+  }, [etapa.id, inscricaoId]);
 
   const handleSelectResposta = (perguntaId: string, alternativaIndex: number) => {
     if (showFeedback) return; // Não permite mudar após envio

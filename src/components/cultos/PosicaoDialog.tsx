@@ -77,14 +77,14 @@ export default function PosicaoDialog({ open, onOpenChange, posicao, timeId, onS
   const loadTimes = async () => {
     try {
       const { data, error } = await supabase
-        .from("times_culto")
+        .from("times")
         .select("id, nome, cor")
         .eq("ativo", true)
         .order("nome", { ascending: true });
 
       if (error) throw error;
       setTimes(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar times");
     }
   };
@@ -131,9 +131,9 @@ export default function PosicaoDialog({ open, onOpenChange, posicao, timeId, onS
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao salvar posição", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

@@ -64,9 +64,9 @@ export function LiturgiaItemDialog({
     try {
       // Buscar a maior ordem atual
       const { data: itensData } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select("ordem")
-        .eq("culto_id", cultoId)
+        .eq("evento_id", cultoId)
         .order("ordem", { ascending: false })
         .limit(1);
 
@@ -77,9 +77,9 @@ export function LiturgiaItemDialog({
       const permiteMultiplo = tiposMultiplos.includes(tipo.toLowerCase());
 
       const { error } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .insert({
-          culto_id: cultoId,
+          evento_id: cultoId,
           tipo,
           titulo,
           descricao: descricao || null,
@@ -95,8 +95,8 @@ export function LiturgiaItemDialog({
       toast.success("Item adicionado com sucesso!");
       resetForm();
       onSaved();
-    } catch (error: any) {
-      toast.error("Erro ao adicionar item", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao adicionar item", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setSaving(false);
     }

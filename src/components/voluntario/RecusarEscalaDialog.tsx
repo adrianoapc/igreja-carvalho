@@ -10,7 +10,7 @@ interface Escala {
   id: string;
   culto: {
     titulo: string;
-    data_culto: string;
+    data_evento: string;
   };
   time: {
     nome: string;
@@ -57,7 +57,7 @@ export function RecusarEscalaDialog({
           {escala && (
             <p className="text-sm text-muted-foreground mt-1">
               Escala de <strong>{escala.time.nome}</strong> para <strong>{escala.culto.titulo}</strong> em{" "}
-              {format(new Date(escala.culto.data_culto), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.
+              {format(new Date(escala.culto.data_evento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.
             </p>
           )}
         </div>

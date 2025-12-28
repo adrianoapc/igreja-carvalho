@@ -8,6 +8,23 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Refactor
+
+#### 🔄 Migração cultos → eventos — Polimorfismo por Tipos (28 de Dez/2025)
+- **Rename database**: Tabela `cultos` renomeada para `eventos`; colunas `culto_id` → `evento_id` em 8 tabelas satélites (escalas, kids_checkins, liturgias, cancoes, etc.); FKs atualizadas com novos nomes
+- **Enum evento_tipo**: Criado tipo `CULTO | RELOGIO | TAREFA | EVENTO | OUTRO` para suportar múltiplos tipos de agendamentos
+- **Tabela evento_subtipos**: Categorização adicional com tipo_pai (FK para enum), permitindo subtipos personalizados (ex: "Culto de Celebração", "Vigília 24h", "Reunião de Conselho")
+- **Frontend refatorado**: 50+ arquivos adaptados (queries `.from("cultos")` → `.from("eventos")`; componentes de tabs com lógica condicional por tipo; formulário com seleção de tipo/subtipo)
+- **Tabs condicionais**: EventoDetalhes exibe abas específicas por tipo (Liturgia/Música apenas para CULTO; Checklist para TAREFA; Turnos para RELOGIO)
+- **Renomeações em massa**: `times_culto` → `times`, `liturgia_culto` → `liturgias`, `escalas_culto` → `escalas` (migrations + sed script)
+
+**Impacto no usuário**: Sistema agora suporta agendar não apenas cultos, mas relógios de oração 24h, tarefas operacionais e eventos gerais, mantendo todo o sistema de escalas e check-in funcionando para qualquer tipo.  
+**Arquivos refatorados**: `EventoDialog.tsx`, `EventoDetalhes.tsx`, `LiturgiaTabContent.tsx`, `MusicaTabContent.tsx`, `EscalasTabContent.tsx`, `MinhasEscalas.tsx`, `DashboardLeader.tsx`, +40 componentes  
+**Migrations**: `20251228153548_eb7694bc-61dd-4a27-b372-cdc2c5dea3ac.sql` (schema), `20251228154110_832aab55-e1e4-4c38-975a-fe5166ae5bad.sql` (FKs), `20251228154443_26bbe883-8edb-4e46-b0d7-c37f5169c299.sql` (renames)  
+**ADRs criados**: [ADR-017](adr/ADR-017-refatoracao-hub-eventos-voluntariado.md), [ADR-018](adr/ADR-018-estrategia-migracao-cultos-eventos.md)
+
+---
+
 ### Adicionado
 
 #### 🔐 Gestão de Permissões — Controles Avançados (26 de Dez/2025)

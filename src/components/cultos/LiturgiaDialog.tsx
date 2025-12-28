@@ -34,10 +34,10 @@ import { SalvarComoTemplateDialog } from "./SalvarComoTemplateDialog";
 import { SeletorMidiasDialog } from "./SeletorMidiasDialog";
 import RecursosLiturgiaSheet from "./RecursosLiturgiaSheet";
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  data_culto: string;
+  data_evento: string;
 }
 
 interface Membro {
@@ -74,7 +74,7 @@ interface ItemLiturgia {
 interface LiturgiaDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  culto: Culto | null;
+  culto: Evento | null;
 }
 
 const TIPOS_LITURGIA = [
@@ -244,9 +244,9 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     try {
       // Primeiro buscar todos os itens de liturgia deste culto
       const { data: itensData } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select("id")
-        .eq("culto_id", culto.id);
+        .eq("evento_id", culto.id);
 
       if (!itensData || itensData.length === 0) return;
 
@@ -267,8 +267,8 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
       });
       
       setRecursosCount(countMap);
-    } catch (error: any) {
-      console.error("Erro ao carregar contagem de recursos:", error.message);
+    } catch (error: unknown) {
+      console.error("Erro ao carregar contagem de recursos:", error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -287,16 +287,16 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
 
       if (error) throw error;
       setMembros(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar membros", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     }
   };
 
   const loadMidias = async () => {
     try {
-      // Carregar todas as mídias ativas (não filtrar por culto_id pois são reutilizáveis)
+      // Carregar todas as mídias ativas (não filtrar por evento_id pois são reutilizáveis)
       const { data, error } = await supabase
         .from("midias")
         .select("id, titulo, tipo, canal, url, ativo")
@@ -305,9 +305,9 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
 
       if (error) throw error;
       setMidias(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar mídias", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     }
   };
@@ -337,8 +337,8 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
       });
 
       setMidiasVinculadas(midiasMap);
-    } catch (error: any) {
-      console.error("Erro ao carregar mídias vinculadas:", error.message);
+    } catch (error: unknown) {
+      console.error("Erro ao carregar mídias vinculadas:", error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -348,21 +348,21 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select(`
           *,
           responsavel:profiles!responsavel_id(nome, telefone)
         `)
-        .eq("culto_id", culto.id)
+        .eq("evento_id", culto.id)
         .order("ordem", { ascending: true });
 
       if (error) throw error;
       const itensData = data || [];
       setItens(itensData);
       await loadMidiasVinculadas(itensData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar liturgia", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -436,7 +436,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
       if (editando) {
         // Atualizar item existente
         const { error } = await supabase
-          .from("liturgia_culto")
+          .from("liturgias")
           .update(dadosLiturgia)
           .eq("id", editando.id);
 
@@ -447,9 +447,9 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
         const novaOrdem = itens.length > 0 ? Math.max(...itens.map(i => i.ordem)) + 1 : 1;
         
         const { error } = await supabase
-          .from("liturgia_culto")
+          .from("liturgias")
           .insert([{
-            culto_id: culto.id,
+            evento_id: culto.id,
             ...dadosLiturgia,
             ordem: novaOrdem,
           }]);
@@ -460,9 +460,9 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
 
       await loadItens();
       resetForm();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao salvar item", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -475,16 +475,16 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setLoading(true);
     try {
       const { error } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
       toast.success("Item removido com sucesso!");
       await loadItens();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao remover item", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -497,15 +497,15 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
     setLoading(true);
     try {
       const { error } = await supabase.functions.invoke('notificar-liturgia-make', {
-        body: { culto_id: culto.id }
+        body: { evento_id: culto.id }
       });
 
       if (error) throw error;
 
       toast.success("Notificação enviada via Make.com!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao enviar notificação", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -521,7 +521,7 @@ export default function LiturgiaDialog({ open, onOpenChange, culto }: LiturgiaDi
       return;
     }
 
-    const mensagem = `Olá ${nome}! Você foi escalado para a liturgia do culto *${culto?.titulo}* em ${new Date(culto?.data_culto || '').toLocaleDateString('pt-BR')}.
+    const mensagem = `Olá ${nome}! Você foi escalado para a liturgia do culto *${culto?.titulo}* em ${new Date(culto?.data_evento || '').toLocaleDateString('pt-BR')}.
 
 *Sua responsabilidade:*
 Tipo: ${item.tipo}
@@ -550,20 +550,20 @@ Qualquer dúvida, entre em contato conosco.`;
     try {
       // Trocar as ordens
       const { error: error1 } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .update({ ordem: outroItem.ordem })
         .eq("id", item.id);
 
       const { error: error2 } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .update({ ordem: item.ordem })
         .eq("id", outroItem.id);
 
       if (error1 || error2) throw error1 || error2;
       await loadItens();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao reordenar item", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

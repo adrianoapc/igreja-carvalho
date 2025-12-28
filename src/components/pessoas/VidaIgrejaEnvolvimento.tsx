@@ -68,7 +68,7 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
         .select(`
           id,
           posicao_id,
-          times_culto!inner (
+          times!inner (
             id,
             nome,
             cor,
@@ -83,31 +83,41 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
         .eq("pessoa_id", pessoaId)
         .eq("ativo", true);
 
-      const timesFormatted: Time[] = (membrosTimeData || []).map((mt: any) => ({
-        id: mt.times_culto.id,
-        nome: mt.times_culto.nome,
-        cor: mt.times_culto.cor,
-        categoria: mt.times_culto.categoria,
+      const timesFormatted: Time[] = (membrosTimeData || []).map((mt: {
+        times: {
+          id: string;
+          nome: string;
+          cor: string;
+          categoria: string;
+          lider_id: string | null;
+          sublider_id: string | null;
+        };
+        posicoes_time?: { nome: string } | null;
+      }) => ({
+        id: mt.times.id,
+        nome: mt.times.nome,
+        cor: mt.times.cor,
+        categoria: mt.times.categoria,
         posicao: mt.posicoes_time?.nome || null,
-        isLider: mt.times_culto.lider_id === pessoaId,
-        isSublider: mt.times_culto.sublider_id === pessoaId,
+        isLider: mt.times.lider_id === pessoaId,
+        isSublider: mt.times.sublider_id === pessoaId,
       }));
 
       setTimes(timesFormatted);
 
       // Buscar escalas futuras
       const { data: escalasData } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .select(`
           id,
           confirmado,
           cultos!inner (
             id,
             titulo,
-            data_culto,
+            data_evento,
             local
           ),
-          times_culto!inner (
+          times!inner (
             nome,
             cor
           ),
@@ -116,17 +126,22 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
           )
         `)
         .eq("pessoa_id", pessoaId)
-        .gte("cultos.data_culto", new Date().toISOString())
-        .order("cultos(data_culto)", { ascending: true })
+        .gte("cultos.data_evento", new Date().toISOString())
+        .order("cultos(data_evento)", { ascending: true })
         .limit(10);
 
-      const escalasFormatted: Escala[] = (escalasData || []).map((e: any) => ({
+      const escalasFormatted: Escala[] = (escalasData || []).map((e: {
+        id: string;
+        data: string;
+        evento?: { titulo: string } | null;
+        posicoes_time?: { nome: string } | null;
+      }) => ({
         id: e.id,
         culto_titulo: e.cultos.titulo,
-        culto_data: e.cultos.data_culto,
+        culto_data: e.cultos.data_evento,
         culto_local: e.cultos.local,
-        time_nome: e.times_culto.nome,
-        time_cor: e.times_culto.cor,
+        time_nome: e.times.nome,
+        time_cor: e.times.cor,
         posicao: e.posicoes_time?.nome || null,
         confirmado: e.confirmado,
       }));
@@ -147,7 +162,13 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
         .eq("membro_id", pessoaId)
         .order("data_inicio", { ascending: false });
 
-      const funcoesFormatted: Funcao[] = (funcoesData || []).map((f: any) => ({
+      const funcoesFormatted: Funcao[] = (funcoesData || []).map((f: {
+        funcoes_igreja: {
+          id: string;
+          nome: string;
+          categoria: string;
+        };
+      }) => ({
         id: f.id,
         nome: f.funcoes_igreja.nome,
         data_inicio: f.data_inicio,

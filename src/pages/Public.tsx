@@ -10,11 +10,11 @@ import { ptBR } from "date-fns/locale";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  tipo: string;
-  data_culto: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
+  data_evento: string;
   local: string | null;
   endereco: string | null;
   tema: string | null;
@@ -22,7 +22,7 @@ interface Culto {
 
 export default function Public() {
   const navigate = useNavigate();
-  const [proximosCultos, setProximosCultos] = useState<Culto[]>([]);
+  const [proximosCultos, setProximosCultos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,11 +33,11 @@ export default function Public() {
     try {
       const now = new Date().toISOString();
       const { data, error } = await supabase
-        .from("cultos")
-        .select("id, titulo, tipo, data_culto, local, endereco, tema")
-        .gte("data_culto", now)
+        .from("eventos")
+        .select("id, titulo, tipo, data_evento, local, endereco, tema")
+        .gte("data_evento", now)
         .eq("status", "confirmado")
-        .order("data_culto", { ascending: true })
+        .order("data_evento", { ascending: true })
         .limit(4);
 
       if (error) throw error;
@@ -77,8 +77,8 @@ export default function Public() {
 
   const getTipoLabel = (tipo: string) => {
     switch (tipo) {
-      case "culto_domingo": return "Culto Dominical";
-      case "culto_semana": return "Culto de Semana";
+      case "culto_domingo": return "Evento Dominical";
+      case "culto_semana": return "Evento de Semana";
       case "evento_especial": return "Evento Especial";
       case "celebracao": return "Celebração";
       default: return tipo;
@@ -204,11 +204,11 @@ export default function Public() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-primary font-bold text-lg">
-                        {formatCultoDate(culto.data_culto)}
+                        {formatCultoDate(culto.data_evento)}
                       </p>
                       <div className="flex items-center justify-end gap-1 text-muted-foreground text-sm">
                         <Clock className="w-3 h-3" />
-                        {formatCultoTime(culto.data_culto)}
+                        {formatCultoTime(culto.data_evento)}
                       </div>
                     </div>
                   </div>

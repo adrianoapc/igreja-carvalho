@@ -49,9 +49,11 @@ interface CategoriasProps {
   onBack?: () => void;
 }
 
+type CategoriaNode = Categoria & { tipo_normalizado: string; subcategorias: Subcategoria[] };
+
 export default function Categorias({ onBack }: CategoriasProps = {}) {
   const navigate = useNavigate();
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
@@ -60,7 +62,12 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
   // Dialog States
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"CATEGORIA" | "SUBCATEGORIA">("CATEGORIA");
-  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [editingItem, setEditingItem] = useState<{
+    id: string;
+    nome: string;
+    tipo: "entrada" | "saida";
+    secao_dre?: string | null;
+  } | null>(null);
   const [parentId, setParentId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({ nome: "", tipo: "saida" });
@@ -79,21 +86,23 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
       const { data: subs, error: errSub } = await supabase.from("subcategorias_financeiras").select("*").order("nome");
       if (errSub) throw errSub;
 
-      const tree =
-        cats?.map((cat: any) => ({
-          ...cat,
-          tipo_normalizado: cat.tipo ? cat.tipo.toLowerCase() : "desconhecido",
-          subcategorias: subs?.filter((s: any) => s.categoria_id === cat.id) || [],
-        })) || [];
+      const catsData = (cats || []) as Categoria[];
+      const subsData = (subs || []) as Subcategoria[];
+
+      const tree: CategoriaNode[] = catsData.map((cat) => ({
+        ...cat,
+        tipo_normalizado: cat.tipo ? cat.tipo.toLowerCase() : "desconhecido",
+        subcategorias: subsData.filter((s) => s.categoria_id === cat.id),
+      }));
 
       setCategorias(tree);
 
       if (tree.length < 15) {
-        setExpandedCats(new Set(tree.map((curr: any) => curr.id)));
+        setExpandedCats(new Set(tree.map((curr) => curr.id)));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro fetch:", error);
-      toast.error("Erro ao carregar dados", { description: error.message });
+      toast.error("Erro ao carregar dados", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -158,8 +167,8 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
       toast.success("Salvo com sucesso!");
       setDialogOpen(false);
       fetchData();
-    } catch (error: any) {
-      toast.error("Erro ao salvar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setSaving(false);
     }
@@ -173,8 +182,8 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
       if (error) throw error;
       toast.success("Item excluído");
       fetchData();
-    } catch (error: any) {
-      toast.error("Erro ao excluir", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao excluir", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -196,7 +205,7 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
     setDialogOpen(true);
   };
 
-  const openEdit = (item: any, type: "CATEGORIA" | "SUBCATEGORIA") => {
+  const openEdit = (item: Categoria | Subcategoria, type: "CATEGORIA" | "SUBCATEGORIA") => {
     setDialogType(type);
     setEditingItem(item);
     setFormData({ nome: item.nome, tipo: item.tipo ? item.tipo.toLowerCase() : activeTab });
@@ -204,7 +213,7 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
   };
 
   // --- RENDER DA LISTA ---
-  const getFilteredTree = (tipoFiltro: string) => categorias.filter((c: any) => c.tipo_normalizado === tipoFiltro).filter(matchesSearch);
+  const getFilteredTree = (tipoFiltro: string) => categorias.filter((c) => c.tipo_normalizado === tipoFiltro).filter(matchesSearch);
 
   const renderAccordionList = (tipoFiltro: string, isMobile = false) => {
     const filteredTree = getFilteredTree(tipoFiltro);
@@ -284,7 +293,7 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
 
               {isExpanded && (
                 <div className={cn("bg-muted/40 px-4 pb-4 pt-2 space-y-2", isMobile && "px-3 pb-3")}>                  {subcategorias.length ? (
-                    subcategorias.map((sub: any) => (
+                    subcategorias.map((sub) => (
                       <div key={sub.id} className="flex items-center justify-between rounded-lg bg-background border px-3 py-2">
                         <div className="flex items-center gap-2">
                           <CornerDownRight className="h-3 w-3 text-muted-foreground" />

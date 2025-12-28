@@ -79,11 +79,12 @@ export default function EdgeFunctionCard({
         description: enabled ? "A função será executada no próximo agendamento" : "A função não será executada até ser reativada"
       });
       if (onUpdate) onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao alterar status:', error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível alterar o status",
+        description: message || "Não foi possível alterar o status",
         variant: "destructive"
       });
     }
@@ -123,11 +124,12 @@ export default function EdgeFunctionCard({
       // Recarregar configuração para atualizar contadores
       loadConfig();
       if (onUpdate) onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao executar edge function:', error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível executar a função",
+        description: message || "Não foi possível executar a função",
         variant: "destructive"
       });
     } finally {

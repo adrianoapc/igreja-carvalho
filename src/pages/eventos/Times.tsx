@@ -84,7 +84,7 @@ export default function Times() {
 
       if (error) throw error;
       setCategorias(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar categorias");
     }
   };
@@ -92,11 +92,11 @@ export default function Times() {
   const loadTimes = async () => {
     try {
       const { data, error } = await supabase
-        .from("times_culto")
+        .from("times")
         .select(`
           *,
-          lider:profiles!times_culto_lider_id_fkey(id, nome, avatar_url),
-          sublider:profiles!times_culto_sublider_id_fkey(id, nome, avatar_url),
+          lider:profiles!times_lider_id_fkey(id, nome, avatar_url),
+          sublider:profiles!times_sublider_id_fkey(id, nome, avatar_url),
           membros_time(
             pessoa_id,
             posicao_id,
@@ -112,8 +112,8 @@ export default function Times() {
 
       const timesWithCount = data?.map(time => {
         const membros = time.membros_time
-          ?.filter((m: any) => m.profiles && m.ativo)
-          ?.map((m: any) => ({
+          ?.filter((m: { profiles?: unknown; ativo?: boolean }) => m.profiles && m.ativo)
+          ?.map((m: { profiles: { id: string; nome: string; avatar_url?: string | null } }) => ({
             id: m.profiles.id,
             nome: m.profiles.nome,
             posicao: m.posicoes_time?.nome || null
@@ -129,9 +129,9 @@ export default function Times() {
       }) || [];
 
       setTimes(timesWithCount as Time[]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar times", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -207,7 +207,7 @@ export default function Times() {
 
       // Excluir o time
       const { error } = await supabase
-        .from("times_culto")
+        .from("times")
         .delete()
         .eq("id", timeDeletando.id);
 
@@ -216,9 +216,9 @@ export default function Times() {
       toast.success("Time excluído com sucesso");
       loadTimes();
       setDeleteDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao excluir time", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     }
   };

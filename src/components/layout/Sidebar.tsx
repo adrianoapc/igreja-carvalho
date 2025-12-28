@@ -34,6 +34,7 @@ import {
   MonitorPlay,
   Share2
 } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { usePermissions, Permission } from "@/hooks/usePermissions";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import UserMenu from "./UserMenu";
@@ -42,11 +43,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 type MenuItem = {
   title: string;
   url: string;
-  icon: any;
-  permission?: Permission; 
-};
-
-type MenuGroup = {
+  icon: LucideIcon;
+  permission?: Permission;
+};type MenuGroup = {
   label: string;
   items: MenuItem[];
   permission?: Permission; 

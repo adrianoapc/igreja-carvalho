@@ -29,10 +29,10 @@ interface MembroChamada {
   ja_marcado: boolean;
 }
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  data_culto: string;
+  data_evento: string;
 }
 
 export default function Chamada() {
@@ -48,28 +48,28 @@ export default function Chamada() {
       
       // Primeiro tenta buscar culto de hoje
       const { data: cultoHoje, error: errorHoje } = await supabase
-        .from("cultos")
-        .select("id, titulo, data_culto")
-        .gte("data_culto", `${hoje}T00:00:00`)
-        .lte("data_culto", `${hoje}T23:59:59`)
-        .order("data_culto", { ascending: true })
+        .from("eventos")
+        .select("id, titulo, data_evento")
+        .gte("data_evento", `${hoje}T00:00:00`)
+        .lte("data_evento", `${hoje}T23:59:59`)
+        .order("data_evento", { ascending: true })
         .limit(1)
         .maybeSingle();
 
       if (errorHoje) throw errorHoje;
-      if (cultoHoje) return cultoHoje as Culto;
+      if (cultoHoje) return cultoHoje as Evento;
 
       // Se não houver culto hoje, busca o mais recente
       const { data: cultoRecente, error: errorRecente } = await supabase
-        .from("cultos")
-        .select("id, titulo, data_culto")
-        .lt("data_culto", `${hoje}T00:00:00`)
-        .order("data_culto", { ascending: false })
+        .from("eventos")
+        .select("id, titulo, data_evento")
+        .lt("data_evento", `${hoje}T00:00:00`)
+        .order("data_evento", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (errorRecente) throw errorRecente;
-      return cultoRecente as Culto | null;
+      return cultoRecente as Evento | null;
     },
   });
 
@@ -80,7 +80,7 @@ export default function Chamada() {
       if (!culto?.id) return [];
       
       const { data, error } = await supabase.rpc("get_minha_lista_chamada", {
-        p_culto_id: culto.id,
+        p_evento_id: culto.id,
       });
 
       if (error) throw error;
@@ -105,7 +105,7 @@ export default function Chamada() {
 
       if (marcar) {
         const { error } = await supabase.from("presencas_culto").insert({
-          culto_id: culto.id,
+          evento_id: culto.id,
           pessoa_id: pessoaId,
           metodo: "lider_celula",
           validado_por: currentUser.id,
@@ -115,7 +115,7 @@ export default function Chamada() {
         const { error } = await supabase
           .from("presencas_culto")
           .delete()
-          .eq("culto_id", culto.id)
+          .eq("evento_id", culto.id)
           .eq("pessoa_id", pessoaId);
         if (error) throw error;
       }
@@ -215,7 +215,7 @@ export default function Chamada() {
     );
   }
 
-  const dataCulto = new Date(culto.data_culto);
+  const dataCulto = new Date(culto.data_evento);
   const isHoje = new Date().toDateString() === dataCulto.toDateString();
 
   return (

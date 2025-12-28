@@ -53,7 +53,7 @@ export default function Criancas() {
       if (profilesError) throw profilesError;
 
       // Filtrar apenas crianças (menores de 13 anos)
-      const profiles = (allProfiles || []).filter((p: any) => {
+      const profiles = (allProfiles || []).filter((p: { data_nascimento?: string | null; status?: string }) => {
         if (!p.data_nascimento) return false;
         const birthDate = new Date(p.data_nascimento);
         const age = today.getFullYear() - birthDate.getFullYear();
@@ -68,7 +68,7 @@ export default function Criancas() {
 
       // Para cada criança, buscar seus responsáveis
       const kidsWithResponsaveis = await Promise.all(
-        (profiles || []).map(async (kid: any) => {
+        (profiles || []).map(async (kid: { id: string }) => {
           // Query bidirecional: busca os dois lados da relação
           const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
             supabase
@@ -95,7 +95,7 @@ export default function Criancas() {
           const responsavelIds = new Set<string>();
           const responsavelMap = new Map<string, string>(); // id -> tipo_parentesco
 
-          relationships.forEach((item: any) => {
+          relationships.forEach((item: { related_profile: { id: string; nome?: string } }) => {
             let targetId: string;
 
             // Se a criança é "pessoa_id", o responsável é "familiar_id"

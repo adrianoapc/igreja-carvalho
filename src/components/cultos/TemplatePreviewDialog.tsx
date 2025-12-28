@@ -134,7 +134,7 @@ export function TemplatePreviewDialog({
         setEscalas(escalasData || []);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar preview:", error);
       toast.error("Erro ao carregar preview do template");
     } finally {

@@ -48,10 +48,10 @@ interface Cancao {
 }
 
 interface MusicaTabContentProps {
-  cultoId: string;
+  eventoId: string;
 }
 
-export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
+export default function MusicaTabContent({ eventoId }: MusicaTabContentProps) {
   const [cancoes, setCancoes] = useState<Cancao[]>([]);
   const [membros, setMembros] = useState<Membro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +74,7 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
 
   useEffect(() => {
     loadData();
-  }, [cultoId]);
+  }, [eventoId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -87,7 +87,7 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
             solista:profiles!solista_id(nome),
             ministro:profiles!ministro_id(nome)
           `)
-          .eq("culto_id", cultoId)
+          .eq("evento_id", eventoId)
           .order("ordem", { ascending: true }),
         supabase
           .from("profiles")
@@ -101,8 +101,8 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
 
       setCancoes(cancoesRes.data || []);
       setMembros(membrosRes.data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar dados", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar dados", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -175,7 +175,7 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
         const novaOrdem = cancoes.length > 0 ? Math.max(...cancoes.map(c => c.ordem)) + 1 : 1;
         const { error } = await supabase
           .from("cancoes_culto")
-          .insert([{ culto_id: cultoId, ...dadosCancao, ordem: novaOrdem }]);
+          .insert([{ evento_id: eventoId, ...dadosCancao, ordem: novaOrdem }]);
         if (error) throw error;
         toast.success("Música adicionada!");
       }
@@ -183,8 +183,8 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
       setDialogOpen(false);
       resetForm();
       loadData();
-    } catch (error: any) {
-      toast.error("Erro ao salvar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -197,8 +197,8 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
       if (error) throw error;
       toast.success("Música removida!");
       loadData();
-    } catch (error: any) {
-      toast.error("Erro ao remover", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao remover", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -215,8 +215,8 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
         supabase.from("cancoes_culto").update({ ordem: cancao.ordem }).eq("id", outraCancao.id)
       ]);
       loadData();
-    } catch (error: any) {
-      toast.error("Erro ao reordenar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao reordenar", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -228,8 +228,8 @@ export default function MusicaTabContent({ cultoId }: MusicaTabContentProps) {
         .eq("id", cancaoId);
       if (error) throw error;
       loadData();
-    } catch (error: any) {
-      toast.error("Erro ao atualizar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao atualizar", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 

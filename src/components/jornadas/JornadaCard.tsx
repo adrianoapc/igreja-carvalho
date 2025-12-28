@@ -20,7 +20,19 @@ import { toast } from "sonner";
 import ResponsavelSelector from "./ResponsavelSelector";
 
 interface JornadaCardProps {
-  inscricao: any;
+  inscricao: {
+    id: string;
+    pessoa_id: string;
+    etapa_id: string;
+    responsavel_id?: string | null;
+    data_inscricao: string;
+    data_conclusao?: string | null;
+    observacoes?: string | null;
+    profiles?: {
+      nome: string;
+      avatar_url?: string | null;
+    } | null;
+  };
   totalEtapas: number;
   isDragging?: boolean;
   onRefetch?: () => void;

@@ -41,12 +41,13 @@ import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
 import MusicaTabContent from "@/components/cultos/MusicaTabContent";
 import EscalasTabContent from "@/components/cultos/EscalasTabContent";
 
-interface Culto {
+interface Evento {
   id: string;
-  tipo: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
+  subtipo_id: string | null;
   titulo: string;
   descricao: string | null;
-  data_culto: string;
+  data_evento: string;
   duracao_minutos: number | null;
   local: string | null;
   endereco: string | null;
@@ -55,6 +56,7 @@ interface Culto {
   status: string;
   observacoes: string | null;
   exibir_preletor: boolean;
+  evento_subtipos?: { nome: string; cor: string | null } | null;
 }
 
 const STATUS_OPTIONS = [
@@ -71,10 +73,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   cancelado: { label: "Cancelado", color: "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400" },
 };
 
-export default function CultoDetalhes() {
+const TIPO_LABELS: Record<string, string> = {
+  CULTO: "Culto",
+  RELOGIO: "Relógio",
+  TAREFA: "Tarefa",
+  EVENTO: "Evento",
+  OUTRO: "Outro",
+};
+
+export default function EventoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [culto, setCulto] = useState<Culto | null>(null);
+  const [evento, setEvento] = useState<Evento | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notificando, setNotificando] = useState(false);
@@ -90,30 +100,29 @@ export default function CultoDetalhes() {
 
   useEffect(() => {
     if (id) {
-      loadCulto();
+      loadEvento();
       loadStats();
     }
   }, [id]);
 
-  const loadCulto = async () => {
+  const loadEvento = async () => {
     try {
       const { data, error } = await supabase
-        .from("cultos")
-        .select("*")
+        .from("eventos")
+        .select(`*, evento_subtipos ( nome, cor )`)
         .eq("id", id)
         .single();
 
       if (error) throw error;
-      
-      setCulto(data);
+      setEvento(data);
       setTema(data.tema || "");
       setPregador(data.pregador || "");
       setLocal(data.local || "");
       setObservacoes(data.observacoes || "");
       setStatus(data.status);
-    } catch (error: any) {
-      toast.error("Erro ao carregar culto", { description: error.message });
-      navigate("/cultos/geral");
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar evento", { description: error instanceof Error ? error.message : String(error) });
+      navigate("/eventos/lista");
     } finally {
       setLoading(false);
     }
@@ -122,8 +131,8 @@ export default function CultoDetalhes() {
   const loadStats = async () => {
     try {
       const [escalasRes, liturgiaRes] = await Promise.all([
-        supabase.from("escalas_culto").select("id", { count: "exact" }).eq("culto_id", id!),
-        supabase.from("liturgia_culto").select("id", { count: "exact" }).eq("culto_id", id!),
+        supabase.from("escalas").select("id", { count: "exact" }).eq("evento_id", id!),
+        supabase.from("liturgias").select("id", { count: "exact" }).eq("evento_id", id!),
       ]);
 
       setEscalasCount(escalasRes.count || 0);
@@ -134,12 +143,12 @@ export default function CultoDetalhes() {
   };
 
   const handleSave = async () => {
-    if (!culto) return;
+    if (!evento) return;
     setSaving(true);
 
     try {
       const { error } = await supabase
-        .from("cultos")
+        .from("eventos")
         .update({
           tema,
           pregador,
@@ -148,26 +157,26 @@ export default function CultoDetalhes() {
           status,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", culto.id);
+        .eq("id", evento.id);
 
       if (error) throw error;
 
       toast.success("Alterações salvas com sucesso!");
-      loadCulto();
-    } catch (error: any) {
-      toast.error("Erro ao salvar", { description: error.message });
+      loadEvento();
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setSaving(false);
     }
   };
 
   const handleNotificarEscalados = async () => {
-    if (!culto) return;
+    if (!evento) return;
     setNotificando(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('disparar-escala', {
-        body: { culto_id: culto.id }
+        body: { evento_id: evento.id }
       });
 
       if (error) throw error;
@@ -179,8 +188,8 @@ export default function CultoDetalhes() {
       } else {
         toast.error("Erro ao notificar", { description: data.message });
       }
-    } catch (error: any) {
-      toast.error("Erro ao notificar escalados", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao notificar escalados", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setNotificando(false);
     }
@@ -198,12 +207,14 @@ export default function CultoDetalhes() {
     );
   }
 
-  if (!culto) {
+  if (!evento) {
     return null;
   }
 
-  const dataCulto = new Date(culto.data_culto);
-  const statusConfig = STATUS_CONFIG[culto.status] || STATUS_CONFIG.planejado;
+  const dataEvento = new Date(evento.data_evento);
+  const statusConfig = STATUS_CONFIG[evento.status] || STATUS_CONFIG.planejado;
+  const mostrarLiturgia = evento.tipo === "CULTO";
+  const mostrarMusica = evento.tipo === "CULTO";
 
   return (
     <div className="space-y-6">
@@ -213,25 +224,30 @@ export default function CultoDetalhes() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/cultos/geral")}
+            onClick={() => navigate("/eventos/lista")}
             className="shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="space-y-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl md:text-2xl font-bold">{culto.titulo}</h1>
-              <Badge variant="outline">{culto.tipo}</Badge>
+              <h1 className="text-xl md:text-2xl font-bold">{evento.titulo}</h1>
+              <Badge variant="outline">{TIPO_LABELS[evento.tipo]}</Badge>
+              {evento.evento_subtipos && (
+                <Badge variant="secondary" style={{ backgroundColor: evento.evento_subtipos.cor || undefined }}>
+                  {evento.evento_subtipos.nome}
+                </Badge>
+              )}
               <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
-                {format(dataCulto, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                {format(dataEvento, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />
-                {format(dataCulto, "HH:mm")}
+                {format(dataEvento, "HH:mm")}
               </div>
             </div>
           </div>
@@ -252,7 +268,7 @@ export default function CultoDetalhes() {
               <div className="flex flex-col items-center gap-4 py-4">
                 <div className="bg-white p-4 rounded-lg">
                   <QRCodeSVG 
-                    value={`${window.location.origin}/checkin/culto/${culto.id}`}
+                    value={`${window.location.origin}/checkin/culto/${evento.id}`}
                     size={200}
                     level="H"
                   />
@@ -261,7 +277,7 @@ export default function CultoDetalhes() {
                   Escaneie para confirmar presença no culto
                 </p>
                 <p className="text-xs text-muted-foreground break-all text-center">
-                  {`${window.location.origin}/checkin/culto/${culto.id}`}
+                  {`${window.location.origin}/checkin/culto/${evento.id}`}
                 </p>
               </div>
             </DialogContent>
@@ -292,22 +308,30 @@ export default function CultoDetalhes() {
 
       {/* Tabs */}
       <Tabs defaultValue="visao-geral" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className={`grid w-full max-w-2xl ${mostrarLiturgia ? "grid-cols-5" : "grid-cols-3"}`}>
           <TabsTrigger value="visao-geral" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
             <span className="hidden sm:inline">Visão Geral</span>
           </TabsTrigger>
-          <TabsTrigger value="liturgia" className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" />
-            <span className="hidden sm:inline">Liturgia</span>
-          </TabsTrigger>
-          <TabsTrigger value="musica" className="flex items-center gap-2">
-            <ListMusic className="h-4 w-4" />
-            <span className="hidden sm:inline">Música</span>
-          </TabsTrigger>
+          {mostrarLiturgia && (
+            <TabsTrigger value="liturgia" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Liturgia</span>
+            </TabsTrigger>
+          )}
+          {mostrarMusica && (
+            <TabsTrigger value="musica" className="flex items-center gap-2">
+              <ListMusic className="h-4 w-4" />
+              <span className="hidden sm:inline">Música</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="escalas" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Escalas</span>
+          </TabsTrigger>
+          <TabsTrigger value="checkin" className="flex items-center gap-2">
+            <QrCode className="h-4 w-4" />
+            <span className="hidden sm:inline">Check-in</span>
           </TabsTrigger>
         </TabsList>
 
@@ -323,7 +347,7 @@ export default function CultoDetalhes() {
                 <div>
                   <p className="text-sm text-muted-foreground">Duração Estimada</p>
                   <p className="text-2xl font-bold">
-                    {culto.duracao_minutos ? `${culto.duracao_minutos} min` : "—"}
+                    {evento.duracao_minutos ? `${evento.duracao_minutos} min` : "—"}
                   </p>
                 </div>
               </CardContent>
@@ -357,7 +381,7 @@ export default function CultoDetalhes() {
           {/* Formulário de Edição */}
           <Card>
             <CardHeader>
-              <CardTitle>Informações do Culto</CardTitle>
+              <CardTitle>Informações do Evento</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -429,19 +453,35 @@ export default function CultoDetalhes() {
           </Card>
         </TabsContent>
 
-        {/* Tab: Liturgia */}
-        <TabsContent value="liturgia" className="mt-6">
-          <LiturgiaTabContent cultoId={culto.id} />
-        </TabsContent>
+        {/* Tab: Liturgia (apenas CULTO) */}
+        {mostrarLiturgia && (
+          <TabsContent value="liturgia" className="mt-6">
+            <LiturgiaTabContent eventoId={id!} />
+          </TabsContent>
+        )}
 
-        {/* Tab: Música */}
-        <TabsContent value="musica" className="mt-6">
-          <MusicaTabContent cultoId={culto.id} />
-        </TabsContent>
+        {/* Tab: Música (apenas CULTO) */}
+        {mostrarMusica && (
+          <TabsContent value="musica" className="mt-6">
+            <MusicaTabContent eventoId={id!} />
+          </TabsContent>
+        )}
 
-        {/* Tab: Escalas */}
+        {/* Tab: Escalas (sempre) */}
         <TabsContent value="escalas" className="mt-6">
-          <EscalasTabContent cultoId={culto.id} />
+          <EscalasTabContent eventoId={id!} />
+        </TabsContent>
+
+        {/* Tab: Check-in (sempre) */}
+        <TabsContent value="checkin" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Check-in do Evento</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Funcionalidade de check-in em desenvolvimento.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

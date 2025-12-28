@@ -52,8 +52,8 @@ export default function CentrosCusto({ onBack }: Props) {
       
       if (error) throw error;
       setCentros(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar centros de custo", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar centros de custo", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -94,8 +94,8 @@ export default function CentrosCusto({ onBack }: Props) {
       setDialogOpen(false);
       resetForm();
       fetchCentros();
-    } catch (error: any) {
-      toast.error("Erro ao salvar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -111,8 +111,8 @@ export default function CentrosCusto({ onBack }: Props) {
       if (error) throw error;
       toast.success("Centro de custo excluído");
       fetchCentros();
-    } catch (error: any) {
-      toast.error("Erro ao excluir", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao excluir", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 

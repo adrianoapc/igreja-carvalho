@@ -80,7 +80,7 @@ export default function DRE() {
       return;
     }
 
-    const exportData: any[] = [];
+    const exportData: Array<Record<string, string | number>> = [];
     
     dadosAgrupados.forEach((secao) => {
       // Header da seção

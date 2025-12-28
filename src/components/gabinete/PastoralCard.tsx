@@ -10,6 +10,13 @@ import { cn } from "@/lib/utils";
 
 type GravidadeEnum = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
 
+type HistoricoEvolucao = {
+  data: string;
+  autor: string;
+  acao: string;
+  detalhes?: string;
+};
+
 interface AtendimentoPastoral {
   id: string;
   created_at: string;
@@ -24,7 +31,7 @@ interface AtendimentoPastoral {
   data_agendamento: string | null;
   local_atendimento: string | null;
   observacoes_internas: string | null;
-  historico_evolucao: any[] | null;
+  historico_evolucao: HistoricoEvolucao[] | null;
   pessoa?: { nome: string | null; telefone: string | null } | null;
   visitante?: { nome: string | null; telefone: string | null } | null;
   pastor?: { nome: string | null } | null;

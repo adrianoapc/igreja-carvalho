@@ -84,7 +84,7 @@ export default function Membros() {
           data: timesData
         } = await supabase.from("membros_time").select(`
               id,
-              times_culto (
+              times (
                 id,
                 nome,
                 cor
@@ -97,14 +97,14 @@ export default function Membros() {
         
         return {
           ...membro,
-          funcoes: funcoesData?.map((f: any) => ({
+          funcoes: funcoesData?.map((f: { funcoes_igreja: { id: string; nome: string; categoria: string } }) => ({
             id: f.funcoes_igreja.id,
             nome: f.funcoes_igreja.nome
           })) || [],
-          times: timesData?.map((t: any) => ({
-            id: t.times_culto.id,
-            nome: t.times_culto.nome,
-            cor: t.times_culto.cor,
+          times: timesData?.map((t: { times: { id: string; nome: string } }) => ({
+            id: t.times.id,
+            nome: t.times.nome,
+            cor: t.times.cor,
             posicao: t.posicoes_time?.nome || null
           })) || []
         };
