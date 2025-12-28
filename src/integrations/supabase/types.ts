@@ -423,9 +423,9 @@ export type Database = {
       aulas: {
         Row: {
           created_at: string | null
-          culto_id: string | null
           data_inicio: string
           duracao_minutos: number | null
+          evento_id: string | null
           id: string
           jornada_id: string | null
           link_reuniao: string | null
@@ -438,9 +438,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          culto_id?: string | null
           data_inicio: string
           duracao_minutos?: number | null
+          evento_id?: string | null
           id?: string
           jornada_id?: string | null
           link_reuniao?: string | null
@@ -453,9 +453,9 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          culto_id?: string | null
           data_inicio?: string
           duracao_minutos?: number | null
+          evento_id?: string | null
           id?: string
           jornada_id?: string | null
           link_reuniao?: string | null
@@ -468,10 +468,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "aulas_culto_id_fkey"
-            columns: ["culto_id"]
+            foreignKeyName: "aulas_evento_id_fkey"
+            columns: ["evento_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -618,8 +618,8 @@ export type Database = {
           bpm: number | null
           cifra: string | null
           created_at: string
-          culto_id: string
           duracao_minutos: number | null
+          evento_id: string
           id: string
           letra: string | null
           link_spotify: string | null
@@ -637,8 +637,8 @@ export type Database = {
           bpm?: number | null
           cifra?: string | null
           created_at?: string
-          culto_id: string
           duracao_minutos?: number | null
+          evento_id: string
           id?: string
           letra?: string | null
           link_spotify?: string | null
@@ -656,8 +656,8 @@ export type Database = {
           bpm?: number | null
           cifra?: string | null
           created_at?: string
-          culto_id?: string
           duracao_minutos?: number | null
+          evento_id?: string
           id?: string
           letra?: string | null
           link_spotify?: string | null
@@ -672,10 +672,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "cancoes_culto_culto_id_fkey"
-            columns: ["culto_id"]
+            foreignKeyName: "cancoes_culto_evento_id_fkey"
+            columns: ["evento_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -874,10 +874,10 @@ export type Database = {
           categoria_midia: string | null
           created_at: string | null
           created_by: string | null
-          culto_id: string | null
           data_fim: string | null
           data_inicio: string | null
           descricao: string | null
+          evento_id: string | null
           exibir_app: boolean | null
           exibir_site: boolean | null
           exibir_telao: boolean | null
@@ -898,10 +898,10 @@ export type Database = {
           categoria_midia?: string | null
           created_at?: string | null
           created_by?: string | null
-          culto_id?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          evento_id?: string | null
           exibir_app?: boolean | null
           exibir_site?: boolean | null
           exibir_telao?: boolean | null
@@ -922,10 +922,10 @@ export type Database = {
           categoria_midia?: string | null
           created_at?: string | null
           created_by?: string | null
-          culto_id?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          evento_id?: string | null
           exibir_app?: boolean | null
           exibir_site?: boolean | null
           exibir_telao?: boolean | null
@@ -943,10 +943,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "comunicados_culto_id_fkey"
-            columns: ["culto_id"]
+            foreignKeyName: "comunicados_evento_id_fkey"
+            columns: ["evento_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -1045,63 +1045,6 @@ export type Database = {
         }
         Relationships: []
       }
-      cultos: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          data_culto: string
-          descricao: string | null
-          duracao_minutos: number | null
-          endereco: string | null
-          exibir_preletor: boolean
-          id: string
-          local: string | null
-          observacoes: string | null
-          pregador: string | null
-          status: string
-          tema: string | null
-          tipo: string
-          titulo: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          data_culto: string
-          descricao?: string | null
-          duracao_minutos?: number | null
-          endereco?: string | null
-          exibir_preletor?: boolean
-          id?: string
-          local?: string | null
-          observacoes?: string | null
-          pregador?: string | null
-          status?: string
-          tema?: string | null
-          tipo: string
-          titulo: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          data_culto?: string
-          descricao?: string | null
-          duracao_minutos?: number | null
-          endereco?: string | null
-          exibir_preletor?: boolean
-          id?: string
-          local?: string | null
-          observacoes?: string | null
-          pregador?: string | null
-          status?: string
-          tema?: string | null
-          tipo?: string
-          titulo?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       edge_function_config: {
         Row: {
           created_at: string | null
@@ -1179,8 +1122,8 @@ export type Database = {
           checkin_realizado: boolean | null
           confirmado: boolean
           created_at: string
-          culto_id: string
           data_confirmacao: string | null
+          evento_id: string
           id: string
           motivo_recusa: string | null
           observacoes: string | null
@@ -1195,8 +1138,8 @@ export type Database = {
           checkin_realizado?: boolean | null
           confirmado?: boolean
           created_at?: string
-          culto_id: string
           data_confirmacao?: string | null
+          evento_id: string
           id?: string
           motivo_recusa?: string | null
           observacoes?: string | null
@@ -1211,8 +1154,8 @@ export type Database = {
           checkin_realizado?: boolean | null
           confirmado?: boolean
           created_at?: string
-          culto_id?: string
           data_confirmacao?: string | null
+          evento_id?: string
           id?: string
           motivo_recusa?: string | null
           observacoes?: string | null
@@ -1225,10 +1168,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "escalas_culto_culto_id_fkey"
-            columns: ["culto_id"]
+            foreignKeyName: "escalas_culto_evento_id_fkey"
+            columns: ["evento_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -1399,6 +1342,104 @@ export type Database = {
             columns: ["jornada_id"]
             isOneToOne: false
             referencedRelation: "jornadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evento_subtipos: {
+        Row: {
+          ativo: boolean | null
+          cor: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          tipo_pai: Database["public"]["Enums"]["evento_tipo"]
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          tipo_pai: Database["public"]["Enums"]["evento_tipo"]
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          tipo_pai?: Database["public"]["Enums"]["evento_tipo"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      eventos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_evento: string
+          descricao: string | null
+          duracao_minutos: number | null
+          endereco: string | null
+          exibir_preletor: boolean
+          id: string
+          local: string | null
+          observacoes: string | null
+          pregador: string | null
+          status: string
+          subtipo_id: string | null
+          tema: string | null
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_evento: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          endereco?: string | null
+          exibir_preletor?: boolean
+          id?: string
+          local?: string | null
+          observacoes?: string | null
+          pregador?: string | null
+          status?: string
+          subtipo_id?: string | null
+          tema?: string | null
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_evento?: string
+          descricao?: string | null
+          duracao_minutos?: number | null
+          endereco?: string | null
+          exibir_preletor?: boolean
+          id?: string
+          local?: string | null
+          observacoes?: string | null
+          pregador?: string | null
+          status?: string
+          subtipo_id?: string | null
+          tema?: string | null
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eventos_subtipo_id_fkey"
+            columns: ["subtipo_id"]
+            isOneToOne: false
+            referencedRelation: "evento_subtipos"
             referencedColumns: ["id"]
           },
         ]
@@ -2031,10 +2072,10 @@ export type Database = {
             referencedColumns: ["pessoa_id"]
           },
           {
-            foreignKeyName: "kids_checkins_culto_id_fkey"
+            foreignKeyName: "kids_checkins_evento_id_fkey"
             columns: ["culto_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -2126,7 +2167,7 @@ export type Database = {
             foreignKeyName: "kids_diario_culto_id_fkey"
             columns: ["culto_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -2155,9 +2196,9 @@ export type Database = {
       liturgia_culto: {
         Row: {
           created_at: string
-          culto_id: string
           descricao: string | null
           duracao_minutos: number | null
+          evento_id: string
           id: string
           midias_ids: string[] | null
           ordem: number
@@ -2170,9 +2211,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          culto_id: string
           descricao?: string | null
           duracao_minutos?: number | null
+          evento_id: string
           id?: string
           midias_ids?: string[] | null
           ordem: number
@@ -2185,9 +2226,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          culto_id?: string
           descricao?: string | null
           duracao_minutos?: number | null
+          evento_id?: string
           id?: string
           midias_ids?: string[] | null
           ordem?: number
@@ -2200,10 +2241,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "liturgia_culto_culto_id_fkey"
-            columns: ["culto_id"]
+            foreignKeyName: "liturgia_culto_evento_id_fkey"
+            columns: ["evento_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -2560,7 +2601,7 @@ export type Database = {
             foreignKeyName: "midias_culto_culto_id_fkey"
             columns: ["culto_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
         ]
@@ -3002,10 +3043,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "presencas_culto_culto_id_fkey"
+            foreignKeyName: "presencas_culto_evento_id_fkey"
             columns: ["culto_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -4409,10 +4450,10 @@ export type Database = {
             referencedColumns: ["pessoa_id"]
           },
           {
-            foreignKeyName: "kids_checkins_culto_id_fkey"
+            foreignKeyName: "kids_checkins_evento_id_fkey"
             columns: ["culto_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -4484,7 +4525,7 @@ export type Database = {
             foreignKeyName: "kids_diario_culto_id_fkey"
             columns: ["culto_id"]
             isOneToOne: false
-            referencedRelation: "cultos"
+            referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
@@ -4740,6 +4781,7 @@ export type Database = {
         | "financeiro"
         | "ministerial"
         | "outro"
+      evento_tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO"
       gravidade_enum: "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
       sentimento_tipo:
         | "feliz"
@@ -4925,6 +4967,7 @@ export const Constants = {
         "ministerial",
         "outro",
       ],
+      evento_tipo: ["CULTO", "RELOGIO", "TAREFA", "EVENTO", "OUTRO"],
       gravidade_enum: ["BAIXA", "MEDIA", "ALTA", "CRITICA"],
       sentimento_tipo: [
         "feliz",
