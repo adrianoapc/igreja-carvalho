@@ -314,8 +314,8 @@ export default function RecursosLiturgiaSheet({
 
       if (error) throw error;
       setMidias(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar mídias", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar mídias", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -346,8 +346,8 @@ export default function RecursosLiturgiaSheet({
       }));
       
       setRecursos(recursosFormatados);
-    } catch (error: any) {
-      toast.error("Erro ao carregar recursos", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar recursos", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -387,8 +387,8 @@ export default function RecursosLiturgiaSheet({
       toast.success(permiteMultiplo ? "Mídia adicionada!" : "Mídia substituída!");
       await loadRecursos();
       onResourcesUpdate();
-    } catch (error: any) {
-      toast.error("Erro ao adicionar mídia", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao adicionar mídia", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -407,8 +407,8 @@ export default function RecursosLiturgiaSheet({
       toast.success("Mídia removida!");
       await loadRecursos();
       onResourcesUpdate();
-    } catch (error: any) {
-      toast.error("Erro ao remover mídia", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao remover mídia", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -428,8 +428,8 @@ export default function RecursosLiturgiaSheet({
 
       if (error) throw error;
       toast.success("Duração atualizada!");
-    } catch (error: any) {
-      toast.error("Erro ao atualizar duração", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao atualizar duração", { description: error instanceof Error ? error.message : String(error) });
       await loadRecursos(); // Revert on error
     }
   };
@@ -470,8 +470,8 @@ export default function RecursosLiturgiaSheet({
       }
       
       onResourcesUpdate();
-    } catch (error: any) {
-      toast.error("Erro ao reordenar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao reordenar", { description: error instanceof Error ? error.message : String(error) });
       await loadRecursos(); // Revert on error
     }
   };

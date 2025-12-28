@@ -51,7 +51,17 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
         pessoaId = pessoaData;
       }
 
-      const pedidoData: any = {
+      const pedidoData: {
+        tipo: string;
+        pedido: string;
+        anonimo: boolean;
+        status: string;
+        membro_id?: string;
+        pessoa_id?: string | null;
+        nome_solicitante?: string;
+        email_solicitante?: string;
+        telefone_solicitante?: string;
+      } = {
         tipo,
         pedido,
         anonimo,

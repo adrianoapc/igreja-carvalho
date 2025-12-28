@@ -112,9 +112,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
       if (error) throw error;
       setPosicoes(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar posições", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     }
   };
@@ -136,9 +136,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
       if (error) throw error;
       setMembros(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar membros", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     }
   };
@@ -153,9 +153,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
       if (error) throw error;
       setPessoas(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar pessoas", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     }
   };
@@ -180,9 +180,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       setNovaPosicao("");
       setDescricaoPosicao("");
       loadPosicoes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao adicionar posição", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -209,9 +209,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       setDescricaoPosicao("");
       setPosicaoEditando(null);
       loadPosicoes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao atualizar posição", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -234,9 +234,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       setPosicaoParaDeletar(null);
       loadPosicoes();
       loadMembros();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao remover posição", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -265,7 +265,7 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
           setShowConflictWarning(true);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao verificar conflito:", error);
     } finally {
       setCheckingConflict(false);
@@ -279,15 +279,15 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
     // Buscar próximo culto para verificar conflito
     const { data: proximoCulto } = await supabase
-      .from("cultos")
-      .select("data_culto")
-      .gte("data_culto", new Date().toISOString())
-      .order("data_culto", { ascending: true })
+      .from("eventos")
+      .select("data_evento")
+      .gte("data_evento", new Date().toISOString())
+      .order("data_evento", { ascending: true })
       .limit(1)
       .maybeSingle();
 
     if (proximoCulto) {
-      await checkConflito(pessoaId, proximoCulto.data_culto);
+      await checkConflito(pessoaId, proximoCulto.data_evento);
     }
   };
 
@@ -325,12 +325,12 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       setConflictInfo(null);
       setShowConflictWarning(false);
       loadMembros();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.code === "23505") {
         toast.error("Esta pessoa já está neste time com esta posição");
       } else {
         toast.error("Erro ao adicionar membro", {
-          description: error.message
+          description: error instanceof Error ? error.message : String(error)
         });
       }
     } finally {
@@ -353,9 +353,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       toast.success("Membro removido do time!");
       setMembroParaDeletar(null);
       loadMembros();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao remover membro", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

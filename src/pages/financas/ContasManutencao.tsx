@@ -115,8 +115,8 @@ export default function ContasManutencao({ onBack }: Props) {
       setDialogOpen(false);
       resetForm();
     },
-    onError: (error: any) => {
-      toast.error("Erro ao criar conta", { description: error.message });
+    onError: (error: unknown) => {
+      toast.error("Erro ao criar conta", { description: error instanceof Error ? error.message : String(error) });
     },
   });
 
@@ -143,8 +143,8 @@ export default function ContasManutencao({ onBack }: Props) {
       setDialogOpen(false);
       resetForm();
     },
-    onError: (error: any) => {
-      toast.error("Erro ao atualizar", { description: error.message });
+    onError: (error: unknown) => {
+      toast.error("Erro ao atualizar", { description: error instanceof Error ? error.message : String(error) });
     },
   });
 
@@ -157,8 +157,8 @@ export default function ContasManutencao({ onBack }: Props) {
       toast.success("Conta excluída");
       queryClient.invalidateQueries({ queryKey: ['contas-manutencao'] });
     },
-    onError: (error: any) => {
-      toast.error("Erro ao excluir", { description: error.message });
+    onError: (error: unknown) => {
+      toast.error("Erro ao excluir", { description: error instanceof Error ? error.message : String(error) });
     },
   });
 

@@ -10,7 +10,7 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 interface FormaPagamentoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  formaPagamento?: any;
+  formaPagamento?: { id: string | number; nome: string };
 }
 
 export function FormaPagamentoDialog({ open, onOpenChange, formaPagamento }: FormaPagamentoDialogProps) {
@@ -49,10 +49,10 @@ export function FormaPagamentoDialog({ open, onOpenChange, formaPagamento }: For
       queryClient.invalidateQueries({ queryKey: ['formas-pagamento'] });
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });
     },

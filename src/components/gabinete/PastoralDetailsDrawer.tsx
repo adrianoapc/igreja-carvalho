@@ -67,7 +67,7 @@ interface AtendimentoPastoral {
   data_agendamento: string | null;
   local_atendimento: string | null;
   observacoes_internas: string | null;
-  historico_evolucao: any[] | null;
+  historico_evolucao: Array<{ data: string; autor: string; acao: string; detalhes?: string }> | null;
   pessoa?: { nome: string | null; telefone: string | null } | null;
   visitante?: { nome: string | null; telefone: string | null } | null;
   pastor?: { nome: string | null } | null;
@@ -232,11 +232,11 @@ export function PastoralDetailsDrawer({
     }: {
       id: string;
       nota: EvolucaoNota;
-      historicoAtual: any[];
+      historicoAtual: Array<{ data: string; autor: string; acao: string; detalhes?: string }>;
       mudarStatus?: boolean;
     }) => {
       const novoHistorico = [...(historicoAtual || []), nota];
-      const updateData: any = { historico_evolucao: novoHistorico };
+      const updateData: { historico_evolucao: Array<{ data: string; autor: string; acao: string; detalhes?: string }> } = { historico_evolucao: novoHistorico };
       if (mudarStatus) {
         updateData.status = "EM_ACOMPANHAMENTO";
       }

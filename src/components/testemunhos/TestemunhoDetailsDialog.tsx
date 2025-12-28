@@ -40,7 +40,14 @@ const testemunhoSchema = z.object({
 interface TestemunhoDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  testemunho: any;
+  testemunho: {
+    id: string;
+    titulo: string;
+    descricao: string;
+    status: string;
+    data_testemunho?: string | null;
+    pessoa?: { nome?: string } | null;
+  };
   onSuccess: () => void;
 }
 
@@ -135,7 +142,7 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
   const handleStatusChange = async (newStatus: string) => {
     setLoading(true);
     try {
-      const updateData: any = { status: newStatus as any };
+      const updateData: { status: string } = { status: newStatus };
       
       if (newStatus === "publico" && !testemunho.data_publicacao) {
         updateData.data_publicacao = new Date().toISOString();

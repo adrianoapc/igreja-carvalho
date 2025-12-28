@@ -91,7 +91,9 @@ function extractJsonAndText(aiContent: string) {
       try {
         parsedJson = JSON.parse(markdownMatch[1].trim());
         cleanText = aiContent.replace(markdownMatch[0], '').trim();
-      } catch (e) {}
+      } catch (e) {
+        // Falha no parse do JSON markdown, tentar próxima estratégia
+      }
     }
     
     if (!parsedJson) {
@@ -104,10 +106,14 @@ function extractJsonAndText(aiContent: string) {
                 parsedJson = tempJson;
                 cleanText = aiContent.substring(0, firstOpen).trim();
             }
-         } catch (e) {}
+         } catch (e) {
+           // JSON inline inválido, continuar sem metadados
+         }
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    // Erro geral no processamento, usar texto original
+  }
   
   cleanText = (cleanText || aiContent).replace(/```json/g, '').replace(/```/g, '').trim();
   return { cleanText, parsedJson };
@@ -176,7 +182,7 @@ serve(async (req) => {
       .select('*').eq('telefone', telefone).neq('status', 'CONCLUIDO')
       .gt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()).maybeSingle();
 
-    let historico = sessao ? sessao.historico_conversa : [];
+    const historico = sessao ? sessao.historico_conversa : [];
 
     if (!sessao) {
       const { data: nova, error } = await supabase.from('atendimentos_bot')
@@ -371,7 +377,9 @@ serve(async (req) => {
             p_function_name: FUNCTION_NAME, p_status: 'success', p_execution_time_ms: executionTime,
             p_request_payload: requestPayload, p_response_payload: { reply: responseMessage, admin: notificarAdmin }
         });
-    } catch (e) {}
+    } catch (e) {
+      // Falha no logging não deve impedir resposta
+    }
 
     // 7. Retorno para o Make
     return new Response(JSON.stringify({ 

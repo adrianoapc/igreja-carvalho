@@ -18,7 +18,11 @@ export default function NotificationsBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const navigate = useNavigate();
 
-  const handleNotificationClick = (notification: any) => {
+  const handleNotificationClick = (notification: {
+    id: string;
+    read: boolean;
+    type: string;
+  }) => {
     if (!notification.read) {
       markAsRead(notification.id);
     }

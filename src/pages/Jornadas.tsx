@@ -114,13 +114,13 @@ export default function Jornadas() {
             {jornadas.map((jornada) => {
               const inscricoes = jornada.inscricoes_jornada || [];
               const totalInscritos = inscricoes.length;
-              const concluidos = inscricoes.filter((i: any) => i.concluido).length;
+              const concluidos = inscricoes.filter((i: { concluido?: boolean }) => i.concluido).length;
               const etapas = jornada.etapas_jornada?.length || 0;
               const progressoGeral = totalInscritos > 0 
                 ? Math.round((concluidos / totalInscritos) * 100) 
                 : 0;
               const pessoas = inscricoes
-                .map((i: any) => i.pessoa)
+                .map((i: { pessoa?: { nome?: string; avatar_url?: string | null } | null }) => i.pessoa)
                 .filter(Boolean)
                 .slice(0, 3);
               const maisCount = Math.max(0, totalInscritos - 3);
@@ -176,7 +176,7 @@ export default function Jornadas() {
                         <div className="flex items-center shrink-0">
                           {pessoas.length > 0 ? (
                             <div className="flex -space-x-2">
-                              {pessoas.map((pessoa: any, idx: number) => (
+                              {pessoas.map((pessoa: { nome?: string; avatar_url?: string | null } | null, idx: number) => (
                                 <Avatar
                                   key={pessoa.id}
                                   className="w-7 h-7 border-2 border-background"

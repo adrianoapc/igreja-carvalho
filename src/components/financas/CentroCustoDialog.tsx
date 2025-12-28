@@ -12,7 +12,12 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 interface CentroCustoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  centro?: any;
+  centro?: {
+    id: string | number;
+    nome: string;
+    descricao?: string | null;
+    base_ministerial_id?: string | null;
+  };
 }
 
 export function CentroCustoDialog({ open, onOpenChange, centro }: CentroCustoDialogProps) {
@@ -75,8 +80,8 @@ export function CentroCustoDialog({ open, onOpenChange, centro }: CentroCustoDia
         setDescricao("");
         setBaseMinisterialId("");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao salvar centro de custo");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar centro de custo");
     } finally {
       setLoading(false);
     }

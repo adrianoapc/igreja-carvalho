@@ -72,7 +72,7 @@ export default function KidsDashboard() {
 
         // Filtrar apenas crianças menores de 13 anos
         const today = new Date();
-        const criancas = (todosProfiles || []).filter((p: any) => {
+        const criancas = (todosProfiles || []).filter((p: { data_nascimento?: string | null; status?: string }) => {
           const birthDate = new Date(p.data_nascimento);
           const age = today.getFullYear() - birthDate.getFullYear();
           const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -82,7 +82,7 @@ export default function KidsDashboard() {
           return actualAge < 13;
         });
 
-        const criancaIds = criancas?.map((c: any) => c.id) || [];
+        const criancaIds = criancas?.map((c: { id: string }) => c.id) || [];
         
         // Se não há crianças cadastradas, retornar valores zerados
         if (criancaIds.length === 0) {
@@ -98,7 +98,7 @@ export default function KidsDashboard() {
         // Presenças de crianças no período (via presencas_culto)
         const { data: presencas, error: presencasError } = await supabase
           .from("presencas_culto")
-          .select("pessoa_id, culto_id, created_at")
+          .select("pessoa_id, evento_id, created_at")
           .in("pessoa_id", criancaIds)
           .gte("created_at", startDate.toISOString());
 
@@ -109,10 +109,10 @@ export default function KidsDashboard() {
         
         // Crianças presentes AGORA (culto ativo)
         const { data: cultoAtivo } = await supabase
-          .from("cultos")
+          .from("eventos")
           .select("id")
-          .gte("data_culto", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-          .lte("data_culto", new Date().toISOString())
+          .gte("data_evento", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+          .lte("data_evento", new Date().toISOString())
           .maybeSingle();
 
         let checkinsAtivos = 0;
@@ -120,7 +120,7 @@ export default function KidsDashboard() {
           const { data: presencasHoje } = await supabase
             .from("presencas_culto")
             .select("pessoa_id")
-            .eq("culto_id", cultoAtivo.id)
+            .eq("evento_id", cultoAtivo.id)
             .in("pessoa_id", criancas?.map(c => c.id) || []);
           
           checkinsAtivos = presencasHoje?.length || 0;
@@ -166,7 +166,7 @@ export default function KidsDashboard() {
           .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null };
 
         // Filtrar apenas crianças menores de 13 anos
-        const criancas = (todosProfiles || []).filter((p: any) => {
+        const criancas = (todosProfiles || []).filter((p: { data_nascimento: string }) => {
           const birthDate = new Date(p.data_nascimento);
           const age = today.getFullYear() - birthDate.getFullYear();
           const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -184,7 +184,7 @@ export default function KidsDashboard() {
           .select(`
             *,
             pessoa:profiles!presencas_culto_pessoa_id_fkey(id, nome, avatar_url),
-            culto:cultos(id, titulo, data_culto)
+            culto:cultos(id, titulo, data_evento)
           `)
           .in("pessoa_id", criancas.map(c => c.id))
           .order("created_at", { ascending: false })
@@ -222,7 +222,7 @@ export default function KidsDashboard() {
         if (error) throw error;
 
         // Filtrar apenas crianças menores de 13 anos
-        const criancas = (todosProfiles || []).filter((p: any) => {
+        const criancas = (todosProfiles || []).filter((p: { data_nascimento: string }) => {
           const birthDate = new Date(p.data_nascimento);
           const age = today.getFullYear() - birthDate.getFullYear();
           const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -232,8 +232,8 @@ export default function KidsDashboard() {
           return actualAge < 13;
         });
 
-        const comAlergias = criancas?.filter((c: any) => c.alergias && c.alergias.trim().length > 0).length || 0;
-        const comNecessidades = criancas?.filter((c: any) => c.necessidades_especiais && c.necessidades_especiais.trim().length > 0).length || 0;
+        const comAlergias = criancas?.filter((c: { alergias?: string | null }) => c.alergias && c.alergias.trim().length > 0).length || 0;
+        const comNecessidades = criancas?.filter((c: { necessidades_especiais?: string | null }) => c.necessidades_especiais && c.necessidades_especiais.trim().length > 0).length || 0;
 
         return {
           totalComAlergias: comAlergias,

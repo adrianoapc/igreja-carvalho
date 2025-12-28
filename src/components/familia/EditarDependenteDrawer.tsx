@@ -60,7 +60,7 @@ export default function EditarDependenteDrawer({
       onSuccess();
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Erro ao atualizar dados");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao atualizar dados");
     },
   });
 

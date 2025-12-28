@@ -67,8 +67,8 @@ export default function FormasPagamento({ onBack }: Props) {
       setDialogOpen(false);
       resetForm();
     },
-    onError: (error: any) => {
-      toast.error("Erro ao criar", { description: error.message });
+    onError: (error: unknown) => {
+      toast.error("Erro ao criar", { description: error instanceof Error ? error.message : String(error) });
     },
   });
 
@@ -86,8 +86,8 @@ export default function FormasPagamento({ onBack }: Props) {
       setDialogOpen(false);
       resetForm();
     },
-    onError: (error: any) => {
-      toast.error("Erro ao atualizar", { description: error.message });
+    onError: (error: unknown) => {
+      toast.error("Erro ao atualizar", { description: error instanceof Error ? error.message : String(error) });
     },
   });
 
@@ -100,8 +100,8 @@ export default function FormasPagamento({ onBack }: Props) {
       toast.success("Forma de pagamento excluída");
       queryClient.invalidateQueries({ queryKey: ['formas-pagamento'] });
     },
-    onError: (error: any) => {
-      toast.error("Erro ao excluir", { description: error.message });
+    onError: (error: unknown) => {
+      toast.error("Erro ao excluir", { description: error instanceof Error ? error.message : String(error) });
     },
   });
 

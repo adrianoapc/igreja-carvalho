@@ -371,7 +371,7 @@ export default function Dashboard() {
                 tickFormatter={(value) => formatCurrency(value)}
               />
               <Tooltip 
-                formatter={(value: any) => formatCurrency(value)}
+                formatter={(value: number) => formatCurrency(value)}
                 contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
               />
               <Legend />
@@ -410,7 +410,7 @@ export default function Dashboard() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value: any) => formatCurrency(value)}
+                    formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                   />
                 </RechartsePieChart>

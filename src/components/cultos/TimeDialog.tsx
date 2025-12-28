@@ -95,7 +95,7 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
 
       if (error) throw error;
       setCategorias(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar categorias");
     }
   };
@@ -110,7 +110,7 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
 
       if (error) throw error;
       setMembros(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar membros");
     }
   };
@@ -166,7 +166,7 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
       if (time) {
         // Atualizar time existente
         const { error } = await supabase
-          .from("times_culto")
+          .from("times")
           .update(dataToSave)
           .eq("id", time.id);
 
@@ -175,7 +175,7 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
       } else {
         // Criar novo time
         const { error } = await supabase
-          .from("times_culto")
+          .from("times")
           .insert(dataToSave);
 
         if (error) throw error;
@@ -184,9 +184,9 @@ export default function TimeDialog({ open, onOpenChange, time, onSuccess }: Time
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao salvar time", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

@@ -28,7 +28,7 @@ interface EscalaCulto {
   culto: {
     id: string;
     titulo: string;
-    data_culto: string;
+    data_evento: string;
   };
   time: {
     id: string;
@@ -69,30 +69,30 @@ export default function EscalasPendentesWidget() {
       const proximos7Dias = addDays(hoje, 7);
 
       const { data, error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .select(`
           id,
           confirmado,
           status_confirmacao,
-          culto:cultos!escalas_culto_culto_id_fkey (
+          culto:eventos!escalas_evento_id_fkey (
             id,
             titulo,
-            data_culto
+            data_evento
           ),
-          time:times_culto!escalas_culto_time_id_fkey (
+          time:times!escalas_time_id_fkey (
             id,
             nome,
             cor
           ),
-          pessoa:profiles!escalas_culto_pessoa_id_fkey (
+          pessoa:profiles!escalas_pessoa_id_fkey (
             id,
             nome,
             telefone
           )
         `)
-        .gte("culto.data_culto", hoje.toISOString())
-        .lte("culto.data_culto", proximos7Dias.toISOString())
-        .order("culto(data_culto)", { ascending: true });
+        .gte("culto.data_evento", hoje.toISOString())
+        .lte("culto.data_evento", proximos7Dias.toISOString())
+        .order("culto(data_evento)", { ascending: true });
 
       if (error) throw error;
       return (data || []).filter(e => e.culto !== null) as EscalaCulto[];
@@ -270,9 +270,9 @@ export default function EscalasPendentesWidget() {
                 <Legend 
                   verticalAlign="bottom" 
                   height={36}
-                  formatter={(value, entry: any) => (
+                  formatter={(value: string, entry: { payload?: { value?: number } }) => (
                     <span className="text-xs">
-                      {value}: {entry.payload.value}
+                      {value}: {entry.payload?.value ?? 0}
                     </span>
                   )}
                 />

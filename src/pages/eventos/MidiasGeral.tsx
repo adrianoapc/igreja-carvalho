@@ -53,7 +53,7 @@ interface Midia {
   canal: string;
   ordem: number;
   ativo: boolean;
-  culto_id?: string;
+  evento_id?: string;
   created_at: string;
   scheduled_at?: string | null;
   expires_at?: string | null;
@@ -296,7 +296,7 @@ export default function MidiasGeral() {
       
       if (error) throw error;
       setTags(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar tags:', error);
     }
   };
@@ -314,7 +314,7 @@ export default function MidiasGeral() {
       
       // Carregar todas as liturgias para contar uso das mídias
       const { data: liturgiasData } = await supabase
-        .from('liturgia_culto')
+        .from('liturgias')
         .select('midias_ids');
       
       // Carregar tags de cada mídia e contar uso em liturgias
@@ -338,7 +338,7 @@ export default function MidiasGeral() {
       );
       
       setMidias(midiasComDados);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar mídias:', error);
       toast.error("Erro ao carregar mídias");
     } finally {
@@ -417,7 +417,7 @@ export default function MidiasGeral() {
 
       toast.success("Mídia deletada com sucesso!");
       loadMidias();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao deletar mídia:', error);
       toast.error("Erro ao deletar mídia");
     } finally {
@@ -436,7 +436,7 @@ export default function MidiasGeral() {
 
       toast.success(midia.ativo ? "Mídia desativada" : "Mídia ativada");
       loadMidias();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao atualizar mídia:', error);
       toast.error("Erro ao atualizar mídia");
     }

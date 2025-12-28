@@ -63,7 +63,7 @@ export function AplicarLiturgiaTemplateDialog({
 
       if (error) throw error;
       setTemplates(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar templates:", error);
       toast.error("Erro ao carregar templates");
     } finally {
@@ -98,9 +98,9 @@ export function AplicarLiturgiaTemplateDialog({
       if (clearExisting) {
         // Buscar itens existentes para deletar recursos
         const { data: itensExistentes } = await supabase
-          .from("liturgia_culto")
+          .from("liturgias")
           .select("id")
-          .eq("culto_id", cultoId);
+          .eq("evento_id", cultoId);
 
         if (itensExistentes && itensExistentes.length > 0) {
           // Deletar recursos associados
@@ -112,9 +112,9 @@ export function AplicarLiturgiaTemplateDialog({
 
           // Deletar itens
           await supabase
-            .from("liturgia_culto")
+            .from("liturgias")
             .delete()
-            .eq("culto_id", cultoId);
+            .eq("evento_id", cultoId);
         }
       }
 
@@ -122,9 +122,9 @@ export function AplicarLiturgiaTemplateDialog({
       let ordemInicial = 1;
       if (!clearExisting) {
         const { data: itensExistentes } = await supabase
-          .from("liturgia_culto")
+          .from("liturgias")
           .select("ordem")
-          .eq("culto_id", cultoId)
+          .eq("evento_id", cultoId)
           .order("ordem", { ascending: false })
           .limit(1);
 
@@ -135,7 +135,7 @@ export function AplicarLiturgiaTemplateDialog({
 
       // Criar novos itens baseados no template
       const novosItens = itensTemplate.map((item, index) => ({
-        culto_id: cultoId,
+        evento_id: cultoId,
         titulo: item.titulo,
         tipo: item.tipo,
         ordem: ordemInicial + index,
@@ -146,7 +146,7 @@ export function AplicarLiturgiaTemplateDialog({
       }));
 
       const { error: insertError } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .insert(novosItens);
 
       if (insertError) throw insertError;
@@ -157,9 +157,9 @@ export function AplicarLiturgiaTemplateDialog({
 
       onSuccess?.();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao aplicar template:", error);
-      toast.error("Erro ao aplicar template", { description: error.message });
+      toast.error("Erro ao aplicar template", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setApplying(null);
     }
@@ -177,18 +177,18 @@ export function AplicarLiturgiaTemplateDialog({
       toast.success("Template excluído");
       setDeleteConfirm(null);
       loadTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao excluir template:", error);
-      toast.error("Erro ao excluir template", { description: error.message });
+      toast.error("Erro ao excluir template", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
   const handleSelectTemplate = (template: Template) => {
     // Verificar se já existem itens no culto
     supabase
-      .from("liturgia_culto")
+      .from("liturgias")
       .select("id", { count: "exact", head: true })
-      .eq("culto_id", cultoId)
+      .eq("evento_id", cultoId)
       .then(({ count }) => {
         if (count && count > 0) {
           // Já tem itens - perguntar se quer limpar ou adicionar

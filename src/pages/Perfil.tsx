@@ -177,7 +177,7 @@ export default function Perfil() {
 
       if (funcoesError) throw funcoesError;
       setFuncoes(funcoesData || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar dados do perfil");
     } finally {

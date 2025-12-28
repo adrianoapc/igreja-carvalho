@@ -6,11 +6,11 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  tipo: string;
-  data_culto: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
+  data_evento: string;
   local: string | null;
   endereco: string | null;
   tema: string | null;
@@ -20,7 +20,7 @@ interface Culto {
 }
 
 interface EventoDetailsDialogProps {
-  evento: Culto | null;
+  evento: Evento | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -28,7 +28,7 @@ interface EventoDetailsDialogProps {
 export function EventoDetailsDialog({ evento, open, onOpenChange }: EventoDetailsDialogProps) {
   if (!evento) return null;
 
-  const cultoDate = parseISO(evento.data_culto);
+  const cultoDate = parseISO(evento.data_evento);
   const weekDay = format(cultoDate, "EEEE", { locale: ptBR });
   const fullDate = format(cultoDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const time = format(cultoDate, "HH:mm");

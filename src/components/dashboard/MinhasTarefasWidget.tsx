@@ -33,7 +33,7 @@ export default function MinhasTarefasWidget() {
     queryFn: async () => {
       if (!profile?.id) return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("tarefas")
         .select(`
           id, titulo, prioridade, data_vencimento,

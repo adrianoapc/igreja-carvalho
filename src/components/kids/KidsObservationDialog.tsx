@@ -82,19 +82,19 @@ export function KidsObservationDialog({
           .select("*")
           .eq("crianca_id", crianca.id)
           .eq("data", format(new Date(), "yyyy-MM-dd"))
-          .is("culto_id", null)
+          .is("evento_id", null)
           .maybeSingle();
 
         if (error) throw error;
         return data;
       }
 
-      // Se tem culto, buscar por culto_id
+      // Se tem culto, buscar por evento_id
       const { data, error } = await supabase
         .from("kids_diario")
         .select("*")
         .eq("crianca_id", crianca.id)
-        .eq("culto_id", cultoId)
+        .eq("evento_id", cultoId)
         .maybeSingle();
 
       if (error) throw error;
@@ -128,7 +128,7 @@ export function KidsObservationDialog({
 
       const dados = {
         crianca_id: crianca.id,
-        culto_id: cultoId || null,
+        evento_id: cultoId || null,
         data: format(new Date(), "yyyy-MM-dd"),
         professor_id: professorId,
         comportamento_tags: comportamentos,
@@ -166,9 +166,9 @@ export function KidsObservationDialog({
       queryClient.invalidateQueries({ queryKey: ["kids-diario"] });
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Erro ao salvar diário:", error);
-      toast.error("Erro ao salvar diário: " + error.message);
+      toast.error("Erro ao salvar diário: " + error instanceof Error ? error.message : String(error));
     },
   });
 

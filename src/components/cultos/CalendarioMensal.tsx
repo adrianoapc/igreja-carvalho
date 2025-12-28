@@ -25,18 +25,18 @@ const STATUS_COLORS: Record<string, string> = {
   cancelado: "bg-red-400 hover:bg-red-500 opacity-60"
 };
 
-interface Culto {
+interface Evento {
   id: string;
-  tipo: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
   titulo: string;
-  data_culto: string;
+  data_evento: string;
   status: string;
 }
 
 interface CalendarioMensalProps {
-  cultos: Culto[];
+  cultos: Evento[];
   escalasCount: Record<string, number>;
-  onCultoClick: (culto: Culto) => void;
+  onCultoClick: (culto: Evento) => void;
 }
 
 export default function CalendarioMensal({ cultos, escalasCount, onCultoClick }: CalendarioMensalProps) {
@@ -49,9 +49,9 @@ export default function CalendarioMensal({ cultos, escalasCount, onCultoClick }:
   }, [currentMonth]);
 
   const cultosPorDia = useMemo(() => {
-    const map: Record<string, Culto[]> = {};
+    const map: Record<string, Evento[]> = {};
     cultos.forEach((culto) => {
-      const date = new Date(culto.data_culto);
+      const date = new Date(culto.data_evento);
       const key = format(date, "yyyy-MM-dd");
       if (!map[key]) map[key] = [];
       map[key].push(culto);

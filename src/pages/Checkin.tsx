@@ -48,8 +48,8 @@ export default function Checkin() {
     try {
       if (tipo === "culto") {
         const { data, error } = await supabase
-          .from("cultos")
-          .select("id, titulo, data_culto, tipo")
+          .from("eventos")
+          .select("id, titulo, data_evento, tipo")
           .eq("id", id)
           .maybeSingle();
         
@@ -58,7 +58,7 @@ export default function Checkin() {
           setEvento({
             id: data.id,
             titulo: data.titulo,
-            data: data.data_culto,
+            data: data.data_evento,
             tipo: data.tipo,
           });
         }
@@ -79,7 +79,7 @@ export default function Checkin() {
           });
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar evento:", error);
       toast.error("Evento não encontrado");
     } finally {
@@ -115,9 +115,9 @@ export default function Checkin() {
       } else {
         toast.error(data.message || "Erro ao registrar presença");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro no check-in:", error);
-      toast.error("Erro ao processar check-in", { description: error.message });
+      toast.error("Erro ao processar check-in", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setSearching(false);
     }

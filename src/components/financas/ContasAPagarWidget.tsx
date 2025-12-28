@@ -16,6 +16,15 @@ interface TransacaoPendente {
   data_vencimento: string;
 }
 
+interface TransacaoRow {
+  id: string;
+  descricao: string;
+  valor: number;
+  data_vencimento: string;
+  solicitacao_reembolso_id: string | null;
+  solicitacao_reembolso?: { status: string } | null;
+}
+
 type AlertaStatus = "vencido" | "hoje" | "breve" | "ok";
 
 function resolverStatus(dataVencimento: string): AlertaStatus {
@@ -62,14 +71,19 @@ export function ContasAPagarWidget() {
         .limit(20); // Buscar mais pois vamos filtrar
 
       if (error) throw error;
-      
+
+      const rows = (data ?? []) as TransacaoRow[];
       // Filtrar: exclui transações de reembolso que NÃO estão pagas
-      const filtered = (data || []).filter(t => 
-        !t.solicitacao_reembolso_id || 
-        (t.solicitacao_reembolso as any)?.status === 'pago'
+      const filtered = rows.filter((t) =>
+        !t.solicitacao_reembolso_id || t.solicitacao_reembolso?.status === "pago"
       );
-      
-      return filtered.slice(0, 10) as TransacaoPendente[];
+
+      return filtered.slice(0, 10).map((t) => ({
+        id: t.id,
+        descricao: t.descricao,
+        valor: Number(t.valor),
+        data_vencimento: t.data_vencimento,
+      }));
     },
   });
 

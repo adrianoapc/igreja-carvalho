@@ -27,8 +27,15 @@ import EtapaContentDialog from "./EtapaContentDialog";
 interface EditarJornadaDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  jornada: any;
-  onSuccess: () => void;
+  jornada: {
+    id: string;
+    nome: string;
+    descricao?: string | null;
+    tipo_jornada?: string | null;
+    cor?: string | null;
+    ativo?: boolean;
+  };
+  onUpdate: () => void;
 }
 
 const CORES_TEMA = [
@@ -305,7 +312,7 @@ export default function EditarJornadaDialog({
 
             <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
               <Label className="font-medium">Tipo de Jornada</Label>
-              <RadioGroup value={tipoJornada} onValueChange={(v: any) => setTipoJornada(v)}>
+              <RadioGroup value={tipoJornada} onValueChange={(v: "evangelismo" | "discipulado" | "membresia" | "mentoria" | "personalizado") => setTipoJornada(v)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="auto_instrucional" id="tipo_curso" />
                   <Label htmlFor="tipo_curso" className="font-normal cursor-pointer flex-1">

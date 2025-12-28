@@ -34,7 +34,13 @@ interface Etapa {
   tipo_conteudo: string | null;
   conteudo_url: string | null;
   conteudo_texto: string | null;
-  quiz_config?: any;
+  quiz_config?: {
+    perguntas?: Array<{
+      pergunta: string;
+      opcoes: string[];
+      resposta_correta: number;
+    }>;
+  };
   check_automatico?: boolean | null;
   aula_vinculada_id: string | null;
   concluida: boolean;

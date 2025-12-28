@@ -138,7 +138,12 @@ export default function EtapaContentDialog({
       }
 
       // Preparar payload
-      const payload: any = {
+      const payload: {
+        conteudo_texto?: string;
+        conteudo_video?: string;
+        recursos?: string;
+        perguntas_reflexao?: unknown[];
+      } = {
         tipo_conteudo: tipoConteudo,
         conteudo_url: tipoConteudo === "video" ? conteudoUrl : null,
         conteudo_texto: tipoConteudo === "texto" ? conteudoTexto : null,
@@ -195,7 +200,7 @@ export default function EtapaContentDialog({
     }
   };
 
-  const updatePergunta = (id: string, campo: string, valor: any) => {
+  const updatePergunta = (id: string, campo: string, valor: unknown) => {
     setPerguntas(
       perguntas.map((p) =>
         p.id === id ? { ...p, [campo]: valor } : p

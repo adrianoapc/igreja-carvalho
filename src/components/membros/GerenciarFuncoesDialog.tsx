@@ -88,10 +88,10 @@ export function GerenciarFuncoesDialog({
       setEditingId(null);
       setShowForm(false);
       fetchFuncoes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível salvar a função",
+        description: error instanceof Error ? error.message : String(error) || "Não foi possível salvar a função",
         variant: "destructive",
       });
     } finally {
@@ -118,10 +118,10 @@ export function GerenciarFuncoesDialog({
       if (error) throw error;
       toast({ title: "Função excluída com sucesso" });
       fetchFuncoes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível excluir a função",
+        description: error instanceof Error ? error.message : String(error) || "Não foi possível excluir a função",
         variant: "destructive",
       });
     }

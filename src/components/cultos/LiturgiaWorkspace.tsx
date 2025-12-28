@@ -310,7 +310,7 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
       const permiteMultiplo = tiposMultiplos.includes(tipo.toLowerCase());
 
       const { error } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .update({
           tipo,
           titulo,
@@ -325,8 +325,8 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
       if (error) throw error;
       toast.success("Item atualizado!");
       onSave();
-    } catch (error: any) {
-      toast.error("Erro ao salvar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setSaving(false);
     }
@@ -357,8 +357,8 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
       toast.success(permiteMultiplo ? "Mídia adicionada!" : "Mídia vinculada!");
       await loadRecursos();
       onSave();
-    } catch (error: any) {
-      toast.error("Erro ao adicionar mídia", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao adicionar mídia", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -373,8 +373,8 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
       toast.success("Mídia removida!");
       await loadRecursos();
       onSave();
-    } catch (error: any) {
-      toast.error("Erro ao remover mídia", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao remover mídia", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -388,7 +388,7 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
         .from("liturgia_recursos")
         .update({ duracao_segundos: newDuration })
         .eq("id", recursoId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao atualizar duração");
       await loadRecursos();
     }
@@ -413,7 +413,7 @@ export default function LiturgiaWorkspace({ item, membros, onSave, onDelete }: L
           .eq("id", newRecursos[i].id);
       }
       onSave();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao reordenar");
       await loadRecursos();
     }

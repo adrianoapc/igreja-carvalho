@@ -12,7 +12,16 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 interface ContaDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  conta?: any;
+  conta?: {
+    id: string | number;
+    nome: string;
+    tipo: "bancaria" | "fisica" | "virtual";
+    saldo_inicial?: number | null;
+    banco?: string | null;
+    agencia?: string | null;
+    conta_numero?: string | null;
+    observacoes?: string | null;
+  };
 }
 
 export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
@@ -70,8 +79,8 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
       queryClient.invalidateQueries({ queryKey: ['contas'] });
       queryClient.invalidateQueries({ queryKey: ['contas-resumo'] });
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao salvar conta");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar conta");
     } finally {
       setLoading(false);
     }
@@ -100,7 +109,7 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium mb-2 block">Tipo de conta *</Label>
-              <RadioGroup value={tipo} onValueChange={(value: any) => setTipo(value)}>
+              <RadioGroup value={tipo} onValueChange={(value: "bancaria" | "fisica" | "virtual") => setTipo(value)}>
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="bancaria" id="bancaria" />

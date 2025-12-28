@@ -70,12 +70,12 @@ export default function KidsCheckinScanner() {
       fim.setHours(23, 59, 59, 999);
 
       const { data, error } = await supabase
-        .from("cultos")
-        .select("id, titulo, data_culto, status")
-        .gte("data_culto", inicio.toISOString())
-        .lte("data_culto", fim.toISOString())
+        .from("eventos")
+        .select("id, titulo, data_evento, status")
+        .gte("data_evento", inicio.toISOString())
+        .lte("data_evento", fim.toISOString())
         .in("status", ["planejado", "confirmado"])
-        .order("data_culto", { ascending: true })
+        .order("data_evento", { ascending: true })
         .limit(1);
 
       if (error) throw error;
@@ -269,7 +269,7 @@ export default function KidsCheckinScanner() {
         const checkins = selectedChildrenArray.map((childId) => ({
           crianca_id: childId,
           responsavel_id: scannedId,
-          culto_id: cultoHoje.id,
+          evento_id: cultoHoje.id,
           checkin_por: profile?.id || null,
         }));
 
@@ -285,7 +285,7 @@ export default function KidsCheckinScanner() {
 
         // 2. Criar presencas_culto (único por criança por culto)
         const presencas = selectedChildrenArray.map((childId) => ({
-          culto_id: cultoHoje.id,
+          evento_id: cultoHoje.id,
           pessoa_id: childId,
           metodo: "qrcode",
           // Evita FK inválida caso o perfil do usuário não esteja em profiles
@@ -318,9 +318,9 @@ export default function KidsCheckinScanner() {
       setIsScannerActive(true);
       setActiveCheckinsMap(new Map());
       setIsCheckoutMode(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao processar:", error);
-      toast.error(error.message || "Erro ao processar operação");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao processar operação");
     } finally {
       setIsProcessing(false);
     }

@@ -121,11 +121,11 @@ export function useAuthDiagnostics() {
 
         if (error) {
           console.error('[Diagnostics] Refresh failed:', {
-            errorMessage: error.message,
+            errorMessage: error instanceof Error ? error.message : String(error),
             errorStatus: (error as any).status,
             errorCode: (error as any).code,
           });
-          return { success: false, error: error.message };
+          return { success: false, error: error instanceof Error ? error.message : String(error) };
         }
 
         console.log('[Diagnostics] Refresh successful:', {

@@ -40,7 +40,14 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      const updateData: any = { status: newStatus };
+      const updateData: {
+        status: string;
+        data_pagamento?: null;
+        juros?: number;
+        multas?: number;
+        desconto?: number;
+        taxas_administrativas?: number;
+      } = { status: newStatus };
       
       // Se marcar como pendente, remover todos os dados de pagamento/recebimento
       if (newStatus === "pendente") {

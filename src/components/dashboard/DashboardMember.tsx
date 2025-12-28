@@ -48,7 +48,7 @@ export default function DashboardMember() {
 
   useEffect(() => {
     fetchBanners();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   useEffect(() => {

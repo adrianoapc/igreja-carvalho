@@ -20,10 +20,10 @@ import {
 import { cn } from "@/lib/utils";
 import { MediaPickerDialog } from "./MediaPickerDialog";
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  data_culto: string;
+  data_evento: string;
 }
 
 interface MidiaSelecionada {
@@ -36,7 +36,14 @@ interface MidiaSelecionada {
 interface PublicacaoStepperProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  publicacao?: any | null;
+  publicacao?: {
+    id?: string;
+    titulo?: string;
+    descricao?: string;
+    tipo?: string;
+    data_publicacao?: string;
+    conteudo?: unknown;
+  } | null;
   onSuccess: () => void;
 }
 
@@ -63,7 +70,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [cultos, setCultos] = useState<Culto[]>([]);
+  const [cultos, setCultos] = useState<Evento[]>([]);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [mediaPickerTarget, setMediaPickerTarget] = useState<"main" | "telao">("main");
   
@@ -89,7 +96,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
     exibir_site: false,
     enviar_push: false,
     tags: [] as string[],
-    culto_id: "",
+    evento_id: "",
     ordem_telao: 0,
   });
 
@@ -118,7 +125,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
           exibir_site: publicacao.exibir_site ?? false,
           enviar_push: false,
           tags: publicacao.tags || [],
-          culto_id: publicacao.culto_id || "",
+          evento_id: publicacao.evento_id || "",
           ordem_telao: publicacao.ordem_telao || 0,
         });
         // Carregar mídia vinculada
@@ -167,7 +174,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
       exibir_site: false,
       enviar_push: false,
       tags: [],
-      culto_id: "",
+      evento_id: "",
       ordem_telao: 0,
     });
     setSegmentacao({ publico_alvo: "todos" });
@@ -178,10 +185,10 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
   const loadCultos = async () => {
     try {
       const { data } = await supabase
-        .from("cultos")
-        .select("id, titulo, data_culto")
-        .gte("data_culto", new Date().toISOString())
-        .order("data_culto", { ascending: true })
+        .from("eventos")
+        .select("id, titulo, data_evento")
+        .gte("data_evento", new Date().toISOString())
+        .order("data_evento", { ascending: true })
         .limit(20);
       setCultos(data || []);
     } catch (error) {
@@ -194,7 +201,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
     setMediaPickerOpen(true);
   };
 
-  const handleMediaSelect = (midia: any) => {
+  const handleMediaSelect = (midia: { id: string; url?: string; tipo?: string }) => {
     if (mediaPickerTarget === "main") {
       setMidiaSelecionada(midia);
     } else {
@@ -270,7 +277,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
         url_arquivo_telao: distribuicao.exibir_telao && midiaTelaoSelecionada ? midiaTelaoSelecionada.url : null,
         ordem_telao: distribuicao.exibir_telao ? distribuicao.ordem_telao : 0,
         tags: distribuicao.exibir_telao ? distribuicao.tags : [],
-        culto_id: distribuicao.exibir_telao && distribuicao.culto_id ? distribuicao.culto_id : null,
+        evento_id: distribuicao.exibir_telao && distribuicao.evento_id ? distribuicao.evento_id : null,
         categoria_midia: segmentacao.publico_alvo,
       };
 
@@ -286,8 +293,8 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -373,7 +380,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
               <Input
                 value={formData.titulo}
                 onChange={e => setFormData({ ...formData, titulo: e.target.value })}
-                placeholder="Ex: Culto Especial de Domingo"
+                placeholder="Ex: Evento Especial de Domingo"
               />
             </div>
 
@@ -582,12 +589,12 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
                           </div>
                         </div>
 
-                        {/* Vincular Culto */}
+                        {/* Vincular Evento */}
                         <div className="space-y-2">
                           <Label className="text-xs font-medium text-muted-foreground">VINCULAR A CULTO (OPCIONAL)</Label>
                         <Select
-                            value={distribuicao.culto_id || "none"}
-                            onValueChange={v => setDistribuicao({ ...distribuicao, culto_id: v === "none" ? "" : v })}
+                            value={distribuicao.evento_id || "none"}
+                            onValueChange={v => setDistribuicao({ ...distribuicao, evento_id: v === "none" ? "" : v })}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione um culto..." />
@@ -596,7 +603,7 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
                               <SelectItem value="none">Nenhum (Geral)</SelectItem>
                               {cultos.map(culto => (
                                 <SelectItem key={culto.id} value={culto.id}>
-                                  {culto.titulo} - {new Date(culto.data_culto).toLocaleDateString("pt-BR")}
+                                  {culto.titulo} - {new Date(culto.data_evento).toLocaleDateString("pt-BR")}
                                 </SelectItem>
                               ))}
                             </SelectContent>

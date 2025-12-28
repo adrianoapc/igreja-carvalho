@@ -143,7 +143,7 @@ export default function RelatorioOferta() {
           message: `${profile?.nome} criou um relatório de oferta do culto de ${format(dataCulto, 'dd/MM/yyyy')} aguardando sua validação. Total: ${formatCurrency(calcularTotal())}`,
           type: 'conferencia_oferta',
           metadata: {
-            data_culto: format(dataCulto, 'yyyy-MM-dd'),
+            data_evento: format(dataCulto, 'yyyy-MM-dd'),
             lancado_por: profile?.nome,
             lancado_por_id: profile?.id,
             conferente_id: conferenteId,
@@ -163,17 +163,28 @@ export default function RelatorioOferta() {
       setDataCulto(new Date());
       setConferenteId("");
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao enviar relatório:', error);
       toast.error('Erro ao enviar relatório', {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfirmarOferta = async (notificationId: string, metadata: any) => {
+    type OfertaMetadata = {
+      data_evento: string;
+      lancado_por?: string;
+      lancado_por_id?: string;
+      valores: Record<string, string>;
+      valores_formatados?: string;
+      total: number;
+      taxa_cartao_credito?: string;
+      taxa_cartao_debito?: string;
+    };
+
+    const handleConfirmarOferta = async (notificationId: string, metadata: OfertaMetadata) => {
     setLoading(true);
 
     try {
@@ -188,7 +199,7 @@ export default function RelatorioOferta() {
       }
 
       const { data: userData } = await supabase.auth.getUser();
-      const dataFormatada = metadata.data_culto;
+      const dataFormatada = metadata.data_evento;
       const valoresMetadata = metadata.valores;
       const taxaCredito = metadata.taxa_cartao_credito;
       const taxaDebito = metadata.taxa_cartao_debito;
@@ -245,7 +256,7 @@ export default function RelatorioOferta() {
         const transacao = {
           tipo: 'entrada',
           tipo_lancamento: 'unico',
-          descricao: `Oferta - Culto ${format(new Date(metadata.data_culto), 'dd/MM/yyyy')}`,
+          descricao: `Oferta - Culto ${format(new Date(metadata.data_evento), 'dd/MM/yyyy')}`,
           valor: valorNumerico,
           data_vencimento: dataFormatada,
           data_competencia: dataFormatada,
@@ -280,17 +291,17 @@ export default function RelatorioOferta() {
       queryClient.invalidateQueries({ queryKey: ['contas-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao criar lançamentos:', error);
       toast.error('Erro ao criar lançamentos', {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRejeitarOferta = async (notificationId: string, metadata: any) => {
+  const handleRejeitarOferta = async (notificationId: string, metadata: OfertaMetadata) => {
     try {
       // Buscar perfil do lançador usando lancado_por_id do metadata
       const { data: lancadorProfile } = await supabase
@@ -308,10 +319,10 @@ export default function RelatorioOferta() {
       await supabase.from('notifications').insert({
         user_id: lancadorProfile.user_id,
         title: 'Relatório de Oferta Rejeitado',
-        message: `O conferente ${profile?.nome} rejeitou o relatório de oferta do culto de ${format(new Date(metadata.data_culto), 'dd/MM/yyyy')}. Total: ${formatCurrency(metadata.total)}`,
+        message: `O conferente ${profile?.nome} rejeitou o relatório de oferta do culto de ${format(new Date(metadata.data_evento), 'dd/MM/yyyy')}. Total: ${formatCurrency(metadata.total)}`,
         type: 'rejeicao_oferta',
         metadata: {
-          data_culto: format(new Date(metadata.data_culto), 'dd/MM/yyyy'),
+          data_evento: format(new Date(metadata.data_evento), 'dd/MM/yyyy'),
           conferente: profile?.nome,
           lancado_por: metadata.lancado_por,
           valores: metadata.valores_formatados,
@@ -328,7 +339,7 @@ export default function RelatorioOferta() {
 
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.info('Conferência rejeitada.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao rejeitar oferta:', error);
       toast.error('Erro ao rejeitar oferta');
     }
@@ -541,13 +552,13 @@ export default function RelatorioOferta() {
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0 space-y-3">
             {notificacoesPendentes.map((notif) => {
-              const metadata = notif.metadata as any;
+              const metadata = notif.metadata as OfertaMetadata;
               const valoresObj = metadata.valores || {};
               const total = metadata.total || 0;
               
               const dadosConferencia = {
-                dataCulto: new Date(metadata.data_culto),
-                valores: Object.entries(valoresObj).reduce((acc, [id, valorStr]: [string, any]) => {
+                dataCulto: new Date(metadata.data_evento),
+                valores: Object.entries(valoresObj).reduce((acc, [id, valorStr]: [string, string]) => {
                   const valorNumerico = parseFloat(String(valorStr).replace(',', '.'));
                   if (valorNumerico > 0) {
                     const forma = formasPagamento?.find(f => f.id === id);

@@ -11,7 +11,11 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 interface BaseMinisterialDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  base?: any;
+  base?: {
+    id: string | number;
+    titulo: string;
+    descricao?: string | null;
+  };
 }
 
 export function BaseMinisterialDialog({ open, onOpenChange, base }: BaseMinisterialDialogProps) {
@@ -53,8 +57,8 @@ export function BaseMinisterialDialog({ open, onOpenChange, base }: BaseMinister
         setTitulo("");
         setDescricao("");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao salvar base ministerial");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar base ministerial");
     } finally {
       setLoading(false);
     }

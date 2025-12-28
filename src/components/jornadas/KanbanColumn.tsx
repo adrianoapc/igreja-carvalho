@@ -10,7 +10,14 @@ import JornadaCard from "./JornadaCard";
 interface KanbanColumnProps {
   id: string;
   title: string;
-  items: any[];
+  items: Array<{
+    id: string;
+    pessoa_id: string;
+    etapa_id: string;
+    responsavel_id?: string | null;
+    data_inscricao: string;
+    profiles?: { nome: string; avatar_url?: string | null } | null;
+  }>;
   totalEtapas: number;
   onRefetch: () => void;
   etapasOrdenadas: Array<{ id: string; ordem: number; titulo: string }>;

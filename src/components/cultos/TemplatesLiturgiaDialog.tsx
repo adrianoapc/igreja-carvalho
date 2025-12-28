@@ -152,9 +152,9 @@ export function TemplatesLiturgiaDialog({
 
       onSuccess?.();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao salvar template:", error);
-      toast.error(error.message || "Erro ao salvar template");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar template");
     } finally {
       setLoading(false);
     }

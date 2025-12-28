@@ -23,20 +23,20 @@ export default function VisaoProjetosWidget() {
     queryFn: async () => {
       // Buscar tarefas atrasadas (não concluídas e vencidas)
       const hoje = new Date().toISOString().split("T")[0];
-      const { count: atrasadas } = await (supabase as any)
+      const { count: atrasadas } = await supabase
         .from("tarefas")
         .select("*", { count: "exact", head: true })
         .neq("status", "done")
         .lt("data_vencimento", hoje);
 
       // Buscar projetos ativos
-      const { count: projetosAtivos } = await (supabase as any)
+      const { count: projetosAtivos } = await supabase
         .from("projetos")
         .select("*", { count: "exact", head: true })
         .eq("status", "ativo");
 
       // Buscar top 3 projetos com progresso
-      const { data: projetos } = await (supabase as any)
+      const { data: projetos } = await supabase
         .from("projetos")
         .select(`id, titulo, tarefas(status)`)
         .eq("status", "ativo")
@@ -44,9 +44,9 @@ export default function VisaoProjetosWidget() {
 
       const projetosComProgresso: ProjetoComProgresso[] = (projetos || [])
         .map(p => {
-          const tarefas = p.tarefas || [];
+          const tarefas = (p as { tarefas?: { status: string }[] }).tarefas || [];
           const total = tarefas.length;
-          const concluidas = tarefas.filter((t: { status: string }) => t.status === "done").length;
+          const concluidas = tarefas.filter((t) => t.status === "done").length;
           return {
             id: p.id,
             titulo: p.titulo,

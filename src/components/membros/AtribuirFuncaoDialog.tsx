@@ -101,11 +101,11 @@ export function AtribuirFuncaoDialog({
       onSuccess();
       onOpenChange(false);
       setSelectedFuncao("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao atribuir função:", error);
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível atribuir a função",
+        description: error instanceof Error ? error.message : String(error) || "Não foi possível atribuir a função",
         variant: "destructive",
       });
     } finally {

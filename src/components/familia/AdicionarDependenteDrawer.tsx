@@ -197,7 +197,7 @@ export default function AdicionarDependenteDrawer({
       onSuccess();
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Erro ao adicionar dependente");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao adicionar dependente");
     },
   });
 

@@ -258,7 +258,7 @@ export default function NotificacoesAdmin({ onBack }: Props) {
     setLoadingOps(prev => ({ ...prev, [`${regraId}-${canal}`]: true }));
 
     try {
-      const payload: any = { canais: newCanais };
+      const payload: { canais: string[] } = { canais: newCanais };
       if (canal === 'inapp') payload.canal_inapp = newValue;
       if (canal === 'push') payload.canal_push = newValue;
       if (canal === 'whatsapp') payload.canal_whatsapp = newValue;

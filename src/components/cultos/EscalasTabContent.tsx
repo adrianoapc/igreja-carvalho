@@ -49,10 +49,10 @@ interface Escala {
 }
 
 interface EscalasTabContentProps {
-  cultoId: string;
+  eventoId: string;
 }
 
-export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
+export default function EscalasTabContent({ eventoId }: EscalasTabContentProps) {
   const { hasAccess } = useAuth();
   const isAdmin = hasAccess("cultos", "aprovar_gerenciar");
   
@@ -64,17 +64,17 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
 
   useEffect(() => {
     loadData();
-  }, [cultoId]);
+  }, [eventoId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [timesRes, posicoesRes, escalasRes] = await Promise.all([
-        supabase.from("times_culto").select("*").eq("ativo", true).order("categoria").order("nome"),
+        supabase.from("times").select("*").eq("ativo", true).order("categoria").order("nome"),
         supabase.from("posicoes_time").select("*").eq("ativo", true),
-        supabase.from("escalas_culto")
+        supabase.from("escalas")
           .select(`*, profiles:pessoa_id(nome), posicoes_time:posicao_id(nome)`)
-          .eq("culto_id", cultoId)
+          .eq("evento_id", eventoId)
       ]);
 
       if (timesRes.error) throw timesRes.error;
@@ -96,8 +96,8 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
         membrosMap[time.id] = data || [];
       }
       setMembrosTime(membrosMap);
-    } catch (error: any) {
-      toast.error("Erro ao carregar dados", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar dados", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -105,8 +105,8 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
 
   const handleAddEscala = async (timeId: string, pessoaId: string, posicaoId: string | null) => {
     try {
-      const { error } = await supabase.from("escalas_culto").insert({
-        culto_id: cultoId,
+      const { error } = await supabase.from("escalas").insert({
+        evento_id: eventoId,
         time_id: timeId,
         pessoa_id: pessoaId,
         posicao_id: posicaoId,
@@ -115,36 +115,36 @@ export default function EscalasTabContent({ cultoId }: EscalasTabContentProps) {
       if (error) throw error;
       toast.success("Voluntário escalado!");
       loadData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.code === "23505") {
         toast.error("Este voluntário já está escalado");
       } else {
-        toast.error("Erro ao escalar", { description: error.message });
+        toast.error("Erro ao escalar", { description: error instanceof Error ? error.message : String(error) });
       }
     }
   };
 
   const handleRemoveEscala = async (escalaId: string) => {
     try {
-      const { error } = await supabase.from("escalas_culto").delete().eq("id", escalaId);
+      const { error } = await supabase.from("escalas").delete().eq("id", escalaId);
       if (error) throw error;
       toast.success("Voluntário removido da escala");
       loadData();
-    } catch (error: any) {
-      toast.error("Erro ao remover", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao remover", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
   const handleToggleConfirmacao = async (escala: Escala) => {
     try {
       const { error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .update({ confirmado: !escala.confirmado })
         .eq("id", escala.id);
       if (error) throw error;
       loadData();
-    } catch (error: any) {
-      toast.error("Erro ao atualizar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao atualizar", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 

@@ -28,7 +28,7 @@ interface AtendimentoPastoral {
   data_agendamento: string | null;
   local_atendimento: string | null;
   observacoes_internas: string | null;
-  historico_evolucao: any[] | null;
+  historico_evolucao: Array<{ data: string; autor: string; acao: string; detalhes?: string }> | null;
   pessoa?: { nome: string | null; telefone: string | null } | null;
   visitante?: { nome: string | null; telefone: string | null } | null;
   pastor?: { nome: string | null } | null;

@@ -162,7 +162,7 @@ export default function RegistrarVisitanteFamiliaDialog({
       onSuccess(criancasIds);
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Erro ao cadastrar família");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao cadastrar família");
     },
   });
 

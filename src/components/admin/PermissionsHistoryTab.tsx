@@ -130,7 +130,7 @@ export function PermissionsHistoryTab({ roles, permissions, onRollbackSuccess }:
       );
 
       setAuditLog(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao buscar histórico de permissões:', err);
       setError('Não foi possível carregar o histórico. Tente novamente.');
     } finally {
@@ -162,12 +162,12 @@ export function PermissionsHistoryTab({ roles, permissions, onRollbackSuccess }:
       if (onRollbackSuccess) {
         onRollbackSuccess();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao desfazer lote:', err);
       toast({
         variant: 'destructive',
         title: 'Erro ao desfazer',
-        description: err.message || 'Não foi possível reverter este lote.',
+        description: err instanceof Error ? err.message : 'Não foi possível reverter este lote.',
       });
     } finally {
       setRollingBack(false);

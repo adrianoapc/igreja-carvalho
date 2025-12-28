@@ -31,7 +31,7 @@ type ColumnMapping = {
 
 export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<any[]>([]);
+  const [preview, setPreview] = useState<Array<Record<string, unknown>>>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [fileName, setFileName] = useState<string>("");
@@ -57,7 +57,7 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
       }
 
       // Extrair nomes das colunas
-      const firstRow: any = jsonData[0];
+      const firstRow = jsonData[0] as Record<string, unknown>;
       const columnNames = Object.keys(firstRow);
       setColumns(columnNames);
       
@@ -86,13 +86,13 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
     }
   };
 
-  const parseValor = (valor: any): number => {
+  const parseValor = (valor: unknown): number => {
     if (!valor) return 0;
     const valorStr = String(valor).replace(/[^\d,.-]/g, "").replace(",", ".");
     return parseFloat(valorStr) || 0;
   };
 
-  const parseData = (data: any): string | null => {
+  const parseData = (data: unknown): string | null => {
     if (!data) return null;
     try {
       // Tentar diferentes formatos de data

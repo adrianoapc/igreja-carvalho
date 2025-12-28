@@ -20,32 +20,34 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TemplatePreviewDialog } from "./TemplatePreviewDialog";
 
-interface Culto {
+interface Evento {
   id: string;
-  tipo: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
   titulo: string;
   descricao: string | null;
-  data_culto: string;
+  data_evento: string;
   duracao_minutos: number | null;
   local: string | null;
   endereco: string | null;
   pregador: string | null;
   tema: string | null;
   status: string;
+  subtipo_id?: string | null;
 }
 
-interface CultoDialogProps {
+interface EventoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  culto?: Culto | null;
+  evento?: Evento | null;
   onSuccess: () => void;
 }
 
-const cultoSchema = z.object({
-  tipo: z.string().min(1, "Tipo é obrigatório"),
+const eventoSchema = z.object({
+  tipo: z.enum(["CULTO", "RELOGIO", "TAREFA", "EVENTO", "OUTRO"]),
+  subtipo_id: z.string().optional(),
   titulo: z.string().min(1, "Título é obrigatório").max(200, "Título muito longo"),
   descricao: z.string().max(1000, "Descrição muito longa").optional(),
-  data_culto: z.date(),
+  data_evento: z.date(),
   hora: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Hora inválida (use HH:MM)"),
   duracao_minutos: z.number().int().min(0).max(600).optional(),
   local: z.string().max(200, "Local muito longo").optional(),
@@ -54,21 +56,50 @@ const cultoSchema = z.object({
   tema: z.string().max(300, "Tema muito longo").optional(),
   status: z.enum(["planejado", "confirmado", "realizado", "cancelado"]),
 });
+type EventoFormData = z.infer<typeof eventoSchema>;
 
-type CultoFormData = z.infer<typeof cultoSchema>;
+interface Subtipo {
+  id: string;
+  nome: string;
+  tipo_pai: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
+  cor: string | null;
+}
 
-export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: CultoDialogProps) {
+const TIPOS_EVENTO = [
+  { value: "CULTO", label: "Culto" },
+  { value: "RELOGIO", label: "Relógio de Oração" },
+  { value: "TAREFA", label: "Tarefa/Atividade" },
+  { value: "EVENTO", label: "Evento Geral" },
+  { value: "OUTRO", label: "Outro" },
+];
+
+interface Template {
+  id: string;
+  nome: string;
+  categoria?: string | null;
+  tipo_culto?: string | null;
+  tema_padrao?: string | null;
+  duracao_padrao?: number | null;
+  local_padrao?: string | null;
+  pregador_padrao?: string | null;
+  incluir_escalas?: boolean | null;
+}
+
+export default function EventoDialog({ open, onOpenChange, evento, onSuccess }: EventoDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showTemplatePreview, setShowTemplatePreview] = useState(false);
   const [templateApplied, setTemplateApplied] = useState(false);
-  const isEditing = !!culto;
+  const isEditing = !!evento;
+  const [subtipos, setSubtipos] = useState<Subtipo[]>([]);
+  const [tipoSelecionado, setTipoSelecionado] = useState<string>("");
 
-  const form = useForm<CultoFormData>({
-    resolver: zodResolver(cultoSchema),
+  const form = useForm<EventoFormData>({
+    resolver: zodResolver(eventoSchema),
     defaultValues: {
-      tipo: "",
+      tipo: "CULTO",
+      subtipo_id: "",
       titulo: "",
       descricao: "",
       hora: "19:00",
@@ -85,25 +116,33 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
     if (open && !isEditing) {
       loadTemplates();
     }
-    
-    if (culto) {
-      const dataCulto = new Date(culto.data_culto);
+    // carregar subtipo ao mudar tipo
+    const tipo = form.watch("tipo");
+    if (tipo) {
+      setTipoSelecionado(tipo);
+      loadSubtipos(tipo);
+    }
+
+    if (evento) {
+      const dataCulto = new Date(evento.data_evento);
       form.reset({
-        tipo: culto.tipo,
-        titulo: culto.titulo,
-        descricao: culto.descricao || "",
-        data_culto: dataCulto,
+        tipo: evento.tipo,
+        subtipo_id: evento.subtipo_id || "",
+        titulo: evento.titulo,
+        descricao: evento.descricao || "",
+        data_evento: dataCulto,
         hora: format(dataCulto, "HH:mm"),
-        duracao_minutos: culto.duracao_minutos || undefined,
-        local: culto.local || "",
-        endereco: culto.endereco || "",
-        pregador: culto.pregador || "",
-        tema: culto.tema || "",
-        status: culto.status as "planejado" | "confirmado" | "realizado" | "cancelado",
+        duracao_minutos: evento.duracao_minutos || undefined,
+        local: evento.local || "",
+        endereco: evento.endereco || "",
+        pregador: evento.pregador || "",
+        tema: evento.tema || "",
+        status: evento.status as "planejado" | "confirmado" | "realizado" | "cancelado",
       });
     } else {
       form.reset({
-        tipo: "",
+        tipo: "CULTO",
+        subtipo_id: "",
         titulo: "",
         descricao: "",
         hora: "19:00",
@@ -116,7 +155,23 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
       });
       setTemplateApplied(false);
     }
-  }, [culto, form, open, isEditing]);
+  }, [evento, form, open, isEditing]);
+
+  const loadSubtipos = async (tipo: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("evento_subtipos")
+        .select("*")
+        .eq("tipo_pai", tipo)
+        .eq("ativo", true)
+        .order("nome");
+
+      if (error) throw error;
+      setSubtipos(data || []);
+    } catch (error: unknown) {
+      console.error("Erro ao carregar subtipos:", error);
+    }
+  };
 
   const loadTemplates = async () => {
     try {
@@ -128,12 +183,12 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
 
       if (error) throw error;
       setTemplates(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar templates:", error);
     }
   };
 
-  const handleApplyTemplate = (template: any) => {
+  const handleApplyTemplate = (template: Template) => {
     form.setValue("tipo", template.tipo_culto || "");
     form.setValue("titulo", template.tema_padrao || "");
     form.setValue("duracao_minutos", template.duracao_padrao || 120);
@@ -145,19 +200,20 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
     toast.success("Template aplicado! Configure data e finalize a criação.");
   };
 
-  const onSubmit = async (data: CultoFormData) => {
+  const onSubmit = async (data: EventoFormData) => {
     setLoading(true);
     try {
       // Combinar data e hora
       const [horas, minutos] = data.hora.split(":").map(Number);
-      const dataHoraCompleta = new Date(data.data_culto);
+      const dataHoraCompleta = new Date(data.data_evento);
       dataHoraCompleta.setHours(horas, minutos, 0, 0);
 
-      const cultoData = {
+      const eventoData = {
         tipo: data.tipo,
+        subtipo_id: data.subtipo_id || null,
         titulo: data.titulo,
         descricao: data.descricao || null,
-        data_culto: dataHoraCompleta.toISOString(),
+        data_evento: dataHoraCompleta.toISOString(),
         duracao_minutos: data.duracao_minutos || null,
         local: data.local || null,
         endereco: data.endereco || null,
@@ -168,16 +224,16 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
 
       if (isEditing) {
         const { error } = await supabase
-          .from("cultos")
-          .update(cultoData)
-          .eq("id", culto.id);
+          .from("eventos")
+          .update(eventoData)
+          .eq("id", evento!.id);
 
         if (error) throw error;
         toast.success("Evento atualizado com sucesso!");
       } else {
         const { data: novoCulto, error: cultoError } = await supabase
-          .from("cultos")
-          .insert([cultoData])
+          .from("eventos")
+          .insert([eventoData])
           .select()
           .single();
 
@@ -193,9 +249,9 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao salvar evento", {
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setLoading(false);
@@ -222,7 +278,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
 
       if (itensTemplate && itensTemplate.length > 0) {
         const novosItens = itensTemplate.map(item => ({
-          culto_id: cultoId,
+          evento_id: cultoId,
           ordem: item.ordem,
           tipo: item.tipo,
           titulo: item.titulo,
@@ -232,7 +288,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
           midias_ids: item.midias_ids
         }));
 
-        await supabase.from("liturgia_culto").insert(novosItens);
+        await supabase.from("liturgias").insert(novosItens);
       }
 
       // Copiar escalas se incluídas
@@ -244,7 +300,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
 
         if (escalasTemplate && escalasTemplate.length > 0) {
           const novasEscalas = escalasTemplate.map(escala => ({
-            culto_id: cultoId,
+            evento_id: cultoId,
             time_id: escala.time_id,
             posicao_id: escala.posicao_id,
             pessoa_id: escala.pessoa_id,
@@ -252,10 +308,10 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
             confirmado: false
           }));
 
-          await supabase.from("escalas_culto").insert(novasEscalas);
+          await supabase.from("escalas").insert(novasEscalas);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao aplicar template:", error);
       toast.error("Template aplicado com avisos - verifique liturgia e escalas");
     }
@@ -331,20 +387,41 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Culto de Celebração">Culto de Celebração</SelectItem>
-                        <SelectItem value="Culto de Oração">Culto de Oração</SelectItem>
-                        <SelectItem value="Culto de Ensino">Culto de Ensino</SelectItem>
-                        <SelectItem value="Culto de Jovens">Culto de Jovens</SelectItem>
-                        <SelectItem value="Santa Ceia">Santa Ceia</SelectItem>
-                        <SelectItem value="Batismo">Batismo</SelectItem>
-                        <SelectItem value="Evento Especial">Evento Especial</SelectItem>
-                        <SelectItem value="Outro">Outro</SelectItem>
+                        {TIPOS_EVENTO.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* Subtipo/Categoria (opcional) */}
+              {subtipos.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="subtipo_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria (Opcional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a categoria (opcional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {subtipos.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Status */}
               <FormField
@@ -380,7 +457,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
                 <FormItem>
                   <FormLabel>Título *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: Culto de Celebração Dominical" {...field} />
+                    <Input placeholder="Ex: Evento de Celebração Dominical" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -391,7 +468,7 @@ export default function CultoDialog({ open, onOpenChange, culto, onSuccess }: Cu
               {/* Data */}
               <FormField
                 control={form.control}
-                name="data_culto"
+                name="data_evento"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Data *</FormLabel>

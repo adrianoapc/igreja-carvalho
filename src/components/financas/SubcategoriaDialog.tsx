@@ -12,7 +12,10 @@ interface SubcategoriaDialogProps {
   onOpenChange: (open: boolean) => void;
   categoriaId: string;
   categoriaNome: string;
-  subcategoria?: any;
+  subcategoria?: {
+    id: string | number;
+    nome: string;
+  };
 }
 
 export function SubcategoriaDialog({ 
@@ -58,8 +61,8 @@ export function SubcategoriaDialog({
       if (!subcategoria) {
         setNome("");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao salvar subcategoria");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar subcategoria");
     } finally {
       setLoading(false);
     }

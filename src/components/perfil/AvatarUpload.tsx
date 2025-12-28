@@ -96,7 +96,7 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarUpdat
       onAvatarUpdated();
       setShowUploadDialog(false);
       handleClearPreview();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao fazer upload:", error);
       toast.error("Erro ao atualizar foto de perfil");
     } finally {

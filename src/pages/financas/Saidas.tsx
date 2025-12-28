@@ -23,7 +23,13 @@ export default function Saidas() {
   const { formatValue } = useHideValues();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [editingTransacao, setEditingTransacao] = useState<any>(null);
+  const [editingTransacao, setEditingTransacao] = useState<{
+    id: string;
+    descricao: string;
+    valor: number;
+    status: string;
+    data_vencimento: string;
+  } | null>(null);
   
   // MonthPicker states
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -174,7 +180,9 @@ export default function Saidas() {
     }
   };
 
-  const getStatusDisplay = (transacao: any) => {
+  type TransacaoResumo = { status: string; data_vencimento: string | Date };
+
+  const getStatusDisplay = (transacao: TransacaoResumo) => {
     if (transacao.status === 'pago') return 'Pago';
     if (transacao.status === 'pendente') {
       const hoje = new Date();
@@ -187,7 +195,7 @@ export default function Saidas() {
     return 'Atrasado';
   };
 
-  const getStatusColorDynamic = (transacao: any) => {
+  const getStatusColorDynamic = (transacao: TransacaoResumo) => {
     if (transacao.status === 'pago') {
       return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400';
     }

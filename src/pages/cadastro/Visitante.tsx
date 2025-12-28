@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type InputHTMLAttributes } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -208,7 +208,7 @@ export default function CadastroVisitante() {
                   onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                   disabled={loading}
                 >
-                  {(inputProps: any) => (
+                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
                     <Input
                       {...inputProps}
                       id="telefone"

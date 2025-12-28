@@ -42,8 +42,8 @@ const TelaoLiturgia = () => {
     queryFn: async () => {
       if (!cultoId) return null;
       const { data, error } = await supabase
-        .from("cultos")
-        .select("titulo, data_culto")
+        .from("eventos")
+        .select("titulo, data_evento")
         .eq("id", cultoId)
         .single();
 
@@ -59,9 +59,9 @@ const TelaoLiturgia = () => {
     queryFn: async () => {
       if (!cultoId) return [];
       const { data, error } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select("id, ordem, titulo, tipo")
-        .eq("culto_id", cultoId)
+        .eq("evento_id", cultoId)
         .order("ordem", { ascending: true });
 
       if (error) throw error;
@@ -101,8 +101,8 @@ const TelaoLiturgia = () => {
     
     for (const liturgiaItem of liturgiaItems) {
       const itemRecursos = allRecursos
-        .filter((r: any) => r.liturgia_item_id === liturgiaItem.id && r.midia)
-        .sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
+        .filter((r: { liturgia_item_id: string; midia?: unknown }) => r.liturgia_item_id === liturgiaItem.id && r.midia)
+        .sort((a: { ordem?: number }, b: { ordem?: number }) => (a.ordem || 0) - (b.ordem || 0));
       
       for (const recurso of itemRecursos) {
         result.push({
@@ -144,8 +144,8 @@ const TelaoLiturgia = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'liturgia_culto',
-          filter: `culto_id=eq.${cultoId}`,
+          table: 'liturgias',
+          filter: `evento_id=eq.${cultoId}`,
         },
         () => {
           refetchLiturgia();

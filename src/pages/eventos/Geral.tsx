@@ -25,26 +25,26 @@ export default function CultosGeral() {
 
     // Buscar cultos futuros/atuais primeiro para usar os IDs na contagem de escalas
     const { data: cultosFuturos, count: countCultos } = await supabase
-      .from("cultos")
+      .from("eventos")
       .select("id", { count: "exact" })
-      .gte("data_culto", startOfDay)
+      .gte("data_evento", startOfDay)
       .in("status", ["planejado", "confirmado"]);
 
     const cultosIds = (cultosFuturos || []).map((c) => c.id);
 
     const [times, escalas, realizados, midias] = await Promise.all([
       supabase
-        .from("times_culto")
+        .from("times")
         .select("id", { count: "exact" })
         .eq("ativo", true),
       cultosIds.length === 0
         ? Promise.resolve({ count: 0 })
         : supabase
-            .from("escalas_culto")
+            .from("escalas")
             .select("id", { count: "exact" })
-            .in("culto_id", cultosIds),
+            .in("evento_id", cultosIds),
       supabase
-        .from("cultos")
+        .from("eventos")
         .select("id", { count: "exact" })
         .eq("status", "realizado"),
       supabase

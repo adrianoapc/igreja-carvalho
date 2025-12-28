@@ -154,7 +154,7 @@ const ERROR_MESSAGES: Record<AuthErrorType, AuthError> = {
 
 export function parseAuthError(error: unknown): AuthError {
   const errorMessage = error instanceof Error 
-    ? error.message.toLowerCase() 
+    ? error instanceof Error ? error.message : String(error).toLowerCase() 
     : String(error).toLowerCase();
 
   // Procurar padrão correspondente

@@ -28,10 +28,10 @@ interface Membro {
 }
 
 interface LiturgiaTabContentProps {
-  cultoId: string;
+  eventoId: string;
 }
 
-export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps) {
+export default function LiturgiaTabContent({ eventoId }: LiturgiaTabContentProps) {
   const [itens, setItens] = useState<ItemLiturgia[]>([]);
   const [membros, setMembros] = useState<Membro[]>([]);
   const [selectedItem, setSelectedItem] = useState<ItemLiturgia | null>(null);
@@ -43,7 +43,7 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
 
   useEffect(() => {
     loadData();
-  }, [cultoId]);
+  }, [eventoId, loadData]);
 
   const loadData = async () => {
     setLoading(true);
@@ -54,12 +54,12 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
   const loadItens = async () => {
     try {
       const { data, error } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select(`
           *,
           responsavel:profiles!responsavel_id(nome)
         `)
-        .eq("culto_id", cultoId)
+        .eq("evento_id", eventoId)
         .order("ordem", { ascending: true });
 
       if (error) throw error;
@@ -74,8 +74,8 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
           setSelectedItem(null);
         }
       }
-    } catch (error: any) {
-      toast.error("Erro ao carregar liturgia", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar liturgia", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -89,17 +89,17 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
 
       if (error) throw error;
       setMembros(data || []);
-    } catch (error: any) {
-      console.error("Erro ao carregar membros:", error.message);
+    } catch (error: unknown) {
+      console.error("Erro ao carregar membros:", error instanceof Error ? error.message : String(error));
     }
   };
 
   const loadRecursosCount = async () => {
     try {
       const { data: itensData } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .select("id")
-        .eq("culto_id", cultoId);
+        .eq("evento_id", eventoId);
 
       if (!itensData || itensData.length === 0) return;
 
@@ -118,8 +118,8 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
       });
       
       setRecursosCount(countMap);
-    } catch (error: any) {
-      console.error("Erro ao carregar contagem de recursos:", error.message);
+    } catch (error: unknown) {
+      console.error("Erro ao carregar contagem de recursos:", error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -129,14 +129,14 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
     try {
       for (const item of newItens) {
         const { error } = await supabase
-          .from("liturgia_culto")
+          .from("liturgias")
           .update({ ordem: item.ordem })
           .eq("id", item.id);
         
         if (error) throw error;
       }
-    } catch (error: any) {
-      toast.error("Erro ao reordenar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao reordenar", { description: error instanceof Error ? error.message : String(error) });
       await loadItens();
     }
   };
@@ -153,7 +153,7 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
 
       // Depois remove o item
       const { error } = await supabase
-        .from("liturgia_culto")
+        .from("liturgias")
         .delete()
         .eq("id", id);
 
@@ -162,8 +162,8 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
       toast.success("Item removido!");
       setSelectedItem(null);
       await loadData();
-    } catch (error: any) {
-      toast.error("Erro ao remover item", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao remover item", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -217,20 +217,20 @@ export default function LiturgiaTabContent({ cultoId }: LiturgiaTabContentProps)
       <AplicarLiturgiaTemplateDialog
         open={showTemplateDialog}
         onOpenChange={setShowTemplateDialog}
-        cultoId={cultoId}
+        eventoId={eventoId}
         onSuccess={handleTemplateApplied}
       />
 
       <SalvarLiturgiaTemplateDialog
         open={showSaveTemplateDialog}
         onOpenChange={setShowSaveTemplateDialog}
-        cultoId={cultoId}
+        eventoId={eventoId}
       />
 
       <LiturgiaItemDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        cultoId={cultoId}
+        eventoId={eventoId}
         membros={membros}
         onSaved={handleItemAdded}
       />

@@ -39,7 +39,7 @@ export default function Categorias() {
       const categoriasComContagem = await Promise.all(
         (categoriasData || []).map(async (cat) => {
           const { count } = await supabase
-            .from("times_culto")
+            .from("times")
             .select("*", { count: "exact", head: true })
             .eq("categoria", cat.id);
 
@@ -51,9 +51,9 @@ export default function Categorias() {
       );
 
       setCategorias(categoriasComContagem);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar categorias", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);

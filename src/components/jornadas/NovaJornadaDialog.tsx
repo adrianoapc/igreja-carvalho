@@ -164,7 +164,7 @@ export default function NovaJornadaDialog({
           {/* Tipo de Jornada */}
           <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
             <Label className="font-semibold text-base">Tipo de Jornada *</Label>
-            <RadioGroup value={tipoJornada} onValueChange={(value: any) => setTipoJornada(value)}>
+            <RadioGroup value={tipoJornada} onValueChange={(value: "evangelismo" | "discipulado" | "membresia" | "mentoria" | "personalizado") => setTipoJornada(value)}>
               <div className="space-y-3">
                 {/* Curso / EAD */}
                 <Label

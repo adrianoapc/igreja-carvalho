@@ -107,7 +107,14 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess, initialCon
         pessoaId = pessoaData;
       }
 
-      const testemunhoData: any = {
+      const testemunhoData: {
+        titulo: string;
+        descricao: string;
+        data_testemunho: string;
+        pessoa_id?: string;
+        publico: boolean;
+        status: string;
+      } = {
         titulo: result.data.titulo,
         mensagem: result.data.mensagem,
         categoria: result.data.categoria as any,

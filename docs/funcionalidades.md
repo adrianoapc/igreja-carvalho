@@ -55,6 +55,52 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 
 ---
 
+## 1.8 Hub de Eventos e Voluntariado
+
+### Objetivo
+Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igreja**, não apenas cultos. Suporta escalação de voluntários, liturgia, check-in e recursos audiovisuais para múltiplos formatos de atividades.
+
+### Tipos de Eventos Suportados
+- **CULTO**: Cultos dominicais, especiais, celebrações (com liturgia e músicas)
+- **RELOGIO**: Relógios de Oração 24h com turnos de intercessão
+- **TAREFA**: Atividades operacionais e projetos com checklist
+- **EVENTO**: Eventos gerais (conferências, retiros, workshops)
+- **OUTRO**: Categoria flexível para casos não cobertos
+
+### Subtipos/Categorização
+- Cada tipo pode ter **subtipos personalizados** (ex: "Culto de Celebração", "Vigília 24h", "Reunião de Conselho")
+- Configurados via tabela `evento_subtipos` com cores e ícones próprios
+- 14 subtipos pré-cadastrados na migração inicial
+
+### Funcionalidades Principais
+- **Criação de eventos**: Formulário com seleção de tipo/subtipo, data/hora, local, duração, tema, pregador
+- **Tabs condicionais**: Interface adapta-se ao tipo do evento
+  - CULTO: tabs de Liturgia, Músicas, Escalas, Check-in
+  - RELOGIO: tabs de Turnos 24h, Escalas, Check-in
+  - TAREFA: tabs de Checklist, Escalas
+  - EVENTO: tabs de Visão Geral, Escalas, Check-in
+- **Escalas unificadas**: Sistema de voluntariado funciona para todos os tipos
+- **Check-in**: QR Code de presença disponível para qualquer evento
+- **Templates**: Modelos reutilizáveis de liturgia aplicáveis a novos cultos
+
+### Recursos Técnicos
+- **Polimorfismo por enum**: Coluna `tipo` (evento_tipo) + tabela `evento_subtipos`
+- **Consultas polimórficas**: Queries adaptam-se ao tipo via `.eq("tipo", ...)`
+- **RLS policies**: Controle de acesso por feature flags (ex: apenas beta users criam tipos não-CULTO)
+
+### Gestão de Times e Escalas
+- **Times**: Equipes organizadas por categoria (Louvor, Mídia, Intercessão, etc.)
+- **Posições**: Cargos dentro de cada time (Vocalista, Operador de Som, etc.)
+- **Escalação**: Vinculação pessoa + time + posição + evento com confirmação de presença
+- **Notificações**: Sistema de avisos automáticos via edge functions
+
+### Links
+- **ADRs**: [ADR-017 (Hub de Eventos)](adr/ADR-017-refatoracao-hub-eventos-voluntariado.md), [ADR-018 (Migração)](adr/ADR-018-estrategia-migracao-cultos-eventos.md)
+- **Manual**: [Cultos e Eventos](manual-usuario.md#cultos-e-eventos) _(a confirmar)_
+- **Migrations**: `20251228153548_eb7694bc` (schema), `20251228154110_832aab55` (FKs), `20251228154443_26bbe883` (renames)
+
+---
+
 ## Módulo Kids
 
 ### Visão de funcionalidades

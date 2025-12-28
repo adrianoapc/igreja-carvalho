@@ -75,7 +75,7 @@ export default function Insights() {
         <div className="flex items-center gap-2">
           <HideValuesToggle />
           <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Select value={periodo} onValueChange={(v: any) => setPeriodo(v)}>
+          <Select value={periodo} onValueChange={(v) => setPeriodo(v as "3" | "6" | "12")}>
             <SelectTrigger className="w-[180px]">
               <SelectValue />
             </SelectTrigger>
@@ -149,7 +149,7 @@ export default function Insights() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="nome" angle={-45} textAnchor="end" height={100} />
                     <YAxis />
-                    <Tooltip formatter={(value: any) => formatValue(value)} />
+                    <Tooltip formatter={(value: number) => formatValue(value)} />
                     <Bar dataKey="total" fill="#8B5CF6" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -207,7 +207,7 @@ export default function Insights() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: any) => formatValue(value)} />
+                    <Tooltip formatter={(value: number) => formatValue(value)} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -259,7 +259,7 @@ export default function Insights() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="mes" />
                   <YAxis />
-                  <Tooltip formatter={(value: any) => formatValue(value)} />
+                  <Tooltip formatter={(value: number) => formatValue(value)} />
                   <Legend />
                   <Line type="monotone" dataKey="total" stroke="#8B5CF6" strokeWidth={2} name="Total" />
                   <Line type="monotone" dataKey="media" stroke="#EC4899" strokeWidth={2} strokeDasharray="5 5" name="Média" />
@@ -370,7 +370,15 @@ export default function Insights() {
 }
 
 // Função para processar insights dos dados
-function processarInsights(transacoes: any[]) {
+type TransacaoFinanceira = {
+  valor: number;
+  descricao?: string;
+  data_vencimento: string | Date;
+  fornecedor?: { nome?: string } | null;
+  categoria?: { nome?: string } | null;
+};
+
+function processarInsights(transacoes: TransacaoFinanceira[]) {
   const totalGasto = transacoes.reduce((acc, t) => acc + (t.valor || 0), 0);
   const mediaTransacao = totalGasto / (transacoes.length || 1);
   

@@ -62,9 +62,9 @@ export default function BasesMinisteriais({ onBack }: Props) {
 
       if (error) throw error;
       setBases(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao buscar bases:", error);
-      toast.error("Erro ao carregar dados", { description: error.message });
+      toast.error("Erro ao carregar dados", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -96,8 +96,8 @@ export default function BasesMinisteriais({ onBack }: Props) {
       }
       setIsDialogOpen(false);
       fetchBases();
-    } catch (error: any) {
-      toast.error("Erro ao salvar", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setSaving(false);
     }
@@ -110,8 +110,8 @@ export default function BasesMinisteriais({ onBack }: Props) {
       if (error) throw error;
       toast.success("Removido com sucesso");
       fetchBases();
-    } catch (error: any) {
-      toast.error("Erro ao excluir", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao excluir", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 

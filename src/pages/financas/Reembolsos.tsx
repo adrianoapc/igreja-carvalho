@@ -1,3 +1,4 @@
+import { type ElementType } from "react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -344,7 +345,7 @@ export default function Reembolsos() {
       resetarFormulario();
       setNovoReembolsoOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Erro ao criar solicitação:", error);
       toast.error("Erro ao criar solicitação de reembolso");
     },
@@ -385,7 +386,7 @@ export default function Reembolsos() {
       setPagarReembolsoOpen(false);
       setSolicitacaoSelecionada(null);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Erro ao pagar reembolso:", error);
       toast.error("Erro ao processar pagamento");
     },
@@ -466,9 +467,9 @@ export default function Reembolsos() {
       } else {
         throw new Error('Não foi possível extrair dados da nota');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao processar nota fiscal:', error);
-      toast.error(error.message || 'Erro ao processar nota fiscal com IA');
+      toast.error(error instanceof Error ? error.message : String(error) || 'Erro ao processar nota fiscal com IA');
     } finally {
       setProcessandoIA(false);
     }
@@ -541,7 +542,7 @@ export default function Reembolsos() {
   const valorTotal = itens.reduce((sum, item) => sum + item.valor, 0);
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: any; label: string; icon: any }> = {
+    const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string; icon: ElementType }> = {
       rascunho: { variant: "secondary", label: "Rascunho", icon: FileText },
       pendente: { variant: "default", label: "Pendente", icon: Clock },
       aprovado: { variant: "default", label: "Aprovado", icon: CheckCircle },

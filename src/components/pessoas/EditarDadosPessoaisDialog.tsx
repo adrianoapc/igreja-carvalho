@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type InputHTMLAttributes } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -114,7 +114,7 @@ export function EditarDadosPessoaisDialog({
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         toast({
           title: "Erro de validação",
@@ -124,7 +124,7 @@ export function EditarDadosPessoaisDialog({
       } else {
         toast({
           title: "Erro",
-          description: error.message || "Não foi possível atualizar os dados",
+          description: error instanceof Error ? error.message : String(error) || "Não foi possível atualizar os dados",
           variant: "destructive",
         });
       }
@@ -226,7 +226,7 @@ export function EditarDadosPessoaisDialog({
                   setFormData({ ...formData, cpf: e.target.value })
                 }
               >
-                {(inputProps: any) => (
+                {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
                   <Input
                     {...inputProps}
                     id="cpf"

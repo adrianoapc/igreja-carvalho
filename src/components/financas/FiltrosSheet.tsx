@@ -29,9 +29,9 @@ interface FiltrosSheetProps {
   setStatus: (value: string) => void;
   
   // Dados
-  contas: any[];
-  categorias: any[];
-  fornecedores?: any[];
+  contas: Array<{ id: string; nome: string }>;
+  categorias: Array<{ id: string; nome: string }>;
+  fornecedores?: Array<{ id: string; nome: string }>;
   
   // Tipo (para terminologia correta)
   tipoTransacao?: 'entrada' | 'saida';

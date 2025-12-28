@@ -104,8 +104,8 @@ export default function Chatbots({ onBack }: Props) {
 
       if (error) throw error;
       setChatbots(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar chatbots", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar chatbots", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -183,8 +183,8 @@ export default function Chatbots({ onBack }: Props) {
 
       setDialogOpen(false);
       fetchChatbots();
-    } catch (error: any) {
-      toast.error("Erro ao salvar chatbot", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar chatbot", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setSaving(false);
     }
@@ -204,8 +204,8 @@ export default function Chatbots({ onBack }: Props) {
       setDeleteDialogOpen(false);
       setSelectedChatbot(null);
       fetchChatbots();
-    } catch (error: any) {
-      toast.error("Erro ao remover chatbot", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao remover chatbot", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -219,8 +219,8 @@ export default function Chatbots({ onBack }: Props) {
       if (error) throw error;
       toast.success(chatbot.ativo ? "Chatbot desativado" : "Chatbot ativado");
       fetchChatbots();
-    } catch (error: any) {
-      toast.error("Erro ao alterar status", { description: error.message });
+    } catch (error: unknown) {
+      toast.error("Erro ao alterar status", { description: error instanceof Error ? error.message : String(error) });
     }
   };
 

@@ -12,7 +12,21 @@ import { Clock, User, Mail, Phone, EyeOff, Sparkles, AlertTriangle } from "lucid
 interface PedidoDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  pedido: any;
+  pedido: {
+    id: string;
+    status: string;
+    observacoes_intercessor?: string | null;
+    pessoa_id?: string | null;
+    data_resposta?: string | null;
+    pedido?: string;
+    tipo?: string;
+    anonimo?: boolean;
+    nome_solicitante?: string | null;
+    email_solicitante?: string | null;
+    telefone_solicitante?: string | null;
+    prioridade?: string | null;
+    data_criacao?: string;
+  };
   onUpdate: () => void;
 }
 
@@ -40,7 +54,11 @@ export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: Pe
   const handleUpdate = async () => {
     setLoading(true);
     try {
-      const updateData: any = {
+      const updateData: {
+        status: string;
+        observacoes_intercessor: string;
+        data_resposta?: string;
+      } = {
         status,
         observacoes_intercessor: observacoes
       };

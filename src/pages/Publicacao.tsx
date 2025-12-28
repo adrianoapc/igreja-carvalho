@@ -32,7 +32,7 @@ interface Publicacao {
   exibir_telao: boolean | null;
   exibir_site: boolean | null;
   tags: string[] | null;
-  culto_id: string | null;
+  evento_id: string | null;
   ordem_telao: number | null;
   categoria_midia: string | null;
   midia_id: string | null;
@@ -82,8 +82,8 @@ export default function Publicacao() {
 
       if (error) throw error;
       setPublicacoes(data || []);
-    } catch (error: any) {
-      toast({ title: "Erro ao carregar", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Erro ao carregar", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -109,8 +109,8 @@ export default function Publicacao() {
       if (error) throw error;
       toast({ title: "Status atualizado!" });
       loadPublicacoes();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     }
   };
 
@@ -138,8 +138,8 @@ export default function Publicacao() {
 
       toast({ title: "Publicação removida!" });
       loadPublicacoes();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Erro", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally {
       setDeleteDialogOpen(false);
       setDeletingId(null);

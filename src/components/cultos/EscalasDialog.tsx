@@ -12,11 +12,11 @@ import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  data_culto: string;
-  tipo: string;
+  data_evento: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
 }
 
 interface Time {
@@ -41,7 +41,7 @@ interface MembroTime {
 
 interface Escala {
   id: string;
-  culto_id: string;
+  evento_id: string;
   time_id: string;
   pessoa_id: string;
   posicao_id: string | null;
@@ -60,7 +60,7 @@ interface Escala {
 interface EscalasDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  culto: Culto | null;
+  culto: Evento | null;
 }
 
 export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDialogProps) {
@@ -89,7 +89,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
   const loadTimes = async () => {
     try {
       const { data, error } = await supabase
-        .from("times_culto")
+        .from("times")
         .select("*")
         .eq("ativo", true)
         .order("categoria", { ascending: true })
@@ -100,9 +100,9 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
       if (data && data.length > 0 && !timeSelecionado) {
         setTimeSelecionado(data[0].id);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar times", {
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -126,9 +126,9 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
 
       if (error) throw error;
       setMembrosTime(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar membros do time", {
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -138,7 +138,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
 
     try {
       const { data, error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .select(
           `
           *,
@@ -146,13 +146,13 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
           posicoes_time:posicao_id(nome)
         `,
         )
-        .eq("culto_id", culto.id);
+        .eq("evento_id", culto.id);
 
       if (error) throw error;
       setEscalas(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar escalas", {
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -162,8 +162,8 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
 
     setLoading(true);
     try {
-      const { error } = await supabase.from("escalas_culto").insert({
-        culto_id: culto.id,
+      const { error } = await supabase.from("escalas").insert({
+        evento_id: culto.id,
         time_id: timeSelecionado,
         pessoa_id: membro.pessoa_id,
         posicao_id: membro.posicao_id,
@@ -174,12 +174,12 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
 
       toast.success("Membro escalado com sucesso!");
       loadEscalas();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.code === "23505") {
         toast.error("Este membro já está escalado nesta posição");
       } else {
         toast.error("Erro ao escalar membro", {
-          description: error.message,
+          description: error instanceof Error ? error.message : String(error),
         });
       }
     } finally {
@@ -190,15 +190,15 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
   const handleRemoverEscala = async (escalaId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("escalas_culto").delete().eq("id", escalaId);
+      const { error } = await supabase.from("escalas").delete().eq("id", escalaId);
 
       if (error) throw error;
 
       toast.success("Membro removido da escala!");
       loadEscalas();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao remover da escala", {
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setLoading(false);
@@ -209,7 +209,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
     setLoading(true);
     try {
       const { error } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .update({ confirmado: !escala.confirmado })
         .eq("id", escala.id);
 
@@ -217,9 +217,9 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
 
       toast.success(escala.confirmado ? "Presença desmarcada" : "Presença confirmada!");
       loadEscalas();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao atualizar confirmação", {
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setLoading(false);
@@ -361,7 +361,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
         <div className="border-b pb-4 px-6 pt-6">
           <h2 className="text-lg font-semibold">Escalas - {culto.titulo}</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {format(new Date(culto.data_culto), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+            {format(new Date(culto.data_evento), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
           </p>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">

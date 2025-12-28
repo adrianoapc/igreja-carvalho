@@ -39,10 +39,10 @@ interface Sala {
   nome: string;
 }
 
-interface Culto {
+interface Evento {
   id: string;
   titulo: string;
-  data_culto: string;
+  data_evento: string;
 }
 
 interface Profile {
@@ -72,7 +72,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
   // Data lists
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
-  const [cultos, setCultos] = useState<Culto[]>([]);
+  const [cultos, setCultos] = useState<Evento[]>([]);
   const [professores, setProfessores] = useState<Profile[]>([]);
 
   useEffect(() => {
@@ -116,10 +116,10 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
 
     // Fetch cultos futuros
     const { data: cultosData } = await supabase
-      .from("cultos")
-      .select("id, titulo, data_culto")
-      .gte("data_culto", new Date().toISOString())
-      .order("data_culto");
+      .from("eventos")
+      .select("id, titulo, data_evento")
+      .gte("data_evento", new Date().toISOString())
+      .order("data_evento");
     setCultos(cultosData || []);
 
     // Fetch professores (membros)
@@ -160,7 +160,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
       modalidade,
       sala_id: (modalidade === "presencial" || modalidade === "hibrido") ? salaId : null,
       link_reuniao: (modalidade === "online" || modalidade === "hibrido") ? linkReuniao : null,
-      culto_id: vinculadoCulto ? cultoId : null,
+      evento_id: vinculadoCulto ? cultoId : null,
       status: "agendada",
     });
 
@@ -391,7 +391,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
                 <div className="flex items-center gap-3">
                   <Church className={`w-5 h-5 ${vinculadoCulto ? "text-primary" : "text-muted-foreground"}`} />
                   <div>
-                    <p className="font-medium">Acontece durante um Culto?</p>
+                    <p className="font-medium">Acontece durante um Evento?</p>
                     <p className="text-xs text-muted-foreground">
                       Ex: Escola Bíblica Dominical
                     </p>
@@ -405,7 +405,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
 
               {vinculadoCulto && (
                 <div className="space-y-2">
-                  <Label>Culto Vinculado</Label>
+                  <Label>Evento Vinculado</Label>
                   <Select value={cultoId} onValueChange={setCultoId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o culto" />
@@ -413,7 +413,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
                     <SelectContent>
                       {cultos.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.titulo} - {format(new Date(c.data_culto), "dd/MM HH:mm")}
+                          {c.titulo} - {format(new Date(c.data_evento), "dd/MM HH:mm")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -439,7 +439,7 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
                     <p><strong>Link:</strong> {linkReuniao}</p>
                   )}
                   {vinculadoCulto && cultoId && (
-                    <p><strong>Culto:</strong> {cultos.find(c => c.id === cultoId)?.titulo}</p>
+                    <p><strong>Evento:</strong> {cultos.find(c => c.id === cultoId)?.titulo}</p>
                   )}
                 </div>
               </div>

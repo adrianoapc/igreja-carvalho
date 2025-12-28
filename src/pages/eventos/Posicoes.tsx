@@ -48,15 +48,15 @@ export default function Posicoes() {
         .from("posicoes_time")
         .select(`
           *,
-          time:times_culto(id, nome, cor)
+          time:times(id, nome, cor)
         `)
         .order("nome", { ascending: true });
 
       if (error) throw error;
       setPosicoes(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao carregar posições", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setLoading(false);
@@ -89,7 +89,7 @@ export default function Posicoes() {
         .eq("posicao_id", posicaoDeletar.id);
 
       const { count: escalasCount } = await supabase
-        .from("escalas_culto")
+        .from("escalas")
         .select("*", { count: "exact", head: true })
         .eq("posicao_id", posicaoDeletar.id);
 
@@ -110,9 +110,9 @@ export default function Posicoes() {
 
       toast.success("Posição deletada com sucesso!");
       loadPosicoes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Erro ao deletar posição", {
-        description: error.message
+        description: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setDeleteDialogOpen(false);
@@ -150,7 +150,7 @@ export default function Posicoes() {
     }
     acc[timeId].posicoes.push(pos);
     return acc;
-  }, {} as Record<string, { time: any; posicoes: Posicao[] }>);
+  }, {} as Record<string, { time: { id: string; nome: string }; posicoes: Posicao[] }>);
 
   return (
     <div className="space-y-4 md:space-y-6">

@@ -76,7 +76,7 @@ export default function Templates() {
       );
 
       setTemplates(templatesWithCount);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar templates:", error);
       toast.error("Erro ao carregar templates");
     } finally {
@@ -102,9 +102,9 @@ export default function Templates() {
 
       toast.success("Template excluído com sucesso");
       loadTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao excluir template:", error);
-      toast.error(error.message || "Erro ao excluir template");
+      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao excluir template");
     } finally {
       setDeleteDialogOpen(false);
       setTemplateToDelete(null);
@@ -122,7 +122,7 @@ export default function Templates() {
 
       toast.success(template.ativo ? "Template desativado" : "Template ativado");
       loadTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao atualizar template:", error);
       toast.error("Erro ao atualizar template");
     }
@@ -174,7 +174,7 @@ export default function Templates() {
 
       toast.success("Template duplicado com sucesso");
       loadTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao duplicar template:", error);
       toast.error("Erro ao duplicar template");
     }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type InputHTMLAttributes } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,7 +91,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
       if (!user) throw new Error("Usuário não autenticado");
 
       // Verificar se já existe uma pessoa com o mesmo email ou telefone
-      let query = supabase
+      const query = supabase
         .from("profiles")
         .select("*")
         .in("status", ["visitante", "frequentador"]);
@@ -332,7 +332,7 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
               onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
               disabled={loading}
             >
-              {(inputProps: any) => (
+              {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
                 <Input
                   {...inputProps}
                   id="telefone"
