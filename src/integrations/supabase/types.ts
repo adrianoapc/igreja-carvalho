@@ -868,6 +868,79 @@ export type Database = {
         }
         Relationships: []
       }
+      checkins: {
+        Row: {
+          created_at: string | null
+          evento_id: string
+          id: string
+          metodo: string | null
+          pessoa_id: string
+          tipo_registro: string | null
+          validado_por: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          evento_id: string
+          id?: string
+          metodo?: string | null
+          pessoa_id: string
+          tipo_registro?: string | null
+          validado_por?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          evento_id?: string
+          id?: string
+          metodo?: string | null
+          pessoa_id?: string
+          tipo_registro?: string | null
+          validado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkins_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_validado_por_fkey"
+            columns: ["validado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       comunicados: {
         Row: {
           ativo: boolean | null
@@ -3010,72 +3083,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
-          },
-        ]
-      }
-      presencas_culto: {
-        Row: {
-          created_at: string | null
-          culto_id: string
-          id: string
-          metodo: string | null
-          pessoa_id: string
-          tipo_registro: string | null
-          validado_por: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          culto_id: string
-          id?: string
-          metodo?: string | null
-          pessoa_id: string
-          tipo_registro?: string | null
-          validado_por?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          culto_id?: string
-          id?: string
-          metodo?: string | null
-          pessoa_id?: string
-          tipo_registro?: string | null
-          validado_por?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "presencas_culto_evento_id_fkey"
-            columns: ["culto_id"]
-            isOneToOne: false
-            referencedRelation: "eventos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "presencas_culto_pessoa_id_fkey"
-            columns: ["pessoa_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "presencas_culto_pessoa_id_fkey"
-            columns: ["pessoa_id"]
-            isOneToOne: false
-            referencedRelation: "view_absent_kids"
-            referencedColumns: ["child_id"]
-          },
-          {
-            foreignKeyName: "presencas_culto_pessoa_id_fkey"
-            columns: ["pessoa_id"]
-            isOneToOne: false
-            referencedRelation: "view_health_score"
-            referencedColumns: ["pessoa_id"]
-          },
-          {
-            foreignKeyName: "presencas_culto_validado_por_fkey"
-            columns: ["validado_por"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
           },
         ]
       }
