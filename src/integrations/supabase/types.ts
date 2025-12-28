@@ -2048,7 +2048,7 @@ export type Database = {
           checkout_por: string | null
           created_at: string | null
           crianca_id: string
-          culto_id: string | null
+          evento_id: string | null
           id: string
           observacoes: string | null
           responsavel_id: string
@@ -2061,7 +2061,7 @@ export type Database = {
           checkout_por?: string | null
           created_at?: string | null
           crianca_id: string
-          culto_id?: string | null
+          evento_id?: string | null
           id?: string
           observacoes?: string | null
           responsavel_id: string
@@ -2074,7 +2074,7 @@ export type Database = {
           checkout_por?: string | null
           created_at?: string | null
           crianca_id?: string
-          culto_id?: string | null
+          evento_id?: string | null
           id?: string
           observacoes?: string | null
           responsavel_id?: string
@@ -2146,7 +2146,7 @@ export type Database = {
           },
           {
             foreignKeyName: "kids_checkins_evento_id_fkey"
-            columns: ["culto_id"]
+            columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
             referencedColumns: ["id"]
@@ -4406,7 +4406,7 @@ export type Database = {
           crianca_data_nascimento: string | null
           crianca_id: string | null
           crianca_nome: string | null
-          culto_id: string | null
+          evento_id: string | null
           id: string | null
           observacoes: string | null
           responsavel_id: string | null
@@ -4458,7 +4458,7 @@ export type Database = {
           },
           {
             foreignKeyName: "kids_checkins_evento_id_fkey"
-            columns: ["culto_id"]
+            columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
             referencedColumns: ["id"]
