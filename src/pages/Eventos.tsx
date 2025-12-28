@@ -3,18 +3,18 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import { useEffect } from "react";
 
-export default function Cultos() {
+export default function Eventos() {
   const location = useLocation();
   const navigate = useNavigate();
-  const isRootPath = location.pathname === "/cultos";
+  const isRootPath = location.pathname === "/eventos";
 
   useEffect(() => {
     if (isRootPath) {
-      navigate("/cultos/geral", { replace: true });
+      navigate("/eventos/geral", { replace: true });
     }
   }, [isRootPath, navigate]);
 
-  const showBackButton = !isRootPath && location.pathname !== "/cultos/geral";
+  const showBackButton = !isRootPath && location.pathname !== "/eventos/geral";
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
@@ -22,7 +22,7 @@ export default function Cultos() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/cultos/geral")}
+          onClick={() => navigate("/eventos/geral")}
           className="mb-2"
         >
           <ChevronLeft className="w-4 h-4 mr-2" />
