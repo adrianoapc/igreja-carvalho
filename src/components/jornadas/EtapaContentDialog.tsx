@@ -139,10 +139,11 @@ export default function EtapaContentDialog({
 
       // Preparar payload
       const payload: {
-        conteudo_texto?: string;
-        conteudo_video?: string;
-        recursos?: string;
-        perguntas_reflexao?: unknown[];
+        tipo_conteudo?: string;
+        conteudo_url?: string | null;
+        conteudo_texto?: string | null;
+        quiz_config?: { notaMinima: number; perguntas: Pergunta[] } | null;
+        check_automatico?: boolean | null;
       } = {
         tipo_conteudo: tipoConteudo,
         conteudo_url: tipoConteudo === "video" ? conteudoUrl : null,
@@ -153,11 +154,11 @@ export default function EtapaContentDialog({
             : null,
         check_automatico:
           tipoConteudo === "video" ? bloqueioVideo : null,
-      };
+      } as Record<string, unknown>;
 
       const { error } = await supabase
         .from("etapas_jornada")
-        .update(payload)
+        .update(payload as Record<string, unknown>)
         .eq("id", etapa.id);
 
       if (error) throw error;

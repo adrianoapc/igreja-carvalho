@@ -33,7 +33,7 @@ export function BaseMinisterialDialog({ open, onOpenChange, base }: BaseMinister
         const { error } = await supabase
           .from('bases_ministeriais')
           .update({ titulo, descricao })
-          .eq('id', base.id);
+          .eq('id', String(base.id));
 
         if (error) throw error;
         toast.success("Base ministerial atualizada com sucesso!");

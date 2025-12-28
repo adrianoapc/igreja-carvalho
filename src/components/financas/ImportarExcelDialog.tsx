@@ -77,7 +77,7 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
       });
       
       setMapping(autoMapping);
-      setPreview(jsonData.slice(0, 10));
+      setPreview(jsonData.slice(0, 10) as Record<string, unknown>[]);
       
       toast.success(`${jsonData.length} linhas encontradas no arquivo`);
     } catch (error) {
@@ -110,7 +110,7 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
       }
       
       // Tentar parse como data
-      const date = new Date(data);
+      const date = new Date(data as string | number);
       if (!isNaN(date.getTime())) {
         return date.toISOString().split('T')[0];
       }

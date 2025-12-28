@@ -54,7 +54,7 @@ export function CentroCustoDialog({ open, onOpenChange, centro }: CentroCustoDia
             descricao,
             base_ministerial_id: baseMinisterialId || null,
           })
-          .eq('id', centro.id);
+          .eq('id', String(centro.id));
 
         if (error) throw error;
         toast.success("Centro de custo atualizado com sucesso!");

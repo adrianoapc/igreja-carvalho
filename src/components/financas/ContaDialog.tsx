@@ -53,7 +53,7 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
             conta_numero: tipo === 'bancaria' ? contaNumero : null,
             observacoes,
           })
-          .eq('id', conta.id);
+          .eq('id', String(conta.id));
 
         if (error) throw error;
         toast.success("Conta atualizada com sucesso!");

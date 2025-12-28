@@ -26,6 +26,13 @@ interface PedidoDetailsDialogProps {
     telefone_solicitante?: string | null;
     prioridade?: string | null;
     data_criacao?: string;
+    data_alocacao?: string | null;
+    analise_ia_titulo?: string | null;
+    analise_ia_motivo?: string | null;
+    analise_ia_gravidade?: string | null;
+    analise_ia_resposta?: string | null;
+    profiles?: { nome: string } | null;
+    intercessores?: { nome: string } | null;
   };
   onUpdate: () => void;
 }
@@ -69,7 +76,7 @@ export function PedidoDetailsDialog({ open, onOpenChange, pedido, onUpdate }: Pe
 
       const { error } = await supabase
         .from("pedidos_oracao")
-        .update(updateData)
+        .update(updateData as Record<string, unknown>)
         .eq("id", pedido.id);
 
       if (error) throw error;

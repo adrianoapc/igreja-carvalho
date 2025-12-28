@@ -52,7 +52,7 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
             tipo,
             secao_dre: secaoDre,
           })
-          .eq('id', categoria.id);
+          .eq('id', String(categoria.id));
 
         if (error) throw error;
         toast.success("Categoria atualizada com sucesso!");
