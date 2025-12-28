@@ -1279,7 +1279,7 @@ export type Database = {
             foreignKeyName: "escalas_time_id_fkey"
             columns: ["time_id"]
             isOneToOne: false
-            referencedRelation: "times_culto"
+            referencedRelation: "times"
             referencedColumns: ["id"]
           },
         ]
@@ -1355,7 +1355,7 @@ export type Database = {
             foreignKeyName: "escalas_template_time_id_fkey"
             columns: ["time_id"]
             isOneToOne: false
-            referencedRelation: "times_culto"
+            referencedRelation: "times"
             referencedColumns: ["id"]
           },
         ]
@@ -2576,7 +2576,7 @@ export type Database = {
             foreignKeyName: "membros_time_time_id_fkey"
             columns: ["time_id"]
             isOneToOne: false
-            referencedRelation: "times_culto"
+            referencedRelation: "times"
             referencedColumns: ["id"]
           },
         ]
@@ -2982,7 +2982,7 @@ export type Database = {
             foreignKeyName: "posicoes_time_time_id_fkey"
             columns: ["time_id"]
             isOneToOne: false
-            referencedRelation: "times_culto"
+            referencedRelation: "times"
             referencedColumns: ["id"]
           },
         ]
@@ -3897,7 +3897,7 @@ export type Database = {
           },
         ]
       }
-      times_culto: {
+      times: {
         Row: {
           ativo: boolean
           categoria: string
@@ -3936,42 +3936,42 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "times_culto_lider_id_fkey"
+            foreignKeyName: "times_lider_id_fkey"
             columns: ["lider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "times_culto_lider_id_fkey"
+            foreignKeyName: "times_lider_id_fkey"
             columns: ["lider_id"]
             isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
           {
-            foreignKeyName: "times_culto_lider_id_fkey"
+            foreignKeyName: "times_lider_id_fkey"
             columns: ["lider_id"]
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
           },
           {
-            foreignKeyName: "times_culto_sublider_id_fkey"
+            foreignKeyName: "times_sublider_id_fkey"
             columns: ["sublider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "times_culto_sublider_id_fkey"
+            foreignKeyName: "times_sublider_id_fkey"
             columns: ["sublider_id"]
             isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
           {
-            foreignKeyName: "times_culto_sublider_id_fkey"
+            foreignKeyName: "times_sublider_id_fkey"
             columns: ["sublider_id"]
             isOneToOne: false
             referencedRelation: "view_health_score"
