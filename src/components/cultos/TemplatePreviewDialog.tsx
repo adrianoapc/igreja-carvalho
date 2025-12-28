@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
-import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

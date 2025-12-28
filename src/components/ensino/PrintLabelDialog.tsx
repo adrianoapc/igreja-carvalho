@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, CheckCircle2 } from "lucide-react";
 import KidsSecurityLabel from "./KidsSecurityLabel";
-import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 interface PrintLabelDialogProps {
   open: boolean;

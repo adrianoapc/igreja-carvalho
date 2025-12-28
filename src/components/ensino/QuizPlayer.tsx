@@ -61,10 +61,6 @@ export default function QuizPlayer({ etapa, inscricaoId, onAprovado }: QuizPlaye
   const perguntas = quizConfig?.perguntas || [];
   const notaMinima = quizConfig?.notaMinima || 70;
 
-  useEffect(() => {
-    carregarUltimaTentativa();
-  }, [carregarUltimaTentativa]);
-
   const carregarUltimaTentativa = useCallback(async () => {
     if (!inscricaoId) return;
 
@@ -88,6 +84,10 @@ export default function QuizPlayer({ etapa, inscricaoId, onAprovado }: QuizPlaye
       console.error("Erro ao carregar tentativa:", error);
     }
   }, [etapa.id, inscricaoId]);
+
+  useEffect(() => {
+    carregarUltimaTentativa();
+  }, [carregarUltimaTentativa]);
 
   const handleSelectResposta = (perguntaId: string, alternativaIndex: number) => {
     if (showFeedback) return; // Não permite mudar após envio
@@ -192,7 +192,7 @@ export default function QuizPlayer({ etapa, inscricaoId, onAprovado }: QuizPlaye
             <CardTitle className="text-xl">{etapa.titulo}</CardTitle>
             {ultimaTentativa && !showFeedback && (
               <Badge variant="secondary">
-                Última nota: {ultimaTentativa.nota_obtida}%
+                Última nota: {(ultimaTentativa as { nota_obtida?: number }).nota_obtida ?? 0}%
               </Badge>
             )}
           </div>
