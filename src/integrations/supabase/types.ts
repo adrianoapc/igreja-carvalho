@@ -1190,7 +1190,7 @@ export type Database = {
         }
         Relationships: []
       }
-      escalas_culto: {
+      escalas: {
         Row: {
           checkin_realizado: boolean | null
           confirmado: boolean
@@ -1241,42 +1241,42 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "escalas_culto_evento_id_fkey"
+            foreignKeyName: "escalas_evento_id_fkey"
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "escalas_culto_pessoa_id_fkey"
+            foreignKeyName: "escalas_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "escalas_culto_pessoa_id_fkey"
+            foreignKeyName: "escalas_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
           {
-            foreignKeyName: "escalas_culto_pessoa_id_fkey"
+            foreignKeyName: "escalas_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
           },
           {
-            foreignKeyName: "escalas_culto_posicao_id_fkey"
+            foreignKeyName: "escalas_posicao_id_fkey"
             columns: ["posicao_id"]
             isOneToOne: false
             referencedRelation: "posicoes_time"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "escalas_culto_time_id_fkey"
+            foreignKeyName: "escalas_time_id_fkey"
             columns: ["time_id"]
             isOneToOne: false
             referencedRelation: "times_culto"
@@ -4645,19 +4645,31 @@ export type Database = {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
         Returns: string
       }
-      check_voluntario_conflito: {
-        Args: {
-          p_data_inicio: string
-          p_duracao_minutos?: number
-          p_voluntario_id: string
-        }
-        Returns: {
-          conflito_detectado: boolean
-          evento_data: string
-          evento_titulo: string
-          time_nome: string
-        }[]
-      }
+      check_voluntario_conflito:
+        | {
+            Args: {
+              p_escala_id?: string
+              p_evento_id: string
+              p_pessoa_id: string
+            }
+            Returns: {
+              mensagem: string
+              tem_conflito: boolean
+            }[]
+          }
+        | {
+            Args: {
+              p_data_inicio: string
+              p_duracao_minutos?: number
+              p_voluntario_id: string
+            }
+            Returns: {
+              conflito_detectado: boolean
+              evento_data: string
+              evento_titulo: string
+              time_nome: string
+            }[]
+          }
       checkin_por_localizacao: {
         Args: { p_lat: number; p_long: number; p_telefone: string }
         Returns: Json
