@@ -2266,7 +2266,76 @@ export type Database = {
           },
         ]
       }
-      liturgia_culto: {
+      liturgia_recursos: {
+        Row: {
+          created_at: string | null
+          duracao_segundos: number | null
+          id: string
+          liturgia_item_id: string
+          midia_id: string
+          ordem: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          duracao_segundos?: number | null
+          id?: string
+          liturgia_item_id: string
+          midia_id: string
+          ordem?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          duracao_segundos?: number | null
+          id?: string
+          liturgia_item_id?: string
+          midia_id?: string
+          ordem?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liturgia_recursos_liturgia_item_id_fkey"
+            columns: ["liturgia_item_id"]
+            isOneToOne: false
+            referencedRelation: "liturgias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liturgia_recursos_midia_id_fkey"
+            columns: ["midia_id"]
+            isOneToOne: false
+            referencedRelation: "midias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      liturgia_templates: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          estrutura_json: Json | null
+          id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descricao?: string | null
+          estrutura_json?: Json | null
+          id?: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string | null
+          estrutura_json?: Json | null
+          id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      liturgias: {
         Row: {
           created_at: string
           descricao: string | null
@@ -2314,103 +2383,34 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "liturgia_culto_evento_id_fkey"
+            foreignKeyName: "liturgias_evento_id_fkey"
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "liturgia_culto_responsavel_id_fkey"
+            foreignKeyName: "liturgias_responsavel_id_fkey"
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "liturgia_culto_responsavel_id_fkey"
+            foreignKeyName: "liturgias_responsavel_id_fkey"
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
           {
-            foreignKeyName: "liturgia_culto_responsavel_id_fkey"
+            foreignKeyName: "liturgias_responsavel_id_fkey"
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
           },
         ]
-      }
-      liturgia_recursos: {
-        Row: {
-          created_at: string | null
-          duracao_segundos: number | null
-          id: string
-          liturgia_item_id: string
-          midia_id: string
-          ordem: number | null
-        }
-        Insert: {
-          created_at?: string | null
-          duracao_segundos?: number | null
-          id?: string
-          liturgia_item_id: string
-          midia_id: string
-          ordem?: number | null
-        }
-        Update: {
-          created_at?: string | null
-          duracao_segundos?: number | null
-          id?: string
-          liturgia_item_id?: string
-          midia_id?: string
-          ordem?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "liturgia_recursos_liturgia_item_id_fkey"
-            columns: ["liturgia_item_id"]
-            isOneToOne: false
-            referencedRelation: "liturgia_culto"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "liturgia_recursos_midia_id_fkey"
-            columns: ["midia_id"]
-            isOneToOne: false
-            referencedRelation: "midias"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      liturgia_templates: {
-        Row: {
-          created_at: string | null
-          descricao: string | null
-          estrutura_json: Json | null
-          id: string
-          nome: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          descricao?: string | null
-          estrutura_json?: Json | null
-          id?: string
-          nome: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          descricao?: string | null
-          estrutura_json?: Json | null
-          id?: string
-          nome?: string
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       logs_auditoria_chat: {
         Row: {
