@@ -4605,8 +4605,8 @@ export type Database = {
         }
         Returns: {
           conflito_detectado: boolean
-          culto_data: string
-          culto_titulo: string
+          evento_data: string
+          evento_titulo: string
           time_nome: string
         }[]
       }
