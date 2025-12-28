@@ -59,7 +59,7 @@ export default function DashboardLeader() {
   const fetchStats = async () => {
     // Membros na célula (simplified - count members in teams where user is leader)
     const { data: teams } = await supabase
-      .from('times_culto')
+      .from('times')
       .select('id')
       .or(`lider_id.eq.${profile?.id},sublider_id.eq.${profile?.id}`);
 

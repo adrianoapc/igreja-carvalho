@@ -366,7 +366,7 @@ export default function AulaDetailsSheet({
 
     // Buscar presenças do culto
     const { data: presencasCulto, error: fetchError } = await supabase
-      .from("presencas_culto")
+      .from("checkins")
       .select("pessoa_id")
       .eq("evento_id", aula.evento_id);
 

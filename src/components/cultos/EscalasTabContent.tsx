@@ -54,7 +54,7 @@ interface EscalasTabContentProps {
 
 export default function EscalasTabContent({ eventoId }: EscalasTabContentProps) {
   const { hasAccess } = useAuth();
-  const isAdmin = hasAccess("cultos", "aprovar_gerenciar");
+  const isAdmin = hasAccess("eventos", "aprovar_gerenciar");
   
   const [times, setTimes] = useState<Time[]>([]);
   const [posicoes, setPosicoes] = useState<Posicao[]>([]);

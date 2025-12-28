@@ -410,14 +410,14 @@ export default function KidsCheckinScanner() {
                 <span className="font-semibold">Nenhum culto aberto hoje</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {hasAccess("cultos", "criar_editar")
-                  ? "Cadastre o culto do dia para liberar o check-in das crianças."
-                  : "Peça a um organizador para abrir o culto do dia e liberar o check-in."}
+                {hasAccess("eventos", "criar_editar")
+                  ? "Cadastre o evento do dia para liberar o check-in das crianças."
+                  : "Peça a um organizador para abrir o evento do dia e liberar o check-in."}
               </p>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 <Button variant="outline" onClick={() => navigate("/kids/dashboard")}>Voltar</Button>
-                {hasAccess("cultos", "criar_editar") ? (
-                  <Button onClick={() => navigate("/cultos/eventos")}>Cadastrar culto</Button>
+                {hasAccess("eventos", "criar_editar") ? (
+                  <Button onClick={() => navigate("/eventos/lista")}>Cadastrar evento</Button>
                 ) : null}
               </div>
             </CardContent>

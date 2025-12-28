@@ -730,7 +730,7 @@ export type Database = {
           id: string
           nome: string
           secao_dre: string | null
-          tipo: Database["public"]["Enums"]["evento_tipo"]
+          tipo: string
           updated_at: string
         }
         Insert: {
@@ -740,7 +740,7 @@ export type Database = {
           id?: string
           nome: string
           secao_dre?: string | null
-          tipo: Database["public"]["Enums"]["evento_tipo"]
+          tipo: string
           updated_at?: string
         }
         Update: {
@@ -750,7 +750,7 @@ export type Database = {
           id?: string
           nome?: string
           secao_dre?: string | null
-          tipo?: Database["public"]["Enums"]["evento_tipo"]
+          tipo?: string
           updated_at?: string
         }
         Relationships: []
@@ -2179,7 +2179,7 @@ export type Database = {
           comportamento_tags: string[] | null
           created_at: string | null
           crianca_id: string
-          evento_id: string | null
+          culto_id: string | null
           data: string
           humor: string | null
           id: string
@@ -2192,7 +2192,7 @@ export type Database = {
           comportamento_tags?: string[] | null
           created_at?: string | null
           crianca_id: string
-          evento_id?: string | null
+          culto_id?: string | null
           data?: string
           humor?: string | null
           id?: string
@@ -2205,7 +2205,7 @@ export type Database = {
           comportamento_tags?: string[] | null
           created_at?: string | null
           crianca_id?: string
-          evento_id?: string | null
+          culto_id?: string | null
           data?: string
           humor?: string | null
           id?: string
@@ -2237,8 +2237,8 @@ export type Database = {
             referencedColumns: ["pessoa_id"]
           },
           {
-            foreignKeyName: "kids_diario_evento_id_fkey"
-            columns: ["evento_id"]
+            foreignKeyName: "kids_diario_culto_id_fkey"
+            columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "eventos"
             referencedColumns: ["id"]
@@ -2623,7 +2623,7 @@ export type Database = {
           canal: string
           created_at: string
           created_by: string | null
-          evento_id: string | null
+          culto_id: string | null
           descricao: string | null
           expires_at: string | null
           id: string
@@ -2640,7 +2640,7 @@ export type Database = {
           canal?: string
           created_at?: string
           created_by?: string | null
-          evento_id?: string | null
+          culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
           id?: string
@@ -2657,7 +2657,7 @@ export type Database = {
           canal?: string
           created_at?: string
           created_by?: string | null
-          evento_id?: string | null
+          culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
           id?: string
@@ -2671,8 +2671,8 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "midias_culto_evento_id_fkey"
-            columns: ["evento_id"]
+            foreignKeyName: "midias_culto_culto_id_fkey"
+            columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "eventos"
             referencedColumns: ["id"]
@@ -4495,7 +4495,7 @@ export type Database = {
           crianca_nascimento: string | null
           crianca_nome: string | null
           culto_data: string | null
-          evento_id: string | null
+          culto_id: string | null
           culto_titulo: string | null
           data: string | null
           humor: string | null
@@ -4529,8 +4529,8 @@ export type Database = {
             referencedColumns: ["pessoa_id"]
           },
           {
-            foreignKeyName: "kids_diario_evento_id_fkey"
-            columns: ["evento_id"]
+            foreignKeyName: "kids_diario_culto_id_fkey"
+            columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "eventos"
             referencedColumns: ["id"]

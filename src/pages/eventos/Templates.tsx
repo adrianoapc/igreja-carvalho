@@ -194,7 +194,7 @@ export default function Templates() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/cultos")}
+          onClick={() => navigate("/eventos")}
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>

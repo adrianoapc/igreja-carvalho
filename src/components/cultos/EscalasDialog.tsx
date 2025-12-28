@@ -351,7 +351,7 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
   const timeAtual = times.find((t) => t.id === timeSelecionado);
   //const isAdmin = profile?.user_id; // Simplificado - em produção, verificar se é admin
   const { hasAccess } = useAuth();
-  const isAdmin = hasAccess("cultos", "aprovar_gerenciar");
+  const isAdmin = hasAccess("eventos", "aprovar_gerenciar");
 
   if (!culto) return null;
 
