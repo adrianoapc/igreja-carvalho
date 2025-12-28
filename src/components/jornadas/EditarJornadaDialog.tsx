@@ -29,13 +29,19 @@ interface EditarJornadaDialogProps {
   onOpenChange: (open: boolean) => void;
   jornada: {
     id: string;
-    nome: string;
+    titulo: string;
+    nome?: string;
     descricao?: string | null;
     tipo_jornada?: string | null;
+    cor_tema?: string | null;
     cor?: string | null;
     ativo?: boolean;
+    exibir_portal?: boolean;
+    requer_pagamento?: boolean;
+    valor?: number | null;
   };
-  onUpdate: () => void;
+  onUpdate?: () => void;
+  onSuccess?: () => void;
 }
 
 const CORES_TEMA = [
@@ -77,6 +83,7 @@ export default function EditarJornadaDialog({
   onOpenChange,
   jornada,
   onSuccess,
+  onUpdate,
 }: EditarJornadaDialogProps) {
   const queryClient = useQueryClient();
   const [titulo, setTitulo] = useState("");
@@ -110,11 +117,16 @@ export default function EditarJornadaDialog({
   // Initialize form when dialog opens
   useEffect(() => {
     if (open && jornada) {
-      setTitulo(jornada.titulo);
+      setTitulo(jornada.titulo || jornada.nome || "");
       setDescricao(jornada.descricao || "");
-      setCorTema(jornada.cor_tema || CORES_TEMA[0]);
-      setAtivo(jornada.ativo);
-      setTipoJornada(jornada.tipo_jornada || 'auto_instrucional');
+      setCorTema(jornada.cor_tema || jornada.cor || CORES_TEMA[0]);
+      setAtivo(jornada.ativo ?? true);
+      const tipoValue = jornada.tipo_jornada;
+      if (tipoValue === 'auto_instrucional' || tipoValue === 'hibrido' || tipoValue === 'processo_acompanhado') {
+        setTipoJornada(tipoValue);
+      } else {
+        setTipoJornada('auto_instrucional');
+      }
       setExibirPortal(jornada.exibir_portal ?? true);
       setRequerPagamento(!!jornada.requer_pagamento);
       setValor(jornada.valor ? String(jornada.valor) : "");
@@ -193,7 +205,8 @@ export default function EditarJornadaDialog({
     },
     onSuccess: () => {
       toast.success("Jornada atualizada!");
-      onSuccess();
+      onSuccess?.();
+      onUpdate?.();
     },
     onError: (error) => {
       console.error("Error updating jornada:", error);
@@ -312,7 +325,7 @@ export default function EditarJornadaDialog({
 
             <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
               <Label className="font-medium">Tipo de Jornada</Label>
-              <RadioGroup value={tipoJornada} onValueChange={(v: "evangelismo" | "discipulado" | "membresia" | "mentoria" | "personalizado") => setTipoJornada(v)}>
+              <RadioGroup value={tipoJornada} onValueChange={(v: "auto_instrucional" | "hibrido" | "processo_acompanhado") => setTipoJornada(v)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="auto_instrucional" id="tipo_curso" />
                   <Label htmlFor="tipo_curso" className="font-normal cursor-pointer flex-1">

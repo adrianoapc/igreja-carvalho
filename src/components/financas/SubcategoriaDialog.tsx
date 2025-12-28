@@ -38,7 +38,7 @@ export function SubcategoriaDialog({
         const { error } = await supabase
           .from('subcategorias_financeiras')
           .update({ nome })
-          .eq('id', subcategoria.id);
+          .eq('id', String(subcategoria.id));
 
         if (error) throw error;
         toast.success("Subcategoria atualizada com sucesso!");

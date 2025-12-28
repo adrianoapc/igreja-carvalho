@@ -52,7 +52,7 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
             ? `${conta.observacoes}\n\nAjuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
             : `Ajuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
         })
-        .eq('id', conta.id);
+        .eq('id', String(conta.id));
 
       if (error) throw error;
 

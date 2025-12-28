@@ -62,7 +62,7 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
             cep,
             observacoes,
           })
-          .eq('id', fornecedor.id);
+          .eq('id', String(fornecedor.id));
 
         if (error) throw error;
         toast.success("Fornecedor atualizado com sucesso!");

@@ -86,7 +86,7 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
 
       const { data: insertedPedido, error } = await supabase
         .from("pedidos_oracao")
-        .insert([pedidoData])
+        .insert([pedidoData] as Record<string, unknown>[])
         .select('id')
         .single();
 

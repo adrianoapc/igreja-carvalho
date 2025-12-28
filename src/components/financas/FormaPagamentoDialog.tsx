@@ -32,7 +32,7 @@ export function FormaPagamentoDialog({ open, onOpenChange, formaPagamento }: For
         const { error } = await supabase
           .from('formas_pagamento')
           .update({ nome })
-          .eq('id', formaPagamento.id);
+          .eq('id', String(formaPagamento.id));
         if (error) throw error;
       } else {
         const { error } = await supabase

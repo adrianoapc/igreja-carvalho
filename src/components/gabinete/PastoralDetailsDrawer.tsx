@@ -76,7 +76,9 @@ interface AtendimentoPastoral {
 interface EvolucaoNota {
   data: string;
   autor: string;
-  texto: string;
+  texto?: string;
+  acao?: string;
+  detalhes?: string;
 }
 
 interface Pastor {
@@ -235,14 +237,14 @@ export function PastoralDetailsDrawer({
       historicoAtual: Array<{ data: string; autor: string; acao: string; detalhes?: string }>;
       mudarStatus?: boolean;
     }) => {
-      const novoHistorico = [...(historicoAtual || []), nota];
-      const updateData: { historico_evolucao: Array<{ data: string; autor: string; acao: string; detalhes?: string }> } = { historico_evolucao: novoHistorico };
+      const novoHistorico = [...(historicoAtual || []), { data: nota.data, autor: nota.autor, acao: nota.texto || 'Nota adicionada', detalhes: nota.texto }];
+      const updateData: { historico_evolucao: Array<{ data: string; autor: string; acao: string; detalhes?: string }>; status?: StatusEnum } = { historico_evolucao: novoHistorico };
       if (mudarStatus) {
-        updateData.status = "EM_ACOMPANHAMENTO";
+        updateData.status = "EM_ACOMPANHAMENTO" as StatusEnum;
       }
       const { error } = await supabase
         .from("atendimentos_pastorais")
-        .update(updateData)
+        .update(updateData as Record<string, unknown>)
         .eq("id", id);
       if (error) throw error;
     },
@@ -510,7 +512,7 @@ export function PastoralDetailsDrawer({
                   <p className="text-xs text-muted-foreground py-2">Nenhuma evolução registrada</p>
                 ) : (
                   <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {(atendimento.historico_evolucao as EvolucaoNota[])
+                    {(atendimento.historico_evolucao || [])
                       .slice(-2)
                       .reverse()
                       .map((nota, index) => (
@@ -520,7 +522,7 @@ export function PastoralDetailsDrawer({
                             <span>•</span>
                             <span>{format(new Date(nota.data), "dd/MM HH:mm", { locale: ptBR })}</span>
                           </div>
-                          <p className="line-clamp-2">{nota.texto}</p>
+                          <p className="line-clamp-2">{nota.acao || nota.detalhes || ''}</p>
                         </div>
                       ))}
                   </div>

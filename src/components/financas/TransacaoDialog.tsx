@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -59,6 +59,9 @@ interface TransacaoDialogProps {
     multas?: number | null;
     desconto?: number | null;
     taxas_administrativas?: number | null;
+    total_parcelas?: number | null;
+    recorrencia?: "diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral" | null;
+    data_fim_recorrencia?: string | null;
   };
 }
 
@@ -68,6 +71,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
 
@@ -660,7 +664,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       let error;
       if (transacao) {
-        const result = await supabase.from("transacoes_financeiras").update(transacaoData).eq("id", transacao.id);
+        const result = await supabase.from("transacoes_financeiras").update(transacaoData).eq("id", String(transacao.id));
         error = result.error;
       } else {
         const result = await supabase.from("transacoes_financeiras").insert(transacaoData);

@@ -23,15 +23,31 @@ interface JornadaCardProps {
   inscricao: {
     id: string;
     pessoa_id: string;
-    etapa_id: string;
+    etapa_id?: string | null;
+    etapa_atual_id?: string | null;
     responsavel_id?: string | null;
-    data_inscricao: string;
+    data_inscricao?: string;
+    data_mudanca_fase?: string | null;
     data_conclusao?: string | null;
     observacoes?: string | null;
+    concluido?: boolean;
+    created_at?: string;
     profiles?: {
       nome: string;
       avatar_url?: string | null;
     } | null;
+    pessoa?: {
+      nome: string;
+      avatar_url?: string | null;
+      telefone?: string | null;
+    } | null;
+    responsavel?: {
+      id: string;
+      nome: string;
+      avatar_url?: string | null;
+    } | null;
+    etapas_concluidas?: number;
+    etapas_concluidas_ids?: string[];
   };
   totalEtapas: number;
   isDragging?: boolean;
@@ -63,14 +79,16 @@ export default function JornadaCard({
     transition,
   };
 
-  const pessoa = inscricao.pessoa;
+  const pessoa = inscricao.pessoa || inscricao.profiles;
   const responsavel = inscricao.responsavel;
-  const phoneDigits = pessoa?.telefone ? pessoa.telefone.replace(/\D/g, "") : "";
+  const phoneDigits = (pessoa as { telefone?: string } | null | undefined)?.telefone 
+    ? (pessoa as { telefone?: string }).telefone!.replace(/\D/g, "") 
+    : "";
   const whatsappLink = phoneDigits ? `https://wa.me/${phoneDigits}` : null;
   
   // Calcular progresso baseado nas etapas CONCLUÍDAS (presencas_aula com status='concluido')
-  const etapasConcluidas = inscricao.etapas_concluidas || 0;
-  const etapasConcluidasIds: string[] = inscricao.etapas_concluidas_ids || [];
+  const etapasConcluidas = inscricao.etapas_concluidas ?? 0;
+  const etapasConcluidasIds: string[] = inscricao.etapas_concluidas_ids ?? [];
   const progress = totalEtapas > 0 ? (etapasConcluidas / totalEtapas) * 100 : 0;
 
   // Promoção automática: verificar se a etapa atual já foi concluída

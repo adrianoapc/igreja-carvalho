@@ -94,7 +94,7 @@ export function KidsObservationDialog({
         .from("kids_diario")
         .select("*")
         .eq("crianca_id", crianca.id)
-        .eq("evento_id", cultoId)
+        .eq("evento_id", cultoId as string)
         .maybeSingle();
 
       if (error) throw error;
@@ -168,7 +168,7 @@ export function KidsObservationDialog({
     },
     onError: (error: unknown) => {
       console.error("Erro ao salvar diário:", error);
-      toast.error("Erro ao salvar diário: " + error instanceof Error ? error.message : String(error));
+      toast.error("Erro ao salvar diário: " + (error instanceof Error ? error.message : String(error)));
     },
   });
 
