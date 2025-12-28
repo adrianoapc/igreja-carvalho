@@ -4625,7 +4625,7 @@ export type Database = {
         }[]
       }
       get_minha_lista_chamada: {
-        Args: { p_culto_id: string }
+        Args: { p_evento_id: string }
         Returns: {
           avatar_url: string
           ja_marcado: boolean
