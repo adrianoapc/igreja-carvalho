@@ -159,10 +159,11 @@ export default function EventoDialog({ open, onOpenChange, evento, onSuccess }: 
 
   const loadSubtipos = async (tipo: string) => {
     try {
+      const tipoEnum = tipo as "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
       const { data, error } = await supabase
         .from("evento_subtipos")
         .select("*")
-        .eq("tipo_pai", tipo)
+        .eq("tipo_pai", tipoEnum)
         .eq("ativo", true)
         .order("nome");
 
@@ -189,7 +190,10 @@ export default function EventoDialog({ open, onOpenChange, evento, onSuccess }: 
   };
 
   const handleApplyTemplate = (template: Template) => {
-    form.setValue("tipo", template.tipo_culto || "");
+    const tipoValue = template.tipo_culto as "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO" | undefined;
+    if (tipoValue) {
+      form.setValue("tipo", tipoValue);
+    }
     form.setValue("titulo", template.tema_padrao || "");
     form.setValue("duracao_minutos", template.duracao_padrao || 120);
     form.setValue("local", template.local_padrao || "");

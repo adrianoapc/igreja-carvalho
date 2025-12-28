@@ -41,15 +41,15 @@ export default function LiturgiaTabContent({ eventoId }: LiturgiaTabContentProps
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [eventoId, loadData]);
-
   const loadData = async () => {
     setLoading(true);
     await Promise.all([loadItens(), loadMembros(), loadRecursosCount()]);
     setLoading(false);
   };
+
+  useEffect(() => {
+    loadData();
+  }, [eventoId]);
 
   const loadItens = async () => {
     try {

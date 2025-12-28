@@ -31,7 +31,8 @@ interface LiturgiaItemTemplate {
 interface AplicarLiturgiaTemplateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cultoId: string;
+  cultoId?: string;
+  eventoId?: string;
   onSuccess?: () => void;
 }
 
@@ -39,8 +40,10 @@ export function AplicarLiturgiaTemplateDialog({
   open,
   onOpenChange,
   cultoId,
+  eventoId,
   onSuccess
 }: AplicarLiturgiaTemplateDialogProps) {
+  const targetId = eventoId || cultoId || "";
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [applying, setApplying] = useState<string | null>(null);
@@ -100,7 +103,7 @@ export function AplicarLiturgiaTemplateDialog({
         const { data: itensExistentes } = await supabase
           .from("liturgias")
           .select("id")
-          .eq("evento_id", cultoId);
+          .eq("evento_id", targetId);
 
         if (itensExistentes && itensExistentes.length > 0) {
           // Deletar recursos associados
@@ -114,7 +117,7 @@ export function AplicarLiturgiaTemplateDialog({
           await supabase
             .from("liturgias")
             .delete()
-            .eq("evento_id", cultoId);
+            .eq("evento_id", targetId);
         }
       }
 
@@ -124,7 +127,7 @@ export function AplicarLiturgiaTemplateDialog({
         const { data: itensExistentes } = await supabase
           .from("liturgias")
           .select("ordem")
-          .eq("evento_id", cultoId)
+          .eq("evento_id", targetId)
           .order("ordem", { ascending: false })
           .limit(1);
 
@@ -135,7 +138,7 @@ export function AplicarLiturgiaTemplateDialog({
 
       // Criar novos itens baseados no template
       const novosItens = itensTemplate.map((item, index) => ({
-        evento_id: cultoId,
+        evento_id: targetId,
         titulo: item.titulo,
         tipo: item.tipo,
         ordem: ordemInicial + index,
@@ -188,7 +191,7 @@ export function AplicarLiturgiaTemplateDialog({
     supabase
       .from("liturgias")
       .select("id", { count: "exact", head: true })
-      .eq("evento_id", cultoId)
+      .eq("evento_id", targetId)
       .then(({ count }) => {
         if (count && count > 0) {
           // Já tem itens - perguntar se quer limpar ou adicionar

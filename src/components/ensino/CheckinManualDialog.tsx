@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertCircle, Baby, Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,15 +42,6 @@ export function CheckinManualDialog({ open, onOpenChange, sala, onSuccess }: Che
   const [results, setResults] = useState<ProfileKid[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (open && sala) {
-      setResults([]);
-      setSelectedChildId(null);
-      setSearch("");
-      loadAulaAtiva();
-    }
-  }, [open, sala, loadAulaAtiva]);
-
   const loadAulaAtiva = useCallback(async () => {
     if (!sala) return;
     setLoadingAula(true);
@@ -88,6 +79,15 @@ export function CheckinManualDialog({ open, onOpenChange, sala, onSuccess }: Che
       setLoadingAula(false);
     }
   }, [sala]);
+
+  useEffect(() => {
+    if (open && sala) {
+      setResults([]);
+      setSelectedChildId(null);
+      setSearch("");
+      loadAulaAtiva();
+    }
+  }, [open, sala, loadAulaAtiva]);
 
   const handleSearch = async () => {
     if (!search.trim()) return;
@@ -141,7 +141,8 @@ export function CheckinManualDialog({ open, onOpenChange, sala, onSuccess }: Che
       });
 
       if (error) {
-        if (error instanceof Error ? error.message : String(error)?.toLowerCase().includes("constraint") || error.code === "23505") {
+        const pgError = error as { code?: string; message?: string };
+        if (pgError.message?.toLowerCase().includes("constraint") || pgError.code === "23505") {
           toast.error("Esta criança já possui um check-in aberto nesta aula.");
         } else {
           toast.error("Erro ao realizar check-in");

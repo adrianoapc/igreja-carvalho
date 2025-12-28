@@ -32,6 +32,8 @@ type RootProps = Pick<React.ComponentProps<typeof Dialog>, "open" | "defaultOpen
 interface ResponsiveDialogProps extends RootProps {
   trigger?: React.ReactNode;
   children: React.ReactNode;
+  /** @deprecated title prop is ignored - include DialogTitle inside children */
+  title?: string;
   dialogContentProps?: React.ComponentPropsWithoutRef<typeof DialogContent>;
   drawerContentProps?: React.ComponentPropsWithoutRef<typeof DrawerContent>;
   dialogProps?: Omit<React.ComponentProps<typeof Dialog>, "children">;
@@ -44,6 +46,7 @@ export function ResponsiveDialog({
   open,
   defaultOpen,
   onOpenChange,
+  title: _title, // ignored - kept for backwards compatibility
   dialogContentProps,
   drawerContentProps,
   dialogProps,

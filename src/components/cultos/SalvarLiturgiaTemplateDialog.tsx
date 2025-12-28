@@ -12,7 +12,8 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 interface SalvarLiturgiaTemplateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cultoId: string;
+  cultoId?: string;
+  eventoId?: string;
   onSuccess?: () => void;
 }
 
@@ -30,8 +31,10 @@ export function SalvarLiturgiaTemplateDialog({
   open,
   onOpenChange,
   cultoId,
+  eventoId,
   onSuccess
 }: SalvarLiturgiaTemplateDialogProps) {
+  const targetId = eventoId || cultoId || "";
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,7 +52,7 @@ export function SalvarLiturgiaTemplateDialog({
       const { data: itensLiturgia, error: fetchError } = await supabase
         .from("liturgias")
         .select("titulo, tipo, ordem, duracao_minutos, descricao, responsavel_id, responsavel_externo")
-        .eq("evento_id", cultoId)
+        .eq("evento_id", targetId)
         .order("ordem");
 
       if (fetchError) throw fetchError;
@@ -101,10 +104,11 @@ export function SalvarLiturgiaTemplateDialog({
     <ResponsiveDialog 
       open={open} 
       onOpenChange={onOpenChange}
-      title="Salvar como Template"
     >
       <div className="flex flex-col h-full">
-        {/* Content */}
+        <div className="border-b pb-4 px-6 pt-6">
+          <h2 className="text-lg font-semibold">Salvar como Template</h2>
+        </div>
         <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
           <div className="space-y-4">
             <div className="space-y-2">

@@ -18,7 +18,8 @@ interface Membro {
 interface LiturgiaItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cultoId: string;
+  cultoId?: string;
+  eventoId?: string;
   membros: Membro[];
   onSaved: () => void;
 }
@@ -31,10 +32,12 @@ const TIPOS_LITURGIA = [
 export function LiturgiaItemDialog({ 
   open, 
   onOpenChange, 
-  cultoId, 
+  cultoId,
+  eventoId, 
   membros, 
   onSaved 
 }: LiturgiaItemDialogProps) {
+  const targetId = eventoId || cultoId || "";
   const [tipo, setTipo] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -66,7 +69,7 @@ export function LiturgiaItemDialog({
       const { data: itensData } = await supabase
         .from("liturgias")
         .select("ordem")
-        .eq("evento_id", cultoId)
+        .eq("evento_id", targetId)
         .order("ordem", { ascending: false })
         .limit(1);
 
@@ -79,7 +82,7 @@ export function LiturgiaItemDialog({
       const { error } = await supabase
         .from("liturgias")
         .insert({
-          evento_id: cultoId,
+          evento_id: targetId,
           tipo,
           titulo,
           descricao: descricao || null,

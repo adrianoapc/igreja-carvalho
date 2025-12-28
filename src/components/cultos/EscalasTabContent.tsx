@@ -116,7 +116,8 @@ export default function EscalasTabContent({ eventoId }: EscalasTabContentProps) 
       toast.success("Voluntário escalado!");
       loadData();
     } catch (error: unknown) {
-      if (error.code === "23505") {
+      const pgError = error as { code?: string };
+      if (pgError.code === "23505") {
         toast.error("Este voluntário já está escalado");
       } else {
         toast.error("Erro ao escalar", { description: error instanceof Error ? error.message : String(error) });

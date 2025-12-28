@@ -64,8 +64,10 @@ interface Pessoa {
 interface ConflictInfo {
   conflito_detectado: boolean;
   time_nome: string;
-  culto_titulo: string;
-  culto_data: string;
+  evento_titulo?: string;
+  evento_data?: string;
+  culto_titulo?: string;
+  culto_data?: string;
 }
 
 interface GerenciarTimeDialogProps {
@@ -298,8 +300,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
     }
 
     if (showConflictWarning && conflictInfo) {
+      const titulo = conflictInfo.evento_titulo || conflictInfo.culto_titulo || "";
       const confirmar = window.confirm(
-        `⚠️ ATENÇÃO: Esta pessoa já está escalada em "${conflictInfo.time_nome}" para o culto "${conflictInfo.culto_titulo}".\n\nDeseja adicionar mesmo assim?`
+        `⚠️ ATENÇÃO: Esta pessoa já está escalada em "${conflictInfo.time_nome}" para o evento "${titulo}".\n\nDeseja adicionar mesmo assim?`
       );
       if (!confirmar) return;
     }
@@ -326,7 +329,8 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       setShowConflictWarning(false);
       loadMembros();
     } catch (error: unknown) {
-      if (error.code === "23505") {
+      const pgError = error as { code?: string };
+      if (pgError.code === "23505") {
         toast.error("Esta pessoa já está neste time com esta posição");
       } else {
         toast.error("Erro ao adicionar membro", {

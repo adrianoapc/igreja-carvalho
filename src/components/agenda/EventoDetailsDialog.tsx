@@ -112,11 +112,7 @@ ${locationText}${addressText}${themeText}${preacherText}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.3 }}
         >
-          <div className="space-y-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-        >
+          <div className="space-y-4">
           {/* Date and Time */}
           <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
             <Calendar className="w-5 h-5 text-primary mt-0.5" />

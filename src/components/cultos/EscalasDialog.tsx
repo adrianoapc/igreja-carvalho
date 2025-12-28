@@ -175,7 +175,8 @@ export default function EscalasDialog({ open, onOpenChange, culto }: EscalasDial
       toast.success("Membro escalado com sucesso!");
       loadEscalas();
     } catch (error: unknown) {
-      if (error.code === "23505") {
+      const pgError = error as { code?: string };
+      if (pgError.code === "23505") {
         toast.error("Este membro já está escalado nesta posição");
       } else {
         toast.error("Erro ao escalar membro", {
