@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('Erro na verificação de sentimentos críticos:', error);
     
     // Registrar erro

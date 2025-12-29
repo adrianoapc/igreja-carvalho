@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,11 +93,11 @@ Deno.serve(async (req) => {
       culto_id,
       culto_titulo: culto.titulo,
       culto_data: culto.data_culto,
-      itens: itens.map((item: any) => ({
+      itens: itens.map((item: Record<string, unknown>) => ({
         tipo: item.tipo,
         titulo: item.titulo,
-        responsavel_nome: item.profiles?.nome || item.responsavel_externo,
-        responsavel_telefone: item.profiles?.telefone,
+        responsavel_nome: (item.profiles as Record<string, unknown>)?.nome || item.responsavel_externo,
+        responsavel_telefone: (item.profiles as Record<string, unknown>)?.telefone,
         responsavel_externo: item.responsavel_externo,
         duracao_minutos: item.duracao_minutos,
       })),

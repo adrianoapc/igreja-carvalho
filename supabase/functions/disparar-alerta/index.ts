@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,13 +11,13 @@ const APP_URL = Deno.env.get("APP_URL") || "https://igreja.lovable.app";
 
 interface DisparadorPayload {
   evento: string;
-  dados: Record<string, any>;
+  dados: Record<string, unknown>;
   user_id_alvo?: string;
   // Suporte para webhook de banco (Database Webhook payload)
   type?: string;
   table?: string;
-  record?: Record<string, any>;
-  old_record?: Record<string, any>;
+  record?: Record<string, unknown>;
+  old_record?: Record<string, unknown>;
 }
 
 interface NotificacaoRegra {
@@ -53,15 +53,16 @@ interface ProfileComRoles {
 }
 
 // Formatar string com variáveis do tipo {{chave}}
-function formatarTemplate(template: string, dados: Record<string, any>): string {
-  return template.replace(/{{(\w+)}}/g, (match, chave) => {
-    return dados[chave] ?? match;
+function formatarTemplate(template: string, dados: Record<string, unknown>): string {
+  return template.replace(/{{(\w+)}}/g, (match, chave: string) => {
+    const valor = dados[chave];
+    return valor !== undefined && valor !== null ? String(valor) : match;
   });
 }
 
 // Buscar regras para o evento
 async function buscarRegras(
-  supabase: any,
+  supabase: SupabaseClient,
   eventoSlug: string
 ): Promise<NotificacaoRegra[]> {
   const { data, error } = await supabase
@@ -80,7 +81,7 @@ async function buscarRegras(
 
 // Buscar evento config
 async function buscarEvento(
-  supabase: any,
+  supabase: SupabaseClient,
   eventoSlug: string
 ): Promise<NotificacaoEvento | null> {
   const { data, error } = await supabase
@@ -99,7 +100,7 @@ async function buscarEvento(
 
 // Buscar usuários por role
 async function buscarUsuariosPorRole(
-  supabase: any,
+  supabase: SupabaseClient,
   role: string
 ): Promise<ProfileComRoles[]> {
   // Tabela legada
@@ -123,8 +124,8 @@ async function buscarUsuariosPorRole(
   }
 
   const userIds = [
-    ...(roleUsers?.map((r: any) => r.user_id) || []),
-    ...(appRoles?.map((r: any) => r.user_id) || []),
+    ...(roleUsers?.map((r: { user_id: string }) => r.user_id) || []),
+    ...(appRoles?.map((r: { user_id: string }) => r.user_id) || []),
   ];
 
   if (userIds.length === 0) return [];
@@ -144,7 +145,7 @@ async function buscarUsuariosPorRole(
 
 // Buscar usuário específico
 async function buscarUsuario(
-  supabase: any,
+  supabase: SupabaseClient,
   userId: string
 ): Promise<ProfileComRoles | null> {
   const { data, error } = await supabase
@@ -163,7 +164,7 @@ async function buscarUsuario(
 
 // Disparar notificação in-app
 async function dispararInApp(
-  supabase: any,
+  supabase: SupabaseClient,
   userId: string,
   titulo: string,
   mensagem: string,
@@ -323,7 +324,7 @@ interface AtendimentoPastoralRecord {
 
 // Handler para atendimentos_pastorais
 async function handleAtendimentoPastoral(
-  supabase: any,
+  supabase: SupabaseClient,
   record: AtendimentoPastoralRecord
 ): Promise<{ sucesso: boolean; mensagem: string }> {
   console.log(`🏥 Processando alerta de Gabinete Pastoral: ${record.id}`);

@@ -26,7 +26,7 @@ Analise a imagem da nota fiscal e extraia as seguintes informações:
 Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`;
 
 // Fetch chatbot config from database
-async function getChatbotConfig(supabase: any): Promise<{ model: string; systemPrompt: string }> {
+async function getChatbotConfig(supabase: SupabaseClient): Promise<{ model: string; systemPrompt: string }> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
@@ -94,8 +94,8 @@ serve(async (req) => {
       );
     }
 
-    const hasPermission = userRoles?.some((ur: any) => 
-      ['admin', 'tesoureiro', 'pastor'].includes(ur.role?.name?.toLowerCase())
+    const hasPermission = userRoles?.some((ur: Record<string, unknown>) => 
+      ['admin', 'tesoureiro', 'pastor'].includes((ur.role as Record<string, unknown>)?.name?.toString()?.toLowerCase() || '')
     );
 
     if (!hasPermission) {
@@ -268,7 +268,7 @@ serve(async (req) => {
       }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Erro ao processar nota fiscal:', error);
     return new Response(
       JSON.stringify({ 

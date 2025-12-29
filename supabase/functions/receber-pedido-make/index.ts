@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     const tipo = mapearTemaParaTipo(validatedData.tema);
 
     // Preparar dados do pedido
-    const pedidoData: any = {
+    const pedidoData: Record<string, unknown> = {
       pedido: validatedData.mensagem,
       tipo: tipo,
       status: 'pendente',

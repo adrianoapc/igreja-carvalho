@@ -178,7 +178,7 @@ export default function PessoaDetalhes() {
         .order("data_inicio", { ascending: false });
 
       setFuncoes(
-        funcoesData?.map((f: any) => ({
+        funcoesData?.map((f: Record<string, unknown>) => ({
           id: f.id,
           nome: f.funcoes_igreja?.nome || "—",
           data_inicio: f.data_inicio,

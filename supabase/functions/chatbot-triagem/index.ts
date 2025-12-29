@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 // --- INTERFACES ---
 interface RequestBody {
@@ -60,7 +60,7 @@ const DEFAULT_TEXT_MODEL = 'gpt-4o-mini';
 const DEFAULT_AUDIO_MODEL = 'whisper-1';
 
 // --- CONFIGURAÇÃO (DB) ---
-async function getChatbotConfig() {
+async function getChatbotConfig(): Promise<Record<string, unknown>> {
   try {
     const { data: config } = await supabase
       .from('chatbot_configs')
@@ -81,9 +81,9 @@ async function getChatbotConfig() {
 }
 
 // --- LIMPEZA DE JSON ---
-function extractJsonAndText(aiContent: string) {
+function extractJsonAndText(aiContent: string): { cleanText: string; parsedJson: Record<string, unknown> | null } {
   let cleanText = aiContent;
-  let parsedJson: any = null;
+  let parsedJson: Record<string, unknown> | null = null;
 
   try {
     const markdownMatch = aiContent.match(/```(?:json)?([\s\S]*?)```/i);
@@ -120,7 +120,7 @@ function extractJsonAndText(aiContent: string) {
 }
 
 // --- ROTEAMENTO DE PASTOR (LÓGICA DE INTELIGÊNCIA) ---
-async function definirPastorResponsavel(perfilUsuario: any): Promise<string | null> {
+async function definirPastorResponsavel(perfilUsuario: Record<string, unknown>): Promise<string | null> {
   // 1. Se tem líder cadastrado, tenta mandar pro líder
   if (perfilUsuario?.lider_id) {
       // Opcional: Você pode adicionar uma verificação aqui se o lider_id é realmente um pastor
@@ -159,7 +159,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   
   const startTime = Date.now();
-  let requestPayload: any = {};
+  let requestPayload: Record<string, unknown> = {};
 
   try {
     const body = await req.json() as RequestBody;
@@ -198,7 +198,7 @@ serve(async (req) => {
     const messages = [
       { role: "system", content: config.systemPrompt },
       { role: "system", content: `CTX: Tel ${telefone}, Nome ${nome_perfil}.` },
-      ...historico.map((h: any) => ({ role: h.role, content: h.content })),
+      ...historico.map((h: Record<string, unknown>) => ({ role: h.role, content: h.content })),
       { role: "user", content: inputTexto }
     ];
 

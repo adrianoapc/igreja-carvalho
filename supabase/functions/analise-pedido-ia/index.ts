@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ============= CORS & CONSTANTS =============
 const corsHeaders = {
@@ -51,7 +51,7 @@ interface AnaliseResult {
 // ============= HELPER FUNCTIONS =============
 
 // Fetch chatbot config from database with fallback
-async function getChatbotConfig(supabase: any): Promise<ChatbotConfig> {
+async function getChatbotConfig(supabase: SupabaseClient): Promise<ChatbotConfig> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')

@@ -178,7 +178,7 @@ export default function CursoPlayer() {
         presencasData?.map(p => [p.etapa_id, p.created_at]) || []
       );
 
-      const etapasComStatus: Etapa[] = (etapasData || []).map((etapa: any) => ({
+      const etapasComStatus: Etapa[] = (etapasData || []).map((etapa: Record<string, unknown>) => ({
         ...etapa,
         quiz_config: normalizeQuizConfig(etapa.quiz_config),
         concluida: conclusoesMap.has(etapa.id),

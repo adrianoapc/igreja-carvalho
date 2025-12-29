@@ -155,7 +155,7 @@ serve(async (req) => {
 
     // Filtrar registros válidos E aplicar filtro anti-spam no código
     // (Supabase não suporta OR com IS NULL em .or() facilmente)
-    const escalasValidas = (escalasPendentes || []).filter((e: any) => {
+    const escalasValidas = (escalasPendentes || []).filter((e: Record<string, unknown>) => {
       if (!e.culto || !e.pessoa || !e.time) return false;
       
       // Filtro anti-spam: só enviar se ultimo_aviso_em é NULL ou > 24h atrás
@@ -193,8 +193,8 @@ serve(async (req) => {
     // Processar cada escala pendente
     for (const escalaRaw of escalasValidas) {
       try {
-        // Cast para any para evitar problemas com tipos do Supabase
-        const escala = escalaRaw as any;
+        // Cast para Record para evitar problemas com tipos do Supabase
+        const escala = escalaRaw as Record<string, unknown>;
         const pessoa = escala.pessoa;
         const culto = escala.culto;
         const time = escala.time;

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,9 +128,9 @@ serve(async (req) => {
     const escalaIdsEnviados: string[] = [];
 
     for (const escala of escalas) {
-      const profile = escala.profiles as any;
-      const time = escala.times_culto as any;
-      const posicao = escala.posicoes_time as any;
+      const profile = escala.profiles as Record<string, unknown>;
+      const time = escala.times_culto as Record<string, unknown>;
+      const posicao = escala.posicoes_time as Record<string, unknown>;
 
       const nome = profile?.nome || 'Voluntário';
       const telefone = profile?.telefone;

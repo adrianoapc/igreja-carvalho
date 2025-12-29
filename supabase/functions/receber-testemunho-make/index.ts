@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
       .substring(0, 100) + (validatedData.mensagem.length > 100 ? '...' : '');
 
     // Preparar dados do testemunho
-    const testemunhoData: any = {
+    const testemunhoData: Record<string, unknown> = {
       titulo: titulo,
       mensagem: validatedData.mensagem,
       categoria: 'outro', // Categoria padrão

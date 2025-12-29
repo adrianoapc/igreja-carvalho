@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ============= CORS & CONSTANTS =============
 const corsHeaders = {
@@ -61,7 +61,7 @@ interface ChatbotConfig {
 // ============= HELPER FUNCTIONS =============
 
 // Fetch chatbot config from database with fallback
-async function getChatbotConfig(supabase: any): Promise<ChatbotConfig> {
+async function getChatbotConfig(supabase: SupabaseClient): Promise<ChatbotConfig> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
@@ -92,7 +92,7 @@ function normalizePhone(phone: string): string {
 }
 
 // Find or create user in profiles or visitantes_leads
-async function identificarUsuario(supabase: any, telefone: string, nomePerfil?: string): Promise<{
+async function identificarUsuario(supabase: SupabaseClient, telefone: string, nomePerfil?: string): Promise<{
   pessoa_id: string | null;
   visitante_id: string | null;
   lider_id: string | null;
