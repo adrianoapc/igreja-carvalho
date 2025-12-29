@@ -2337,6 +2337,8 @@ export type Database = {
       }
       liturgias: {
         Row: {
+          bloqueio_progresso: boolean
+          conteudo_config: Json
           created_at: string
           descricao: string | null
           duracao_minutos: number | null
@@ -2348,10 +2350,13 @@ export type Database = {
           responsavel_externo: string | null
           responsavel_id: string | null
           tipo: string
+          tipo_conteudo: string
           titulo: string
           updated_at: string
         }
         Insert: {
+          bloqueio_progresso?: boolean
+          conteudo_config?: Json
           created_at?: string
           descricao?: string | null
           duracao_minutos?: number | null
@@ -2363,10 +2368,13 @@ export type Database = {
           responsavel_externo?: string | null
           responsavel_id?: string | null
           tipo: string
+          tipo_conteudo?: string
           titulo: string
           updated_at?: string
         }
         Update: {
+          bloqueio_progresso?: boolean
+          conteudo_config?: Json
           created_at?: string
           descricao?: string | null
           duracao_minutos?: number | null
@@ -2378,6 +2386,7 @@ export type Database = {
           responsavel_externo?: string | null
           responsavel_id?: string | null
           tipo?: string
+          tipo_conteudo?: string
           titulo?: string
           updated_at?: string
         }
