@@ -28,7 +28,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   BarChart,
@@ -118,6 +118,7 @@ export default function DashboardAdmin() {
   const [consolidationData, setConsolidationData] = useState<ConsolidationData[]>([]);
   const [pedidosOracao, setPedidosOracao] = useState<PedidoOracao[]>([]);
   const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
+  const [alreadyRegisteredToday, setAlreadyRegisteredToday] = useState(false);
   const { profile } = useAuth();
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
@@ -136,7 +137,26 @@ export default function DashboardAdmin() {
     fetchConsolidationData();
     fetchPedidosOracao();
     fetchTestemunhos();
-  }, []);
+    checkTodaySentimento();
+  }, [profile?.id]);
+
+  const checkTodaySentimento = async () => {
+    if (!profile?.id) return;
+    
+    const today = new Date();
+    const dayStart = startOfDay(today).toISOString();
+    const dayEnd = endOfDay(today).toISOString();
+
+    const { data } = await supabase
+      .from("sentimentos_membros")
+      .select("id")
+      .eq("pessoa_id", profile.id)
+      .gte("data_registro", dayStart)
+      .lte("data_registro", dayEnd)
+      .limit(1);
+
+    setAlreadyRegisteredToday(!!data && data.length > 0);
+  };
 
   const fetchComunicados = async () => {
     const now = new Date().toISOString();
@@ -366,19 +386,27 @@ export default function DashboardAdmin() {
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>*/}
         </div>
-        <Button
-          onClick={() => setSentimentoDialogOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
-        >
-          <Heart className="w-4 h-4" />
-          <span>Como você está?</span>
-        </Button>
+        {!alreadyRegisteredToday && (
+          <Button
+            onClick={() => setSentimentoDialogOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+          >
+            <Heart className="w-4 h-4" />
+            <span>Como você está?</span>
+          </Button>
+        )}
       </div>
 
       {/* Widget de Monitoramento de Escalas para Admin */}
       <EscalasPendentesWidget />
 
-      <RegistrarSentimentoDialog open={sentimentoDialogOpen} onOpenChange={setSentimentoDialogOpen} />
+      <RegistrarSentimentoDialog 
+        open={sentimentoDialogOpen} 
+        onOpenChange={(open) => {
+          setSentimentoDialogOpen(open);
+          if (!open) checkTodaySentimento();
+        }} 
+      />
 
       {/* Alertas Section */}
       {activeAlertas.length > 0 && (
