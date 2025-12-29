@@ -32,7 +32,9 @@ interface InscricaoComProgresso {
   etapasConcluidas: number;
 }
 
-interface SupabaseInscricao extends Omit<InscricaoComProgresso, "totalEtapas" | "etapasConcluidas"> {}
+interface SupabaseInscricao extends Omit<InscricaoComProgresso, "totalEtapas" | "etapasConcluidas"> {
+  id?: string;
+}
 
 interface JornadaDisponivel {
   id: string;

@@ -116,8 +116,8 @@ export default function EventoDetalhes() {
       if (error) throw error;
 
       const normalized: Evento = {
-        ...(data as any),
-        tipo: (data as any).tipo as Evento["tipo"],
+        ...data,
+        tipo: data.tipo as Evento["tipo"],
       };
 
       setEvento(normalized);

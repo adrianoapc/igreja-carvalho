@@ -338,11 +338,12 @@ export default function CursoPlayer() {
     }
 
     const { tipo_conteudo, conteudo_url, conteudo_texto } = etapaSelecionada;
+    let embedUrl = "";
 
     switch (tipo_conteudo) {
       case "video":
         // Converter URL do YouTube para embed
-        let embedUrl = conteudo_url || "";
+        embedUrl = conteudo_url || "";
         if (embedUrl.includes("youtube.com/watch")) {
           const videoId = new URL(embedUrl).searchParams.get("v");
           embedUrl = `https://www.youtube.com/embed/${videoId}`;

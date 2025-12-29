@@ -46,13 +46,14 @@ export default function KidsDashboard() {
       try {
         const now = new Date();
         let startDate: Date;
+        let weekStart: Date;
 
         switch (selectedPeriod) {
           case "hoje":
             startDate = new Date(now.setHours(0, 0, 0, 0));
             break;
           case "semana":
-            const weekStart = new Date(now);
+            weekStart = new Date(now);
             weekStart.setDate(now.getDate() - now.getDay());
             startDate = new Date(weekStart.setHours(0, 0, 0, 0));
             break;
@@ -260,13 +261,14 @@ export default function KidsDashboard() {
       try {
         const now = new Date();
         let startDate: Date;
+        let weekStart: Date;
 
         switch (selectedPeriod) {
           case "hoje":
             startDate = new Date(now.setHours(0, 0, 0, 0));
             break;
           case "semana":
-            const weekStart = new Date(now);
+            weekStart = new Date(now);
             weekStart.setDate(now.getDate() - now.getDay());
             startDate = new Date(weekStart.setHours(0, 0, 0, 0));
             break;
@@ -292,7 +294,7 @@ export default function KidsDashboard() {
         };
 
         diarios?.forEach(d => {
-          if (d.humor && humorCounts.hasOwnProperty(d.humor)) {
+          if (d.humor && Object.hasOwn(humorCounts, d.humor)) {
             humorCounts[d.humor]++;
           }
         });
@@ -320,13 +322,14 @@ export default function KidsDashboard() {
       try {
         const now = new Date();
         let startDate: Date;
+        let weekStart: Date;
 
         switch (selectedPeriod) {
           case "hoje":
             startDate = new Date(now.setHours(0, 0, 0, 0));
             break;
           case "semana":
-            const weekStart = new Date(now);
+            weekStart = new Date(now);
             weekStart.setDate(now.getDate() - now.getDay());
             startDate = new Date(weekStart.setHours(0, 0, 0, 0));
             break;

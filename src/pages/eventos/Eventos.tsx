@@ -53,7 +53,7 @@ export default function Eventos() {
 
       if (error) throw error;
 
-      const normalized = (data || []).map((d: any) => ({
+      const normalized = (data || []).map((d) => ({
         ...d,
         tipo: d.tipo as Evento["tipo"],
       }));
