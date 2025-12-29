@@ -79,7 +79,7 @@ export function KidsObservationDialog({
         // Se não tem culto, buscar por data
         const { data, error } = await supabase
           .from("kids_diario")
-          .select("*")
+          .select("id, humor, comportamento_tags, necessidades_tags, observacoes")
           .eq("crianca_id", crianca.id)
           .eq("data", format(new Date(), "yyyy-MM-dd"))
           .is("evento_id", null)
@@ -92,7 +92,7 @@ export function KidsObservationDialog({
       // Se tem culto, buscar por evento_id
       const { data, error } = await supabase
         .from("kids_diario")
-        .select("*")
+        .select("id, humor, comportamento_tags, necessidades_tags, observacoes")
         .eq("crianca_id", crianca.id)
         .eq("evento_id", cultoId)
         .maybeSingle();

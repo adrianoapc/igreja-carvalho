@@ -49,6 +49,18 @@ export function useNotifications() {
     };
   }, [user]);
 
+  const toRecord = (value: unknown): Record<string, unknown> | undefined => {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    return undefined;
+  };
+
+  const normalizeNotification = (n: any): Notification => ({
+    ...n,
+    metadata: toRecord(n?.metadata),
+  });
+
   const loadNotifications = async () => {
     if (!user) return;
 
@@ -62,8 +74,9 @@ export function useNotifications() {
 
       if (error) throw error;
 
-      setNotifications(data || []);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
+      const normalized = (data || []).map(normalizeNotification);
+      setNotifications(normalized);
+      setUnreadCount(normalized.filter(n => !n.read).length);
     } catch (error) {
       console.error("Error loading notifications:", error);
     } finally {

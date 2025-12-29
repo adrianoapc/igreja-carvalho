@@ -67,7 +67,13 @@ export default function GabinetePastoral() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as AtendimentoPastoral[];
+
+      const normalized = (data || []).map((row: any) => ({
+        ...row,
+        historico_evolucao: Array.isArray(row.historico_evolucao) ? row.historico_evolucao : null,
+      }));
+
+      return normalized as AtendimentoPastoral[];
     },
     staleTime: 30000, // 30s cache
   });

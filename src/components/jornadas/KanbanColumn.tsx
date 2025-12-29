@@ -13,10 +13,18 @@ interface KanbanColumnProps {
   items: Array<{
     id: string;
     pessoa_id: string;
-    etapa_id: string;
+    etapa_atual_id?: string | null;
+    etapa_id?: string | null;
     responsavel_id?: string | null;
-    data_inscricao: string;
+    created_at?: string;
+    data_inscricao?: string;
+    data_mudanca_fase?: string | null;
+    concluido?: boolean;
+    pessoa?: { nome: string; avatar_url?: string | null; telefone?: string | null } | null;
     profiles?: { nome: string; avatar_url?: string | null } | null;
+    responsavel?: { id: string; nome: string; avatar_url?: string | null } | null;
+    etapas_concluidas?: number;
+    etapas_concluidas_ids?: string[];
   }>;
   totalEtapas: number;
   onRefetch: () => void;

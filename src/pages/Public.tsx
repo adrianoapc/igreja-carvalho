@@ -41,7 +41,13 @@ export default function Public() {
         .limit(4);
 
       if (error) throw error;
-      setProximosCultos(data || []);
+
+      const normalized = (data || []).map((d: any) => ({
+        ...d,
+        tipo: d.tipo as Evento["tipo"],
+      }));
+
+      setProximosCultos(normalized);
     } catch (error) {
       console.error("Error fetching cultos:", error);
     } finally {

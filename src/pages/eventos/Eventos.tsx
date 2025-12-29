@@ -52,10 +52,16 @@ export default function Eventos() {
         .order("data_evento", { ascending: true });
 
       if (error) throw error;
-      setCultos(data || []);
+
+      const normalized = (data || []).map((d: any) => ({
+        ...d,
+        tipo: d.tipo as Evento["tipo"],
+      }));
+
+      setCultos(normalized);
 
       // Carregar contagem de escalas para cada culto
-      if (data && data.length > 0) {
+      if (normalized.length > 0) {
         const { data: escalasData } = await supabase
           .from("escalas")
           .select("evento_id");

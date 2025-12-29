@@ -120,7 +120,7 @@ export default function Jornadas() {
                 ? Math.round((concluidos / totalInscritos) * 100) 
                 : 0;
               const pessoas = inscricoes
-                .map((i: { pessoa?: { nome?: string; avatar_url?: string | null } | null }) => i.pessoa)
+                .map((i: { pessoa?: { id?: string; nome?: string; avatar_url?: string | null } | null }) => i.pessoa)
                 .filter(Boolean)
                 .slice(0, 3);
               const maisCount = Math.max(0, totalInscritos - 3);
@@ -176,15 +176,15 @@ export default function Jornadas() {
                         <div className="flex items-center shrink-0">
                           {pessoas.length > 0 ? (
                             <div className="flex -space-x-2">
-                              {pessoas.map((pessoa: { nome?: string; avatar_url?: string | null } | null, idx: number) => (
+                              {pessoas.map((pessoa, idx: number) => (
                                 <Avatar
-                                  key={pessoa.id}
+                                  key={(pessoa?.id ?? `${jornada.id}-${idx}`) as string}
                                   className="w-7 h-7 border-2 border-background"
                                   style={{ zIndex: pessoas.length - idx }}
                                 >
-                                  <AvatarImage src={pessoa.avatar_url} />
+                                  <AvatarImage src={pessoa?.avatar_url || undefined} />
                                   <AvatarFallback className="text-[10px] bg-muted">
-                                    {getInitials(pessoa.nome)}
+                                    {getInitials(pessoa?.nome || "")}
                                   </AvatarFallback>
                                 </Avatar>
                               ))}
