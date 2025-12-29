@@ -235,8 +235,9 @@ Deno.serve(async (req) => {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       }
     );
-  } catch (error) {
-    console.error('Erro na verificação de sentimentos críticos:', error);
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('Erro na verificação de sentimentos críticos:', errorMsg);
     
     // Registrar erro
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -246,11 +247,11 @@ Deno.serve(async (req) => {
     await supabase.rpc('log_edge_function_execution', {
       p_function_name: 'verificar-sentimentos-criticos',
       p_status: 'error',
-      p_details: error.message
+      p_details: errorMsg
     });
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMsg }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },

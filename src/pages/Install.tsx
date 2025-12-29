@@ -4,6 +4,11 @@ import { Smartphone, Share, Download, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export default function Install() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);

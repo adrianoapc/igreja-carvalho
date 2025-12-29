@@ -294,8 +294,8 @@ export default function KidsDashboard() {
         };
 
         diarios?.forEach(d => {
-          if (d.humor && Object.hasOwn(humorCounts, d.humor)) {
-            humorCounts[d.humor]++;
+          if (d.humor && d.humor in humorCounts) {
+            humorCounts[d.humor as keyof typeof humorCounts]++;
           }
         });
 

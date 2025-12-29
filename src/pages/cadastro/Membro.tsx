@@ -709,7 +709,7 @@ export default function CadastroMembro() {
               Atualize seus dados
             </CardTitle>
             <CardDescription>
-              Olá {profile?.nome?.split(" ")[0]}! Atualize suas informações abaixo.
+              Olá {profile && typeof profile === 'object' && 'nome' in profile ? String((profile as { nome?: string }).nome || '').split(" ")[0] : ''}! Atualize suas informações abaixo.
             </CardDescription>
           </CardHeader>
           

@@ -93,7 +93,7 @@ export default function ProjetoDetalhes() {
   } = useQuery({
     queryKey: ["tarefas", id],
     queryFn: async () => {
-      const { data, error } = await (supabase as SupabaseClient)
+      const { data, error } = await supabase
         .from("tarefas")
         .select(
           `*, responsavel:profiles!tarefas_responsavel_id_fkey(id, nome, avatar_url)`

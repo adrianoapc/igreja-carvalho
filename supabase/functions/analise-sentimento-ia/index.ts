@@ -127,7 +127,8 @@ async function identificarUsuario(supabase: SupabaseClient, telefone: string, no
       .limit(1);
 
     if (memberships && memberships.length > 0) {
-      liderId = memberships[0].times_culto?.lider_id || null;
+      const timeData = memberships[0].times_culto as { lider_id?: string } | null;
+      liderId = timeData?.lider_id || null;
       console.log(`Líder encontrado: ${liderId}`);
     }
 

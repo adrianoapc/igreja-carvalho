@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase as supa } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ interface NotificacaoRegra {
   evento_slug: string;
   role_alvo?: string | null;
   user_id_especifico?: string | null;
-  canais?: { inapp?: boolean; push?: boolean; whatsapp?: boolean } | null;
+  canais?: Record<string, boolean> | null;
   ativo?: boolean | null;
 }
 
@@ -204,7 +204,6 @@ export default function NotificacoesAdmin({ onBack }: Props) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const handleBack = onBack ?? (() => navigate(-1));
-  const supa = supabase as unknown;
   
   const [eventos, setEventos] = useState<NotificacaoEvento[]>([]);
   const [regras, setRegras] = useState<NotificacaoRegra[]>([]);

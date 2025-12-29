@@ -89,7 +89,9 @@ type AppRole =
   | "lider"
   | "membro"
   | "pastor"
+  | "professor"
   | "secretario"
+  | "tecnico"
   | "tesoureiro";
 type AccessLevel =
   | "visualizar"
@@ -103,6 +105,8 @@ const AVAILABLE_ROLES: AppRole[] = [
   "lider",
   "secretario",
   "tesoureiro",
+  "professor",
+  "tecnico",
   "intercessor",
   "membro",
   "basico",
@@ -120,6 +124,8 @@ const ROLE_LABELS: Record<AppRole, string> = {
   lider: "Líder",
   secretario: "Secretário(a)",
   tesoureiro: "Tesoureiro(a)",
+  professor: "Professor(a)",
+  tecnico: "Técnico",
   intercessor: "Intercessor",
   membro: "Membro",
   basico: "Básico",
@@ -307,10 +313,11 @@ export default function Admin() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from("user_roles").insert([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("user_roles").insert([
         {
           user_id: userId,
-          role: role as AppRole,
+          role: role,
         },
       ]);
 
@@ -347,11 +354,12 @@ export default function Admin() {
   const handleRemoveRole = async (userId: string, role: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
         .from("user_roles")
         .delete()
         .eq("user_id", userId)
-        .eq("role", role as string);
+        .eq("role", role);
 
       if (error) throw error;
 
@@ -431,9 +439,10 @@ export default function Admin() {
     newAccessLevel: string
   ) => {
     try {
-      const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
         .from("module_permissions")
-        .update({ access_level: newAccessLevel as string })
+        .update({ access_level: newAccessLevel })
         .eq("id", permission.id);
 
       if (error) throw error;
@@ -490,11 +499,12 @@ export default function Admin() {
     }
 
     try {
-      const { error } = await supabase.from("module_permissions").insert([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("module_permissions").insert([
         {
           module_name: newPermission.module_name,
-          role: newPermission.role as string,
-          access_level: newPermission.access_level as string,
+          role: newPermission.role,
+          access_level: newPermission.access_level,
         },
       ]);
 

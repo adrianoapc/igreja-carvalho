@@ -192,11 +192,18 @@ export default function CursoPlayer() {
       );
 
       const etapasComStatus: Etapa[] = (etapasData || []).map(
-        (etapa: Record<string, unknown>) => ({
-          ...etapa,
+        (etapa) => ({
+          id: String(etapa.id),
+          titulo: String(etapa.titulo || ''),
+          ordem: Number(etapa.ordem || 0),
+          tipo_conteudo: etapa.tipo_conteudo as string | null,
+          conteudo_url: etapa.conteudo_url as string | null,
+          conteudo_texto: etapa.conteudo_texto as string | null,
+          aula_vinculada_id: (etapa.aula_vinculada_id as string | null) ?? null,
+          check_automatico: etapa.check_automatico as boolean | null,
           quiz_config: normalizeQuizConfig(etapa.quiz_config),
-          concluida: conclusoesMap.has(etapa.id),
-          data_conclusao: conclusoesMap.get(etapa.id),
+          concluida: conclusoesMap.has(String(etapa.id)),
+          data_conclusao: conclusoesMap.get(String(etapa.id)),
         })
       );
 
