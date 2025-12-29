@@ -1,6 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Users, Music, Clock, BarChart3, Image } from "lucide-react";
+import {
+  Plus,
+  Calendar,
+  Users,
+  Music,
+  Clock,
+  BarChart3,
+  Image,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +20,7 @@ export default function CultosGeral() {
     timesAtivos: 0,
     membrosEscalados: 0,
     cultosRealizados: 0,
-    midiasAtivas: 0
+    midiasAtivas: 0,
   });
 
   useEffect(() => {
@@ -33,10 +41,7 @@ export default function CultosGeral() {
     const cultosIds = (cultosFuturos || []).map((c) => c.id);
 
     const [times, escalas, realizados, midias] = await Promise.all([
-      supabase
-        .from("times")
-        .select("id", { count: "exact" })
-        .eq("ativo", true),
+      supabase.from("times").select("id", { count: "exact" }).eq("ativo", true),
       cultosIds.length === 0
         ? Promise.resolve({ count: 0 })
         : supabase
@@ -50,7 +55,7 @@ export default function CultosGeral() {
       supabase
         .from("midias")
         .select("id", { count: "exact" })
-        .eq("ativo", true)
+        .eq("ativo", true),
     ]);
 
     setStats({
@@ -58,7 +63,7 @@ export default function CultosGeral() {
       timesAtivos: times.count || 0,
       membrosEscalados: escalas.count || 0,
       cultosRealizados: realizados.count || 0,
-      midiasAtivas: midias.count || 0
+      midiasAtivas: midias.count || 0,
     });
   };
 
@@ -67,30 +72,30 @@ export default function CultosGeral() {
       title: "Eventos",
       description: "Gerenciar cultos e eventos programados",
       icon: Calendar,
-      path: "/cultos/eventos",
-      stats: [{ label: "Próximos", value: stats.proximosCultos }]
+      path: "/eventos/lista",
+      stats: [{ label: "Próximos", value: stats.proximosCultos }],
     },
     {
       title: "Times",
       description: "Gerenciar equipes e departamentos",
       icon: Users,
-      path: "/cultos/times",
-      stats: [{ label: "Times Ativos", value: stats.timesAtivos }]
+      path: "/eventos/times",
+      stats: [{ label: "Times Ativos", value: stats.timesAtivos }],
     },
     {
       title: "Dashboard Liturgia",
       description: "Estatísticas e análise de participação",
       icon: BarChart3,
-      path: "/cultos/liturgia-dashboard",
-      stats: [{ label: "Cultos", value: stats.cultosRealizados }]
+      path: "/eventos/liturgia",
+      stats: [{ label: "Cultos", value: stats.cultosRealizados }],
     },
     {
       title: "Mídias",
       description: "Gerenciar conteúdo visual e comunicação",
       icon: Image,
-      path: "/cultos/midias",
-      stats: [{ label: "Mídias Ativas", value: stats.midiasAtivas }]
-    }
+      path: "/eventos/midias",
+      stats: [{ label: "Mídias Ativas", value: stats.midiasAtivas }],
+    },
   ];
 
   const quickActions = [
@@ -98,32 +103,34 @@ export default function CultosGeral() {
       title: "Novo Culto/Evento",
       description: "Criar novo culto ou evento",
       icon: Plus,
-      action: () => navigate("/cultos/eventos?novo=true")
+      action: () => navigate("/eventos/lista?novo=true"),
     },
     {
       title: "Gerenciar Times",
       description: "Adicionar ou editar times",
       icon: Users,
-      action: () => navigate("/cultos/times")
+      action: () => navigate("/eventos/times"),
     },
     {
       title: "Ver Dashboard Liturgia",
       description: "Estatísticas de participação",
       icon: BarChart3,
-      action: () => navigate("/cultos/liturgia-dashboard")
+      action: () => navigate("/eventos/liturgia"),
     },
     {
       title: "Gerenciar Mídias",
       description: "Adicionar ou editar mídias",
       icon: Image,
-      action: () => navigate("/cultos/midias")
-    }
+      action: () => navigate("/eventos/midias"),
+    },
   ];
 
   return (
     <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Cultos e Eventos</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+          Cultos e Eventos
+        </h1>
         <p className="text-sm md:text-base text-muted-foreground mt-1">
           Gerencie cultos, eventos, times e escalas
         </p>
@@ -138,8 +145,12 @@ export default function CultosGeral() {
                 <Calendar className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
               </div>
               <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Próximos Cultos</p>
-                <p className="text-xl md:text-2xl font-bold">{stats.proximosCultos}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Próximos Cultos
+                </p>
+                <p className="text-xl md:text-2xl font-bold">
+                  {stats.proximosCultos}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -152,8 +163,12 @@ export default function CultosGeral() {
                 <Users className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
               </div>
               <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Times Ativos</p>
-                <p className="text-xl md:text-2xl font-bold">{stats.timesAtivos}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Times Ativos
+                </p>
+                <p className="text-xl md:text-2xl font-bold">
+                  {stats.timesAtivos}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -166,8 +181,12 @@ export default function CultosGeral() {
                 <Music className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
               </div>
               <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Membros Escalados</p>
-                <p className="text-xl md:text-2xl font-bold">{stats.membrosEscalados}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Membros Escalados
+                </p>
+                <p className="text-xl md:text-2xl font-bold">
+                  {stats.membrosEscalados}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -180,8 +199,12 @@ export default function CultosGeral() {
                 <Clock className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
               </div>
               <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Realizados</p>
-                <p className="text-xl md:text-2xl font-bold">{stats.cultosRealizados}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Realizados
+                </p>
+                <p className="text-xl md:text-2xl font-bold">
+                  {stats.cultosRealizados}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -190,7 +213,9 @@ export default function CultosGeral() {
 
       {/* Módulos Principais */}
       <div>
-        <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Módulos Principais</h2>
+        <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">
+          Módulos Principais
+        </h2>
         <div className="grid gap-3 md:gap-4 sm:grid-cols-2">
           {modules.map((module) => (
             <Card
@@ -204,7 +229,9 @@ export default function CultosGeral() {
                     <module.icon className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base md:text-lg">{module.title}</CardTitle>
+                    <CardTitle className="text-base md:text-lg">
+                      {module.title}
+                    </CardTitle>
                     <p className="text-xs md:text-sm text-muted-foreground mt-1">
                       {module.description}
                     </p>
@@ -215,8 +242,12 @@ export default function CultosGeral() {
                 <div className="flex flex-wrap gap-3 md:gap-4">
                   {module.stats.map((stat) => (
                     <div key={stat.label}>
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                      <p className="text-lg md:text-xl font-bold">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {stat.label}
+                      </p>
+                      <p className="text-lg md:text-xl font-bold">
+                        {stat.value}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -228,7 +259,9 @@ export default function CultosGeral() {
 
       {/* Ações Rápidas */}
       <div>
-        <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Ações Rápidas</h2>
+        <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">
+          Ações Rápidas
+        </h2>
         <div className="grid gap-3 md:gap-4 sm:grid-cols-2">
           {quickActions.map((action) => (
             <Card
@@ -242,7 +275,9 @@ export default function CultosGeral() {
                     <action.icon className="w-5 h-5 md:w-6 md:h-6 text-accent-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm md:text-base">{action.title}</h3>
+                    <h3 className="font-semibold text-sm md:text-base">
+                      {action.title}
+                    </h3>
                     <p className="text-xs md:text-sm text-muted-foreground">
                       {action.description}
                     </p>
