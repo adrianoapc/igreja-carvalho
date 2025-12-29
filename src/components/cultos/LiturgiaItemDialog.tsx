@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Video, BookOpen, Timer, Image, Users, HelpCircle, Presentation } from "lucide-react";
 
 interface Membro {
   id: string;
@@ -29,6 +30,18 @@ const TIPOS_LITURGIA = [
   "Pregação", "Oferta", "Santa Ceia", "Anúncios", "Encerramento", "Outro"
 ];
 
+export type TipoConteudo = 'ATO_PRESENCIAL' | 'VIDEO' | 'IMAGEM' | 'VERSICULO' | 'PEDIDOS' | 'TIMER' | 'QUIZ';
+
+const TIPOS_CONTEUDO = [
+  { value: 'ATO_PRESENCIAL', label: 'Ato Presencial', icon: Presentation },
+  { value: 'VIDEO', label: 'Vídeo', icon: Video },
+  { value: 'IMAGEM', label: 'Imagem/Slide', icon: Image },
+  { value: 'VERSICULO', label: 'Versículo Bíblico', icon: BookOpen },
+  { value: 'PEDIDOS', label: 'Pedidos de Oração', icon: Users },
+  { value: 'TIMER', label: 'Timer/Contagem', icon: Timer },
+  { value: 'QUIZ', label: 'Quiz Interativo', icon: HelpCircle },
+] as const;
+
 export function LiturgiaItemDialog({ 
   open, 
   onOpenChange, 
@@ -46,6 +59,13 @@ export function LiturgiaItemDialog({
   const [isConvidadoExterno, setIsConvidadoExterno] = useState(false);
   const [nomeConvidadoExterno, setNomeConvidadoExterno] = useState("");
   const [saving, setSaving] = useState(false);
+  
+  // Novos estados para conteúdo digital
+  const [tipoConteudo, setTipoConteudo] = useState<TipoConteudo>('ATO_PRESENCIAL');
+  const [videoUrl, setVideoUrl] = useState("");
+  const [versiculoRef, setVersiculoRef] = useState("");
+  const [timerMinutos, setTimerMinutos] = useState("");
+  const [imagemUrl, setImagemUrl] = useState("");
 
   const resetForm = () => {
     setTipo("");
@@ -55,6 +75,28 @@ export function LiturgiaItemDialog({
     setResponsavelId("");
     setIsConvidadoExterno(false);
     setNomeConvidadoExterno("");
+    setTipoConteudo('ATO_PRESENCIAL');
+    setVideoUrl("");
+    setVersiculoRef("");
+    setTimerMinutos("");
+    setImagemUrl("");
+  };
+
+  const buildConteudoConfig = () => {
+    switch (tipoConteudo) {
+      case 'VIDEO':
+        return { url: videoUrl, autoplay: false };
+      case 'VERSICULO':
+        return { referencia: versiculoRef };
+      case 'TIMER':
+        return { duracao_segundos: parseInt(timerMinutos || '0') * 60 };
+      case 'IMAGEM':
+        return { url: imagemUrl };
+      case 'PEDIDOS':
+        return { tags: [], limite: 10 };
+      default:
+        return {};
+    }
   };
 
   const handleSave = async () => {
@@ -91,6 +133,8 @@ export function LiturgiaItemDialog({
           responsavel_externo: isConvidadoExterno ? nomeConvidadoExterno.trim() : null,
           ordem: novaOrdem,
           permite_multiplo: permiteMultiplo,
+          tipo_conteudo: tipoConteudo,
+          conteudo_config: buildConteudoConfig(),
         });
 
       if (error) throw error;
@@ -159,6 +203,73 @@ export function LiturgiaItemDialog({
               placeholder="Detalhes adicionais..."
             />
           </div>
+
+          {/* Tipo de Conteúdo Digital */}
+          <div className="space-y-2">
+            <Label>Tipo de Conteúdo</Label>
+            <Select value={tipoConteudo} onValueChange={(v) => setTipoConteudo(v as TipoConteudo)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPOS_CONTEUDO.map(tc => (
+                  <SelectItem key={tc.value} value={tc.value}>
+                    <div className="flex items-center gap-2">
+                      <tc.icon className="w-4 h-4" />
+                      {tc.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Campos condicionais baseados no tipo de conteúdo */}
+          {tipoConteudo === 'VIDEO' && (
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <Label>URL do Vídeo (YouTube/Vimeo)</Label>
+              <Input
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=..."
+              />
+            </div>
+          )}
+
+          {tipoConteudo === 'VERSICULO' && (
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <Label>Referência Bíblica</Label>
+              <Input
+                value={versiculoRef}
+                onChange={(e) => setVersiculoRef(e.target.value)}
+                placeholder="Ex: João 3:16 ou Salmos 23:1-6"
+              />
+            </div>
+          )}
+
+          {tipoConteudo === 'TIMER' && (
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <Label>Duração do Timer (minutos)</Label>
+              <Input
+                type="number"
+                value={timerMinutos}
+                onChange={(e) => setTimerMinutos(e.target.value)}
+                placeholder="Ex: 5"
+                min="1"
+              />
+            </div>
+          )}
+
+          {tipoConteudo === 'IMAGEM' && (
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <Label>URL da Imagem</Label>
+              <Input
+                value={imagemUrl}
+                onChange={(e) => setImagemUrl(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <Checkbox

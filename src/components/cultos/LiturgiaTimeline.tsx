@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GripVertical, Clock, User, Film, Plus, Layers, Save } from "lucide-react";
+import { GripVertical, Clock, User, Film, Plus, Layers, Save, Video, BookOpen, Timer, Image, Users, HelpCircle, Presentation } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -21,6 +21,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+export type TipoConteudo = 'ATO_PRESENCIAL' | 'VIDEO' | 'IMAGEM' | 'VERSICULO' | 'PEDIDOS' | 'TIMER' | 'QUIZ' | 'AUDIO' | 'TEXTO';
+
 interface ItemLiturgia {
   id: string;
   tipo: string;
@@ -31,10 +33,25 @@ interface ItemLiturgia {
   responsavel_id: string | null;
   responsavel_externo: string | null;
   permite_multiplo?: boolean;
+  tipo_conteudo?: TipoConteudo;
+  conteudo_config?: Record<string, unknown>;
+  bloqueio_progresso?: boolean;
   responsavel?: {
     nome: string;
   };
 }
+
+const TIPO_CONTEUDO_ICONS: Record<TipoConteudo, { icon: typeof Video; label: string; color: string }> = {
+  'ATO_PRESENCIAL': { icon: Presentation, label: 'Presencial', color: 'text-muted-foreground' },
+  'VIDEO': { icon: Video, label: 'Vídeo', color: 'text-red-500' },
+  'IMAGEM': { icon: Image, label: 'Imagem', color: 'text-blue-500' },
+  'VERSICULO': { icon: BookOpen, label: 'Versículo', color: 'text-amber-500' },
+  'PEDIDOS': { icon: Users, label: 'Pedidos', color: 'text-purple-500' },
+  'TIMER': { icon: Timer, label: 'Timer', color: 'text-green-500' },
+  'QUIZ': { icon: HelpCircle, label: 'Quiz', color: 'text-pink-500' },
+  'AUDIO': { icon: Film, label: 'Áudio', color: 'text-cyan-500' },
+  'TEXTO': { icon: BookOpen, label: 'Texto', color: 'text-orange-500' },
+};
 
 interface LiturgiaTimelineProps {
   itens: ItemLiturgia[];
@@ -107,6 +124,18 @@ function SortableItemCard({
               <Badge variant="secondary" className="text-xs">
                 {item.tipo}
               </Badge>
+              {/* Ícone do tipo de conteúdo */}
+              {item.tipo_conteudo && item.tipo_conteudo !== 'ATO_PRESENCIAL' && (
+                (() => {
+                  const config = TIPO_CONTEUDO_ICONS[item.tipo_conteudo];
+                  const IconComponent = config?.icon || Presentation;
+                  return (
+                    <span className={`text-xs flex items-center gap-1 ${config?.color || ''}`} title={config?.label}>
+                      <IconComponent className="w-3 h-3" />
+                    </span>
+                  );
+                })()
+              )}
               {item.duracao_minutos && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock className="w-3 h-3" />
