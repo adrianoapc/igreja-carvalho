@@ -97,14 +97,14 @@ export default function Membros() {
         
         return {
           ...membro,
-          funcoes: funcoesData?.map((f: { funcoes_igreja: { id: string; nome: string; categoria: string } }) => ({
+          funcoes: funcoesData?.map((f: { funcoes_igreja: { id: string; nome: string } }) => ({
             id: f.funcoes_igreja.id,
             nome: f.funcoes_igreja.nome
           })) || [],
-          times: timesData?.map((t: { times: { id: string; nome: string } }) => ({
+          times: timesData?.map((t: { times: { id: string; nome: string; cor?: string }; posicoes_time?: { nome: string } | null }) => ({
             id: t.times.id,
             nome: t.times.nome,
-            cor: t.times.cor,
+            cor: t.times.cor || null,
             posicao: t.posicoes_time?.nome || null
           })) || []
         };

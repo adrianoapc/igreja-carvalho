@@ -95,7 +95,7 @@ export default function Criancas() {
           const responsavelIds = new Set<string>();
           const responsavelMap = new Map<string, string>(); // id -> tipo_parentesco
 
-          relationships.forEach((item: { related_profile: { id: string; nome?: string } }) => {
+          relationships.forEach((item: { pessoa_id: string; familiar_id: string; tipo_parentesco: string }) => {
             let targetId: string;
 
             // Se a criança é "pessoa_id", o responsável é "familiar_id"

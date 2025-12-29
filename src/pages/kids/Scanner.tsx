@@ -293,12 +293,12 @@ export default function KidsCheckinScanner() {
         }));
 
         const { error: presencaError } = await supabase
-          .from("presencas_culto")
+          .from("checkins")
           .insert(presencas)
           .select();
 
         if (presencaError) {
-          console.error("Erro Supabase (presencas_culto):", presencaError);
+          console.error("Erro Supabase (checkins):", presencaError);
           toast.error(`Erro ao registrar presença: ${presencaError.message || "desconhecido"}`);
           // Não lançar erro - a presença pode já existir
         }

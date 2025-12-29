@@ -467,7 +467,7 @@ export default function Contas() {
       <ContaDialog 
         open={contaDialogOpen}
         onOpenChange={setContaDialogOpen}
-        conta={selectedConta}
+        conta={selectedConta as { id: string; nome: string; tipo: "bancaria" | "fisica" | "virtual"; saldo_inicial?: number; banco?: string; agencia?: string; conta_numero?: string; observacoes?: string } | undefined}
       />
 
       <AjusteSaldoDialog
