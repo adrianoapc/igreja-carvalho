@@ -28,9 +28,9 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
     try {
       const sixMonthsAgo = subMonths(new Date(), 6);
 
-      // Buscar presenças do membro nos últimos 6 meses
+      // Buscar presenças do membro nos últimos 6 meses (usando checkins)
       const { data: presencasData } = await supabase
-        .from("presencas_culto")
+        .from("checkins")
         .select("evento_id, created_at")
         .eq("pessoa_id", pessoaId)
         .gte("created_at", sixMonthsAgo.toISOString());
@@ -43,7 +43,7 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
         .lte("data_evento", new Date().toISOString())
         .in("status", ["confirmado", "realizado"]);
 
-      setPresencas(presencasData || []);
+      setPresencas((presencasData || []) as Presenca[]);
       setTotalCultos(cultosCount || 0);
     } catch (error) {
       console.error("Erro ao carregar frequência:", error);

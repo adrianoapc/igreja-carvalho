@@ -128,7 +128,7 @@ export default function Escalas() {
         .order("data_evento", { ascending: true });
 
       if (error) throw error;
-      setCultos(data || []);
+      setCultos((data || []) as Evento[]);
     } catch (error: unknown) {
       toast.error("Erro ao carregar cultos", { description: error instanceof Error ? error.message : String(error) });
     } finally {

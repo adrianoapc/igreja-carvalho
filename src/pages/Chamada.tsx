@@ -104,7 +104,7 @@ export default function Chamada() {
       if (!culto?.id || !currentUser?.id) throw new Error("Dados incompletos");
 
       if (marcar) {
-        const { error } = await supabase.from("presencas_culto").insert({
+        const { error } = await supabase.from("checkins").insert({
           evento_id: culto.id,
           pessoa_id: pessoaId,
           metodo: "lider_celula",
@@ -113,7 +113,7 @@ export default function Chamada() {
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from("presencas_culto")
+          .from("checkins")
           .delete()
           .eq("evento_id", culto.id)
           .eq("pessoa_id", pessoaId);

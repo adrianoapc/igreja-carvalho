@@ -90,7 +90,7 @@ export default function Ensino() {
         *,
         sala:salas(id, nome),
         jornada:jornadas(id, titulo),
-        culto:cultos(id, titulo),
+        evento:eventos(id, titulo),
         professor:profiles!aulas_professor_id_fkey(id, nome, avatar_url)
       `)
       .gte("data_inicio", new Date().toISOString())
@@ -101,7 +101,12 @@ export default function Ensino() {
       return;
     }
 
-    setAulas(data || []);
+    // Map evento to culto for backward compatibility
+    const mappedData = (data || []).map((aula: Record<string, unknown>) => ({
+      ...aula,
+      culto: aula.evento
+    }));
+    setAulas(mappedData as Aula[]);
   };
 
   const fetchSalas = async () => {

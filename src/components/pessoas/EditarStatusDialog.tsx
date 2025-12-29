@@ -104,7 +104,7 @@ export function EditarStatusDialog({
 
       const { error } = await supabase
         .from("profiles")
-        .update(updateData)
+        .update(updateData as { status: "visitante" | "frequentador" | "membro"; data_cadastro_membro?: string; observacoes?: string })
         .eq("id", pessoaId);
 
       if (error) throw error;

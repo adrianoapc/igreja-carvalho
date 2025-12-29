@@ -194,7 +194,9 @@ export default function Admin() {
       if (!validation.success) {
         throw new Error(validation.error.issues[0].message);
       }
-      const updateData: { status: string; data_cadastro_membro?: string } = { status: newStatus };
+      const updateData: { status: "visitante" | "frequentador" | "membro"; data_cadastro_membro?: string } = { 
+        status: newStatus as "visitante" | "frequentador" | "membro" 
+      };
       if (newStatus === "membro") {
         updateData.data_cadastro_membro = new Date().toISOString();
       }

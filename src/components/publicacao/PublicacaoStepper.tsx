@@ -43,6 +43,17 @@ interface PublicacaoStepperProps {
     tipo?: string;
     data_publicacao?: string;
     conteudo?: unknown;
+    nivel_urgencia?: string;
+    data_inicio?: string;
+    data_fim?: string;
+    ativo?: boolean;
+    exibir_app?: boolean;
+    exibir_telao?: boolean;
+    exibir_site?: boolean;
+    tags?: string[];
+    evento_id?: string;
+    ordem_telao?: number;
+    midia_id?: string;
   } | null;
   onSuccess: () => void;
 }
@@ -201,11 +212,12 @@ export function PublicacaoStepper({ open, onOpenChange, publicacao, onSuccess }:
     setMediaPickerOpen(true);
   };
 
-  const handleMediaSelect = (midia: { id: string; url?: string; tipo?: string }) => {
+  const handleMediaSelect = (midia: { id: string; url?: string; tipo?: string; titulo?: string }) => {
+    const fullMidia = { id: midia.id, url: midia.url || "", tipo: midia.tipo || "", titulo: midia.titulo || "" };
     if (mediaPickerTarget === "main") {
-      setMidiaSelecionada(midia);
+      setMidiaSelecionada(fullMidia);
     } else {
-      setMidiaTelaoSelecionada(midia);
+      setMidiaTelaoSelecionada(fullMidia);
     }
   };
 

@@ -56,7 +56,7 @@ export function ResponsiveDialog({
 
   if (isMobile) {
     return (
-      <Drawer open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange} {...drawerProps}>
+      <Drawer open={open} onOpenChange={onOpenChange}>
         {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
         <DrawerContent {...drawerContentProps}>{children}</DrawerContent>
       </Drawer>

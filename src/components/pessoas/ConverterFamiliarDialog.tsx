@@ -131,7 +131,7 @@ export function ConverterFamiliarDialog({
 
       const { data: newProfile, error: profileError } = await supabase
         .from("profiles")
-        .insert(profileData)
+        .insert([profileData as { nome: string; status: "visitante" | "frequentador" | "membro"; email?: string | null; telefone?: string | null }])
         .select()
         .single();
 

@@ -94,7 +94,7 @@ export function KidsObservationDialog({
         .from("kids_diario")
         .select("*")
         .eq("crianca_id", crianca.id)
-        .eq("evento_id", cultoId as string)
+        .eq("evento_id", cultoId)
         .maybeSingle();
 
       if (error) throw error;
