@@ -234,7 +234,10 @@ export default function NotificacoesAdmin({ onBack }: Props) {
       if (resRegras.error) throw resRegras.error;
 
       setEventos(resEventos.data || []);
-      setRegras(resRegras.data || []);
+      setRegras((resRegras.data || []).map(r => ({
+        ...r,
+        canais: r.canais as Record<string, boolean> | null
+      })));
     } catch (error) {
       console.error(error);
       toast({ title: "Erro", description: "Falha ao carregar configurações.", variant: "destructive" });
@@ -290,7 +293,7 @@ export default function NotificacoesAdmin({ onBack }: Props) {
       const { data, error } = await supa.from("notificacao_regras").insert(payload).select().single();
       if (error) throw error;
 
-      setRegras(prev => [...prev, data]);
+      setRegras(prev => [...prev, { ...data, canais: data.canais as Record<string, boolean> | null }]);
       toast({ title: "Regra criada com sucesso!", className: "bg-green-50 border-green-200 text-green-800" });
       setDialogOpen(false);
       setSelectedRole("");
