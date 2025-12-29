@@ -95,9 +95,9 @@ export default function KidsDashboard() {
           };
         }
 
-        // Presenças de crianças no período (via presencas_culto)
+        // Presenças de crianças no período (via checkins)
         const { data: presencas, error: presencasError } = await supabase
-          .from("presencas_culto")
+          .from("checkins")
           .select("pessoa_id, evento_id, created_at")
           .in("pessoa_id", criancaIds)
           .gte("created_at", startDate.toISOString());
@@ -118,7 +118,7 @@ export default function KidsDashboard() {
         let checkinsAtivos = 0;
         if (cultoAtivo) {
           const { data: presencasHoje } = await supabase
-            .from("presencas_culto")
+            .from("checkins")
             .select("pessoa_id")
             .eq("evento_id", cultoAtivo.id)
             .in("pessoa_id", criancas?.map(c => c.id) || []);
@@ -180,24 +180,29 @@ export default function KidsDashboard() {
 
         // Buscar presenças recentes de crianças
         const { data, error } = await supabase
-          .from("presencas_culto")
-          .select(`
-            *,
-            pessoa:profiles!presencas_culto_pessoa_id_fkey(id, nome, avatar_url),
-            culto:cultos(id, titulo, data_evento)
-          `)
+          .from("checkins")
+          .select("id, pessoa_id, evento_id, created_at")
           .in("pessoa_id", criancas.map(c => c.id))
           .order("created_at", { ascending: false })
           .limit(5);
 
         if (error) throw error;
+
+        // Buscar dados das pessoas
+        const pessoaIds = [...new Set((data || []).map(d => d.pessoa_id))];
+        const { data: pessoasData } = await supabase
+          .from("profiles")
+          .select("id, nome, avatar_url")
+          .in("id", pessoaIds);
+        
+        const pessoasMap = new Map((pessoasData || []).map(p => [p.id, p]));
         
         return (data || []).map(item => ({
           id: item.id,
-          crianca_nome: item.pessoa?.nome || "Sem nome",
-          crianca_avatar: item.pessoa?.avatar_url,
+          crianca_nome: pessoasMap.get(item.pessoa_id)?.nome || "Sem nome",
+          crianca_avatar: pessoasMap.get(item.pessoa_id)?.avatar_url,
           checkin_at: item.created_at,
-          culto_titulo: item.culto?.titulo || "Culto",
+          culto_titulo: "Culto",
         }));
       } catch (error) {
         console.error("Erro ao carregar últimos check-ins kids:", error);

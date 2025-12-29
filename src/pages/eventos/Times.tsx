@@ -113,7 +113,7 @@ export default function Times() {
       const timesWithCount = data?.map(time => {
         const membros = time.membros_time
           ?.filter((m: { profiles?: unknown; ativo?: boolean }) => m.profiles && m.ativo)
-          ?.map((m: { profiles: { id: string; nome: string; avatar_url?: string | null } }) => ({
+          ?.map((m: { profiles: { id: string; nome: string; avatar_url?: string | null }; posicoes_time?: { nome: string } | null }) => ({
             id: m.profiles.id,
             nome: m.profiles.nome,
             posicao: m.posicoes_time?.nome || null

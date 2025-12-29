@@ -233,7 +233,7 @@ export function useNotifications() {
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload: { new: Notification }) => {
+        (payload: { new: Notification; old?: { read?: boolean } }) => {
           const updatedNotification = payload.new as Notification;
           
           setNotifications(prev =>

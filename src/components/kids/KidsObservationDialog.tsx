@@ -90,12 +90,15 @@ export function KidsObservationDialog({
       }
 
       // Se tem culto, buscar por evento_id
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await (supabase as any)
         .from("kids_diario")
         .select("id, humor, comportamento_tags, necessidades_tags, observacoes")
         .eq("crianca_id", crianca.id)
         .eq("evento_id", cultoId)
         .maybeSingle();
+      
+      const { data, error } = result as { data: { id: string; humor: string | null; comportamento_tags: string[] | null; necessidades_tags: string[] | null; observacoes: string | null } | null; error: Error | null };
 
       if (error) throw error;
       return data;

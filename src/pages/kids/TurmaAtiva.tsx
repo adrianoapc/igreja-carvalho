@@ -68,7 +68,7 @@ export default function TurmaAtiva() {
 
       // Buscar presenças do culto de hoje (uma presença por criança)
       const { data: presencas, error: presencasError } = await supabase
-        .from("presencas_culto")
+        .from("checkins")
         .select("pessoa_id")
         .eq("evento_id", culto.id);
 
@@ -123,11 +123,12 @@ export default function TurmaAtiva() {
       });
 
       // Buscar diários já registrados para este culto
-      const { data: diarios } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: diarios } = await (supabase as any)
         .from("kids_diario")
         .select("crianca_id")
         .eq("evento_id", culto.id)
-        .in("crianca_id", criancaIds);
+        .in("crianca_id", criancaIds) as { data: { crianca_id: string }[] | null };
 
       const diariosSet = new Set(diarios?.map(d => d.crianca_id) || []);
 

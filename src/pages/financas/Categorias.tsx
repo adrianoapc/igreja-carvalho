@@ -32,9 +32,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 interface Categoria {
   id: string;
   nome: string;
-  tipo: string;
+  tipo: "entrada" | "saida";
   ativo: boolean;
   cor?: string | null;
+  secao_dre?: string | null;
   subcategorias?: Subcategoria[];
 }
 
@@ -207,8 +208,24 @@ export default function Categorias({ onBack }: CategoriasProps = {}) {
 
   const openEdit = (item: Categoria | Subcategoria, type: "CATEGORIA" | "SUBCATEGORIA") => {
     setDialogType(type);
-    setEditingItem(item);
-    setFormData({ nome: item.nome, tipo: item.tipo ? item.tipo.toLowerCase() : activeTab });
+    if ("tipo" in item) {
+      // É uma Categoria
+      setEditingItem({
+        id: item.id,
+        nome: item.nome,
+        tipo: item.tipo,
+        secao_dre: item.secao_dre,
+      });
+    } else {
+      // É uma Subcategoria - usar o activeTab como tipo
+      setEditingItem({
+        id: item.id,
+        nome: item.nome,
+        tipo: activeTab as "entrada" | "saida",
+      });
+    }
+    const tipoValue = "tipo" in item ? item.tipo : activeTab;
+    setFormData({ nome: item.nome, tipo: tipoValue });
     setDialogOpen(true);
   };
 

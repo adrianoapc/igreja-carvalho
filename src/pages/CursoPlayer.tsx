@@ -87,6 +87,8 @@ const normalizeQuizConfig = (value: unknown): Etapa["quiz_config"] | undefined =
   const notaMinima = Number(v.notaMinima ?? v.nota_minima ?? 70);
   return { notaMinima, perguntas };
 };
+
+export default function CursoPlayer() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();

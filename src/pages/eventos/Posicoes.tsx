@@ -177,7 +177,7 @@ export default function Posicoes() {
               <div className="flex items-center gap-3">
                 <div 
                   className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: time.cor }}
+                  style={{ backgroundColor: (time as { cor?: string }).cor || "#6366f1" }}
                 >
                   <Users className="w-6 h-6 text-white" />
                 </div>
