@@ -1517,6 +1517,71 @@ export type Database = {
           },
         ]
       }
+      eventos_convites: {
+        Row: {
+          created_at: string
+          enviado_em: string | null
+          evento_id: string
+          id: string
+          motivo_recusa: string | null
+          pessoa_id: string
+          status: string
+          updated_at: string
+          visualizado_em: string | null
+        }
+        Insert: {
+          created_at?: string
+          enviado_em?: string | null
+          evento_id: string
+          id?: string
+          motivo_recusa?: string | null
+          pessoa_id: string
+          status?: string
+          updated_at?: string
+          visualizado_em?: string | null
+        }
+        Update: {
+          created_at?: string
+          enviado_em?: string | null
+          evento_id?: string
+          id?: string
+          motivo_recusa?: string | null
+          pessoa_id?: string
+          status?: string
+          updated_at?: string
+          visualizado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eventos_convites_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_convites_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_convites_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "eventos_convites_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       familias: {
         Row: {
           created_at: string
