@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,11 +45,12 @@ export default function DashboardMember() {
   const firstName = profile?.nome?.split(" ")[0] || "Membro";
   const [banners, setBanners] = useState<Banner[]>([]);
   const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
+  const [alreadyRegisteredToday, setAlreadyRegisteredToday] = useState(false);
 
   useEffect(() => {
     fetchBanners();
-     
-  }, []);
+    checkTodaySentimento();
+  }, [profile?.id]);
 
   useEffect(() => {
     if (searchParams.get("sentimento") === "true") {
@@ -58,6 +59,24 @@ export default function DashboardMember() {
       setSearchParams(searchParams);
     }
   }, [searchParams, setSearchParams]);
+
+  const checkTodaySentimento = async () => {
+    if (!profile?.id) return;
+    
+    const today = new Date();
+    const dayStart = startOfDay(today).toISOString();
+    const dayEnd = endOfDay(today).toISOString();
+
+    const { data } = await supabase
+      .from("sentimentos_membros")
+      .select("id")
+      .eq("pessoa_id", profile.id)
+      .gte("data_registro", dayStart)
+      .lte("data_registro", dayEnd)
+      .limit(1);
+
+    setAlreadyRegisteredToday(!!data && data.length > 0);
+  };
 
   const fetchBanners = async () => {
     const now = new Date().toISOString();
@@ -99,16 +118,24 @@ export default function DashboardMember() {
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>  */}
         </div>
-        <Button
-          onClick={() => setSentimentoDialogOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
-        >
-          <Heart className="w-4 h-4" />
-          <span>Como você está?</span>
-        </Button>
+        {!alreadyRegisteredToday && (
+          <Button
+            onClick={() => setSentimentoDialogOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+          >
+            <Heart className="w-4 h-4" />
+            <span>Como você está?</span>
+          </Button>
+        )}
       </div>
 
-      <RegistrarSentimentoDialog open={sentimentoDialogOpen} onOpenChange={setSentimentoDialogOpen} />
+      <RegistrarSentimentoDialog 
+        open={sentimentoDialogOpen} 
+        onOpenChange={(open) => {
+          setSentimentoDialogOpen(open);
+          if (!open) checkTodaySentimento(); // Atualiza estado ao fechar
+        }} 
+      />
 
       {/* Banners Carousel */}
       {banners.length > 0 && (
