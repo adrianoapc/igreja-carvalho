@@ -69,11 +69,11 @@ interface Props {
 }
 
 export default function Chatbots({ onBack }: Props) {
+  const navigate = useNavigate();
+  const handleBack = onBack ?? (() => navigate(-1));
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [chatbots, setChatbots] = useState<ChatbotConfig[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedChatbot, setSelectedChatbot] = useState<ChatbotConfig | null>(null);
   const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({});
 

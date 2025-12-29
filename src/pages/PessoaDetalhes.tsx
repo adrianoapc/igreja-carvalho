@@ -178,11 +178,11 @@ export default function PessoaDetalhes() {
         .order("data_inicio", { ascending: false });
 
       setFuncoes(
-        funcoesData?.map((f: { funcoes_igreja: { id: string; nome: string; categoria: string } }) => ({
+        funcoesData?.map((f: any) => ({
           id: f.id,
-          nome: f.funcoes_igreja.nome,
+          nome: f.funcoes_igreja?.nome || "—",
           data_inicio: f.data_inicio,
-          ativo: f.ativo,
+          ativo: Boolean(f.ativo),
         })) || []
       );
     } catch (error) {

@@ -96,8 +96,9 @@ function detectBiometricType(): 'face' | 'fingerprint' | 'unknown' {
 
 // Mapeia erros WebAuthn para tipos específicos
 function parseWebAuthnError(error: unknown): { type: BiometricErrorType; message: string } {
-  const errorName = error?.name || '';
-  const errorMessage = error?.message || 'Erro desconhecido';
+  const err = (typeof error === "object" && error !== null) ? (error as { name?: string; message?: string }) : undefined;
+  const errorName = err?.name ?? "";
+  const errorMessage = err?.message ?? "Erro desconhecido";
   
   switch (errorName) {
     case 'NotAllowedError':

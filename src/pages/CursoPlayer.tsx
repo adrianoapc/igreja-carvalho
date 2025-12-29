@@ -35,10 +35,12 @@ interface Etapa {
   conteudo_url: string | null;
   conteudo_texto: string | null;
   quiz_config?: {
-    perguntas?: Array<{
-      pergunta: string;
-      opcoes: string[];
-      resposta_correta: number;
+    notaMinima: number;
+    perguntas: Array<{
+      id: string;
+      texto: string;
+      alternativas: string[];
+      respostaCorreta: number;
     }>;
   };
   check_automatico?: boolean | null;
@@ -60,7 +62,31 @@ interface AulaVinculada {
   sala: { nome: string } | null;
 }
 
-export default function CursoPlayer() {
+const normalizeQuizConfig = (value: unknown): Etapa["quiz_config"] | undefined => {
+  if (typeof value !== "object" || value === null) return undefined;
+  const v = value as any;
+  const perguntasRaw: any[] = Array.isArray(v.perguntas) ? v.perguntas : [];
+
+  const perguntas = perguntasRaw
+    .map((p, idx) => {
+      const texto = String(p?.texto ?? p?.pergunta ?? "");
+      const alternativas = Array.isArray(p?.alternativas) ? p.alternativas : (Array.isArray(p?.opcoes) ? p.opcoes : []);
+      const respostaCorreta = Number(p?.respostaCorreta ?? p?.resposta_correta ?? 0);
+      if (!texto || alternativas.length === 0) return null;
+      return {
+        id: String(p?.id ?? idx),
+        texto,
+        alternativas: alternativas.map((a: any) => String(a)),
+        respostaCorreta,
+      };
+    })
+    .filter(Boolean) as Etapa["quiz_config"]["perguntas"];
+
+  if (perguntas.length === 0) return undefined;
+
+  const notaMinima = Number(v.notaMinima ?? v.nota_minima ?? 70);
+  return { notaMinima, perguntas };
+};
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -148,8 +174,9 @@ export default function CursoPlayer() {
         presencasData?.map(p => [p.etapa_id, p.created_at]) || []
       );
 
-      const etapasComStatus: Etapa[] = (etapasData || []).map(etapa => ({
+      const etapasComStatus: Etapa[] = (etapasData || []).map((etapa: any) => ({
         ...etapa,
+        quiz_config: normalizeQuizConfig(etapa.quiz_config),
         concluida: conclusoesMap.has(etapa.id),
         data_conclusao: conclusoesMap.get(etapa.id),
       }));
@@ -347,8 +374,9 @@ export default function CursoPlayer() {
           </div>
         );
 
-      case "quiz":
-        if (!etapaSelecionada.quiz_config || !inscricaoId) {
+      case "quiz": {
+        const quizConfig = normalizeQuizConfig(etapaSelecionada.quiz_config);
+        if (!quizConfig || !inscricaoId) {
           return (
             <div className="text-center text-muted-foreground py-8">
               Quiz não configurado ou inscrição não encontrada
@@ -356,16 +384,17 @@ export default function CursoPlayer() {
           );
         }
         return (
-          <QuizPlayer 
+          <QuizPlayer
             etapa={{
               id: etapaSelecionada.id,
               titulo: etapaSelecionada.titulo,
-              quiz_config: etapaSelecionada.quiz_config
+              quiz_config: quizConfig,
             }}
             inscricaoId={inscricaoId}
             onAprovado={handleQuizAprovado}
           />
         );
+      }
 
       case "aula_presencial":
       case "evento":

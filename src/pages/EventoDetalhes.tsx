@@ -114,12 +114,18 @@ export default function EventoDetalhes() {
         .single();
 
       if (error) throw error;
-      setEvento(data);
-      setTema(data.tema || "");
-      setPregador(data.pregador || "");
-      setLocal(data.local || "");
-      setObservacoes(data.observacoes || "");
-      setStatus(data.status);
+
+      const normalized: Evento = {
+        ...(data as any),
+        tipo: (data as any).tipo as Evento["tipo"],
+      };
+
+      setEvento(normalized);
+      setTema(normalized.tema || "");
+      setPregador(normalized.pregador || "");
+      setLocal(normalized.local || "");
+      setObservacoes(normalized.observacoes || "");
+      setStatus(normalized.status);
     } catch (error: unknown) {
       toast.error("Erro ao carregar evento", { description: error instanceof Error ? error.message : String(error) });
       navigate("/eventos/lista");
@@ -298,7 +304,7 @@ export default function EventoDetalhes() {
           
           <Button
             variant="outline"
-            onClick={() => window.open(`/telao/liturgia/${culto.id}`, "_blank")}
+            onClick={() => window.open(`/telao/liturgia/${evento.id}`, "_blank")}
           >
             <Presentation className="h-4 w-4 mr-2" />
             Modo Apresentação
