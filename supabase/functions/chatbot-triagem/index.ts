@@ -250,13 +250,11 @@ serve(async (req: Request) => {
     }
 
     // Log de Entrada
-    await supabase
-      .from("logs_auditoria_chat")
-      .insert({
-        sessao_id: sessao.id,
-        ator: "USER",
-        payload_raw: { texto: inputTexto },
-      });
+    await supabase.from("logs_auditoria_chat").insert({
+      sessao_id: sessao.id,
+      ator: "USER",
+      payload_raw: { texto: inputTexto },
+    });
 
     // 4. Chamada IA
     const messages = [
@@ -523,13 +521,11 @@ serve(async (req: Request) => {
     }
 
     // Logs & Métricas
-    await supabase
-      .from("logs_auditoria_chat")
-      .insert({
-        sessao_id: sessao.id,
-        ator: "BOT",
-        payload_raw: { resposta: responseMessage, json: parsedJson },
-      });
+    await supabase.from("logs_auditoria_chat").insert({
+      sessao_id: sessao.id,
+      ator: "BOT",
+      payload_raw: { resposta: responseMessage, json: parsedJson },
+    });
 
     const executionTime = Date.now() - startTime;
     try {
