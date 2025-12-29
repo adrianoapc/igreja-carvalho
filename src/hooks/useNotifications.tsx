@@ -62,7 +62,7 @@ export function useNotifications() {
     }
     const notif = n as Record<string, unknown>;
     return {
-      ...(notif as Notification),
+      ...(notif as unknown as Notification),
       metadata: toRecord(notif?.metadata),
     };
   };

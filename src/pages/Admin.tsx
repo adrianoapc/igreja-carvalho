@@ -233,7 +233,7 @@ export default function Admin() {
     try {
       const { error } = await supabase.from("user_roles").insert([{
         user_id: userId,
-        role: role as string
+        role: role as AppRole
       }]);
 
       if (error) throw error;

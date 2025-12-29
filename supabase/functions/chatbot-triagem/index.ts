@@ -10,6 +10,12 @@ interface RequestBody {
   media_id?: string;
 }
 
+interface ChatbotConfig {
+  textModel: string;
+  audioModel: string;
+  systemPrompt: string;
+}
+
 // --- CONFIGURAÇÃO ---
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,7 +66,7 @@ const DEFAULT_TEXT_MODEL = 'gpt-4o-mini';
 const DEFAULT_AUDIO_MODEL = 'whisper-1';
 
 // --- CONFIGURAÇÃO (DB) ---
-async function getChatbotConfig(): Promise<Record<string, unknown>> {
+async function getChatbotConfig(): Promise<ChatbotConfig> {
   try {
     const { data: config } = await supabase
       .from('chatbot_configs')
@@ -128,7 +134,7 @@ async function definirPastorResponsavel(perfilUsuario: Record<string, unknown>):
       // if (lider?.role === 'PASTOR') return perfilUsuario.lider_id;
       
       // Por enquanto, assume que o líder cuida:
-      return perfilUsuario.lider_id;
+      return perfilUsuario.lider_id as string;
   }
   // 2. Fallback: Pastor de Plantão (Gabinete Geral)
   return UUID_PASTOR_PLANTAO;
@@ -155,11 +161,11 @@ async function processarAudio(mediaId: string, audioModel: string): Promise<stri
 }
 
 // --- SERVIDOR PRINCIPAL ---
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   
   const startTime = Date.now();
-  let requestPayload: Record<string, unknown> = {};
+  let requestPayload: RequestBody = {} as RequestBody;
 
   try {
     const body = await req.json() as RequestBody;
@@ -250,7 +256,7 @@ serve(async (req) => {
           
           // Ordena: Prioriza quem tem data_nascimento mais antiga (assume-se ser pai/mãe, não criança)
           // Em seguida, prioriza cadastro mais antigo (created_at)
-          perfis.sort((a, b) => {
+          perfis.sort((a: { id: string; nome: string; lider_id?: string; data_nascimento?: string; created_at?: string }, b: { id: string; nome: string; lider_id?: string; data_nascimento?: string; created_at?: string }) => {
             // Se ambos têm data de nascimento, quem nasceu antes (mais velho) tem prioridade
             const dataA = a.data_nascimento ? new Date(a.data_nascimento).getTime() : Infinity;
             const dataB = b.data_nascimento ? new Date(b.data_nascimento).getTime() : Infinity;

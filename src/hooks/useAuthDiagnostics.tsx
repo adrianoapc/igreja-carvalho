@@ -122,8 +122,8 @@ export function useAuthDiagnostics() {
         if (error) {
           console.error('[Diagnostics] Refresh failed:', {
             errorMessage: error instanceof Error ? error.message : String(error),
-            errorStatus: (error as Record<string, unknown>).status,
-            errorCode: (error as Record<string, unknown>).code,
+            errorStatus: (error as unknown as Record<string, unknown>).status,
+            errorCode: (error as unknown as Record<string, unknown>).code,
           });
           return { success: false, error: error instanceof Error ? error.message : String(error) };
         }

@@ -125,7 +125,7 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
         .update({
           titulo: result.data.titulo,
           mensagem: result.data.mensagem,
-          categoria: result.data.categoria as string,
+          categoria: result.data.categoria as "espiritual" | "casamento" | "familia" | "saude" | "trabalho" | "financeiro" | "ministerial" | "outro",
         })
         .eq("id", testemunho.id);
 
