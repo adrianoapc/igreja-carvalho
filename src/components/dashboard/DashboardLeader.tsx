@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { format, addDays, isSameDay, isWithinInterval } from "date-fns";
+import { format, addDays, isSameDay, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,11 +42,13 @@ export default function DashboardLeader() {
   });
   const [aniversariantes, setAniversariantes] = useState<Aniversariante[]>([]);
   const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
+  const [alreadyRegisteredToday, setAlreadyRegisteredToday] = useState(false);
 
   useEffect(() => {
     fetchStats();
     fetchAniversariantes();
-  }, []);
+    checkTodaySentimento();
+  }, [profile?.id]);
 
   useEffect(() => {
     if (searchParams.get("sentimento") === "true") {
@@ -55,6 +57,24 @@ export default function DashboardLeader() {
       setSearchParams(searchParams);
     }
   }, [searchParams, setSearchParams]);
+
+  const checkTodaySentimento = async () => {
+    if (!profile?.id) return;
+    
+    const today = new Date();
+    const dayStart = startOfDay(today).toISOString();
+    const dayEnd = endOfDay(today).toISOString();
+
+    const { data } = await supabase
+      .from("sentimentos_membros")
+      .select("id")
+      .eq("pessoa_id", profile.id)
+      .gte("data_registro", dayStart)
+      .lte("data_registro", dayEnd)
+      .limit(1);
+
+    setAlreadyRegisteredToday(!!data && data.length > 0);
+  };
 
   const fetchStats = async () => {
     // Membros na célula (simplified - count members in teams where user is leader)
@@ -122,19 +142,27 @@ export default function DashboardLeader() {
             Olá, {firstName}! {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p> */}
         </div>
-        <Button
-          onClick={() => setSentimentoDialogOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
-        >
-          <Heart className="w-4 h-4" />
-          <span>Como você está?</span>
-        </Button>
+        {!alreadyRegisteredToday && (
+          <Button
+            onClick={() => setSentimentoDialogOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+          >
+            <Heart className="w-4 h-4" />
+            <span>Como você está?</span>
+          </Button>
+        )}
       </div>
 
       {/* Widget de Monitoramento de Escalas */}
       <EscalasPendentesWidget />
 
-      <RegistrarSentimentoDialog open={sentimentoDialogOpen} onOpenChange={setSentimentoDialogOpen} />
+      <RegistrarSentimentoDialog 
+        open={sentimentoDialogOpen} 
+        onOpenChange={(open) => {
+          setSentimentoDialogOpen(open);
+          if (!open) checkTodaySentimento();
+        }} 
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
