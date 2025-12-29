@@ -43,10 +43,21 @@ interface TestemunhoDetailsDialogProps {
   testemunho: {
     id: string;
     titulo: string;
-    descricao: string;
+    mensagem?: string;
+    descricao?: string;
     status: string;
+    categoria?: string;
+    publicar?: boolean;
+    anonimo?: boolean;
     data_testemunho?: string | null;
+    data_publicacao?: string | null;
+    created_at?: string;
+    pessoa_id?: string | null;
     pessoa?: { nome?: string } | null;
+    nome_externo?: string | null;
+    email_externo?: string | null;
+    telefone_externo?: string | null;
+    profiles?: { nome?: string; email?: string; telefone?: string } | null;
   };
   onSuccess: () => void;
 }
@@ -61,7 +72,7 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
 
   const [formData, setFormData] = useState({
     titulo: testemunho?.titulo || "",
-    mensagem: testemunho?.mensagem || "",
+    mensagem: testemunho?.mensagem || testemunho?.descricao || "",
     categoria: testemunho?.categoria || "",
     status: testemunho?.status || "aberto",
     publicar: testemunho?.publicar || false,
@@ -74,10 +85,10 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
     
     setFormData({
       titulo: testemunho.titulo,
-      mensagem: testemunho.mensagem,
-      categoria: testemunho.categoria,
+      mensagem: testemunho.mensagem || testemunho.descricao || "",
+      categoria: testemunho.categoria || "",
       status: testemunho.status,
-      publicar: testemunho.publicar,
+      publicar: testemunho.publicar || false,
     });
 
     const fetchPessoaNome = async () => {
@@ -142,7 +153,9 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
   const handleStatusChange = async (newStatus: string) => {
     setLoading(true);
     try {
-      const updateData: { status: string } = { status: newStatus };
+      const updateData: { status: "aberto" | "arquivado" | "publico"; data_publicacao?: string } = { 
+        status: newStatus as "aberto" | "arquivado" | "publico" 
+      };
       
       if (newStatus === "publico" && !testemunho.data_publicacao) {
         updateData.data_publicacao = new Date().toISOString();
@@ -279,11 +292,11 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
                 </div>
               )}
               <p className="text-sm text-muted-foreground">
-                Data: {format(new Date(testemunho.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                Data: {format(new Date(testemunho.created_at || new Date()), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
               </p>
             </div>
             <div className="flex gap-2">
-              <Badge variant="outline">{getCategoriaLabel(testemunho.categoria)}</Badge>
+              <Badge variant="outline">{getCategoriaLabel(testemunho.categoria || "")}</Badge>
               {testemunho.publicar ? (
                 <Badge className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400">
                   <Eye className="w-3 h-3 mr-1" />
@@ -355,7 +368,7 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
           ) : (
             <div className="space-y-4 bg-muted p-4 rounded-lg">
               <h3 className="font-semibold text-lg">{testemunho.titulo}</h3>
-              <p className="whitespace-pre-wrap text-sm">{testemunho.mensagem}</p>
+              <p className="whitespace-pre-wrap text-sm">{testemunho.mensagem || testemunho.descricao}</p>
             </div>
           )}
 
@@ -372,10 +385,10 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
                     setIsEditing(false);
                     setFormData({
                       titulo: testemunho.titulo,
-                      mensagem: testemunho.mensagem,
-                      categoria: testemunho.categoria,
+                      mensagem: testemunho.mensagem || testemunho.descricao || "",
+                      categoria: testemunho.categoria || "",
                       status: testemunho.status,
-                      publicar: testemunho.publicar,
+                      publicar: testemunho.publicar || false,
                     });
                     setErrors({});
                   }}

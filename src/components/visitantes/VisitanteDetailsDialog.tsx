@@ -175,7 +175,9 @@ export function VisitanteDetailsDialog({
 
     setPromoting(true);
     try {
-      const updateData: { status: string; data_cadastro_membro?: string } = { status: nextStatus };
+      const updateData: { status: "visitante" | "frequentador" | "membro"; data_cadastro_membro?: string } = { 
+        status: nextStatus as "visitante" | "frequentador" | "membro" 
+      };
       
       // Se está promovendo para membro, adiciona data_cadastro_membro
       if (nextStatus === "membro") {

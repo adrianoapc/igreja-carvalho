@@ -109,15 +109,20 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess, initialCon
 
       const testemunhoData: {
         titulo: string;
-        descricao: string;
-        data_testemunho: string;
+        mensagem: string;
+        categoria: "casamento" | "espiritual" | "familia" | "financeiro" | "ministerial" | "outro" | "saude" | "trabalho";
+        status: "aberto" | "arquivado" | "publico";
+        publicar: boolean;
+        anonimo: boolean;
+        autor_id?: string;
         pessoa_id?: string;
-        publico: boolean;
-        status: string;
+        nome_externo?: string;
+        email_externo?: string;
+        telefone_externo?: string;
       } = {
         titulo: result.data.titulo,
         mensagem: result.data.mensagem,
-        categoria: result.data.categoria as any,
+        categoria: result.data.categoria as "casamento" | "espiritual" | "familia" | "financeiro" | "ministerial" | "outro" | "saude" | "trabalho",
         status: "aberto",
         publicar,
         anonimo,
@@ -137,7 +142,7 @@ export function NovoTestemunhoDialog({ open, onOpenChange, onSuccess, initialCon
         testemunhoData.telefone_externo = result.data.telefone;
       }
 
-      const { error } = await supabase.from("testemunhos").insert(testemunhoData);
+      const { error } = await supabase.from("testemunhos").insert([testemunhoData]);
 
       if (error) throw error;
 

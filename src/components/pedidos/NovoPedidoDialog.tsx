@@ -52,17 +52,17 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
       }
 
       const pedidoData: {
-        tipo: string;
+        tipo: "agradecimento" | "espiritual" | "familia" | "financeiro" | "outro" | "saude" | "trabalho";
         pedido: string;
         anonimo: boolean;
-        status: string;
+        status: "pendente" | "em_oracao" | "respondido" | "arquivado";
         membro_id?: string;
         pessoa_id?: string | null;
         nome_solicitante?: string;
         email_solicitante?: string;
         telefone_solicitante?: string;
       } = {
-        tipo,
+        tipo: tipo as "agradecimento" | "espiritual" | "familia" | "financeiro" | "outro" | "saude" | "trabalho",
         pedido,
         anonimo,
         status: "pendente"
@@ -86,7 +86,7 @@ export function NovoPedidoDialog({ open, onOpenChange, onSuccess, initialDescrip
 
       const { data: insertedPedido, error } = await supabase
         .from("pedidos_oracao")
-        .insert([pedidoData] as Record<string, unknown>[])
+        .insert([pedidoData])
         .select('id')
         .single();
 

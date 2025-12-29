@@ -143,7 +143,7 @@ export default function Agenda() {
         .order("data_evento", { ascending: true });
 
       if (error) throw error;
-      setCultos(data || []);
+      setCultos((data || []) as Evento[]);
     } catch (error) {
       console.error("Error fetching cultos:", error);
     } finally {

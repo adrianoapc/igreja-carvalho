@@ -111,7 +111,8 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
         .select(`
           id,
           confirmado,
-          cultos!inner (
+          evento_id,
+          eventos!inner (
             id,
             titulo,
             data_evento,
@@ -126,20 +127,21 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
           )
         `)
         .eq("pessoa_id", pessoaId)
-        .gte("cultos.data_evento", new Date().toISOString())
-        .order("cultos(data_evento)", { ascending: true })
+        .gte("eventos.data_evento", new Date().toISOString())
+        .order("eventos(data_evento)", { ascending: true })
         .limit(10);
 
       const escalasFormatted: Escala[] = (escalasData || []).map((e: {
         id: string;
-        data: string;
-        evento?: { titulo: string } | null;
+        confirmado: boolean;
+        eventos: { titulo: string; data_evento: string; local: string | null };
+        times: { nome: string; cor: string | null };
         posicoes_time?: { nome: string } | null;
       }) => ({
         id: e.id,
-        culto_titulo: e.cultos.titulo,
-        culto_data: e.cultos.data_evento,
-        culto_local: e.cultos.local,
+        culto_titulo: e.eventos.titulo,
+        culto_data: e.eventos.data_evento,
+        culto_local: e.eventos.local,
         time_nome: e.times.nome,
         time_cor: e.times.cor,
         posicao: e.posicoes_time?.nome || null,
@@ -163,11 +165,10 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
         .order("data_inicio", { ascending: false });
 
       const funcoesFormatted: Funcao[] = (funcoesData || []).map((f: {
-        funcoes_igreja: {
-          id: string;
-          nome: string;
-          categoria: string;
-        };
+        id: string;
+        data_inicio: string;
+        ativo: boolean;
+        funcoes_igreja: { nome: string };
       }) => ({
         id: f.id,
         nome: f.funcoes_igreja.nome,
