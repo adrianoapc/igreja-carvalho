@@ -54,21 +54,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Buscar dados do culto
-    const { data: culto, error: cultoError } = await supabaseClient
-      .from('cultos')
-      .select('titulo, data_culto')
+    // Buscar dados do evento (antes era cultos, agora é eventos)
+    const { data: evento, error: eventoError } = await supabaseClient
+      .from('eventos')
+      .select('titulo, data_evento')
       .eq('id', culto_id)
       .single();
 
-    if (cultoError) {
-      console.error('Error fetching culto:', cultoError);
-      throw new Error('Erro ao buscar dados do culto');
+    if (eventoError) {
+      console.error('Error fetching evento:', eventoError);
+      throw new Error('Erro ao buscar dados do evento');
     }
 
-    // Buscar itens da liturgia com responsáveis
+    // Buscar itens da liturgia com responsáveis (tabela renomeada para liturgias)
     const { data: itens, error: itensError } = await supabaseClient
-      .from('liturgia_culto')
+      .from('liturgias')
       .select(`
         tipo,
         titulo,
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
           telefone
         )
       `)
-      .eq('culto_id', culto_id)
+      .eq('evento_id', culto_id)
       .order('ordem');
 
     if (itensError) {
@@ -89,15 +89,23 @@ Deno.serve(async (req) => {
     }
 
     // Formatar dados para o Make
+    interface LiturgiaItem {
+      tipo: string;
+      titulo: string;
+      duracao_minutos?: number;
+      responsavel_externo?: string;
+      profiles?: { nome?: string; telefone?: string } | null;
+    }
+
     const notification: LiturgiaNotification = {
       culto_id,
-      culto_titulo: culto.titulo,
-      culto_data: culto.data_culto,
-      itens: itens.map((item: Record<string, unknown>) => ({
-        tipo: item.tipo,
-        titulo: item.titulo,
-        responsavel_nome: (item.profiles as Record<string, unknown>)?.nome || item.responsavel_externo,
-        responsavel_telefone: (item.profiles as Record<string, unknown>)?.telefone,
+      culto_titulo: String(evento.titulo || ''),
+      culto_data: String(evento.data_evento || ''),
+      itens: (itens as LiturgiaItem[]).map((item) => ({
+        tipo: String(item.tipo || ''),
+        titulo: String(item.titulo || ''),
+        responsavel_nome: item.profiles?.nome || item.responsavel_externo,
+        responsavel_telefone: item.profiles?.telefone,
         responsavel_externo: item.responsavel_externo,
         duracao_minutos: item.duracao_minutos,
       })),

@@ -484,7 +484,7 @@ serve(async (req) => {
       
       // Handler para atendimentos_pastorais
       if (payload.table === "atendimentos_pastorais" && payload.type === "INSERT") {
-        const resultado = await handleAtendimentoPastoral(supabase, payload.record as AtendimentoPastoralRecord);
+        const resultado = await handleAtendimentoPastoral(supabase, payload.record as unknown as AtendimentoPastoralRecord);
         
         return new Response(
           JSON.stringify(resultado),

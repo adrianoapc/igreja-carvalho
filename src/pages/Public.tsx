@@ -42,8 +42,13 @@ export default function Public() {
 
       if (error) throw error;
 
-      const normalized = (data || []).map((d: Record<string, unknown>) => ({
-        ...d,
+      const normalized: Evento[] = (data || []).map((d: Record<string, unknown>) => ({
+        id: String(d.id),
+        titulo: String(d.titulo || ''),
+        data_evento: String(d.data_evento || ''),
+        local: d.local as string | null,
+        endereco: d.endereco as string | null,
+        tema: d.tema as string | null,
         tipo: (d.tipo as string) as Evento["tipo"],
       }));
 

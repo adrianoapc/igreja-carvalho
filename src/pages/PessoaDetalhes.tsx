@@ -180,12 +180,15 @@ export default function PessoaDetalhes() {
         .order("data_inicio", { ascending: false });
 
       setFuncoes(
-        funcoesData?.map((f: Record<string, unknown>) => ({
-          id: f.id,
-          nome: f.funcoes_igreja?.nome || "—",
-          data_inicio: f.data_inicio,
-          ativo: Boolean(f.ativo),
-        })) || []
+        funcoesData?.map((f: Record<string, unknown>) => {
+          const funcaoIgreja = f.funcoes_igreja as { nome?: string } | null;
+          return {
+            id: String(f.id),
+            nome: funcaoIgreja?.nome || "—",
+            data_inicio: f.data_inicio as string | undefined,
+            ativo: Boolean(f.ativo),
+          };
+        }) || []
       );
     } catch (error) {
       console.error("Erro ao buscar pessoa:", error);

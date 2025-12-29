@@ -326,18 +326,18 @@ export default function MidiasGeral() {
             .select('tag_id, tags_midias(id, nome, cor)')
             .eq('midia_id', midia.id);
           
-          const tags = tagsData?.map((t: Record<string, unknown>) => (t as Record<string, unknown>).tags_midias).filter(Boolean) || [];
+          const tagsParsed = tagsData?.map((t: Record<string, unknown>) => t.tags_midias as { id: string; nome: string; cor: string } | null).filter((t): t is { id: string; nome: string; cor: string } => t !== null) || [];
           
           // Contar em quantas liturgias a mídia aparece
           const liturgias_count = (liturgiasData || []).filter(
             liturgia => liturgia.midias_ids && liturgia.midias_ids.includes(midia.id)
           ).length;
           
-          return { ...midia, tags, liturgias_count };
+          return { ...midia, tags: tagsParsed, liturgias_count };
         })
       );
       
-      setMidias(midiasComDados);
+      setMidias(midiasComDados as Midia[]);
     } catch (error: unknown) {
       console.error('Erro ao carregar mídias:', error);
       toast.error("Erro ao carregar mídias");

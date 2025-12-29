@@ -128,9 +128,12 @@ serve(async (req) => {
     const escalaIdsEnviados: string[] = [];
 
     for (const escala of escalas) {
-      const profile = escala.profiles as Record<string, unknown>;
-      const time = escala.times_culto as Record<string, unknown>;
-      const posicao = escala.posicoes_time as Record<string, unknown>;
+      const profileData = escala.profiles as { nome?: string; telefone?: string } | { nome?: string; telefone?: string }[] | null;
+      const profile = Array.isArray(profileData) ? profileData[0] : profileData;
+      const timeData = escala.times_culto as { nome?: string } | { nome?: string }[] | null;
+      const time = Array.isArray(timeData) ? timeData[0] : timeData;
+      const posicaoData = escala.posicoes_time as { nome?: string } | { nome?: string }[] | null;
+      const posicao = Array.isArray(posicaoData) ? posicaoData[0] : posicaoData;
 
       const nome = profile?.nome || 'Voluntário';
       const telefone = profile?.telefone;
@@ -142,7 +145,7 @@ serve(async (req) => {
       }
 
       // Limpar telefone (apenas números)
-      const telefoneLimpo = telefone.replace(/\D/g, '');
+      const telefoneLimpo = String(telefone).replace(/\D/g, '');
       const telefoneFormatado = telefoneLimpo.startsWith('55') ? telefoneLimpo : `55${telefoneLimpo}`;
 
       // Determinar função/posição
