@@ -87,11 +87,11 @@ export default function ProjetoDialog({ open, onOpenChange, projeto, onSuccess }
       };
 
       if (projeto) {
-        const { error } = await (supabase as any).from("projetos").update(payload).eq("id", projeto.id);
+        const { error } = await supabase.from("projetos").update(payload).eq("id", projeto.id);
         if (error) throw error;
         toast.success("Projeto atualizado");
       } else {
-        const { error } = await (supabase as any).from("projetos").insert(payload);
+        const { error } = await supabase.from("projetos").insert(payload);
         if (error) throw error;
         toast.success("Projeto criado");
       }

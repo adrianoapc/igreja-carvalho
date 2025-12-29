@@ -48,7 +48,7 @@ export default function Criancas() {
         .not("data_nascimento", "is", null)
         .order("nome");
 
-      const { data: allProfiles, error: profilesError } = response as any;
+      const { data: allProfiles, error: profilesError } = response as { data: unknown[]; error: unknown };
 
       if (profilesError) throw profilesError;
 

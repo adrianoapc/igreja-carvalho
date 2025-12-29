@@ -7,6 +7,10 @@ export interface ConfigEnsinoFinanceiro {
   contaId: string | null;
 }
 
+const getEnvVar = (key: string): string | undefined => {
+  return (import.meta.env as Record<string, string | undefined>)[key];
+};
+
 export function useConfiguracaoFinanceiraEnsino() {
   const [config, setConfig] = useState<ConfigEnsinoFinanceiro>({
     categoriaId: null,
@@ -25,7 +29,7 @@ export function useConfiguracaoFinanceiraEnsino() {
           .eq("tipo", "entrada")
           .in("nome", ["Plano de Assinaturas", "Cursos", "Cursos e Treinamentos"])
           .limit(1);
-        const categoriaId = cat?.[0]?.id || (import.meta as any).env?.VITE_FIN_CATEGORIA_CURSOS_ID || null;
+        const categoriaId = cat?.[0]?.id || getEnvVar('VITE_FIN_CATEGORIA_CURSOS_ID') || null;
 
         const { data: base } = await supabase
           .from("bases_ministeriais")
@@ -33,7 +37,7 @@ export function useConfiguracaoFinanceiraEnsino() {
           .eq("ativo", true)
           .ilike("titulo", "%ensino%")
           .limit(1);
-        const baseMinisterialId = base?.[0]?.id || (import.meta as any).env?.VITE_BASE_MINISTERIAL_ENSINO_ID || null;
+        const baseMinisterialId = base?.[0]?.id || getEnvVar('VITE_BASE_MINISTERIAL_ENSINO_ID') || null;
 
         const { data: conta } = await supabase
           .from("contas")
@@ -41,7 +45,7 @@ export function useConfiguracaoFinanceiraEnsino() {
           .eq("ativo", true)
           .order("created_at")
           .limit(1);
-        const contaId = conta?.[0]?.id || (import.meta as any).env?.VITE_CONTA_PADRAO_ENTRADAS_ID || null;
+        const contaId = conta?.[0]?.id || getEnvVar('VITE_CONTA_PADRAO_ENTRADAS_ID') || null;
 
         setConfig({ categoriaId, baseMinisterialId, contaId });
       } finally {

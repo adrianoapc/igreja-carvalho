@@ -326,7 +326,7 @@ export default function MidiasGeral() {
             .select('tag_id, tags_midias(id, nome, cor)')
             .eq('midia_id', midia.id);
           
-          const tags = tagsData?.map(t => (t as any).tags_midias).filter(Boolean) || [];
+          const tags = tagsData?.map((t: Record<string, unknown>) => (t as Record<string, unknown>).tags_midias).filter(Boolean) || [];
           
           // Contar em quantas liturgias a mídia aparece
           const liturgias_count = (liturgiasData || []).filter(

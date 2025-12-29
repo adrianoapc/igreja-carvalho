@@ -90,11 +90,11 @@ export default function TarefaDialog({ open, onOpenChange, projetoId, tarefa, on
       };
 
       if (tarefa) {
-        const { error } = await (supabase as any).from("tarefas").update(payload).eq("id", tarefa.id);
+        const { error } = await supabase.from("tarefas").update(payload).eq("id", tarefa.id);
         if (error) throw error;
         toast.success("Tarefa atualizada");
       } else {
-        const { error } = await (supabase as any).from("tarefas").insert(payload);
+        const { error } = await supabase.from("tarefas").insert(payload);
         if (error) throw error;
         toast.success("Tarefa criada");
       }
@@ -113,7 +113,7 @@ export default function TarefaDialog({ open, onOpenChange, projetoId, tarefa, on
 
     setLoading(true);
     try {
-      const { error } = await (supabase as any).from("tarefas").delete().eq("id", tarefa.id);
+      const { error } = await supabase.from("tarefas").delete().eq("id", tarefa.id);
       if (error) throw error;
       toast.success("Tarefa excluída");
       onSuccess();

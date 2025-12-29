@@ -64,19 +64,21 @@ interface AulaVinculada {
 
 const normalizeQuizConfig = (value: unknown): Etapa["quiz_config"] | undefined => {
   if (typeof value !== "object" || value === null) return undefined;
-  const v = value as any;
-  const perguntasRaw: any[] = Array.isArray(v.perguntas) ? v.perguntas : [];
+  const v = value as Record<string, unknown>;
+  const perguntasRaw: unknown[] = Array.isArray(v.perguntas) ? v.perguntas : [];
 
   const perguntas = perguntasRaw
     .map((p, idx) => {
-      const texto = String(p?.texto ?? p?.pergunta ?? "");
-      const alternativas = Array.isArray(p?.alternativas) ? p.alternativas : (Array.isArray(p?.opcoes) ? p.opcoes : []);
-      const respostaCorreta = Number(p?.respostaCorreta ?? p?.resposta_correta ?? 0);
+      if (typeof p !== 'object' || p === null) return null;
+      const pObj = p as Record<string, unknown>;
+      const texto = String(pObj?.texto ?? pObj?.pergunta ?? "");
+      const alternativas = Array.isArray(pObj?.alternativas) ? pObj.alternativas : (Array.isArray(pObj?.opcoes) ? pObj.opcoes : []);
+      const respostaCorreta = Number(pObj?.respostaCorreta ?? pObj?.resposta_correta ?? 0);
       if (!texto || alternativas.length === 0) return null;
       return {
-        id: String(p?.id ?? idx),
+        id: String(pObj?.id ?? idx),
         texto,
-        alternativas: alternativas.map((a: any) => String(a)),
+        alternativas: alternativas.map((a: unknown) => String(a)),
         respostaCorreta,
       };
     })

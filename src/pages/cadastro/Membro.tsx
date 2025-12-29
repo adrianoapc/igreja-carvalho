@@ -16,7 +16,7 @@ export default function CadastroMembro() {
   const [step, setStep] = useState<Step>("search");
   const [loading, setLoading] = useState(false);
   const [searchEmail, setSearchEmail] = useState("");
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [formData, setFormData] = useState({
     nome: "",
     telefone: "",

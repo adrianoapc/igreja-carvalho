@@ -204,7 +204,7 @@ export default function NotificacoesAdmin({ onBack }: Props) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const handleBack = onBack ?? (() => navigate(-1));
-  const supa = supabase as any;
+  const supa = supabase as unknown;
   
   const [eventos, setEventos] = useState<NotificacaoEvento[]>([]);
   const [regras, setRegras] = useState<NotificacaoRegra[]>([]);

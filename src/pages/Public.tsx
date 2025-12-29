@@ -42,9 +42,9 @@ export default function Public() {
 
       if (error) throw error;
 
-      const normalized = (data || []).map((d: any) => ({
+      const normalized = (data || []).map((d: Record<string, unknown>) => ({
         ...d,
-        tipo: d.tipo as Evento["tipo"],
+        tipo: (d.tipo as string) as Evento["tipo"],
       }));
 
       setProximosCultos(normalized);

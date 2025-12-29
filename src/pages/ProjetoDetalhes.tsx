@@ -62,7 +62,7 @@ export default function ProjetoDetalhes() {
   const { data: projeto, isLoading: loadingProjeto, refetch: refetchProjeto } = useQuery({
     queryKey: ["projeto", id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("projetos")
         .select(`*, lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url)`)
         .eq("id", id)
@@ -101,7 +101,7 @@ export default function ProjetoDetalhes() {
     if (!tarefa || tarefa.status === novoStatus) return;
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("tarefas")
         .update({ status: novoStatus })
         .eq("id", tarefaId);

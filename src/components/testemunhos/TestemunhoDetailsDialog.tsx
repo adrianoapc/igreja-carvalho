@@ -125,7 +125,7 @@ export function TestemunhoDetailsDialog({ open, onOpenChange, testemunho, onSucc
         .update({
           titulo: result.data.titulo,
           mensagem: result.data.mensagem,
-          categoria: result.data.categoria as any,
+          categoria: result.data.categoria as string,
         })
         .eq("id", testemunho.id);
 

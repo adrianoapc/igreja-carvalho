@@ -233,7 +233,7 @@ export default function Admin() {
     try {
       const { error } = await supabase.from("user_roles").insert([{
         user_id: userId,
-        role: role as any
+        role: role as string
       }]);
 
       if (error) throw error;
@@ -272,7 +272,7 @@ export default function Admin() {
         .from("user_roles")
         .delete()
         .eq("user_id", userId)
-        .eq("role", role as any);
+        .eq("role", role as string);
 
       if (error) throw error;
 
@@ -349,7 +349,7 @@ export default function Admin() {
     try {
       const { error } = await supabase
         .from("module_permissions")
-        .update({ access_level: newAccessLevel as any })
+        .update({ access_level: newAccessLevel as string })
         .eq("id", permission.id);
 
       if (error) throw error;
@@ -406,8 +406,8 @@ export default function Admin() {
         .from("module_permissions")
         .insert([{
           module_name: newPermission.module_name,
-          role: newPermission.role as any,
-          access_level: newPermission.access_level as any
+          role: newPermission.role as string,
+          access_level: newPermission.access_level as string
         }]);
 
       if (error) throw error;

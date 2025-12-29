@@ -232,7 +232,7 @@ export default function BiometricLogin() {
             console.log('[BiometricLogin] Access token fallback successful');
           } catch (fallbackError) {
             console.error('[BiometricLogin] Access token fallback failed:', fallbackError);
-            sessionError = fallbackError as any;
+            sessionError = fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError));
           }
         }
 

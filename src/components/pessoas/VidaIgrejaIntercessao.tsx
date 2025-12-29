@@ -255,7 +255,7 @@ export function VidaIgrejaIntercessao({ pessoaId }: Props) {
           return (
             <button
               key={btn.key}
-              onClick={() => setSelectedType(btn.key as any)}
+              onClick={() => setSelectedType(btn.key as "pedido" | "sentimento" | "testemunho")}
               className={`flex sm:flex-col items-center sm:items-center gap-2 sm:gap-1 p-2 sm:p-3 rounded-lg border transition-colors w-full sm:w-auto ${active ? "bg-primary/10 border-primary" : "bg-card hover:bg-muted/50"}`}
             >
               <div className={`flex items-center gap-1 sm:gap-2 flex-1 sm:flex-col sm:items-center ${btn.color}`}>

@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 /**
  * Export data to Excel file
  */
-export function exportToExcel(data: any[], filename: string, sheetName: string = 'Dados') {
+export function exportToExcel(data: Record<string, unknown>[], filename: string, sheetName: string = 'Dados') {
   if (!data || data.length === 0) {
     throw new Error('Não há dados para exportar');
   }
@@ -37,7 +37,7 @@ export function exportToExcel(data: any[], filename: string, sheetName: string =
 /**
  * Export data to CSV file
  */
-export function exportToCSV(data: any[], filename: string) {
+export function exportToCSV(data: Record<string, unknown>[], filename: string) {
   if (!data || data.length === 0) {
     throw new Error('Não há dados para exportar');
   }

@@ -68,7 +68,7 @@ export default function GabinetePastoral() {
 
       if (error) throw error;
 
-      const normalized = (data || []).map((row: any) => ({
+      const normalized = (data || []).map((row: Record<string, unknown>) => ({
         ...row,
         historico_evolucao: Array.isArray(row.historico_evolucao) ? row.historico_evolucao : null,
       }));

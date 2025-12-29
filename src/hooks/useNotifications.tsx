@@ -56,10 +56,16 @@ export function useNotifications() {
     return undefined;
   };
 
-  const normalizeNotification = (n: any): Notification => ({
-    ...n,
-    metadata: toRecord(n?.metadata),
-  });
+  const normalizeNotification = (n: unknown): Notification => {
+    if (typeof n !== 'object' || n === null) {
+      throw new Error('Invalid notification');
+    }
+    const notif = n as Record<string, unknown>;
+    return {
+      ...(notif as Notification),
+      metadata: toRecord(notif?.metadata),
+    };
+  };
 
   const loadNotifications = async () => {
     if (!user) return;

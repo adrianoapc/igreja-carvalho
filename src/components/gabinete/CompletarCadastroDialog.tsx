@@ -34,7 +34,7 @@ export function CompletarCadastroDialog({
         throw new Error("ID do visitante não informado");
       }
 
-      const updateData: Record<string, any> = {};
+      const updateData: Record<string, string> = {};
       if (nome.trim()) updateData.nome = nome.trim();
       if (email.trim()) updateData.email = email.trim();
 

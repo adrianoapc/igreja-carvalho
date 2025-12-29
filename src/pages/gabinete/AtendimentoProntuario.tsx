@@ -196,7 +196,7 @@ export default function AtendimentoProntuario() {
     }) => {
       if (!id) throw new Error("ID não informado");
       const novoHistorico = [...historicoAtual, nota];
-      const updateData: Record<string, any> = { historico_evolucao: novoHistorico };
+      const updateData: Record<string, unknown> = { historico_evolucao: novoHistorico };
       if (mudarStatus) {
         updateData.status = "EM_ACOMPANHAMENTO";
       }
