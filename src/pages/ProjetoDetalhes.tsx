@@ -45,10 +45,14 @@ const COLUNAS = [
 
 const statusBadgeVariant = (status: string) => {
   switch (status) {
-    case "ativo": return "default";
-    case "concluido": return "secondary";
-    case "pausado": return "outline";
-    default: return "default";
+    case "ativo":
+      return "default";
+    case "concluido":
+      return "secondary";
+    case "pausado":
+      return "outline";
+    default:
+      return "default";
   }
 };
 
@@ -59,12 +63,18 @@ export default function ProjetoDetalhes() {
   const [projetoDialogOpen, setProjetoDialogOpen] = useState(false);
   const [tarefaEditando, setTarefaEditando] = useState<Tarefa | null>(null);
 
-  const { data: projeto, isLoading: loadingProjeto, refetch: refetchProjeto } = useQuery({
+  const {
+    data: projeto,
+    isLoading: loadingProjeto,
+    refetch: refetchProjeto,
+  } = useQuery({
     queryKey: ["projeto", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projetos")
-        .select(`*, lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url)`)
+        .select(
+          `*, lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url)`
+        )
         .eq("id", id)
         .single();
       if (error) {
@@ -76,12 +86,18 @@ export default function ProjetoDetalhes() {
     enabled: !!id,
   });
 
-  const { data: tarefas, isLoading: loadingTarefas, refetch: refetchTarefas } = useQuery({
+  const {
+    data: tarefas,
+    isLoading: loadingTarefas,
+    refetch: refetchTarefas,
+  } = useQuery({
     queryKey: ["tarefas", id],
     queryFn: async () => {
       const { data, error } = await (supabase as SupabaseClient)
         .from("tarefas")
-        .select(`*, responsavel:profiles!tarefas_responsavel_id_fkey(id, nome, avatar_url)`)
+        .select(
+          `*, responsavel:profiles!tarefas_responsavel_id_fkey(id, nome, avatar_url)`
+        )
         .eq("projeto_id", id)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -97,7 +113,7 @@ export default function ProjetoDetalhes() {
     const tarefaId = active.id as string;
     const novoStatus = over.id as string;
 
-    const tarefa = tarefas?.find(t => t.id === tarefaId);
+    const tarefa = tarefas?.find((t) => t.id === tarefaId);
     if (!tarefa || tarefa.status === novoStatus) return;
 
     try {
@@ -125,12 +141,25 @@ export default function ProjetoDetalhes() {
   };
 
   const totalTarefas = tarefas?.length || 0;
-  const tarefasConcluidas = tarefas?.filter(t => t.status === "done").length || 0;
-  const tarefasAtrasadas = tarefas?.filter(t => t.data_vencimento && new Date(t.data_vencimento) < new Date() && t.status !== "done").length || 0;
-  const taxaConclusao = totalTarefas > 0 ? (tarefasConcluidas / totalTarefas) * 100 : 0;
+  const tarefasConcluidas =
+    tarefas?.filter((t) => t.status === "done").length || 0;
+  const tarefasAtrasadas =
+    tarefas?.filter(
+      (t) =>
+        t.data_vencimento &&
+        new Date(t.data_vencimento) < new Date() &&
+        t.status !== "done"
+    ).length || 0;
+  const taxaConclusao =
+    totalTarefas > 0 ? (tarefasConcluidas / totalTarefas) * 100 : 0;
 
   const getInitials = (nome: string) => {
-    return nome.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+    return nome
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
   };
 
   if (loadingProjeto) {
@@ -146,7 +175,11 @@ export default function ProjetoDetalhes() {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Projeto não encontrado</p>
-        <Button variant="outline" onClick={() => navigate("/projetos")} className="mt-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate("/projetos")}
+          className="mt-4"
+        >
           Voltar para Projetos
         </Button>
       </div>
@@ -159,16 +192,26 @@ export default function ProjetoDetalhes() {
       <div className="shrink-0 z-10 relative p-4 border-b bg-background">
         <div className="flex items-center justify-between gap-4 mb-3">
           <div className="flex items-center gap-4 flex-1 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/projetos")}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/projetos")}
+            >
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-foreground truncate">{projeto.titulo}</h1>
-                <Badge variant={statusBadgeVariant(projeto.status)}>{projeto.status}</Badge>
+                <h1 className="text-xl font-bold text-foreground truncate">
+                  {projeto.titulo}
+                </h1>
+                <Badge variant={statusBadgeVariant(projeto.status)}>
+                  {projeto.status}
+                </Badge>
               </div>
               {projeto.descricao && (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{projeto.descricao}</p>
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                  {projeto.descricao}
+                </p>
               )}
               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
                 <span>{totalTarefas} tarefas</span>
@@ -183,7 +226,9 @@ export default function ProjetoDetalhes() {
                 {projeto.data_fim && (
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {format(new Date(projeto.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                    {format(new Date(projeto.data_fim), "dd/MM/yyyy", {
+                      locale: ptBR,
+                    })}
                   </span>
                 )}
               </div>
@@ -200,7 +245,11 @@ export default function ProjetoDetalhes() {
               </Avatar>
             )}
 
-            <Button variant="outline" size="sm" onClick={() => setProjetoDialogOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setProjetoDialogOpen(true)}
+            >
               <Pencil className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">Editar</span>
             </Button>
@@ -216,20 +265,23 @@ export default function ProjetoDetalhes() {
       <div className="flex-1 overflow-x-auto bg-muted/30 p-4">
         {loadingTarefas ? (
           <div className="flex gap-4 min-w-max">
-            {COLUNAS.map(col => (
+            {COLUNAS.map((col) => (
               <Skeleton key={col.id} className="w-80 h-96" />
             ))}
           </div>
         ) : (
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <div className="flex gap-4 min-w-max">
-              {COLUNAS.map(coluna => (
+              {COLUNAS.map((coluna) => (
                 <KanbanTarefasColumn
                   key={coluna.id}
                   id={coluna.id}
                   titulo={coluna.titulo}
                   cor={coluna.cor}
-                  tarefas={tarefas?.filter(t => t.status === coluna.id) || []}
+                  tarefas={tarefas?.filter((t) => t.status === coluna.id) || []}
                   onEditarTarefa={handleEditarTarefa}
                 />
               ))}

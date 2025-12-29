@@ -5,21 +5,57 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Search, UserCog, Shield, ArrowUpCircle, Trash2, Heart, Calendar as CalendarIcon, AlertTriangle, Settings, Plus, Edit2, Activity } from "lucide-react";
+import {
+  Search,
+  UserCog,
+  Shield,
+  ArrowUpCircle,
+  Trash2,
+  Heart,
+  Calendar as CalendarIcon,
+  AlertTriangle,
+  Settings,
+  Plus,
+  Edit2,
+  Activity,
+} from "lucide-react";
 import { z } from "zod";
 import EdgeFunctionCard from "@/components/admin/EdgeFunctionCard";
 import EdgeFunctionMonitoring from "@/components/admin/EdgeFunctionMonitoring";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const updateUserSchema = z.object({
   status: z.enum(["visitante", "frequentador", "membro"]),
-  observacoes: z.string().max(500, "Observações devem ter no máximo 500 caracteres").optional()
+  observacoes: z
+    .string()
+    .max(500, "Observações devem ter no máximo 500 caracteres")
+    .optional(),
 });
 
 interface UserProfile {
@@ -46,10 +82,31 @@ interface ModulePermission {
   access_level: string;
 }
 
-type AppRole = "admin" | "basico" | "intercessor" | "lider" | "membro" | "pastor" | "secretario" | "tesoureiro";
-type AccessLevel = "visualizar" | "criar_editar" | "aprovar_gerenciar" | "acesso_completo";
+type AppRole =
+  | "admin"
+  | "basico"
+  | "intercessor"
+  | "lider"
+  | "membro"
+  | "pastor"
+  | "secretario"
+  | "tesoureiro";
+type AccessLevel =
+  | "visualizar"
+  | "criar_editar"
+  | "aprovar_gerenciar"
+  | "acesso_completo";
 
-const AVAILABLE_ROLES: AppRole[] = ["admin", "pastor", "lider", "secretario", "tesoureiro", "intercessor", "membro", "basico"];
+const AVAILABLE_ROLES: AppRole[] = [
+  "admin",
+  "pastor",
+  "lider",
+  "secretario",
+  "tesoureiro",
+  "intercessor",
+  "membro",
+  "basico",
+];
 const ACCESS_LEVELS: { value: AccessLevel; label: string }[] = [
   { value: "visualizar", label: "Visualizar" },
   { value: "criar_editar", label: "Criar/Editar" },
@@ -83,8 +140,13 @@ export default function Admin() {
   // Permissions state
   const [permissions, setPermissions] = useState<ModulePermission[]>([]);
   const [modules, setModules] = useState<string[]>([]);
-  const [editingPermission, setEditingPermission] = useState<ModulePermission | null>(null);
-  const [newPermission, setNewPermission] = useState({ module_name: "", role: "", access_level: "" });
+  const [editingPermission, setEditingPermission] =
+    useState<ModulePermission | null>(null);
+  const [newPermission, setNewPermission] = useState({
+    module_name: "",
+    role: "",
+    access_level: "",
+  });
   const [showAddPermission, setShowAddPermission] = useState(false);
 
   const [initialCheckDone, setInitialCheckDone] = useState(false);
@@ -92,15 +154,15 @@ export default function Admin() {
   useEffect(() => {
     // Aguardar o carregamento da autenticação
     if (authLoading || initialCheckDone) return;
-    
+
     setInitialCheckDone(true);
-    
+
     if (!hasAccess("membros", "acesso_completo")) {
       setAccessDenied(true);
       toast({
         title: "Acesso negado",
         description: "Você não tem permissão para acessar esta página",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -109,15 +171,14 @@ export default function Admin() {
   }, [authLoading]);
 
   useEffect(() => {
-    let filtered = users.filter(user =>
-      user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    let filtered = users.filter(
+      (user) =>
+        user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (roleFilter !== "all") {
-      filtered = filtered.filter(user =>
-        user.roles?.includes(roleFilter)
-      );
+      filtered = filtered.filter((user) => user.roles?.includes(roleFilter));
     }
 
     setFilteredUsers(filtered);
@@ -138,12 +199,14 @@ export default function Admin() {
 
       if (rolesError) throw rolesError;
 
-      const usersWithRoles = profiles?.map(profile => ({
-        ...profile,
-        roles: rolesData
-          ?.filter(r => r.user_id === profile.user_id)
-          .map(r => r.role) || []
-      })) || [];
+      const usersWithRoles =
+        profiles?.map((profile) => ({
+          ...profile,
+          roles:
+            rolesData
+              ?.filter((r) => r.user_id === profile.user_id)
+              .map((r) => r.role) || [],
+        })) || [];
 
       setUsers(usersWithRoles);
       setFilteredUsers(usersWithRoles);
@@ -151,7 +214,7 @@ export default function Admin() {
       toast({
         title: "Erro",
         description: "Não foi possível carregar os usuários",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -166,20 +229,23 @@ export default function Admin() {
       if (error) throw error;
 
       setPermissions(data || []);
-      const uniqueModules = [...new Set(data?.map(p => p.module_name) || [])];
+      const uniqueModules = [...new Set(data?.map((p) => p.module_name) || [])];
       setModules(uniqueModules);
     } catch (error: unknown) {
       toast({
         title: "Erro",
         description: "Não foi possível carregar as permissões",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const loadUserRoles = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
       if (error) throw error;
       setUserRoles(data?.map((r: UserRole) => r.role) || []);
     } catch (error: unknown) {
@@ -187,32 +253,41 @@ export default function Admin() {
     }
   };
 
-  const handlePromoteUser = async (profileId: string, newStatus: "visitante" | "frequentador" | "membro") => {
+  const handlePromoteUser = async (
+    profileId: string,
+    newStatus: "visitante" | "frequentador" | "membro"
+  ) => {
     setIsLoading(true);
     try {
       const validation = updateUserSchema.safeParse({ status: newStatus });
       if (!validation.success) {
         throw new Error(validation.error.issues[0].message);
       }
-      const updateData: { status: "visitante" | "frequentador" | "membro"; data_cadastro_membro?: string } = { 
-        status: newStatus as "visitante" | "frequentador" | "membro" 
+      const updateData: {
+        status: "visitante" | "frequentador" | "membro";
+        data_cadastro_membro?: string;
+      } = {
+        status: newStatus as "visitante" | "frequentador" | "membro",
       };
       if (newStatus === "membro") {
         updateData.data_cadastro_membro = new Date().toISOString();
       }
       // Usar profile.id em vez de user_id pois visitantes não têm user_id
-      const { error } = await supabase.from("profiles").update(updateData).eq("id", profileId);
+      const { error } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", profileId);
       if (error) throw error;
       toast({
         title: "Sucesso!",
-        description: `Usuário promovido para ${newStatus}`
+        description: `Usuário promovido para ${newStatus}`,
       });
       loadUsers();
     } catch (error: unknown) {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -223,24 +298,28 @@ export default function Admin() {
     if (!userId) {
       toast({
         title: "Erro",
-        description: "Este usuário não possui login no sistema. Apenas usuários autenticados podem receber cargos.",
-        variant: "destructive"
+        description:
+          "Este usuário não possui login no sistema. Apenas usuários autenticados podem receber cargos.",
+        variant: "destructive",
       });
       return;
     }
-    
+
     setIsLoading(true);
     try {
-      const { error } = await supabase.from("user_roles").insert([{
-        user_id: userId,
-        role: role as AppRole
-      }]);
+      const { error } = await supabase.from("user_roles").insert([
+        {
+          user_id: userId,
+          role: role as AppRole,
+        },
+      ]);
 
       if (error) throw error;
 
       const timestamp = new Date().toLocaleString("pt-BR");
       const currentObs = selectedUser?.observacoes || "";
-      const newObs = `${currentObs}\n[${timestamp}] Cargo "${role}" atribuído pelo admin`.trim();
+      const newObs =
+        `${currentObs}\n[${timestamp}] Cargo "${role}" atribuído pelo admin`.trim();
 
       await supabase
         .from("profiles")
@@ -249,7 +328,7 @@ export default function Admin() {
 
       toast({
         title: "Sucesso!",
-        description: `Cargo ${role} atribuído`
+        description: `Cargo ${role} atribuído`,
       });
 
       loadUserRoles(userId);
@@ -258,7 +337,7 @@ export default function Admin() {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -278,7 +357,8 @@ export default function Admin() {
 
       const timestamp = new Date().toLocaleString("pt-BR");
       const currentObs = selectedUser?.observacoes || "";
-      const newObs = `${currentObs}\n[${timestamp}] Cargo "${role}" removido pelo admin`.trim();
+      const newObs =
+        `${currentObs}\n[${timestamp}] Cargo "${role}" removido pelo admin`.trim();
 
       await supabase
         .from("profiles")
@@ -287,7 +367,7 @@ export default function Admin() {
 
       toast({
         title: "Sucesso!",
-        description: `Cargo ${role} removido`
+        description: `Cargo ${role} removido`,
       });
 
       loadUserRoles(userId);
@@ -296,7 +376,7 @@ export default function Admin() {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -320,7 +400,8 @@ export default function Admin() {
 
       const timestamp = new Date().toLocaleString("pt-BR");
       const currentObs = selectedUser?.observacoes || "";
-      const newObs = `${currentObs}\n[${timestamp}] Promovido de "básico" para "membro" pelo admin`.trim();
+      const newObs =
+        `${currentObs}\n[${timestamp}] Promovido de "básico" para "membro" pelo admin`.trim();
 
       await supabase
         .from("profiles")
@@ -329,7 +410,7 @@ export default function Admin() {
 
       toast({
         title: "Usuário promovido!",
-        description: "Usuário agora tem acesso completo como membro"
+        description: "Usuário agora tem acesso completo como membro",
       });
 
       loadUserRoles(userId);
@@ -338,14 +419,17 @@ export default function Admin() {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleUpdatePermission = async (permission: ModulePermission, newAccessLevel: string) => {
+  const handleUpdatePermission = async (
+    permission: ModulePermission,
+    newAccessLevel: string
+  ) => {
     try {
       const { error } = await supabase
         .from("module_permissions")
@@ -356,14 +440,14 @@ export default function Admin() {
 
       toast({
         title: "Sucesso!",
-        description: "Permissão atualizada"
+        description: "Permissão atualizada",
       });
       loadPermissions();
     } catch (error: unknown) {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -379,42 +463,46 @@ export default function Admin() {
 
       toast({
         title: "Sucesso!",
-        description: "Permissão removida"
+        description: "Permissão removida",
       });
       loadPermissions();
     } catch (error: unknown) {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const handleAddPermission = async () => {
-    if (!newPermission.module_name || !newPermission.role || !newPermission.access_level) {
+    if (
+      !newPermission.module_name ||
+      !newPermission.role ||
+      !newPermission.access_level
+    ) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from("module_permissions")
-        .insert([{
+      const { error } = await supabase.from("module_permissions").insert([
+        {
           module_name: newPermission.module_name,
           role: newPermission.role as string,
-          access_level: newPermission.access_level as string
-        }]);
+          access_level: newPermission.access_level as string,
+        },
+      ]);
 
       if (error) throw error;
 
       toast({
         title: "Sucesso!",
-        description: "Permissão adicionada"
+        description: "Permissão adicionada",
       });
       setNewPermission({ module_name: "", role: "", access_level: "" });
       setShowAddPermission(false);
@@ -423,7 +511,7 @@ export default function Admin() {
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : String(error),
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -432,7 +520,7 @@ export default function Admin() {
     const colors = {
       visitante: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
       frequentador: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-      membro: "bg-green-500/10 text-green-500 border-green-500/20"
+      membro: "bg-green-500/10 text-green-500 border-green-500/20",
     };
     return colors[status as keyof typeof colors] || "";
   };
@@ -462,7 +550,7 @@ export default function Admin() {
   };
 
   const getPermissionForRoleAndModule = (role: string, module: string) => {
-    return permissions.find(p => p.role === role && p.module_name === module);
+    return permissions.find((p) => p.role === role && p.module_name === module);
   };
 
   if (authLoading) {
@@ -478,7 +566,9 @@ export default function Admin() {
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <Shield className="w-16 h-16 text-destructive mb-4" />
         <h2 className="text-xl font-semibold">Acesso Negado</h2>
-        <p className="text-muted-foreground mt-2">Você não tem permissão para acessar esta página.</p>
+        <p className="text-muted-foreground mt-2">
+          Você não tem permissão para acessar esta página.
+        </p>
       </div>
     );
   }
@@ -488,7 +578,9 @@ export default function Admin() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Administração</h1>
-          <p className="text-muted-foreground mt-1">Gerencie usuários, permissões e configurações do sistema</p>
+          <p className="text-muted-foreground mt-1">
+            Gerencie usuários, permissões e configurações do sistema
+          </p>
         </div>
         <Shield className="w-12 h-12 text-primary opacity-20" />
       </div>
@@ -520,7 +612,7 @@ export default function Admin() {
                     placeholder="Buscar por nome ou email..."
                     className="pl-10"
                     value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap">
@@ -531,8 +623,10 @@ export default function Admin() {
                   >
                     Todos ({users.length})
                   </Button>
-                  {AVAILABLE_ROLES.map(role => {
-                    const count = users.filter(u => u.roles?.includes(role)).length;
+                  {AVAILABLE_ROLES.map((role) => {
+                    const count = users.filter((u) =>
+                      u.roles?.includes(role)
+                    ).length;
                     if (count === 0) return null;
                     return (
                       <Button
@@ -550,26 +644,39 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredUsers.map(user => (
-                  <div key={user.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors">
+                {filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between p-4 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+                  >
                     <div className="flex items-center gap-4 flex-1">
                       <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold text-lg">
                         {user.nome.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-foreground">{user.nome}</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                        <p className="font-medium text-foreground">
+                          {user.nome}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {user.email}
+                        </p>
                         <div className="flex gap-2 mt-1 flex-wrap">
                           <Badge className={getStatusBadge(user.status)}>
                             {user.status}
                           </Badge>
-                          {user.roles?.map(role => (
-                            <Badge key={role} className={getRoleBadgeColor(role)}>
+                          {user.roles?.map((role) => (
+                            <Badge
+                              key={role}
+                              className={getRoleBadgeColor(role)}
+                            >
                               {ROLE_LABELS[role as AppRole] || role}
                             </Badge>
                           ))}
                           {(!user.roles || user.roles.length === 0) && (
-                            <Badge variant="outline" className="text-muted-foreground">
+                            <Badge
+                              variant="outline"
+                              className="text-muted-foreground"
+                            >
                               Sem cargo
                             </Badge>
                           )}
@@ -578,10 +685,14 @@ export default function Admin() {
                     </div>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setSelectedUser(user);
-                          loadUserRoles(user.user_id);
-                        }}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            loadUserRoles(user.user_id);
+                          }}
+                        >
                           <UserCog className="w-4 h-4 mr-2" />
                           Gerenciar
                         </Button>
@@ -599,49 +710,84 @@ export default function Admin() {
                             <div className="space-y-2">
                               <Label>Status Atual</Label>
                               <div className="flex items-center gap-2">
-                                <Badge className={getStatusBadge(selectedUser.status)}>
+                                <Badge
+                                  className={getStatusBadge(
+                                    selectedUser.status
+                                  )}
+                                >
                                   {selectedUser.status}
                                 </Badge>
                                 {selectedUser.status !== "membro" && (
-                                  <Button size="sm" onClick={() => handlePromoteUser(selectedUser.id, selectedUser.status === "visitante" ? "frequentador" : "membro")} disabled={isLoading}>
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      handlePromoteUser(
+                                        selectedUser.id,
+                                        selectedUser.status === "visitante"
+                                          ? "frequentador"
+                                          : "membro"
+                                      )
+                                    }
+                                    disabled={isLoading}
+                                  >
                                     <ArrowUpCircle className="w-4 h-4 mr-2" />
-                                    Promover para {selectedUser.status === "visitante" ? "Frequentador" : "Membro"}
+                                    Promover para{" "}
+                                    {selectedUser.status === "visitante"
+                                      ? "Frequentador"
+                                      : "Membro"}
                                   </Button>
                                 )}
                               </div>
                             </div>
 
                             {/* Promoção de Básico para Membro */}
-                            {userRoles.includes("basico") && !userRoles.includes("membro") && (
-                              <div className="space-y-2 p-4 rounded-lg bg-primary/5 border border-primary/20">
-                                <Label className="flex items-center gap-2">
-                                  <ArrowUpCircle className="w-4 h-4 text-primary" />
-                                  Promoção de Acesso
-                                </Label>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  Este usuário tem acesso básico. Promova para membro para liberar acesso completo ao sistema.
-                                </p>
-                                <Button
-                                  onClick={() => handlePromoteBasicoToMembro(selectedUser.user_id)}
-                                  disabled={isLoading}
-                                  className="w-full"
-                                >
-                                  <ArrowUpCircle className="w-4 h-4 mr-2" />
-                                  Promover para Membro
-                                </Button>
-                              </div>
-                            )}
+                            {userRoles.includes("basico") &&
+                              !userRoles.includes("membro") && (
+                                <div className="space-y-2 p-4 rounded-lg bg-primary/5 border border-primary/20">
+                                  <Label className="flex items-center gap-2">
+                                    <ArrowUpCircle className="w-4 h-4 text-primary" />
+                                    Promoção de Acesso
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground mb-3">
+                                    Este usuário tem acesso básico. Promova para
+                                    membro para liberar acesso completo ao
+                                    sistema.
+                                  </p>
+                                  <Button
+                                    onClick={() =>
+                                      handlePromoteBasicoToMembro(
+                                        selectedUser.user_id
+                                      )
+                                    }
+                                    disabled={isLoading}
+                                    className="w-full"
+                                  >
+                                    <ArrowUpCircle className="w-4 h-4 mr-2" />
+                                    Promover para Membro
+                                  </Button>
+                                </div>
+                              )}
 
                             {/* Roles */}
                             <div className="space-y-2">
                               <Label>Cargos Atuais</Label>
                               <div className="flex flex-wrap gap-2 mb-2">
-                                {userRoles.map(role => (
-                                  <Badge key={role} className={`${getRoleBadgeColor(role)} gap-2`}>
+                                {userRoles.map((role) => (
+                                  <Badge
+                                    key={role}
+                                    className={`${getRoleBadgeColor(
+                                      role
+                                    )} gap-2`}
+                                  >
                                     {ROLE_LABELS[role as AppRole] || role}
                                     {role !== "basico" && (
                                       <button
-                                        onClick={() => handleRemoveRole(selectedUser.user_id, role)}
+                                        onClick={() =>
+                                          handleRemoveRole(
+                                            selectedUser.user_id,
+                                            role
+                                          )
+                                        }
                                         className="hover:text-destructive"
                                         disabled={isLoading}
                                       >
@@ -651,20 +797,26 @@ export default function Admin() {
                                   </Badge>
                                 ))}
                                 {userRoles.length === 0 && (
-                                  <p className="text-sm text-muted-foreground">Nenhum cargo atribuído</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Nenhum cargo atribuído
+                                  </p>
                                 )}
                               </div>
 
                               {!userRoles.includes("basico") && (
                                 <Select
-                                  onValueChange={(role: string) => handleAddRole(selectedUser.user_id, role)}
+                                  onValueChange={(role: string) =>
+                                    handleAddRole(selectedUser.user_id, role)
+                                  }
                                   disabled={isLoading}
                                 >
                                   <SelectTrigger>
                                     <SelectValue placeholder="Adicionar cargo" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {AVAILABLE_ROLES.filter(role => !userRoles.includes(role)).map(role => (
+                                    {AVAILABLE_ROLES.filter(
+                                      (role) => !userRoles.includes(role)
+                                    ).map((role) => (
                                       <SelectItem key={role} value={role}>
                                         {ROLE_LABELS[role]}
                                       </SelectItem>
@@ -691,13 +843,21 @@ export default function Admin() {
                               <Label>Informações</Label>
                               <div className="text-sm space-y-1">
                                 <p>
-                                  <span className="text-muted-foreground">Primeira visita:</span>{" "}
-                                  {new Date(selectedUser.data_primeira_visita).toLocaleDateString("pt-BR")}
+                                  <span className="text-muted-foreground">
+                                    Primeira visita:
+                                  </span>{" "}
+                                  {new Date(
+                                    selectedUser.data_primeira_visita
+                                  ).toLocaleDateString("pt-BR")}
                                 </p>
                                 {selectedUser.data_cadastro_membro && (
                                   <p>
-                                    <span className="text-muted-foreground">Membro desde:</span>{" "}
-                                    {new Date(selectedUser.data_cadastro_membro).toLocaleDateString("pt-BR")}
+                                    <span className="text-muted-foreground">
+                                      Membro desde:
+                                    </span>{" "}
+                                    {new Date(
+                                      selectedUser.data_cadastro_membro
+                                    ).toLocaleDateString("pt-BR")}
                                   </p>
                                 )}
                               </div>
@@ -722,7 +882,10 @@ export default function Admin() {
                   Configure quais cargos têm acesso a cada módulo do sistema
                 </p>
               </div>
-              <Dialog open={showAddPermission} onOpenChange={setShowAddPermission}>
+              <Dialog
+                open={showAddPermission}
+                onOpenChange={setShowAddPermission}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm">
                     <Plus className="w-4 h-4 mr-2" />
@@ -742,20 +905,27 @@ export default function Admin() {
                       <Input
                         placeholder="Nome do módulo (ex: financas, membros)"
                         value={newPermission.module_name}
-                        onChange={e => setNewPermission({ ...newPermission, module_name: e.target.value })}
+                        onChange={(e) =>
+                          setNewPermission({
+                            ...newPermission,
+                            module_name: e.target.value,
+                          })
+                        }
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Cargo</Label>
                       <Select
                         value={newPermission.role}
-                        onValueChange={role => setNewPermission({ ...newPermission, role })}
+                        onValueChange={(role) =>
+                          setNewPermission({ ...newPermission, role })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o cargo" />
                         </SelectTrigger>
                         <SelectContent>
-                          {AVAILABLE_ROLES.map(role => (
+                          {AVAILABLE_ROLES.map((role) => (
                             <SelectItem key={role} value={role}>
                               {ROLE_LABELS[role]}
                             </SelectItem>
@@ -767,13 +937,18 @@ export default function Admin() {
                       <Label>Nível de Acesso</Label>
                       <Select
                         value={newPermission.access_level}
-                        onValueChange={level => setNewPermission({ ...newPermission, access_level: level })}
+                        onValueChange={(level) =>
+                          setNewPermission({
+                            ...newPermission,
+                            access_level: level,
+                          })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o nível" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ACCESS_LEVELS.map(level => (
+                          {ACCESS_LEVELS.map((level) => (
                             <SelectItem key={level.value} value={level.value}>
                               {level.label}
                             </SelectItem>
@@ -794,8 +969,11 @@ export default function Admin() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[150px]">Módulo</TableHead>
-                      {AVAILABLE_ROLES.map(role => (
-                        <TableHead key={role} className="text-center min-w-[120px]">
+                      {AVAILABLE_ROLES.map((role) => (
+                        <TableHead
+                          key={role}
+                          className="text-center min-w-[120px]"
+                        >
                           <Badge className={getRoleBadgeColor(role)}>
                             {ROLE_LABELS[role]}
                           </Badge>
@@ -804,27 +982,47 @@ export default function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {modules.map(module => (
+                    {modules.map((module) => (
                       <TableRow key={module}>
-                        <TableCell className="font-medium capitalize">{module}</TableCell>
-                        {AVAILABLE_ROLES.map(role => {
-                          const permission = getPermissionForRoleAndModule(role, module);
+                        <TableCell className="font-medium capitalize">
+                          {module}
+                        </TableCell>
+                        {AVAILABLE_ROLES.map((role) => {
+                          const permission = getPermissionForRoleAndModule(
+                            role,
+                            module
+                          );
                           return (
-                            <TableCell key={`${module}-${role}`} className="text-center">
+                            <TableCell
+                              key={`${module}-${role}`}
+                              className="text-center"
+                            >
                               {permission ? (
                                 <div className="flex items-center justify-center gap-1">
                                   <Select
                                     value={permission.access_level}
-                                    onValueChange={(value) => handleUpdatePermission(permission, value)}
+                                    onValueChange={(value) =>
+                                      handleUpdatePermission(permission, value)
+                                    }
                                   >
                                     <SelectTrigger className="w-auto h-7 text-xs">
-                                      <Badge className={`${getAccessLevelBadge(permission.access_level)} text-xs`}>
-                                        {ACCESS_LEVELS.find(l => l.value === permission.access_level)?.label || permission.access_level}
+                                      <Badge
+                                        className={`${getAccessLevelBadge(
+                                          permission.access_level
+                                        )} text-xs`}
+                                      >
+                                        {ACCESS_LEVELS.find(
+                                          (l) =>
+                                            l.value === permission.access_level
+                                        )?.label || permission.access_level}
                                       </Badge>
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {ACCESS_LEVELS.map(level => (
-                                        <SelectItem key={level.value} value={level.value}>
+                                      {ACCESS_LEVELS.map((level) => (
+                                        <SelectItem
+                                          key={level.value}
+                                          value={level.value}
+                                        >
                                           {level.label}
                                         </SelectItem>
                                       ))}
@@ -834,13 +1032,17 @@ export default function Admin() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6"
-                                    onClick={() => handleDeletePermission(permission.id)}
+                                    onClick={() =>
+                                      handleDeletePermission(permission.id)
+                                    }
                                   >
                                     <Trash2 className="w-3 h-3 text-destructive" />
                                   </Button>
                                 </div>
                               ) : (
-                                <span className="text-muted-foreground/50">-</span>
+                                <span className="text-muted-foreground/50">
+                                  -
+                                </span>
                               )}
                             </TableCell>
                           );
@@ -854,7 +1056,7 @@ export default function Admin() {
               <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
                 <h4 className="font-medium text-sm mb-2">Níveis de Acesso</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {ACCESS_LEVELS.map(level => (
+                  {ACCESS_LEVELS.map((level) => (
                     <div key={level.value} className="flex items-center gap-2">
                       <Badge className={getAccessLevelBadge(level.value)}>
                         {level.label}
@@ -872,16 +1074,32 @@ export default function Admin() {
             <CardHeader>
               <CardTitle>Automações e Edge Functions</CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
-                Gerencie as funções automáticas: ative/desative, configure horários e execute manualmente.
+                Gerencie as funções automáticas: ative/desative, configure
+                horários e execute manualmente.
               </p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <EdgeFunctionCard title="Sentimentos Diários" description="Notificação diária perguntando aos membros como estão se sentindo" functionName="notificar-sentimentos-diario" icon={<Heart className="w-5 h-5" />} />
+                <EdgeFunctionCard
+                  title="Sentimentos Diários"
+                  description="Notificação diária perguntando aos membros como estão se sentindo"
+                  functionName="notificar-sentimentos-diario"
+                  icon={<Heart className="w-5 h-5" />}
+                />
 
-                <EdgeFunctionCard title="Alertas Críticos" description="Verifica membros com sentimentos negativos repetidos e notifica líderes" functionName="verificar-sentimentos-criticos" icon={<AlertTriangle className="w-5 h-5" />} />
+                <EdgeFunctionCard
+                  title="Alertas Críticos"
+                  description="Verifica membros com sentimentos negativos repetidos e notifica líderes"
+                  functionName="verificar-sentimentos-criticos"
+                  icon={<AlertTriangle className="w-5 h-5" />}
+                />
 
-                <EdgeFunctionCard title="Aniversários" description="Notifica sobre aniversários, casamentos e batismos do dia seguinte" functionName="notificar-aniversarios" icon={<CalendarIcon className="w-5 h-5" />} />
+                <EdgeFunctionCard
+                  title="Aniversários"
+                  description="Notifica sobre aniversários, casamentos e batismos do dia seguinte"
+                  functionName="notificar-aniversarios"
+                  icon={<CalendarIcon className="w-5 h-5" />}
+                />
               </div>
 
               <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
@@ -894,12 +1112,30 @@ export default function Admin() {
                   </div>
                 </div>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li><strong>Ativar/Desativar:</strong> Use o toggle para pausar temporariamente uma função sem deletá-la</li>
-                  <li><strong>Configurar Horário:</strong> Clique no ícone de engrenagem para alterar o horário de execução</li>
-                  <li><strong>Executar Manualmente:</strong> Use "Executar Agora" para testar ou forçar uma execução</li>
-                  <li><strong>Horários:</strong> Todos os horários são no fuso de Brasília (UTC-3)</li>
-                  <li><strong>Status:</strong> O badge mostra se a função está ativa ou desativada</li>
-                  <li><strong>Contador:</strong> Acompanhe quantas vezes cada função foi executada</li>
+                  <li>
+                    <strong>Ativar/Desativar:</strong> Use o toggle para pausar
+                    temporariamente uma função sem deletá-la
+                  </li>
+                  <li>
+                    <strong>Configurar Horário:</strong> Clique no ícone de
+                    engrenagem para alterar o horário de execução
+                  </li>
+                  <li>
+                    <strong>Executar Manualmente:</strong> Use "Executar Agora"
+                    para testar ou forçar uma execução
+                  </li>
+                  <li>
+                    <strong>Horários:</strong> Todos os horários são no fuso de
+                    Brasília (UTC-3)
+                  </li>
+                  <li>
+                    <strong>Status:</strong> O badge mostra se a função está
+                    ativa ou desativada
+                  </li>
+                  <li>
+                    <strong>Contador:</strong> Acompanhe quantas vezes cada
+                    função foi executada
+                  </li>
                 </ul>
               </div>
             </CardContent>

@@ -8,19 +8,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { 
-  ArrowLeft, 
-  Check, 
-  Play, 
-  Lock, 
-  Video, 
-  FileText, 
+import {
+  ArrowLeft,
+  Check,
+  Play,
+  Lock,
+  Video,
+  FileText,
   Calendar,
   MapPin,
   CheckCircle2,
   ChevronRight,
   Trophy,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
 import QuizPlayer from "@/components/ensino/QuizPlayer";
 import { gerarCertificado } from "@/components/ensino/CertificadoGenerator";
@@ -62,18 +62,26 @@ interface AulaVinculada {
   sala: { nome: string } | null;
 }
 
-const normalizeQuizConfig = (value: unknown): Etapa["quiz_config"] | undefined => {
+const normalizeQuizConfig = (
+  value: unknown
+): Etapa["quiz_config"] | undefined => {
   if (typeof value !== "object" || value === null) return undefined;
   const v = value as Record<string, unknown>;
   const perguntasRaw: unknown[] = Array.isArray(v.perguntas) ? v.perguntas : [];
 
   const perguntas = perguntasRaw
     .map((p, idx) => {
-      if (typeof p !== 'object' || p === null) return null;
+      if (typeof p !== "object" || p === null) return null;
       const pObj = p as Record<string, unknown>;
       const texto = String(pObj?.texto ?? pObj?.pergunta ?? "");
-      const alternativas = Array.isArray(pObj?.alternativas) ? pObj.alternativas : (Array.isArray(pObj?.opcoes) ? pObj.opcoes : []);
-      const respostaCorreta = Number(pObj?.respostaCorreta ?? pObj?.resposta_correta ?? 0);
+      const alternativas = Array.isArray(pObj?.alternativas)
+        ? pObj.alternativas
+        : Array.isArray(pObj?.opcoes)
+        ? pObj.opcoes
+        : [];
+      const respostaCorreta = Number(
+        pObj?.respostaCorreta ?? pObj?.resposta_correta ?? 0
+      );
       if (!texto || alternativas.length === 0) return null;
       return {
         id: String(pObj?.id ?? idx),
@@ -94,11 +102,13 @@ export default function CursoPlayer() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  
+
   const [jornada, setJornada] = useState<Jornada | null>(null);
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [etapaSelecionada, setEtapaSelecionada] = useState<Etapa | null>(null);
-  const [aulaVinculada, setAulaVinculada] = useState<AulaVinculada | null>(null);
+  const [aulaVinculada, setAulaVinculada] = useState<AulaVinculada | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [marcandoConcluido, setMarcandoConcluido] = useState(false);
   const [sidebarAberta, setSidebarAberta] = useState(true);
@@ -107,7 +117,8 @@ export default function CursoPlayer() {
   const [inscricaoId, setInscricaoId] = useState<string | null>(null);
 
   // Verificar se jornada está 100% concluída
-  const jornadaConcluida = etapas.length > 0 && etapas.every(e => e.concluida);
+  const jornadaConcluida =
+    etapas.length > 0 && etapas.every((e) => e.concluida);
 
   useEffect(() => {
     if (id && profile?.id) {
@@ -159,14 +170,16 @@ export default function CursoPlayer() {
       // Buscar etapas com campos de quiz
       const { data: etapasData, error: etapasError } = await supabase
         .from("etapas_jornada")
-        .select("id, titulo, ordem, tipo_conteudo, conteudo_url, conteudo_texto, quiz_config, check_automatico, aula_vinculada_id")
+        .select(
+          "id, titulo, ordem, tipo_conteudo, conteudo_url, conteudo_texto, quiz_config, check_automatico, aula_vinculada_id"
+        )
         .eq("jornada_id", id)
         .order("ordem");
 
       if (etapasError) throw etapasError;
 
       // Buscar conclusões do aluno
-      const etapaIds = etapasData?.map(e => e.id) || [];
+      const etapaIds = etapasData?.map((e) => e.id) || [];
       const { data: presencasData } = await supabase
         .from("presencas_aula")
         .select("etapa_id, created_at")
@@ -175,22 +188,23 @@ export default function CursoPlayer() {
         .eq("status", "concluido");
 
       const conclusoesMap = new Map(
-        presencasData?.map(p => [p.etapa_id, p.created_at]) || []
+        presencasData?.map((p) => [p.etapa_id, p.created_at]) || []
       );
 
-      const etapasComStatus: Etapa[] = (etapasData || []).map((etapa: Record<string, unknown>) => ({
-        ...etapa,
-        quiz_config: normalizeQuizConfig(etapa.quiz_config),
-        concluida: conclusoesMap.has(etapa.id),
-        data_conclusao: conclusoesMap.get(etapa.id),
-      }));
+      const etapasComStatus: Etapa[] = (etapasData || []).map(
+        (etapa: Record<string, unknown>) => ({
+          ...etapa,
+          quiz_config: normalizeQuizConfig(etapa.quiz_config),
+          concluida: conclusoesMap.has(etapa.id),
+          data_conclusao: conclusoesMap.get(etapa.id),
+        })
+      );
 
       setEtapas(etapasComStatus);
 
       // Selecionar primeira etapa não concluída ou a primeira
-      const primeiraIncompleta = etapasComStatus.find(e => !e.concluida);
+      const primeiraIncompleta = etapasComStatus.find((e) => !e.concluida);
       setEtapaSelecionada(primeiraIncompleta || etapasComStatus[0] || null);
-
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
       toast.error("Erro ao carregar curso");
@@ -206,9 +220,13 @@ export default function CursoPlayer() {
             <Lock className="h-10 w-10 mx-auto text-muted-foreground" />
             <h2 className="text-lg font-semibold">Acesso bloqueado</h2>
             <p className="text-sm text-muted-foreground">
-              Pagamento pendente{valorCurso ? ` (R$ ${valorCurso.toFixed(2)})` : ""}. Aguarde confirmação da tesouraria.
+              Pagamento pendente
+              {valorCurso ? ` (R$ ${valorCurso.toFixed(2)})` : ""}. Aguarde
+              confirmação da tesouraria.
             </p>
-            <Button variant="link" onClick={() => navigate(-1)}>Voltar</Button>
+            <Button variant="link" onClick={() => navigate(-1)}>
+              Voltar
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -225,7 +243,7 @@ export default function CursoPlayer() {
     if (data) {
       setAulaVinculada({
         ...data,
-        sala: Array.isArray(data.sala) ? data.sala[0] : data.sala
+        sala: Array.isArray(data.sala) ? data.sala[0] : data.sala,
       });
     }
   };
@@ -250,54 +268,59 @@ export default function CursoPlayer() {
 
       const now = new Date().toISOString();
       let error;
-      
+
       if (existingRecord) {
         // Atualizar registro existente
         const result = await supabase
           .from("presencas_aula")
-          .update({ 
-            status: "concluido", 
+          .update({
+            status: "concluido",
             checkin_at: now,
-            checkout_at: now // Marcar checkout para evitar conflito com constraint de Kids
+            checkout_at: now, // Marcar checkout para evitar conflito com constraint de Kids
           })
           .eq("id", existingRecord.id);
         error = result.error;
       } else {
         // Inserir novo registro - checkout_at preenchido para não conflitar com idx_one_active_checkin_per_child
-        const result = await supabase
-          .from("presencas_aula")
-          .insert({
-            aluno_id: profile.id,
-            etapa_id: etapaSelecionada.id,
-            status: "concluido",
-            checkin_at: now,
-            checkout_at: now, // Conclusão de etapa = checkin e checkout simultâneo
-          });
+        const result = await supabase.from("presencas_aula").insert({
+          aluno_id: profile.id,
+          etapa_id: etapaSelecionada.id,
+          status: "concluido",
+          checkin_at: now,
+          checkout_at: now, // Conclusão de etapa = checkin e checkout simultâneo
+        });
         error = result.error;
       }
 
       if (error) throw error;
 
       toast.success("🎉 Etapa concluída!", {
-        description: "Parabéns pelo progresso!"
+        description: "Parabéns pelo progresso!",
       });
 
       // Atualizar estado local
-      setEtapas(prev => prev.map(e => 
-        e.id === etapaSelecionada.id 
-          ? { ...e, concluida: true, data_conclusao: new Date().toISOString() }
-          : e
-      ));
-      setEtapaSelecionada(prev => prev ? { ...prev, concluida: true } : null);
+      setEtapas((prev) =>
+        prev.map((e) =>
+          e.id === etapaSelecionada.id
+            ? {
+                ...e,
+                concluida: true,
+                data_conclusao: new Date().toISOString(),
+              }
+            : e
+        )
+      );
+      setEtapaSelecionada((prev) =>
+        prev ? { ...prev, concluida: true } : null
+      );
 
       // Avançar para próxima etapa
-      const indexAtual = etapas.findIndex(e => e.id === etapaSelecionada.id);
+      const indexAtual = etapas.findIndex((e) => e.id === etapaSelecionada.id);
       if (indexAtual < etapas.length - 1) {
         setTimeout(() => {
           setEtapaSelecionada(etapas[indexAtual + 1]);
         }, 1500);
       }
-
     } catch (error) {
       console.error("Erro ao marcar como concluído:", error);
       toast.error("Erro ao salvar progresso");
@@ -371,10 +394,14 @@ export default function CursoPlayer() {
       case "texto":
         return (
           <div className="prose prose-sm dark:prose-invert max-w-none">
-            <h2 className="text-xl font-semibold mb-4">{etapaSelecionada.titulo}</h2>
-            <div 
+            <h2 className="text-xl font-semibold mb-4">
+              {etapaSelecionada.titulo}
+            </h2>
+            <div
               className="whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(conteudo_texto || "") }}
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(conteudo_texto || ""),
+              }}
             />
           </div>
         );
@@ -408,9 +435,11 @@ export default function CursoPlayer() {
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-center gap-3 text-primary">
                 <Calendar className="h-8 w-8" />
-                <h2 className="text-xl font-semibold">{etapaSelecionada.titulo}</h2>
+                <h2 className="text-xl font-semibold">
+                  {etapaSelecionada.titulo}
+                </h2>
               </div>
-              
+
               <p className="text-muted-foreground">
                 Esta etapa é uma aula presencial.
               </p>
@@ -420,7 +449,11 @@ export default function CursoPlayer() {
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4" />
                     <span>
-                      {format(new Date(aulaVinculada.data_inicio), "PPP 'às' HH:mm", { locale: ptBR })}
+                      {format(
+                        new Date(aulaVinculada.data_inicio),
+                        "PPP 'às' HH:mm",
+                        { locale: ptBR }
+                      )}
                     </span>
                   </div>
                   {aulaVinculada.sala && (
@@ -449,9 +482,9 @@ export default function CursoPlayer() {
               </div>
             )}
             {conteudo_url && (
-              <a 
-                href={conteudo_url} 
-                target="_blank" 
+              <a
+                href={conteudo_url}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
@@ -482,9 +515,9 @@ export default function CursoPlayer() {
       {/* Header Fixo - Sempre visível */}
       <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate("/cursos")}
             className="shrink-0"
           >
@@ -498,10 +531,10 @@ export default function CursoPlayer() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            {etapas.filter(e => e.concluida).length}/{etapas.length} etapas
+            {etapas.filter((e) => e.concluida).length}/{etapas.length} etapas
           </span>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => setSidebarAberta(!sidebarAberta)}
             className="lg:hidden"
@@ -513,10 +546,12 @@ export default function CursoPlayer() {
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Sidebar - Índice */}
-        <div className={`
-          ${sidebarAberta ? 'flex' : 'hidden'} 
+        <div
+          className={`
+          ${sidebarAberta ? "flex" : "hidden"} 
           lg:flex w-full lg:w-80 border-r bg-muted/30 flex-shrink-0 flex-col
-        `}>
+        `}
+        >
           <div className="p-4 border-b bg-background lg:block hidden">
             <h2 className="font-semibold line-clamp-2">{jornada?.titulo}</h2>
             {jornada?.descricao && (
@@ -537,24 +572,33 @@ export default function CursoPlayer() {
                   }}
                   className={`
                     w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors
-                    ${etapa.id === etapaSelecionada?.id 
-                      ? 'bg-primary/10 border border-primary/20' 
-                      : 'hover:bg-muted'}
+                    ${
+                      etapa.id === etapaSelecionada?.id
+                        ? "bg-primary/10 border border-primary/20"
+                        : "hover:bg-muted"
+                    }
                   `}
                 >
-                  <div className={`
+                  <div
+                    className={`
                     w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
-                    ${etapa.concluida ? 'bg-green-500/10' : 'bg-muted'}
-                  `}>
+                    ${etapa.concluida ? "bg-green-500/10" : "bg-muted"}
+                  `}
+                  >
                     {getIconeEtapa(etapa)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium line-clamp-2 ${etapa.concluida ? 'text-muted-foreground' : ''}`}>
+                    <p
+                      className={`text-sm font-medium line-clamp-2 ${
+                        etapa.concluida ? "text-muted-foreground" : ""
+                      }`}
+                    >
                       {index + 1}. {etapa.titulo}
                     </p>
                     {etapa.concluida && etapa.data_conclusao && (
                       <p className="text-xs text-muted-foreground">
-                        Concluído em {format(new Date(etapa.data_conclusao), "dd/MM")}
+                        Concluído em{" "}
+                        {format(new Date(etapa.data_conclusao), "dd/MM")}
                       </p>
                     )}
                   </div>
@@ -574,13 +618,13 @@ export default function CursoPlayer() {
                     <p className="text-sm text-amber-700 dark:text-amber-300">
                       Parabéns! Você completou todas as etapas desta jornada.
                     </p>
-                    <Button 
+                    <Button
                       onClick={() => {
                         if (profile?.nome && jornada?.titulo) {
                           gerarCertificado({
                             nomeAluno: profile.nome,
                             nomeJornada: jornada.titulo,
-                            dataConclusao: new Date()
+                            dataConclusao: new Date(),
                           });
                           toast.success("Certificado baixado com sucesso!");
                         }
@@ -599,7 +643,11 @@ export default function CursoPlayer() {
         </div>
 
         {/* Área Principal */}
-        <div className={`flex-1 flex flex-col min-w-0 ${sidebarAberta ? 'hidden lg:flex' : 'flex'}`}>
+        <div
+          className={`flex-1 flex flex-col min-w-0 ${
+            sidebarAberta ? "hidden lg:flex" : "flex"
+          }`}
+        >
           {/* Conteúdo */}
           <ScrollArea className="flex-1 p-4 lg:p-6">
             {/* Tela de Celebração Fullscreen - Exibida quando jornada 100% concluída e nenhuma etapa está aberta */}
@@ -625,17 +673,18 @@ export default function CursoPlayer() {
                     </div>
 
                     <p className="text-base text-amber-700 dark:text-amber-300 max-w-lg mx-auto">
-                      Todas as etapas foram completadas com sucesso. Continue sua caminhada de aprendizado e crescimento!
+                      Todas as etapas foram completadas com sucesso. Continue
+                      sua caminhada de aprendizado e crescimento!
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-                      <Button 
+                      <Button
                         onClick={() => {
                           if (profile?.nome && jornada?.titulo) {
                             gerarCertificado({
                               nomeAluno: profile.nome,
                               nomeJornada: jornada.titulo,
-                              dataConclusao: new Date()
+                              dataConclusao: new Date(),
                             });
                             toast.success("Certificado baixado com sucesso!");
                           }
@@ -646,7 +695,7 @@ export default function CursoPlayer() {
                         <Trophy className="h-5 w-5 mr-2" />
                         Baixar Certificado
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => navigate("/cursos")}
                         variant="outline"
                         size="lg"
@@ -660,15 +709,13 @@ export default function CursoPlayer() {
                 </Card>
               </div>
             ) : (
-              <div className="max-w-4xl mx-auto">
-                {renderConteudo()}
-              </div>
+              <div className="max-w-4xl mx-auto">{renderConteudo()}</div>
             )}
           </ScrollArea>
 
           {/* Barra de Ação */}
           {etapaSelecionada && (
-            <div 
+            <div
               className="border-t p-4 bg-background"
               style={{ borderTopColor: corTema }}
             >
@@ -676,7 +723,9 @@ export default function CursoPlayer() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   {getIconeConteudo(etapaSelecionada.tipo_conteudo)}
                   <span className="hidden sm:inline">
-                    Etapa {etapas.findIndex(e => e.id === etapaSelecionada.id) + 1} de {etapas.length}
+                    Etapa{" "}
+                    {etapas.findIndex((e) => e.id === etapaSelecionada.id) + 1}{" "}
+                    de {etapas.length}
                   </span>
                 </div>
 
@@ -687,36 +736,39 @@ export default function CursoPlayer() {
                       Concluído
                       {etapaSelecionada.data_conclusao && (
                         <span className="text-muted-foreground ml-1">
-                          em {format(new Date(etapaSelecionada.data_conclusao), "dd/MM/yyyy")}
+                          em{" "}
+                          {format(
+                            new Date(etapaSelecionada.data_conclusao),
+                            "dd/MM/yyyy"
+                          )}
                         </span>
                       )}
                     </span>
                   </div>
+                ) : // Soft-lock: ocultar botão para quiz e video com check_automatico
+                etapaSelecionada.tipo_conteudo === "quiz" ||
+                  (etapaSelecionada.tipo_conteudo === "video" &&
+                    etapaSelecionada.check_automatico) ? (
+                  <div className="text-sm text-muted-foreground">
+                    {etapaSelecionada.tipo_conteudo === "quiz"
+                      ? "Complete o quiz para avançar"
+                      : "Assista o vídeo completo para avançar"}
+                  </div>
                 ) : (
-                  // Soft-lock: ocultar botão para quiz e video com check_automatico
-                  (etapaSelecionada.tipo_conteudo === "quiz" || 
-                   (etapaSelecionada.tipo_conteudo === "video" && etapaSelecionada.check_automatico)) ? (
-                    <div className="text-sm text-muted-foreground">
-                      {etapaSelecionada.tipo_conteudo === "quiz" 
-                        ? "Complete o quiz para avançar" 
-                        : "Assista o vídeo completo para avançar"}
-                    </div>
-                  ) : (
-                    <Button 
-                      onClick={marcarConcluido}
-                      disabled={marcandoConcluido}
-                      className="gap-2"
-                    >
-                      {marcandoConcluido ? (
-                        "Salvando..."
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Marcar como Concluído
-                        </>
-                      )}
-                    </Button>
-                  )
+                  <Button
+                    onClick={marcarConcluido}
+                    disabled={marcandoConcluido}
+                    className="gap-2"
+                  >
+                    {marcandoConcluido ? (
+                      "Salvando..."
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Marcar como Concluído
+                      </>
+                    )}
+                  </Button>
                 )}
               </div>
             </div>

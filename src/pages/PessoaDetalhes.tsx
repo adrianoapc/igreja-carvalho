@@ -151,7 +151,7 @@ export default function PessoaDetalhes() {
 
   const fetchPessoa = async () => {
     if (!id) return;
-    
+
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -165,7 +165,8 @@ export default function PessoaDetalhes() {
       // Buscar funções da pessoa
       const { data: funcoesData } = await supabase
         .from("membro_funcoes")
-        .select(`
+        .select(
+          `
           id,
           data_inicio,
           ativo,
@@ -173,7 +174,8 @@ export default function PessoaDetalhes() {
             id,
             nome
           )
-        `)
+        `
+        )
         .eq("membro_id", id)
         .order("data_inicio", { ascending: false });
 
@@ -219,19 +221,27 @@ export default function PessoaDetalhes() {
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case "visitante": return "outline";
-      case "frequentador": return "secondary";
-      case "membro": return "default";
-      default: return "outline";
+      case "visitante":
+        return "outline";
+      case "frequentador":
+        return "secondary";
+      case "membro":
+        return "default";
+      default:
+        return "outline";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "visitante": return "VISITANTE";
-      case "frequentador": return "FREQUENTADOR";
-      case "membro": return "MEMBRO";
-      default: return status.toUpperCase();
+      case "visitante":
+        return "VISITANTE";
+      case "frequentador":
+        return "FREQUENTADOR";
+      case "membro":
+        return "MEMBRO";
+      default:
+        return status.toUpperCase();
     }
   };
 
@@ -253,11 +263,11 @@ export default function PessoaDetalhes() {
     const entrada = new Date(dataEntrada);
     const anos = hoje.getFullYear() - entrada.getFullYear();
     const meses = hoje.getMonth() - entrada.getMonth();
-    
+
     if (anos > 0) {
-      return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+      return `${anos} ${anos === 1 ? "ano" : "anos"}`;
     } else if (meses > 0) {
-      return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+      return `${meses} ${meses === 1 ? "mês" : "meses"}`;
     } else {
       return "Recente";
     }
@@ -266,7 +276,12 @@ export default function PessoaDetalhes() {
   return (
     <div className="space-y-6 p-2 sm:p-0">
       {/* Back Button */}
-      <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="mb-2">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => navigate(-1)}
+        className="mb-2"
+      >
         <ArrowLeft className="w-5 h-5" />
       </Button>
 
@@ -287,7 +302,9 @@ export default function PessoaDetalhes() {
             {/* Dados principais reorganizados */}
             <div className="flex-1 space-y-3 text-center md:text-left">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                <h1 className="text-2xl md:text-3xl font-bold leading-tight">{pessoa.nome}</h1>
+                <h1 className="text-2xl md:text-3xl font-bold leading-tight">
+                  {pessoa.nome}
+                </h1>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -307,14 +324,18 @@ export default function PessoaDetalhes() {
                     {pessoa.email}
                   </span>
                 )}
-                {pessoa.email && pessoa.telefone && <span className="hidden md:inline">•</span>}
+                {pessoa.email && pessoa.telefone && (
+                  <span className="hidden md:inline">•</span>
+                )}
                 {pessoa.telefone && (
                   <span className="flex items-center gap-1 justify-center md:justify-start">
                     <Phone className="w-4 h-4 flex-shrink-0" />
                     {formatarTelefone(pessoa.telefone)}
                   </span>
                 )}
-                {(pessoa.email || pessoa.telefone) && <span className="hidden md:inline">•</span>}
+                {(pessoa.email || pessoa.telefone) && (
+                  <span className="hidden md:inline">•</span>
+                )}
                 <span className="flex items-center gap-1 justify-center md:justify-start">
                   <IdCard className="w-4 h-4 flex-shrink-0" />
                   ID: {pessoa.id.slice(0, 8)}
@@ -343,7 +364,10 @@ export default function PessoaDetalhes() {
                   ))}
 
                 {pessoa.user_id && (
-                  <Badge variant="outline" className="text-xs border-green-500 text-green-700 capitalize">
+                  <Badge
+                    variant="outline"
+                    className="text-xs border-green-500 text-green-700 capitalize"
+                  >
                     <Check className="w-3 h-3 mr-1" />
                     Usuário App
                   </Badge>
@@ -363,23 +387,38 @@ export default function PessoaDetalhes() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="hidden md:grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
-          <TabsTrigger value="perfil" className="flex-col gap-1 py-2 px-1 text-xs">
+          <TabsTrigger
+            value="perfil"
+            className="flex-col gap-1 py-2 px-1 text-xs"
+          >
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Perfil</span>
           </TabsTrigger>
-          <TabsTrigger value="mais" className="flex-col gap-1 py-2 px-1 text-xs">
+          <TabsTrigger
+            value="mais"
+            className="flex-col gap-1 py-2 px-1 text-xs"
+          >
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Dados Adicionais</span>
           </TabsTrigger>
-          <TabsTrigger value="envolvimento" className="flex-col gap-1 py-2 px-1 text-xs">
+          <TabsTrigger
+            value="envolvimento"
+            className="flex-col gap-1 py-2 px-1 text-xs"
+          >
             <Activity className="w-4 h-4" />
             <span className="hidden sm:inline">Envolvimento</span>
           </TabsTrigger>
-          <TabsTrigger value="frequencia" className="flex-col gap-1 py-2 px-1 text-xs">
+          <TabsTrigger
+            value="frequencia"
+            className="flex-col gap-1 py-2 px-1 text-xs"
+          >
             <CalendarDays className="w-4 h-4" />
             <span className="hidden sm:inline">Frequência</span>
           </TabsTrigger>
-          <TabsTrigger value="intercessao" className="flex-col gap-1 py-2 px-1 text-xs">
+          <TabsTrigger
+            value="intercessao"
+            className="flex-col gap-1 py-2 px-1 text-xs"
+          >
             <MessageCircle className="w-4 h-4" />
             <span className="hidden sm:inline">Sentimentos</span>
           </TabsTrigger>
@@ -405,13 +444,16 @@ export default function PessoaDetalhes() {
         <TabsContent value="perfil" className="space-y-4 md:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <h3 className="text-base md:text-lg font-semibold">Informações do Perfil</h3>
+              <h3 className="text-base md:text-lg font-semibold">
+                Informações do Perfil
+              </h3>
               <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                Visualização consolidada dos dados cadastrais. Use as outras abas para editar.
+                Visualização consolidada dos dados cadastrais. Use as outras
+                abas para editar.
               </p>
             </div>
           </div>
-          
+
           {/* Grid de Informações Principais - Versão Limpa */}
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {/* Card: Dados Civis */}
@@ -448,26 +490,41 @@ export default function PessoaDetalhes() {
                 <CollapsibleContent>
                   <CardContent className="space-y-3 pt-0">
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Sexo:</span>
-                      <span className="text-sm font-semibold text-right">{pessoa.sexo || "—"}</span>
+                      <span className="text-sm text-muted-foreground">
+                        Sexo:
+                      </span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.sexo || "—"}
+                      </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Nascimento:</span>
+                      <span className="text-sm text-muted-foreground">
+                        Nascimento:
+                      </span>
                       <span className="text-sm font-semibold text-right">
                         {pessoa.data_nascimento
-                          ? `${format(new Date(pessoa.data_nascimento), "dd/MM/yyyy")} (${calcularIdade(pessoa.data_nascimento)})`
+                          ? `${format(
+                              new Date(pessoa.data_nascimento),
+                              "dd/MM/yyyy"
+                            )} (${calcularIdade(pessoa.data_nascimento)})`
                           : "—"}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Estado Civil:</span>
-                      <span className="text-sm font-semibold text-right">{pessoa.estado_civil || "—"}</span>
+                      <span className="text-sm text-muted-foreground">
+                        Estado Civil:
+                      </span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.estado_civil || "—"}
+                      </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">CPF:</span>
+                      <span className="text-sm text-muted-foreground">
+                        CPF:
+                      </span>
                       <span className="text-sm font-semibold text-right">
                         {pessoa.cpf ? formatarCPF(pessoa.cpf) : "—"}
                       </span>
@@ -475,14 +532,20 @@ export default function PessoaDetalhes() {
                     <Separator />
                     <div className="flex justify-between items-start">
                       <span className="text-sm text-muted-foreground">RG:</span>
-                      <span className="text-sm font-semibold text-right">{pessoa.rg || "—"}</span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.rg || "—"}
+                      </span>
                     </div>
                     {pessoa.necessidades_especiais && (
                       <>
                         <Separator />
                         <div className="flex justify-between items-start">
-                          <span className="text-sm text-muted-foreground">Necessidades:</span>
-                          <span className="text-sm font-semibold text-right">{pessoa.necessidades_especiais}</span>
+                          <span className="text-sm text-muted-foreground">
+                            Necessidades:
+                          </span>
+                          <span className="text-sm font-semibold text-right">
+                            {pessoa.necessidades_especiais}
+                          </span>
                         </div>
                       </>
                     )}
@@ -492,7 +555,10 @@ export default function PessoaDetalhes() {
             </Collapsible>
 
             {/* Card: Dados de Contatos */}
-            <Collapsible open={dadosContatosOpen} onOpenChange={setDadosContatosOpen}>
+            <Collapsible
+              open={dadosContatosOpen}
+              onOpenChange={setDadosContatosOpen}
+            >
               <Card>
                 <CollapsibleTrigger asChild>
                   <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
@@ -525,45 +591,63 @@ export default function PessoaDetalhes() {
                 <CollapsibleContent>
                   <CardContent className="space-y-3 pt-0">
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Celular:</span>
+                      <span className="text-sm text-muted-foreground">
+                        Celular:
+                      </span>
                       <span className="text-sm font-semibold text-right">
-                        {pessoa.telefone ? formatarTelefone(pessoa.telefone) : "—"}
+                        {pessoa.telefone
+                          ? formatarTelefone(pessoa.telefone)
+                          : "—"}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">E-mail:</span>
+                      <span className="text-sm text-muted-foreground">
+                        E-mail:
+                      </span>
                       <span className="text-sm font-semibold text-right break-all">
                         {pessoa.email || "—"}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">CEP:</span>
+                      <span className="text-sm text-muted-foreground">
+                        CEP:
+                      </span>
                       <span className="text-sm font-semibold text-right">
                         {pessoa.cep ? formatarCEP(pessoa.cep) : "—"}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Cidade:</span>
+                      <span className="text-sm text-muted-foreground">
+                        Cidade:
+                      </span>
                       <span className="text-sm font-semibold text-right">
-                        {pessoa.cidade && pessoa.estado 
+                        {pessoa.cidade && pessoa.estado
                           ? `${pessoa.cidade} - ${pessoa.estado}`
                           : pessoa.cidade || pessoa.estado || "—"}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Bairro:</span>
-                      <span className="text-sm font-semibold text-right">{pessoa.bairro || "—"}</span>
+                      <span className="text-sm text-muted-foreground">
+                        Bairro:
+                      </span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.bairro || "—"}
+                      </span>
                     </div>
                     {pessoa.endereco && (
                       <>
                         <Separator />
                         <div className="flex justify-between items-start">
-                          <span className="text-sm text-muted-foreground">Endereço:</span>
-                          <span className="text-sm font-semibold text-right">{pessoa.endereco}</span>
+                          <span className="text-sm text-muted-foreground">
+                            Endereço:
+                          </span>
+                          <span className="text-sm font-semibold text-right">
+                            {pessoa.endereco}
+                          </span>
                         </div>
                       </>
                     )}
@@ -573,7 +657,10 @@ export default function PessoaDetalhes() {
             </Collapsible>
 
             {/* Card: Dados Eclesiásticos */}
-            <Collapsible open={dadosEclesiasticosOpen} onOpenChange={setDadosEclesiasticosOpen}>
+            <Collapsible
+              open={dadosEclesiasticosOpen}
+              onOpenChange={setDadosEclesiasticosOpen}
+            >
               <Card>
                 <CollapsibleTrigger asChild>
                   <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
@@ -593,12 +680,20 @@ export default function PessoaDetalhes() {
                 <CollapsibleContent>
                   <CardContent className="space-y-3 pt-0">
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Batizado:</span>
+                      <span className="text-sm text-muted-foreground">
+                        Batizado:
+                      </span>
                       <div className="flex items-center gap-1">
                         {pessoa.batizado ? (
-                          <><Check className="w-4 h-4 text-green-600" /><span className="text-sm font-semibold">Sim</span></>
+                          <>
+                            <Check className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-semibold">Sim</span>
+                          </>
                         ) : (
-                          <><X className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-semibold">Não</span></>
+                          <>
+                            <X className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-semibold">Não</span>
+                          </>
                         )}
                       </div>
                     </div>
@@ -606,37 +701,59 @@ export default function PessoaDetalhes() {
                       <>
                         <Separator />
                         <div className="flex justify-between items-start">
-                          <span className="text-sm text-muted-foreground">Data Batismo:</span>
+                          <span className="text-sm text-muted-foreground">
+                            Data Batismo:
+                          </span>
                           <span className="text-sm font-semibold text-right">
-                            {format(new Date(pessoa.data_batismo), "dd/MM/yyyy")}
+                            {format(
+                              new Date(pessoa.data_batismo),
+                              "dd/MM/yyyy"
+                            )}
                           </span>
                         </div>
                       </>
                     )}
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">É Líder:</span>
+                      <span className="text-sm text-muted-foreground">
+                        É Líder:
+                      </span>
                       <div className="flex items-center gap-1">
                         {pessoa.e_lider ? (
-                          <><Crown className="w-4 h-4 text-amber-600" /><span className="text-sm font-semibold">Sim</span></>
+                          <>
+                            <Crown className="w-4 h-4 text-amber-600" />
+                            <span className="text-sm font-semibold">Sim</span>
+                          </>
                         ) : (
-                          <><X className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-semibold">Não</span></>
+                          <>
+                            <X className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-semibold">Não</span>
+                          </>
                         )}
                       </div>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Conversão:</span>
+                      <span className="text-sm text-muted-foreground">
+                        Conversão:
+                      </span>
                       <span className="text-sm font-semibold text-right">
                         {pessoa.data_conversao
-                          ? format(new Date(pessoa.data_conversao), "dd/MM/yyyy")
+                          ? format(
+                              new Date(pessoa.data_conversao),
+                              "dd/MM/yyyy"
+                            )
                           : "—"}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">Entrou por:</span>
-                      <span className="text-sm font-semibold text-right">{pessoa.entrou_por || "—"}</span>
+                      <span className="text-sm text-muted-foreground">
+                        Entrou por:
+                      </span>
+                      <span className="text-sm font-semibold text-right">
+                        {pessoa.entrou_por || "—"}
+                      </span>
                     </div>
                   </CardContent>
                 </CollapsibleContent>
@@ -645,7 +762,11 @@ export default function PessoaDetalhes() {
           </div>
 
           {/* Família */}
-          <FamiliaresSection pessoaId={pessoa.id} pessoaNome={pessoa.nome} readOnly />
+          <FamiliaresSection
+            pessoaId={pessoa.id}
+            pessoaNome={pessoa.nome}
+            readOnly
+          />
         </TabsContent>
 
         {/* Tab: Frequência */}
@@ -667,7 +788,10 @@ export default function PessoaDetalhes() {
         <TabsContent value="mais" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Card: Dados Adicionais */}
-            <Collapsible open={dadosAdicionaisOpen} onOpenChange={setDadosAdicionaisOpen}>
+            <Collapsible
+              open={dadosAdicionaisOpen}
+              onOpenChange={setDadosAdicionaisOpen}
+            >
               <Card className="shadow-soft">
                 <CardHeader className="p-4 md:p-5 bg-gradient-to-r from-primary/5 to-transparent">
                   <div className="flex items-center justify-between">
@@ -675,15 +799,25 @@ export default function PessoaDetalhes() {
                       <div className="p-2 bg-primary/10 rounded-lg">
                         <FileText className="w-5 h-5 text-primary" />
                       </div>
-                      <CardTitle className="text-base md:text-lg">Dados Adicionais</CardTitle>
+                      <CardTitle className="text-base md:text-lg">
+                        Dados Adicionais
+                      </CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setEditarAdicionaisOpen(true)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditarAdicionaisOpen(true)}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          {dadosAdicionaisOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {dadosAdicionaisOpen ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
                         </Button>
                       </CollapsibleTrigger>
                     </div>
@@ -693,44 +827,76 @@ export default function PessoaDetalhes() {
                   <CardContent className="p-4 md:p-5 space-y-3">
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                       <div>
-                        <p className="text-muted-foreground mb-1">Escolaridade</p>
-                        <p className="font-medium">{pessoa.escolaridade || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Escolaridade
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.escolaridade || "—"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground mb-1">Profissão</p>
                         <p className="font-medium">{pessoa.profissao || "—"}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground mb-1">Nacionalidade</p>
-                        <p className="font-medium">{pessoa.nacionalidade || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Nacionalidade
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.nacionalidade || "—"}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground mb-1">Naturalidade</p>
-                        <p className="font-medium">{pessoa.naturalidade || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Naturalidade
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.naturalidade || "—"}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground mb-1">Tipo sanguíneo</p>
-                        <p className="font-medium">{pessoa.tipo_sanguineo || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Tipo sanguíneo
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.tipo_sanguineo || "—"}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground mb-1">Entrevistado por</p>
-                        <p className="font-medium">{pessoa.entrevistado_por || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Entrevistado por
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.entrevistado_por || "—"}
+                        </p>
                       </div>
                       <div className="col-span-2">
-                        <p className="text-muted-foreground mb-1">Cadastrado por</p>
-                        <p className="font-medium">{pessoa.cadastrado_por || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Cadastrado por
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.cadastrado_por || "—"}
+                        </p>
                       </div>
                       <div className="col-span-2">
                         <p className="text-muted-foreground mb-1">Alergias</p>
                         <p className="font-medium">{pessoa.alergias || "—"}</p>
                       </div>
                       <div className="col-span-2">
-                        <p className="text-muted-foreground mb-1">Necessidades Especiais</p>
-                        <p className="font-medium">{pessoa.necessidades_especiais || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Necessidades Especiais
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.necessidades_especiais || "—"}
+                        </p>
                       </div>
                       <div className="col-span-2">
-                        <p className="text-muted-foreground mb-1">Observações</p>
-                        <p className="font-medium">{pessoa.observacoes || "—"}</p>
+                        <p className="text-muted-foreground mb-1">
+                          Observações
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.observacoes || "—"}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -747,7 +913,9 @@ export default function PessoaDetalhes() {
                       <div className="p-2 bg-primary/10 rounded-lg">
                         <FileText className="w-5 h-5 text-primary" />
                       </div>
-                      <CardTitle className="text-base md:text-lg">Documentos</CardTitle>
+                      <CardTitle className="text-base md:text-lg">
+                        Documentos
+                      </CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm">
@@ -755,7 +923,11 @@ export default function PessoaDetalhes() {
                       </Button>
                       <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          {documentosOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {documentosOpen ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
                         </Button>
                       </CollapsibleTrigger>
                     </div>
