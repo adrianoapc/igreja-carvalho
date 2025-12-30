@@ -6,12 +6,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, MoreVertical, CheckCircle, XCircle, BookOpen, Clock, Users } from "lucide-react";
+import { Search, MoreVertical, CheckCircle, XCircle, BookOpen, Clock, Users, History, Route } from "lucide-react";
+import { Link } from "react-router-dom";
+import { getRegraMinisterio } from "@/lib/voluntariado/triagem";
 
 interface Candidato {
   id: string;
@@ -36,16 +38,32 @@ const statusOptions = [
   { value: "rejeitado", label: "Rejeitado" },
 ];
 
+interface Jornada {
+  id: string;
+  titulo: string;
+}
+
 export default function Candidatos() {
   const { toast } = useToast();
   const [candidatos, setCandidatos] = useState<Candidato[]>([]);
+  const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
 
   useEffect(() => {
     fetchCandidatos();
+    fetchJornadas();
   }, [statusFilter]);
+
+  const fetchJornadas = async () => {
+    const { data } = await supabase
+      .from("jornadas")
+      .select("id, titulo")
+      .eq("ativo", true)
+      .order("titulo");
+    if (data) setJornadas(data);
+  };
 
   const fetchCandidatos = async () => {
     setLoading(true);
@@ -85,6 +103,50 @@ export default function Candidatos() {
       });
       fetchCandidatos();
     }
+  };
+
+  const enviarParaTrilha = async (candidato: Candidato, jornadaId: string) => {
+    // Buscar perfil do usuário logado para registrar quem fez a ação
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+
+    const { error } = await supabase
+      .from("candidatos_voluntario")
+      .update({
+        status: "em_trilha",
+        trilha_requerida_id: jornadaId,
+        data_avaliacao: new Date().toISOString(),
+        avaliado_por: userProfile?.id || null,
+      })
+      .eq("id", candidato.id);
+
+    if (error) {
+      toast({
+        title: "Erro ao vincular trilha",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      const trilhaNome = jornadas.find((j) => j.id === jornadaId)?.titulo;
+      toast({
+        title: "Trilha vinculada",
+        description: `Candidato enviado para ${trilhaNome}`,
+      });
+      fetchCandidatos();
+    }
+  };
+
+  const getTrilhaSugerida = (ministerio: string) => {
+    const regra = getRegraMinisterio({ nome: ministerio });
+    if (regra) {
+      return jornadas.find((j) => 
+        j.titulo.toLowerCase().includes(regra.trilhaTitulo.toLowerCase().replace("trilha ", ""))
+      );
+    }
+    return jornadas.find((j) => j.titulo.toLowerCase().includes("integração"));
   };
 
   const getStatusBadge = (status: string) => {
@@ -132,11 +194,19 @@ export default function Candidatos() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Candidatos a Voluntário</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Gerencie as inscrições de voluntariado
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Candidatos a Voluntário</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Gerencie as inscrições de voluntariado
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link to="/voluntariado/historico">
+            <History className="h-4 w-4 mr-2" />
+            Histórico
+          </Link>
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -278,10 +348,31 @@ export default function Candidatos() {
                               <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
                               Aprovar
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateStatus(candidato.id, "em_trilha")}>
-                              <BookOpen className="h-4 w-4 mr-2 text-purple-600" />
-                              Enviar p/ Trilha
-                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <BookOpen className="h-4 w-4 mr-2 text-purple-600" />
+                                Enviar p/ Trilha
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                {(() => {
+                                  const sugerida = getTrilhaSugerida(candidato.ministerio);
+                                  return jornadas.map((jornada) => (
+                                    <DropdownMenuItem
+                                      key={jornada.id}
+                                      onClick={() => enviarParaTrilha(candidato, jornada.id)}
+                                    >
+                                      <Route className="h-4 w-4 mr-2" />
+                                      {jornada.titulo}
+                                      {sugerida?.id === jornada.id && (
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                          Sugerida
+                                        </Badge>
+                                      )}
+                                    </DropdownMenuItem>
+                                  ));
+                                })()}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
                             <DropdownMenuItem onClick={() => updateStatus(candidato.id, "rejeitado")}>
                               <XCircle className="h-4 w-4 mr-2 text-red-600" />
                               Rejeitar
