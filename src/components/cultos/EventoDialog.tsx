@@ -102,6 +102,14 @@ const eventoSchema = z.object({
   pregador: z.string().optional(),
   tema: z.string().optional(),
   status: z.enum(["planejado", "confirmado", "realizado", "cancelado"]),
+  // Campos de Inscrição
+  requer_inscricao: z.boolean().default(false),
+  requer_pagamento: z.boolean().default(false),
+  valor_inscricao: z.number().min(0).optional(),
+  vagas_limite: z.number().int().min(1).optional().nullable(),
+  inscricoes_abertas_ate: z.date().optional().nullable(),
+  categoria_financeira_id: z.string().optional().nullable(),
+  conta_financeira_id: z.string().optional().nullable(),
 });
 
 type EventoFormData = z.infer<typeof eventoSchema>;
@@ -215,7 +223,7 @@ export default function EventoDialog({
           endereco: evento.endereco || "",
           pregador: evento.pregador || "",
           tema: evento.tema || "",
-          status: evento.status as Evento["status"],
+          status: (evento.status as "planejado" | "confirmado" | "realizado" | "cancelado"),
           usar_data_fim: deveUsarDataFim,
           data_fim: dataFimCalculada,
           hora_fim: format(dataFimCalculada, "HH:mm"),
@@ -237,10 +245,11 @@ export default function EventoDialog({
   }, [open, evento]);
 
   const loadSubtipos = async (tipo: string) => {
+    const tipoEnum = tipo as "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
     const { data } = await supabase
       .from("evento_subtipos")
       .select("*")
-      .eq("tipo_pai", tipo)
+      .eq("tipo_pai", tipoEnum)
       .eq("ativo", true)
       .order("nome");
     setSubtipos(data || []);
@@ -328,7 +337,7 @@ export default function EventoDialog({
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
-      className="sm:max-w-4xl" // AQUI: Força a largura expandida no Desktop (896px)
+      dialogContentProps={{ className: "sm:max-w-4xl" }}
     >
       <div className="flex flex-col h-full max-h-[90vh]">
         <div className="border-b pb-4 px-6 pt-6 bg-background sticky top-0 z-10">
