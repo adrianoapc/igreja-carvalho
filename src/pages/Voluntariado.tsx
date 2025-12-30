@@ -64,12 +64,15 @@ interface Candidatura {
   created_at: string;
 }
 
+// Status que bloqueiam nova candidatura no MESMO ministério
+const STATUS_BLOQUEANTES = ["pendente", "em_analise", "aprovado", "em_trilha"];
+
 export default function Voluntariado() {
   const { toast } = useToast();
   const { user, profile, loading: authLoading } = useAuth();
   const [formData, setFormData] = useState<VolunteerFormData>(initialFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [minhaCandidatura, setMinhaCandidatura] = useState<Candidatura | null>(null);
+  const [minhasCandidaturas, setMinhasCandidaturas] = useState<Candidatura[]>([]);
   const [loadingCandidatura, setLoadingCandidatura] = useState(true);
 
   // Preencher dados do perfil se logado
@@ -84,9 +87,9 @@ export default function Voluntariado() {
     }
   }, [profile]);
 
-  // Verificar se já tem candidatura
+  // Verificar candidaturas existentes
   useEffect(() => {
-    const fetchMinhaCandidatura = async () => {
+    const fetchMinhasCandidaturas = async () => {
       if (!profile?.id) {
         setLoadingCandidatura(false);
         return;
@@ -96,20 +99,26 @@ export default function Voluntariado() {
         .from("candidatos_voluntario")
         .select("id, ministerio, disponibilidade, experiencia, status, created_at")
         .eq("pessoa_id", profile.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
 
       if (!error && data) {
-        setMinhaCandidatura(data);
+        setMinhasCandidaturas(data);
       }
       setLoadingCandidatura(false);
     };
 
     if (!authLoading) {
-      fetchMinhaCandidatura();
+      fetchMinhasCandidaturas();
     }
   }, [profile?.id, authLoading]);
+
+  // Ministérios em que já tem candidatura ativa (não pode duplicar)
+  const ministeriosBloqueados = minhasCandidaturas
+    .filter(c => STATUS_BLOQUEANTES.includes(c.status))
+    .map(c => c.ministerio);
+
+  // Ministérios disponíveis para nova candidatura
+  const ministeriosDisponiveis = ministryOptions.filter(m => !ministeriosBloqueados.includes(m));
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -160,14 +169,14 @@ export default function Voluntariado() {
 
       // Atualizar estado com a nova candidatura
       if (data) {
-        setMinhaCandidatura({
+        setMinhasCandidaturas(prev => [{
           id: data.id,
           ministerio: data.ministerio,
           disponibilidade: data.disponibilidade,
           experiencia: data.experiencia,
           status: data.status,
           created_at: data.created_at,
-        });
+        }, ...prev]);
       }
 
       setFormData(initialFormState);
@@ -183,9 +192,9 @@ export default function Voluntariado() {
     }
   };
 
-  const handleNovaInscricao = () => {
-    setMinhaCandidatura(null);
-  };
+  // Candidaturas ativas (não rejeitadas)
+  const candidaturasAtivas = minhasCandidaturas.filter(c => c.status !== "rejeitado");
+  const temCandidaturaAtiva = candidaturasAtivas.length > 0;
 
   if (authLoading || loadingCandidatura) {
     return (
@@ -204,50 +213,33 @@ export default function Voluntariado() {
         </p>
       </div>
 
-      {/* Se já tem candidatura ativa (não rejeitada), mostrar status */}
-      {minhaCandidatura && minhaCandidatura.status !== "rejeitado" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-          <MinhaInscricaoCard 
-            candidatura={minhaCandidatura} 
-            onNovaInscricao={handleNovaInscricao}
-          />
-          <Card>
-            <CardHeader>
-              <CardTitle>Próximos passos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {minhaCandidatura.status === "pendente" && (
-                <>
-                  <p>✓ Sua inscrição foi recebida</p>
-                  <p>⏳ Aguardando análise da liderança</p>
-                  <p>📞 Entraremos em contato em breve</p>
-                </>
-              )}
-              {minhaCandidatura.status === "em_analise" && (
-                <>
-                  <p>✓ Sua inscrição está sendo analisada</p>
-                  <p>⏳ A liderança verificará seu perfil</p>
-                  <p>📞 Você será contatado em breve</p>
-                </>
-              )}
-              {minhaCandidatura.status === "aprovado" && (
-                <>
-                  <p>🎉 Você foi aprovado!</p>
-                  <p>📞 A equipe entrará em contato</p>
-                  <p>📅 Você será incluído nas escalas</p>
-                </>
-              )}
-              {minhaCandidatura.status === "em_trilha" && (
-                <>
-                  <p>📚 Complete sua trilha de capacitação</p>
-                  <p>👉 Acesse "Meus Cursos" no menu</p>
-                  <p>✅ Após concluir, você será escalado</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
+      {/* Mostrar candidaturas ativas se existirem */}
+      {temCandidaturaAtiva && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Suas Candidaturas</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {candidaturasAtivas.map((candidatura) => (
+              <MinhaInscricaoCard 
+                key={candidatura.id}
+                candidatura={candidatura} 
+              />
+            ))}
+          </div>
+          
+          {ministeriosDisponiveis.length > 0 && (
+            <Card className="border-dashed">
+              <CardContent className="pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Você pode se candidatar a outros ministérios: {ministeriosDisponiveis.join(", ")}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      ) : (
+      )}
+
+      {/* Formulário - mostrar se ainda há ministérios disponíveis ou não está logado */}
+      {(ministeriosDisponiveis.length > 0 || !profile) && (
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
           <Card>
             <CardHeader>
@@ -312,13 +304,18 @@ export default function Voluntariado() {
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ministryOptions.map((option) => (
+                        {(profile ? ministeriosDisponiveis : ministryOptions).map((option) => (
                           <SelectItem key={option} value={option}>
                             {option}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {profile && ministeriosBloqueados.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Você já tem candidatura em: {ministeriosBloqueados.join(", ")}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

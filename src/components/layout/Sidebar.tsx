@@ -86,6 +86,7 @@ const MENU_GROUPS: MenuGroup[] = [
     items: [
       { title: "Chamada Rápida", url: "/chamada", icon: ClipboardCheck, permission: "ministerio.view" },
       { title: "Voluntariado", url: "/voluntariado", icon: HeartHandshake, permission: "ministerio.view" },
+      { title: "Candidatos", url: "/voluntariado/candidatos", icon: Users, permission: "ministerio.view" },
       { title: "Escalas (Gestão)", url: "/escalas", icon: CalendarDays, permission: "ministerio.view" },
       { title: "Agenda & Eventos", url: "/eventos", icon: CalendarDays, permission: "ministerio.view" },
       { title: "Kids", url: "/kids", icon: Baby, permission: "ministerio.view" },
