@@ -1196,6 +1196,8 @@ export type Database = {
           confirmado: boolean
           created_at: string
           data_confirmacao: string | null
+          data_hora_fim: string | null
+          data_hora_inicio: string | null
           evento_id: string
           id: string
           motivo_recusa: string | null
@@ -1212,6 +1214,8 @@ export type Database = {
           confirmado?: boolean
           created_at?: string
           data_confirmacao?: string | null
+          data_hora_fim?: string | null
+          data_hora_inicio?: string | null
           evento_id: string
           id?: string
           motivo_recusa?: string | null
@@ -1228,6 +1232,8 @@ export type Database = {
           confirmado?: boolean
           created_at?: string
           data_confirmacao?: string | null
+          data_hora_fim?: string | null
+          data_hora_inicio?: string | null
           evento_id?: string
           id?: string
           motivo_recusa?: string | null
