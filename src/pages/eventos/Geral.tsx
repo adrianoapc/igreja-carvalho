@@ -515,7 +515,7 @@ export default function EventosGeral() {
                 <div className="h-8 w-8 rounded-md bg-orange-100 text-orange-700 flex items-center justify-center mr-3 group-hover:scale-105 transition-transform">
                   <LayoutTemplate className="h-4 w-4" />
                 </div>{" "}
-                Templates de Culto
+                Templates de Evento
               </Button>
               <Button
                 variant="outline"

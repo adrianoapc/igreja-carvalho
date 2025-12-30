@@ -512,7 +512,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
               <SelectContent>
                 <SelectItem value="app">App</SelectItem>
                 <SelectItem value="redes_sociais">Redes Sociais</SelectItem>
-                <SelectItem value="telao">Telão do Culto</SelectItem>
+                <SelectItem value="telao">Telão do Evento</SelectItem>
                 <SelectItem value="site">Site</SelectItem>
               </SelectContent>
             </Select>

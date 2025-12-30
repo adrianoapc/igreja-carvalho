@@ -27,7 +27,7 @@ const ROUTE_LABELS: Record<string, string> = {
   // Ministério
   ministerio: "Ministério",
   escalas: "Escalas",
-  cultos: "Cultos",
+  cultos: "Eventos",
   kids: "Kids",
   ensino: "Ensino",
   midias: "Mídias",

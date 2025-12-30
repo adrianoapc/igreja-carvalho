@@ -115,7 +115,7 @@ export function SalvarLiturgiaTemplateDialog({
               <Label htmlFor="nome">Nome do Template *</Label>
               <Input
                 id="nome"
-                placeholder="Ex: Culto de Santa Ceia"
+                placeholder="Ex: Evento de Santa Ceia"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 autoFocus

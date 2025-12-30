@@ -5,7 +5,7 @@ import { Plus, UserCog, Users, Edit, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import PosicaoDialog from "@/components/cultos/PosicaoDialog";
+import PosicaoDialog from "@/components/eventos/PosicaoDialog";
 import {
   AlertDialog,
   AlertDialogAction,

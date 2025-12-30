@@ -191,7 +191,7 @@ export default function EscalasTabContent({ eventoId }: EscalasTabContentProps) 
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Users className="h-5 w-5" />
-          Escalas do Culto
+          Escalas do Evento
         </h3>
         <div className="flex items-center gap-4 text-sm flex-wrap">
           <div className="flex items-center gap-1">

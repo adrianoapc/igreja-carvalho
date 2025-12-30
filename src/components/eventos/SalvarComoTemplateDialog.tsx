@@ -177,7 +177,7 @@ export function SalvarComoTemplateDialog({
               id="nome"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Culto Dominical Padrão"
+              placeholder="Ex: Evento Dominical Padrão"
               required
             />
           </div>
