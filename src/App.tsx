@@ -35,8 +35,12 @@ const Chamada = lazy(() => import("./pages/Chamada"));
 const Escalas = lazy(() => import("./pages/Escalas"));
 const MinhasEscalas = lazy(() => import("./pages/MinhasEscalas"));
 const Voluntariado = lazy(() => import("./pages/Voluntariado"));
-const VoluntariadoCandidatos = lazy(() => import("./pages/voluntariado/Candidatos"));
-const VoluntariadoHistorico = lazy(() => import("./pages/voluntariado/Historico"));
+const VoluntariadoCandidatos = lazy(
+  () => import("./pages/voluntariado/Candidatos")
+);
+const VoluntariadoHistorico = lazy(
+  () => import("./pages/voluntariado/Historico")
+);
 const Publicacao = lazy(() => import("./pages/Publicacao"));
 const Comunicados = lazy(() => import("./pages/Comunicados"));
 const Announcements = lazy(() => import("./pages/Announcements"));
@@ -70,12 +74,16 @@ const AtendimentoProntuario = lazy(
 
 // Intercessão
 const Intercessao = lazy(() => import("./pages/Intercessao"));
-const MeuHub = lazy(() => import("./pages/intercessao/MeuHub"));
-const GestaoIntercessao = lazy(
-  () => import("./pages/intercessao/GestaoIntercessao")
+const DiarioDeOracao = lazy(
+  () => import("./pages/intercessao/pessoal/DiarioDeOracao")
 );
-const Intercessores = lazy(() => import("./pages/intercessao/Intercessores"));
-const Sentimentos = lazy(() => import("./pages/intercessao/Sentimentos"));
+const SalaDeGuerra = lazy(
+  () => import("./pages/intercessao/ministerio/SalaDeGuerra")
+);
+const GestaoEquipes = lazy(
+  () => import("./pages/intercessao/admin/GestaoEquipes")
+);
+const Sentimentos = lazy(() => import("./pages/intercessao/admin/Sentimentos"));
 
 // Ministério Kids
 const KidsDashboard = lazy(() => import("./pages/kids/Dashboard"));
@@ -427,26 +435,26 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/intercessao/meu-hub"
+                  path="/intercessao/diario"
                   element={
                     <AuthGate>
-                      <MeuHub />
+                      <DiarioDeOracao />
                     </AuthGate>
                   }
                 />
                 <Route
-                  path="/intercessao/gestao"
+                  path="/intercessao/sala-de-guerra"
                   element={
                     <AuthGate>
-                      <GestaoIntercessao />
+                      <SalaDeGuerra />
                     </AuthGate>
                   }
                 />
                 <Route
-                  path="/intercessao/intercessores"
+                  path="/intercessao/equipes"
                   element={
                     <AuthGate>
-                      <Intercessores />
+                      <GestaoEquipes />
                     </AuthGate>
                   }
                 />

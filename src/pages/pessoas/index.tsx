@@ -104,9 +104,10 @@ export default function Pessoas() {
         // Buscar pessoas que aceitaram Jesus recentemente
         const { data: aceitaram } = await supabase
           .from("profiles")
-          .select("id, nome, avatar_url, telefone, email, sexo, data_primeira_visita, status")
+          .select("id, nome, avatar_url, telefone, email, sexo, data_conversao, status")
           .eq("aceitou_jesus", true)
-          .order("data_primeira_visita", { ascending: false })
+          .not("data_conversao", "is", null)
+          .order("data_conversao", { ascending: false })
           .limit(5);
 
         setAceitaramJesus(aceitaram || []);

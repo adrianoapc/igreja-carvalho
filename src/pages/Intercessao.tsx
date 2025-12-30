@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Users, Heart, ArrowRight, Plus, Clock } from "lucide-react";
+import { MessageCircle, Users, Heart, ArrowRight, Plus, Clock, MessageSquareHeart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,10 +52,10 @@ export default function Intercessao() {
 
   const modules = [
     {
-      title: "Pedidos de Oração",
-      description: "Gerencie e acompanhe os pedidos de oração da igreja",
-      icon: MessageCircle,
-      path: "/intercessao/pedidos",
+      title: "Diário de Oração",
+      description: "Seus pedidos de oração e testemunhos pessoais",
+      icon: Heart,
+      path: "/intercessao/diario",
       stats: [
         { label: "Pendentes", value: stats.pedidosPendentes, color: "text-accent-foreground" },
         { label: "Em Oração", value: stats.pedidosEmOracao, color: "text-primary" },
@@ -64,10 +64,10 @@ export default function Intercessao() {
       iconColor: "text-primary",
     },
     {
-      title: "Intercessores",
-      description: "Gerencie a equipe de intercessão e distribuição de pedidos",
-      icon: Users,
-      path: "/intercessao/intercessores",
+      title: "Sala de Guerra",
+      description: "Área de trabalho dos intercessores - ore pela comunidade",
+      icon: MessageSquareHeart,
+      path: "/intercessao/sala-de-guerra",
       stats: [
         { label: "Ativos", value: stats.intercessoresAtivos, color: "text-green-600" },
       ],
@@ -75,12 +75,12 @@ export default function Intercessao() {
       iconColor: "text-green-600",
     },
     {
-      title: "Testemunhos",
-      description: "Compartilhe e gerencie testemunhos de fé e milagres",
-      icon: Heart,
-      path: "/intercessao/testemunhos",
+      title: "Gestão de Equipes",
+      description: "Configure intercessores e escalas de oração",
+      icon: Users,
+      path: "/intercessao/equipes",
       stats: [
-        { label: "Pendentes", value: stats.testemunhosPendentes, color: "text-accent-foreground" },
+        { label: "Testemunhos", value: stats.testemunhosPendentes, color: "text-accent-foreground" },
       ],
       color: "bg-accent/10",
       iconColor: "text-accent-foreground",
