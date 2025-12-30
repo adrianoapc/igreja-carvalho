@@ -32,7 +32,8 @@ import {
   CalendarCheck,
   Megaphone,
   MonitorPlay,
-  Share2
+  Share2,
+  Route
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 import { usePermissions, Permission } from "@/hooks/usePermissions";
@@ -60,6 +61,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Minha Família", url: "/perfil/familia", icon: Home },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },
       { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
+      { title: "Jornadas", url: "/jornadas", icon: Route },
     ],
   },
   {
