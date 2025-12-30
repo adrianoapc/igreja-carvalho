@@ -28,6 +28,7 @@ import {
   User,
   LayoutTemplate,
   Plus,
+  Send,
 } from "lucide-react";
 import { format, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -228,7 +229,7 @@ export default function EventosGeral() {
                       </div>
                       {sentinelaAtual && (
                         <span className="text-xs font-medium opacity-80">
-                          até {sentinelaAtual.horario}
+                          até {sentinelaAtual.ate}
                         </span>
                       )}
                     </div>
@@ -240,16 +241,35 @@ export default function EventosGeral() {
                     <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-0.5">
                       Próximo
                     </p>
-                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 truncate max-w-[120px]">
-                      {proximoSentinela ? proximoSentinela.nome : "—"}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 truncate max-w-[120px]">
+                        {proximoSentinela ? proximoSentinela.nome : "—"}
+                      </p>
+                      {proximoSentinela && (
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          às {proximoSentinela.inicio}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <Button
-                    className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all hover:scale-105"
-                    onClick={() => navigate(`/eventos/${relogioId}`)}
-                  >
-                    Ver Grade
-                  </Button>
+                  <div className="flex gap-2">
+                    {sentinelaAtual && (
+                      <Button
+                        variant="outline"
+                        className="w-full md:w-auto border-blue-500 text-blue-700 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-950"
+                        onClick={() => navigate(`/oracao/player/${sentinelaAtual.escalaId}`)}
+                      >
+                        <Flame className="h-4 w-4 mr-2" />
+                        Abrir Player
+                      </Button>
+                    )}
+                    <Button
+                      className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all hover:scale-105"
+                      onClick={() => navigate(`/eventos/${relogioId}?tab=escalas`)}
+                    >
+                      Ver Grade
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -309,9 +329,25 @@ export default function EventosGeral() {
                   <Button
                     variant="outline"
                     className="gap-2 h-10 px-6 border-primary/20 hover:border-primary/50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/eventos/${nextEvent.id}?tab=escalas`);
+                    }}
                   >
                     <Users className="h-4 w-4" /> Ver Escala
                   </Button>
+                  {nextEvent.tipo === "EVENTO" && (
+                    <Button
+                      variant="outline"
+                      className="gap-2 h-10 px-6 border-blue-500/20 hover:border-blue-500/50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/eventos/${nextEvent.id}?tab=convites`);
+                      }}
+                    >
+                      <Send className="h-4 w-4" /> Gerenciar Convites
+                    </Button>
+                  )}
                   <Button className="gap-2 h-10 px-6 shadow-sm group-hover:bg-primary/90">
                     Gerenciar Detalhes{" "}
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />

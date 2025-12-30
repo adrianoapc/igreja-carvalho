@@ -119,6 +119,9 @@ const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
 const Projetos = lazy(() => import("./pages/Projetos"));
 const ProjetoDetalhes = lazy(() => import("./pages/ProjetoDetalhes"));
 
+// Oração
+const PrayerPlayer = lazy(() => import("./pages/oracao/Player"));
+
 // Admin
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminPermissions = lazy(() => import("./pages/AdminPermissions"));
@@ -656,6 +659,16 @@ const App = () => (
                   element={
                     <AuthGate>
                       <MinhasEscalas />
+                    </AuthGate>
+                  }
+                />
+
+                {/* Oração */}
+                <Route
+                  path="/oracao/player/:escalaId"
+                  element={
+                    <AuthGate>
+                      <PrayerPlayer />
                     </AuthGate>
                   }
                 />

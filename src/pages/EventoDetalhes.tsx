@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import LiturgiaTab from "@/components/eventos/tabs/LiturgiaTab";
 import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
 import MusicaTabContent from "@/components/cultos/MusicaTabContent";
 import EscalasTabContent from "@/components/cultos/EscalasTabContent";
@@ -106,12 +107,14 @@ const TIPO_LABELS: Record<string, string> = {
 export default function EventoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [evento, setEvento] = useState<Evento | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notificando, setNotificando] = useState(false);
   const [escalasCount, setEscalasCount] = useState(0);
   const [liturgiaCount, setLiturgiaCount] = useState(0);
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "visao-geral");
 
   // Form state
   const [tema, setTema] = useState("");
@@ -256,8 +259,9 @@ export default function EventoDetalhes() {
 
   const dataEvento = new Date(evento.data_evento);
   const statusConfig = STATUS_CONFIG[evento.status] || STATUS_CONFIG.planejado;
-  const mostrarLiturgia = evento.tipo === "CULTO";
+  const mostrarLiturgia = evento.tipo === "CULTO" || evento.tipo === "RELOGIO";
   const mostrarMusica = evento.tipo === "CULTO";
+  const mostrarConvites = evento.tipo === "EVENTO";
 
   return (
     <div className="space-y-6">
@@ -359,40 +363,61 @@ export default function EventoDetalhes() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="visao-geral" className="w-full">
-        <TabsList
-          className={`grid w-full max-w-2xl ${
-            mostrarLiturgia ? "grid-cols-6" : "grid-cols-4"
-          }`}
-        >
-          <TabsTrigger value="visao-geral" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent flex-wrap">
+          <TabsTrigger 
+            value="visao-geral" 
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+          >
+            <Eye className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Visão Geral</span>
           </TabsTrigger>
+          
           {mostrarLiturgia && (
-            <TabsTrigger value="liturgia" className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Liturgia</span>
+            <TabsTrigger 
+              value="liturgia"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+            >
+              <ClipboardList className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Liturgia & Roteiro</span>
             </TabsTrigger>
           )}
+          
           {mostrarMusica && (
-            <TabsTrigger value="musica" className="flex items-center gap-2">
-              <ListMusic className="h-4 w-4" />
+            <TabsTrigger 
+              value="musica"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+            >
+              <ListMusic className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Música</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="escalas" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
+          
+          <TabsTrigger 
+            value="escalas"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+          >
+            <Users className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Escalas</span>
           </TabsTrigger>
-          <TabsTrigger value="checkin" className="flex items-center gap-2">
-            <QrCode className="h-4 w-4" />
+          
+          <TabsTrigger 
+            value="checkin"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+          >
+            <QrCode className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Check-in</span>
           </TabsTrigger>
-          <TabsTrigger value="convites" className="flex items-center gap-2">
-            <Send className="h-4 w-4" />
-            <span className="hidden sm:inline">Convites</span>
-          </TabsTrigger>
+          
+          {mostrarConvites && (
+            <TabsTrigger 
+              value="convites"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Convites</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Tab: Visão Geral */}
@@ -524,7 +549,7 @@ export default function EventoDetalhes() {
         {/* Tab: Liturgia (apenas CULTO) */}
         {mostrarLiturgia && (
           <TabsContent value="liturgia" className="mt-6">
-            <LiturgiaTabContent eventoId={id!} />
+            <LiturgiaTab eventoId={id!} />
           </TabsContent>
         )}
 
@@ -559,9 +584,11 @@ export default function EventoDetalhes() {
         </TabsContent>
 
         {/* Tab: Convites */}
-        <TabsContent value="convites" className="mt-6">
-          <ConvitesTabContent eventoId={evento.id} />
-        </TabsContent>
+        {mostrarConvites && (
+          <TabsContent value="convites" className="mt-6">
+            <ConvitesTabContent eventoId={evento.id} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

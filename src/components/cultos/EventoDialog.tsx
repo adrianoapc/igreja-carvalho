@@ -199,7 +199,7 @@ export default function EventoDialog({
         const duracao = evento.duracao_minutos || 120;
         const dataFimCalculada = addMinutes(dataInicio, duracao);
         const deveUsarDataFim =
-          evento.tipo === "RELOGIO" || evento.tipo === "EVENTO";
+          evento.tipo === "RELOGIO" || evento.tipo === "EVENTO" || evento.tipo === "TAREFA";
 
         form.reset({
           tipo: evento.tipo,
@@ -482,7 +482,7 @@ export default function EventoDialog({
                   <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
                     Data e Horário
                   </Label>
-                  {!isRelogio && (
+                  {!isRelogio && !isTarefa && !isEventoGeral && (
                     <Button
                       type="button"
                       variant="link"

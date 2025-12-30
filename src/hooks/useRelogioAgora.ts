@@ -7,6 +7,7 @@ interface Sentinela {
   nome: string;
   foto: string | null;
   ate: string;
+  escalaId: string;
 }
 
 interface ProximoSentinela {
@@ -25,6 +26,7 @@ interface RelogioAgoraData {
   sentinelaAtual: Sentinela | null;
   proximoSentinela: ProximoSentinela | null;
   loading: boolean;
+  eventoId?: string;
 }
 
 export function useRelogioAgora(): RelogioAgoraData {
@@ -127,6 +129,7 @@ export function useRelogioAgora(): RelogioAgoraData {
               ate: format(new Date(sentinelaAtual.data_hora_fim), "HH:mm", {
                 locale: ptBR,
               }),
+              escalaId: sentinelaAtual.id,
             }
           : null,
         proximoSentinela: proximoSentinela
@@ -151,5 +154,6 @@ export function useRelogioAgora(): RelogioAgoraData {
     sentinelaAtual: data?.sentinelaAtual || null,
     proximoSentinela: data?.proximoSentinela || null,
     loading: isLoading,
+    eventoId: data?.evento?.id,
   };
 }
