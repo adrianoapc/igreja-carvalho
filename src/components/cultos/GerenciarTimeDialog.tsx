@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { avaliarTriagemVoluntario, getRegraMinisterio, type TriagemResultado } from "@/lib/voluntariado/triagem";
 
 interface Time {
   id: string;
@@ -70,6 +71,16 @@ interface ConflictInfo {
   culto_data?: string;
 }
 
+interface PendenciaTrilha {
+  id: string;
+  pessoa_id: string;
+  concluido: boolean | null;
+  profiles: {
+    nome: string;
+    email: string | null;
+  };
+}
+
 interface GerenciarTimeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -93,6 +104,10 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
   const [checkingConflict, setCheckingConflict] = useState(false);
   const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
   const [showConflictWarning, setShowConflictWarning] = useState(false);
+  const [triagemAtual, setTriagemAtual] = useState<TriagemResultado | null>(null);
+  const [inscricaoTrilha, setInscricaoTrilha] = useState<{ id: string; concluido: boolean | null } | null>(null);
+  const [pendenciasTrilha, setPendenciasTrilha] = useState<PendenciaTrilha[]>([]);
+  const [carregandoPendencias, setCarregandoPendencias] = useState(false);
 
   useEffect(() => {
     if (open && time) {
@@ -138,6 +153,7 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
       if (error) throw error;
       setMembros(data || []);
+      await loadPendenciasTrilha(data || []);
     } catch (error: unknown) {
       toast.error("Erro ao carregar membros", {
         description: error instanceof Error ? error.message : String(error)
@@ -245,6 +261,75 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
     }
   };
 
+  const buscarJornadaIdPorTitulo = async (titulo: string) => {
+    const { data, error } = await supabase
+      .from("jornadas")
+      .select("id")
+      .eq("titulo", titulo)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.id || null;
+  };
+
+  const carregarInscricaoTrilha = async (pessoaId: string, trilhaTitulo: string) => {
+    try {
+      const jornadaId = await buscarJornadaIdPorTitulo(trilhaTitulo);
+      if (!jornadaId) {
+        setInscricaoTrilha(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("inscricoes_jornada")
+        .select("id, concluido")
+        .eq("pessoa_id", pessoaId)
+        .eq("jornada_id", jornadaId)
+        .maybeSingle();
+
+      if (error) throw error;
+      setInscricaoTrilha(data ? { id: data.id, concluido: data.concluido } : null);
+    } catch (error: unknown) {
+      console.error("Erro ao carregar inscrição da trilha:", error);
+      setInscricaoTrilha(null);
+    }
+  };
+
+  const loadPendenciasTrilha = async (membrosAtuais: MembroTime[]) => {
+    if (!time) return;
+
+    const regra = getRegraMinisterio({ nome: time.nome, categoria: time.categoria });
+    if (!regra) {
+      setPendenciasTrilha([]);
+      return;
+    }
+
+    setCarregandoPendencias(true);
+    try {
+      const jornadaId = await buscarJornadaIdPorTitulo(regra.trilhaTitulo);
+      if (!jornadaId) {
+        setPendenciasTrilha([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("inscricoes_jornada")
+        .select("id, pessoa_id, concluido, profiles:pessoa_id(nome, email)")
+        .eq("jornada_id", jornadaId);
+
+      if (error) throw error;
+
+      const membrosIds = new Set(membrosAtuais.map((membro) => membro.pessoa_id));
+      const pendencias = (data || []).filter((inscricao) => !membrosIds.has(inscricao.pessoa_id));
+      setPendenciasTrilha(pendencias as PendenciaTrilha[]);
+    } catch (error: unknown) {
+      console.error("Erro ao carregar pendências de trilha:", error);
+      setPendenciasTrilha([]);
+    } finally {
+      setCarregandoPendencias(false);
+    }
+  };
+
   const checkConflito = async (pessoaId: string, cultoData: string) => {
     if (!pessoaId || !cultoData) return;
 
@@ -278,6 +363,21 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
     setPessoaSelecionada(pessoaId);
     setConflictInfo(null);
     setShowConflictWarning(false);
+    setInscricaoTrilha(null);
+
+    if (time) {
+      const pessoa = pessoas.find((item) => item.id === pessoaId);
+      if (pessoa) {
+        const triagem = avaliarTriagemVoluntario(pessoa.status, {
+          nome: time.nome,
+          categoria: time.categoria,
+        });
+        setTriagemAtual(triagem);
+        if (triagem.trilhaTitulo) {
+          await carregarInscricaoTrilha(pessoaId, triagem.trilhaTitulo);
+        }
+      }
+    }
 
     // Buscar próximo culto para verificar conflito
     const { data: proximoCulto } = await supabase
@@ -309,6 +409,63 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
     setLoading(true);
     try {
+      const pessoa = pessoas.find((item) => item.id === pessoaSelecionada);
+      const triagem = pessoa && time
+        ? avaliarTriagemVoluntario(pessoa.status, { nome: time.nome, categoria: time.categoria })
+        : null;
+
+      if (triagem?.status === "em_trilha") {
+        if (!triagem.trilhaTitulo) {
+          toast.error("Trilha obrigatória não encontrada para este ministério.");
+          return;
+        }
+
+        const jornadaId = await buscarJornadaIdPorTitulo(triagem.trilhaTitulo);
+        if (!jornadaId) {
+          toast.error("Trilha não encontrada. Verifique o cadastro de jornadas.");
+          return;
+        }
+
+        const { data: inscricaoExistente, error: inscricaoErro } = await supabase
+          .from("inscricoes_jornada")
+          .select("id, concluido")
+          .eq("pessoa_id", pessoaSelecionada)
+          .eq("jornada_id", jornadaId)
+          .maybeSingle();
+
+        if (inscricaoErro) throw inscricaoErro;
+
+        if (inscricaoExistente?.concluido) {
+          // Trilha concluída, pode aprovar direto no time.
+        } else {
+          if (!inscricaoExistente) {
+            const { error: insertErro } = await supabase
+              .from("inscricoes_jornada")
+              .insert({
+                jornada_id: jornadaId,
+                pessoa_id: pessoaSelecionada,
+                data_entrada: new Date().toISOString(),
+                concluido: false,
+              });
+
+            if (insertErro) throw insertErro;
+          }
+
+          toast.success("Pendência de trilha criada!", {
+            description: `Trilha: ${triagem.trilhaTitulo}`,
+          });
+          setPessoaSelecionada("");
+          setPosicaoSelecionada("");
+          setShowAddMembro(false);
+          setConflictInfo(null);
+          setShowConflictWarning(false);
+          setTriagemAtual(null);
+          setInscricaoTrilha(null);
+          await loadMembros();
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from("membros_time")
         .insert({
@@ -327,6 +484,8 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
       setShowAddMembro(false);
       setConflictInfo(null);
       setShowConflictWarning(false);
+      setTriagemAtual(null);
+      setInscricaoTrilha(null);
       loadMembros();
     } catch (error: unknown) {
       const pgError = error as { code?: string };
@@ -370,6 +529,22 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
     p.nome.toLowerCase().includes(buscaPessoa.toLowerCase()) ||
     p.email?.toLowerCase().includes(buscaPessoa.toLowerCase())
   );
+
+  const statusTriagemLabel = () => {
+    if (!triagemAtual) return null;
+    if (triagemAtual.status === "aprovado") return "Aprovado";
+    if (inscricaoTrilha?.concluido) return "Aprovado";
+    return "Em trilha";
+  };
+
+  const statusTriagemBadge = () => {
+    const status = statusTriagemLabel();
+    if (!status) return null;
+    if (status === "Aprovado") {
+      return <Badge className="bg-green-500/20 text-green-700 border-green-500/30">{status}</Badge>;
+    }
+    return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700 border-yellow-500/30">{status}</Badge>;
+  };
 
   if (!time) return null;
 
@@ -539,6 +714,8 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                           setPessoaSelecionada("");
                           setPosicaoSelecionada("");
                           setBuscaPessoa("");
+                          setTriagemAtual(null);
+                          setInscricaoTrilha(null);
                         }}
                       >
                         <X className="w-4 h-4" />
@@ -609,6 +786,30 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                       </Alert>
                     )}
 
+                    {triagemAtual && (
+                      <Alert>
+                        {statusTriagemLabel() === "Aprovado" ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                          <Clock className="h-4 w-4" />
+                        )}
+                        <AlertDescription className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">Status da inscrição:</span>
+                            {statusTriagemBadge()}
+                          </div>
+                          {triagemAtual.motivo && (
+                            <p className="text-sm text-muted-foreground">{triagemAtual.motivo}</p>
+                          )}
+                          {triagemAtual.trilhaTitulo && (
+                            <p className="text-sm">
+                              Trilha indicada: <span className="font-semibold">{triagemAtual.trilhaTitulo}</span>
+                            </p>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
                     <div className="space-y-2">
                       <Label htmlFor="posicao-membro">Posição (opcional)</Label>
                       <select
@@ -630,7 +831,11 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                       disabled={!pessoaSelecionada || loading || checkingConflict}
                       className="w-full bg-gradient-primary"
                     >
-                      {showConflictWarning ? "Adicionar Mesmo Assim" : "Adicionar ao Time"}
+                      {statusTriagemLabel() === "Em trilha"
+                        ? "Criar pendência de trilha"
+                        : showConflictWarning
+                          ? "Adicionar Mesmo Assim"
+                          : "Adicionar ao Time"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -639,6 +844,38 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
               {/* Lista de Membros */}
               <ScrollArea className="flex-1">
                 <div className="space-y-2">
+                  {pendenciasTrilha.length > 0 && (
+                    <Card className="border-dashed">
+                      <CardHeader className="p-4">
+                        <CardTitle className="text-base">Pendências de Trilha</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 space-y-2">
+                        {carregandoPendencias && (
+                          <p className="text-sm text-muted-foreground">Carregando pendências...</p>
+                        )}
+                        {pendenciasTrilha.map((pendencia) => (
+                          <div key={pendencia.id} className="flex items-center justify-between gap-3 border rounded-md p-3">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm">{pendencia.profiles.nome}</p>
+                              {pendencia.profiles.email && (
+                                <p className="text-xs text-muted-foreground">{pendencia.profiles.email}</p>
+                              )}
+                            </div>
+                            <Badge
+                              variant={pendencia.concluido ? "default" : "secondary"}
+                              className={
+                                pendencia.concluido
+                                  ? "bg-green-500/20 text-green-700 border-green-500/30"
+                                  : "bg-yellow-500/20 text-yellow-700 border-yellow-500/30"
+                              }
+                            >
+                              {pendencia.concluido ? "Aprovado" : "Em trilha"}
+                            </Badge>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
                   {membros.map((membro) => (
                     <Card key={membro.id}>
                       <CardContent className="p-4">
@@ -651,6 +888,9 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
                                   {membro.posicoes_time.nome}
                                 </Badge>
                               )}
+                              <Badge className="bg-green-500/20 text-green-700 border-green-500/30">
+                                Aprovado
+                              </Badge>
                             </div>
                             {membro.profiles.email && (
                               <p className="text-sm text-muted-foreground mt-1">
