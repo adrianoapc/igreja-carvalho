@@ -8,9 +8,73 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Adicionado
+
+#### 🙏 Relógio de Oração — Blocos Inteligentes e Player Dinâmico (30 de Dez/2025)
+
+- **Blocos Inteligentes na Liturgia**: Novo tipo de conteúdo `BLOCO_*` (TESTEMUNHO, SENTIMENTO, VISITANTE, PEDIDOS) na tabela `liturgias`; campo `tipo_conteudo` aceita 14 tipos (migration aplicada); componente `LiturgiaItemDialog` categoriza tipos em "Manuais/Estáticos" vs "Automáticos (Inteligência)" com badges visuais (emojis 🎬📖🙏👋); info card explica que blocos automáticos são preenchidos pela Edge Function
+- **Player de Oração com Conteúdo Dinâmico**: `Player.tsx` integra hook `useLiturgiaInteligente` que consome Edge Function `playlist-oracao`; recebe `slides` prontos quando `evento_id` fornecido; renderiza 3 novos tipos de slide customizados (CUSTOM_TESTEMUNHO com Quote, CUSTOM_SENTIMENTO com AlertCircle, CUSTOM_VISITANTES via componente `VisitantesSlide`); pedidos exibem botão "Orei" (Heart → ThumbsUp) que persiste status `em_oracao` no banco; carrega histórico de pedidos orados ao montar
+- **Edge Function Expandida**: `playlist-oracao` agora aceita `evento_id` no body; busca liturgia do evento, monta array de slides combinando itens manuais + 5 blocos inteligentes (testemunhos, alerta espiritual, visitantes, broadcast, pessoais); retorna campo `slides` completo; logs detalhados de cada etapa
+- **Componentes Novos**: `VisitantesSlide` renderiza cards de visitantes com avatars circulares, badges de "Primeira Visita", versículo Atos 2:47 e animações slide-in; `useLiturgiaInteligente` hook React com estado loading/error, mapeia resposta da Edge Function e expõe método `refetch()`
+- **Validação Client-Side**: `LiturgiaItemDialog` valida tipos aceitos antes de INSERT, exibe toast com erro descritivo se constraint não foi aplicada
+
+**Impacto no usuário:** Líderes criam liturgias com blocos automáticos (gratidão, clamor, vidas, intercessão) que são preenchidos em tempo real pela IA durante o Relógio de Oração; intercessores veem conteúdo dinâmico no Player (testemunhos recentes, visitantes da semana, pedidos urgentes) e marcam orações feitas com feedback visual; Edge Function orquestra montagem de slides sem lógica duplicada no frontend.  
+**Módulos afetados:** Oração (Player, LiturgiaInteligente), Eventos (LiturgiaItemDialog), Automações (playlist-oracao)  
+**Arquivos alterados:** `Player.tsx` (+300 linhas), `LiturgiaItemDialog.tsx` (+150 linhas), `playlist-oracao/index.ts` (+100 linhas), `VisitantesSlide.tsx` (novo), `useLiturgiaInteligente.ts` (novo)  
+**Migrations:** `20251230000000_add_blocos_inteligentes.sql` (DROP/ADD constraint com 14 tipos, índice evento_id + tipo_conteudo)  
+**Arquivos de Suporte:** `APLICAR_MIGRATION_BLOCOS.sql` (script Dashboard-ready), `README_MIGRATION.md` (guia passo-a-passo)
+
+#### 📅 Relógio de Oração — Timeline Visual de Turnos de 24h (29 de Dez/2025)
+
+- **Componente EscalaTimeline**: Grid visual de 24 horas com cards de voluntários; DatePicker para navegar entre dias do RELOGIO; slots coloridos (verde=confirmado, amarelo=pendente, cinza=vazio, azul=hora atual); ícones de status visual
+- **Ações por Slot**: Menu dropdown com opções Editar, Duplicar para Amanhã, Remover; integração com `EscalaSlotDialog` para editar voluntário + horário individual
+- **Hook useRelogioAgora**: Retorna dados do Relógio de Oração ativo no momento (id, titulo, data/hora início/fim, evento_id) para navegação direta ao Player; permite acesso rápido a turnos em andamento
+- **Integration com EventoDetalhes**: Quando tipo = RELOGIO, exibe Timeline em lugar da tab de Escalas tradicional; mantém compatibilidade com CULTO (usa EscalasTabContent original)
+
+**Impacto no usuário:** Líderes veem visualmente quais turnos estão vazios/confirmados/pendentes em um Relógio de Oração; podem ajustar voluntários rapidamente por turno horário; navegação instantânea para Player do turno em andamento.  
+**Módulos afetados:** Escalas, Eventos (RELOGIO)  
+**Arquivos criados:** `EscalaTimeline.tsx` (+374 linhas), `EscalaSlotDialog.tsx` (+200 linhas), `useRelogioAgora.ts` (novo hook, +139 linhas)  
+**Arquivos modificados:** `EventoDetalhes.tsx` (conditional rendering), `Eventos.tsx` (refactor +547 linhas), `Geral.tsx` (dashboard +697 linhas)
+
+#### 🔄 Escalas com Recorrência — None/Daily/Weekly/Custom (29 de Dez/2025)
+
+- **Componente AdicionarVoluntarioSheet**: Sheet (não dialog) para adição de voluntários com recorrência; combobox com busca em tempo real de nomes; seleção de horário (início/fim com defaults do slot clicado)
+- **4 Tipos de Recorrência**:
+  - `None`: Atribuição única (apenas a data selecionada)
+  - `Daily`: Repete todos os dias até o fim do evento (RELOGIO = 7 dias, CULTO = duração do evento)
+  - `Weekly`: Repete mesmo dia da semana em intervalos de 7 dias
+  - `Custom`: Checkbox por dia da semana (ex: Seg + Qua apenas)
+- **Cálculo Frontend**: Gera array de datas futuras baseado na recorrência; exibe preview com contagem e lista de datas em card azul
+- **Detecção de Conflitos**: Verifica se voluntário já tem escalas naquelas datas; exibe aviso com conflitos encontrados; bloqueia inserção se houver conflitos
+- **Batch Insert**: Cria array de objetos escalas com timestamps corretos; insere tudo de uma vez via Supabase `.insert(array)`; exibe toast com total de slots criados
+
+**Impacto no usuário:** Escaladores não precisam adicionar manualmente o mesmo voluntário em múltiplos turnos; definem recorrência uma vez e o sistema popula todos os turnos automaticamente; conflitos são detectados proativamente.  
+**Módulos afetados:** Escalas, Voluntariado  
+**Arquivos criados:** `AdicionarVoluntarioSheet.tsx` (+504 linhas)  
+**Bundle impact:** EventoDetalhes 88.67kB → 110.09kB (+21.42kB para novas features)
+
+#### 👥 Eventos — Gestão de Convites e Tabs Condicionais (29 de Dez/2025)
+
+- **ConvitesPendentesWidget**: Widget no dashboard mostrando convites pendentes de aceitação; vinculado a eventos específicos; ações rápidas (Aceitar/Recusar)
+- **ConvitesTabContent & EnviarConvitesDialog**: Nova tab em EventoDetalhes para gerenciar convites; seleção em massa de pessoas; envio de convites com template customizável; rastreamento de status (pendente, aceito, recusado)
+- **Tab Condicionais por Tipo**:
+  - CULTO: tabs Liturgia, Músicas, Escalas, Check-in
+  - RELOGIO: tabs Turnos (Timeline), Escalas, Check-in
+  - TAREFA: tabs Checklist, Escalas
+  - EVENTO: tabs Visão Geral, Convites, Escalas, Check-in
+- **Parameter de Tab**: EventoDetalhes aceita parâmetro de query `tab` para abrir aba específica diretamente (ex: `/evento/123?tab=liturgia`)
+
+**Impacto no usuário:** Organizadores gerenciam convites centralizadamente; interface adapta-se ao tipo de evento mostrando apenas abas relevantes; navegação direta para tab específica via URL.  
+**Módulos afetados:** Eventos, Escalas  
+**Arquivos criados:** `ConvitesPendentesWidget.tsx` (+226 linhas), `ConvitesTabContent.tsx` (+269 linhas), `EnviarConvitesDialog.tsx` (+314 linhas), `LiturgiaTab.tsx` (wrapper, +9 linhas)  
+**Arquivos modificados:** `EventoDetalhes.tsx` (+81 linhas refactor), `Eventos.tsx` refactor
+
+---
+
 ### Refactor
 
 #### 🔄 Migração cultos → eventos — Polimorfismo por Tipos (28 de Dez/2025)
+
 - **Rename database**: Tabela `cultos` renomeada para `eventos`; colunas `culto_id` → `evento_id` em 8 tabelas satélites (escalas, kids_checkins, liturgias, cancoes, etc.); FKs atualizadas com novos nomes
 - **Enum evento_tipo**: Criado tipo `CULTO | RELOGIO | TAREFA | EVENTO | OUTRO` para suportar múltiplos tipos de agendamentos
 - **Tabela evento_subtipos**: Categorização adicional com tipo_pai (FK para enum), permitindo subtipos personalizados (ex: "Culto de Celebração", "Vigília 24h", "Reunião de Conselho")
@@ -28,6 +92,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Adicionado
 
 #### 🔐 Gestão de Permissões — Controles Avançados (26 de Dez/2025)
+
 - **Controles tri-state em massa**: Headers do accordion de módulos agora exibem células individuais por cargo com indicadores visuais (✅ todas ativas, ➖ parcial, ⭕ nenhuma); click alterna entre ativar/desativar todas as permissões do módulo para aquele cargo
 - **Clonagem de permissões**: Botão Copy no cabeçalho de cada cargo abre dropdown para selecionar cargo de origem; função `handleCloneRole` calcula diff baseado em estado efetivo (inclui `pendingChanges`), sincroniza totalmente (adiciona/remove) para deixar Target idêntico ao Source via batch update
 - **Dialog de confirmação com diff visual**: Botão "Salvar Alterações" interceptado por `handlePreSave` → abre modal com resumo agrupado por cargo; exibe adições (verde ✅) e remoções (vermelhas ❌) com lookup de nomes; lista scrollável (max-h-60vh); botões Cancelar/Confirmar; execução real movida para `executeSave`
@@ -40,6 +105,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🔐 Gestão de Permissões — Rollback de Transações (27 de Dez/2025)
+
 - **Histórico de Permissões**: Nova aba "Histórico" em AdminPermissions exibe timeline de todas as alterações agrupadas por transação (request_id), mostrando:
   - Data/hora e usuário autor da mudança
   - Ações agrupadas: adições (verde ✅ com ícone Plus) e remoções (vermelho ❌ com ícone Trash2)
@@ -57,9 +123,8 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
-
-
 #### 💰 UX Financeiro — Correções de Navegação (26 de Dez/2025)
+
 - **Fix navegação Categorias**: Tela dentro de Configurações agora retorna corretamente para `/configuracoes` via prop `onBack`, corrigindo redirecionamento incorreto para `/financas`
 - **Melhorias em ContasManutencao**: Adiciona filtro `.not('conta_id', 'is', null)` na query de transações; tratamento de erro `transacoesError` com toast; validação `if (t.conta_id)` antes de processar
 - **Remoção campo obsoleto**: Remove exibição de `saldo_atual` de ContasManutencao (cálculo deve vir de transações agregadas)
@@ -72,6 +137,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 📱 FASE 1: Mobile UX Refactor — Safe Areas e iOS (25-26 de Dez/2025)
+
 - **Infraestrutura CSS mobile**: Variáveis `--safe-area-inset-*` aplicadas em `MainLayout` (header/wrapper com padding seguro); `font-size: 16px` em inputs/selects mobile para evitar zoom automático no iOS
 - **ResponsiveDialog base**: Novo componente `src/components/ui/responsive-dialog.tsx` que renderiza Dialog (desktop) ou Drawer (mobile) baseado em `useMediaQuery`; migração sistemática de 72 dialogs/drawers do sistema
 - **UX EditarPessoa mobile**: Revisão completa com sections colapsáveis, campos otimizados para toque, scroll suave
@@ -86,6 +152,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🎨 ResponsiveDialog Migration — Padrão Unificado (25 de Dez/2025)
+
 - **72 dialogs migrados**: Substituição sistemática de `Dialog` (desktop-only) e `Drawer` (mobile-only) por `ResponsiveDialog` que adapta automaticamente baseado em viewport
 - **Componentização**: Extração de `SeletorMidiasDialog` de `LiturgiaDialog`; componentização de upload/viewer em `TransacaoDialog`
 - **Accessibility fixes**: Atributos ARIA corrigidos, foco gerenciado, navegação por teclado preservada
@@ -98,6 +165,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 📖 Documentação UX Mobile (25 de Dez/2025)
+
 - **PLANO_UX_MOBILE_BASE_GEMINI.md**: Plano base de UX mobile gerado com Gemini, documentando estratégias de safe-areas, responsive dialogs e touch optimization
 - **PLANO_UX_MOBILE_RESPONSIVO.md**: Documentação completa do plano de responsividade mobile com roadmap, prioridades e checklist
 - **plano-ux-roadmap.md**: Roadmap expandido com avaliação inicial de UX e próximos passos
@@ -109,6 +177,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🔧 Refatoração de Telas Financeiras e Navegação (24 de Dez/2025)
+
 - **Modernização de UX financeira**: Telas `BasesMinisteriais`, `Categorias`, `CentrosCusto`, `FormasPagamento` e `Fornecedores` refatoradas com layout tabular consistente, busca integrada e cards minimalistas
 - **Nova tela de Manutenção de Contas**: `ContasManutencao.tsx` permite gestão de contas bancárias e físicas com validação de movimentações antes da exclusão
 - **Modernização Admin**: `Chatbots.tsx` e `Webhooks.tsx` com nova interface compacta e agrupamento visual de configurações
@@ -124,6 +193,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🧭 Agendamento Pastoral e Identidade do Chatbot (23 de Dez/2025)
+
 - **Wizard de agendamento**: Etapa "Pessoa" com autocomplete de membros/visitantes, deduplicação por telefone e criação automática de lead quando necessário; grava `pessoa_id` ou `visitante_id`, `gravidade`, `data_agendamento` e `local_atendimento`
 - **Bloqueio de conflitos**: Slots de 30min com seleção múltipla, respeitando compromissos existentes em `atendimentos_pastorais` e na nova tabela `agenda_pastoral` (compromissos administrativos do pastor)
 - **Deduplicação no chatbot-triagem**: Para telefones com múltiplos perfis, escolhe o candidato mais antigo (data de nascimento > criação) e registra alerta; fallback cria/recupera `visitantes_leads`
@@ -133,6 +203,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Módulos afetados:** Gabinete, Chatbot Triagem, Integrações Supabase
 
 #### 🏛️ Módulo Gabinete Digital - Implementação Completa (20 de Dez/2025)
+
 - **Nova tela `/gabinete`** (`GabinetePastoral.tsx`): Kanban interativo com drag-and-drop via @dnd-kit, KPIs pastorais, highlights de casos críticos
 - **Componentes reutilizáveis**: `PastoralCard`, `PastoralDetailsDrawer`, `PastoralFilters`, `PastoralKPIs`, `PastoralListView`, `PastoralKanbanColumn`
 - **Prontuário com abas**: Informações gerais, histórico, notas de evolução, agendamento, análise IA
@@ -149,6 +220,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🔧 Refatoração de Edge Functions para Configuração Dinâmica (20 de Dez/2025)
+
 - **`analise-sentimento-ia` e `analise-pedido-ia` agora consultam `chatbot_configs`** para prompts e modelos, removendo hardcoding
 - **Fallback automático**: Se `chatbot_configs` não encontrado, usa `DEFAULT_PROMPT` e `DEFAULT_MODEL` evitando quebra de deploy
 - **getChatbotConfig()** unificado: Função reutilizável nas duas edge functions com cache em memória para performance
@@ -160,6 +232,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 📊 Integração de KPIs Pastorais no Dashboard Admin (20 de Dez/2025)
+
 - **Widget `GabinetePastoralWidget`**: Exibe status consolidado de atendimentos (Pendente, Em Acompanhamento, Agendado, Concluído) com contadores de abertos
 - **Card dedicado no DashboardAdmin** com atalho para `/gabinete` permitindo overview rápido da carga pastoral
 - **UX melhorada**: Status por linha, evita cramping, contador de "casos abertos" em destaque
@@ -171,6 +244,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🔄 Reorganização de Widgets no Dashboard - Vida Igreja (20 de Dez/2025)
+
 - **Consolidation Funnel widget movido**: De Finanças para seção "Vida Igreja" no Dashboard, refletindo prioridade ministerial
 - **Reordenação de layout**: Mantém Finanças compacta, dá destaque ao funil de evangelismo em contexto de "Vida da Igreja"
 
@@ -181,6 +255,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 📚 Documentação de Decisão Arquitetural (20 de Dez/2025)
+
 - **ADR-014 criada**: "Módulo Gabinete Digital, Roteamento Pastoral e Unificação de Entradas" documenta dual-write, matriz de alertas, privacidade RLS
 - **ADR-012 renomeada**: De ADR-013 para ADR-012 para consistência numerológica pós-arquivamento
 - **Catálogo de telas atualizado**: Adicionada `GabinetePastoral` na nova seção "PASTORAL & GABINETE"
@@ -194,6 +269,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Melhorado
 
 #### 🔐 Melhorias na Autenticação Biométrica (19 de Dez/2025)
+
 - **Detecção automática de tipo de biometria**: Sistema detecta se dispositivo usa Face ID (iPhones X+, iPads Pro) ou Touch ID/Fingerprint e exibe ícone e textos apropriados
 - **Tratamento de erros específicos**: 8 tipos de erro WebAuthn mapeados (`NOT_ALLOWED`, `NOT_RECOGNIZED`, `TIMEOUT`, `HARDWARE_ERROR`, `NOT_FOUND`, `SECURITY_ERROR`, `NOT_SUPPORTED`, `UNKNOWN`) com mensagens contextuais
 - **Estados de loading contextuais**: Feedback visual específico para cada fase ("Olhe para a câmera...", "Toque no sensor...", "Verificando...", "Entrando...")
@@ -202,12 +278,14 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - **Fluxo de habilitação melhorado**: `EnableBiometricDialog` com estados visuais (idle → enrolling → success/error) e recuperação de erros
 
 **Arquivos alterados:**
+
 - `src/hooks/useBiometricAuth.tsx`: Novo tipo `BiometricResult`, função `parseWebAuthnError()`, `detectBiometricType()`, `triggerHapticFeedback()`
 - `src/pages/BiometricLogin.tsx`: Estados de loading, mensagens contextuais, ícones dinâmicos
 - `src/components/auth/BiometricUnlockScreen.tsx`: Estados visuais, detecção de tipo, animações
 - `src/components/auth/EnableBiometricDialog.tsx`: Fluxo de habilitação com feedback visual
 
 **Impacto no usuário:**
+
 - Experiência mais clara com feedback visual e textual específico para cada situação
 - Usuários de Face ID veem ícone de rosto; usuários de Touch ID veem ícone de digital
 - Mensagens de erro orientam próximos passos (tentar novamente vs usar senha)
@@ -220,6 +298,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Adicionado
 
 #### 🤖 Edge Function chatbot-triagem (Intercessão V2 - 18 de Dez/2025)
+
 - **Nova Edge Function `chatbot-triagem`**: Chatbot de triagem para receber pedidos de oração via WhatsApp/Make webhook
   - **Gestão de sessão (State Machine)**: Busca/cria sessão em `atendimentos_bot` com janela de 24h
   - **IA integrada**: Usa OpenAI (`gpt-4o-mini` para chat + `whisper-1` para áudio) para conduzir a conversa
@@ -230,6 +309,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
   - **Endpoint público**: `verify_jwt = false` para receber webhook do Make
 
 **Fluxo:**
+
 1. Make envia: `{ telefone, nome_perfil, tipo_mensagem, conteudo_texto? }`
 2. Se áudio, baixa via API WhatsApp e transcreve com Whisper
 3. Busca sessão ativa (< 24h) ou cria nova em `atendimentos_bot`
@@ -239,6 +319,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 7. Resposta retorna `reply_message`, `notificar_admin` e dados de contato para follow-up
 
 **System Prompt IA:**
+
 - Personifica equipe de acolhimento, oculta que é IA e prioriza FAQ antes do fluxo de pedido
 - Guia coleta de nome, motivo e preferência de anonimato/publicação
 - Só retorna JSON estruturado quando o fluxo é concluído (pedido/testemunho/encaminhamento)
@@ -248,6 +329,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🤖 Intercessão V2 - Fase 1: Schema de Banco de Dados (18 de Dez/2025)
+
 - **ENUMs criados**: `status_intercessor` (ATIVO, PAUSA, FERIAS) e `status_sessao_chat` (INICIADO, EM_ANDAMENTO, CONCLUIDO, EXPIRADO)
 - **Nova tabela `visitantes_leads`**: CRM de Evangelismo para leads externos via WhatsApp/Bot (telefone único, estágio de funil, origem)
 - **Nova tabela `atendimentos_bot`**: State Machine para controle de sessão do chatbot de triagem (histórico_conversa JSONB, meta_dados IA)
@@ -259,6 +341,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Decisão arquitetural:** ADR-012 - CRM de Evangelismo, Chatbot IA e Compliance LGPD
 
 **Impacto no usuário:**
+
 - Preparação para receber pedidos de oração via WhatsApp com triagem por IA
 - Separação clara entre cuidado pastoral (membros) e evangelismo (leads externos)
 - Controle de burnout de intercessores com status de disponibilidade
@@ -270,6 +353,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Corrigido
 
 #### 🔧 Correções de Rotas e Políticas RLS (18 de Dez/2025)
+
 - **Rota /biblia**: Adicionada rota faltante no App.tsx que causava erro 404 ao acessar a página da Bíblia
 - **Rota /minha-familia → /perfil/familia**: Corrigidos links em Sidebar, UserMenu e DashboardVisitante que apontavam para rota inexistente `/minha-familia`; rota correta é `/perfil/familia` (componente FamilyWallet)
 - **RLS inscricoes_jornada**: Adicionada política permitindo membros autenticados se inscreverem em jornadas (pessoa_id vinculado ao user_id via profiles)
@@ -283,6 +367,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Adicionado
 
 #### 📚 Documentação de Fluxos (18 de Dez/2025)
+
 - **Novo diagrama**: `docs/diagramas/fluxo-sentimentos-ia.md` — Fluxo completo de análise de sentimentos via IA e alertas pastorais
 - **Novo diagrama**: `docs/diagramas/fluxo-escalas-lembretes.md` — Fluxo de lembretes automáticos de escalas (cron + anti-spam)
 - **Novo diagrama**: `docs/diagramas/fluxo-liturgia-escalas.md` — Integração automática Liturgia ↔ Escalas via triggers
@@ -292,6 +377,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🔐 Página de Configuração de Webhooks (18 de Dez/2025)
+
 - **Nova tela admin**: `/admin/webhooks` para gerenciar webhooks de integração de forma segura
 - **Segurança**: Valores de webhook são mascarados na interface (exibe apenas `••••••••••`)
 - **Atualização via Secrets**: Botão "Atualizar" abre formulário seguro para inserir novos valores sem expor dados
@@ -299,6 +385,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - **Remoção de campo exposto**: Campo `webhook_make_liturgia` removido de ConfiguracoesIgreja.tsx por segurança
 
 **Impacto no usuário:**
+
 - Admins/Técnicos podem gerenciar webhooks sem expor URLs sensíveis na interface
 - Navegação via card em Configurações da Igreja → "Webhooks de Integração"
 
@@ -307,6 +394,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🧠 Card de IA nas Configurações + Tela Admin de Chatbots (18 de Dez/2025)
+
 - **Novo card "Chatbots & Inteligência Artificial"** em `ConfiguracoesIgreja.tsx` confirma status do `OPENAI_API_KEY` e leva ao gerenciamento dedicado
 - **Nova tela admin `/admin/chatbots`**: CRUD completo para `chatbot_configs`, seleção de modelos (texto/áudio/visão), edição de prompts e toggle de ativação
 - Interface traz diálogos dedicados para criação/edição, pré-visualização dos prompts e controle de exclusão segura
@@ -318,11 +406,13 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### ⏰ Melhorias nas Edge Functions de Escalas (18 de Dez/2025)
+
 - **disparar-escala**: Agora busca webhook de `configuracoes_igreja` ou secrets do projeto; atualiza `ultimo_aviso_em` após envio bem-sucedido
 - **verificar-escalas-pendentes**: Filtro anti-spam adicionado - só dispara para escalas onde `ultimo_aviso_em IS NULL` ou `> 24h`
 - **Rastreabilidade**: Campo `ultimo_aviso_em` em `escalas_culto` registra timestamp do último aviso enviado
 
 **Impacto no usuário:**
+
 - Voluntários não recebem lembretes duplicados em curto período
 - Sistema de notificações mais confiável e rastreável
 
@@ -333,17 +423,20 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Adicionado
 
 #### 🤖 Análise de IA para Pedidos de Oração (18 de Dez/2025)
+
 - **Categorização automática por IA**: Pedidos de oração agora são analisados automaticamente via Edge Function `analise-pedido-ia` usando Lovable AI (Gemini 2.5 Flash)
 - **Campos de análise**: `analise_ia_titulo` (título sugerido), `analise_ia_motivo` (categoria raiz: Saúde, Financeiro, Luto, Relacionamento, etc.), `analise_ia_gravidade` (baixa/media/critica), `analise_ia_resposta` (mensagem pastoral sugerida)
 - **UI integrada**: Cards de pedidos exibem badge de gravidade com cores (verde/amarelo/vermelho), ícones contextuais, e resposta pastoral na visualização detalhada
 - **Disparo assíncrono**: Análise executada automaticamente após criação do pedido, sem bloquear fluxo do usuário
 
 **Impacto no usuário:**
+
 - Intercessores e liderança visualizam categorização automática para triagem mais eficiente
 - Gravidade visual facilita priorização de pedidos críticos
 - Resposta pastoral sugerida auxilia no acompanhamento
 
 **Tabelas/Campos afetados:**
+
 - `pedidos_oracao`: Adicionados campos `analise_ia_titulo`, `analise_ia_motivo`, `analise_ia_gravidade`, `analise_ia_resposta`
 
 **Módulos afetados:** Intercessão (Pedidos de Oração)
@@ -353,6 +446,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Refatorado
 
 #### 📊 Reuso do Widget de Escalas (17 de Dez/2025)
+
 - Unificamos o widget de monitoramento de escalas em um componente compartilhado (`EscalasPendentesWidget`) e o adicionamos aos dashboards de Líder e Admin para reaproveitar lógica de consulta e apresentação.
 
 **Comportamento:** passa a exibir o mesmo painel de confirmados/pendentes/recusados também no dashboard do Admin (sem alterações de fluxo ou regras de negócio).
@@ -362,15 +456,18 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Adicionado
 
 #### 🎓 Player do Aluno: Certificado e Celebração (17 de Dez/2025)
+
 - **Download de certificado em PDF** diretamente no `CursoPlayer` ao concluir 100% das etapas (botão na sidebar e na tela de celebração)
 - **Tela de celebração** em tela cheia quando todas as etapas estão concluídas, com chamada para baixar o certificado
 - **Design do PDF**: paisagem A4, bordas decorativas azul/dourado, identifica aluno, jornada e data de conclusão
 
 **Impacto no usuário:**
+
 - Alunos obtêm comprovante imediato de conclusão sem intervenção do admin
 - Jornada paga continua bloqueada até pagamento, mas certificado só aparece após todas as etapas concluídas
 
 **Riscos/Observações:**
+
 - Geração de PDF ocorre no front-end (jsPDF); navegadores bloqueiam pop-up se for acionado automaticamente — ação do usuário é necessária
 - Sem alterações de schema; usa dados existentes de jornada/inscrição
 
@@ -379,6 +476,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Corrigido
 
 #### 🔒 Correções de Segurança (17 de Dez/2025)
+
 - **Path Traversal em uploads**: Adicionada validação de caminho em `Publicacao.tsx` e `MidiasGeral.tsx` para prevenir ataques de path traversal em uploads de arquivos
 - **Funções RPC sem autorização**: Adicionadas verificações de `auth.uid()` em 3 funções SECURITY DEFINER:
   - `get_user_familia_id`: Agora verifica se usuário consulta próprio familia_id (ou é admin)
@@ -396,6 +494,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Adicionado
 
 #### 🎓 Editor de Conteúdo de Etapas com Quiz (17 de Dez/2025)
+
 - **EtapaContentDialog expandido**: Novo editor admin para configurar conteúdo de etapas com 4 tipos suportados
   - **Texto/Leitura**: Armazena conteúdo em `conteudo_texto`
   - **Vídeo Aula**: URL em `conteudo_url` com preview YouTube/Vimeo em tempo real; checkbox para bloqueio até conclusão (`check_automatico`)
@@ -405,21 +504,25 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - **Preview dinâmico**: Videos com embed funcional que atualiza em tempo real conforme URL é digitada
 
 **Impacto no usuário:**
+
 - Admins ganham interface robusta para criar quizzes educacionais com múltiplas tentativas
 - Vídeos com bloqueio automático garantem que alunos assistam conteúdo completo
 - Suporte a 4 tipos de conteúdo cobre a maioria dos cenários educacionais
 
 **Riscos/Observações:**
+
 - `quiz_config` é armazenado como JSON; estrutura deve ser mantida para compatibilidade futura
 - Preview de vídeo funciona para YouTube/Vimeo; outras plataformas mostram placeholder
 - Sem validação de URL no front-end (deixado para backend)
 
 **Tabelas/Campos afetados:**
+
 - `etapas_jornada.tipo_conteudo`, `conteudo_url`, `conteudo_texto`, `quiz_config`, `check_automatico` (já existentes, agora em uso completo)
 
 ---
 
 #### 🎓 Diferenciar Tipos de Jornadas com Badges Visuais (17 de Dez/2025)
+
 - **Tipo de Jornada (UI)**: RadioGroup com 3 tipos (Curso/EAD, Processo/Pipeline, Híbrido) em `NovaJornadaDialog` e `EditarJornadaDialog`
   - **Curso/EAD** (`auto_instrucional`): Foco em conteúdo educacional; portal visível e pagamento opcional
   - **Processo/Pipeline** (`processo_acompanhado`): Jornada interna de acompanhamento (pastoral, onboarding); **portal e pagamento desabilitados automaticamente**; etapas chamadas "Colunas do Kanban"
@@ -429,27 +532,32 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - **Etapas label dinâmico**: "Capítulos" para cursos, "Colunas do Kanban" para processos
 
 **Impacto no usuário:**
+
 - Admins diferenciam jornadas de forma clara ao criar/editar
 - Alunos e líderes identificam rapidamente tipo da jornada na listagem
 - Simplifica criação de jornadas internas sem acumular campo de pagamento
 
 **Riscos/Observações:**
+
 - Tipo é imutável após criação (decisão de design para evitar cascata de mudanças); se precisar mudar, é necessário excluir e recriar
 - Campo `tipo_jornada` é NOT NULL com default `auto_instrucional` (retrocompatível com jornadas existentes)
 
 **Tabelas/Campos afetados:**
+
 - `jornadas.tipo_jornada` (TEXT NOT NULL DEFAULT 'auto_instrucional') - **já presente no banco via migração anterior**
 - UI: `NovaJornadaDialog.tsx`, `EditarJornadaDialog.tsx`, `Jornadas.tsx`
 
 ---
 
 #### 🎓 Jornadas Avançadas: Tipos, Quiz e Soft-Lock (Dez/2024)
+
 - **Tipo de Jornada**: Campo `tipo_jornada` classifica jornadas como `auto_instrucional` (Player), `processo_acompanhado` (Kanban) ou `hibrido`
 - **Etapas enriquecidas**: Tipos de conteúdo (`texto`, `video`, `quiz`, `tarefa`, `reuniao`), URL de conteúdo, configuração de quiz (JSON), check automático e duração estimada
 - **Sistema de Quiz**: Nova tabela `respostas_quiz` para histórico de respostas dos alunos com nota, aprovação e tentativas
 - **Soft-Lock**: Campo `check_automatico` permite definir se o sistema avança automaticamente ou requer ação do aluno
 
 **Tabelas alteradas:**
+
 - `jornadas`: Adicionado campo `tipo_jornada` (text com check constraint)
 - `etapas_jornada`: Adicionados campos `conteudo_tipo`, `conteudo_url`, `quiz_config`, `check_automatico`, `duracao_estimada_minutos`
 - `respostas_quiz`: Nova tabela com RLS para histórico de quizzes
@@ -459,12 +567,14 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ---
 
 #### 🎓 Jornadas com Pagamento (Dez/2024)
+
 - **Cursos pagos**: Jornadas agora podem ser configuradas como pagas, com valor definido pelo admin
 - **Status de pagamento**: Inscrições possuem status de pagamento (`isento`, `pendente`, `pago`)
 - **Integração financeira**: Inscrições pagas podem vincular-se a transações financeiras para rastreabilidade
 - **Categoria financeira**: Criada categoria "Cursos e Treinamentos" (entrada) para receitas de cursos
 
 **Tabelas alteradas:**
+
 - `jornadas`: Adicionados campos `requer_pagamento` (boolean) e `valor` (numeric)
 - `inscricoes_jornada`: Adicionados campos `status_pagamento` (text) e `transacao_id` (FK)
 - `categorias_financeiras`: Inserida categoria "Cursos e Treinamentos"

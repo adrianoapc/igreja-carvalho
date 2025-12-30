@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,15 +11,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  Users, 
-  Timer, 
-  CheckCircle2, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  Users,
+  Timer,
+  CheckCircle2,
   Presentation,
   Eye,
   ListMusic,
@@ -27,7 +33,7 @@ import {
   Save,
   QrCode,
   Send,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -37,9 +43,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import LiturgiaTab from "@/components/eventos/tabs/LiturgiaTab";
 import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
 import MusicaTabContent from "@/components/cultos/MusicaTabContent";
 import EscalasTabContent from "@/components/cultos/EscalasTabContent";
+import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
+import EscalaTimeline from "@/components/escalas/EscalaTimeline";
 
 interface Evento {
   id: string;
@@ -67,10 +76,24 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  planejado: { label: "Planejado", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400" },
-  confirmado: { label: "Confirmado", color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400" },
-  realizado: { label: "Realizado", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400" },
-  cancelado: { label: "Cancelado", color: "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400" },
+  planejado: {
+    label: "Planejado",
+    color:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400",
+  },
+  confirmado: {
+    label: "Confirmado",
+    color:
+      "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
+  },
+  realizado: {
+    label: "Realizado",
+    color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
+  },
+  cancelado: {
+    label: "Cancelado",
+    color: "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400",
+  },
 };
 
 const TIPO_LABELS: Record<string, string> = {
@@ -84,12 +107,16 @@ const TIPO_LABELS: Record<string, string> = {
 export default function EventoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [evento, setEvento] = useState<Evento | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notificando, setNotificando] = useState(false);
   const [escalasCount, setEscalasCount] = useState(0);
   const [liturgiaCount, setLiturgiaCount] = useState(0);
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("tab") || "visao-geral"
+  );
 
   // Form state
   const [tema, setTema] = useState("");
@@ -127,7 +154,9 @@ export default function EventoDetalhes() {
       setObservacoes(normalized.observacoes || "");
       setStatus(normalized.status);
     } catch (error: unknown) {
-      toast.error("Erro ao carregar evento", { description: error instanceof Error ? error.message : String(error) });
+      toast.error("Erro ao carregar evento", {
+        description: error instanceof Error ? error.message : String(error),
+      });
       navigate("/eventos/lista");
     } finally {
       setLoading(false);
@@ -137,8 +166,14 @@ export default function EventoDetalhes() {
   const loadStats = async () => {
     try {
       const [escalasRes, liturgiaRes] = await Promise.all([
-        supabase.from("escalas").select("id", { count: "exact" }).eq("evento_id", id!),
-        supabase.from("liturgias").select("id", { count: "exact" }).eq("evento_id", id!),
+        supabase
+          .from("escalas")
+          .select("id", { count: "exact" })
+          .eq("evento_id", id!),
+        supabase
+          .from("liturgias")
+          .select("id", { count: "exact" })
+          .eq("evento_id", id!),
       ]);
 
       setEscalasCount(escalasRes.count || 0);
@@ -170,7 +205,9 @@ export default function EventoDetalhes() {
       toast.success("Alterações salvas com sucesso!");
       loadEvento();
     } catch (error: unknown) {
-      toast.error("Erro ao salvar", { description: error instanceof Error ? error.message : String(error) });
+      toast.error("Erro ao salvar", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setSaving(false);
     }
@@ -181,21 +218,26 @@ export default function EventoDetalhes() {
     setNotificando(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('disparar-escala', {
-        body: { evento_id: evento.id }
-      });
+      const { data, error } = await supabase.functions.invoke(
+        "disparar-escala",
+        {
+          body: { evento_id: evento.id },
+        }
+      );
 
       if (error) throw error;
 
       if (data.success) {
         toast.success(data.message, {
-          description: data.erros > 0 ? `${data.erros} falhas` : undefined
+          description: data.erros > 0 ? `${data.erros} falhas` : undefined,
         });
       } else {
         toast.error("Erro ao notificar", { description: data.message });
       }
     } catch (error: unknown) {
-      toast.error("Erro ao notificar escalados", { description: error instanceof Error ? error.message : String(error) });
+      toast.error("Erro ao notificar escalados", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setNotificando(false);
     }
@@ -219,8 +261,9 @@ export default function EventoDetalhes() {
 
   const dataEvento = new Date(evento.data_evento);
   const statusConfig = STATUS_CONFIG[evento.status] || STATUS_CONFIG.planejado;
-  const mostrarLiturgia = evento.tipo === "CULTO";
+  const mostrarLiturgia = evento.tipo === "CULTO" || evento.tipo === "RELOGIO";
   const mostrarMusica = evento.tipo === "CULTO";
+  const mostrarConvites = evento.tipo === "EVENTO";
 
   return (
     <div className="space-y-6">
@@ -240,7 +283,12 @@ export default function EventoDetalhes() {
               <h1 className="text-xl md:text-2xl font-bold">{evento.titulo}</h1>
               <Badge variant="outline">{TIPO_LABELS[evento.tipo]}</Badge>
               {evento.evento_subtipos && (
-                <Badge variant="secondary" style={{ backgroundColor: evento.evento_subtipos.cor || undefined }}>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: evento.evento_subtipos.cor || undefined,
+                  }}
+                >
                   {evento.evento_subtipos.nome}
                 </Badge>
               )}
@@ -269,11 +317,13 @@ export default function EventoDetalhes() {
             </DialogTrigger>
             <DialogContent className="max-w-sm">
               <DialogHeader>
-                <DialogTitle className="text-center">QR Code de Presença</DialogTitle>
+                <DialogTitle className="text-center">
+                  QR Code de Presença
+                </DialogTitle>
               </DialogHeader>
               <div className="flex flex-col items-center gap-4 py-4">
                 <div className="bg-white p-4 rounded-lg">
-                  <QRCodeSVG 
+                  <QRCodeSVG
                     value={`${window.location.origin}/checkin/culto/${evento.id}`}
                     size={200}
                     level="H"
@@ -288,7 +338,7 @@ export default function EventoDetalhes() {
               </div>
             </DialogContent>
           </Dialog>
-          
+
           <Button
             variant="outline"
             onClick={handleNotificarEscalados}
@@ -301,10 +351,12 @@ export default function EventoDetalhes() {
             )}
             Notificar Escalados
           </Button>
-          
+
           <Button
             variant="outline"
-            onClick={() => window.open(`/telao/liturgia/${evento.id}`, "_blank")}
+            onClick={() =>
+              window.open(`/telao/liturgia/${evento.id}`, "_blank")
+            }
           >
             <Presentation className="h-4 w-4 mr-2" />
             Modo Apresentação
@@ -313,32 +365,61 @@ export default function EventoDetalhes() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="visao-geral" className="w-full">
-        <TabsList className={`grid w-full max-w-2xl ${mostrarLiturgia ? "grid-cols-5" : "grid-cols-3"}`}>
-          <TabsTrigger value="visao-geral" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent flex-wrap">
+          <TabsTrigger
+            value="visao-geral"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+          >
+            <Eye className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Visão Geral</span>
           </TabsTrigger>
+
           {mostrarLiturgia && (
-            <TabsTrigger value="liturgia" className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Liturgia</span>
+            <TabsTrigger
+              value="liturgia"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+            >
+              <ClipboardList className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Liturgia & Roteiro</span>
             </TabsTrigger>
           )}
+
           {mostrarMusica && (
-            <TabsTrigger value="musica" className="flex items-center gap-2">
-              <ListMusic className="h-4 w-4" />
+            <TabsTrigger
+              value="musica"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+            >
+              <ListMusic className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Música</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="escalas" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
+
+          <TabsTrigger
+            value="escalas"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+          >
+            <Users className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Escalas</span>
           </TabsTrigger>
-          <TabsTrigger value="checkin" className="flex items-center gap-2">
-            <QrCode className="h-4 w-4" />
+
+          <TabsTrigger
+            value="checkin"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+          >
+            <QrCode className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Check-in</span>
           </TabsTrigger>
+
+          {mostrarConvites && (
+            <TabsTrigger
+              value="convites"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Convites</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Tab: Visão Geral */}
@@ -351,9 +432,13 @@ export default function EventoDetalhes() {
                   <Timer className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Duração Estimada</p>
+                  <p className="text-sm text-muted-foreground">
+                    Duração Estimada
+                  </p>
                   <p className="text-2xl font-bold">
-                    {evento.duracao_minutos ? `${evento.duracao_minutos} min` : "—"}
+                    {evento.duracao_minutos
+                      ? `${evento.duracao_minutos} min`
+                      : "—"}
                   </p>
                 </div>
               </CardContent>
@@ -365,7 +450,9 @@ export default function EventoDetalhes() {
                   <Users className="h-6 w-6 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Voluntários Escalados</p>
+                  <p className="text-sm text-muted-foreground">
+                    Voluntários Escalados
+                  </p>
                   <p className="text-2xl font-bold">{escalasCount}</p>
                 </div>
               </CardContent>
@@ -377,7 +464,9 @@ export default function EventoDetalhes() {
                   <CheckCircle2 className="h-6 w-6 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Itens na Liturgia</p>
+                  <p className="text-sm text-muted-foreground">
+                    Itens na Liturgia
+                  </p>
                   <p className="text-2xl font-bold">{liturgiaCount}</p>
                 </div>
               </CardContent>
@@ -462,7 +551,7 @@ export default function EventoDetalhes() {
         {/* Tab: Liturgia (apenas CULTO) */}
         {mostrarLiturgia && (
           <TabsContent value="liturgia" className="mt-6">
-            <LiturgiaTabContent eventoId={id!} />
+            <LiturgiaTab eventoId={id!} />
           </TabsContent>
         )}
 
@@ -475,7 +564,11 @@ export default function EventoDetalhes() {
 
         {/* Tab: Escalas (sempre) */}
         <TabsContent value="escalas" className="mt-6">
-          <EscalasTabContent eventoId={id!} />
+          {evento?.tipo === "RELOGIO" ? (
+            <EscalaTimeline evento={evento} />
+          ) : (
+            <EscalasTabContent eventoId={id!} />
+          )}
         </TabsContent>
 
         {/* Tab: Check-in (sempre) */}
@@ -485,10 +578,19 @@ export default function EventoDetalhes() {
               <CardTitle>Check-in do Evento</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Funcionalidade de check-in em desenvolvimento.</p>
+              <p className="text-sm text-muted-foreground">
+                Funcionalidade de check-in em desenvolvimento.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Tab: Convites */}
+        {mostrarConvites && (
+          <TabsContent value="convites" className="mt-6">
+            <ConvitesTabContent eventoId={evento.id} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

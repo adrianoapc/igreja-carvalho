@@ -2,25 +2,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Users, 
-  UserPlus, 
-  ClipboardList, 
+import {
+  Users,
+  UserPlus,
+  ClipboardList,
   Calendar,
   CheckCircle2,
   Cake,
   Phone,
-  Heart
+  Heart,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { format, addDays, isSameDay, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import {
+  format,
+  addDays,
+  isSameDay,
+  isWithinInterval,
+  startOfDay,
+  endOfDay,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import { WelcomeHeader } from "./WelcomeHeader";
 import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
+import ConvitesPendentesWidget from "@/components/dashboard/ConvitesPendentesWidget";
 
 interface Aniversariante {
   id: string;
@@ -33,12 +41,12 @@ export default function DashboardLeader() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
-  const firstName = profile?.nome?.split(' ')[0] || 'Líder';
-  
+  const firstName = profile?.nome?.split(" ")[0] || "Líder";
+
   const [stats, setStats] = useState({
     membrosCelula: 0,
     visitantesPendentes: 0,
-    relatoriosAtrasados: 0
+    relatoriosAtrasados: 0,
   });
   const [aniversariantes, setAniversariantes] = useState<Aniversariante[]>([]);
   const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
@@ -60,7 +68,7 @@ export default function DashboardLeader() {
 
   const checkTodaySentimento = async () => {
     if (!profile?.id) return;
-    
+
     const today = new Date();
     const dayStart = startOfDay(today).toISOString();
     const dayEnd = endOfDay(today).toISOString();
@@ -79,54 +87,73 @@ export default function DashboardLeader() {
   const fetchStats = async () => {
     // Membros na célula (simplified - count members in teams where user is leader)
     const { data: teams } = await supabase
-      .from('times')
-      .select('id')
+      .from("times")
+      .select("id")
       .or(`lider_id.eq.${profile?.id},sublider_id.eq.${profile?.id}`);
 
     if (teams && teams.length > 0) {
-      const teamIds = teams.map(t => t.id);
+      const teamIds = teams.map((t) => t.id);
       const { count } = await supabase
-        .from('membros_time')
-        .select('*', { count: 'exact', head: true })
-        .in('time_id', teamIds)
-        .eq('ativo', true);
-      
-      setStats(prev => ({ ...prev, membrosCelula: count || 0 }));
+        .from("membros_time")
+        .select("*", { count: "exact", head: true })
+        .in("time_id", teamIds)
+        .eq("ativo", true);
+
+      setStats((prev) => ({ ...prev, membrosCelula: count || 0 }));
     }
 
     // Visitantes pendentes de contato
     const { count: visitantesCount } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'visitante')
-      .eq('deseja_contato', true);
-    
-    setStats(prev => ({ ...prev, visitantesPendentes: visitantesCount || 0 }));
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "visitante")
+      .eq("deseja_contato", true);
+
+    setStats((prev) => ({
+      ...prev,
+      visitantesPendentes: visitantesCount || 0,
+    }));
   };
 
   const fetchAniversariantes = async () => {
     const today = new Date();
     const endOfWeek = addDays(today, 7);
-    
+
     const { data } = await supabase
-      .from('profiles')
-      .select('id, nome, avatar_url, data_nascimento')
-      .not('data_nascimento', 'is', null);
+      .from("profiles")
+      .select("id, nome, avatar_url, data_nascimento")
+      .not("data_nascimento", "is", null);
 
     if (data) {
-      const aniversariantesSemana = data.filter(p => {
-        if (!p.data_nascimento) return false;
-        const nascimento = new Date(p.data_nascimento);
-        const thisYearBirthday = new Date(today.getFullYear(), nascimento.getMonth(), nascimento.getDate());
-        return isWithinInterval(thisYearBirthday, { start: today, end: endOfWeek });
-      }).slice(0, 5);
+      const aniversariantesSemana = data
+        .filter((p) => {
+          if (!p.data_nascimento) return false;
+          const nascimento = new Date(p.data_nascimento);
+          const thisYearBirthday = new Date(
+            today.getFullYear(),
+            nascimento.getMonth(),
+            nascimento.getDate()
+          );
+          return isWithinInterval(thisYearBirthday, {
+            start: today,
+            end: endOfWeek,
+          });
+        })
+        .slice(0, 5);
 
       setAniversariantes(aniversariantesSemana);
     }
   };
 
   const getInitials = (name: string) => {
-    return name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
+    return (
+      name
+        ?.split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase() || "?"
+    );
   };
 
   return (
@@ -156,12 +183,15 @@ export default function DashboardLeader() {
       {/* Widget de Monitoramento de Escalas */}
       <EscalasPendentesWidget />
 
-      <RegistrarSentimentoDialog 
-        open={sentimentoDialogOpen} 
+      {/* Convites Pendentes Widget */}
+      <ConvitesPendentesWidget />
+
+      <RegistrarSentimentoDialog
+        open={sentimentoDialogOpen}
         onOpenChange={(open) => {
           setSentimentoDialogOpen(open);
           if (!open) checkTodaySentimento();
-        }} 
+        }}
       />
 
       {/* KPIs */}
@@ -172,7 +202,9 @@ export default function DashboardLeader() {
               <Users className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{stats.membrosCelula}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.membrosCelula}
+              </p>
               <p className="text-sm text-muted-foreground">Membros na Célula</p>
             </div>
           </CardContent>
@@ -184,8 +216,12 @@ export default function DashboardLeader() {
               <UserPlus className="w-6 h-6 text-amber-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{stats.visitantesPendentes}</p>
-              <p className="text-sm text-muted-foreground">Visitantes Pendentes</p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.visitantesPendentes}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Visitantes Pendentes
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -196,8 +232,12 @@ export default function DashboardLeader() {
               <ClipboardList className="w-6 h-6 text-red-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{stats.relatoriosAtrasados}</p>
-              <p className="text-sm text-muted-foreground">Relatórios Atrasados</p>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.relatoriosAtrasados}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Relatórios Atrasados
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -205,19 +245,19 @@ export default function DashboardLeader() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4">
-        <Button 
-          size="lg" 
+        <Button
+          size="lg"
           className="h-24 flex flex-col gap-2"
-          onClick={() => navigate('/chamada')}
+          onClick={() => navigate("/chamada")}
         >
           <CheckCircle2 className="w-8 h-8" />
           <span>Fazer Chamada</span>
         </Button>
-        <Button 
-          size="lg" 
+        <Button
+          size="lg"
           variant="outline"
           className="h-24 flex flex-col gap-2"
-          onClick={() => navigate('/pessoas/visitantes?novo=true')}
+          onClick={() => navigate("/pessoas/visitantes?novo=true")}
         >
           <UserPlus className="w-8 h-8" />
           <span>Novo Visitante</span>
@@ -238,26 +278,40 @@ export default function DashboardLeader() {
               Nenhum aniversariante esta semana
             </p>
           ) : (
-            aniversariantes.map(pessoa => {
+            aniversariantes.map((pessoa) => {
               const nascimento = new Date(pessoa.data_nascimento);
               const today = new Date();
-              const thisYearBirthday = new Date(today.getFullYear(), nascimento.getMonth(), nascimento.getDate());
+              const thisYearBirthday = new Date(
+                today.getFullYear(),
+                nascimento.getMonth(),
+                nascimento.getDate()
+              );
               const isToday = isSameDay(thisYearBirthday, today);
-              
+
               return (
-                <div key={pessoa.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                <div
+                  key={pessoa.id}
+                  className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
+                >
                   <Avatar className="w-10 h-10">
                     <AvatarImage src={pessoa.avatar_url || undefined} />
                     <AvatarFallback>{getInitials(pessoa.nome)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{pessoa.nome}</p>
+                    <p className="text-sm font-medium truncate">
+                      {pessoa.nome}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {format(thisYearBirthday, "d 'de' MMMM", { locale: ptBR })}
+                      {format(thisYearBirthday, "d 'de' MMMM", {
+                        locale: ptBR,
+                      })}
                     </p>
                   </div>
                   {isToday && (
-                    <Badge variant="secondary" className="bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300">
+                    <Badge
+                      variant="secondary"
+                      className="bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300"
+                    >
                       Hoje! 🎉
                     </Badge>
                   )}
@@ -265,11 +319,11 @@ export default function DashboardLeader() {
               );
             })
           )}
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="w-full text-xs"
-            onClick={() => navigate('/pessoas')}
+            onClick={() => navigate("/pessoas")}
           >
             Ver todos
           </Button>

@@ -30,7 +30,8 @@
 3. Clique em **"Entrar"**
 
 ![Tela de Login](./screenshots/placeholder-login.png)
-> *Screenshot: Tela de login do sistema*
+
+> _Screenshot: Tela de login do sistema_
 
 ### 1.2 Primeiro Acesso (Cadastro)
 
@@ -40,7 +41,8 @@
 4. Você receberá acesso básico automaticamente
 
 ![Tela de Cadastro](./screenshots/placeholder-cadastro.png)
-> *Screenshot: Formulário de criação de conta*
+
+> _Screenshot: Formulário de criação de conta_
 
 ### 1.3 Autenticação Biométrica (Opcional)
 
@@ -51,7 +53,8 @@ Após o primeiro login, o sistema pode oferecer a opção de habilitar desbloque
 3. Nos próximos acessos, use biometria para entrar rapidamente
 
 ![Diálogo Biometria](./screenshots/placeholder-biometria.png)
-> *Screenshot: Diálogo para habilitar autenticação biométrica*
+
+> _Screenshot: Diálogo para habilitar autenticação biométrica_
 
 ---
 
@@ -62,30 +65,32 @@ O Dashboard é a página inicial após o login. O conteúdo varia conforme seu p
 ### 2.1 Dashboard do Administrador/Pastor
 
 ![Dashboard Admin](./screenshots/placeholder-dashboard-admin.png)
-> *Screenshot: Dashboard administrativo*
+
+> _Screenshot: Dashboard administrativo_
 
 **Elementos disponíveis:**
 
-| Elemento | Descrição |
-|----------|-----------|
-| Gráfico de Fluxo de Caixa | Entradas vs Saídas do mês |
-| KPIs de Projetos | Tarefas atrasadas e projetos ativos |
-| Alertas Pastorais | Membros que precisam de atenção |
-| Aniversariantes | Próximos aniversários |
+| Elemento                  | Descrição                           |
+| ------------------------- | ----------------------------------- |
+| Gráfico de Fluxo de Caixa | Entradas vs Saídas do mês           |
+| KPIs de Projetos          | Tarefas atrasadas e projetos ativos |
+| Alertas Pastorais         | Membros que precisam de atenção     |
+| Aniversariantes           | Próximos aniversários               |
 
 ### 2.2 Dashboard do Membro
 
 ![Dashboard Membro](./screenshots/placeholder-dashboard-membro.png)
-> *Screenshot: Dashboard do membro*
+
+> _Screenshot: Dashboard do membro_
 
 **Elementos disponíveis:**
 
-| Elemento | Descrição |
-|----------|-----------|
-| Carrossel de Comunicados | Banners e avisos ativos |
-| Carteirinha Digital | QR Code para check-in |
-| Minhas Tarefas | Tarefas atribuídas a você |
-| Ações Rápidas | Botões de acesso rápido |
+| Elemento                 | Descrição                 |
+| ------------------------ | ------------------------- |
+| Carrossel de Comunicados | Banners e avisos ativos   |
+| Carteirinha Digital      | QR Code para check-in     |
+| Minhas Tarefas           | Tarefas atribuídas a você |
+| Ações Rápidas            | Botões de acesso rápido   |
 
 ### 2.3 Notificações
 
@@ -96,34 +101,37 @@ O sino no canto superior direito mostra suas notificações:
 3. Clique em uma notificação para ser direcionado
 
 ![Notificações](./screenshots/placeholder-notificacoes.png)
-> *Screenshot: Painel de notificações*
+
+> _Screenshot: Painel de notificações_
 
 ---
 
 ## 3. Gestão de Pessoas
 
 ### 3.X Pessoas / Membros
+
 - **Onde acessar**: Menu lateral → **Pessoas** → escolha **Todos**, **Membros**, **Visitantes** ou **Frequentadores** (atalhos principais) ou use a página inicial de Pessoas.
 - **Ao abrir a tela**: você vê cards/estatísticas (totais por status), atalhos rápidos, e a lista de pessoas com nome, contato, status e avatar (quando cadastrado). Em dispositivos móveis, os cards podem ocupar mais espaço; role para chegar na lista.
 - **Buscar/filtrar** (passo a passo):
-   1. Use a barra de busca (nome, telefone ou email)
-   2. Selecione o filtro de **Status** (Visitante/Frequentador/Membro)
-   3. Confira os contadores por status para validar o filtro
-   4. Role para carregar mais pessoas (infinite scroll)
+  1.  Use a barra de busca (nome, telefone ou email)
+  2.  Selecione o filtro de **Status** (Visitante/Frequentador/Membro)
+  3.  Confira os contadores por status para validar o filtro
+  4.  Role para carregar mais pessoas (infinite scroll)
 - **Cadastrar nova pessoa** (passo a passo):
-   1. Clique em **+ Novo** (na lista ou no atalho de Membros/Visitantes)
-   2. Preencha **Nome** (obrigatório)
-   3. Informe **Telefone ou Email** (recomendado para contato)
-   4. Defina **Status inicial**: Visitante, Frequentador ou Membro
-   5. Salve para concluir o cadastro; a pessoa aparece na listagem
+  1.  Clique em **+ Novo** (na lista ou no atalho de Membros/Visitantes)
+  2.  Preencha **Nome** (obrigatório)
+  3.  Informe **Telefone ou Email** (recomendado para contato)
+  4.  Defina **Status inicial**: Visitante, Frequentador ou Membro
+  5.  Salve para concluir o cadastro; a pessoa aparece na listagem
 - **Editar pessoa existente** (passo a passo):
-   1. Abra a pessoa pela lista (clique no nome)
-   2. Use **Editar** para ajustar dados pessoais/contatos/status
-   3. Salve; a lista e o perfil são atualizados
+  1.  Abra a pessoa pela lista (clique no nome)
+  2.  Use **Editar** para ajustar dados pessoais/contatos/status
+  3.  Salve; a lista e o perfil são atualizados
 - **Campos obrigatórios e validações**: Nome é obrigatório; status deve ser um dos valores válidos (Visitante/Frequentador/Membro); contatos ajudam na busca e no follow-up. Em mobile, priorize inserir contato para facilitar ações posteriores.
 - **Vincular funções/roles ministeriais**: No perfil, acesse a área de status/igreja e atribua funções (quando disponível) conforme a liderança definir.
 
 **Exemplos práticos**
+
 - Cadastro de novo membro: Pessoas → Membros → **+ Novo** → Nome obrigatório, telefone/email recomendado, status **membro** → Salvar → aparece na lista com badge.
 - Atualização de dados: Pessoas → Todos → abra a pessoa → **Editar** → ajuste endereço/telefone/status → Salvar → a listagem reflete as alterações.
 
@@ -136,7 +144,8 @@ O sino no canto superior direito mostra suas notificações:
 2. O módulo se expande mostrando as opções
 
 ![Menu Pessoas](./screenshots/placeholder-menu-pessoas.png)
-> *Screenshot: Menu expandido de Pessoas*
+
+> _Screenshot: Menu expandido de Pessoas_
 
 ### 3.2 Visão Geral
 
@@ -147,7 +156,8 @@ A página inicial do módulo mostra:
 - **Ações rápidas**: Botões para cadastros
 
 ![Pessoas Visão Geral](./screenshots/placeholder-pessoas-geral.png)
-> *Screenshot: Visão geral do módulo Pessoas*
+
+> _Screenshot: Visão geral do módulo Pessoas_
 
 ### 3.3 Cadastrando um Visitante
 
@@ -160,7 +170,8 @@ A página inicial do módulo mostra:
    - Tipo: Visitante ou Frequentador
 
 ![Cadastro Visitante](./screenshots/placeholder-cadastro-visitante.png)
-> *Screenshot: Formulário de cadastro de visitante*
+
+> _Screenshot: Formulário de cadastro de visitante_
 
 4. Clique em **"Salvar"**
 
@@ -169,16 +180,17 @@ A página inicial do módulo mostra:
 1. Na lista de pessoas, clique no **nome** da pessoa
 2. A página de detalhes abre com as abas:
 
-| Aba | Conteúdo |
-|-----|----------|
-| **Perfil** | Resumo de todos os dados (somente leitura) |
-| **Pessoais** | Dados pessoais editáveis |
-| **Contatos** | Email, telefone, endereço |
-| **Igreja** | Funções e status eclesiástico |
-| **Mais** | Observações e dados adicionais |
+| Aba          | Conteúdo                                   |
+| ------------ | ------------------------------------------ |
+| **Perfil**   | Resumo de todos os dados (somente leitura) |
+| **Pessoais** | Dados pessoais editáveis                   |
+| **Contatos** | Email, telefone, endereço                  |
+| **Igreja**   | Funções e status eclesiástico              |
+| **Mais**     | Observações e dados adicionais             |
 
 ![Perfil Pessoa](./screenshots/placeholder-perfil-pessoa.png)
-> *Screenshot: Página de detalhes da pessoa*
+
+> _Screenshot: Página de detalhes da pessoa_
 
 ### 3.5 Editando Dados
 
@@ -188,7 +200,8 @@ A página inicial do módulo mostra:
 4. Clique em **"Salvar"**
 
 ![Editar Dados](./screenshots/placeholder-editar-dados.png)
-> *Screenshot: Diálogo de edição de dados pessoais*
+
+> _Screenshot: Diálogo de edição de dados pessoais_
 
 ### 3.6 Promovendo Status
 
@@ -200,7 +213,8 @@ Para promover uma pessoa (Visitante → Frequentador → Membro):
 4. Confirme a alteração
 
 ![Alterar Status](./screenshots/placeholder-alterar-status.png)
-> *Screenshot: Diálogo de alteração de status*
+
+> _Screenshot: Diálogo de alteração de status_
 
 ### 3.7 Atribuindo Funções
 
@@ -212,7 +226,8 @@ Para promover uma pessoa (Visitante → Frequentador → Membro):
 6. Clique em **"Salvar"**
 
 ![Atribuir Função](./screenshots/placeholder-atribuir-funcao.png)
-> *Screenshot: Diálogo de atribuição de função*
+
+> _Screenshot: Diálogo de atribuição de função_
 
 ### 3.8 Gerenciando Familiares
 
@@ -225,7 +240,8 @@ Na página de detalhes da pessoa:
 5. Clique em **"Salvar"**
 
 ![Familiares](./screenshots/placeholder-familiares.png)
-> *Screenshot: Seção de familiares no perfil*
+
+> _Screenshot: Seção de familiares no perfil_
 
 ---
 
@@ -242,6 +258,7 @@ O módulo financeiro separa claramente três conceitos fundamentais para garanti
 > **Importante**: Esta separação está documentada no [ADR-001](adr/ADR-001-separacao-fato-gerador-caixa-dre.md) e é fundamental para a integridade contábil do sistema.
 
 Para visualizar os fluxos completos:
+
 - [Fluxo Financeiro Geral](diagramas/fluxo-financeiro.md)
 - [Sequência de Eventos](diagramas/sequencia-financeira.md)
 - [Composição do DRE](diagramas/dre.md)
@@ -254,7 +271,8 @@ Para visualizar os fluxos completos:
 2. O módulo se expande mostrando as opções
 
 ![Menu Finanças](./screenshots/placeholder-menu-financas.png)
-> *Screenshot: Menu expandido de Finanças*
+
+> _Screenshot: Menu expandido de Finanças_
 
 ### 4.2 Dashboard Financeiro
 
@@ -265,7 +283,8 @@ A visão geral financeira mostra:
 - **Resumo mensal** com totais
 
 ![Dashboard Financeiro](./screenshots/placeholder-dashboard-financeiro.png)
-> *Screenshot: Dashboard financeiro*
+
+> _Screenshot: Dashboard financeiro_
 
 ### 4.3 Registrando uma Entrada (Receita)
 
@@ -275,21 +294,23 @@ A visão geral financeira mostra:
 2. Clique em **"+ Nova Entrada"**
 3. Preencha os campos:
 
-| Campo | Descrição | Exemplo |
-|-------|-----------|---------|
-| Descrição | Nome/motivo da entrada | "Oferta Culto Domingo" |
-| Valor | Valor em reais | R$ 500,00 |
-| Data | Data da transação | 15/12/2024 |
-| Conta | Conta de destino | Conta Corrente |
-| Categoria | Classificação contábil | Receitas Operacionais > Ofertas |
-| Forma de Pagamento | PIX, Dinheiro, etc. | PIX |
+| Campo              | Descrição              | Exemplo                         |
+| ------------------ | ---------------------- | ------------------------------- |
+| Descrição          | Nome/motivo da entrada | "Oferta Culto Domingo"          |
+| Valor              | Valor em reais         | R$ 500,00                       |
+| Data               | Data da transação      | 15/12/2024                      |
+| Conta              | Conta de destino       | Conta Corrente                  |
+| Categoria          | Classificação contábil | Receitas Operacionais > Ofertas |
+| Forma de Pagamento | PIX, Dinheiro, etc.    | PIX                             |
 
 ![Nova Entrada](./screenshots/placeholder-nova-entrada.png)
-> *Screenshot: Formulário de nova entrada*
+
+> _Screenshot: Formulário de nova entrada_
 
 4. Clique em **"Salvar"**
 
 **O que acontece:**
+
 - ✅ **Fato Gerador** criado: "Oferta Culto Domingo" em Receitas Operacionais
 - ✅ **Caixa** atualizado: +R$ 500 na Conta Corrente
 - ✅ **DRE** impactado: +R$ 500 em Receitas do mês
@@ -304,23 +325,25 @@ A visão geral financeira mostra:
 2. Clique em **"+ Nova Saída"**
 3. Preencha os campos:
 
-| Campo | Descrição | Exemplo |
-|-------|-----------|---------|
-| Descrição | Natureza da despesa | "Equipamento de Som" |
-| Valor | Valor total | R$ 3.000,00 |
-| Data | Data de competência | 10/12/2024 |
-| Conta | Conta de origem | Conta Corrente |
-| Categoria | Classificação contábil | Despesas Administrativas > Equipamentos |
-| Fornecedor | Quem recebe | Loja de Som LTDA |
-| Forma de Pagamento | Como será pago | Parcelado 3x |
+| Campo              | Descrição              | Exemplo                                 |
+| ------------------ | ---------------------- | --------------------------------------- |
+| Descrição          | Natureza da despesa    | "Equipamento de Som"                    |
+| Valor              | Valor total            | R$ 3.000,00                             |
+| Data               | Data de competência    | 10/12/2024                              |
+| Conta              | Conta de origem        | Conta Corrente                          |
+| Categoria          | Classificação contábil | Despesas Administrativas > Equipamentos |
+| Fornecedor         | Quem recebe            | Loja de Som LTDA                        |
+| Forma de Pagamento | Como será pago         | Parcelado 3x                            |
 
 ![Nova Saída](./screenshots/placeholder-nova-saida.png)
-> *Screenshot: Formulário de nova saída*
+
+> _Screenshot: Formulário de nova saída_
 
 4. **Opcional**: Anexe nota fiscal (imagem ou PDF)
 5. Clique em **"Salvar"**
 
 **O que acontece:**
+
 - ✅ **Fato Gerador** criado: "Equipamento de Som" R$ 3.000 em Despesas Administrativas
 - ✅ **3 Transações de Caixa** agendadas: R$ 1.000 cada mês
 - ✅ **DRE de dezembro**: -R$ 3.000 (impacto total no mês da competência)
@@ -351,9 +374,11 @@ Para transações com status "Pendente":
 4. Clique em **"Confirmar"**
 
 ![Confirmar Pagamento](./screenshots/placeholder-confirmar-pagamento.png)
-> *Screenshot: Diálogo de confirmação de pagamento*
+
+> _Screenshot: Diálogo de confirmação de pagamento_
 
 **O que acontece:**
+
 - ✅ Status da transação muda para "Pago"
 - ✅ Saldo da conta é atualizado
 - ✅ Juros/multas/descontos **não alteram o DRE** (são ajustes de caixa)
@@ -370,7 +395,8 @@ Use o seletor de período no topo:
 3. A lista é filtrada automaticamente
 
 ![Filtro Período](./screenshots/placeholder-filtro-periodo.png)
-> *Screenshot: Seletor de período*
+
+> _Screenshot: Seletor de período_
 
 ### 4.7 Relatório de Ofertas
 
@@ -381,13 +407,15 @@ Use o seletor de período no topo:
 5. Um conferente receberá notificação para validar
 
 ![Relatório Ofertas](./screenshots/placeholder-relatorio-ofertas.png)
-> *Screenshot: Formulário de relatório de ofertas*
+
+> _Screenshot: Formulário de relatório de ofertas_
 
 ### 4.8 Gerenciando Reembolsos
 
 #### Cenário 3: Líder Comprou Material e Precisa Ser Reembolsado
 
 1. **Registre o Fato Gerador (Despesa Real)**
+
    - Acesse **Finanças > Saídas**
    - Descrição: "Material de Evangelismo"
    - Categoria: Despesas Ministeriais > Evangelismo
@@ -398,12 +426,13 @@ Use o seletor de período no topo:
 2. **Registre a Transação de Caixa (Reembolso ao Líder)**
    - Acesse **Finanças > Saídas**
    - Descrição: "Reembolso João Silva - Material Evangelismo"
-   - Categoria: *Mesma categoria do fato gerador*
+   - Categoria: _Mesma categoria do fato gerador_
    - Valor: R$ 200
    - Conta: Caixa ou Transferência
    - Marque como "Reembolso" (se disponível)
 
 **Resultado:**
+
 - ✅ **DRE**: Registra despesa de R$ 200 em "Evangelismo" (natureza correta)
 - ✅ **Caixa**: Registra saída de R$ 200 para João Silva
 - ✅ **Rastreabilidade**: Vinculação entre o fato gerador e o reembolso
@@ -422,6 +451,7 @@ Use quando o lançamento foi feito por engano ou precisa ser cancelado:
 4. Confirme
 
 **Impacto:**
+
 - ❌ **DRE**: O lançamento é removido (ou marcado como estornado)
 - ❌ **Caixa**: Se já houve pagamento, o estorno não reverte automaticamente (faça estorno de caixa separadamente)
 
@@ -435,6 +465,7 @@ Use quando o pagamento foi feito por engano mas o fato gerador é válido:
 4. Confirme
 
 **Impacto:**
+
 - ✅ **DRE**: Permanece inalterado
 - ❌ **Caixa**: Saldo é revertido
 
@@ -470,6 +501,7 @@ Organize o plano de contas por tipo de movimentação:
 6. Use a busca para localizar rapidamente
 
 **Exemplos de estrutura:**
+
 - **Entradas**: Dízimos > Dízimo Mensal, Ofertas > Oferta de Missões
 - **Saídas**: Pessoal > Salários, Infraestrutura > Aluguel
 
@@ -538,9 +570,11 @@ Gerencie contas onde o dinheiro transita:
    - Resultado líquido
 
 ![DRE](./screenshots/placeholder-dre.png)
-> *Screenshot: Relatório DRE*
+
+> _Screenshot: Relatório DRE_
 
 **Interpretação:**
+
 - **Receitas**: Todos os fatos geradores de entrada por competência
 - **Despesas**: Todos os fatos geradores de saída por competência
 - **Resultado**: Receita - Despesa (independente se foi pago ou não)
@@ -557,6 +591,7 @@ Para entender a composição do DRE em detalhes, consulte: [Diagrama DRE](diagra
 6. Identifique divergências (juros, taxas, lançamentos não previstos)
 
 **O que acontece:**
+
 - ✅ Transações conciliadas recebem status "Conciliado"
 - ⚠️ Divergências são destacadas para ajuste manual
 - ✅ Saldo final é validado contra o extrato
@@ -569,12 +604,12 @@ Em qualquer lista financeira:
 2. Um arquivo Excel será baixado com todos os dados filtrados
 
 **Formatos disponíveis:**
+
 - Transações completas (com categoria, fornecedor, forma de pagamento)
 - DRE anual
 - Projeções financeiras
 
 ---
-
 
 ### Referências Técnicas
 
@@ -596,14 +631,16 @@ Para entender melhor a arquitetura financeira e decisões técnicas:
 2. Visualize o calendário de eventos
 
 ![Calendário Cultos](./screenshots/placeholder-calendario-cultos.png)
-> *Screenshot: Calendário de cultos*
+
+> _Screenshot: Calendário de cultos_
 
 #### O que aparece na tela (Geral)
+
 - Cards com métricas: **Próximos Cultos**, **Times Ativos**, **Membros Escalados**, **Realizados**, **Mídias Ativas**
 - Módulos principais (cards clicáveis): **Eventos**, **Times**, **Dashboard Liturgia**, **Mídias**
 - Ações rápidas: **Novo Culto/Evento**, **Gerenciar Times**, **Ver Dashboard Liturgia**, **Gerenciar Mídias**
 
-> Evidência: `src/pages/Cultos.tsx` (redireciona `/cultos` → `/cultos/geral`) e `src/pages/cultos/Geral.tsx` (estatísticas, módulos e ações). 
+> Evidência: `src/pages/Cultos.tsx` (redireciona `/cultos` → `/cultos/geral`) e `src/pages/cultos/Geral.tsx` (estatísticas, módulos e ações).
 > Calendário de eventos — (a confirmar)
 
 ### 5.2 Criando um Novo Culto
@@ -619,7 +656,8 @@ Para entender melhor a arquitetura financeira e decisões técnicas:
 3. Clique em **"Salvar"**
 
 ![Novo Culto](./screenshots/placeholder-novo-culto.png)
-> *Screenshot: Formulário de novo culto*
+
+> _Screenshot: Formulário de novo culto_
 
 > Observação: criação/edição ocorre pela página de **Eventos** (rota `src/pages/cultos/Eventos.tsx`, detalhes — (a confirmar)). Atalho de criação pode abrir com parâmetro `?novo=true`.
 
@@ -634,23 +672,27 @@ Ao clicar em um culto, você acessa a **Mesa de Controle** com as abas:
 - Edição de tema, pregador, status
 
 ![Mesa Controle - Geral](./screenshots/placeholder-mesa-controle-geral.png)
-> *Screenshot: Aba Visão Geral da Mesa de Controle*
+
+> _Screenshot: Aba Visão Geral da Mesa de Controle_
 
 #### Aba Liturgia
 
 Interface dividida em duas colunas:
 
 **Coluna Esquerda - Timeline:**
+
 - Lista ordenável de itens da liturgia
 - Arraste para reordenar
 - Clique para selecionar
 
 **Coluna Direita - Editor:**
+
 - Detalhes do item selecionado
 - Recursos de mídia vinculados
 
 ![Mesa Controle - Liturgia](./screenshots/placeholder-mesa-controle-liturgia.png)
-> *Screenshot: Aba Liturgia da Mesa de Controle*
+
+> _Screenshot: Aba Liturgia da Mesa de Controle_
 
 ##### Adicionando Item à Liturgia
 
@@ -679,7 +721,8 @@ Para itens de avisos/anúncios:
 - Atribuição de Ministro e Solista
 
 ![Mesa Controle - Música](./screenshots/placeholder-mesa-controle-musica.png)
-> *Screenshot: Aba Música da Mesa de Controle*
+
+> _Screenshot: Aba Música da Mesa de Controle_
 
 ##### Adicionando Música
 
@@ -697,7 +740,8 @@ Visualização e gestão dos voluntários escalados:
 3. Voluntários receberão notificação para confirmar
 
 ![Mesa Controle - Escalas](./screenshots/placeholder-mesa-controle-escalas.png)
-> *Screenshot: Aba Escalas da Mesa de Controle*
+
+> _Screenshot: Aba Escalas da Mesa de Controle_
 
 ### 5.4 Usando Templates
 
@@ -710,7 +754,8 @@ Visualização e gestão dos voluntários escalados:
 5. Os itens são adicionados automaticamente
 
 ![Aplicar Template](./screenshots/placeholder-aplicar-template.png)
-> *Screenshot: Diálogo de seleção de template*
+
+> _Screenshot: Diálogo de seleção de template_
 
 #### Salvando como Template
 
@@ -724,40 +769,271 @@ Visualização e gestão dos voluntários escalados:
 Para apresentar na igreja, utilize um dos modos abaixo (ambos em tela cheia):
 
 #### 5.5.1 Modo Comunicados (`/telao`)
+
 - Fonte: comunicados com `ativo = true` e `exibir_telao = true` (ordem por `ordem_telao`/`created_at`)
 - Como abrir: acessar a rota `/telao` no navegador do projetor
 - Controles de teclado:
 
-| Tecla | Ação |
-|-------|------|
-| **→** ou **Espaço** | Próximo slide |
-| **←** | Slide anterior |
-| **F** | Tela cheia |
-| **P** | Pausar/retomar auto-play |
+| Tecla               | Ação                     |
+| ------------------- | ------------------------ |
+| **→** ou **Espaço** | Próximo slide            |
+| **←**               | Slide anterior           |
+| **F**               | Tela cheia               |
+| **P**               | Pausar/retomar auto-play |
 
 #### 5.5.2 Modo Liturgia (`/telao-liturgia/:cultoId`)
+
 - Fonte: itens da liturgia (`liturgia_culto`) e recursos vinculados (`liturgia_recursos` → `midias`)
 - Como abrir: acessar `/telao-liturgia/<ID_DO_CULTO>` a partir da Mesa de Controle
 - Realtime: alterações na liturgia/recursos atualizam a playlist automaticamente
 - Controles de teclado:
 
-| Tecla | Ação |
-|-------|------|
-| **→** ou **Espaço** | Próximo recurso |
-| **←** | Recurso anterior |
-| **F** | Tela cheia |
-| **P** | Pausar/retomar auto-avance |
-| **B** | Tela preta |
-| **C** | Tela limpa (neutra) |
+| Tecla               | Ação                       |
+| ------------------- | -------------------------- |
+| **→** ou **Espaço** | Próximo recurso            |
+| **←**               | Recurso anterior           |
+| **F**               | Tela cheia                 |
+| **P**               | Pausar/retomar auto-avance |
+| **B**               | Tela preta                 |
+| **C**               | Tela limpa (neutra)        |
 
 ![Telão](./screenshots/placeholder-telao.png)
-> *Screenshot: Tela de projeção*
+
+> _Screenshot: Tela de projeção_
 
 > Observação: no modo liturgia, exibe barra de progresso quando definido `duracao_segundos` no recurso.
 
 #### Links de Diagramas (Cultos)
+
 - Fluxo do módulo: `diagramas/fluxo-cultos.md`
 - Sequência do módulo: `diagramas/sequencia-cultos.md`
+
+---
+
+## 5.4 Relógio de Oração (tipo RELOGIO)
+
+### Acessando o Relógio
+
+1. No menu de **Eventos**, identifique um evento do tipo **RELOGIO** (ícone de relógio)
+2. Clique no evento para abrir **EventoDetalhes**
+3. Você verá as tabs adaptadas: **Turnos** (Timeline), **Escalas**, **Check-in**
+
+### Aba Turnos (Timeline Visual)
+
+A Timeline exibe um grid de **24 horas** com slots de voluntários:
+
+#### Layout da Timeline
+
+- **Coluna esquerda**: Horas (00:00 até 23:00)
+- **Coluna central**: Cards com voluntários por horário
+- **DatePicker no topo**: Navega entre os dias do Relógio (ex: Relógio de 7 dias = navegação dia a dia)
+
+#### Color Coding dos Slots
+
+| Cor        | Significado                         |
+| ---------- | ----------------------------------- |
+| 🟢 Verde   | Voluntário confirmou presença       |
+| 🟡 Amarelo | Pendente de confirmação             |
+| ⚪ Cinza   | Slot vazio (sem voluntário)         |
+| 🔵 Azul    | Hora atual (destaque em tempo real) |
+
+#### Ações por Slot
+
+Clique no menu (⋮) de cada slot para:
+
+- **Editar**: Mudar voluntário ou horário do turno
+- **Duplicar para Amanhã**: Cria slot idêntico no próximo dia
+- **Remover**: Deleta o turno
+
+#### Adicionando Voluntários com Recorrência
+
+1. Clique em um slot vazio
+2. Abre sheet **"Adicionar Voluntário"**
+3. Preencha:
+   - **Voluntário**: Busque por nome (combobox com autocomplete)
+   - **Horário**: Defina início e fim (defaults vêm do slot clicado)
+   - **Recorrência**: Escolha um tipo:
+     - **Nenhuma**: Apenas este slot
+     - **Diária**: Repete todos os dias até fim do Relógio
+     - **Semanal**: Repete no mesmo dia da semana
+     - **Personalizada**: Selecione dias específicos (Seg/Ter/Qua/etc.)
+4. Visualize o preview: **"X turnos serão criados em: [datas]"**
+5. ⚠️ Se houver conflitos (voluntário já escalado nesses dias), aviso aparece
+6. Clique **"Adicionar"** para inserir todas as escalas
+
+**Exemplo**: João Silva, 14h-16h, Recorrência Diária → cria 7 turnos (um por dia) automaticamente.
+
+### Player de Oração (`/oracao/player/:escalaId`)
+
+#### Acessando o Player
+
+**Opção 1 - Via Timeline:**
+
+- Na Timeline, clique em um card de voluntário → abre Player daquele turno
+
+**Opção 2 - Via Centro de Operações:**
+
+- No Dashboard/Centro de Operações, veja widget **"Relógio Ativo Agora"**
+- Clique **"Entrar no Turno"** → abre Player do turno em andamento
+
+#### Interface do Player
+
+Full-screen e imersivo, com:
+
+**Header** (top)
+
+- Barra de progresso segmentada (1 linha = 1 slide)
+- Botão fechar (X)
+- Nome do evento + título do slide
+- Timer do turno em andamento (MM:SS, piscando em vermelho)
+
+**Conteúdo Central** (2/3 da tela)
+
+- Exibe slide atual (tipo-dependente, ver tabela abaixo)
+- Animações slide-in/fade-in para transições
+
+**Footer** (bottom)
+
+- Botões **◀** (anterior) e **▶** (próximo)
+- Indicador **"X / Y"** (slides)
+
+#### Tipos de Slides e Renderização
+
+| Tipo                | Ícone | Visual                        | Conteúdo                             |
+| ------------------- | ----- | ----------------------------- | ------------------------------------ |
+| `VERSICULO`         | 📖    | Texto em itálico centralizado | Versículo bíblico                    |
+| `VIDEO`             | ▶️    | Container 16:9                | YouTube embed ou fallback            |
+| `AVISO`             | 📢    | Título grande + parágrafo     | Anúncio/instrução                    |
+| `TIMER`             | ⏱️    | Timer em fonte grande         | Contagem regressiva (ex: 30:00)      |
+| `PEDIDOS`           | 🙏    | Lista com cards               | Pedidos de oração com botão "Orei"   |
+| `CUSTOM_TESTEMUNHO` | 💬    | Card com Quote icon           | Testemunho em citação estilizada     |
+| `CUSTOM_SENTIMENTO` | ⚠️    | Card com AlertCircle          | Alerta espiritual (padrão emocional) |
+| `CUSTOM_VISITANTES` | 👥    | Grid com avatars              | Cards de visitantes com badges       |
+
+#### Interagindo com Pedidos
+
+No slide de **PEDIDOS**, cada item mostra:
+
+- Nome da pessoa que pediu (ou "Anônimo")
+- Descrição do pedido
+- Tipo de pedido (se registrado)
+
+**Marcando "Orei":**
+
+1. Clique no botão ❤️ (Heart) no canto direito do pedido
+2. Ícone muda para ✅ (ThumbsUp) + gradiente verde
+3. Status é salvo no banco (`pedidos_oracao.status = 'em_oracao'`)
+4. Você pode continuar marcando outros pedidos
+
+**Histórico de Orações:**
+Ao abrir o Player, o sistema carrega automaticamente quais pedidos você já marcou como orados (persiste entre aberturas).
+
+#### Navegação de Slides
+
+- **Clique ◀/▶**: Avança ou retrocede
+- **Última slide**: Clique ▶ abre confirma de encerramento ("Turno finalizado! Deus abençoe.")
+- **Barra de progresso**: Cada segmento = 1 slide; clique em segmento para ir direto (a confirmar)
+
+#### Player com Conteúdo Inteligente
+
+Quando um Relógio é criado com **tipo*conteudo = BLOCO*\*** (TESTEMUNHO, SENTIMENTO, VISITANTE, PEDIDOS), o Player automaticamente:
+
+1. Chama a Edge Function `playlist-oracao` com `evento_id`
+2. Edge Function agrega:
+   - **Testemunhos**: Últimos 3 públicos
+   - **Alerta Espiritual**: Análise de sentimentos (se 3+ negativos = crítico)
+   - **Visitantes**: Últimos 7 dias
+   - **Pedidos Broadcast**: Prioritários (status = em_oracao)
+   - **Pedidos Pessoais**: Individuais
+3. Retorna slides prontos que são injetados no roteiro
+4. Você vê conteúdo **vivo e atualizado** do que a igreja está sentindo/orando
+
+### Escalas com Recorrência
+
+#### O que é Recorrência?
+
+Recorrência permite atribuir o **mesmo voluntário a múltiplos turnos automaticamente** em vez de adicionar manualmente cada um. Útil para:
+
+- ✅ Relógios 24h com 7 dias (não quer adicionar 7 vezes o mesmo nome)
+- ✅ Escalas semanais (ex: "João sempre faz segunda")
+- ✅ Padrões fixos (ex: "Mariana seg/qua/sex")
+
+#### 4 Tipos de Recorrência
+
+1. **Nenhuma** (padrão)
+
+   - Apenas 1 slot (data + horário selecionado)
+   - Sem repetição
+
+2. **Diária**
+
+   - Repete **todos os dias** até o fim do evento
+   - RELOGIO de 7 dias = 7 turnos
+   - CULTO com duração de 3 dias = 3 turnos
+
+3. **Semanal**
+
+   - Repete **mesmo dia da semana**
+   - Intervalo de 7 dias
+   - Ex: Se escolhe terça → repete todas as terças
+
+4. **Personalizada (Customizada)**
+   - Selecione **checkboxes específicos** (Seg/Ter/Qua/etc.)
+   - Exemplo: segunda + quarta + sexta apenas
+   - Gera turnos conforme padrão escolhido
+
+#### Como Usar (Passo-a-Passo)
+
+**Cenário**: RELOGIO "Vigília 24h" com 7 dias. Quer escalar João Silva (14h-16h) todos os dias.
+
+1. **Na Timeline**, clique em um **slot vazio** no dia 1, horário 14h
+2. Sheet **"Adicionar Voluntário"** abre
+3. **Busque "João Silva"** no combobox (autocomplete funciona)
+4. **Defina horário**: 14h até 16h (ou ajuste conforme necessário)
+5. **Selecione "Diária"** na seção Recorrência
+6. **Preview aparece**:
+   ```
+   ✅ 7 turnos serão criados:
+   • 30 de Dez (terça)
+   • 31 de Dez (quarta)
+   • 1º de Jan (quinta)
+   ... (até o fim do Relógio)
+   ```
+7. Se não houver **conflitos** (João já escalado nesses dias), clique **"Adicionar"**
+8. Sistema cria todos os 7 turnos em um comando só
+9. Toast confirma: **"7 turnos criados para João Silva"**
+
+#### Detecção de Conflitos
+
+Se João **já tem escalas** em alguns dos dias:
+
+```
+⚠️ Conflitos detectados:
+• 31 de Dez (já está escalado 16h-18h)
+• 1º de Jan (já está escalado 12h-14h)
+
+Deseja continuar? (inserirá apenas datas sem conflito)
+```
+
+**Opções:**
+
+- **Cancelar**: Não insere nada
+- **Continuar**: Insere apenas nos dias sem conflito (5 de 7)
+
+#### Editando Recorrências
+
+Se precisar mudar João depois:
+
+1. **Na Timeline**, clique no card dele
+2. Abre **EscalaSlotDialog** (simples, 1 turno)
+3. Edite voluntário/horário
+4. Salve
+5. ⚠️ Nota: Edição é **individual** (apenas 1 turno); para padrões recorrentes, considere remover e re-adicionar com novo padrão
+
+#### Removendo Turnos
+
+- **Remover 1 turno**: Menu (⋮) → Remover
+- **Remover série inteira**: (a confirmar) Pode ser necessário remover um por um ou via feature futura
 
 ---
 
@@ -956,6 +1232,7 @@ A página inicial `/intercessao` exibe:
    - Registrar observações pastorais (em campo de notas do perfil)
 
 **Links Úteis**:
+
 - Fluxo Intercessão (Mermaid): [`../diagramas/fluxo-intercessao.md`](../diagramas/fluxo-intercessao.md)
 - Sequência Intercessão (Mermaid): [`../diagramas/sequencia-intercessao.md`](../diagramas/sequencia-intercessao.md)
 - Produto — Intercessão: [`../produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto`](../produto/README_PRODUTO.MD#intercessão-oração-e-testemunhos-visão-de-produto)
@@ -994,7 +1271,8 @@ Para jornadas que requerem pagamento:
 > **Nota**: Pagamentos confirmados podem ser vinculados a transações financeiras (categoria "Cursos e Treinamentos") para rastreabilidade contábil.
 
 ![Nova Jornada](./screenshots/placeholder-nova-jornada.png)
-> *Screenshot: Formulário de nova jornada*
+
+> _Screenshot: Formulário de nova jornada_
 
 #### Configurando Etapas
 
@@ -1018,7 +1296,8 @@ Para jornadas que requerem pagamento:
 3. Sistema registra nota, aprovação e número de tentativas
 
 ![Etapas Jornada](./screenshots/placeholder-etapas-jornada.png)
-> *Screenshot: Configuração de etapas*
+
+> _Screenshot: Configuração de etapas_
 
 #### Kanban de Participantes
 
@@ -1028,7 +1307,8 @@ Para jornadas que requerem pagamento:
 4. Veja progresso e responsável
 
 ![Kanban Jornada](./screenshots/placeholder-kanban-jornada.png)
-> *Screenshot: Board Kanban da jornada*
+
+> _Screenshot: Board Kanban da jornada_
 
 #### Inscrevendo Participante
 
@@ -1036,7 +1316,7 @@ Para jornadas que requerem pagamento:
 2. Selecione a pessoa
 3. Defina o responsável/discipulador
 4. Clique em **"Salvar"**
-Guard-rails (Cultos):
+   Guard-rails (Cultos):
 
 - Não mover/renomear/apagar arquivos em /docs
 - Apenas COMPLEMENTAR docs existentes
@@ -1070,7 +1350,8 @@ Guard-rails (Cultos):
 4. Clique em **"Salvar"**
 
 ![Nova Aula](./screenshots/placeholder-nova-aula.png)
-> *Screenshot: Drawer de nova aula*
+
+> _Screenshot: Drawer de nova aula_
 
 #### Registrando Presenças (Check-in Manual)
 
@@ -1093,7 +1374,8 @@ Guard-rails (Cultos):
 4. Clique em **"Salvar"**
 
 ![Nova Sala](./screenshots/placeholder-nova-sala.png)
-> *Screenshot: Formulário de sala*
+
+> _Screenshot: Formulário de sala_
 
 #### Fazendo Check-in de Criança
 
@@ -1104,7 +1386,8 @@ Guard-rails (Cultos):
 5. Sistema gera etiquetas de segurança
 
 ![Check-in Kids](./screenshots/placeholder-checkin-kids.png)
-> *Screenshot: Tela de check-in*
+
+> _Screenshot: Tela de check-in_
 
 #### Imprimindo Etiquetas
 
@@ -1116,7 +1399,8 @@ Após o check-in:
    - **Etiqueta do Responsável**: Nome da criança, código
 
 ![Etiquetas](./screenshots/placeholder-etiquetas.png)
-> *Screenshot: Preview das etiquetas*
+
+> _Screenshot: Preview das etiquetas_
 
 #### Fazendo Check-out
 
@@ -1126,6 +1410,7 @@ Após o check-in:
 4. Verifique o código de segurança
 
 **Links relacionados**
+
 - Funcionalidades — Jornadas e Ensino: `funcionalidades.md#5-jornadas-e-ensino`
 - Produto — Jornadas e Ensino: `produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto`
 - Diagramas: `diagramas/fluxo-ensino.md`, `diagramas/sequencia-ensino.md`, `diagramas/fluxo-cursos-pagos.md`
@@ -1146,7 +1431,8 @@ Após o check-in:
 4. Clique em **"Salvar"**
 
 ![Novo Projeto](./screenshots/placeholder-novo-projeto.png)
-> *Screenshot: Formulário de novo projeto*
+
+> _Screenshot: Formulário de novo projeto_
 
 ### 8.2 Kanban de Tarefas
 
@@ -1160,7 +1446,8 @@ Ao acessar um projeto:
 3. A barra de progresso atualiza automaticamente
 
 ![Kanban Tarefas](./screenshots/placeholder-kanban-tarefas.png)
-> *Screenshot: Board de tarefas*
+
+> _Screenshot: Board de tarefas_
 
 ### 8.3 Criando Tarefas
 
@@ -1174,7 +1461,8 @@ Ao acessar um projeto:
 3. Clique em **"Salvar"**
 
 ![Nova Tarefa](./screenshots/placeholder-nova-tarefa.png)
-> *Screenshot: Formulário de tarefa*
+
+> _Screenshot: Formulário de tarefa_
 
 ### 8.4 Tarefas Atrasadas
 
@@ -1195,7 +1483,8 @@ O módulo de Comunicação permite que liderança e secretaria criem e publiquem
 - **Permissões**: apenas administradores e liderança podem criar/editar comunicados (RLS `comunicados_gestao_admin`).
 
 ![Hub Publicação](./screenshots/placeholder-hub-publicacao.png)
-> *Screenshot: Hub de publicação*
+
+> _Screenshot: Hub de publicação_
 
 ### 9.2 Criando um Comunicado (passo a passo)
 
@@ -1214,11 +1503,13 @@ O módulo de Comunicação permite que liderança e secretaria criem e publiquem
 - **Link de ação** (opcional): URL para direcionar quando o usuário clicar
 
 ![Comunicado Passo 1](./screenshots/placeholder-comunicado-passo1.png)
-> *Screenshot: Passo 1 - Conteúdo*
+
+> _Screenshot: Passo 1 - Conteúdo_
 
 #### Passo 2: Canais de Publicação
 
 Defina onde o comunicado será exibido (múltipla escolha):
+
 - ☐ **App/Dashboard**: aparece no carrossel do dashboard dos membros
 - ☐ **Telão/Projetor**: entra na playlist do ProPresenter ou sistema de projeção
   - Pode definir **ordem de exibição** no telão (campo `ordem_telao`)
@@ -1228,7 +1519,8 @@ Defina onde o comunicado será exibido (múltipla escolha):
 **Observação:** Um comunicado pode ser publicado em múltiplos canais simultaneamente.
 
 ![Comunicado Passo 2](./screenshots/placeholder-comunicado-passo2.png)
-> *Screenshot: Passo 2 - Canais*
+
+> _Screenshot: Passo 2 - Canais_
 
 #### Passo 3: Agendamento e Categorização
 
@@ -1240,7 +1532,8 @@ Defina onde o comunicado será exibido (múltipla escolha):
 - **Vincular a culto** (opcional): associa o comunicado a um culto específico (FK `culto_id`)
 
 ![Comunicado Passo 3](./screenshots/placeholder-comunicado-passo3.png)
-> *Screenshot: Passo 3 - Agendamento*
+
+> _Screenshot: Passo 3 - Agendamento_
 
 4. Clique em **"Publicar"** para ativar o comunicado
 
@@ -1270,15 +1563,18 @@ Não há segmentação por roles (admin, membro, visitante) ou grupos específic
 ### 9.6 Visualização nos Canais
 
 #### No App/Dashboard
+
 - Membros veem os comunicados ativos no **carrossel de banners** (`BannerCarousel.tsx`) na tela principal.
 - Query: `SELECT * FROM comunicados WHERE ativo = true AND exibir_app = true AND (data_inicio <= NOW() AND (data_fim IS NULL OR data_fim >= NOW()))`.
 
 #### No Telão/Projetor
+
 - Comunicados com `exibir_telao = true` são consumidos pela página `/telao` (`Telao.tsx`).
 - Exibição em carrossel automático com controles de navegação e pausa.
 - Ordem definida pelo campo `ordem_telao`.
 
 #### No Site Público
+
 - Comunicados com `exibir_site = true` são exibidos no carrossel do site (integração a confirmar).
 
 **Links úteis**: (diagrama de fluxo de comunicação a criar)
@@ -1300,7 +1596,8 @@ Não há segmentação por roles (admin, membro, visitante) ou grupos específic
 5. Clique em **"Salvar"**
 
 ![Nova Mídia](./screenshots/placeholder-nova-midia.png)
-> *Screenshot: Upload de mídia*
+
+> _Screenshot: Upload de mídia_
 
 ---
 
@@ -1316,7 +1613,8 @@ O módulo de **Notificações** entrega alertas automáticos do sistema diretame
 4. Notificações já lidas ficam acinzentadas
 
 ![Sino de Notificações](./screenshots/placeholder-sino-notificacoes.png)
-> *Screenshot: Popover de notificações*
+
+> _Screenshot: Popover de notificações_
 
 ### 10.2 Tipos de Notificações
 
@@ -1334,17 +1632,21 @@ Cada tipo tem **ícone e cor próprios** para rápida identificação visual.
 ### 10.3 Interagindo com Notificações
 
 #### Ver detalhes:
+
 - Clique sobre a notificação para **ser redirecionado** à tela correspondente (ex: clicar em "Nova Conta a Pagar" leva ao Financeiro)
 
 #### Marcar como lida:
+
 - Ao clicar, a notificação é **automaticamente marcada como lida**
 - Você também pode clicar em **"Limpar"** (botão no topo) para marcar **todas como lidas de uma vez**
 
 #### Excluir:
+
 - Passe o mouse sobre uma notificação e clique no **ícone de lixeira** que aparece à direita
 
 ![Ações de Notificação](./screenshots/placeholder-acoes-notificacao.png)
-> *Screenshot: Ações em notificações*
+
+> _Screenshot: Ações em notificações_
 
 ### 10.4 Canais de Entrega
 
@@ -1368,44 +1670,48 @@ Se você é **Administrador**, pode gerenciar quais eventos disparam notificaç�
    - 💬 **WhatsApp**: via integração externa
 
 #### Adicionar destinatário:
+
 1. Clique em **"+ Add"** no card do evento
 2. Selecione o **role** (cargo) no dropdown
 3. O destinatário é criado com canais padrão ativos
 
 #### Ativar/Desativar canal:
+
 - Use os **switches** (toggle) para ativar/desativar canais por destinatário
 - Exemplo: "Tesoureiro recebe apenas in-app e push, sem WhatsApp"
 
 #### Remover destinatário:
+
 - Passe o mouse sobre a linha e clique no **ícone de lixeira**
 
 ![Admin Notificações](./screenshots/placeholder-admin-notificacoes.png)
-> *Screenshot: Tela de configuração de notificações (admin)*
+
+> _Screenshot: Tela de configuração de notificações (admin)_
 
 ### 10.6 Eventos Disponíveis
 
 Principais eventos que podem disparar notificações automáticas:
 
-| Evento                          | Categoria    | Quando dispara                                    |
-|---------------------------------|--------------|--------------------------------------------------|
-| `financeiro_conta_vencer`       | Financeiro   | Nova conta a pagar cadastrada                     |
-| `financeiro_reembolso_aprovacao`| Financeiro   | Reembolso aguardando aprovação                    |
-| `kids_checkin`                  | Kids         | Criança fez check-in no ministério                |
-| `kids_ocorrencia`               | Kids         | Registrada ocorrência/choro de criança            |
-| `novo_visitante`                | Pessoas      | Novo visitante cadastrado no sistema              |
-| `pedido_oracao`                 | Intercessão  | Novo pedido de oração recebido                    |
+| Evento                           | Categoria   | Quando dispara                         |
+| -------------------------------- | ----------- | -------------------------------------- |
+| `financeiro_conta_vencer`        | Financeiro  | Nova conta a pagar cadastrada          |
+| `financeiro_reembolso_aprovacao` | Financeiro  | Reembolso aguardando aprovação         |
+| `kids_checkin`                   | Kids        | Criança fez check-in no ministério     |
+| `kids_ocorrencia`                | Kids        | Registrada ocorrência/choro de criança |
+| `novo_visitante`                 | Pessoas     | Novo visitante cadastrado no sistema   |
+| `pedido_oracao`                  | Intercessão | Novo pedido de oração recebido         |
 
 > 📌 **Nota**: A lista de eventos é expansível. Novos eventos podem ser adicionados conforme necessidades operacionais da igreja.
 
 ### 10.7 Diferença: Notificações vs. Comunicação
 
-| Aspecto                | Notificações                          | Comunicação                        |
-|------------------------|---------------------------------------|------------------------------------|
-| **Origem**             | Automática (evento do sistema)        | Manual (criação humana)            |
-| **Conteúdo**           | Template fixo (ex: "Nova conta X")    | Livre (banners, avisos, editoria)  |
-| **Destinatário**       | Definido por role/cargo               | Público geral (app/telão/site)     |
-| **Objetivo**           | Alerta operacional / ação requerida   | Informação institucional           |
-| **Edição**             | Não editável (gerado pelo sistema)    | Totalmente editável                |
+| Aspecto          | Notificações                        | Comunicação                       |
+| ---------------- | ----------------------------------- | --------------------------------- |
+| **Origem**       | Automática (evento do sistema)      | Manual (criação humana)           |
+| **Conteúdo**     | Template fixo (ex: "Nova conta X")  | Livre (banners, avisos, editoria) |
+| **Destinatário** | Definido por role/cargo             | Público geral (app/telão/site)    |
+| **Objetivo**     | Alerta operacional / ação requerida | Informação institucional          |
+| **Edição**       | Não editável (gerado pelo sistema)  | Totalmente editável               |
 
 > **Regra de ouro**: Se é uma **reação a um evento do sistema**, é Notificação. Se é **conteúdo criado manualmente para comunicar algo**, é Comunicação.
 
@@ -1419,7 +1725,8 @@ Principais eventos que podem disparar notificações automáticas:
 2. Selecione **"Perfil"**
 
 ![Menu Perfil](./screenshots/placeholder-menu-perfil.png)
-> *Screenshot: Menu do usuário*
+
+> _Screenshot: Menu do usuário_
 
 #### Alterando Foto
 
@@ -1429,7 +1736,8 @@ Principais eventos que podem disparar notificações automáticas:
 4. Clique em **"Confirmar"**
 
 ![Upload Foto](./screenshots/placeholder-upload-foto.png)
-> *Screenshot: Diálogo de foto de perfil*
+
+> _Screenshot: Diálogo de foto de perfil_
 
 #### Alterando Senha
 
@@ -1447,7 +1755,8 @@ Principais eventos que podem disparar notificações automáticas:
    - Clique em **"Recusar"** e informe o motivo
 
 ![Minhas Escalas](./screenshots/placeholder-minhas-escalas.png)
-> *Screenshot: Lista de escalas*
+
+> _Screenshot: Lista de escalas_
 
 ### 10.3 Minha Família
 
@@ -1456,7 +1765,8 @@ Principais eventos que podem disparar notificações automáticas:
 3. Clique em **"+ Adicionar Dependente"** para cadastrar filhos
 
 ![Minha Família](./screenshots/placeholder-minha-familia.png)
-> *Screenshot: Página Minha Família*
+
+> _Screenshot: Página Minha Família_
 
 ### 10.4 Meus Cursos
 
@@ -1465,13 +1775,15 @@ Principais eventos que podem disparar notificações automáticas:
 3. Clique em um curso para continuar estudando
 
 ![Meus Cursos](./screenshots/placeholder-meus-cursos.png)
-> *Screenshot: Lista de cursos*
+
+> _Screenshot: Lista de cursos_
 
 #### Inscrição em Cursos Pagos (Aluno)
 
 Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O sistema diferencia cursos gratuitos e pagos para garantir uma experiência clara e segura.
 
 **Como inscrever-se**
+
 1. Acesse **Minha Área > Meus Cursos**.
 2. Use as abas no topo:
    - **Meus cursos**: cursos já inscritos (com progresso e status).
@@ -1483,15 +1795,18 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
    - Cursos **pagos**: uma transação financeira de **entrada** é criada com **status pendente** e sua inscrição fica com **status_pagamento: pendente**.
 
 **O que você verá após a inscrição paga**
+
 - No painel **Meus cursos**, o curso aparece com o badge **“Aguardando Pagamento”**.
 - Ao tentar abrir o **Player**, o acesso fica **bloqueado** até a confirmação de pagamento.
 - Após a confirmação (baixa no módulo financeiro), o status muda para **pago** e o conteúdo é liberado.
 
 **Dicas e avisos**
+
 - Caso veja um aviso de **configuração financeira ausente**, procure a secretaria/tesouraria para ajustar a conta de recebimento (a confirmar conforme política interna).
 - Formas de pagamento como **PIX/Cartão** não aparecem no app do aluno neste fluxo (a confirmar integração); a baixa é registrada administrativamente no módulo financeiro.
 
 **Fluxo visual (Mermaid)**
+
 - Consulte o diagrama: [Fluxo de Cursos Pagos](diagramas/fluxo-cursos-pagos.md)
 
 ### 10.5 Registrando Sentimento
@@ -1502,7 +1817,8 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
 4. Clique em **"Registrar"**
 
 ![Registrar Sentimento](./screenshots/placeholder-registrar-sentimento.png)
-> *Screenshot: Diálogo de sentimento*
+
+> _Screenshot: Diálogo de sentimento_
 
 ---
 
@@ -1517,7 +1833,8 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
    - Logs de erros
 
 ![Painel Admin](./screenshots/placeholder-painel-admin.png)
-> *Screenshot: Painel administrativo*
+
+> _Screenshot: Painel administrativo_
 
 ### 11.2 Gerenciando Funções de Igreja
 
@@ -1532,31 +1849,37 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
 2. Seções disponíveis:
 
 **Modo de Manutenção:**
+
 - Ativar/desativar modo manutenção (bloqueia acesso ao sistema)
 - Permitir acesso público durante manutenção
 - Personalizar mensagem de manutenção
 
 **Informações Básicas:**
+
 - Nome da igreja
 - Subtítulo
 - Logo (upload com preview)
 
 **Webhooks de Integração:**
+
 - Card com link para página dedicada `/admin/webhooks`
 - Gerenciamento seguro de URLs de webhook (valores mascarados)
 
 **Notificações & Plantão Pastoral:**
+
 - Telefone do plantão pastoral (para alertas críticos)
 - Provedor WhatsApp: Make.com, Meta Official API, ou Evolution API
 - Campos de credenciais variam conforme provedor selecionado
 
 **IA & Chatbot:**
+
 - Card "Chatbots & Inteligência Artificial" confirma visualmente se o `OPENAI_API_KEY` está presente
 - Botão **Gerenciar Chatbots & IAs** redireciona para a tela administrativa `/admin/chatbots`
 - Dica exibida lembra que os prompts/modelos são ajustados nessa tela dedicada
 
 ![Configurações Igreja](./screenshots/placeholder-config-igreja.png)
-> *Screenshot: Configurações da igreja*
+
+> _Screenshot: Configurações da igreja_
 
 ### 11.3.1 Webhooks de Integração
 
@@ -1580,10 +1903,12 @@ Página dedicada em `/admin/webhooks` para gerenciar webhooks de forma segura:
 ### 11.4 Gestão de Permissões (Admin)
 
 #### Visão Geral
+
 Acesse **Admin > Permissões** para gerenciar a matriz de permissões por cargo. A interface exibe uma tabela com permissões agrupadas por módulo em accordion expansível.
 
 ![Matriz de Permissões](./screenshots/placeholder-admin-permissions.png)
-> *Screenshot: Matriz de permissões com controles tri-state*
+
+> _Screenshot: Matriz de permissões com controles tri-state_
 
 #### Controles Tri-State por Módulo
 
@@ -1594,6 +1919,7 @@ No cabeçalho de cada módulo (ex: Financeiro, Comunicados, Kids), você verá i
 - **⭕ Cinza (XCircle)**: Nenhuma permissão ativa
 
 **Como usar:**
+
 1. Clique no indicador para alternar entre ativar/desativar todas as permissões do módulo
 2. Se estado for "nenhuma" ou "parcial" → Ativa todas
 3. Se estado for "todas ativas" → Desativa todas
@@ -1629,7 +1955,8 @@ Antes de salvar, revise todas as alterações:
    - **Confirmar Salvar**: Persiste no banco de dados
 
 ![Confirmação de Permissões](./screenshots/placeholder-permissions-confirm.png)
-> *Screenshot: Dialog de confirmação com diff visual*
+
+> _Screenshot: Dialog de confirmação com diff visual_
 
 #### Dicas de Uso
 
@@ -1637,6 +1964,7 @@ Antes de salvar, revise todas as alterações:
 - **Batch operations**: Controles em massa evitam cliques repetitivos
 - **Auditoria**: Todas as alterações são registradas com timestamp e autor
 - **Undo**: Após salvar, botão "Desfazer" aparece no toast por 10 segundos
+
 #### Desfazendo Alterações de Permissões (Rollback)
 
 Se você cometeu um erro ao alterar permissões, pode desfazer facilmente:
@@ -1651,7 +1979,6 @@ O histórico mostra quem fez cada mudança, quando, e que permissões foram alte
 
 **Nota:** Você só pode desfazer suas próprias alterações (ou as de outros admins, se tiver permissão de auditoria).
 
-
 ---
 
 ### 11.5 Links Externos e QR Codes
@@ -1665,7 +1992,8 @@ Na página de Pessoas:
 3. Baixe QR Codes para impressão
 
 ![Links Externos](./screenshots/placeholder-links-externos.png)
-> *Screenshot: Card de links externos*
+
+> _Screenshot: Card de links externos_
 
 ---
 
@@ -1673,30 +2001,30 @@ Na página de Pessoas:
 
 ### Telão (Projeção)
 
-| Tecla | Ação |
-|-------|------|
-| `→` ou `Espaço` | Próximo slide |
-| `←` | Slide anterior |
-| `F` | Alternar tela cheia |
-| `P` | Pausar/retomar auto-play |
-| `B` | Tela preta |
-| `C` | Limpar tela |
-| `Esc` | Sair da tela cheia |
+| Tecla           | Ação                     |
+| --------------- | ------------------------ |
+| `→` ou `Espaço` | Próximo slide            |
+| `←`             | Slide anterior           |
+| `F`             | Alternar tela cheia      |
+| `P`             | Pausar/retomar auto-play |
+| `B`             | Tela preta               |
+| `C`             | Limpar tela              |
+| `Esc`           | Sair da tela cheia       |
 
 ---
 
 ## Apêndice B: Glossário
 
-| Termo | Definição |
-|-------|-----------|
-| **Visitante** | Pessoa que visitou a igreja pela primeira vez |
-| **Frequentador** | Pessoa que frequenta regularmente mas não é membro |
-| **Membro** | Pessoa oficialmente membro da igreja |
-| **Intercessor** | Membro dedicado a orar pelos pedidos recebidos |
-| **Jornada** | Trilha de aprendizado/curso com múltiplas etapas |
-| **Escala** | Atribuição de voluntário para servir em um culto |
-| **Mesa de Controle** | Interface de gestão completa de um culto |
-| **DRE** | Demonstrativo de Resultado do Exercício |
+| Termo                | Definição                                          |
+| -------------------- | -------------------------------------------------- |
+| **Visitante**        | Pessoa que visitou a igreja pela primeira vez      |
+| **Frequentador**     | Pessoa que frequenta regularmente mas não é membro |
+| **Membro**           | Pessoa oficialmente membro da igreja               |
+| **Intercessor**      | Membro dedicado a orar pelos pedidos recebidos     |
+| **Jornada**          | Trilha de aprendizado/curso com múltiplas etapas   |
+| **Escala**           | Atribuição de voluntário para servir em um culto   |
+| **Mesa de Controle** | Interface de gestão completa de um culto           |
+| **DRE**              | Demonstrativo de Resultado do Exercício            |
 
 ---
 
@@ -1710,6 +2038,7 @@ O sistema adapta automaticamente a interface para dispositivos móveis:
 - **Mobile (<768px)**: Dialogs se transformam em drawers (bottom sheet) que deslizam de baixo para cima
 
 **Vantagens no mobile:**
+
 - Melhor uso do espaço vertical limitado
 - Interação nativa (deslizar para fechar)
 - Conteúdo mais acessível sem scroll excessivo
@@ -1717,6 +2046,7 @@ O sistema adapta automaticamente a interface para dispositivos móveis:
 ### Safe Areas (iPhone)
 
 A interface respeita as áreas seguras do dispositivo:
+
 - **Notch/Dynamic Island**: Conteúdo não fica oculto pela área do sensor
 - **Home indicator**: Botões e controles ficam acima da barra de gesto
 - **Margens laterais**: Respeitadas em dispositivos com bordas arredondadas
@@ -1749,4 +2079,4 @@ Em caso de dúvidas ou problemas:
 
 ---
 
-*Documento gerado em Dezembro de 2024*
+_Documento gerado em Dezembro de 2024_

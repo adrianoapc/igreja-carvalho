@@ -29,6 +29,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import MinhasTarefasWidget from "@/components/dashboard/MinhasTarefasWidget";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import { WelcomeHeader } from "./WelcomeHeader";
+import ConvitesPendentesWidget from "@/components/dashboard/ConvitesPendentesWidget";
 
 interface Banner {
   id: string;
@@ -62,7 +63,7 @@ export default function DashboardMember() {
 
   const checkTodaySentimento = async () => {
     if (!profile?.id) return;
-    
+
     const today = new Date();
     const dayStart = startOfDay(today).toISOString();
     const dayEnd = endOfDay(today).toISOString();
@@ -97,7 +98,14 @@ export default function DashboardMember() {
   };
 
   const getInitials = (name: string) => {
-    return name?.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase() || "?";
+    return (
+      name
+        ?.split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase() || "?"
+    );
   };
 
   const handleBannerClick = (banner: Banner) => {
@@ -111,8 +119,8 @@ export default function DashboardMember() {
       {/* Header & Personal Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-            <WelcomeHeader /> 
-        {/* 
+          <WelcomeHeader />
+          {/* 
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Olá, {firstName}!</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
@@ -129,12 +137,15 @@ export default function DashboardMember() {
         )}
       </div>
 
-      <RegistrarSentimentoDialog 
-        open={sentimentoDialogOpen} 
+      {/* Widget de Convites Pendentes */}
+      <ConvitesPendentesWidget />
+
+      <RegistrarSentimentoDialog
+        open={sentimentoDialogOpen}
         onOpenChange={(open) => {
           setSentimentoDialogOpen(open);
           if (!open) checkTodaySentimento(); // Atualiza estado ao fechar
-        }} 
+        }}
       />
 
       {/* Banners Carousel */}
@@ -178,9 +189,13 @@ export default function DashboardMember() {
                       </div>
                     ) : (
                       <CardContent className="p-4 aspect-[16/9] flex flex-col justify-center bg-gradient-to-r from-primary/10 to-primary/5">
-                        <h3 className="text-lg font-bold text-foreground">{banner.titulo}</h3>
+                        <h3 className="text-lg font-bold text-foreground">
+                          {banner.titulo}
+                        </h3>
                         {banner.descricao && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">{banner.descricao}</p>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
+                            {banner.descricao}
+                          </p>
                         )}
                       </CardContent>
                     )}
@@ -203,14 +218,25 @@ export default function DashboardMember() {
         <CardContent className="p-4 flex items-center gap-4">
           <Avatar className="w-16 h-16 border-2 border-primary/30">
             <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="text-lg bg-primary/20 text-primary">{getInitials(profile?.nome || "")}</AvatarFallback>
+            <AvatarFallback className="text-lg bg-primary/20 text-primary">
+              {getInitials(profile?.nome || "")}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground truncate">{profile?.nome}</p>
-            <p className="text-sm text-muted-foreground capitalize">{profile?.status}</p>
+            <p className="font-semibold text-foreground truncate">
+              {profile?.nome}
+            </p>
+            <p className="text-sm text-muted-foreground capitalize">
+              {profile?.status}
+            </p>
           </div>
           <div className="p-1.5 bg-white rounded-lg border">
-            <QRCodeSVG value={`checkin:${profile?.id || ""}`} size={52} level="M" includeMargin={false} />
+            <QRCodeSVG
+              value={`checkin:${profile?.id || ""}`}
+              size={52}
+              level="M"
+              includeMargin={false}
+            />
           </div>
         </CardContent>
       </Card>
@@ -259,17 +285,25 @@ export default function DashboardMember() {
       </div>
 
       {/* Bíblia Access */}
-      <Card className="shadow-soft cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/biblia")}>
+      <Card
+        className="shadow-soft cursor-pointer hover:shadow-md transition-shadow"
+        onClick={() => navigate("/biblia")}
+      >
         <CardContent className="p-4 flex items-center gap-4">
           <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30">
             <BookOpen className="w-6 h-6 text-amber-600" />
           </div>
           <div className="flex-1">
             <p className="font-medium text-foreground">Bíblia Sagrada</p>
-            <p className="text-sm text-muted-foreground">Leia e medite na Palavra</p>
+            <p className="text-sm text-muted-foreground">
+              Leia e medite na Palavra
+            </p>
           </div>
         </CardContent>
       </Card>
+
+      {/* Convites Pendentes Widget */}
+      <ConvitesPendentesWidget />
 
       {/* Minhas Tarefas Widget */}
       <MinhasTarefasWidget />
