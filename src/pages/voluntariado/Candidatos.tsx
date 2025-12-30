@@ -113,7 +113,18 @@ export default function Candidatos() {
       .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
       .single();
 
-    const { error } = await supabase
+    // Verificar se o candidato tem pessoa_id vinculado
+    if (!candidato.pessoa_id) {
+      toast({
+        title: "Candidato sem perfil vinculado",
+        description: "Este candidato não tem um perfil de usuário vinculado. Não é possível inscrevê-lo na trilha automaticamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 1. Atualizar status do candidato
+    const { error: errorCandidato } = await supabase
       .from("candidatos_voluntario")
       .update({
         status: "em_trilha",
@@ -123,20 +134,49 @@ export default function Candidatos() {
       })
       .eq("id", candidato.id);
 
-    if (error) {
+    if (errorCandidato) {
       toast({
         title: "Erro ao vincular trilha",
-        description: error.message,
+        description: errorCandidato.message,
         variant: "destructive",
       });
+      return;
+    }
+
+    // 2. Criar inscrição na jornada (trilha)
+    const { error: errorInscricao } = await supabase
+      .from("inscricoes_jornada")
+      .insert({
+        jornada_id: jornadaId,
+        pessoa_id: candidato.pessoa_id,
+        responsavel_id: userProfile?.id || null,
+        data_entrada: new Date().toISOString(),
+        concluido: false,
+      });
+
+    if (errorInscricao) {
+      // Se já existir inscrição, apenas avisa (não é erro crítico)
+      if (errorInscricao.code === "23505") {
+        toast({
+          title: "Trilha vinculada",
+          description: "Candidato já estava inscrito nesta trilha.",
+        });
+      } else {
+        toast({
+          title: "Aviso",
+          description: `Status atualizado, mas houve erro ao criar inscrição: ${errorInscricao.message}`,
+          variant: "destructive",
+        });
+      }
     } else {
       const trilhaNome = jornadas.find((j) => j.id === jornadaId)?.titulo;
       toast({
         title: "Trilha vinculada",
-        description: `Candidato enviado para ${trilhaNome}`,
+        description: `Candidato inscrito em ${trilhaNome}`,
       });
-      fetchCandidatos();
     }
+
+    fetchCandidatos();
   };
 
   const getTrilhaSugerida = (ministerio: string) => {
