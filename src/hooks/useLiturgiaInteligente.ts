@@ -58,7 +58,7 @@ export function useLiturgiaInteligente(eventoId?: string) {
         setError(errorMsg);
         // Fallback com dados vazios
         setPlaylist({
-          alerta: [],
+          alerta: undefined,
           testemunhos: [],
           visitantes: [],
           broadcast: [],

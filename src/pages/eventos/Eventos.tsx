@@ -69,7 +69,7 @@ import CalendarioMensal from "@/components/cultos/CalendarioMensal";
 
 interface Evento {
   id: string;
-  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
+  tipo: string;
   titulo: string;
   descricao: string | null;
   data_evento: string;
@@ -141,7 +141,7 @@ export default function Eventos() {
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
 
   // KPIs
   const [kpis, setKpis] = useState({
@@ -164,12 +164,7 @@ export default function Eventos() {
 
       if (error) throw error;
 
-      const normalized = (data || []).map((d) => ({
-        ...d,
-        tipo: d.tipo as Evento["tipo"],
-      }));
-
-      setEventos(normalized);
+      setEventos((data || []) as Evento[]);
     } catch (error: unknown) {
       toast.error("Erro ao carregar eventos", {
         description: error instanceof Error ? error.message : String(error),
@@ -433,9 +428,9 @@ export default function Eventos() {
                   <Calendar
                     initialFocus
                     mode="range"
-                    defaultMonth={dateRange.from}
+                    defaultMonth={dateRange?.from}
                     selected={dateRange}
-                    onSelect={(range) => setDateRange(range || {})}
+                    onSelect={(range) => setDateRange(range as { from: Date; to: Date } | undefined)}
                     numberOfMonths={2}
                   />
                 </PopoverContent>
@@ -662,9 +657,9 @@ export default function Eventos() {
 
         <TabsContent value="calendario" className="mt-4">
           <CalendarioMensal
-            cultos={filteredEventos}
+            cultos={filteredEventos as any}
             escalasCount={{}}
-            onCultoClick={handleAbrirEvento}
+            onCultoClick={(e) => handleAbrirEvento(e as any)}
           />
         </TabsContent>
       </Tabs>
@@ -672,7 +667,7 @@ export default function Eventos() {
       <EventoDialog
         open={eventoDialogOpen}
         onOpenChange={setEventoDialogOpen}
-        evento={editingEvento}
+        evento={editingEvento as any}
         onSuccess={() => {
           loadEventos();
           loadKPIs();

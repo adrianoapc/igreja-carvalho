@@ -29,7 +29,7 @@ import {
 interface ConvitePendente {
   id: string;
   status: "pendente" | "confirmado" | "recusado";
-  data_envio: string;
+  enviado_em: string | null;
   evento: {
     id: string;
     titulo: string;
@@ -59,7 +59,7 @@ export default function ConvitesPendentesWidget() {
           `
           id,
           status,
-          data_envio,
+          enviado_em,
           evento:eventos!eventos_convites_evento_id_fkey (
             id,
             titulo,
