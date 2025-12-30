@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
+import {
   Clock,
   Plus,
   MoreHorizontal,
@@ -16,7 +16,7 @@ import {
   Trash2,
   Copy,
   AlertCircle,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -25,8 +25,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import EscalaSlotDialog from "./EscalaSlotDialog";
+import AdicionarVoluntarioSheet from "./AdicionarVoluntarioSheet";
 
 interface Evento {
   id: string;
@@ -59,11 +64,21 @@ interface EscalaTimelineProps {
 }
 
 export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(evento.data_evento));
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    new Date(evento.data_evento)
+  );
   const [escalas, setEscalas] = useState<EscalaSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [slotDialogOpen, setSlotDialogOpen] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{ hora: number; data: Date } | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{
+    hora: number;
+    data: Date;
+  } | null>(null);
+  const [selectedSlotSheet, setSelectedSlotSheet] = useState<{
+    hora: number;
+    data: Date;
+  } | null>(null);
   const [editingSlot, setEditingSlot] = useState<EscalaSlot | null>(null);
 
   useEffect(() => {
@@ -78,7 +93,8 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
 
       const { data, error } = await supabase
         .from("escalas")
-        .select(`
+        .select(
+          `
           id,
           data_hora_inicio,
           data_hora_fim,
@@ -91,7 +107,8 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
             nome,
             avatar_url
           )
-        `)
+        `
+        )
         .eq("evento_id", evento.id)
         .gte("data_hora_inicio", dayStart.toISOString())
         .lt("data_hora_inicio", dayEnd.toISOString())
@@ -100,7 +117,8 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
       if (error) throw error;
       setEscalas(data || []);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao carregar escalas";
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar escalas";
       console.error("Erro ao carregar escalas:", error);
       toast.error(message);
     } finally {
@@ -111,9 +129,8 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
   const handleAddSlot = (hora: number) => {
     const slotDate = new Date(selectedDate);
     slotDate.setHours(hora, 0, 0, 0);
-    setSelectedSlot({ hora, data: slotDate });
-    setEditingSlot(null);
-    setSlotDialogOpen(true);
+    setSelectedSlotSheet({ hora, data: slotDate });
+    setSheetOpen(true);
   };
 
   const handleEditSlot = (escala: EscalaSlot) => {
@@ -135,7 +152,8 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
       toast.success("Voluntário removido");
       loadEscalas();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao remover voluntário";
+      const message =
+        error instanceof Error ? error.message : "Erro ao remover voluntário";
       console.error("Erro ao remover:", error);
       toast.error(message);
     }
@@ -146,45 +164,48 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
       const proximaData = new Date(escala.data_hora_inicio);
       proximaData.setDate(proximaData.getDate() + 1);
 
-      const { error } = await supabase
-        .from("escalas")
-        .insert({
-          evento_id: evento.id,
-          pessoa_id: escala.pessoa_id,
-          data_hora_inicio: proximaData.toISOString(),
-          data_hora_fim: new Date(proximaData.getTime() + (24 * 60 * 60 * 1000)).toISOString(),
-          confirmado: escala.confirmado,
-          time_id: escala.time_id,
-          posicao_id: escala.posicao_id,
-        });
+      const { error } = await supabase.from("escalas").insert({
+        evento_id: evento.id,
+        pessoa_id: escala.pessoa_id,
+        data_hora_inicio: proximaData.toISOString(),
+        data_hora_fim: new Date(
+          proximaData.getTime() + 24 * 60 * 60 * 1000
+        ).toISOString(),
+        confirmado: escala.confirmado,
+        time_id: escala.time_id,
+        posicao_id: escala.posicao_id,
+      });
 
       if (error) throw error;
       toast.success("Turno duplicado para o próximo dia");
       loadEscalas();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao duplicar turno";
+      const message =
+        error instanceof Error ? error.message : "Erro ao duplicar turno";
       console.error("Erro ao duplicar:", error);
       toast.error(message);
     }
   };
 
   const getEscalaForHour = (hora: number): EscalaSlot | undefined => {
-    return escalas.find(e => {
+    return escalas.find((e) => {
       const startHora = new Date(e.data_hora_inicio).getHours();
       return startHora === hora;
     });
   };
 
   const getStatusColor = (escala?: EscalaSlot) => {
-    if (!escala) return "bg-gray-50 dark:bg-gray-950 border-dashed border-gray-300 dark:border-gray-700";
-    return escala.confirmado 
-      ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" 
+    if (!escala)
+      return "bg-gray-50 dark:bg-gray-950 border-dashed border-gray-300 dark:border-gray-700";
+    return escala.confirmado
+      ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
       : "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800";
   };
 
   const geraSlots = () => {
     const slots = [];
-    const horas = evento.tipo === "RELOGIO" ? 24 : (evento.duracao_minutos || 120) / 60;
+    const horas =
+      evento.tipo === "RELOGIO" ? 24 : (evento.duracao_minutos || 120) / 60;
 
     for (let i = 0; i < horas; i++) {
       slots.push(i);
@@ -207,7 +228,9 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
                 <Clock className="w-5 h-5" />
                 Timeline de Turnos
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">{evento.titulo}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {evento.titulo}
+              </p>
             </div>
 
             {/* Date Picker */}
@@ -215,7 +238,9 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full sm:w-auto">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  {format(selectedDate, "dd 'de' MMMM 'de' yyyy", {
+                    locale: ptBR,
+                  })}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -226,7 +251,9 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
                   disabled={(date) => {
                     const eventStart = new Date(evento.data_evento);
                     const eventEnd = new Date(eventStart);
-                    eventEnd.setDate(eventEnd.getDate() + (evento.tipo === "RELOGIO" ? 7 : 1));
+                    eventEnd.setDate(
+                      eventEnd.getDate() + (evento.tipo === "RELOGIO" ? 7 : 1)
+                    );
                     return date < eventStart || date > eventEnd;
                   }}
                 />
@@ -235,9 +262,7 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
 
             {/* Info Tags */}
             <div className="flex items-center gap-2">
-              {isToday && (
-                <Badge className="bg-blue-600">Hoje</Badge>
-              )}
+              {isToday && <Badge className="bg-blue-600">Hoje</Badge>}
               <Badge variant="outline">{slots.length}h</Badge>
             </div>
           </div>
@@ -250,7 +275,10 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
+                <div
+                  key={i}
+                  className="h-16 bg-muted rounded-lg animate-pulse"
+                />
               ))}
             </div>
           ) : slots.length === 0 ? (
@@ -268,7 +296,9 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
                 <div
                   key={hora}
                   className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                    isCurrentHour ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : getStatusColor(escala)
+                    isCurrentHour
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                      : getStatusColor(escala)
                   }`}
                 >
                   {/* Horário */}
@@ -289,7 +319,9 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
                     {escala ? (
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={escala.profiles.avatar_url || undefined} />
+                          <AvatarImage
+                            src={escala.profiles.avatar_url || undefined}
+                          />
                           <AvatarFallback>
                             {escala.profiles.nome.charAt(0).toUpperCase()}
                           </AvatarFallback>
@@ -299,7 +331,9 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
                             {escala.profiles.nome}
                           </p>
                           <Badge
-                            variant={escala.confirmado ? "default" : "secondary"}
+                            variant={
+                              escala.confirmado ? "default" : "secondary"
+                            }
                             className="text-xs mt-1"
                           >
                             {escala.confirmado ? "Confirmado" : "Pendente"}
@@ -324,16 +358,24 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
                     <div className="flex-shrink-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditSlot(escala)}>
+                          <DropdownMenuItem
+                            onClick={() => handleEditSlot(escala)}
+                          >
                             <Edit2 className="w-4 h-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicateSlot(escala)}>
+                          <DropdownMenuItem
+                            onClick={() => handleDuplicateSlot(escala)}
+                          >
                             <Copy className="w-4 h-4 mr-2" />
                             Repetir Amanhã
                           </DropdownMenuItem>
@@ -367,6 +409,19 @@ export default function EscalaTimeline({ evento }: EscalaTimelineProps) {
           setSlotDialogOpen(false);
           setSelectedSlot(null);
           setEditingSlot(null);
+        }}
+      />
+
+      {/* Sheet para Adicionar Voluntário com Recorrência */}
+      <AdicionarVoluntarioSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        evento={evento}
+        slotData={selectedSlotSheet || undefined}
+        onSuccess={() => {
+          loadEscalas();
+          setSheetOpen(false);
+          setSelectedSlotSheet(null);
         }}
       />
     </div>

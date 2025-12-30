@@ -3,7 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import {
   Heart,
   TrendingUp,
@@ -29,7 +35,14 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  startOfDay,
+  endOfDay,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   BarChart,
@@ -44,7 +57,11 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import Autoplay from "embla-carousel-autoplay";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useHideValues } from "@/hooks/useHideValues";
@@ -115,8 +132,12 @@ export default function DashboardAdmin() {
     saidasVariacao: 0,
   });
   const [saldoTotalContas, setSaldoTotalContas] = useState<number>(0);
-  const [cashFlowData, setCashFlowData] = useState<{ mes: string; entradas: number; saidas: number }[]>([]);
-  const [consolidationData, setConsolidationData] = useState<ConsolidationData[]>([]);
+  const [cashFlowData, setCashFlowData] = useState<
+    { mes: string; entradas: number; saidas: number }[]
+  >([]);
+  const [consolidationData, setConsolidationData] = useState<
+    ConsolidationData[]
+  >([]);
   const [pedidosOracao, setPedidosOracao] = useState<PedidoOracao[]>([]);
   const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
   const [alreadyRegisteredToday, setAlreadyRegisteredToday] = useState(false);
@@ -143,7 +164,7 @@ export default function DashboardAdmin() {
 
   const checkTodaySentimento = async () => {
     if (!profile?.id) return;
-    
+
     const today = new Date();
     const dayStart = startOfDay(today).toISOString();
     const dayEnd = endOfDay(today).toISOString();
@@ -163,15 +184,21 @@ export default function DashboardAdmin() {
     const now = new Date().toISOString();
     const { data } = await supabase
       .from("comunicados")
-      .select("id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao")
+      .select(
+        "id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao"
+      )
       .eq("ativo", true)
       .lte("data_inicio", now)
       .or(`data_fim.is.null,data_fim.gte.${now}`)
       .order("created_at", { ascending: false });
 
     if (data) {
-      const alertasList = data.filter((c) => c.tipo === "alerta") as Comunicado[];
-      const bannersList = data.filter((c) => c.tipo === "banner") as Comunicado[];
+      const alertasList = data.filter(
+        (c) => c.tipo === "alerta"
+      ) as Comunicado[];
+      const bannersList = data.filter(
+        (c) => c.tipo === "banner"
+      ) as Comunicado[];
       setAlertas(alertasList);
       setBanners(bannersList);
     }
@@ -184,10 +211,16 @@ export default function DashboardAdmin() {
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-    const { data: contasData } = await supabase.from("contas").select("saldo_atual").eq("ativo", true);
+    const { data: contasData } = await supabase
+      .from("contas")
+      .select("saldo_atual")
+      .eq("ativo", true);
 
     if (contasData) {
-      const total = contasData.reduce((acc, c) => acc + Number(c.saldo_atual), 0);
+      const total = contasData.reduce(
+        (acc, c) => acc + Number(c.saldo_atual),
+        0
+      );
       setSaldoTotalContas(total);
     }
 
@@ -206,16 +239,26 @@ export default function DashboardAdmin() {
       .eq("status", "pago");
 
     if (currentData) {
-      const entradas = currentData.filter((t) => t.tipo === "entrada").reduce((acc, t) => acc + Number(t.valor), 0);
-      const saidas = currentData.filter((t) => t.tipo === "saida").reduce((acc, t) => acc + Number(t.valor), 0);
+      const entradas = currentData
+        .filter((t) => t.tipo === "entrada")
+        .reduce((acc, t) => acc + Number(t.valor), 0);
+      const saidas = currentData
+        .filter((t) => t.tipo === "saida")
+        .reduce((acc, t) => acc + Number(t.valor), 0);
 
       const lastEntradas =
-        lastMonthData?.filter((t) => t.tipo === "entrada").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+        lastMonthData
+          ?.filter((t) => t.tipo === "entrada")
+          .reduce((acc, t) => acc + Number(t.valor), 0) || 0;
       const lastSaidas =
-        lastMonthData?.filter((t) => t.tipo === "saida").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+        lastMonthData
+          ?.filter((t) => t.tipo === "saida")
+          .reduce((acc, t) => acc + Number(t.valor), 0) || 0;
 
-      const entradasVariacao = lastEntradas > 0 ? ((entradas - lastEntradas) / lastEntradas) * 100 : 0;
-      const saidasVariacao = lastSaidas > 0 ? ((saidas - lastSaidas) / lastSaidas) * 100 : 0;
+      const entradasVariacao =
+        lastEntradas > 0 ? ((entradas - lastEntradas) / lastEntradas) * 100 : 0;
+      const saidasVariacao =
+        lastSaidas > 0 ? ((saidas - lastSaidas) / lastSaidas) * 100 : 0;
 
       setFinancialStats({
         entradas,
@@ -240,9 +283,13 @@ export default function DashboardAdmin() {
         .eq("status", "pago");
 
       const monthEntradas =
-        monthData?.filter((t) => t.tipo === "entrada").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+        monthData
+          ?.filter((t) => t.tipo === "entrada")
+          .reduce((acc, t) => acc + Number(t.valor), 0) || 0;
       const monthSaidas =
-        monthData?.filter((t) => t.tipo === "saida").reduce((acc, t) => acc + Number(t.valor), 0) || 0;
+        monthData
+          ?.filter((t) => t.tipo === "saida")
+          .reduce((acc, t) => acc + Number(t.valor), 0) || 0;
 
       cashFlow.push({
         mes: format(monthDate, "MMM", { locale: ptBR }),
@@ -254,16 +301,37 @@ export default function DashboardAdmin() {
   };
 
   const fetchConsolidationData = async () => {
-    const { data: visitors } = await supabase.from("profiles").select("id").eq("status", "visitante");
+    const { data: visitors } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("status", "visitante");
 
-    const { data: frequenters } = await supabase.from("profiles").select("id").eq("status", "frequentador");
+    const { data: frequenters } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("status", "frequentador");
 
-    const { data: members } = await supabase.from("profiles").select("id").eq("status", "membro");
+    const { data: members } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("status", "membro");
 
     setConsolidationData([
-      { name: "Visitantes", value: visitors?.length || 0, color: "hsl(var(--chart-1))" },
-      { name: "Frequentadores", value: frequenters?.length || 0, color: "hsl(var(--chart-2))" },
-      { name: "Membros", value: members?.length || 0, color: "hsl(var(--chart-3))" },
+      {
+        name: "Visitantes",
+        value: visitors?.length || 0,
+        color: "hsl(var(--chart-1))",
+      },
+      {
+        name: "Frequentadores",
+        value: frequenters?.length || 0,
+        color: "hsl(var(--chart-2))",
+      },
+      {
+        name: "Membros",
+        value: members?.length || 0,
+        color: "hsl(var(--chart-3))",
+      },
     ]);
   };
 
@@ -276,7 +344,7 @@ export default function DashboardAdmin() {
         pedido,
         nome_solicitante,
         created_at
-      `,
+      `
       )
       .in("status", ["pendente", "em_oracao"])
       .order("created_at", { ascending: false })
@@ -289,7 +357,7 @@ export default function DashboardAdmin() {
             ...pedido,
             pessoa: null as { nome: string; avatar_url: string | null } | null,
           };
-        }),
+        })
       );
       setPedidosOracao(pedidosWithPessoa);
     }
@@ -304,7 +372,7 @@ export default function DashboardAdmin() {
         titulo,
         nome_externo,
         created_at
-      `,
+      `
       )
       .eq("status", "publico")
       .order("created_at", { ascending: false })
@@ -318,7 +386,6 @@ export default function DashboardAdmin() {
       setTestemunhos(testemunhosWithPessoa);
     }
   };
-
 
   const getInitials = (name: string) => {
     return (
@@ -341,7 +408,8 @@ export default function DashboardAdmin() {
         };
       case "destructive":
         return {
-          className: "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800 dark:text-red-200",
+          className:
+            "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800 dark:text-red-200",
           Icon: AlertCircle,
         };
       default:
@@ -398,15 +466,18 @@ export default function DashboardAdmin() {
         )}
       </div>
 
+      {/* Widget de Convites Pendentes */}
+      <ConvitesPendentesWidget />
+
       {/* Widget de Monitoramento de Escalas para Admin */}
       <EscalasPendentesWidget />
 
-      <RegistrarSentimentoDialog 
-        open={sentimentoDialogOpen} 
+      <RegistrarSentimentoDialog
+        open={sentimentoDialogOpen}
         onOpenChange={(open) => {
           setSentimentoDialogOpen(open);
           if (!open) checkTodaySentimento();
-        }} 
+        }}
       />
 
       {/* Alertas Section */}
@@ -417,9 +488,13 @@ export default function DashboardAdmin() {
             return (
               <Alert key={alerta.id} className={`${className} relative`}>
                 <Icon className="h-4 w-4" />
-                <AlertTitle className="font-semibold">{alerta.titulo}</AlertTitle>
+                <AlertTitle className="font-semibold">
+                  {alerta.titulo}
+                </AlertTitle>
                 {alerta.descricao && (
-                  <AlertDescription className="text-sm opacity-90">{alerta.descricao}</AlertDescription>
+                  <AlertDescription className="text-sm opacity-90">
+                    {alerta.descricao}
+                  </AlertDescription>
                 )}
                 <Button
                   variant="ghost"
@@ -455,7 +530,9 @@ export default function DashboardAdmin() {
                           fit="contain"
                         />
                         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-                          <h3 className="text-white font-bold text-lg drop-shadow-md">{banner.titulo}</h3>
+                          <h3 className="text-white font-bold text-lg drop-shadow-md">
+                            {banner.titulo}
+                          </h3>
                           {banner.link_acao && (
                             <div className="flex items-center gap-1 mt-1 text-white/80 text-xs">
                               <ExternalLink className="w-3 h-3" />
@@ -466,9 +543,13 @@ export default function DashboardAdmin() {
                       </div>
                     ) : (
                       <CardContent className="p-4 md:p-6 aspect-[21/9] flex flex-col justify-center bg-gradient-to-r from-primary/10 to-primary/5">
-                        <h3 className="text-lg md:text-xl font-bold text-foreground">{banner.titulo}</h3>
+                        <h3 className="text-lg md:text-xl font-bold text-foreground">
+                          {banner.titulo}
+                        </h3>
                         {banner.descricao && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">{banner.descricao}</p>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
+                            {banner.descricao}
+                          </p>
                         )}
                         {banner.link_acao && (
                           <div className="flex items-center gap-1 mt-2 text-primary text-xs">
@@ -494,15 +575,30 @@ export default function DashboardAdmin() {
 
       {/* Quick Actions Toolbar */}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => navigate("/financas/relatorio-oferta")} className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/financas/relatorio-oferta")}
+          className="gap-2"
+        >
           <DollarSign className="w-4 h-4" />
           <span className="hidden sm:inline">Entradas</span>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => navigate("/financas/saidas?nova=true")} className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/financas/saidas?nova=true")}
+          className="gap-2"
+        >
           <Camera className="w-4 h-4" />
           <span className="hidden sm:inline">Lançar Nota</span>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => navigate("/pessoas/visitantes?novo=true")} className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/pessoas/visitantes?novo=true")}
+          className="gap-2"
+        >
           <UserPlus className="w-4 h-4" />
           <span className="hidden sm:inline">Novo Visitante</span>
         </Button>
@@ -544,7 +640,11 @@ export default function DashboardAdmin() {
                   </p>
                 </div>
                 <div
-                  className={`flex items-center text-xs ${financialStats.entradasVariacao >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                  className={`flex items-center text-xs ${
+                    financialStats.entradasVariacao >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
                 >
                   {financialStats.entradasVariacao >= 0 ? (
                     <ArrowUpRight className="w-3 h-3" />
@@ -562,10 +662,16 @@ export default function DashboardAdmin() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Saídas</p>
-                  <p className="text-lg md:text-xl font-bold text-red-600">{formatValue(financialStats.saidas)}</p>
+                  <p className="text-lg md:text-xl font-bold text-red-600">
+                    {formatValue(financialStats.saidas)}
+                  </p>
                 </div>
                 <div
-                  className={`flex items-center text-xs ${financialStats.saidasVariacao <= 0 ? "text-emerald-600" : "text-red-600"}`}
+                  className={`flex items-center text-xs ${
+                    financialStats.saidasVariacao <= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
                 >
                   {financialStats.saidasVariacao <= 0 ? (
                     <ArrowDownRight className="w-3 h-3" />
@@ -583,7 +689,11 @@ export default function DashboardAdmin() {
               <div>
                 <p className="text-xs text-muted-foreground">Saldo do Mês</p>
                 <p
-                  className={`text-lg md:text-xl font-bold ${financialStats.saldo >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                  className={`text-lg md:text-xl font-bold ${
+                    financialStats.saldo >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
                 >
                   {formatValue(financialStats.saldo)}
                 </p>
@@ -594,9 +704,13 @@ export default function DashboardAdmin() {
           <Card className="shadow-soft border-primary/20 bg-primary/5">
             <CardContent className="p-4">
               <div>
-                <p className="text-xs text-muted-foreground">Saldo Total (Contas)</p>
+                <p className="text-xs text-muted-foreground">
+                  Saldo Total (Contas)
+                </p>
                 <p
-                  className={`text-lg md:text-xl font-bold ${saldoTotalContas >= 0 ? "text-primary" : "text-red-600"}`}
+                  className={`text-lg md:text-xl font-bold ${
+                    saldoTotalContas >= 0 ? "text-primary" : "text-red-600"
+                  }`}
                 >
                   {formatValue(saldoTotalContas)}
                 </p>
@@ -620,24 +734,47 @@ export default function DashboardAdmin() {
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cashFlowData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="mes" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-muted"
+                  />
+                  <XAxis
+                    dataKey="mes"
+                    className="text-xs"
+                    tick={{ fill: "hsl(var(--muted-foreground))" }}
+                  />
                   <YAxis
                     className="text-xs"
                     tick={{ fill: "hsl(var(--muted-foreground))" }}
                     tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
                   />
                   <ChartTooltip
-                    content={<ChartTooltipContent formatter={(value) => formatValue(Number(value))} />}
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) => formatValue(Number(value))}
+                      />
+                    }
                   />
-                  <Legend 
-                    verticalAlign="top" 
+                  <Legend
+                    verticalAlign="top"
                     height={28}
-                    formatter={(value) => value === 'entradas' ? 'Entradas' : 'Saídas'}
-                    wrapperStyle={{ fontSize: '12px' }}
+                    formatter={(value) =>
+                      value === "entradas" ? "Entradas" : "Saídas"
+                    }
+                    wrapperStyle={{ fontSize: "12px" }}
                   />
-                  <Bar dataKey="entradas" name="Entradas" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="saidas" name="Saídas" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="entradas"
+                    name="Entradas"
+                    fill="hsl(142, 76%, 36%)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="saidas"
+                    name="Saídas"
+                    fill="hsl(0, 84%, 60%)"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
@@ -696,21 +833,36 @@ export default function DashboardAdmin() {
             </CardHeader>
             <CardContent className="space-y-3">
               {pedidosOracao.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido pendente</p>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum pedido pendente
+                </p>
               ) : (
                 pedidosOracao.map((pedido) => (
-                  <div key={pedido.id} className="flex items-start gap-2 p-2 rounded-lg bg-muted/50">
+                  <div
+                    key={pedido.id}
+                    className="flex items-start gap-2 p-2 rounded-lg bg-muted/50"
+                  >
                     <Avatar className="w-8 h-8">
-                      <AvatarImage src={pedido.pessoa?.avatar_url || undefined} />
+                      <AvatarImage
+                        src={pedido.pessoa?.avatar_url || undefined}
+                      />
                       <AvatarFallback className="text-xs">
-                        {getInitials(pedido.pessoa?.nome || pedido.nome_solicitante || "Anônimo")}
+                        {getInitials(
+                          pedido.pessoa?.nome ||
+                            pedido.nome_solicitante ||
+                            "Anônimo"
+                        )}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">
-                        {pedido.pessoa?.nome || pedido.nome_solicitante || "Anônimo"}
+                        {pedido.pessoa?.nome ||
+                          pedido.nome_solicitante ||
+                          "Anônimo"}
                       </p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{pedido.pedido}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {pedido.pedido}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -736,21 +888,36 @@ export default function DashboardAdmin() {
             </CardHeader>
             <CardContent className="space-y-3">
               {testemunhos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhum testemunho recente</p>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum testemunho recente
+                </p>
               ) : (
                 testemunhos.map((testemunho) => (
-                  <div key={testemunho.id} className="flex items-start gap-2 p-2 rounded-lg bg-muted/50">
+                  <div
+                    key={testemunho.id}
+                    className="flex items-start gap-2 p-2 rounded-lg bg-muted/50"
+                  >
                     <Avatar className="w-8 h-8">
-                      <AvatarImage src={testemunho.pessoa?.avatar_url || undefined} />
+                      <AvatarImage
+                        src={testemunho.pessoa?.avatar_url || undefined}
+                      />
                       <AvatarFallback className="text-xs">
-                        {getInitials(testemunho.pessoa?.nome || testemunho.nome_externo || "Anônimo")}
+                        {getInitials(
+                          testemunho.pessoa?.nome ||
+                            testemunho.nome_externo ||
+                            "Anônimo"
+                        )}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">
-                        {testemunho.pessoa?.nome || testemunho.nome_externo || "Anônimo"}
+                        {testemunho.pessoa?.nome ||
+                          testemunho.nome_externo ||
+                          "Anônimo"}
                       </p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{testemunho.titulo}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {testemunho.titulo}
+                      </p>
                     </div>
                   </div>
                 ))

@@ -4,14 +4,21 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Users,
   CheckCircle2,
   XCircle,
   Clock,
   Send,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -31,7 +38,9 @@ interface ConvitesTabContentProps {
   eventoId: string;
 }
 
-export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps) {
+export default function ConvitesTabContent({
+  eventoId,
+}: ConvitesTabContentProps) {
   const [convites, setConvites] = useState<Convite[]>([]);
   const [loading, setLoading] = useState(true);
   const [enviarDialogOpen, setEnviarDialogOpen] = useState(false);
@@ -45,7 +54,8 @@ export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps
     try {
       const { data, error } = await supabase
         .from("eventos_convites")
-        .select(`
+        .select(
+          `
           id,
           pessoa_id,
           status,
@@ -53,14 +63,16 @@ export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps
           profiles:pessoa_id (
             nome
           )
-        `)
+        `
+        )
         .eq("evento_id", eventoId)
         .order("data_envio", { ascending: false });
 
       if (error) throw error;
       setConvites(data || []);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao carregar convites";
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar convites";
       console.error("Erro ao carregar convites:", error);
       toast.error(message);
     } finally {
@@ -72,21 +84,22 @@ export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps
     setReenviando(convite.id);
     try {
       // Chamar edge function para reenviar notificação
-      const { error } = await supabase.functions.invoke('disparar-alerta', {
+      const { error } = await supabase.functions.invoke("disparar-alerta", {
         body: {
           user_id: convite.pessoa_id,
-          titulo: 'Convite Reenviado',
+          titulo: "Convite Reenviado",
           mensagem: `Seu convite para o evento foi reenviado. Por favor, confirme sua presença.`,
-          tipo: 'push',
-          slug: 'convite_evento'
-        }
+          tipo: "push",
+          slug: "convite_evento",
+        },
       });
 
       if (error) throw error;
 
       toast.success("Convite reenviado com sucesso!");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao reenviar convite";
+      const message =
+        error instanceof Error ? error.message : "Erro ao reenviar convite";
       console.error("Erro ao reenviar convite:", error);
       toast.error(message);
     } finally {
@@ -95,18 +108,26 @@ export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps
   };
 
   const totalConvidados = convites.length;
-  const confirmados = convites.filter(c => c.status === "confirmado").length;
-  const recusados = convites.filter(c => c.status === "recusado").length;
-  const pendentes = convites.filter(c => c.status === "pendente").length;
+  const confirmados = convites.filter((c) => c.status === "confirmado").length;
+  const recusados = convites.filter((c) => c.status === "recusado").length;
+  const pendentes = convites.filter((c) => c.status === "pendente").length;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "confirmado":
-        return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300">Confirmado</Badge>;
+        return (
+          <Badge className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300">
+            Confirmado
+          </Badge>
+        );
       case "recusado":
         return <Badge variant="destructive">Recusado</Badge>;
       default:
-        return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300">Pendente</Badge>;
+        return (
+          <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300">
+            Pendente
+          </Badge>
+        );
     }
   };
 
@@ -190,7 +211,10 @@ export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps
             Gerencie os convites e acompanhe as confirmações
           </p>
         </div>
-        <Button onClick={() => setEnviarDialogOpen(true)} className="bg-gradient-primary">
+        <Button
+          onClick={() => setEnviarDialogOpen(true)}
+          className="bg-gradient-primary"
+        >
           <Send className="w-4 h-4 mr-2" />
           Enviar Convites
         </Button>
@@ -202,7 +226,9 @@ export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps
           {convites.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Nenhum convite enviado</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                Nenhum convite enviado
+              </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Comece enviando convites para este evento.
               </p>
@@ -227,11 +253,13 @@ export default function ConvitesTabContent({ eventoId }: ConvitesTabContentProps
                     <TableCell className="font-medium">
                       {convite.profiles.nome}
                     </TableCell>
+                    <TableCell>{getStatusBadge(convite.status)}</TableCell>
                     <TableCell>
-                      {getStatusBadge(convite.status)}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(convite.data_envio), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      {format(
+                        new Date(convite.data_envio),
+                        "dd/MM/yyyy HH:mm",
+                        { locale: ptBR }
+                      )}
                     </TableCell>
                     <TableCell>
                       {convite.status === "pendente" && (

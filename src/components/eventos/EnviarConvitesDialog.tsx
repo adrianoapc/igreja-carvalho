@@ -4,7 +4,13 @@ import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +43,12 @@ export default function EnviarConvitesDialog({
   open,
   onOpenChange,
   eventoId,
-  onSuccess
+  onSuccess,
 }: EnviarConvitesDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [metodoSelecionado, setMetodoSelecionado] = useState<"time" | "perfil" | "individual">("time");
+  const [metodoSelecionado, setMetodoSelecionado] = useState<
+    "time" | "perfil" | "individual"
+  >("time");
   const [timeSelecionado, setTimeSelecionado] = useState<string>("");
   const [perfilSelecionado, setPerfilSelecionado] = useState<string>("");
   const [pessoaSelecionada, setPessoaSelecionada] = useState<string>("");
@@ -58,16 +66,25 @@ export default function EnviarConvitesDialog({
   const loadDados = async () => {
     try {
       const [timesRes, perfisRes, pessoasRes] = await Promise.all([
-        supabase.from("times").select("id, nome, categoria").eq("ativo", true).order("categoria, nome"),
-        supabase.from("perfis").select("id, nome").eq("ativo", true).order("nome"),
-        supabase.from("profiles").select("id, nome").order("nome").limit(100)
+        supabase
+          .from("times")
+          .select("id, nome, categoria")
+          .eq("ativo", true)
+          .order("categoria, nome"),
+        supabase
+          .from("perfis")
+          .select("id, nome")
+          .eq("ativo", true)
+          .order("nome"),
+        supabase.from("profiles").select("id, nome").order("nome").limit(100),
       ]);
 
       setTimes(timesRes.data || []);
       setPerfis(perfisRes.data || []);
       setPessoas(pessoasRes.data || []);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao carregar dados";
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar dados";
       console.error("Erro ao carregar dados:", error);
       toast.error(message);
     }
@@ -86,14 +103,14 @@ export default function EnviarConvitesDialog({
           .eq("time_id", timeSelecionado)
           .eq("ativo", true);
 
-        pessoaIds = membros?.map(m => m.pessoa_id) || [];
+        pessoaIds = membros?.map((m) => m.pessoa_id) || [];
       } else if (metodoSelecionado === "perfil" && perfilSelecionado) {
         const { data: usuarios } = await supabase
           .from("profiles")
           .select("id")
           .eq("perfil_id", perfilSelecionado);
 
-        pessoaIds = usuarios?.map(u => u.id) || [];
+        pessoaIds = usuarios?.map((u) => u.id) || [];
       } else if (metodoSelecionado === "individual" && pessoaSelecionada) {
         pessoaIds = [pessoaSelecionada];
       }
@@ -104,11 +121,11 @@ export default function EnviarConvitesDialog({
       }
 
       // Inserir convites na tabela eventos_convites
-      const convitesData = pessoaIds.map(pessoaId => ({
+      const convitesData = pessoaIds.map((pessoaId) => ({
         evento_id: eventoId,
         pessoa_id: pessoaId,
         status: "pendente",
-        data_envio: new Date().toISOString()
+        data_envio: new Date().toISOString(),
       }));
 
       const { error: insertError } = await supabase
@@ -118,15 +135,16 @@ export default function EnviarConvitesDialog({
       if (insertError) throw insertError;
 
       // Disparar notificações via edge function
-      const notificacoesPromises = pessoaIds.map(pessoaId =>
-        supabase.functions.invoke('disparar-alerta', {
+      const notificacoesPromises = pessoaIds.map((pessoaId) =>
+        supabase.functions.invoke("disparar-alerta", {
           body: {
             user_id: pessoaId,
-            titulo: 'Novo Convite',
-            mensagem: 'Você recebeu um convite para um evento. Por favor, confirme sua presença.',
-            tipo: 'push',
-            slug: 'convite_evento'
-          }
+            titulo: "Novo Convite",
+            mensagem:
+              "Você recebeu um convite para um evento. Por favor, confirme sua presença.",
+            tipo: "push",
+            slug: "convite_evento",
+          },
         })
       );
 
@@ -141,9 +159,9 @@ export default function EnviarConvitesDialog({
       setTimeSelecionado("");
       setPerfilSelecionado("");
       setPessoaSelecionada("");
-
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao enviar convites";
+      const message =
+        error instanceof Error ? error.message : "Erro ao enviar convites";
       console.error("Erro ao enviar convites:", error);
       toast.error(message);
     } finally {
@@ -168,7 +186,9 @@ export default function EnviarConvitesDialog({
               <Label>Método de Seleção</Label>
               <RadioGroup
                 value={metodoSelecionado}
-                onValueChange={(value: "time" | "perfil" | "individual") => setMetodoSelecionado(value)}
+                onValueChange={(value: "time" | "perfil" | "individual") =>
+                  setMetodoSelecionado(value)
+                }
                 className="grid grid-cols-1 gap-3"
               >
                 <div>
@@ -184,13 +204,19 @@ export default function EnviarConvitesDialog({
                     <Users className="w-5 h-5 text-primary" />
                     <div>
                       <div className="font-medium">Selecionar Time</div>
-                      <div className="text-sm text-muted-foreground">Enviar para todos os membros de um time</div>
+                      <div className="text-sm text-muted-foreground">
+                        Enviar para todos os membros de um time
+                      </div>
                     </div>
                   </Label>
                 </div>
 
                 <div>
-                  <RadioGroupItem value="perfil" id="perfil" className="sr-only" />
+                  <RadioGroupItem
+                    value="perfil"
+                    id="perfil"
+                    className="sr-only"
+                  />
                   <Label
                     htmlFor="perfil"
                     className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
@@ -202,13 +228,19 @@ export default function EnviarConvitesDialog({
                     <UserCheck className="w-5 h-5 text-primary" />
                     <div>
                       <div className="font-medium">Selecionar Perfil</div>
-                      <div className="text-sm text-muted-foreground">Enviar para todos com um perfil específico</div>
+                      <div className="text-sm text-muted-foreground">
+                        Enviar para todos com um perfil específico
+                      </div>
                     </div>
                   </Label>
                 </div>
 
                 <div>
-                  <RadioGroupItem value="individual" id="individual" className="sr-only" />
+                  <RadioGroupItem
+                    value="individual"
+                    id="individual"
+                    className="sr-only"
+                  />
                   <Label
                     htmlFor="individual"
                     className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
@@ -220,7 +252,9 @@ export default function EnviarConvitesDialog({
                     <Search className="w-5 h-5 text-primary" />
                     <div>
                       <div className="font-medium">Busca Individual</div>
-                      <div className="text-sm text-muted-foreground">Selecionar pessoa específica</div>
+                      <div className="text-sm text-muted-foreground">
+                        Selecionar pessoa específica
+                      </div>
                     </div>
                   </Label>
                 </div>
@@ -231,7 +265,10 @@ export default function EnviarConvitesDialog({
             {metodoSelecionado === "time" && (
               <div className="space-y-2">
                 <Label>Selecionar Time</Label>
-                <Select value={timeSelecionado} onValueChange={setTimeSelecionado}>
+                <Select
+                  value={timeSelecionado}
+                  onValueChange={setTimeSelecionado}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Escolha um time..." />
                   </SelectTrigger>
@@ -240,7 +277,9 @@ export default function EnviarConvitesDialog({
                       <SelectItem key={time.id} value={time.id}>
                         <div className="flex items-center gap-2">
                           <span>{time.nome}</span>
-                          <Badge variant="outline" className="text-xs">{time.categoria}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {time.categoria}
+                          </Badge>
                         </div>
                       </SelectItem>
                     ))}
@@ -252,7 +291,10 @@ export default function EnviarConvitesDialog({
             {metodoSelecionado === "perfil" && (
               <div className="space-y-2">
                 <Label>Selecionar Perfil</Label>
-                <Select value={perfilSelecionado} onValueChange={setPerfilSelecionado}>
+                <Select
+                  value={perfilSelecionado}
+                  onValueChange={setPerfilSelecionado}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Escolha um perfil..." />
                   </SelectTrigger>
@@ -270,7 +312,10 @@ export default function EnviarConvitesDialog({
             {metodoSelecionado === "individual" && (
               <div className="space-y-2">
                 <Label>Selecionar Pessoa</Label>
-                <Select value={pessoaSelecionada} onValueChange={setPessoaSelecionada}>
+                <Select
+                  value={pessoaSelecionada}
+                  onValueChange={setPessoaSelecionada}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Busque uma pessoa..." />
                   </SelectTrigger>
@@ -298,7 +343,8 @@ export default function EnviarConvitesDialog({
           </Button>
           <Button
             onClick={handleEnviarConvites}
-            disabled={loading ||
+            disabled={
+              loading ||
               (metodoSelecionado === "time" && !timeSelecionado) ||
               (metodoSelecionado === "perfil" && !perfilSelecionado) ||
               (metodoSelecionado === "individual" && !pessoaSelecionada)

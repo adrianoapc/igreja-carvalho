@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Calendar,
   Clock,
@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   XCircle,
   Send,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,13 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ConvitePendente {
   id: string;
@@ -35,15 +42,21 @@ interface ConvitePendente {
 export default function ConvitesPendentesWidget() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [motivoRecusa, setMotivoRecusa] = useState("");
+  const [selectedConvite, setSelectedConvite] = useState<string | null>(null);
 
   const { data: convites = [], isLoading } = useQuery({
     queryKey: ["convites-pendentes", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
+      const now = new Date().toISOString();
+
       const { data, error } = await supabase
         .from("eventos_convites")
-        .select(`
+        .select(
+          `
           id,
           status,
           data_envio,
@@ -54,10 +67,12 @@ export default function ConvitesPendentesWidget() {
             local,
             tipo
           )
-        `)
+        `
+        )
         .eq("pessoa_id", user?.id)
         .eq("status", "pendente")
-        .order("data_envio", { ascending: false });
+        .gt("evento.data_evento", now)
+        .order("evento.data_evento", { ascending: true });
 
       if (error) throw error;
       return data as ConvitePendente[];
@@ -66,10 +81,23 @@ export default function ConvitesPendentesWidget() {
   });
 
   const updateConviteMutation = useMutation({
-    mutationFn: async ({ conviteId, status }: { conviteId: string; status: "confirmado" | "recusado" }) => {
+    mutationFn: async ({
+      conviteId,
+      status,
+      motivo,
+    }: {
+      conviteId: string;
+      status: "confirmado" | "recusado";
+      motivo?: string;
+    }) => {
+      const payload: { status: "confirmado" | "recusado"; motivo_recusa?: string } = { status };
+      if (motivo) {
+        payload.motivo_recusa = motivo;
+      }
+
       const { error } = await supabase
         .from("eventos_convites")
-        .update({ status })
+        .update(payload)
         .eq("id", conviteId);
 
       if (error) throw error;
@@ -77,10 +105,14 @@ export default function ConvitesPendentesWidget() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["convites-pendentes"] });
       toast.success("Convite atualizado com sucesso!");
+      setDialogOpen(false);
+      setMotivoRecusa("");
+      setSelectedConvite(null);
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Erro ao atualizar convite";
       console.error("Erro ao atualizar convite:", error);
-      toast.error("Erro ao atualizar convite");
+      toast.error(message);
     },
   });
 
@@ -88,139 +120,143 @@ export default function ConvitesPendentesWidget() {
     updateConviteMutation.mutate({ conviteId, status: "confirmado" });
   };
 
-  const handleRecusar = (conviteId: string) => {
-    updateConviteMutation.mutate({ conviteId, status: "recusado" });
+  const handleRecusarClick = (conviteId: string) => {
+    setSelectedConvite(conviteId);
+    setDialogOpen(true);
+  };
+
+  const handleConfirmarRecusa = () => {
+    if (selectedConvite) {
+      updateConviteMutation.mutate({
+        conviteId: selectedConvite,
+        status: "recusado",
+        motivo: motivoRecusa.trim(),
+      });
+    }
   };
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="w-5 h-5" />
-            Convites Pendentes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[1, 2].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="h-20 bg-muted rounded-lg"></div>
-              </div>
-            ))}
-          </div>
+      <Card className="border-amber-200 bg-amber-50 dark:border-amber-900/30 dark:bg-amber-950/10 shadow-md">
+        <CardContent className="p-4">
+          <div className="animate-pulse h-20 bg-muted rounded-lg"></div>
         </CardContent>
       </Card>
     );
   }
 
-  if (convites.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="w-5 h-5" />
-            Convites Pendentes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <Send className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Nenhum convite pendente</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Você não tem convites aguardando resposta
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+  const primeiroConvite = convites[0];
+
+  if (!primeiroConvite) {
+    return null;
   }
+
+  const dataEvento = new Date(primeiroConvite.evento.data_evento);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Send className="w-5 h-5" />
-          Convites Pendentes
-          <Badge variant="secondary">{convites.length}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {convites.map((convite) => {
-            const dataEvento = new Date(convite.evento.data_evento);
-            const dataEnvio = new Date(convite.data_envio);
+    <>
+      <Card className="border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 shadow-lg mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg text-amber-900 dark:text-amber-100">
+            <Send className="w-5 h-5 text-amber-600" />
+            Você foi convidado para{" "}
+            <span className="font-bold text-amber-700 dark:text-amber-200">
+              {primeiroConvite.evento.titulo}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Informações do evento */}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              {format(dataEvento, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              {format(dataEvento, "HH:mm")}
+            </div>
+            {primeiroConvite.evento.local && (
+              <div className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                <span>{primeiroConvite.evento.local}</span>
+              </div>
+            )}
+          </div>
 
-            return (
-              <Card key={convite.id} className="border-l-4 border-l-primary">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-lg truncate">
-                        {convite.evento.titulo}
-                      </h4>
+          {/* Botões */}
+          <div className="flex gap-3 pt-2">
+            <Button
+              onClick={() => handleAceitar(primeiroConvite.id)}
+              disabled={updateConviteMutation.isPending}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold h-10"
+            >
+              {updateConviteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+              )}
+              Confirmar Presença
+            </Button>
 
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {format(dataEvento, "dd/MM/yyyy", { locale: ptBR })}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {format(dataEvento, "HH:mm")}
-                        </div>
-                        {convite.evento.local && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            <span className="truncate">{convite.evento.local}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          {convite.evento.tipo}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          Enviado em {format(dataEnvio, "dd/MM/yyyy", { locale: ptBR })}
-                        </span>
-                      </div>
-                    </div>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => handleRecusarClick(primeiroConvite.id)}
+                  disabled={updateConviteMutation.isPending}
+                  variant="ghost"
+                  className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 font-semibold h-10"
+                >
+                  {updateConviteMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <XCircle className="w-4 h-4 mr-2" />
+                  )}
+                  Não poderei ir
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Recusar convite</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="motivo">Motivo (opcional)</Label>
+                    <Textarea
+                      id="motivo"
+                      placeholder="Conte-nos por que não poderá comparecer..."
+                      value={motivoRecusa}
+                      onChange={(e) => setMotivoRecusa(e.target.value)}
+                      className="min-h-[100px]"
+                    />
                   </div>
-
-                  <div className="flex gap-3 mt-4">
+                  <div className="flex gap-3 pt-4">
                     <Button
-                      onClick={() => handleAceitar(convite.id)}
-                      disabled={updateConviteMutation.isPending}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      variant="outline"
+                      onClick={() => setDialogOpen(false)}
+                      className="flex-1"
                     >
-                      {updateConviteMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                      )}
-                      Aceitar
+                      Cancelar
                     </Button>
                     <Button
-                      onClick={() => handleRecusar(convite.id)}
+                      onClick={handleConfirmarRecusa}
                       disabled={updateConviteMutation.isPending}
-                      variant="outline"
-                      className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                      className="flex-1 bg-red-600 hover:bg-red-700"
                     >
                       {updateConviteMutation.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
                         <XCircle className="w-4 h-4 mr-2" />
                       )}
-                      Recusar
+                      Confirmar Recusa
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }

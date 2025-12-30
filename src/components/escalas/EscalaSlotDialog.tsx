@@ -4,7 +4,13 @@ import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 
@@ -77,7 +83,8 @@ export default function EscalaSlotDialog({
       if (error) throw error;
       setVoluntarios(data || []);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao carregar voluntários";
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar voluntários";
       console.error("Erro ao carregar voluntários:", error);
       toast.error(message);
     } finally {
@@ -109,15 +116,13 @@ export default function EscalaSlotDialog({
         const dataFim = new Date(dataInicio);
         dataFim.setHours(dataFim.getHours() + 1);
 
-        const { error } = await supabase
-          .from("escalas")
-          .insert({
-            evento_id: evento.id,
-            pessoa_id: selectedVoluntario,
-            data_hora_inicio: dataInicio.toISOString(),
-            data_hora_fim: dataFim.toISOString(),
-            confirmado,
-          });
+        const { error } = await supabase.from("escalas").insert({
+          evento_id: evento.id,
+          pessoa_id: selectedVoluntario,
+          data_hora_inicio: dataInicio.toISOString(),
+          data_hora_fim: dataFim.toISOString(),
+          confirmado,
+        });
 
         if (error) throw error;
         toast.success("Voluntário adicionado ao turno");
@@ -125,7 +130,8 @@ export default function EscalaSlotDialog({
 
       onSuccess();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao salvar escala";
+      const message =
+        error instanceof Error ? error.message : "Erro ao salvar escala";
       console.error("Erro ao salvar:", error);
       toast.error(message);
     } finally {
@@ -140,16 +146,17 @@ export default function EscalaSlotDialog({
           <h2 className="text-lg font-semibold">
             {editingSlot ? "Editar Turno" : "Adicionar Voluntário"}
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {evento.titulo}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{evento.titulo}</p>
         </div>
 
         <div className="space-y-4">
           {/* Seletor de Voluntário */}
           <div className="space-y-2">
             <Label>Voluntário</Label>
-            <Select value={selectedVoluntario} onValueChange={setSelectedVoluntario}>
+            <Select
+              value={selectedVoluntario}
+              onValueChange={setSelectedVoluntario}
+            >
               <SelectTrigger disabled={loadingVoluntarios}>
                 <SelectValue placeholder="Selecione um voluntário..." />
               </SelectTrigger>

@@ -295,7 +295,8 @@ export default function EventoDialog({
       onSuccess();
       onOpenChange(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erro ao salvar evento";
+      const message =
+        error instanceof Error ? error.message : "Erro ao salvar evento";
       toast.error(message);
     } finally {
       setLoading(false);
@@ -303,7 +304,8 @@ export default function EventoDialog({
   };
 
   const handleApplyTemplate = (template: Template) => {
-    if (template.tipo_culto) form.setValue("tipo", template.tipo_culto as Evento["tipo"]);
+    if (template.tipo_culto)
+      form.setValue("tipo", template.tipo_culto as Evento["tipo"]);
     form.setValue("titulo", template.tema_padrao || "");
     form.setValue("duracao_minutos", template.duracao_padrao || 120);
     setTemplateApplied(true);

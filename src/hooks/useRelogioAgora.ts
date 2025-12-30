@@ -58,7 +58,9 @@ export function useRelogioAgora(): RelogioAgoraData {
 
       // Calcular fim do evento (data_evento + duracao_minutos)
       const dataInicio = new Date(evento.data_evento);
-      const dataFim = new Date(dataInicio.getTime() + (evento.duracao_minutos || 24 * 60) * 60 * 1000);
+      const dataFim = new Date(
+        dataInicio.getTime() + (evento.duracao_minutos || 24 * 60) * 60 * 1000
+      );
 
       // Verificar se o evento ainda está ativo
       if (now < dataInicio || now > dataFim) {
@@ -73,7 +75,8 @@ export function useRelogioAgora(): RelogioAgoraData {
       // 2. Buscar sentinela atual
       const { data: sentinelaAtual, error: sentinelaError } = await supabase
         .from("escalas")
-        .select(`
+        .select(
+          `
           id,
           data_hora_inicio,
           data_hora_fim,
@@ -81,7 +84,8 @@ export function useRelogioAgora(): RelogioAgoraData {
             nome,
             avatar_url
           )
-        `)
+        `
+        )
         .eq("evento_id", evento.id)
         .lte("data_hora_inicio", nowISO)
         .gte("data_hora_fim", nowISO)
@@ -93,13 +97,15 @@ export function useRelogioAgora(): RelogioAgoraData {
       // 3. Buscar próximo sentinela
       const { data: proximoSentinela, error: proximoError } = await supabase
         .from("escalas")
-        .select(`
+        .select(
+          `
           id,
           data_hora_inicio,
           profiles:pessoa_id (
             nome
           )
-        `)
+        `
+        )
         .eq("evento_id", evento.id)
         .gt("data_hora_inicio", nowISO)
         .order("data_hora_inicio", { ascending: true })
@@ -114,15 +120,25 @@ export function useRelogioAgora(): RelogioAgoraData {
           id: evento.id,
           titulo: evento.titulo,
         },
-        sentinelaAtual: sentinelaAtual ? {
-          nome: sentinelaAtual.profiles?.nome || "Desconhecido",
-          foto: sentinelaAtual.profiles?.avatar_url || null,
-          ate: format(new Date(sentinelaAtual.data_hora_fim), "HH:mm", { locale: ptBR }),
-        } : null,
-        proximoSentinela: proximoSentinela ? {
-          nome: proximoSentinela.profiles?.nome || "Desconhecido",
-          inicio: format(new Date(proximoSentinela.data_hora_inicio), "HH:mm", { locale: ptBR }),
-        } : null,
+        sentinelaAtual: sentinelaAtual
+          ? {
+              nome: sentinelaAtual.profiles?.nome || "Desconhecido",
+              foto: sentinelaAtual.profiles?.avatar_url || null,
+              ate: format(new Date(sentinelaAtual.data_hora_fim), "HH:mm", {
+                locale: ptBR,
+              }),
+            }
+          : null,
+        proximoSentinela: proximoSentinela
+          ? {
+              nome: proximoSentinela.profiles?.nome || "Desconhecido",
+              inicio: format(
+                new Date(proximoSentinela.data_hora_inicio),
+                "HH:mm",
+                { locale: ptBR }
+              ),
+            }
+          : null,
       };
     },
     refetchInterval: 60000, // Atualizar a cada minuto
