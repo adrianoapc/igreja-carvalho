@@ -168,17 +168,90 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
   - Convites pendentes de aceitação
   - Evento associado e data
   - Ações rápidas (Aceitar/Recusar)
-- **Tab Convites**: Nova abra em EventoDetalhes (apenas para tipo EVENTO) com:
+- **Tab Convites**: Nova aba em EventoDetalhes (apenas para tipo EVENTO) com:
   - Lista de pessoas convidadas (nome, email, status: pendente/aceito/recusado)
   - Seleção múltipla para enviar convites em massa
   - Template customizável para mensagem de convite
   - Rastreamento de quem aceitou/recusou
+
+#### Gestão de Inscrições (Eventos em geral)
+
+- **Tab Inscrições**: `InscricoesTabContent` em EventoDetalhes exibe:
+  - Tabela de inscritos com pessoa (nome, avatar, email, telefone)
+  - Status de pagamento (Pendente, Pago, Isento, Cancelado) com badges coloridos
+  - Data de inscrição formatada (ex: "15 de Jan, 2025")
+  - Busca em tempo real por nome
+  - Estatísticas no header: Total inscritos, Pendentes, Pagos, Cancelados (cards coloridos)
+  - Ações por inscrito: Confirmar pagamento, Isentar, Cancelar, Remover
+- **Dialog Adicionar Inscrição**: `AdicionarInscricaoDialog` permite admin:
+  - Combobox de busca de pessoas (nome + avatar)
+  - Seleção de status inicial (Pendente/Pago/Isento/Cancelado)
+  - Validação de duplicatas (bloqueia se pessoa já inscrita)
+  - Criação automática de transação financeira se `evento.requer_pagamento = true` (entrada na categoria/conta do evento)
+- **Integração com Financeiro**: 
+  - Confirmar pagamento → `status_pagamento: pago` + marca transação vinculada como concluída
+  - Isentar → `status_pagamento: isento` + cancela transação se houver
+  - Cancelar → `status_pagamento: cancelado` + cancela transação pendente
+  - Campos em eventos: `requer_pagamento` (bool), `valor_inscricao` (numeric), `categoria_financeira_id`, `conta_financeira_id`, `vagas_limite` (numeric)
+- **Componentes**: `InscricoesTabContent.tsx` (+387 linhas), `AdicionarInscricaoDialog.tsx` (+277 linhas)
+
+#### Tabs Condicionais por Tipo de Evento
+
 - **Tabs Condicionais**:
   - **CULTO**: Liturgia, Músicas, Escalas, Check-in
   - **RELOGIO**: Timeline (Turnos), Escalas, Check-in
   - **TAREFA**: Checklist, Escalas
-  - **EVENTO**: Visão Geral, Convites, Escalas, Check-in
-- **Navegação Direta**: Parâmetro `?tab=liturgia` abre abra específica diretamente
+  - **EVENTO**: Visão Geral, Convites, Inscrições, Escalas, Check-in
+- **Navegação Direta**: Parâmetro `?tab=liturgia` abre aba específica diretamente
+
+### Portal de Voluntariado
+
+#### Tela Pública de Inscrição
+
+- **Rota**: `/voluntariado` (pública, sem necessidade de autenticação)
+- **Componente**: `Voluntariado.tsx` (+257 linhas)
+- **Formulário**:
+  - Seleção de ministério: 7 opções (Recepção, Louvor, Mídia, Kids, Intercessão, Ação Social, Eventos)
+  - Disponibilidade: 5 opções (Domingos manhã, Domingos noite, Durante a semana, Eventos pontuais, Flexível)
+  - Experiência: 3 níveis (Nenhuma experiência, Já servi antes, Sirvo atualmente)
+  - Campos: Contato (telefone/email) e Observações (textarea opcional)
+  - Validação: Campos obrigatórios (área, disponibilidade, experiência)
+- **Acesso**: Link na `Sidebar` para membros e admins; pode ser compartilhado publicamente via URL
+
+#### Sistema de Triagem Automática
+
+- **Biblioteca de Triagem**: `src/lib/voluntariado/triagem.ts` (+118 linhas)
+  - Função `avaliarTriagemVoluntario(perfilStatus, ministerio)` retorna status `aprovado` ou `em_trilha`
+  - 5 regras de ministério pré-definidas:
+    - **Kids**: Requer ser membro → Trilha Kids
+    - **Louvor**: Requer ser membro → Trilha de Louvor
+    - **Mídia**: Requer ser membro → Trilha de Mídia
+    - **Intercessão**: Não requer ser membro → Trilha de Intercessão
+    - **Recepção**: Não requer ser membro → Trilha de Recepção
+  - Fallback: Não-membros → **Trilha de Integração** (obrigatória antes de servir)
+  - Normalização de texto (remove acentos) para matching flexível de nomes de ministério
+
+- **Integração em GerenciarTimeDialog**:
+  - Carrega perfil da pessoa (`profiles.tipo`) e ministério (`ministerios.nome` + `categoria`)
+  - Chama `avaliarTriagemVoluntario()` ao adicionar membro
+  - Exibe badge:
+    - Verde "Aprovado" → Apto para escalar
+    - Amarelo "Requer Trilha" → Tooltip com nome da trilha e requisitos não atendidos
+  - Verifica inscrição em jornadas (trilhas) via `inscricoes_jornada`:
+    - Busca jornada por título (ex: "Trilha Kids")
+    - Mostra status de conclusão (`concluido: true/false`)
+    - Lista pendências (etapas não concluídas)
+  - Track de progresso: Contagem de etapas concluídas vs total
+
+- **Trilhas Mapeadas**: 6 trilhas identificadas:
+  1. Trilha de Integração (para não-membros)
+  2. Trilha Kids
+  3. Trilha de Louvor
+  4. Trilha de Mídia
+  5. Trilha de Intercessão
+  6. Trilha de Recepção
+
+- **Componentes**: `GerenciarTimeDialog.tsx` (+120 linhas de triagem), `triagem.ts` (biblioteca completa)
 
 ### Links
 

@@ -10,6 +10,30 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 🙋 Portal de Voluntariado — Inscrição com Formulário e Triagem Inteligente (30 de Dez/2025)
+
+- **Nova Tela de Voluntariado**: Página `/voluntariado` com formulário público para candidatos a voluntários; seleção de ministério (7 opções: Recepção, Louvor, Mídia, Kids, Intercessão, Ação Social, Eventos); disponibilidade (5 opções: Domingos manhã/noite, Durante a semana, Eventos pontuais, Flexível); experiência (Nenhuma/Já servi/Sirvo atualmente); campos de contato e observações; link na `Sidebar` para acesso rápido
+- **Biblioteca de Triagem Automática**: `src/lib/voluntariado/triagem.ts` implementa regras de elegibilidade por ministério; 5 regras pré-definidas (Kids, Louvor, Mídia requerem ser membro; Intercessão e Recepção permitem frequentadores); função `avaliarTriagemVoluntario()` retorna status `aprovado` ou `em_trilha` com trilha específica (Integração, Kids, Louvor, Mídia, Intercessão, Recepção); normalização de texto com remoção de acentos para matching flexível de nomes de ministério
+- **Integração com Gerenciamento de Time**: `GerenciarTimeDialog` carrega perfil do voluntário e ministério; chama `avaliarTriagemVoluntario()` ao adicionar membro; exibe badge verde "Aprovado" ou amarelo "Requer Trilha" com tooltip; mostra requisitos não atendidos (ex: "Ser membro da igreja"); verifica inscrição em jornadas (trilhas) e status de conclusão; track de pendências por trilha com contagem de etapas concluídas
+- **Trilhas Mapeadas**: 6 trilhas identificadas (Integração, Kids, Louvor, Mídia, Intercessão, Recepção); função `trilhasMapeadas()` exporta lista completa; fallback para trilha de Integração se voluntário não é membro
+
+**Impacto no usuário:** Candidatos a voluntários preenchem formulário público sem login; líderes veem automaticamente se voluntário precisa de trilha antes de escalar; sistema bloqueia ministérios sensíveis (Kids, Louvor) para não-membros; transparência sobre requisitos e progresso em trilhas.  
+**Módulos afetados:** Voluntariado (novo), Escalas (triagem), Jornadas (verificação trilhas)  
+**Arquivos criados:** `Voluntariado.tsx` (+257 linhas), `triagem.ts` (+118 linhas)  
+**Arquivos modificados:** `App.tsx` (rota `/voluntariado`), `Sidebar.tsx` (link), `GerenciarTimeDialog.tsx` (+120 linhas triagem), `AppBreadcrumb.tsx` (breadcrumb)
+
+#### 📝 Eventos — Sistema de Inscrições com Gestão de Participantes (30 de Dez/2025)
+
+- **Nova Tab "Inscrições"**: `InscricoesTabContent` exibe lista de inscritos em eventos com tabela responsiva; dados de pessoa (nome, avatar, email, telefone); status de pagamento (Pendente, Pago, Isento, Cancelado) com badges coloridos e ícones; data de inscrição formatada; busca por nome em tempo real; dropdown de ações (Confirmar pagamento, Isentar, Cancelar, Remover) por inscrito; estatísticas no header (total inscritos, pendentes, pagos, cancelados) com cards coloridos
+- **Dialog de Adicionar Inscrição**: `AdicionarInscricaoDialog` permite admin inscrever pessoas manualmente; combobox de busca de pessoas com avatar e dados; seleção de status inicial (Pendente/Pago/Isento/Cancelado); validação de duplicatas (bloqueia se pessoa já inscrita); criação de transação financeira automática se `requer_pagamento=true` (entrada na categoria do evento, valor conforme `valor_inscricao`); toast de sucesso com nome da pessoa; botão "+" no header da tab
+- **Integração com EventoDialog**: Campo `requer_pagamento` (boolean) e `valor_inscricao` (numeric) em formulário de criação/edição; campos `categoria_financeira_id` e `conta_financeira_id` para vincular transações; renderiza tab "Inscrições" apenas se evento requer inscrições (controlado por evento.tipo ou flag específica)
+- **Gestão de Pagamentos**: Confirmar pagamento atualiza `status_pagamento` para `pago` e marca transação vinculada como concluída; Isentar muda status para `isento` e cancela transação se houver; Cancelar marca inscrição como `cancelado` e transação pendente também; validação de limites de vagas (`vagas_limite`) ao adicionar inscrição
+
+**Impacto no usuário:** Admins gerenciam inscrições de eventos com controle de pagamento individual; visão clara de quem pagou/está pendente/isento; criação automática de transações financeiras vinculadas; estatísticas rápidas no cabeçalho da tab.  
+**Módulos afetados:** Eventos (inscrições), Financeiro (transações vinculadas)  
+**Arquivos criados:** `InscricoesTabContent.tsx` (+387 linhas), `AdicionarInscricaoDialog.tsx` (+277 linhas)  
+**Arquivos modificados:** `EventoDialog.tsx` (campos pagamento), `EventoDetalhes.tsx` (nova tab condicional)
+
 #### 🙏 Relógio de Oração — Blocos Inteligentes e Player Dinâmico (30 de Dez/2025)
 
 - **Blocos Inteligentes na Liturgia**: Novo tipo de conteúdo `BLOCO_*` (TESTEMUNHO, SENTIMENTO, VISITANTE, PEDIDOS) na tabela `liturgias`; campo `tipo_conteudo` aceita 14 tipos (migration aplicada); componente `LiturgiaItemDialog` categoriza tipos em "Manuais/Estáticos" vs "Automáticos (Inteligência)" com badges visuais (emojis 🎬📖🙏👋); info card explica que blocos automáticos são preenchidos pela Edge Function
