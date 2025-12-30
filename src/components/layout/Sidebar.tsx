@@ -36,6 +36,7 @@ import {
   Heart,
   Sparkles,
   Smile,
+  Route,
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 import { usePermissions, Permission } from "@/hooks/usePermissions";
@@ -57,21 +58,58 @@ type MenuGroup = {
 
 const MENU_GROUPS: MenuGroup[] = [
   {
-    label: "Visão Geral",
+    label: "📋 VISÃO GERAL",
     items: [
-      { title: "Dashboard", url: "/", icon: LayoutDashboard },
+      { title: "Início", url: "/", icon: LayoutDashboard },
       { title: "Mural & Avisos", url: "/mural", icon: MonitorPlay },
+      { title: "Diário de Oração", url: "/intercessao/diario", icon: Heart },
+      { title: "Agenda", url: "/eventos", icon: CalendarDays },
+      { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
       { title: "Minha Família", url: "/perfil/familia", icon: Home },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },
-      { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
       { title: "Jornadas", url: "/jornadas", icon: Route },
     ],
   },
   {
-    label: "Pessoas & Cuidado",
+    label: "⚡ MINISTÉRIOS",
     items: [
       {
-        title: "Membros & Visitantes",
+        title: "Intercessão › Sala de Guerra",
+        url: "/intercessao/sala-de-guerra",
+        icon: MessageSquareHeart,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Kids › Check-in",
+        url: "/kids",
+        icon: Baby,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Voluntariado",
+        url: "/voluntariado",
+        icon: Briefcase,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Escalas",
+        url: "/escalas",
+        icon: CalendarCheck,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Ensino",
+        url: "/ensino",
+        icon: BookOpen,
+        permission: "ensino.view",
+      },
+    ],
+  },
+  {
+    label: "🏛️ GESTÃO & CUIDADO",
+    items: [
+      {
+        title: "Pessoas",
         url: "/pessoas",
         icon: Users,
         permission: "pessoas.view",
@@ -82,71 +120,30 @@ const MENU_GROUPS: MenuGroup[] = [
         icon: HeartHandshake,
         permission: "gabinete.view",
       },
-    ],
-  },
-  {
-    label: "Hub de Intercessão",
-    items: [
-      { title: "Meu Hub", url: "/intercessao/meu-hub", icon: Heart },
       {
-        title: "Gestão Completa",
-        url: "/intercessao/gestao",
-        icon: MessageSquareHeart,
+        title: "Intercessão › Equipes",
+        url: "/intercessao/equipes",
+        icon: Users,
         permission: "ministerio.view",
       },
       {
-        title: "Sentimentos",
+        title: "Intercessão › Sentimentos",
         url: "/intercessao/sentimentos",
         icon: Smile,
         permission: "ministerio.view",
       },
       {
-        title: "Intercessores",
-        url: "/intercessao/intercessores",
-        icon: Users,
-        permission: "ministerio.view",
-      },
-    ],
-  },
-  {
-    label: "Comunicação & Mídia",
-    items: [
-      {
-        title: "Comunicados (Push)",
+        title: "Comunicação",
         url: "/comunicados",
         icon: Megaphone,
         permission: "ministerio.view",
       },
       {
-        title: "Publicação Social",
-        url: "/publicacao",
-        icon: Share2,
-        permission: "ministerio.view",
-      },
-      {
-        title: "Arquivos & Mídias",
+        title: "Mídias",
         url: "/midias",
         icon: Video,
         permission: "ministerio.view",
       },
-    ],
-    permission: "ministerio.view",
-  },
-  {
-    label: "Ministérios & Operação",
-    items: [
-      { title: "Chamada Rápida", url: "/chamada", icon: ClipboardCheck, permission: "ministerio.view" },
-      { title: "Voluntariado", url: "/voluntariado", icon: HeartHandshake, permission: "ministerio.view" },
-      { title: "Candidatos", url: "/voluntariado/candidatos", icon: Users, permission: "ministerio.view" },
-      { title: "Escalas (Gestão)", url: "/escalas", icon: CalendarDays, permission: "ministerio.view" },
-      { title: "Agenda & Eventos", url: "/eventos", icon: CalendarDays, permission: "ministerio.view" },
-      { title: "Kids", url: "/kids", icon: Baby, permission: "ministerio.view" },
-      { title: "Ensino (Gestão)", url: "/ensino", icon: BookOpen, permission: "ensino.view" },
-    ],
-  },
-  {
-    label: "Gestão Administrativa",
-    items: [
       {
         title: "Projetos",
         url: "/projetos",

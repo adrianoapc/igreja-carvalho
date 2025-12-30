@@ -88,7 +88,7 @@ const CATEGORIAS_TESTEMUNHOS = [
   { value: "outro", label: "Outros", icon: Smile },
 ];
 
-export default function GestaoIntercessao() {
+export default function SalaDeGuerra() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"pedidos" | "testemunhos">(
@@ -338,11 +338,10 @@ export default function GestaoIntercessao() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">
-                Gestão de Intercessão
-              </h1>
+              <h1 className="text-2xl md:text-3xl font-bold">Sala de Guerra</h1>
               <p className="text-sm md:text-base text-muted-foreground mt-1">
-                Gerencie pedidos de oração e testemunhos da comunidade
+                Área de trabalho dos intercessores - ore pelos pedidos da
+                comunidade
               </p>
             </div>
           </div>

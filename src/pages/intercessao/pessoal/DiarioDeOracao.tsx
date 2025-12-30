@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, Heart, Plus, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +38,7 @@ interface Testemunho {
   publicar: boolean;
 }
 
-export default function SolicitacaoPedido() {
+export default function DiarioDeOracao() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"pedidos" | "testemunhos">(
@@ -41,6 +48,12 @@ export default function SolicitacaoPedido() {
   const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilterPedidos, setStatusFilterPedidos] = useState("todos");
+  const [tipoFilterPedidos, setTipoFilterPedidos] = useState("todos");
+  const [statusFilterTestemunhos, setStatusFilterTestemunhos] =
+    useState("todos");
+  const [categoriaFilterTestemunhos, setCategoriaFilterTestemunhos] =
+    useState("todos");
   const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
   const [novoTestemunhoOpen, setNovoTestemunhoOpen] = useState(false);
 
@@ -48,13 +61,15 @@ export default function SolicitacaoPedido() {
     if (!user?.id) return;
 
     try {
+      // Buscar pelo user_id (auth) usando membro_id
       const { data, error } = await supabase
         .from("pedidos_oracao")
         .select("*")
-        .eq("pessoa_id", user.id)
+        .or(`membro_id.eq.${user.id},pessoa_id.eq.${user.id}`)
         .order("data_criacao", { ascending: false });
 
       if (error) throw error;
+      console.log("Pedidos encontrados:", data?.length || 0);
       setPedidos(data || []);
     } catch (error) {
       console.error("Erro ao buscar pedidos:", error);
@@ -66,13 +81,29 @@ export default function SolicitacaoPedido() {
     if (!user?.id) return;
 
     try {
+      // Primeiro buscar o profiles.id do usuário logado
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (!profileData?.id) {
+        console.log("Profile não encontrado para user_id:", user.id);
+        return;
+      }
+
+      // Agora buscar testemunhos pelo profiles.id
       const { data, error } = await supabase
         .from("testemunhos")
         .select("*")
-        .eq("autor_id", user.id)
+        .eq("autor_id", profileData.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      console.log("Testemunhos encontrados:", data?.length || 0);
       setTestemunhos(data || []);
     } catch (error) {
       console.error("Erro ao buscar testemunhos:", error);
@@ -93,17 +124,54 @@ export default function SolicitacaoPedido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const filteredPedidos = pedidos.filter(
-    (p) =>
+  const filteredPedidos = pedidos.filter((p) => {
+    const matchSearch =
       p.pedido?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.tipo?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      p.tipo?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus =
+      statusFilterPedidos === "todos" || p.status === statusFilterPedidos;
+    const matchTipo =
+      tipoFilterPedidos === "todos" || p.tipo === tipoFilterPedidos;
+    return matchSearch && matchStatus && matchTipo;
+  });
 
-  const filteredTestemunhos = testemunhos.filter(
-    (t) =>
+  const filteredTestemunhos = testemunhos.filter((t) => {
+    const matchSearch =
       t.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.mensagem?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      t.mensagem?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchCategoria =
+      categoriaFilterTestemunhos === "todos" ||
+      t.categoria === categoriaFilterTestemunhos;
+    const matchStatus =
+      statusFilterTestemunhos === "todos" ||
+      (statusFilterTestemunhos === "publico"
+        ? t.publicar === true
+        : t.status === statusFilterTestemunhos);
+    return matchSearch && matchCategoria && matchStatus;
+  });
+
+  const TIPO_PEDIDOS = [
+    { value: "todos", label: "Todos os Tipos" },
+    { value: "saude", label: "Saúde" },
+    { value: "familia", label: "Família" },
+    { value: "financeiro", label: "Financeiro" },
+    { value: "trabalho", label: "Trabalho" },
+    { value: "espiritual", label: "Espiritual" },
+    { value: "agradecimento", label: "Agradecimento" },
+    { value: "outro", label: "Outro" },
+  ];
+
+  const CATEGORIAS_TESTEMUNHOS = [
+    { value: "todos", label: "Todas Categorias" },
+    { value: "espiritual", label: "Área Espiritual" },
+    { value: "casamento", label: "Casamento" },
+    { value: "familia", label: "Família" },
+    { value: "saude", label: "Saúde" },
+    { value: "trabalho", label: "Trabalho" },
+    { value: "financeiro", label: "Vida Financeira" },
+    { value: "ministerial", label: "Vida Ministerial" },
+    { value: "outro", label: "Outros" },
+  ];
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -145,7 +213,7 @@ export default function SolicitacaoPedido() {
             </Button>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">
-                Minha Intercessão
+                Diário de Oração
               </h1>
               <p className="text-sm md:text-base text-muted-foreground mt-1">
                 Compartilhe pedidos de oração e testemunhos
@@ -178,6 +246,33 @@ export default function SolicitacaoPedido() {
 
           {/* Tab: Pedidos */}
           <TabsContent value="pedidos" className="space-y-4">
+            {/* Header da Tab com Ícone */}
+            <Card className="shadow-soft border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+                  <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                    <Heart className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl md:text-2xl font-bold mb-1">
+                      Seus Pedidos de Oração
+                    </h2>
+                    <p className="text-sm md:text-base text-muted-foreground">
+                      Compartilhe suas necessidades e nossa equipe de
+                      intercessores estará orando por você
+                    </p>
+                  </div>
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 w-full md:w-auto justify-center"
+                    onClick={() => setNovoPedidoOpen(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Pedido
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {loading ? (
               <Card className="shadow-soft">
                 <CardContent className="p-8 md:p-12 text-center">
@@ -190,49 +285,54 @@ export default function SolicitacaoPedido() {
               <Card className="shadow-soft border-0">
                 <CardContent className="p-12 md:p-16 text-center">
                   <div className="flex flex-col items-center gap-6">
-                    <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <Heart className="w-10 h-10 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl md:text-3xl font-bold mb-2">
-                        Precisa de Oração?
-                      </h2>
-                      <p className="text-base md:text-lg text-muted-foreground max-w-md mx-auto">
-                        Compartilhe seu pedido e nossa equipe de intercessores
-                        estará orando por você
-                      </p>
-                    </div>
-                    <Button
-                      size="lg"
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-soft mt-4"
-                      onClick={() => setNovoPedidoOpen(true)}
-                    >
-                      <Plus className="w-5 h-5 mr-2" />
-                      Fazer Novo Pedido de Oração
-                    </Button>
+                    <p className="text-base md:text-lg text-muted-foreground">
+                      Você ainda não fez nenhum pedido de oração
+                    </p>
                   </div>
                 </CardContent>
               </Card>
             ) : (
               <>
-                <div className="flex flex-col md:flex-row gap-3 mb-4">
-                  <input
-                    type="text"
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                  <Input
                     placeholder="Buscar seus pedidos..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-lg border bg-background text-sm"
+                    className="flex-1"
                   />
-                  <Button
-                    className="bg-blue-600 hover:bg-blue-700"
-                    onClick={() => setNovoPedidoOpen(true)}
+                  <Select
+                    value={statusFilterPedidos}
+                    onValueChange={setStatusFilterPedidos}
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Novo Pedido
-                  </Button>
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos Status</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="em_oracao">Em Oração</SelectItem>
+                      <SelectItem value="respondido">Respondido</SelectItem>
+                      <SelectItem value="arquivado">Arquivado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={tipoFilterPedidos}
+                    onValueChange={setTipoFilterPedidos}
+                  >
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIPO_PEDIDOS.map((tipo) => (
+                        <SelectItem key={tipo.value} value={tipo.value}>
+                          {tipo.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   {filteredPedidos.length}{" "}
                   {filteredPedidos.length === 1
                     ? "pedido encontrado"
@@ -291,6 +391,33 @@ export default function SolicitacaoPedido() {
 
           {/* Tab: Testemunhos */}
           <TabsContent value="testemunhos" className="space-y-4">
+            {/* Header da Tab com Ícone */}
+            <Card className="shadow-soft border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50/50 to-transparent dark:from-amber-900/10">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+                  <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl md:text-2xl font-bold mb-1">
+                      Seus Testemunhos
+                    </h2>
+                    <p className="text-sm md:text-base text-muted-foreground">
+                      Conte como Deus tem agido em sua vida e inspire outros
+                      irmãos
+                    </p>
+                  </div>
+                  <Button
+                    className="bg-amber-600 hover:bg-amber-700 flex-shrink-0 w-full md:w-auto justify-center"
+                    onClick={() => setNovoTestemunhoOpen(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Testemunho
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {loading ? (
               <Card className="shadow-soft">
                 <CardContent className="p-8 md:p-12 text-center">
@@ -303,49 +430,53 @@ export default function SolicitacaoPedido() {
               <Card className="shadow-soft border-0">
                 <CardContent className="p-12 md:p-16 text-center">
                   <div className="flex flex-col items-center gap-6">
-                    <div className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                      <Sparkles className="w-10 h-10 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl md:text-3xl font-bold mb-2">
-                        Compartilhe seu Testemunho
-                      </h2>
-                      <p className="text-base md:text-lg text-muted-foreground max-w-md mx-auto">
-                        Conte como Deus tem agido em sua vida e inspire outros
-                        irmãos
-                      </p>
-                    </div>
-                    <Button
-                      size="lg"
-                      className="bg-amber-600 hover:bg-amber-700 text-white shadow-soft mt-4"
-                      onClick={() => setNovoTestemunhoOpen(true)}
-                    >
-                      <Plus className="w-5 h-5 mr-2" />
-                      Compartilhar Testemunho
-                    </Button>
+                    <p className="text-base md:text-lg text-muted-foreground">
+                      Você ainda não compartilhou nenhum testemunho
+                    </p>
                   </div>
                 </CardContent>
               </Card>
             ) : (
               <>
-                <div className="flex flex-col md:flex-row gap-3 mb-4">
-                  <input
-                    type="text"
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                  <Input
                     placeholder="Buscar seus testemunhos..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-lg border bg-background text-sm"
+                    className="flex-1"
                   />
-                  <Button
-                    className="bg-amber-600 hover:bg-amber-700"
-                    onClick={() => setNovoTestemunhoOpen(true)}
+                  <Select
+                    value={statusFilterTestemunhos}
+                    onValueChange={setStatusFilterTestemunhos}
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Novo Testemunho
-                  </Button>
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos Status</SelectItem>
+                      <SelectItem value="aberto">Aberto</SelectItem>
+                      <SelectItem value="publico">Publicado</SelectItem>
+                      <SelectItem value="arquivado">Arquivado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={categoriaFilterTestemunhos}
+                    onValueChange={setCategoriaFilterTestemunhos}
+                  >
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIAS_TESTEMUNHOS.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   {filteredTestemunhos.length}{" "}
                   {filteredTestemunhos.length === 1
                     ? "testemunho encontrado"
@@ -385,7 +516,11 @@ export default function SolicitacaoPedido() {
                                     Publicado
                                   </Badge>
                                 ) : (
-                                  <Badge className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/20">
+                                  <Badge
+                                    className={`text-xs ${getStatusColor(
+                                      "pendente"
+                                    )}`}
+                                  >
                                     Pendente
                                   </Badge>
                                 )}

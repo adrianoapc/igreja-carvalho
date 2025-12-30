@@ -456,11 +456,11 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 
 ---
 
-## 3. Cultos e Eventos
+## 3. Eventos e Liturgia
 
-### 3.1 Gestão de Cultos
+### 3.1 Gestão de Eventos
 
-- Cadastro de cultos com tipo, data, local, tema
+- Cadastro de eventos com tipo, data, local, tema
 - Status: Planejado, Confirmado, Realizado, Cancelado
 - Duração estimada e observações
 
@@ -504,35 +504,37 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
   - Controles: `→`/`Espaço` (próximo), `←` (anterior), `P` (pausa), `F` (tela cheia)
   - Suporte a imagens e vídeos (mp4/webm/mov)
 - **Modo Liturgia** — rota `/telao-liturgia/:id` (arquivo `src/pages/TelaoLiturgia.tsx`)
-  - Fonte: `cultos` → `liturgia_culto` (itens) → `liturgia_recursos` (recursos com `midias`)
+  - Fonte: `eventos` → `liturgia_evento` (itens) → `liturgia_recursos` (recursos com `midias`)
   - Realtime: assina mudanças em `liturgia_culto` e `liturgia_recursos` (canal Supabase)
   - Controles: `→`/`Espaço` (próximo), `←` (anterior), `P` (pausa), `F` (tela cheia), `B` (tela preta), `C` (tela limpa)
   - Barra de progresso por recurso (quando `duracao_segundos > 0`)
 
-#### Evidências no Repositório (Cultos)
+#### Evidências no Repositório (Eventos)
 
-- Páginas (src/pages/cultos/): `Geral.tsx`, `Eventos.tsx`, `Times.tsx`, `Posicoes.tsx`, `Templates.tsx`, `LiturgiaDashboard.tsx`, `MidiasGeral.tsx`
+- Páginas (src/pages/eventos/): `Geral.tsx`, `Eventos.tsx`, `Times.tsx`, `Posicoes.tsx`, `Categorias.tsx`, `Templates.tsx`, `LiturgiaDashboard.tsx`, `MidiasGeral.tsx`
+- Página principal: `src/pages/EventoDetalhes.tsx` (detalhes com tabs: Escalas, Liturgia, Inscrições)
 - Projeção: `src/pages/Telao.tsx`, `src/pages/TelaoLiturgia.tsx`
-- Componentes: `src/components/cultos/` — dialogs e telas para liturgia, templates, escalas e mídias
+- Componentes: `src/components/eventos/` — dialogs e telas para liturgia, templates, escalas e mídias
   - Exemplos: `LiturgiaTimeline.tsx`, `LiturgiaWorkspace.tsx`, `LiturgiaDialog.tsx`, `LiturgiaItemDialog.tsx`, `EscalasTabContent.tsx`, `EscalasDialog.tsx`, `TimeDialog.tsx`, `PosicaoDialog.tsx`, `MidiaDialog.tsx`, `TemplatesLiturgiaDialog.tsx`, `SalvarComoTemplateDialog.tsx`
 
 #### Tabelas/Entidades Referenciadas (Evidência de Código)
 
-- `cultos`, `times_culto`, `escalas_culto`, `midias` (dashboard de `Geral.tsx`)
-- `liturgia_culto`, `liturgia_recursos`, `midias` (playlist do `TelaoLiturgia.tsx`)
+- `eventos`, `times_evento`, `escalas_evento`, `midias` (dashboard de `Geral.tsx`)
+- `liturgia_evento`, `liturgia_recursos`, `midias` (playlist do `TelaoLiturgia.tsx`)
 - `comunicados` (slideshow do `Telao.tsx`)
 
-### Módulo Cultos
+### Módulo Eventos
 
 #### Evidências (código e rotas)
 
-- `src/pages/Cultos.tsx`: container de módulo; redireciona `/cultos` → `/cultos/geral` e exibe botão voltar para `/cultos/geral`.
-- `src/pages/cultos/Geral.tsx`: visão geral com métricas (próximos cultos, times ativos, membros escalados, realizados, mídias ativas) e cards para módulos; ações rápidas para criar culto/evento e navegar.
-- `src/pages/cultos/Eventos.tsx`: página de eventos/cultos (detalhamento — (a confirmar)).
-- `src/pages/cultos/Times.tsx`: página de times/equipes (detalhamento — (a confirmar)).
-- `src/pages/cultos/Posicoes.tsx`: página de posições/funções (detalhamento — (a confirmar)).
-- `src/pages/cultos/Templates.tsx`: página de templates de liturgia (detalhamento — (a confirmar)).
-- `src/pages/cultos/LiturgiaDashboard.tsx`: dashboard de liturgia (detalhamento — (a confirmar)).
+- Rota principal: `/eventos` (redireciona para `/eventos/geral`)
+- `src/pages/eventos/Geral.tsx`: visão geral com métricas (próximos eventos, times ativos, membros escalados, realizados, mídias ativas) e cards para módulos; ações rápidas para criar evento e navegar.
+- `src/pages/eventos/Eventos.tsx`: listagem completa de eventos/cultos com filtros (tipo, categoria, data).
+- `src/pages/eventos/Times.tsx`: gestão de times/equipes com foco em voluntários e ministérios.
+- `src/pages/eventos/Posicoes.tsx`: cadastro de posições/funções dentro de times.
+- `src/pages/eventos/Categorias.tsx`: gestão de categorias de eventos.
+- `src/pages/eventos/Templates.tsx`: templates reutilizáveis de liturgia aplicáveis a novos eventos.
+- `src/pages/eventos/LiturgiaDashboard.tsx`: banco de músicas e gerenciamento de liturgia.
 - `src/pages/cultos/MidiasGeral.tsx`: gestão/lista de mídias (detalhamento — (a confirmar)).
 - `src/pages/Telao.tsx` (`/telao`): projeção fullscreen de comunicados (playlist com imagens/vídeos, filtros por período e ordem; controles de teclado).
 - `src/pages/TelaoLiturgia.tsx` (`/telao-liturgia/:id`): projeção fullscreen da liturgia (playlist de recursos por item; controles de teclado; barra de progresso; atualiza via Supabase Realtime).
@@ -743,13 +745,24 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 
 ### Estrutura Geral
 
-#### Páginas Principais (Rotas)
+#### Páginas Principais (Rotas) — 3 Contextos
 
-- `/intercessao`: Container com dashboard de 4 módulos (cards de acesso rápido)
-- `/intercessao/pedidos`: Listagem e gestão de pedidos de oração
-- `/intercessao/intercessores`: Gerenciamento de equipe de intercessores
-- `/intercessao/testemunhos`: Listagem, aprovação e publicação de testemunhos
-- `/intercessao/sentimentos`: Monitoramento de sentimentos e alertas críticos
+**📖 Contexto Pessoal (Membro)**
+
+- `/intercessao/diario`: `DiarioDeOracao.tsx` — área privada do membro para gerenciar seus próprios pedidos de oração e testemunhos pessoais
+
+**⚡ Contexto Ministério (Intercessor)**
+
+- `/intercessao/sala-de-guerra`: `SalaDeGuerra.tsx` — área de trabalho dos intercessores para orar pelos pedidos da comunidade; visualização e ação em pedidos alocados
+
+**🏛️ Contexto Admin (Liderança)**
+
+- `/intercessao/equipes`: `GestaoEquipes.tsx` — gerenciamento de equipe de intercessores (cadastro, ativação, limites)
+- `/intercessao/sentimentos`: `Sentimentos.tsx` — monitoramento de bem-estar emocional, alertas críticos e dashboard de sentimentos
+
+**Hub Central**
+
+- `/intercessao`: `Intercessao.tsx` — dashboard unificado com cards para acessar os 3 contextos e estatísticas gerais
 
 ### 5.1 Pedidos de Oração
 
@@ -802,7 +815,10 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 
 ### 4.5 Integração Frontend
 
-- **Container** (`Intercessao.tsx`): Dashboard com 4 cards (Pedidos, Intercessores, Testemunhos, Sentimentos); cada card exibe estatísticas e link para página específica; ações rápidas (Novo Pedido, Alocar Automático)
+- **Hub Central** (`Intercessao.tsx`): Dashboard com módulos temáticos separados em 3 contextos (Pessoal, Ministério, Admin); cards com estatísticas e navegação direta
+- **Diário de Oração** (`DiarioDeOracao.tsx`): Área privada do membro com tabs para pedidos e testemunhos próprios; filtros por status/tipo/categoria; CTAs mobile-friendly
+- **Sala de Guerra** (`SalaDeGuerra.tsx`): Workspace dos intercessores com listagem de pedidos da comunidade; filtros avançados; ações rápidas (atribuir, marcar como orado); exportação
+- **Gestão de Equipes** (`GestaoEquipes.tsx`): Wrapper para `IntercessoresManager` com controle de acesso por role (líder ou hasAccess); navegação com `?focus=intercessao`
 - **Componentes Dialogs**: `NovoPedidoDialog`, `PedidoDetailsDialog`, `IntercessoresManager`, `NovoTestemunhoDialog`, `TestemunhoDetailsDialog`, `RegistrarSentimentoDialog`, `AlertasCriticos`
 - **Timeline por Pessoa**: `VidaIgrejaIntercessao` exibe histórico unificado (pedidos + sentimentos + testemunhos) para contexto pastoral
 - **Queries/Realtime**: Uso de `@supabase/supabase-js` para CRUD; TanStack Query para cache; Supabase Realtime para atualizações em tempo real (a confirmar se implementado)
