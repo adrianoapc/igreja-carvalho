@@ -34,6 +34,7 @@ const Agenda = lazy(() => import("./pages/Agenda"));
 const Chamada = lazy(() => import("./pages/Chamada"));
 const Escalas = lazy(() => import("./pages/Escalas"));
 const MinhasEscalas = lazy(() => import("./pages/MinhasEscalas"));
+const Voluntariado = lazy(() => import("./pages/Voluntariado"));
 const Publicacao = lazy(() => import("./pages/Publicacao"));
 const Comunicados = lazy(() => import("./pages/Comunicados"));
 const Announcements = lazy(() => import("./pages/Announcements"));
@@ -258,6 +259,14 @@ const App = () => (
                   element={
                     <AuthGate>
                       <Chamada />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/voluntariado"
+                  element={
+                    <AuthGate>
+                      <Voluntariado />
                     </AuthGate>
                   }
                 />
