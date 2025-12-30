@@ -10,6 +10,16 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Adicionado
 
+#### 🎓 Trilhas de Voluntariado — 6 Jornadas + Gestão de Candidatos (30 de Dez/2025)
+
+- **6 Jornadas de Capacitação**: Trilha de Integração, Kids, Louvor, Mídia, Intercessão e Recepção inseridas no módulo Ensino com 3 etapas cada
+- **Tabela `candidatos_voluntario`**: Rastreia candidaturas com status (pendente → em_analise → aprovado/em_trilha/rejeitado)
+- **Notificação Automática**: Trigger `notify_new_candidato_voluntario` alerta admins/líderes quando novo candidato se inscreve
+- **Dashboard de Candidatos**: Widget no Dashboard Admin + página `/voluntariado/candidatos` para gestão completa
+- **Status da Inscrição**: Página `/voluntariado` mostra status atual se usuário logado
+
+**Arquivos criados:** `CandidatosPendentesWidget.tsx`, `Candidatos.tsx`, `MinhaInscricaoCard.tsx`
+
 #### 🙋 Portal de Voluntariado — Inscrição com Formulário e Triagem Inteligente (30 de Dez/2025)
 
 - **Nova Tela de Voluntariado**: Página `/voluntariado` com formulário público para candidatos a voluntários; seleção de ministério (7 opções: Recepção, Louvor, Mídia, Kids, Intercessão, Ação Social, Eventos); disponibilidade (5 opções: Domingos manhã/noite, Durante a semana, Eventos pontuais, Flexível); experiência (Nenhuma/Já servi/Sirvo atualmente); campos de contato e observações; link na `Sidebar` para acesso rápido
