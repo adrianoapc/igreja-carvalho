@@ -68,6 +68,7 @@ import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader"; // <--- Novo
 import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
+import CandidatosPendentesWidget from "@/components/dashboard/CandidatosPendentesWidget";
 
 interface Comunicado {
   id: string;
@@ -471,6 +472,9 @@ export default function DashboardAdmin() {
 
       {/* Widget de Monitoramento de Escalas para Admin */}
       <EscalasPendentesWidget />
+
+      {/* Widget de Candidatos a Voluntário */}
+      <CandidatosPendentesWidget />
 
       <RegistrarSentimentoDialog
         open={sentimentoDialogOpen}

@@ -64,6 +64,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Minha Família", url: "/perfil/familia", icon: Home },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },
       { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
+      { title: "Jornadas", url: "/jornadas", icon: Route },
     ],
   },
   {
@@ -134,42 +135,13 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "Ministérios & Operação",
     items: [
-      {
-        title: "Chamada Rápida",
-        url: "/chamada",
-        icon: ClipboardCheck,
-        permission: "ministerio.view",
-      },
-      {
-        title: "Voluntariado",
-        url: "/voluntariado",
-        icon: HeartHandshake,
-        permission: "ministerio.view",
-      },
-      {
-        title: "Escalas (Gestão)",
-        url: "/escalas",
-        icon: CalendarDays,
-        permission: "ministerio.view",
-      },
-      {
-        title: "Agenda & Eventos",
-        url: "/eventos",
-        icon: CalendarDays,
-        permission: "ministerio.view",
-      },
-      {
-        title: "Kids",
-        url: "/kids",
-        icon: Baby,
-        permission: "ministerio.view",
-      },
-      {
-        title: "Ensino (Gestão)",
-        url: "/ensino",
-        icon: BookOpen,
-        permission: "ensino.view",
-      },
+      { title: "Chamada Rápida", url: "/chamada", icon: ClipboardCheck, permission: "ministerio.view" },
+      { title: "Voluntariado", url: "/voluntariado", icon: HeartHandshake, permission: "ministerio.view" },
+      { title: "Candidatos", url: "/voluntariado/candidatos", icon: Users, permission: "ministerio.view" },
+      { title: "Escalas (Gestão)", url: "/escalas", icon: CalendarDays, permission: "ministerio.view" },
+      { title: "Agenda & Eventos", url: "/eventos", icon: CalendarDays, permission: "ministerio.view" },
+      { title: "Kids", url: "/kids", icon: Baby, permission: "ministerio.view" },
+      { title: "Ensino (Gestão)", url: "/ensino", icon: BookOpen, permission: "ensino.view" },
     ],
   },
   {

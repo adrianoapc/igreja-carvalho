@@ -35,6 +35,8 @@ const Chamada = lazy(() => import("./pages/Chamada"));
 const Escalas = lazy(() => import("./pages/Escalas"));
 const MinhasEscalas = lazy(() => import("./pages/MinhasEscalas"));
 const Voluntariado = lazy(() => import("./pages/Voluntariado"));
+const VoluntariadoCandidatos = lazy(() => import("./pages/voluntariado/Candidatos"));
+const VoluntariadoHistorico = lazy(() => import("./pages/voluntariado/Historico"));
 const Publicacao = lazy(() => import("./pages/Publicacao"));
 const Comunicados = lazy(() => import("./pages/Comunicados"));
 const Announcements = lazy(() => import("./pages/Announcements"));
@@ -269,6 +271,22 @@ const App = () => (
                   element={
                     <AuthGate>
                       <Voluntariado />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/voluntariado/candidatos"
+                  element={
+                    <AuthGate>
+                      <VoluntariadoCandidatos />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/voluntariado/historico"
+                  element={
+                    <AuthGate>
+                      <VoluntariadoHistorico />
                     </AuthGate>
                   }
                 />
