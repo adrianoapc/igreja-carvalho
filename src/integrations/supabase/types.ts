@@ -826,6 +826,68 @@ export type Database = {
           },
         ]
       }
+      candidatos_voluntario_historico: {
+        Row: {
+          acao: string
+          candidato_id: string
+          created_at: string
+          id: string
+          observacoes: string | null
+          realizado_por: string | null
+          status_anterior: string | null
+          status_novo: string | null
+        }
+        Insert: {
+          acao: string
+          candidato_id: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          realizado_por?: string | null
+          status_anterior?: string | null
+          status_novo?: string | null
+        }
+        Update: {
+          acao?: string
+          candidato_id?: string
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          realizado_por?: string | null
+          status_anterior?: string | null
+          status_novo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidatos_voluntario_historico_candidato_id_fkey"
+            columns: ["candidato_id"]
+            isOneToOne: false
+            referencedRelation: "candidatos_voluntario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       categorias_financeiras: {
         Row: {
           ativo: boolean
