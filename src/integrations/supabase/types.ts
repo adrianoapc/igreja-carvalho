@@ -1457,6 +1457,8 @@ export type Database = {
       }
       eventos: {
         Row: {
+          categoria_financeira_id: string | null
+          conta_financeira_id: string | null
           created_at: string
           created_by: string | null
           data_evento: string
@@ -1465,17 +1467,24 @@ export type Database = {
           endereco: string | null
           exibir_preletor: boolean
           id: string
+          inscricoes_abertas_ate: string | null
           local: string | null
           observacoes: string | null
           pregador: string | null
+          requer_inscricao: boolean | null
+          requer_pagamento: boolean | null
           status: string
           subtipo_id: string | null
           tema: string | null
           tipo: string
           titulo: string
           updated_at: string
+          vagas_limite: number | null
+          valor_inscricao: number | null
         }
         Insert: {
+          categoria_financeira_id?: string | null
+          conta_financeira_id?: string | null
           created_at?: string
           created_by?: string | null
           data_evento: string
@@ -1484,17 +1493,24 @@ export type Database = {
           endereco?: string | null
           exibir_preletor?: boolean
           id?: string
+          inscricoes_abertas_ate?: string | null
           local?: string | null
           observacoes?: string | null
           pregador?: string | null
+          requer_inscricao?: boolean | null
+          requer_pagamento?: boolean | null
           status?: string
           subtipo_id?: string | null
           tema?: string | null
           tipo: string
           titulo: string
           updated_at?: string
+          vagas_limite?: number | null
+          valor_inscricao?: number | null
         }
         Update: {
+          categoria_financeira_id?: string | null
+          conta_financeira_id?: string | null
           created_at?: string
           created_by?: string | null
           data_evento?: string
@@ -1503,17 +1519,36 @@ export type Database = {
           endereco?: string | null
           exibir_preletor?: boolean
           id?: string
+          inscricoes_abertas_ate?: string | null
           local?: string | null
           observacoes?: string | null
           pregador?: string | null
+          requer_inscricao?: boolean | null
+          requer_pagamento?: boolean | null
           status?: string
           subtipo_id?: string | null
           tema?: string | null
           tipo?: string
           titulo?: string
           updated_at?: string
+          vagas_limite?: number | null
+          valor_inscricao?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "eventos_categoria_financeira_id_fkey"
+            columns: ["categoria_financeira_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_conta_financeira_id_fkey"
+            columns: ["conta_financeira_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "eventos_subtipo_id_fkey"
             columns: ["subtipo_id"]
@@ -1762,6 +1797,106 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      inscricoes_eventos: {
+        Row: {
+          created_at: string | null
+          evento_id: string
+          id: string
+          observacoes: string | null
+          pessoa_id: string
+          responsavel_inscricao_id: string | null
+          status_pagamento: string
+          transacao_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          evento_id: string
+          id?: string
+          observacoes?: string | null
+          pessoa_id: string
+          responsavel_inscricao_id?: string | null
+          status_pagamento?: string
+          transacao_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          evento_id?: string
+          id?: string
+          observacoes?: string | null
+          pessoa_id?: string
+          responsavel_inscricao_id?: string | null
+          status_pagamento?: string
+          transacao_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inscricoes_eventos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_responsavel_inscricao_id_fkey"
+            columns: ["responsavel_inscricao_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_responsavel_inscricao_id_fkey"
+            columns: ["responsavel_inscricao_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_responsavel_inscricao_id_fkey"
+            columns: ["responsavel_inscricao_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
       }
       inscricoes_jornada: {
         Row: {
