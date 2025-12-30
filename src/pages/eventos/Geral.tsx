@@ -257,7 +257,9 @@ export default function EventosGeral() {
                       <Button
                         variant="outline"
                         className="w-full md:w-auto border-blue-500 text-blue-700 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-950"
-                        onClick={() => navigate(`/oracao/player/${sentinelaAtual.escalaId}`)}
+                        onClick={() =>
+                          navigate(`/oracao/player/${sentinelaAtual.escalaId}`)
+                        }
                       >
                         <Flame className="h-4 w-4 mr-2" />
                         Abrir Player
@@ -265,7 +267,9 @@ export default function EventosGeral() {
                     )}
                     <Button
                       className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all hover:scale-105"
-                      onClick={() => navigate(`/eventos/${relogioId}?tab=escalas`)}
+                      onClick={() =>
+                        navigate(`/eventos/${relogioId}?tab=escalas`)
+                      }
                     >
                       Ver Grade
                     </Button>
@@ -311,7 +315,7 @@ export default function EventosGeral() {
                     </div>
                   </div>
                 </div>
-                <CardDescription className="flex flex-col sm:flex-row sm:items-center gap-4 mt-4 text-base">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-4 text-base text-muted-foreground">
                   <div className="flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-md border text-foreground/80">
                     <Clock className="h-4 w-4 text-primary" />
                     <span className="font-semibold">{nextEvent.hora}</span>
@@ -322,7 +326,7 @@ export default function EventosGeral() {
                       {nextEvent.local}
                     </div>
                   )}
-                </CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-4">
                 <div className="flex flex-col sm:flex-row gap-3 mt-2">

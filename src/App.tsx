@@ -3,7 +3,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
 import { MainLayout } from "./components/layout/MainLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "next-themes";
@@ -43,15 +49,21 @@ const PessoasIndex = lazy(() => import("./pages/pessoas/index"));
 const PessoasTodos = lazy(() => import("./pages/pessoas/Todos"));
 const PessoasMembros = lazy(() => import("./pages/pessoas/Membros"));
 const PessoasVisitantes = lazy(() => import("./pages/pessoas/Visitantes"));
-const PessoasFrequentadores = lazy(() => import("./pages/pessoas/Frequentadores"));
+const PessoasFrequentadores = lazy(
+  () => import("./pages/pessoas/Frequentadores")
+);
 const PessoasContatos = lazy(() => import("./pages/pessoas/Contatos"));
-const PessoasAlteracoes = lazy(() => import("./pages/pessoas/AlteracoesPendentes"));
+const PessoasAlteracoes = lazy(
+  () => import("./pages/pessoas/AlteracoesPendentes")
+);
 const PessoaDetalhes = lazy(() => import("./pages/PessoaDetalhes"));
 const EditarPessoa = lazy(() => import("./pages/pessoas/EditarPessoa"));
 
 // Gabinete
 const GabinetePastoral = lazy(() => import("./pages/GabinetePastoral"));
-const AtendimentoProntuario = lazy(() => import("./pages/gabinete/AtendimentoProntuario"));
+const AtendimentoProntuario = lazy(
+  () => import("./pages/gabinete/AtendimentoProntuario")
+);
 
 // Intercessão
 const Intercessao = lazy(() => import("./pages/Intercessao"));
@@ -104,13 +116,21 @@ const FinancasEntradas = lazy(() => import("./pages/financas/Entradas"));
 const FinancasSaidas = lazy(() => import("./pages/financas/Saidas"));
 const FinancasContas = lazy(() => import("./pages/financas/Contas"));
 const FinancasCategorias = lazy(() => import("./pages/financas/Categorias"));
-const FinancasCentrosCusto = lazy(() => import("./pages/financas/CentrosCusto"));
-const FinancasFornecedores = lazy(() => import("./pages/financas/Fornecedores"));
+const FinancasCentrosCusto = lazy(
+  () => import("./pages/financas/CentrosCusto")
+);
+const FinancasFornecedores = lazy(
+  () => import("./pages/financas/Fornecedores")
+);
 const FinancasBases = lazy(() => import("./pages/financas/BasesMinisteriais"));
 const FinancasFormas = lazy(() => import("./pages/financas/FormasPagamento"));
 const FinancasDRE = lazy(() => import("./pages/financas/DRE"));
-const FinancasRelatorioOferta = lazy(() => import("./pages/financas/RelatorioOferta"));
-const FinancasDashboardOfertas = lazy(() => import("./pages/financas/DashboardOfertas"));
+const FinancasRelatorioOferta = lazy(
+  () => import("./pages/financas/RelatorioOferta")
+);
+const FinancasDashboardOfertas = lazy(
+  () => import("./pages/financas/DashboardOfertas")
+);
 const FinancasProjecao = lazy(() => import("./pages/financas/Projecao"));
 const FinancasInsights = lazy(() => import("./pages/financas/Insights"));
 const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
@@ -175,7 +195,10 @@ const App = () => (
 
               {/* Cadastro Público */}
               <Route path="/cadastro" element={<CadastroIndex />} />
-              <Route path="/cadastro/visitante" element={<CadastroVisitante />} />
+              <Route
+                path="/cadastro/visitante"
+                element={<CadastroVisitante />}
+              />
               <Route path="/cadastro/membro" element={<CadastroMembro />} />
 
               {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}

@@ -114,7 +114,9 @@ export default function EventoDetalhes() {
   const [notificando, setNotificando] = useState(false);
   const [escalasCount, setEscalasCount] = useState(0);
   const [liturgiaCount, setLiturgiaCount] = useState(0);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "visao-geral");
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("tab") || "visao-geral"
+  );
 
   // Form state
   const [tema, setTema] = useState("");
@@ -365,16 +367,16 @@ export default function EventoDetalhes() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent flex-wrap">
-          <TabsTrigger 
-            value="visao-geral" 
+          <TabsTrigger
+            value="visao-geral"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
           >
             <Eye className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Visão Geral</span>
           </TabsTrigger>
-          
+
           {mostrarLiturgia && (
-            <TabsTrigger 
+            <TabsTrigger
               value="liturgia"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
             >
@@ -382,9 +384,9 @@ export default function EventoDetalhes() {
               <span className="hidden sm:inline">Liturgia & Roteiro</span>
             </TabsTrigger>
           )}
-          
+
           {mostrarMusica && (
-            <TabsTrigger 
+            <TabsTrigger
               value="musica"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
             >
@@ -392,25 +394,25 @@ export default function EventoDetalhes() {
               <span className="hidden sm:inline">Música</span>
             </TabsTrigger>
           )}
-          
-          <TabsTrigger 
+
+          <TabsTrigger
             value="escalas"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
           >
             <Users className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Escalas</span>
           </TabsTrigger>
-          
-          <TabsTrigger 
+
+          <TabsTrigger
             value="checkin"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
           >
             <QrCode className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Check-in</span>
           </TabsTrigger>
-          
+
           {mostrarConvites && (
-            <TabsTrigger 
+            <TabsTrigger
               value="convites"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
             >

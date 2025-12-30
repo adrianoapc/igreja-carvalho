@@ -9,37 +9,44 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 ## 1. Gestão de Pessoas
 
 ### 1.1 Cadastro Unificado
+
 - **Visitantes**: Registro de pessoas que visitam a igreja pela primeira vez
 - **Frequentadores**: Pessoas que frequentam regularmente mas não são membros
 - **Membros**: Membros oficiais da igreja com acesso completo ao sistema
 
 ### 1.2 Progressão de Status
+
 - Sistema de progressão: Visitante → Frequentador → Membro
 - Histórico de mudanças registrado automaticamente no campo de observações
 - Data de cadastro como membro registrada automaticamente
 
 ### 1.3 Perfil Completo
+
 - **Dados Pessoais**: Nome, data de nascimento, estado civil, necessidades especiais
 - **Contatos**: Email, telefone, endereço, CEP
 - **Dados Eclesiásticos**: Funções na igreja, status, data de batismo, data de casamento
 - **Informações Adicionais**: Escolaridade, profissão, motivo de entrada, observações
 
 ### 1.4 Relacionamentos Familiares
+
 - Cadastro de familiares vinculados
 - Tipos de parentesco (cônjuge, filho, pai, mãe, etc.)
 - Gestão de família unificada via `familia_id`
 
 ### 1.5 Funções na Igreja
+
 - Cadastro de funções (Pastor, Diácono, Presbítero, etc.)
 - Atribuição de múltiplas funções por membro
 - Histórico de funções com data de início e fim
 
 ### 1.6 Aniversariantes
+
 - Dashboard de aniversários (nascimento, casamento, batismo)
 - Filtros por tipo e período
 - Calendário visual
 
 ### 1.7 Módulo Pessoas / Membros
+
 - **Objetivo**: Centralizar o cadastro unificado de visitantes, frequentadores e membros, permitindo listar, buscar/filtrar e manter dados completos de perfil e status.
 - **Funcionalidades principais**: listar (ordenado por nome via `profiles`), buscar/filtrar por nome/telefone/email/status, criar pessoa, editar pessoa (dados pessoais, contatos, eclesiásticos, adicionais, status), exportar listagens e navegar para detalhes.
 - **Campos/atributos (profiles)**: `id`, `nome`, `email`, `telefone`, `avatar_url`, `status` (`visitante` | `frequentador` | `membro`), `data_primeira_visita`, `numero_visitas`, `user_id`, `sexo`, `data_nascimento`, `estado_civil`, `data_casamento`, `rg`, `cpf`, `alergias`, `necessidades_especiais`, `cep`, `cidade`, `bairro`, `estado`, `endereco`, `entrou_por`, `data_entrada`, `status_igreja`, `data_conversao`, `batizado`, `data_batismo`, `e_lider`, `e_pastor`, `escolaridade`, `profissao`, `nacionalidade`, `naturalidade`, `entrevistado_por`, `cadastrado_por`, `tipo_sanguineo`, `observacoes`.
@@ -48,6 +55,7 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 - **Referências complementares**: [BIDIRECTIONAL_RELATIONSHIPS.md](BIDIRECTIONAL_RELATIONSHIPS.md) (exibição bidirecional de familiares), [AUTHORIZED_GUARDIANS.md](AUTHORIZED_GUARDIANS.md) (responsáveis autorizados para crianças/Kids) e [KIDS_INCLUSION.md](KIDS_INCLUSION.md) (campo de necessidades especiais na jornada Kids ligado aos perfis).
 
 #### Módulo Pessoas / Membros — visão funcional
+
 - **Funcionalidades disponíveis**: dashboard com estatísticas por status; listagem com ordenação por nome e avatars (quando cadastrados); busca e filtro de status; criação/edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem.
 - **Ações permitidas**: criar pessoa (nome obrigatório, contato recomendado), editar dados pessoais/contatos/status/funções, navegar para detalhes, aplicar busca/filtros, carregar mais itens via scroll, acionar atalhos rápidos para segmentos (membros, visitantes, frequentadores).
 - **Regras funcionais**: status restrito a `visitante`/`frequentador`/`membro`; sem deduplicação automática (verificar duplicidade de nome/telefone/email antes de salvar); campos mínimos para cadastro exigem nome; contatos incompletos reduzem eficácia da busca e follow-up; vínculos familiares exibem ambos os lados com inversão de papel; avatars não são obrigatórios e podem exibir fallback.
@@ -58,9 +66,11 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 ## 1.8 Hub de Eventos e Voluntariado
 
 ### Objetivo
+
 Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igreja**, não apenas cultos. Suporta escalação de voluntários, liturgia, check-in e recursos audiovisuais para múltiplos formatos de atividades.
 
 ### Tipos de Eventos Suportados
+
 - **CULTO**: Cultos dominicais, especiais, celebrações (com liturgia e músicas)
 - **RELOGIO**: Relógios de Oração 24h com turnos de intercessão
 - **TAREFA**: Atividades operacionais e projetos com checklist
@@ -68,11 +78,13 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
 - **OUTRO**: Categoria flexível para casos não cobertos
 
 ### Subtipos/Categorização
+
 - Cada tipo pode ter **subtipos personalizados** (ex: "Culto de Celebração", "Vigília 24h", "Reunião de Conselho")
 - Configurados via tabela `evento_subtipos` com cores e ícones próprios
 - 14 subtipos pré-cadastrados na migração inicial
 
 ### Funcionalidades Principais
+
 - **Criação de eventos**: Formulário com seleção de tipo/subtipo, data/hora, local, duração, tema, pregador
 - **Tabs condicionais**: Interface adapta-se ao tipo do evento
   - CULTO: tabs de Liturgia, Músicas, Escalas, Check-in
@@ -84,41 +96,121 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
 - **Templates**: Modelos reutilizáveis de liturgia aplicáveis a novos cultos
 
 ### Recursos Técnicos
+
 - **Polimorfismo por enum**: Coluna `tipo` (evento_tipo) + tabela `evento_subtipos`
 - **Consultas polimórficas**: Queries adaptam-se ao tipo via `.eq("tipo", ...)`
 - **RLS policies**: Controle de acesso por feature flags (ex: apenas beta users criam tipos não-CULTO)
 
 ### Gestão de Times e Escalas
+
 - **Times**: Equipes organizadas por categoria (Louvor, Mídia, Intercessão, etc.)
 - **Posições**: Cargos dentro de cada time (Vocalista, Operador de Som, etc.)
 - **Escalação**: Vinculação pessoa + time + posição + evento com confirmação de presença
 - **Notificações**: Sistema de avisos automáticos via edge functions
 
+### Funcionalidades do Relógio de Oração (tipo RELOGIO)
+
+#### Player de Oração Imersivo
+
+- **Exibição Full-Screen**: Interface escura (fundo preto) otimizada para projetores e imersão
+- **Slides Dinâmicos**: 8 tipos de conteúdo renderizados condicionalmente:
+  - `VERSICULO`: Citação bíblica com ícone BookOpen (amber)
+  - `VIDEO`: Embed YouTube com fallback
+  - `AVISO`: Título + texto descritivo
+  - `TIMER`: Contagem de tempo visual (para momentos de silêncio/oração)
+  - `PEDIDOS`: Lista de pedidos de oração com botão "Orei" (Heart → ThumbsUp) + persistência no banco
+  - `CUSTOM_TESTEMUNHO`: Cards com citações estilizadas (Quote icon, gradiente amber-orange)
+  - `CUSTOM_SENTIMENTO`: Alerta espiritual (AlertCircle icon, gradiente red-pink)
+  - `CUSTOM_VISITANTES`: Componente visual com avatars circulares, badges de "Primeira Visita"
+- **Edge Function `playlist-oracao`**: Orquestra montagem de slides agregando:
+  - Sentimentos (24h) com análise automática de padrões críticos
+  - Testemunhos públicos (últimos 3)
+  - Visitantes recentes (7 dias)
+  - Pedidos broadcast (prioritários para toda a igreja)
+  - Pedidos pessoais (intercessão individual)
+- **Marcação de Orações**: Intercessor clica "Orei" em pedidos → status persiste em `pedidos_oracao` como `em_oracao` com timestamp
+- **Carregamento de Histórico**: Ao abrir Player, carrega quais pedidos o usuário já marcou como orados
+- **Controls Intuitivos**: Navegação com chevrons (< >), progress bar segmentada no topo, timer do turno em andamento
+
+#### Timeline Visual de Turnos (24h)
+
+- **Grid Horário**: Layout de 24 horas (cada linha = 1 hora) com cards de voluntários
+- **DatePicker**: Navega entre dias do RELOGIO (ex: vigor 24h = 7 dias)
+- **Color Coding**:
+  - Verde: Voluntário confirmado
+  - Amarelo: Pendente de confirmação
+  - Cinza: Slot vazio
+  - Azul: Hora atual destacada
+- **Ações por Slot**: Menu dropdown (⋮) com opções:
+  - Editar: Abre dialog para mudar voluntário/horário
+  - Duplicar para Amanhã: Copia slot para o dia seguinte
+  - Remover: Delete do slot
+- **Integração com Player**: Botão de acesso rápido no Centro de Operações (`/dashboard`) mostra "Relógio Ativo Agora" com link direto para Player do turno em andamento
+
+#### Escalas com Recorrência (None/Daily/Weekly/Custom)
+
+- **AdicionarVoluntarioSheet**: Interface em sheet (drawer mobile) com seções:
+  - Busca de Voluntário: Combobox com autocomplete de nomes em tempo real
+  - Horário: Seleção de início e fim (defaults do slot clicado)
+  - Recorrência: 4 opções:
+    - **None**: Apenas a data selecionada
+    - **Daily**: Repete todos os dias até fim do evento
+    - **Weekly**: Repete mesmo dia da semana (intervalo de 7 dias)
+    - **Custom**: Checkboxes por dia da semana (Seg/Ter/Qua/Qui/Sex/Sab/Dom)
+  - Preview: Card azul mostrando `"X escalas serão criadas em: [datas]"`
+  - Detecção de Conflitos: Aviso se voluntário já tem escalas nas datas (lista conflitos)
+- **Batch Insert**: Cria todas as escalas de uma vez (ex: 14 para Daily em 14 dias)
+- **Feedback**: Toast com "14 turnos criados para João Silva"
+
+#### Gestão de Convites (Eventos em geral)
+
+- **ConvitesPendentesWidget**: Widget no Dashboard/DashboardLeader mostrando:
+  - Convites pendentes de aceitação
+  - Evento associado e data
+  - Ações rápidas (Aceitar/Recusar)
+- **Tab Convites**: Nova abra em EventoDetalhes (apenas para tipo EVENTO) com:
+  - Lista de pessoas convidadas (nome, email, status: pendente/aceito/recusado)
+  - Seleção múltipla para enviar convites em massa
+  - Template customizável para mensagem de convite
+  - Rastreamento de quem aceitou/recusou
+- **Tabs Condicionais**:
+  - **CULTO**: Liturgia, Músicas, Escalas, Check-in
+  - **RELOGIO**: Timeline (Turnos), Escalas, Check-in
+  - **TAREFA**: Checklist, Escalas
+  - **EVENTO**: Visão Geral, Convites, Escalas, Check-in
+- **Navegação Direta**: Parâmetro `?tab=liturgia` abre abra específica diretamente
+
 ### Links
+
 - **ADRs**: [ADR-017 (Hub de Eventos)](adr/ADR-017-refatoracao-hub-eventos-voluntariado.md), [ADR-018 (Migração)](adr/ADR-018-estrategia-migracao-cultos-eventos.md)
-- **Manual**: [Cultos e Eventos](manual-usuario.md#cultos-e-eventos) _(a confirmar)_
-- **Migrations**: `20251228153548_eb7694bc` (schema), `20251228154110_832aab55` (FKs), `20251228154443_26bbe883` (renames)
+- **Manual**: [Relógio de Oração](manual-usuario.md#relógio-de-oração) _(a confirmar)_, [Escalas com Recorrência](manual-usuario.md#escalas-com-recorrência) _(a confirmar)_
+- **Migrations**: `20251230000000_add_blocos_inteligentes.sql` (tipos de conteúdo)
+- **Edge Functions**: `playlist-oracao` (agregação de conteúdo inteligente)
 
 ---
 
 ## Módulo Kids
 
 ### Visão de funcionalidades
+
 - **Gestão de crianças e turmas**: diretório de crianças com busca/filtragem e visão de salas/turmas do ministério Kids (cadastro/edição direto no diretório está **a confirmar** conforme disponibilidade da tela).
 - **Presença e diário**: registro de check-in/checkout nas atividades e anotações de diário (humor, saúde, observações). Resumo conceitual em `docs/KIDS_INCLUSION.md`.
 - **Etiquetas e segurança**: uso das informações de perfil para etiquetas de segurança e conferência na retirada.
 - **Ocupação por sala**: visão de lotação em tempo real das salas Kids.
 
 ### Regras de autorização de responsáveis
+
 - **Quem pode retirar**: apenas responsáveis autorizados (guardians) configurados previamente podem realizar o checkout de uma criança.
 - **Como configurar**: seleção de pessoa autorizada e, quando aplicável, indicação das crianças específicas. Fluxos e cenários em `docs/AUTHORIZED_GUARDIANS.md`.
 - **Escopo**: autorização é vinculada ao contexto familiar e às crianças selecionadas; alterações devem ser registradas antes do evento.
 
 ### Regras de notificações
+
 - **Eventos que disparam**: checkout concluído, registros de diário/observações e alertas comportamentais/assiduidade.
 - **Para quem e quando**: direcionamento conforme perfil (equipe do Kids, responsáveis, liderança) e momento do evento. Resumo operacional em `docs/NOTIFICACOES_KIDS.md`.
 
 ### Referências
+
 - Manual (seção Kids): [docs/manual-usuario.md](manual-usuario.md#kids)
 - Produto (seção Kids): [docs/produto/README_PRODUTO.MD](produto/README_PRODUTO.MD#kids-visão-de-produto)
 - Regras e fluxos Kids: [KIDS_INCLUSION.md](KIDS_INCLUSION.md) · [AUTHORIZED_GUARDIANS.md](AUTHORIZED_GUARDIANS.md) · [NOTIFICACOES_KIDS.md](NOTIFICACOES_KIDS.md)
@@ -126,10 +218,13 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
 ## 2. Módulo Financeiro
 
 ### Objetivo do Módulo
+
 Prover controle financeiro completo e transparente para igrejas, separando claramente os conceitos de **Fato Gerador**, **Fluxo de Caixa** e **DRE** para garantir relatórios contábeis precisos e rastreabilidade fiscal. O sistema permite gestão de receitas, despesas, reembolsos e relatórios gerenciais sem perder a integridade contábil.
 
 ### 2.1 Telas de Manutenção (Refatoradas em Dez/2024)
+
 As telas de manutenção financeira foram modernizadas com layout tabular consistente:
+
 - **Bases Ministeriais** (`BasesMinisteriais.tsx`): Gestão de grandes áreas de atuação com busca e edição rápida
 - **Categorias Financeiras** (`Categorias.tsx`): Plano de contas com árvore expansível de categorias e subcategorias, separadas por entrada/saída
 - **Centros de Custo** (`CentrosCusto.tsx`): Unidades orçamentárias com código opcional
@@ -142,6 +237,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 ### Conceitos Fundamentais
 
 #### Fato Gerador (Competência)
+
 - Representa **quando e por que** um valor foi originado (ex.: compra de material, evento, doação)
 - Registrado independentemente do momento do pagamento/recebimento
 - Vinculado a **categoria contábil**, **fornecedor**, **centro de custo** e **base ministerial**
@@ -149,12 +245,14 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - Fonte de verdade para o DRE e análises gerenciais
 
 #### Fluxo de Caixa (Regime de Caixa)
+
 - Representa **quando e como** o dinheiro saiu ou entrou fisicamente
 - Registra forma de pagamento, parcelamento, juros, multas, descontos
 - Pode haver um fato gerador e múltiplos pagamentos (ex.: compra parcelada em 3x)
 - Base para conciliação bancária e gestão de liquidez
 
 #### DRE (Demonstrativo de Resultado do Exercício)
+
 - Relatório contábil por competência que mostra resultado (receita - despesa) do período
 - Calculado a partir dos **fatos geradores** (categorias), não do caixa
 - Independente da forma de pagamento (parcelamento não altera a natureza do gasto)
@@ -165,6 +263,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 ---
 
 ### 2.1 Estrutura Contábil
+
 - **Contas**: Bancárias, virtuais e físicas (caixa)
 - **Bases Ministeriais**: Unidades de negócio/ministério para segmentação de custos
 - **Centros de Custo**: Classificação de despesas por departamento/projeto
@@ -173,6 +272,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Fornecedores**: Cadastro completo com CNPJ/CPF e dados bancários
 
 ### 2.2 Transações
+
 - **Entradas**: Dízimos, ofertas, doações, outras receitas
 - **Saídas**: Pagamentos, despesas operacionais, reembolsos
 - **Status**: Pendente ou Pago/Recebido
@@ -180,12 +280,14 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Vinculação**: Cada transação pode referenciar um ou mais fatos geradores
 
 ### 2.3 Relatório de Ofertas
+
 - Workflow de duplo controle (lançador + conferente)
 - Detalhamento por forma de pagamento
 - Auditoria com aprovação independente
 - Rastreabilidade completa de quem lançou, conferiu e aprovou
 
 ### 2.4 Dashboards e Relatórios
+
 - **Dashboard Geral**: Visão consolidada de receitas e despesas
 - **Dashboard de Ofertas**: Análise específica de ofertas por período
 - **Projeção Financeira**: 12 meses histórico + 6 meses projetado
@@ -193,6 +295,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Insights**: Análises e tendências baseadas em histórico
 
 ### 2.5 Funcionalidades Avançadas
+
 - **Importação Excel**: Importação em massa de transações com validação
 - **Processamento de Notas Fiscais**: IA (Gemini) extrai dados de NF automaticamente
 - **Reconciliação Bancária**: Comparação automática entre lançamentos e extrato bancário
@@ -200,6 +303,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Exportação**: Excel com todos os dados filtrados e formatados
 
 ### 2.6 Formas de Pagamento
+
 - Cadastro configurável (Dinheiro, PIX, Cartão, Transferência, Boleto, etc.)
 - Vinculação em transações com rastreamento completo
 - Suporte a parcelamento e juros
@@ -209,29 +313,34 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 ### Regras de Negócio
 
 #### O que altera o DRE
+
 - Lançamento de novos fatos geradores (receitas ou despesas)
 - Reclassificação de categoria de um fato gerador
 - Estorno de fato gerador (cancela o lançamento contábil)
 - Ajustes de competência (mudança de mês/ano de referência)
 
 #### O que altera o Caixa
+
 - Registro de pagamento/recebimento efetivo
 - Conciliação bancária (confirmação de entrada/saída)
 - Ajustes de saldo manual (ex.: erro de lançamento)
 - Juros, multas ou descontos aplicados no momento do pagamento
 
 #### O que NÃO altera o DRE
+
 - Forma de pagamento escolhida (à vista, parcelado, PIX, boleto)
 - Data de pagamento diferente da data de competência
 - Juros ou descontos aplicados no caixa (são tratados como ajustes de caixa, não de competência)
 
 #### Reembolsos
+
 - Fato gerador original permanece inalterado (ex.: líder comprou material)
 - Transação de caixa registra o reembolso ao líder
 - DRE reflete a categoria do material (não "Reembolso")
 - Permite rastreamento de quem pagou e quando foi reembolsado
 
 #### Estornos
+
 - **Estorno de Fato Gerador**: Cancela o lançamento contábil e impacta DRE
 - **Estorno de Caixa**: Reverte o pagamento/recebimento, impacta apenas o saldo da conta
 - Ambos exigem justificativa e são registrados em log de auditoria
@@ -241,6 +350,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 ### Fluxo Completo (Exemplo Prático)
 
 #### Cenário 1: Oferta Simples
+
 1. Tesoureiro registra **fato gerador**: "Oferta Culto Domingo" (categoria: Receita Operacional)
 2. Tesoureiro registra **transação de caixa**: Entrada de R$ 500 via PIX
 3. Sistema vincula transação ao fato gerador automaticamente
@@ -248,6 +358,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 5. Caixa exibe R$ 500 em "Entradas do mês"
 
 #### Cenário 2: Despesa com Parcelamento
+
 1. Líder compra equipamento de R$ 3.000 parcelado em 3x sem juros
 2. Sistema registra **fato gerador**: "Equipamento de Som" (categoria: Despesas Administrativas) - R$ 3.000
 3. Tesoureiro registra **3 transações de caixa**: R$ 1.000 cada mês
@@ -272,11 +383,13 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 ## 3. Cultos e Eventos
 
 ### 3.1 Gestão de Cultos
+
 - Cadastro de cultos com tipo, data, local, tema
 - Status: Planejado, Confirmado, Realizado, Cancelado
 - Duração estimada e observações
 
 ### 3.2 Liturgia
+
 - **Timeline Visual**: Sequência de itens da liturgia
 - **Tipos de Itens**: Abertura, louvor, oração, pregação, avisos, encerramento
 - **Responsáveis**: Membros ou convidados externos
@@ -285,12 +398,14 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Templates de Liturgia**: Salvar e aplicar modelos
 
 ### 3.3 Músicas
+
 - Cadastro de canções com título, artista, tom, BPM
 - Cifra e letra integradas
 - Links para Spotify e YouTube
 - Atribuição de ministro e solista
 
 ### 3.4 Escalas de Voluntários
+
 - **Times**: Recepção, Mídia, Louvor, Kids, etc.
 - **Posições**: Funções específicas por time
 - **Membros**: Cadastro de voluntários por time
@@ -299,6 +414,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Templates**: Escalas padrão para reutilização
 
 ### 3.5 Projeção (Telão)
+
 - Página fullscreen para projeção (/telao/:cultoId)
 - Playlist automática baseada na liturgia
 - Controles por teclado (setas, F, P, B, C)
@@ -306,6 +422,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - Suporte a imagens e vídeos
 
 #### Modos de Projeção (Evidências)
+
 - **Modo Comunicados** — rota `/telao` (arquivo `src/pages/Telao.tsx`)
   - Fonte: tabela `comunicados` com filtros `ativo = true`, `exibir_telao = true`, janelas `data_inicio`/`data_fim`, `ordem_telao`
   - Controles: `→`/`Espaço` (próximo), `←` (anterior), `P` (pausa), `F` (tela cheia)
@@ -317,12 +434,14 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
   - Barra de progresso por recurso (quando `duracao_segundos > 0`)
 
 #### Evidências no Repositório (Cultos)
+
 - Páginas (src/pages/cultos/): `Geral.tsx`, `Eventos.tsx`, `Times.tsx`, `Posicoes.tsx`, `Templates.tsx`, `LiturgiaDashboard.tsx`, `MidiasGeral.tsx`
 - Projeção: `src/pages/Telao.tsx`, `src/pages/TelaoLiturgia.tsx`
 - Componentes: `src/components/cultos/` — dialogs e telas para liturgia, templates, escalas e mídias
   - Exemplos: `LiturgiaTimeline.tsx`, `LiturgiaWorkspace.tsx`, `LiturgiaDialog.tsx`, `LiturgiaItemDialog.tsx`, `EscalasTabContent.tsx`, `EscalasDialog.tsx`, `TimeDialog.tsx`, `PosicaoDialog.tsx`, `MidiaDialog.tsx`, `TemplatesLiturgiaDialog.tsx`, `SalvarComoTemplateDialog.tsx`
 
 #### Tabelas/Entidades Referenciadas (Evidência de Código)
+
 - `cultos`, `times_culto`, `escalas_culto`, `midias` (dashboard de `Geral.tsx`)
 - `liturgia_culto`, `liturgia_recursos`, `midias` (playlist do `TelaoLiturgia.tsx`)
 - `comunicados` (slideshow do `Telao.tsx`)
@@ -330,6 +449,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 ### Módulo Cultos
 
 #### Evidências (código e rotas)
+
 - `src/pages/Cultos.tsx`: container de módulo; redireciona `/cultos` → `/cultos/geral` e exibe botão voltar para `/cultos/geral`.
 - `src/pages/cultos/Geral.tsx`: visão geral com métricas (próximos cultos, times ativos, membros escalados, realizados, mídias ativas) e cards para módulos; ações rápidas para criar culto/evento e navegar.
 - `src/pages/cultos/Eventos.tsx`: página de eventos/cultos (detalhamento — (a confirmar)).
@@ -342,6 +462,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - `src/pages/TelaoLiturgia.tsx` (`/telao-liturgia/:id`): projeção fullscreen da liturgia (playlist de recursos por item; controles de teclado; barra de progresso; atualiza via Supabase Realtime).
 
 Componentes (src/components/cultos/):
+
 - `LiturgiaTimeline.tsx`, `LiturgiaWorkspace.tsx`, `LiturgiaDialog.tsx`, `LiturgiaItemDialog.tsx`: componentes de liturgia (timeline/edição — (a confirmar funcionamento específico)).
 - `RecursosLiturgiaSheet.tsx`, `MidiaDialog.tsx`, `TagMidiaDialog.tsx`, `SlideshowPreview.tsx`: componentes de recursos/mídias (vincular/visualizar — (a confirmar)).
 - `TemplatesLiturgiaDialog.tsx`, `AplicarTemplateDialog.tsx`, `SalvarLiturgiaTemplateDialog.tsx`, `SalvarComoTemplateDialog.tsx`, `TemplatePreviewDialog.tsx`: componentes para templates de liturgia (aplicar/salvar/preview — (a confirmar)).
@@ -351,15 +472,18 @@ Componentes (src/components/cultos/):
 - `CancoesDialog.tsx`, `MusicaTabContent.tsx`: componentes relacionados a músicas do culto (gestão/lista — (a confirmar)).
 
 Rotas relacionadas (evidência por navegação/código):
+
 - `/cultos`, `/cultos/geral`, `/cultos/eventos`, `/cultos/times`, `/cultos/posicoes`, `/cultos/templates`, `/cultos/liturgia-dashboard`, `/cultos/midias`.
 - Projeção: `/telao`, `/telao-liturgia/:id`.
 
 Integrações Supabase (consultas confirmadas nos arquivos):
+
 - `Geral.tsx`: `cultos` (status `planejado`/`confirmado` para futuros, `realizado` para contagem), `times_culto` (ativos), `escalas_culto` (por `culto_id`), `midias` (ativas).
 - `Telao.tsx`: `comunicados` com filtros `ativo`, `exibir_telao`, janelas `data_inicio`/`data_fim`, ordenação `ordem_telao` e `created_at`.
 - `TelaoLiturgia.tsx`: `cultos` (título/data), `liturgia_culto` (itens), `liturgia_recursos` (recursos com join `midias`); assinatura Realtime para atualizar playlist.
 
 #### Funcionalidades confirmadas
+
 - **Visão Geral**: métricas de cultos e atalhos de navegação para módulos (confirmado em `Geral.tsx`).
 - **Ações rápidas**: navegar para novo culto/evento (`/cultos/eventos?novo=true`), times, dashboard liturgia e mídias (confirmado em `Geral.tsx`).
 - **Projeção (Comunicados)**: slideshow com auto-avance e controles (`→`, `←`, `P`, `F`), suportando imagens/vídeos e filtro por período/canal (confirmado em `Telao.tsx`).
@@ -367,17 +491,20 @@ Integrações Supabase (consultas confirmadas nos arquivos):
 - **Templates/Liturgia/Times/Posições/Escalas/Músicas**: existência de componentes/díalogos específicos (fluxos detalhados — (a confirmar)).
 
 #### Ações disponíveis (evidenciadas)
+
 - Acessar **Geral** (redirect automático) e navegar para **Eventos**, **Times**, **Dashboard Liturgia**, **Mídias**.
 - Criar novo culto/evento via ação rápida (navegação com `?novo=true`).
 - Abrir projeção de **Comunicados** (`/telao`) e **Liturgia** (`/telao-liturgia/:id`) com atalhos de teclado.
 
 #### Regras importantes
+
 - Métricas em **Geral** filtram cultos futuros por `status ∈ {planejado, confirmado}` e contam realizados por `status = realizado` (confirmado).
 - Projeção **Comunicados** respeita janela de exibição (`data_inicio`/`data_fim`), canal (`exibir_telao`) e ordenação (`ordem_telao`, `created_at`) (confirmado).
 - Projeção **Liturgia** auto-avança por `duracao_segundos` e atualiza via Realtime ao editar liturgia/recursos (confirmado).
 - Permissões/validações específicas de edição/criação não estão explícitas nos arquivos analisados — (a confirmar).
 
 #### Links
+
 - Manual do usuário — Cultos: `manual-usuario.md#5-cultos-e-liturgia`
 - Fluxo (Mermaid): `diagramas/fluxo-cultos.md`
 - Sequência (Mermaid): `diagramas/sequencia-cultos.md`
@@ -387,9 +514,11 @@ Integrações Supabase (consultas confirmadas nos arquivos):
 ## 4. Gabinete Digital e Cuidado Pastoral
 
 ### Objetivo do Módulo
+
 Centralizar o cuidado pastoral dos membros através de um sistema de tickets (atendimentos), permitindo que pastores e liderança acompanhem sistematicamente cada necessidade espiritual, pastoral ou de aconselhamento, com histórico completo e segurança de privacidade (view RLS protege dados sensíveis para secretaria).
 
 ### Visão Geral
+
 - **Rota principal**: `/gabinete` (`GabinetePastoral.tsx`)
 - **Destinatários**: Pastores, líderes, secretaria (com acesso restrito via RLS)
 - **Integração**: Recebe tickets de múltiplas origens (chatbot WhatsApp, análise de sentimentos IA, pedidos de ajuda no app)
@@ -398,6 +527,7 @@ Centralizar o cuidado pastoral dos membros através de um sistema de tickets (at
 ### 4.1 Estrutura de Dados
 
 #### Tabela: `atendimentos_pastorais`
+
 - `id` (UUID): Identificador único do atendimento
 - `pessoa_id` (FK → profiles) ou `visitante_id` (FK → visitantes_leads): Vinculação do atendido
 - `origem` (ENUM): CHATBOT, SENTIMENTOS, APP_ORACAO, AGENDA, MANUAL
@@ -413,6 +543,7 @@ Centralizar o cuidado pastoral dos membros através de um sistema de tickets (at
 - `created_at`, `updated_at` (TIMESTAMP)
 
 #### Tabela: `agenda_pastoral`
+
 - `id` (UUID): Evento administrativo ou compromisso pastoral
 - `pastor_id` (FK → profiles): Dono da agenda
 - `titulo`, `descricao`, `tipo`: Identificação do compromisso (ex: culto, reunião, bloqueio)
@@ -421,6 +552,7 @@ Centralizar o cuidado pastoral dos membros através de um sistema de tickets (at
 - `criado_por`, `created_at`, `updated_at`
 
 #### View: `view_agenda_secretaria`
+
 - Exibe somente: `id`, `pessoa_id` (nome do membro), `status`, `pastor_responsavel_id`, `agendado_para`, `gravidade`
 - **Oculta**: `conteudo_original` (protege segredo de confissão/aconselhamento)
 - **Uso**: Secretaria pode agendar/operacionalizar sem ler dados sensíveis
@@ -430,12 +562,14 @@ Centralizar o cuidado pastoral dos membros através de um sistema de tickets (at
 Atendimentos pastorais são criados automaticamente em 3 cenários:
 
 1. **Via Chatbot (`chatbot-triagem` Edge Function)**
+
    - Membro ou visitante envia mensagem WhatsApp pedindo ajuda pastoral/encaminhamento
    - Se o telefone corresponde a múltiplos `profiles`, o bot escolhe o candidato mais antigo (data de nascimento > data de criação); se nenhum existir, cria/recupera `visitantes_leads`
    - Bot detecta intenção "SOLICITACAO_PASTORAL" ou conversa com índice de gravidade alto
    - Sistema cria `atendimentos_pastorais` com `origem = 'CHATBOT'`, `gravidade` conforme análise IA
 
 2. **Via Análise de Sentimentos (`analise-sentimento-ia` Edge Function)**
+
    - Membro registra sentimento negativo (triste, ansioso, angustiado) 3+ dias consecutivos
    - IA detecta padrão crítico e marca `gravidade = CRITICA` ou `ALTA`
    - Sistema cria `atendimentos_pastorais` com `origem = 'SENTIMENTOS'`
@@ -455,12 +589,14 @@ Quando um atendimento é criado, o sistema determina `pastor_responsavel_id` aut
 ### 4.4 Interface Kanban
 
 **Visualização**: Drag-and-drop via `@dnd-kit`
+
 - Coluna 1: PENDENTE (casos novos, aguardando alocação)
 - Coluna 2: EM_ACOMPANHAMENTO (em atendimento ativo)
 - Coluna 3: AGENDADO (com data e hora confirmadas)
 - Coluna 4: CONCLUIDO (encerrados)
 
 **Card de Atendimento**:
+
 - Nome do membro, idade (a confirmar), gravidade (badge colorida: verde/amarelo/vermelho/crítico)
 - Última interação (timestamp relativo, ex: "há 2 horas")
 - Botões rápidos: Abrir Prontuário, Agendar, Encerrar
@@ -487,10 +623,12 @@ Ao clicar no card, abre drawer com abas:
 ### 4.6 Notificações
 
 **Alertas Imediatos** (Eventos que acionam notifications)
+
 - Novo atendimento com `gravidade = CRITICA` → WhatsApp ao pastor responsável via Make
 - Status muda para `EM_ACOMPANHAMENTO` → Confirmação in-app ao pastor
 
 **Alertas Passivos** (Database Webhooks / Triggers, a implementar)
+
 - INSERT em `atendimentos_pastorais` com `gravidade >= ALTA` dispara trigger que chama `disparar-alerta`
 
 ### 4.7 Permissões (RLS)
@@ -503,6 +641,7 @@ Ao clicar no card, abre drawer com abas:
 ### 4.8 KPIs (Dashboard Admin)
 
 **Widget `GabinetePastoralWidget`** exibe:
+
 - Total de pendentes
 - Total em acompanhamento
 - Total agendados
@@ -512,6 +651,7 @@ Ao clicar no card, abre drawer com abas:
 **Card no DashboardAdmin** redireciona para `/gabinete` ao clicar.
 
 ### 4.9 Referências e Links
+
 - **ADR**: [`adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md`](adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
 - **Tabela**: `atendimentos_pastorais`, `view_agenda_secretaria` (em `database-schema.sql`)
 - **Edge Functions**: `analise-sentimento-ia`, `analise-pedido-ia`, `chatbot-triagem`
@@ -522,11 +662,13 @@ Ao clicar no card, abre drawer com abas:
 ## 5. Intercessão, Oração e Testemunhos
 
 ### Objetivo do Módulo
+
 Centralizar gestão de pedidos de oração, intercessão organizada, registro de testemunhos e acompanhamento emocional dos membros, fortalecendo cuidado pastoral e resposta ágil a necessidades espirituais.
 
 ### Estrutura Geral
 
 #### Páginas Principais (Rotas)
+
 - `/intercessao`: Container com dashboard de 4 módulos (cards de acesso rápido)
 - `/intercessao/pedidos`: Listagem e gestão de pedidos de oração
 - `/intercessao/intercessores`: Gerenciamento de equipe de intercessores
@@ -534,6 +676,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - `/intercessao/sentimentos`: Monitoramento de sentimentos e alertas críticos
 
 ### 5.1 Pedidos de Oração
+
 - **Criação**: Membro/visitante/anônimo cria pedido via dialog, com tipo (saúde, família, financeiro, trabalho, espiritual, outro)
 - **Fluxo de Status**: pendente → alocado → em_oracao → respondido/arquivado
 - **Alocação**: Admin aloca a intercessor(es) manualmente ou via "Alocar Automático" (balanceado por carga)
@@ -549,6 +692,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Operações Supabase**: INSERT (novo pedido), SELECT (listagem/filtros por status/tipo), UPDATE (alocar/mudar status/adicionar observação), DELETE (admin apenas)
 
 ### 4.2 Intercessores
+
 - **Cadastro**: Admin cria intercessor com nome, email, telefone, `max_pedidos` (limite simultâneo)
 - **Gerenciamento**: Ativar/inativar, editar dados, visualizar carga (count de pedidos alocados)
 - **Alocação Automática**: Sistema distribui pedidos pendentes entre intercessores ativos respeitando limite
@@ -556,6 +700,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Operações Supabase**: INSERT, SELECT, UPDATE, DELETE (admin apenas)
 
 ### 4.3 Testemunhos
+
 - **Criação**: Membro envia testemunho via dialog, com título, categoria, mensagem, opcional anônimo
 - **Workflow de Aprovação**: Status aberto (submissão) → público (aprovado/publicado) ou arquivado
 - **Publicação**: Testemunho com `status = publico` aparece no carrossel do dashboard para todos membros
@@ -564,6 +709,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Operações Supabase**: INSERT (novo), SELECT (listagem por status), UPDATE (aprovar/arquivar), DELETE (admin apenas)
 
 ### 4.4 Sentimentos
+
 - **Registro**: Membro registra sentimento diário (feliz, triste, ansioso, grato, abençoado, angustiado) via dialog ou notificação automática (9h)
 - **Redirecionamento Inteligente**: Sistema sugere ação baseada em sentimento
   - Positivo (feliz/grato/abençoado) → "Compartilhar Testemunho?" → link para `/intercessao/testemunhos?novo=true`
@@ -579,17 +725,20 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Operações Supabase**: INSERT (novo sentimento), SELECT (listar por período/pessoa), UPDATE (opcional), DELETE (não usual)
 
 ### 4.5 Integração Frontend
+
 - **Container** (`Intercessao.tsx`): Dashboard com 4 cards (Pedidos, Intercessores, Testemunhos, Sentimentos); cada card exibe estatísticas e link para página específica; ações rápidas (Novo Pedido, Alocar Automático)
 - **Componentes Dialogs**: `NovoPedidoDialog`, `PedidoDetailsDialog`, `IntercessoresManager`, `NovoTestemunhoDialog`, `TestemunhoDetailsDialog`, `RegistrarSentimentoDialog`, `AlertasCriticos`
 - **Timeline por Pessoa**: `VidaIgrejaIntercessao` exibe histórico unificado (pedidos + sentimentos + testemunhos) para contexto pastoral
 - **Queries/Realtime**: Uso de `@supabase/supabase-js` para CRUD; TanStack Query para cache; Supabase Realtime para atualizações em tempo real (a confirmar se implementado)
 
 ### 4.6 Permissões (RLS Básico)
+
 - **Membro**: Cria próprio pedido, vê próprios sentimentos, envia testemunho
 - **Intercessor**: Vê pedidos alocados a si, atualiza observações/status
 - **Admin/Pastor**: CRUD completo em todas as tabelas; aprova testemunhos; aloca pedidos; gerencia intercessores
 
 ### 4.7 Referências e Links
+
 - Manual do usuário: [`../manual-usuario.md#6-intercessão`](../manual-usuario.md#6-intercessão)
 - Diagramas: [`../diagramas/fluxo-intercessao.md`](../diagramas/fluxo-intercessao.md), [`../diagramas/sequencia-intercessao.md`](../diagramas/sequencia-intercessao.md)
 
@@ -598,6 +747,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ## 5. Jornadas e Ensino
 
 ### 5.1 Jornadas (Cursos)
+
 - Criação de trilhas educacionais (Consolidação, Escola de Líderes, etc.)
 - **Etapas**: Fases sequenciais da jornada
 - **Tipos de Conteúdo**: Vídeo, texto, presencial, evento
@@ -605,12 +755,14 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Responsáveis**: Líderes/discipuladores por participante
 
 #### Tipos de Jornada (Dez/2024)
+
 - **auto_instrucional**: Exibe Player como visão principal (aluno avança sozinho)
 - **processo_acompanhado**: Exibe Kanban como visão principal (líder acompanha)
 - **hibrido**: Combinação de ambos os modos
 - **Campo**: `tipo_jornada` em `jornadas`
 
 #### Etapas Avançadas (Dez/2024)
+
 - **Tipos de conteúdo**: `texto`, `video`, `quiz`, `tarefa`, `reuniao`
 - **URL de conteúdo**: Link de vídeo ou embed externo
 - **Configuração de Quiz**: JSON com nota mínima e perguntas (`quiz_config`)
@@ -619,17 +771,20 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Campos**: `conteudo_tipo`, `conteudo_url`, `quiz_config`, `check_automatico`, `duracao_estimada_minutos` em `etapas_jornada`
 
 #### Sistema de Quiz (Dez/2024)
+
 - **Tabela**: `respostas_quiz` armazena histórico de respostas
 - **Campos**: `inscricao_id`, `etapa_id`, `respostas` (JSONB), `nota_obtida`, `aprovado`, `tentativa_numero`
 - **RLS**: Aluno vê e insere apenas suas próprias respostas; admin gerencia todas
 
 #### Cursos Pagos (Dez/2024)
+
 - **Configuração de valor**: Admin pode definir se a jornada requer pagamento e o valor
 - **Status de pagamento**: Inscrições possuem status `isento` (padrão), `pendente` ou `pago`
 - **Integração financeira**: Pagamentos podem ser vinculados a transações financeiras (categoria "Cursos e Treinamentos")
 - **Campos**: `requer_pagamento` (boolean), `valor` (numeric) em `jornadas`; `status_pagamento`, `transacao_id` em `inscricoes_jornada`
 
 ### 5.2 Player de Cursos (Aluno)
+
 - Interface LMS para consumo de conteúdo
 - Barra de progresso por curso
 - Marcação de etapas concluídas
@@ -637,6 +792,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Certificado de Conclusão (Dez/2025)**: download de PDF (jsPDF) ao completar 100% das etapas; tela de celebração destaca a conquista e oferece botão de download (sidebar e tela cheia). Sem alterações de schema — reutiliza dados de jornada/inscrição.
 
 ### 5.3 Gestão de Ensino
+
 - Agendamento de aulas (presencial/online/híbrido), vinculadas a jornadas e/ou cultos
 - Cadastro/edição de salas com capacidade, tipo e status ativo/inativo
 - Registro de presenças por aula (inclui check-in manual com validação de criança/perfil)
@@ -644,6 +800,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - Detalhamento de aula com tema, professor, horário e modalidade
 
 ### 5.4 Ministério Infantil (Kids)
+
 - **Salas**: Cadastro com capacidade e faixa etária
 - **Check-in/Check-out**: Registro de entrada e saída
 - **Segurança**: Código único por criança
@@ -653,6 +810,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ---
 
 ### 5.5 Cursos Pagos (Integração Financeira)
+
 - **Campos (DB)**: `jornadas.requer_pagamento` (boolean), `jornadas.valor` (number), `inscricoes_jornada.status_pagamento` (`isento` | `pendente` | `pago`), `inscricoes_jornada.transacao_id` (uuid), `transacoes_financeiras` (entrada vinculada à inscrição).
 - **Fluxo de Inscrição (Aluno)**: ao inscrever-se em jornada paga, o sistema cria uma `transacoes_financeiras` de entrada com `status: pendente` e registra a inscrição com `status_pagamento: pendente` e vínculo em `transacao_id`. Para cursos gratuitos, `status_pagamento: isento`.
 - **Bloqueio de Acesso**: o `CursoPlayer` impede acesso ao conteúdo enquanto `status_pagamento = pendente`, exibindo mensagem de aguardo com o valor da inscrição.
@@ -661,38 +819,45 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Diagrama do Fluxo**: ver `docs/diagramas/fluxo-cursos-pagos.md`.
 
 **Links relacionados**
+
 - Manual do usuário — Jornadas e Ensino: `manual-usuario.md#7-jornadas-e-ensino`
 - Produto — Jornadas e Ensino: `produto/README_PRODUTO.MD#jornadas-e-ensino-visão-de-produto`
 - Arquitetura — Módulo Jornadas e Ensino: `01-Arquitetura/01-arquitetura-geral.MD#módulo-jornadas-e-ensino-visão-técnica`
 - Diagramas: `diagramas/fluxo-ensino.md`, `diagramas/sequencia-ensino.md`, `diagramas/fluxo-cursos-pagos.md`
 
 #### Admin — Confirmação de Pagamento e Liberação de Acesso
+
 - **Onde confirmar**: no módulo Financeiro, localizar a `transacoes_financeiras` vinculada à inscrição (via descrição e/ou `transacao_id`).
 - **Como confirmar**: executar a baixa alterando o **status** da transação para **pago**. Passo a passo em: [Manual do Usuário — Confirmar Pagamento](manual-usuario.md#45-confirmando-pagamento).
 - **Efeito esperado**: a inscrição deve refletir **`status_pagamento: pago`** e o acesso ao `CursoPlayer` é liberado.
 - **Automação da atualização da inscrição**: (a confirmar) — caso não haja atualização automática, o admin pode ajustar manualmente o `status_pagamento` da inscrição no gerenciamento de alunos.
 
 > Observações
+>
 > - Integração PIX/checkout externo: (a confirmar) — não há evidência de integração direta no código atual.
 > - Baixas de pagamento: realizadas no módulo financeiro; quando a transação muda para `pago`, o acesso ao curso é liberado.
 
 ## 6. Comunicação
 
 ### 6.1 Canais de Distribuição
+
 - **App/Dashboard**: Alertas e banners para usuários logados
 - **Telão**: Slideshow para projeção na igreja
 - **Site**: Integração futura com website
 
 ### 6.2 Tipos de Comunicado
+
 - **Banners**: Comunicados visuais com imagem
 - **Alertas**: Mensagens de urgência
 
 ### 6.3 Gestão de Mídias
+
 - Biblioteca centralizada de imagens e vídeos
 - Tags para categorização
 - Vinculação com comunicados e liturgia
 
 ### 6.4 Hub de Publicação
+
 - Interface unificada para gerenciar comunicações
 - Filtros por canal
 - Agendamento de publicação
@@ -703,17 +868,20 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ## 7. Dashboard
 
 ### 7.1 Dashboard Admin/Pastor
+
 - Gráfico de fluxo de caixa mensal
 - KPIs de projetos e tarefas
 - Alertas pastorais (ovelhas em risco)
 - Aniversariantes do período
 
 ### 7.2 Dashboard Líder
+
 - Gestão de célula/ministério
 - Ações rápidas de chamada
 - Registro de visitantes
 
 ### 7.3 Dashboard Membro
+
 - Carrossel de comunicados
 - Carteirinha digital com QR Code
 - Grade de ações (PIX, pedidos, etc.)
@@ -724,12 +892,14 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ## 8. Projetos e Tarefas
 
 ### 8.1 Projetos
+
 - Cadastro com título, descrição, datas
 - Status: Ativo, Concluído, Pausado
 - Líder responsável
 - Barra de progresso visual
 
 ### 8.2 Tarefas (Kanban)
+
 - Três colunas: Não Iniciado, Em Execução, Finalizado
 - Drag-and-drop para mudança de status
 - Prioridade: Baixa, Média, Alta
@@ -741,16 +911,19 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ## 9. Presença e Check-in
 
 ### 9.1 Chamada de Culto
+
 - Registro de presença por culto
 - Métodos: Manual, QR Code, WhatsApp Geo, Líder
 - Validação por líder de célula/ministério
 
 ### 9.2 Check-in por Geolocalização
+
 - Integração via WhatsApp (Make.com)
 - Validação de proximidade com coordenadas da igreja
 - Registro automático de presença
 
 ### 9.3 QR Code de Membro
+
 - Carteirinha digital no dashboard
 - Leitura para check-in rápido
 
@@ -779,11 +952,13 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ## 12. Cadastro Público
 
 ### 12.1 Registro de Visitante
+
 - Página pública (/cadastro/Visitante)
 - QR Code para distribuição
 - Campos: Nome, telefone, como conheceu, tipo de visita
 
 ### 12.2 Atualização de Membro
+
 - Página pública (/cadastro/Membro)
 - Busca por email
 - Atualização de dados sem login
@@ -793,6 +968,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ## 13. Autenticação e Permissões
 
 ### 13.1 Roles do Sistema
+
 - **Admin**: Acesso total
 - **Pastor**: Acesso total
 - **Líder**: Acesso a funcionalidades de liderança
@@ -802,6 +978,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 - **Básico**: Acesso restrito (visualização)
 
 ### 13.2 Níveis de Acesso por Módulo
+
 - Visualizar
 - Criar e Editar
 - Aprovar/Gerenciar
@@ -810,7 +987,9 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 ### 13.3 Gestão Avançada de Permissões (Admin)
 
 #### Controles Tri-State por Módulo
+
 A matriz de permissões (`AdminPermissions.tsx`) agrupa permissões por módulo em accordion expansível. Cada cabeçalho de módulo exibe células individuais por cargo com indicadores visuais:
+
 - ✅ **Verde (todas ativas)**: Todas as permissões do módulo estão ativas para aquele cargo
 - ➖ **Amarelo (parcial)**: Algumas permissões ativas, outras não
 - ⭕ **Cinza (nenhuma)**: Nenhuma permissão ativa
@@ -818,7 +997,9 @@ A matriz de permissões (`AdminPermissions.tsx`) agrupa permissões por módulo 
 **Ação em massa**: Click no indicador alterna entre ativar todas ou desativar todas as permissões do módulo para aquele cargo. Cargos sistema (admin) não podem ser editados.
 
 #### Clonagem de Permissões
+
 Botão **Copy** no cabeçalho de cada coluna de cargo abre dropdown listando outros cargos como origem. Ao selecionar:
+
 - Sistema calcula diff baseado no estado efetivo (inclui alterações pendentes)
 - Sincronização total: adiciona permissões ausentes, remove permissões extras
 - Batch update: atualiza `matrix` e `pendingChanges` de uma vez (sem rerenders)
@@ -827,7 +1008,9 @@ Botão **Copy** no cabeçalho de cada coluna de cargo abre dropdown listando out
 **Caso de uso**: Criar cargo "Líder Júnior" → Copiar permissões de "Líder" → Ajustar diferenças específicas → Salvar.
 
 #### Dialog de Confirmação Visual
+
 Botão "Salvar Alterações" interceptado por modal de confirmação que exibe:
+
 - Resumo agrupado por cargo
 - Adições em verde (✅ Adicionar: Financeiro View)
 - Remoções em vermelho (❌ Remover: Kids Manage)
@@ -837,17 +1020,20 @@ Botão "Salvar Alterações" interceptado por modal de confirmação que exibe:
 **Fluxo**: Revisar diff → Cancelar ou Confirmar → Persistência no Supabase via `executeSave`.
 
 #### Estado Efetivo e Pending Changes
+
 A interface mantém dois estados:
+
 - `originalMatrix`: Estado persistido no banco (role_permissions)
 - `pendingChanges`: Array de `{roleId, permissionId, action: 'add'|'remove'}`
 
 Função `getEffectiveState(roleId, permId)` calcula estado real considerando ambos. Todas as operações (tri-state, clonagem, diff) respeitam alterações não salvas.
 
-
 #### Histórico de Permissões e Rollback
+
 A aba "Histórico" em AdminPermissions implementa auditoria completa com capacidade de reversão:
 
 **Visualização de Histórico:**
+
 - Query agrupa `role_permissions_audit` por `request_id` (transação)
 - Cada grupo exibe:
   - Timestamp e usuário que fez a alteração (`created_at`, `actor`)
@@ -857,6 +1043,7 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 - Collapse automático para economia de espaço (expansível por clique)
 
 **Rollback de Transações:**
+
 - Cada grupo possui botão Undo2 que abre `AlertDialog` de confirmação
 - Confirmação exibe: `request_id`, data/hora, quantidade de mudanças
 - Ao confirmar: chama RPC `rollback_audit_batch(request_id)`
@@ -866,6 +1053,7 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 - Toast exibe sucesso/erro com mensagem descritiva
 
 **Rastreabilidade:**
+
 - Nenhuma operação é "silenciosa": toda mudança em permissões registra:
   - `request_id` (agrupa mudanças da mesma transação)
   - `actor` (usuário que fez)
@@ -875,6 +1063,7 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
   - `metadata` (contexto adicional)
 
 **Fluxo Completo:**
+
 1. Admin faz mudanças (tri-state, clonagem) → `pendingChanges`
 2. Clica "Salvar" → Dialog confirmação → `executeSave`
 3. `save_permissions_batch()` cria transação com `request_id` no `set_audit_context`
@@ -886,6 +1075,7 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 ---
 
 ### 13.4 Autenticação Biométrica
+
 - WebAuthn/Passkeys
 - Desbloqueio rápido por biometria do dispositivo
 
@@ -894,6 +1084,7 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 ## 14. Notificações
 
 ### 14.1 Tipos de Notificação
+
 - Novos pedidos de oração
 - Novos testemunhos
 - Escalas atribuídas
@@ -901,6 +1092,7 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 - Aniversariantes
 
 ### 14.2 Automações
+
 - Notificação diária de sentimentos (9h)
 - Alertas de aniversário
 - Verificação de sentimentos críticos (8h)
@@ -910,12 +1102,14 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 ## 15. Integrações
 
 ### 15.1 Make.com (Webhooks)
+
 - Recebimento de pedidos de oração
 - Recebimento de testemunhos
 - Check-in por geolocalização
 - Notificação de liturgia
 
 ### 15.2 Supabase Realtime
+
 - Atualização em tempo real do telão
 - Sincronização de dados
 
@@ -947,6 +1141,7 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 - Configuração de plantão pastoral segue disponível com máscara de telefone e escolha de provedor WhatsApp
 
 ### 18.1 Chatbots & IAs (Admin)
+
 - Tela dedicada em `/admin/chatbots` lista os bots cadastrados (`chatbot_configs`) com status Ativo/Inativo
 - Cadastro/edição permite informar nome, descrição, edge function associada e modelos para texto (`gpt-4o-mini`, `gpt-4o`, etc.), áudio (`whisper-1`) e visão (`gpt-4o`, `gpt-4-turbo`)
 - Cada canal possui campo de prompt/role editável com pré-visualização expandível para leitura rápida
@@ -967,12 +1162,15 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 ### Mobile UX e ResponsiveDialog Pattern
 
 #### Safe Areas e iOS Optimization
+
 - **CSS Variables**: `--safe-area-inset-top/bottom/left/right` aplicadas em `MainLayout` para respeitar notch/island do iPhone
 - **Input zoom prevention**: `font-size: 16px` em inputs/selects mobile evita zoom automático no iOS
 - **Overflow fixes**: Remoção de `overflow-x: hidden` fixo, aplicação consistente de `pb-safe` em wrappers
 
 #### ResponsiveDialog Component
+
 Componente unificado (`src/components/ui/responsive-dialog.tsx`) que adapta automaticamente baseado em viewport:
+
 - **Desktop (≥768px)**: Renderiza `Dialog` do shadcn/ui (modal centralizado)
 - **Mobile (<768px)**: Renderiza `Drawer` do shadcn/ui (bottom sheet)
 - **API unificada**: Mesmas props para ambos os modos
@@ -987,16 +1185,20 @@ Componente unificado (`src/components/ui/responsive-dialog.tsx`) que adapta auto
 ## Módulo Comunicação
 
 ### Objetivo do Módulo
+
 Facilitar a criação e publicação de comunicados institucionais (avisos, banners, alertas) de forma manual e editorial pela liderança, garantindo visibilidade multiplataforma (app, telão/projetor, site público). O módulo **não** faz disparo automático de notificações push, e-mail ou WhatsApp; apenas publica conteúdo gerenciado manualmente.
 
 ### Funcionalidades Principais
 
 #### Tipos de Comunicação
+
 Baseado na tabela `comunicados`:
+
 - **Banner**: comunicado visual com imagem destacada, exibido em carrossel (campo `tipo = 'banner'`)
 - **Alerta**: comunicado de urgência com mensagem obrigatória, exibido com destaque visual (campo `tipo = 'alerta'`)
 
 #### Criação e Gestão de Comunicados
+
 - **Criar comunicado**: wizard em 3 etapas (conteúdo, canais, agendamento)
   - Conteúdo: título, tipo (banner/alerta), descrição, imagem (storage `comunicados`), link de ação
   - Canais: selecionar onde exibir (`exibir_app`, `exibir_telao`, `exibir_site`)
@@ -1008,6 +1210,7 @@ Baseado na tabela `comunicados`:
 - **Vincular a mídia**: FK opcional `midia_id` para reutilizar mídias da biblioteca
 
 #### Segmentação por Canal
+
 - **App/Dashboard** (`exibir_app = true`):
   - Exibido no carrossel de banners do dashboard dos membros
   - Componente: `BannerCarousel.tsx`
@@ -1021,13 +1224,16 @@ Baseado na tabela `comunicados`:
   - Exibido no carrossel do site da igreja (integração a confirmar)
 
 #### Estados do Comunicado
+
 Baseado nos campos da tabela `comunicados`:
+
 - **Ativo** (`ativo = true`): comunicado está sendo exibido nos canais selecionados (respeitando período de data_inicio/data_fim)
 - **Inativo** (`ativo = false`): comunicado pausado ou expirado, não aparece em nenhum canal
 
 **Observação:** Não há estados intermediários como "rascunho", "em aprovação" ou "enviado". Comunicados são criados e imediatamente ativados ou desativados.
 
 #### Histórico e Listagem
+
 - **Listagem completa**: página `/comunicados` mostra todos os comunicados cadastrados com:
   - Título, tipo (banner/alerta), status (ativo/inativo)
   - Canais de exibição (ícones app/telão/site)
@@ -1037,6 +1243,7 @@ Baseado nos campos da tabela `comunicados`:
 - **Ordenação**: (a confirmar) por data de criação/atualização
 
 #### Categorização e Tags
+
 - **Tags** (`tags[]`): array de strings para categorização livre (ex.: `["Abertura", "Louvor", "Avisos Gerais"]`)
 - **Categoria de mídia** (`categoria_midia`): classificação predefinida (`geral`, `eventos`, `liturgia`)
 - Uso: organização e busca dentro da biblioteca de comunicados/mídias
@@ -1044,9 +1251,11 @@ Baseado nos campos da tabela `comunicados`:
 ### Regras de Autorização
 
 #### Permissões RLS (Row Level Security)
+
 Baseado nas policies da migração `20251203182759_...sql`:
 
 1. **Leitura pública** (`comunicados_leitura_publica`):
+
    - **Quem**: todos os usuários (incluindo não autenticados)
    - **O que**: SELECT em comunicados ativos dentro do período de exibição
    - **Condição**: `ativo = true` e `data_inicio <= NOW()` e (`data_fim IS NULL` ou `data_fim >= NOW()`)
@@ -1057,7 +1266,9 @@ Baseado nas policies da migração `20251203182759_...sql`:
    - **Condição**: `auth.role() = 'authenticated'` (policy simplificada; refinamento via app-level se necessário)
 
 #### Storage Bucket
+
 Baseado na migração de storage:
+
 - **Bucket `comunicados`**: público (`public = true`)
 - **Policies**:
   - `comunicados_public_access`: SELECT público
@@ -1066,6 +1277,7 @@ Baseado na migração de storage:
   - `comunicados_admin_delete`: DELETE apenas para autenticados
 
 #### Resumo de Permissões
+
 - **Visualizar comunicados ativos**: qualquer pessoa (público)
 - **Criar/editar/excluir comunicados**: apenas administradores e secretaria
 - **Upload de imagens**: apenas usuários autenticados
@@ -1073,16 +1285,19 @@ Baseado na migração de storage:
 ### Fluxo Típico de Uso
 
 1. **Criação**:
+
    - Liderança/secretaria acessa `/comunicados` → "+ Novo Comunicado"
    - Preenche wizard (conteúdo, canais, agendamento)
    - Clica em "Publicar" → INSERT na tabela `comunicados` com `ativo = true`
 
 2. **Exibição**:
+
    - **App**: membros veem no carrossel do dashboard (query automática por `exibir_app = true`)
    - **Telão**: operador abre `/telao` → carrossel consome comunicados com `exibir_telao = true`
    - **Site**: (integração a confirmar)
 
 3. **Gestão**:
+
    - Editar: clicar no comunicado → modal de edição → UPDATE
    - Desativar: toggle `ativo = false` → comunicado some dos canais
    - Excluir: DELETE → remove do banco e storage
@@ -1094,6 +1309,7 @@ Baseado na migração de storage:
 ### Integrações e Limitações
 
 #### O que o módulo FAZ:
+
 - Criação editorial manual de comunicados
 - Publicação multiplataforma (app, telão, site)
 - Agendamento de período de exibição
@@ -1102,6 +1318,7 @@ Baseado na migração de storage:
 - Controle de ordem de exibição no telão
 
 #### O que o módulo NÃO FAZ:
+
 - ❌ Disparo automático de push notifications
 - ❌ Envio de e-mails ou mensagens WhatsApp
 - ❌ Segmentação por perfis de usuário (roles/grupos)
@@ -1129,13 +1346,16 @@ Reduzir a dependência de comunicação manual entre áreas, garantindo que **pe
 ### Componentes Principais
 
 #### Frontend
+
 - **`src/pages/admin/Notificacoes.tsx`**: tela de configuração de regras de notificações (admin)
 - **`src/hooks/useNotifications.tsx`**: hook para gerenciar notificações in-app, push e sincronização em tempo real
 - **`src/components/NotificationBell.tsx`**: componente do sininho (bell) na barra superior com popover de notificações
 - **`src/components/NotificationSettings.tsx`**: tela de preferências do usuário (a confirmar)
 
 #### Backend (Supabase)
+
 - **Tabelas**:
+
   - `notifications`: registro de notificações enviadas/recebidas (user_id, title, message, type, read, metadata)
   - `notificacao_eventos`: catálogo de eventos que podem disparar notificações (slug, nome, categoria, variaveis, provider_preferencial)
   - `notificacao_regras`: regras de disparo (evento_slug, role_alvo, canais, ativo)
@@ -1147,6 +1367,7 @@ Reduzir a dependência de comunicação manual entre áreas, garantindo que **pe
   - `notificar-liturgia-make`: notificação de liturgia via Make (a confirmar)
 
 #### Canais de Entrega
+
 - **In-App (Sininho)**: notificação no sistema via tabela `notifications`, visível no `NotificationBell`
 - **Push Notification**: browser Notification API (requer permissão do usuário)
 - **WhatsApp**: via Meta API direto ou Make (conforme `provider_preferencial` do evento)
@@ -1156,20 +1377,21 @@ Reduzir a dependência de comunicação manual entre áreas, garantindo que **pe
 
 Baseado na migration `20251211215552_509ce355-3ad5-444f-857c-4bf1e1001209.sql`:
 
-| Evento Slug                       | Categoria   | Provider Preferencial | Variáveis Disponíveis                      |
-|-----------------------------------|-------------|-----------------------|--------------------------------------------|
-| `financeiro_conta_vencer`         | financeiro  | meta_direto           | descricao, valor, vencimento               |
-| `financeiro_reembolso_aprovacao`  | financeiro  | make                  | solicitante, valor                         |
-| `kids_checkin`                    | kids        | meta_direto           | crianca, responsavel                       |
-| `kids_ocorrencia`                 | kids        | meta_direto           | crianca, motivo                            |
-| `novo_visitante`                  | pessoas     | make                  | nome, telefone                             |
-| `pedido_oracao`                   | intercessao | make                  | nome, motivo                               |
+| Evento Slug                      | Categoria   | Provider Preferencial | Variáveis Disponíveis        |
+| -------------------------------- | ----------- | --------------------- | ---------------------------- |
+| `financeiro_conta_vencer`        | financeiro  | meta_direto           | descricao, valor, vencimento |
+| `financeiro_reembolso_aprovacao` | financeiro  | make                  | solicitante, valor           |
+| `kids_checkin`                   | kids        | meta_direto           | crianca, responsavel         |
+| `kids_ocorrencia`                | kids        | meta_direto           | crianca, motivo              |
+| `novo_visitante`                 | pessoas     | make                  | nome, telefone               |
+| `pedido_oracao`                  | intercessao | make                  | nome, motivo                 |
 
 > 📌 **Provider Preferencial**: define qual integração externa usar para WhatsApp (`meta_direto` = Meta API, `make` = n8n/Make webhook).
 
 ### Regras de Disparo
 
 Cada **regra** (`notificacao_regras`) define:
+
 - **evento_slug**: qual evento escutar (ex: `kids_checkin`)
 - **role_alvo**: qual cargo recebe (ex: `admin`, `pastor`, `tesoureiro`)
 - **user_id_especifico**: override para usuário específico (opcional)
@@ -1180,6 +1402,7 @@ Cada **regra** (`notificacao_regras`) define:
 - **ativo**: boolean (liga/desliga a regra)
 
 Exemplo de regra:
+
 ```json
 {
   "evento_slug": "kids_ocorrencia",
@@ -1196,6 +1419,7 @@ Exemplo de regra:
 ### Fluxo de Disparo
 
 1. **Evento Ocorre no Sistema**:
+
    - Ex: criança faz check-in → código frontend/backend invoca Edge Function `disparar-alerta` com payload:
      ```json
      {
@@ -1208,6 +1432,7 @@ Exemplo de regra:
      ```
 
 2. **Edge Function Processa**:
+
    - Busca evento em `notificacao_eventos` (valida se existe)
    - Busca regras ativas em `notificacao_regras` para o evento
    - Resolve destinatários:
@@ -1216,6 +1441,7 @@ Exemplo de regra:
    - Formata mensagem substituindo variáveis no template (ex: `{{crianca}}` → "João Silva")
 
 3. **Entrega Multi-Canal**:
+
    - **In-App**: INSERT na tabela `notifications` (user_id, title, message, type)
    - **Push**: usa browser Notification API no frontend (via realtime subscription)
    - **WhatsApp**: chama API externa (Meta ou Make) com número do destinatário e mensagem formatada
@@ -1237,13 +1463,17 @@ Não há estados intermediários (rascunho, pendente, etc.). Notificações são
 ### Regras de Autorização (RLS)
 
 #### Tabela `notifications`
+
 Baseado em `docs/database-schema.sql`:
+
 - **Criar**: `"Sistema pode criar notificações"` → INSERT sem restrição (service role)
 - **Ler**: `"Usuários podem ver suas notificações"` → SELECT WHERE `auth.uid() = user_id`
 - **Atualizar**: `"Usuários podem atualizar suas notificações"` → UPDATE WHERE `auth.uid() = user_id`
 
 #### Tabelas `notificacao_eventos` e `notificacao_regras`
+
 Baseado em migration `20251211215552_...sql`:
+
 - **Leitura pública eventos**: SELECT para todos autenticados
 - **Leitura pública regras**: SELECT para todos autenticados (para o sistema resolver destinatários)
 - **Admin gerencia regras**: ALL apenas para usuários com role `admin` em `user_roles`
@@ -1251,12 +1481,15 @@ Baseado em migration `20251211215552_...sql`:
 ### Fluxo Típico de Uso
 
 #### Como Usuário Final:
+
 1. **Receber notificação**:
+
    - Sistema dispara evento → notificação aparece no sininho
    - Badge vermelho indica contagem de não lidas
    - (Opcional) Push notification no navegador/celular
 
 2. **Ver detalhes**:
+
    - Clica no sininho → popover abre com lista de notificações
    - Cada notificação mostra: ícone, categoria, título, mensagem, tempo relativo
 
@@ -1266,15 +1499,19 @@ Baseado em migration `20251211215552_...sql`:
    - Clicar na lixeira → exclui notificação específica
 
 #### Como Administrador:
+
 1. **Acessar configurações**:
+
    - `/admin/notificacoes` → tela com cards de eventos agrupados por categoria
 
 2. **Adicionar destinatário a um evento**:
+
    - Clicar em "+ Add" no card do evento
    - Selecionar role (cargo) no dropdown
    - Regra criada com canais padrão (inapp = true, push/whatsapp = false)
 
 3. **Configurar canais**:
+
    - Usar switches (toggle) para ativar/desativar canais por destinatário
    - Exemplo: "Tesoureiro recebe apenas in-app, líder recebe in-app + push + WhatsApp"
 
@@ -1284,6 +1521,7 @@ Baseado em migration `20251211215552_...sql`:
 ### Integrações e Limitações
 
 #### O que o módulo FAZ:
+
 - Disparo automático de notificações baseado em eventos reais do sistema
 - Entrega multi-canal (in-app, push, WhatsApp)
 - Configuração flexível por evento e role
@@ -1292,6 +1530,7 @@ Baseado em migration `20251211215552_...sql`:
 - Sincronização em tempo real via Supabase Realtime
 
 #### O que o módulo NÃO FAZ:
+
 - ❌ Criação manual de mensagens (isso é Comunicação)
 - ❌ Edição de conteúdo da notificação (templates são fixos)
 - ❌ Segmentação arbitrária ou campanhas de marketing
@@ -1305,4 +1544,3 @@ Baseado em migration `20251211215552_...sql`:
 - Produto — Notificações: [docs/produto/README_PRODUTO.MD](produto/README_PRODUTO.MD#notificações-visão-de-produto)
 - Diagrama de fluxo: [docs/diagramas/fluxo-notificacoes.md](diagramas/fluxo-notificacoes.md) (a criar)
 - Diagrama de sequência: [docs/diagramas/sequencia-notificacoes.md](diagramas/sequencia-notificacoes.md) (a criar)
-

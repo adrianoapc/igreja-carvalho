@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useLiturgiaInteligente } from "@/hooks/useLiturgiaInteligente";
+import { VisitantesSlide } from "@/components/oracao/VisitantesSlide";
 import {
   X,
   ChevronLeft,
@@ -11,6 +13,10 @@ import {
   Music,
   BookOpen,
   ListChecks,
+  Quote,
+  AlertCircle,
+  ThumbsUp,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -20,9 +26,17 @@ import { format, addMinutes, differenceInSeconds } from "date-fns";
 // --- Tipos Locais ---
 interface LiturgiaItem {
   id: string;
-  tipo: "VIDEO" | "VERSICULO" | "PEDIDOS" | "AVISO" | "TIMER";
+  tipo:
+    | "VIDEO"
+    | "VERSICULO"
+    | "PEDIDOS"
+    | "AVISO"
+    | "TIMER"
+    | "CUSTOM_TESTEMUNHO"
+    | "CUSTOM_SENTIMENTO"
+    | "CUSTOM_VISITANTES";
   titulo: string;
-  conteudo: string | null; // URL do video, Texto do versículo, etc.
+  conteudo: string | null; // URL do video, Texto do versículo, JSON stringificado, etc.
   duracao_sugerida_min: number;
   ordem: number;
 }
@@ -46,10 +60,23 @@ export default function PrayerPlayer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [escala, setEscala] = useState<EscalaInfo | null>(null);
+  const [eventoId, setEventoId] = useState<string | undefined>(undefined);
   const [slides, setSlides] = useState<LiturgiaItem[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState<number>(0); // Segundos restantes do turno
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [pedidosOrados, setPedidosOrados] = useState<Set<string>>(new Set()); // Rastreia pedidos que orou
+
+  // Hook para carregar playlist inteligente (passa evento_id quando disponível)
+  const {
+    alertaEspiritual,
+    testemunhos,
+    visitantes,
+    broadcast,
+    pessoais,
+    slides: slidesFromEdge,
+    loading: loadingSmart,
+  } = useLiturgiaInteligente(eventoId);
 
   // Carregar Dados
   useEffect(() => {
@@ -118,6 +145,7 @@ export default function PrayerPlayer() {
 
         console.log("✅ Escala formatada:", escalaFormatada);
         setEscala(escalaFormatada);
+        setEventoId(escalaFormatada.evento.id); // Define evento_id para o hook
 
         // 2. Buscar Liturgia (Roteiro)
         const { data: liturgiaData, error: liturgiaError } = await supabase
@@ -130,6 +158,7 @@ export default function PrayerPlayer() {
         console.log("⚠️ Erro liturgia:", liturgiaError);
 
         if (liturgiaData && liturgiaData.length > 0) {
+          // Caso contrário, constrói o roteiro manualmente
           // Mapear para o formato local
           const items: LiturgiaItem[] = liturgiaData.map((l: any) => ({
             id: l.id,
@@ -139,7 +168,87 @@ export default function PrayerPlayer() {
             duracao_sugerida_min: l.duracao_minutos || 5,
             ordem: l.ordem,
           }));
-          setSlides(items);
+
+          // Construir roteiro final com slides inteligentes
+          let roteiroFinal = [...items];
+
+          // A. BLOCO DE GRATIDÃO (Testemunhos)
+          if (testemunhos && testemunhos.length > 0 && !loadingSmart) {
+            console.log("📖 Adicionando slide de Testemunhos");
+            roteiroFinal.push({
+              id: "gratidao-auto",
+              tipo: "CUSTOM_TESTEMUNHO",
+              titulo: "Tempo de Gratidão",
+              conteudo: JSON.stringify(testemunhos),
+              duracao_sugerida_min: 3,
+              ordem: 1.1,
+            });
+          }
+
+          // B. BLOCO DE ALERTA (Sentimentos Críticos)
+          if (
+            alertaEspiritual &&
+            alertaEspiritual.length > 0 &&
+            !loadingSmart
+          ) {
+            console.log("📖 Adicionando slide de Alerta Espiritual");
+            roteiroFinal.push({
+              id: "insight-auto",
+              tipo: "CUSTOM_SENTIMENTO",
+              titulo: "Termômetro Espiritual",
+              conteudo: JSON.stringify(alertaEspiritual),
+              duracao_sugerida_min: 2,
+              ordem: 1.2,
+            });
+          }
+
+          // C. BLOCO DE VIDAS (Visitantes)
+          if (visitantes && visitantes.length > 0 && !loadingSmart) {
+            console.log("📖 Adicionando slide de Visitantes");
+            roteiroFinal.push({
+              id: "visitantes-auto",
+              tipo: "CUSTOM_VISITANTES",
+              titulo: "Vidas Novas",
+              conteudo: JSON.stringify(visitantes),
+              duracao_sugerida_min: 3,
+              ordem: 1.3,
+            });
+          }
+
+          // D. PEDIDOS BROADCAST
+          if (broadcast && broadcast.length > 0 && !loadingSmart) {
+            console.log("📖 Adicionando slide de Broadcast");
+            roteiroFinal.push({
+              id: "broadcast-auto",
+              tipo: "PEDIDOS",
+              titulo: "Prioridades do Reino",
+              conteudo: JSON.stringify(broadcast),
+              duracao_sugerida_min: 5,
+              ordem: 1.4,
+            });
+          }
+
+          // E. PEDIDOS PESSOAIS
+          if (pessoais && pessoais.length > 0 && !loadingSmart) {
+            console.log("📖 Adicionando slide de Pedidos Pessoais");
+            roteiroFinal.push({
+              id: "pessoais-auto",
+              tipo: "PEDIDOS",
+              titulo: "Carga de Intercessão",
+              conteudo: JSON.stringify(pessoais),
+              duracao_sugerida_min: 10,
+              ordem: 1.5,
+            });
+          }
+
+          // Reordenar por ordem
+          roteiroFinal.sort((a, b) => a.ordem - b.ordem);
+
+          console.log(
+            "✅ Roteiro final com slides inteligentes:",
+            roteiroFinal
+          );
+          setSlides(roteiroFinal);
         } else {
           console.log("⚠️ Sem liturgia, usando fallback");
           // Fallback se não tiver roteiro
@@ -178,11 +287,12 @@ export default function PrayerPlayer() {
             },
           ]);
         }
-        
+
         console.log("✅ Slides carregados:", slides.length);
       } catch (error) {
         console.error("❌ Erro ao carregar player:", error);
-        const errorMsg = error instanceof Error ? error.message : "Erro ao carregar roteiro.";
+        const errorMsg =
+          error instanceof Error ? error.message : "Erro ao carregar roteiro.";
         setError(errorMsg);
         toast.error(errorMsg);
       } finally {
@@ -192,6 +302,56 @@ export default function PrayerPlayer() {
     }
     loadData();
   }, [escalaId]);
+
+  // Atualizar slides quando o Edge Function retornar dados
+  useEffect(() => {
+    if (slidesFromEdge && slidesFromEdge.length > 0) {
+      console.log(
+        "🎯 Atualizando slides com dados da Edge Function:",
+        slidesFromEdge
+      );
+      setSlides(slidesFromEdge);
+      setLoading(false);
+    }
+  }, [slidesFromEdge]);
+
+  // Carregar pedidos que o usuário já orou
+  useEffect(() => {
+    async function carregarPedidosOrados() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Busca pedidos que o usuário é intercessor e estão em oração
+        const { data: pedidosOrados, error } = await supabase
+          .from("pedidos_oracao")
+          .select("id")
+          .eq("intercessor_id", user.id)
+          .eq("status", "em_oracao");
+
+        if (error) {
+          console.error("❌ Erro ao carregar pedidos orados:", error);
+          return;
+        }
+
+        // Popula o set com os IDs dos pedidos orados
+        if (pedidosOrados && pedidosOrados.length > 0) {
+          const ids = new Set(pedidosOrados.map((p) => p.id));
+          setPedidosOrados(ids);
+          console.log(`✅ Carregados ${ids.size} pedidos orados pelo usuário`);
+        }
+      } catch (error) {
+        console.error(
+          "❌ Erro ao carregar histórico de pedidos orados:",
+          error
+        );
+      }
+    }
+
+    carregarPedidosOrados();
+  }, []);
 
   // Timer do Turno Geral
   useEffect(() => {
@@ -225,6 +385,52 @@ export default function PrayerPlayer() {
     }
   };
 
+  // Marcar pedido como orado
+  const marcarComoOrado = async (pedidoId: string) => {
+    try {
+      // Marca visualmente imediatamente (otimista)
+      setPedidosOrados((prev) => new Set([...prev, pedidoId]));
+
+      // Obtém usuário atual
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      // Atualiza status do pedido no banco
+      const { error: updateError } = await supabase
+        .from("pedidos_oracao")
+        .update({
+          status: "em_oracao",
+          intercessor_id: user.id,
+          data_alocacao: new Date().toISOString(),
+        })
+        .eq("id", pedidoId);
+
+      if (updateError) throw updateError;
+
+      // Notifica ao usuário
+      toast.success("✅ Obrigado pela oração!", {
+        description: "Sua intercessão foi registrada no sistema.",
+      });
+
+      console.log(`✅ Pedido ${pedidoId} marcado como em oração`);
+    } catch (error) {
+      console.error("❌ Erro ao marcar como orado:", error);
+      toast.error("Erro ao registrar a oração", {
+        description: error instanceof Error ? error.message : "Tente novamente",
+      });
+      // Reverte a mudança visual em caso de erro
+      setPedidosOrados((prev) => {
+        const next = new Set(prev);
+        next.delete(pedidoId);
+        return next;
+      });
+    }
+  };
+
   // Formatar tempo restante (MM:SS)
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -250,8 +456,14 @@ export default function PrayerPlayer() {
             <X className="h-16 w-16 mx-auto" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Erro</h2>
-          <p className="text-gray-400 mb-6">{error || "Escala não encontrada"}</p>
-          <Button onClick={() => navigate("/")} variant="outline" className="text-white border-white">
+          <p className="text-gray-400 mb-6">
+            {error || "Escala não encontrada"}
+          </p>
+          <Button
+            onClick={() => navigate("/")}
+            variant="outline"
+            className="text-white border-white"
+          >
             Voltar ao Início
           </Button>
         </div>
@@ -341,18 +553,75 @@ export default function PrayerPlayer() {
                 Pedidos de Oração
               </h3>
             </div>
-            {/* Mock de Pedidos - No futuro viria do banco */}
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="bg-white/5 p-4 rounded-lg border border-white/5 hover:bg-white/10 transition-colors"
-              >
-                <p className="font-medium text-sm">Pela saúde da irmã Maria</p>
-                <span className="text-xs text-gray-500">
-                  Há 2 horas • Enfermidade
-                </span>
+            {/* Renderiza pedidos reais do conteúdo */}
+            {currentSlide.conteudo ? (
+              (() => {
+                try {
+                  const pedidos = JSON.parse(currentSlide.conteudo);
+                  return Array.isArray(pedidos) && pedidos.length > 0 ? (
+                    pedidos.map((pedido: any) => {
+                      const orou = pedidosOrados.has(pedido.id);
+                      return (
+                        <div
+                          key={pedido.id}
+                          className={`p-4 rounded-lg border transition-all duration-300 cursor-pointer group ${
+                            orou
+                              ? "bg-green-500/10 border-green-400/50 shadow-[0_0_12px_rgba(34,197,94,0.2)]"
+                              : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm line-clamp-2">
+                                {pedido.pedido}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                <span>
+                                  {pedido.nome_solicitante
+                                    ? `Por: ${pedido.nome_solicitante}`
+                                    : "Anônimo"}
+                                </span>
+                                {pedido.tipo && <span>• {pedido.tipo}</span>}
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant={orou ? "default" : "ghost"}
+                              className={`flex-shrink-0 transition-all ${
+                                orou
+                                  ? "bg-green-600 hover:bg-green-700 text-white shadow-[0_0_12px_rgba(34,197,94,0.4)]"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+                              }`}
+                              onClick={() => marcarComoOrado(pedido.id)}
+                            >
+                              {orou ? (
+                                <ThumbsUp className="w-4 h-4" />
+                              ) : (
+                                <Heart className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">Nenhum pedido disponível</p>
+                    </div>
+                  );
+                } catch (e) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">Erro ao carregar pedidos</p>
+                    </div>
+                  );
+                }
+              })()
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">Nenhum pedido disponível</p>
               </div>
-            ))}
+            )}
           </div>
         )}
 
@@ -367,6 +636,46 @@ export default function PrayerPlayer() {
                 {currentSlide.duracao_sugerida_min}:00
               </div>
             )}
+          </div>
+        )}
+
+        {currentSlide.tipo === "CUSTOM_VISITANTES" && (
+          <VisitantesSlide
+            visitantes={
+              currentSlide.conteudo ? JSON.parse(currentSlide.conteudo) : []
+            }
+          />
+        )}
+
+        {currentSlide.tipo === "CUSTOM_TESTEMUNHO" && (
+          <div className="w-full max-w-2xl animate-in slide-in-from-right duration-500">
+            <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-2xl p-8 border border-amber-400/30">
+              <div className="flex items-center gap-3 mb-6">
+                <Quote className="h-6 w-6 text-amber-400 flex-shrink-0" />
+                <h3 className="text-lg font-semibold text-amber-100">
+                  Testemunho
+                </h3>
+              </div>
+              <p className="text-base leading-relaxed text-white/90 italic">
+                "{currentSlide.conteudo}"
+              </p>
+            </div>
+          </div>
+        )}
+
+        {currentSlide.tipo === "CUSTOM_SENTIMENTO" && (
+          <div className="w-full max-w-2xl animate-in slide-in-from-bottom duration-500">
+            <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 rounded-2xl p-8 border border-red-400/30">
+              <div className="flex items-center gap-3 mb-6">
+                <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0" />
+                <h3 className="text-lg font-semibold text-red-100">
+                  Alerta Espiritual
+                </h3>
+              </div>
+              <p className="text-base leading-relaxed text-white/90">
+                {currentSlide.conteudo}
+              </p>
+            </div>
           </div>
         )}
       </div>
