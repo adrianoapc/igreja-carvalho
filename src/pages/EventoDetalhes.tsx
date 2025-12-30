@@ -47,8 +47,11 @@ import LiturgiaTab from "@/components/eventos/tabs/LiturgiaTab";
 import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
 import MusicaTabContent from "@/components/cultos/MusicaTabContent";
 import EscalasTabContent from "@/components/cultos/EscalasTabContent";
+import InscricoesTabContent from "@/components/eventos/InscricoesTabContent";
 import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
 import EscalaTimeline from "@/components/escalas/EscalaTimeline";
+
+import { Ticket } from "lucide-react";
 
 interface Evento {
   id: string;
@@ -66,6 +69,13 @@ interface Evento {
   observacoes: string | null;
   exibir_preletor: boolean;
   evento_subtipos?: { nome: string; cor: string | null } | null;
+  // Campos de inscrição
+  requer_inscricao: boolean | null;
+  requer_pagamento: boolean | null;
+  valor_inscricao: number | null;
+  vagas_limite: number | null;
+  categoria_financeira_id: string | null;
+  conta_financeira_id: string | null;
 }
 
 const STATUS_OPTIONS = [
