@@ -68,9 +68,11 @@ const AtendimentoProntuario = lazy(
 
 // Intercessão
 const Intercessao = lazy(() => import("./pages/Intercessao"));
-const PedidosOracao = lazy(() => import("./pages/intercessao/PedidosOracao"));
+const MeuHub = lazy(() => import("./pages/intercessao/MeuHub"));
+const GestaoIntercessao = lazy(
+  () => import("./pages/intercessao/GestaoIntercessao")
+);
 const Intercessores = lazy(() => import("./pages/intercessao/Intercessores"));
-const Testemunhos = lazy(() => import("./pages/intercessao/Testemunhos"));
 const Sentimentos = lazy(() => import("./pages/intercessao/Sentimentos"));
 
 // Ministério Kids
@@ -397,7 +399,7 @@ const App = () => (
                   }
                 />
 
-                {/* Intercessão */}
+                {/* Intercessão - Hub */}
                 <Route
                   path="/intercessao"
                   element={
@@ -407,10 +409,18 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/intercessao/pedidos"
+                  path="/intercessao/meu-hub"
                   element={
                     <AuthGate>
-                      <PedidosOracao />
+                      <MeuHub />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/intercessao/gestao"
+                  element={
+                    <AuthGate>
+                      <GestaoIntercessao />
                     </AuthGate>
                   }
                 />
@@ -419,14 +429,6 @@ const App = () => (
                   element={
                     <AuthGate>
                       <Intercessores />
-                    </AuthGate>
-                  }
-                />
-                <Route
-                  path="/intercessao/testemunhos"
-                  element={
-                    <AuthGate>
-                      <Testemunhos />
                     </AuthGate>
                   }
                 />
@@ -667,6 +669,14 @@ const App = () => (
                   element={
                     <AuthGate>
                       <Navigate to="/eventos/liturgia" replace />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/cultos/times"
+                  element={
+                    <AuthGate>
+                      <Navigate to="/eventos/times" replace />
                     </AuthGate>
                   }
                 />

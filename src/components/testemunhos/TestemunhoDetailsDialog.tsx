@@ -75,7 +75,7 @@ interface TestemunhoDetailsDialogProps {
     email_externo?: string | null;
     telefone_externo?: string | null;
     profiles?: { nome?: string; email?: string; telefone?: string } | null;
-  };
+  } | null;
   onSuccess: () => void;
 }
 

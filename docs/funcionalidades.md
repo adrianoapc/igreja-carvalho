@@ -188,7 +188,7 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
   - Seleção de status inicial (Pendente/Pago/Isento/Cancelado)
   - Validação de duplicatas (bloqueia se pessoa já inscrita)
   - Criação automática de transação financeira se `evento.requer_pagamento = true` (entrada na categoria/conta do evento)
-- **Integração com Financeiro**: 
+- **Integração com Financeiro**:
   - Confirmar pagamento → `status_pagamento: pago` + marca transação vinculada como concluída
   - Isentar → `status_pagamento: isento` + cancela transação se houver
   - Cancelar → `status_pagamento: cancelado` + cancela transação pendente
@@ -221,6 +221,7 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
 #### Sistema de Triagem Automática
 
 - **Biblioteca de Triagem**: `src/lib/voluntariado/triagem.ts` (+118 linhas)
+
   - Função `avaliarTriagemVoluntario(perfilStatus, ministerio)` retorna status `aprovado` ou `em_trilha`
   - 5 regras de ministério pré-definidas:
     - **Kids**: Requer ser membro → Trilha Kids
@@ -232,6 +233,7 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
   - Normalização de texto (remove acentos) para matching flexível de nomes de ministério
 
 - **Integração em GerenciarTimeDialog**:
+
   - Carrega perfil da pessoa (`profiles.tipo`) e ministério (`ministerios.nome` + `categoria`)
   - Chama `avaliarTriagemVoluntario()` ao adicionar membro
   - Exibe badge:
@@ -244,6 +246,7 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
   - Track de progresso: Contagem de etapas concluídas vs total
 
 - **Trilhas Mapeadas**: 6 trilhas identificadas:
+
   1. Trilha de Integração (para não-membros)
   2. Trilha Kids
   3. Trilha de Louvor

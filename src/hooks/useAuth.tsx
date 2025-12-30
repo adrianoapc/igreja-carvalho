@@ -13,11 +13,16 @@ interface Profile {
   data_cadastro_membro: string | null;
   observacoes: string | null;
   avatar_url: string | null;
+  e_lider?: boolean | null;
 }
 
 interface ModulePermission {
   module_name: string;
-  access_level: "visualizar" | "criar_editar" | "aprovar_gerenciar" | "acesso_completo";
+  access_level:
+    | "visualizar"
+    | "criar_editar"
+    | "aprovar_gerenciar"
+    | "acesso_completo";
 }
 
 export function useAuth() {
@@ -32,12 +37,14 @@ export function useAuth() {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get("type");
     const accessToken = hashParams.get("access_token");
-    
+
     // Domínio de produção customizado
     const productionDomain = "app.igrejacarvalho.com.br";
     const currentHost = window.location.host;
-    const isOnWrongDomain = currentHost.includes("lovable.app") || currentHost.includes("lovableproject.com");
-    
+    const isOnWrongDomain =
+      currentHost.includes("lovable.app") ||
+      currentHost.includes("lovableproject.com");
+
     if (type === "recovery" && accessToken) {
       // Se estamos no domínio errado (Lovable), redirecionar para o domínio de produção
       if (isOnWrongDomain) {
@@ -93,14 +100,21 @@ export function useAuth() {
   const loadUserData = async (userId: string) => {
     try {
       // Carregar perfil
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
 
       if (profileData) {
         setProfile(profileData);
 
         // Carregar permissões se for membro
         if (profileData.status === "membro") {
-          const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+          const { data: rolesData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", userId);
 
           if (rolesData && rolesData.length > 0) {
             const roles = rolesData.map((r) => r.role);
@@ -125,9 +139,9 @@ export function useAuth() {
 
   const signOut = async () => {
     // Security: Clear biometric refresh token on logout to prevent session reuse
-    sessionStorage.removeItem('biometric_refresh_token');
-    localStorage.removeItem('biometric_refresh_token');
-    
+    sessionStorage.removeItem("biometric_refresh_token");
+    localStorage.removeItem("biometric_refresh_token");
+
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
@@ -156,7 +170,9 @@ export function useAuth() {
 
     // Se não especificar nível, só verifica se tem algum acesso
     if (!requiredLevel) {
-      const hasAnyAccess = permissions.some((p) => p.module_name === moduleName);
+      const hasAnyAccess = permissions.some(
+        (p) => p.module_name === moduleName
+      );
       //console.log("hasAccess (any):", hasAnyAccess);
       return hasAnyAccess;
     }
@@ -168,7 +184,12 @@ export function useAuth() {
       return false;
     }
 
-    const levels = ["visualizar", "criar_editar", "aprovar_gerenciar", "acesso_completo"];
+    const levels = [
+      "visualizar",
+      "criar_editar",
+      "aprovar_gerenciar",
+      "acesso_completo",
+    ];
     const requiredIndex = levels.indexOf(requiredLevel);
     const userIndex = levels.indexOf(permission.access_level);
 
