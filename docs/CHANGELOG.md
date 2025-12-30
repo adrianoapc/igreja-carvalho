@@ -8,6 +8,47 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Alterado
+
+#### 🔄 Refatoração Estrutural: Cultos → Eventos (30 de Dez/2025)
+
+- **Renomeação de Módulo**: Todo o módulo "Cultos" foi renomeado para "Eventos" (commit f425926)
+- **Movimentação de Arquivos**: Pasta `src/components/cultos/` → `src/components/eventos/` (26 componentes)
+- **Atualização de Rotas**: `/cultos/*` → `/eventos/*` com redirects automáticos para compatibilidade
+- **Rotas Afetadas**: `/eventos`, `/eventos/lista`, `/eventos/:id`, `/eventos/geral`, `/eventos/times`, `/eventos/categorias`, `/eventos/posicoes`, `/eventos/templates`, `/eventos/liturgia`, `/eventos/midias`
+- **Componentes Renomeados**: `EventoDialog`, `EscalasTabContent`, `LiturgiaTabContent`, `TimeDialog`, `PosicaoDialog`, `MidiaDialog`, entre outros
+- **Navegação Atualizada**: Sidebar, breadcrumbs e links internos atualizados para nova nomenclatura
+
+**Impacto no usuário:** Mudança apenas visual/navegacional; funcionalidades permanecem idênticas; URLs antigas redirecionam automaticamente  
+**Módulos afetados:** Eventos (ex-Cultos), Liturgia, Times, Mídias  
+**Arquivos modificados:** 42 arquivos (componentes, páginas, rotas)
+
+#### 🙏 Reorganização Intercessão: 3 Contextos de Uso (30 de Dez/2025)
+
+- **Nova Arquitetura em Camadas**: Módulo intercessão reestruturado em 3 contextos distintos (commit 1c7cc61)
+- **Contexto Pessoal (`/intercessao/diario`)**: `DiarioDeOracao.tsx` - área privada do membro para seus próprios pedidos e testemunhos; substituiu `MeuHub.tsx`
+- **Contexto Ministério (`/intercessao/sala-de-guerra`)**: `SalaDeGuerra.tsx` - área de trabalho dos intercessores para orar pela comunidade; substituiu `GestaoIntercessao.tsx`
+- **Contexto Admin (`/intercessao/equipes` e `/sentimentos`)**: `GestaoEquipes.tsx` - gestão de equipe de intercessores; `Sentimentos.tsx` - dashboard de bem-estar emocional da igreja
+- **Sidebar Reorganizado**: Menu agora exibe 3 blocos visuais (📋 Visão Geral, ⚡ Ministérios, 🏛️ Gestão & Cuidado)
+- **Arquivos Removidos**: 7 componentes obsoletos eliminados (PedidosOracao, Testemunhos, SolicitacaoPedido, Intercessores, MeuHub, GestaoIntercessao, arquivos duplicados)
+
+**Impacto no usuário:** Clareza de navegação; separação entre "meu uso" vs "trabalho ministerial" vs "liderança"; redução de confusão sobre onde acessar cada funcionalidade  
+**Módulos afetados:** Intercessão (completo)  
+**Arquivos criados:** 4 novos (DiarioDeOracao, SalaDeGuerra, GestaoEquipes + estrutura de pastas)  
+**Arquivos removidos:** 7 componentes obsoletos
+
+### Corrigido
+
+#### 🐛 Fix: Dashboard Pessoas - "Aceitaram Jesus" (30 de Dez/2025)
+
+- **Query Corrigida**: Componente "Aceitaram Jesus" em `/pessoas` agora usa campo `data_conversao` ao invés de `data_primeira_visita`
+- **Filtro Aprimorado**: Adicionado `.not("data_conversao", "is", null)` para garantir que apenas conversões registradas apareçam
+- **Ordenação Ajustada**: Listagem ordenada por `data_conversao` (descendente) mostrando conversões mais recentes primeiro
+
+**Impacto no usuário:** Dashboard de pessoas agora exibe corretamente apenas pessoas com data de conversão registrada, eliminando falsos positivos  
+**Módulos afetados:** Pessoas (dashboard)  
+**Arquivos modificados:** `src/pages/pessoas/index.tsx`
+
 ### Adicionado
 
 #### 🎓 Trilhas de Voluntariado — 6 Jornadas + Gestão de Candidatos (30 de Dez/2025)
