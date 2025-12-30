@@ -1,7 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Users, Heart, ArrowRight, Plus, Clock, MessageSquareHeart } from "lucide-react";
+import {
+  MessageCircle,
+  Users,
+  Heart,
+  ArrowRight,
+  Plus,
+  Clock,
+  MessageSquareHeart,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,10 +45,13 @@ export default function Intercessao() {
           .select("publicar");
 
         setStats({
-          pedidosPendentes: pedidos?.filter(p => p.status === "pendente").length || 0,
-          pedidosEmOracao: pedidos?.filter(p => p.status === "em_oracao").length || 0,
+          pedidosPendentes:
+            pedidos?.filter((p) => p.status === "pendente").length || 0,
+          pedidosEmOracao:
+            pedidos?.filter((p) => p.status === "em_oracao").length || 0,
           intercessoresAtivos: intercessores?.length || 0,
-          testemunhosPendentes: testemunhos?.filter(t => !t.publicar).length || 0,
+          testemunhosPendentes:
+            testemunhos?.filter((t) => !t.publicar).length || 0,
         });
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
@@ -57,8 +68,16 @@ export default function Intercessao() {
       icon: Heart,
       path: "/intercessao/diario",
       stats: [
-        { label: "Pendentes", value: stats.pedidosPendentes, color: "text-accent-foreground" },
-        { label: "Em Oração", value: stats.pedidosEmOracao, color: "text-primary" },
+        {
+          label: "Pendentes",
+          value: stats.pedidosPendentes,
+          color: "text-accent-foreground",
+        },
+        {
+          label: "Em Oração",
+          value: stats.pedidosEmOracao,
+          color: "text-primary",
+        },
       ],
       color: "bg-primary/10",
       iconColor: "text-primary",
@@ -69,7 +88,11 @@ export default function Intercessao() {
       icon: MessageSquareHeart,
       path: "/intercessao/sala-de-guerra",
       stats: [
-        { label: "Ativos", value: stats.intercessoresAtivos, color: "text-green-600" },
+        {
+          label: "Ativos",
+          value: stats.intercessoresAtivos,
+          color: "text-green-600",
+        },
       ],
       color: "bg-green-100 dark:bg-green-900/20",
       iconColor: "text-green-600",
@@ -80,7 +103,11 @@ export default function Intercessao() {
       icon: Users,
       path: "/intercessao/equipes",
       stats: [
-        { label: "Testemunhos", value: stats.testemunhosPendentes, color: "text-accent-foreground" },
+        {
+          label: "Testemunhos",
+          value: stats.testemunhosPendentes,
+          color: "text-accent-foreground",
+        },
       ],
       color: "bg-accent/10",
       iconColor: "text-accent-foreground",
@@ -124,7 +151,7 @@ export default function Intercessao() {
 
           for (const pedido of pedidosPendentes) {
             await supabase.rpc("alocar_pedido_balanceado", {
-              p_pedido_id: pedido.id
+              p_pedido_id: pedido.id,
             });
           }
 
@@ -149,7 +176,9 @@ export default function Intercessao() {
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Intercessão</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+          Intercessão
+        </h1>
         <p className="text-sm md:text-base text-muted-foreground mt-1">
           Gestão completa de intercessão, pedidos e testemunhos
         </p>
@@ -167,20 +196,29 @@ export default function Intercessao() {
             >
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className={`p-3 rounded-lg ${module.color} flex-shrink-0`}>
+                  <div
+                    className={`p-3 rounded-lg ${module.color} flex-shrink-0`}
+                  >
                     <Icon className={`w-6 h-6 ${module.iconColor}`} />
                   </div>
                   <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 </div>
-                <h3 className="font-semibold text-base md:text-lg mb-1">{module.title}</h3>
+                <h3 className="font-semibold text-base md:text-lg mb-1">
+                  {module.title}
+                </h3>
                 <p className="text-xs md:text-sm text-muted-foreground mb-3">
                   {module.description}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {module.stats.map((stat) => (
                     <div key={stat.label} className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{stat.label}:</span>
-                      <Badge variant="outline" className={`text-xs ${stat.color}`}>
+                      <span className="text-xs text-muted-foreground">
+                        {stat.label}:
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${stat.color}`}
+                      >
                         {stat.value}
                       </Badge>
                     </div>
@@ -227,7 +265,9 @@ export default function Intercessao() {
       {/* Atividade Recente */}
       <Card>
         <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-base md:text-lg">Atividade Recente</CardTitle>
+          <CardTitle className="text-base md:text-lg">
+            Atividade Recente
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-3 md:p-6 pt-0">
           <div className="text-center py-6 text-muted-foreground">

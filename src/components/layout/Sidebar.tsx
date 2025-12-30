@@ -109,7 +109,7 @@ const MENU_GROUPS: MenuGroup[] = [
     label: "🏛️ GESTÃO & CUIDADO",
     items: [
       {
-        title: "Pessoas (CRM)",
+        title: "Pessoas",
         url: "/pessoas",
         icon: Users,
         permission: "pessoas.view",

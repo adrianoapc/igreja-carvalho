@@ -3,7 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, UserPlus, UserCheck, PhoneCall, ArrowRight, FileEdit, Heart, Search } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  UserCheck,
+  PhoneCall,
+  ArrowRight,
+  FileEdit,
+  Heart,
+  Search,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -44,35 +53,43 @@ export default function Pessoas() {
       value: "0",
       icon: Users,
       description: "Membros ativos",
-      color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
+      color:
+        "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
       action: () => navigate("/pessoas/membros"),
     },
   ]);
 
   const [contatosCount, setContatosCount] = useState(0);
   const [pendentesCount, setPendentesCount] = useState(0);
-  const [aceitaramJesus, setAceitaramJesus] = useState<Array<{
-    id: string;
-    nome: string;
-    avatar_url: string | null;
-    telefone: string | null;
-    email: string | null;
-    sexo: string | null;
-    data_primeira_visita: string | null;
-    status: string;
-  }>>([]);
+  const [aceitaramJesus, setAceitaramJesus] = useState<
+    Array<{
+      id: string;
+      nome: string;
+      avatar_url: string | null;
+      telefone: string | null;
+      email: string | null;
+      sexo: string | null;
+      data_primeira_visita: string | null;
+      status: string;
+    }>
+  >([]);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data: profiles, error } = await supabase.from("profiles").select("status");
+        const { data: profiles, error } = await supabase
+          .from("profiles")
+          .select("status");
 
         if (error) throw error;
 
         const total = profiles?.length || 0;
-        const visitantes = profiles?.filter((p) => p.status === "visitante").length || 0;
-        const frequentadores = profiles?.filter((p) => p.status === "frequentador").length || 0;
-        const membros = profiles?.filter((p) => p.status === "membro").length || 0;
+        const visitantes =
+          profiles?.filter((p) => p.status === "visitante").length || 0;
+        const frequentadores =
+          profiles?.filter((p) => p.status === "frequentador").length || 0;
+        const membros =
+          profiles?.filter((p) => p.status === "membro").length || 0;
 
         setStats((prev) => [
           { ...prev[0], value: total.toString() },
@@ -104,7 +121,9 @@ export default function Pessoas() {
         // Buscar pessoas que aceitaram Jesus recentemente
         const { data: aceitaram } = await supabase
           .from("profiles")
-          .select("id, nome, avatar_url, telefone, email, sexo, data_conversao, status")
+          .select(
+            "id, nome, avatar_url, telefone, email, sexo, data_conversao, status"
+          )
           .eq("aceitou_jesus", true)
           .not("data_conversao", "is", null)
           .order("data_conversao", { ascending: false })
@@ -157,8 +176,12 @@ export default function Pessoas() {
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Pessoas</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">Dashboard centralizado de gestão de pessoas</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+          Pessoas
+        </h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
+          Dashboard centralizado de gestão de pessoas
+        </p>
       </div>
 
       {/* Search Bar */}
@@ -173,7 +196,9 @@ export default function Pessoas() {
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && searchTerm.trim()) {
-                  navigate(`/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`);
+                  navigate(
+                    `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`
+                  );
                 }
               }}
             />
@@ -184,7 +209,9 @@ export default function Pessoas() {
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 h-auto p-1"
                 onClick={() => {
                   if (searchTerm.trim()) {
-                    navigate(`/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`);
+                    navigate(
+                      `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`
+                    );
                   }
                 }}
               >
@@ -201,17 +228,27 @@ export default function Pessoas() {
           return (
             <Card
               key={stat.title}
-              className={`cursor-pointer transition-all hover:shadow-md ${stat.action ? "hover:scale-105" : ""}`}
+              className={`cursor-pointer transition-all hover:shadow-md ${
+                stat.action ? "hover:scale-105" : ""
+              }`}
               onClick={stat.action}
             >
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs md:text-sm text-muted-foreground truncate">{stat.title}</p>
-                    <h3 className="text-xl md:text-2xl font-bold mt-1">{stat.value}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 truncate">{stat.description}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">
+                      {stat.title}
+                    </p>
+                    <h3 className="text-xl md:text-2xl font-bold mt-1">
+                      {stat.value}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                      {stat.description}
+                    </p>
                   </div>
-                  <div className={`p-2 md:p-3 rounded-full ${stat.color} flex-shrink-0`}>
+                  <div
+                    className={`p-2 md:p-3 rounded-full ${stat.color} flex-shrink-0`}
+                  >
                     <Icon className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                 </div>
@@ -241,12 +278,16 @@ export default function Pessoas() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                      <h3 className="font-semibold text-sm md:text-base truncate">{action.title}</h3>
+                      <h3 className="font-semibold text-sm md:text-base truncate">
+                        {action.title}
+                      </h3>
                       <Badge variant="secondary" className="text-xs w-fit">
                         {action.count} {action.label}
                       </Badge>
                     </div>
-                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">{action.description}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">
+                      {action.description}
+                    </p>
                   </div>
                   <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground flex-shrink-0" />
                 </div>
@@ -262,9 +303,15 @@ export default function Pessoas() {
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <FileEdit className="h-5 w-5 text-primary" />
             Alterações Pendentes
-            {pendentesCount > 0 && <Badge variant="destructive">{pendentesCount}</Badge>}
+            {pendentesCount > 0 && (
+              <Badge variant="destructive">{pendentesCount}</Badge>
+            )}
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={() => navigate('/pessoas/alteracoes-pendentes')}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/pessoas/alteracoes-pendentes")}
+          >
             Ver histórico
             <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
@@ -275,7 +322,9 @@ export default function Pessoas() {
           ) : (
             <div className="text-center py-4 text-muted-foreground">
               <p className="text-sm">Nenhuma alteração pendente de aprovação</p>
-              <p className="text-xs mt-1">Alterações externas de perfis aparecerão aqui</p>
+              <p className="text-xs mt-1">
+                Alterações externas de perfis aparecerão aqui
+              </p>
             </div>
           )}
         </CardContent>
@@ -293,7 +342,11 @@ export default function Pessoas() {
               Aceitaram Jesus
               <Badge variant="secondary">{aceitaramJesus.length}</Badge>
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => navigate('/pessoas/todos?aceitou_jesus=true')}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/pessoas/todos?aceitou_jesus=true")}
+            >
               Ver todos
               <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
@@ -313,22 +366,31 @@ export default function Pessoas() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{pessoa.nome}</p>
+                    <p className="font-medium text-sm truncate">
+                      {pessoa.nome}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {pessoa.telefone || pessoa.email || "Sem contato"}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       {pessoa.sexo && (
-                        <span className="text-xs text-muted-foreground capitalize">{pessoa.sexo}</span>
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {pessoa.sexo}
+                        </span>
                       )}
                       {pessoa.data_primeira_visita && (
                         <span className="text-xs text-muted-foreground">
-                          {new Date(pessoa.data_primeira_visita).toLocaleDateString("pt-BR")}
+                          {new Date(
+                            pessoa.data_primeira_visita
+                          ).toLocaleDateString("pt-BR")}
                         </span>
                       )}
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-xs capitalize shrink-0">
+                  <Badge
+                    variant="outline"
+                    className="text-xs capitalize shrink-0"
+                  >
                     {pessoa.status}
                   </Badge>
                 </div>
@@ -344,12 +406,16 @@ export default function Pessoas() {
       {/* Recent Activity */}
       <Card>
         <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">Atividade Recente</CardTitle>
+          <CardTitle className="text-lg md:text-xl">
+            Atividade Recente
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-3 md:p-6">
           <div className="text-center py-6 md:py-8 text-muted-foreground">
             <p className="text-sm md:text-base">Nenhuma atividade recente</p>
-            <p className="text-xs md:text-sm mt-1">As últimas interações com pessoas aparecerão aqui</p>
+            <p className="text-xs md:text-sm mt-1">
+              As últimas interações com pessoas aparecerão aqui
+            </p>
           </div>
         </CardContent>
       </Card>
