@@ -1205,7 +1205,7 @@ export type Database = {
           pessoa_id: string
           posicao_id: string | null
           status_confirmacao: string | null
-          time_id: string
+          time_id: string | null
           ultimo_aviso_em: string | null
           updated_at: string
         }
@@ -1223,7 +1223,7 @@ export type Database = {
           pessoa_id: string
           posicao_id?: string | null
           status_confirmacao?: string | null
-          time_id: string
+          time_id?: string | null
           ultimo_aviso_em?: string | null
           updated_at?: string
         }
@@ -1241,7 +1241,7 @@ export type Database = {
           pessoa_id?: string
           posicao_id?: string | null
           status_confirmacao?: string | null
-          time_id?: string
+          time_id?: string | null
           ultimo_aviso_em?: string | null
           updated_at?: string
         }
