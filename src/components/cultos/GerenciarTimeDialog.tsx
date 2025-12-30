@@ -314,7 +314,7 @@ export default function GerenciarTimeDialog({ open, onOpenChange, time }: Gerenc
 
       const { data, error } = await supabase
         .from("inscricoes_jornada")
-        .select("id, pessoa_id, concluido, profiles:pessoa_id(nome, email)")
+        .select("id, pessoa_id, concluido, profiles!inscricoes_jornada_pessoa_id_fkey(nome, email)")
         .eq("jornada_id", jornadaId);
 
       if (error) throw error;

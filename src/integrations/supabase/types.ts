@@ -722,6 +722,110 @@ export type Database = {
           },
         ]
       }
+      candidatos_voluntario: {
+        Row: {
+          avaliado_por: string | null
+          created_at: string | null
+          data_avaliacao: string | null
+          disponibilidade: string
+          email_contato: string | null
+          experiencia: string
+          id: string
+          ministerio: string
+          nome_contato: string
+          observacoes: string | null
+          pessoa_id: string | null
+          status: string
+          telefone_contato: string | null
+          trilha_requerida_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avaliado_por?: string | null
+          created_at?: string | null
+          data_avaliacao?: string | null
+          disponibilidade: string
+          email_contato?: string | null
+          experiencia: string
+          id?: string
+          ministerio: string
+          nome_contato: string
+          observacoes?: string | null
+          pessoa_id?: string | null
+          status?: string
+          telefone_contato?: string | null
+          trilha_requerida_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avaliado_por?: string | null
+          created_at?: string | null
+          data_avaliacao?: string | null
+          disponibilidade?: string
+          email_contato?: string | null
+          experiencia?: string
+          id?: string
+          ministerio?: string
+          nome_contato?: string
+          observacoes?: string | null
+          pessoa_id?: string | null
+          status?: string
+          telefone_contato?: string | null
+          trilha_requerida_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidatos_voluntario_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_trilha_requerida_id_fkey"
+            columns: ["trilha_requerida_id"]
+            isOneToOne: false
+            referencedRelation: "jornadas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias_financeiras: {
         Row: {
           ativo: boolean
