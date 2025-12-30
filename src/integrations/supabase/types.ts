@@ -2912,6 +2912,7 @@ export type Database = {
           analise_ia_resposta: string | null
           analise_ia_titulo: string | null
           anonimo: boolean | null
+          classificacao: string | null
           created_at: string | null
           data_alocacao: string | null
           data_criacao: string | null
@@ -2938,6 +2939,7 @@ export type Database = {
           analise_ia_resposta?: string | null
           analise_ia_titulo?: string | null
           anonimo?: boolean | null
+          classificacao?: string | null
           created_at?: string | null
           data_alocacao?: string | null
           data_criacao?: string | null
@@ -2964,6 +2966,7 @@ export type Database = {
           analise_ia_resposta?: string | null
           analise_ia_titulo?: string | null
           anonimo?: boolean | null
+          classificacao?: string | null
           created_at?: string | null
           data_alocacao?: string | null
           data_criacao?: string | null
