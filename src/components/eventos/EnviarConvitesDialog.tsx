@@ -65,22 +65,16 @@ export default function EnviarConvitesDialog({
 
   const loadDados = async () => {
     try {
-      const [timesRes, perfisRes, pessoasRes] = await Promise.all([
+      const [timesRes, pessoasRes] = await Promise.all([
         supabase
           .from("times")
           .select("id, nome, categoria")
-          .eq("ativo", true)
-          .order("categoria, nome"),
-        supabase
-          .from("perfis")
-          .select("id, nome")
           .eq("ativo", true)
           .order("nome"),
         supabase.from("profiles").select("id, nome").order("nome").limit(100),
       ]);
 
       setTimes(timesRes.data || []);
-      setPerfis(perfisRes.data || []);
       setPessoas(pessoasRes.data || []);
     } catch (error: unknown) {
       const message =
@@ -103,14 +97,7 @@ export default function EnviarConvitesDialog({
           .eq("time_id", timeSelecionado)
           .eq("ativo", true);
 
-        pessoaIds = membros?.map((m) => m.pessoa_id) || [];
-      } else if (metodoSelecionado === "perfil" && perfilSelecionado) {
-        const { data: usuarios } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("perfil_id", perfilSelecionado);
-
-        pessoaIds = usuarios?.map((u) => u.id) || [];
+        pessoaIds = (membros || []).map((m) => m.pessoa_id);
       } else if (metodoSelecionado === "individual" && pessoaSelecionada) {
         pessoaIds = [pessoaSelecionada];
       }
@@ -124,8 +111,8 @@ export default function EnviarConvitesDialog({
       const convitesData = pessoaIds.map((pessoaId) => ({
         evento_id: eventoId,
         pessoa_id: pessoaId,
-        status: "pendente",
-        data_envio: new Date().toISOString(),
+        status: "pendente" as const,
+        enviado_em: new Date().toISOString(),
       }));
 
       const { error: insertError } = await supabase

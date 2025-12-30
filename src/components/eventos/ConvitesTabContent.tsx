@@ -28,10 +28,10 @@ interface Convite {
   id: string;
   pessoa_id: string;
   status: "pendente" | "confirmado" | "recusado";
-  data_envio: string;
+  enviado_em: string | null;
   profiles: {
     nome: string;
-  };
+  } | null;
 }
 
 interface ConvitesTabContentProps {
@@ -59,17 +59,17 @@ export default function ConvitesTabContent({
           id,
           pessoa_id,
           status,
-          data_envio,
+          enviado_em,
           profiles:pessoa_id (
             nome
           )
         `
         )
         .eq("evento_id", eventoId)
-        .order("data_envio", { ascending: false });
+        .order("enviado_em", { ascending: false });
 
       if (error) throw error;
-      setConvites(data || []);
+      setConvites((data || []) as Convite[]);
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Erro ao carregar convites";
@@ -251,15 +251,13 @@ export default function ConvitesTabContent({
                 {convites.map((convite) => (
                   <TableRow key={convite.id}>
                     <TableCell className="font-medium">
-                      {convite.profiles.nome}
+                      {convite.profiles?.nome || "—"}
                     </TableCell>
                     <TableCell>{getStatusBadge(convite.status)}</TableCell>
                     <TableCell>
-                      {format(
-                        new Date(convite.data_envio),
-                        "dd/MM/yyyy HH:mm",
-                        { locale: ptBR }
-                      )}
+                      {convite.enviado_em
+                        ? format(new Date(convite.enviado_em), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                        : "—"}
                     </TableCell>
                     <TableCell>
                       {convite.status === "pendente" && (
