@@ -24,6 +24,7 @@ import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentime
 import AtencaoPastoralWidget from "@/components/dashboard/AtencaoPastoralWidget";
 import VisaoProjetosWidget from "@/components/dashboard/VisaoProjetosWidget";
 import { GabinetePastoralWidget } from "@/components/dashboard/GabinetePastoralWidget";
+import ConvitesPendentesWidget from "@/components/dashboard/ConvitesPendentesWidget";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -767,6 +768,9 @@ export default function DashboardAdmin() {
 
           {/* Gabinete Pastoral Widget */}
           <GabinetePastoralWidget />
+
+          {/* Convites Pendentes Widget */}
+          <ConvitesPendentesWidget />
 
           {/* Sheep Monitoring Widget */}
           <AtencaoPastoralWidget />

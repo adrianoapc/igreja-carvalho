@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import { WelcomeHeader } from "./WelcomeHeader";
 import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
+import ConvitesPendentesWidget from "@/components/dashboard/ConvitesPendentesWidget";
 
 interface Aniversariante {
   id: string;
@@ -155,6 +156,9 @@ export default function DashboardLeader() {
 
       {/* Widget de Monitoramento de Escalas */}
       <EscalasPendentesWidget />
+
+      {/* Convites Pendentes Widget */}
+      <ConvitesPendentesWidget />
 
       <RegistrarSentimentoDialog 
         open={sentimentoDialogOpen} 

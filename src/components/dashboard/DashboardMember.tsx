@@ -29,6 +29,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import MinhasTarefasWidget from "@/components/dashboard/MinhasTarefasWidget";
 import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentimentoDialog";
 import { WelcomeHeader } from "./WelcomeHeader";
+import ConvitesPendentesWidget from "@/components/dashboard/ConvitesPendentesWidget";
 
 interface Banner {
   id: string;
@@ -270,6 +271,9 @@ export default function DashboardMember() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Convites Pendentes Widget */}
+      <ConvitesPendentesWidget />
 
       {/* Minhas Tarefas Widget */}
       <MinhasTarefasWidget />

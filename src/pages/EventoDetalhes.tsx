@@ -40,6 +40,8 @@ import {
 import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
 import MusicaTabContent from "@/components/cultos/MusicaTabContent";
 import EscalasTabContent from "@/components/cultos/EscalasTabContent";
+import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
+import EscalaTimeline from "@/components/escalas/EscalaTimeline";
 
 interface Evento {
   id: string;
@@ -314,7 +316,7 @@ export default function EventoDetalhes() {
 
       {/* Tabs */}
       <Tabs defaultValue="visao-geral" className="w-full">
-        <TabsList className={`grid w-full max-w-2xl ${mostrarLiturgia ? "grid-cols-5" : "grid-cols-3"}`}>
+        <TabsList className={`grid w-full max-w-2xl ${mostrarLiturgia ? "grid-cols-6" : "grid-cols-4"}`}>
           <TabsTrigger value="visao-geral" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
             <span className="hidden sm:inline">Visão Geral</span>
@@ -338,6 +340,10 @@ export default function EventoDetalhes() {
           <TabsTrigger value="checkin" className="flex items-center gap-2">
             <QrCode className="h-4 w-4" />
             <span className="hidden sm:inline">Check-in</span>
+          </TabsTrigger>
+          <TabsTrigger value="convites" className="flex items-center gap-2">
+            <Send className="h-4 w-4" />
+            <span className="hidden sm:inline">Convites</span>
           </TabsTrigger>
         </TabsList>
 
@@ -475,7 +481,11 @@ export default function EventoDetalhes() {
 
         {/* Tab: Escalas (sempre) */}
         <TabsContent value="escalas" className="mt-6">
-          <EscalasTabContent eventoId={id!} />
+          {evento?.tipo === "RELOGIO" ? (
+            <EscalaTimeline evento={evento} />
+          ) : (
+            <EscalasTabContent eventoId={id!} />
+          )}
         </TabsContent>
 
         {/* Tab: Check-in (sempre) */}
@@ -488,6 +498,11 @@ export default function EventoDetalhes() {
               <p className="text-sm text-muted-foreground">Funcionalidade de check-in em desenvolvimento.</p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab: Convites */}
+        <TabsContent value="convites" className="mt-6">
+          <ConvitesTabContent eventoId={evento.id} />
         </TabsContent>
       </Tabs>
     </div>
