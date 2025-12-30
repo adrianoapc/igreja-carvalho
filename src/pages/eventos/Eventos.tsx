@@ -64,8 +64,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import EventoDialog from "@/components/cultos/EventoDialog";
-import CalendarioMensal from "@/components/cultos/CalendarioMensal";
+import EventoDialog from "@/components/eventos/EventoDialog";
+import CalendarioMensal from "@/components/eventos/CalendarioMensal";
 
 interface Evento {
   id: string;

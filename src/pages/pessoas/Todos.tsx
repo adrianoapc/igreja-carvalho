@@ -288,7 +288,7 @@ export default function TodosPessoas() {
                       <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => navigate(`/pessoas/${pessoa.id}`)}>
                         Detalhes
                       </Button>
-                      <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(`/cultos/nova-agenda?membroId=${pessoa.id}`)}>
+                      <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => navigate(`/eventos/nova-agenda?membroId=${pessoa.id}`)}>
                         Agendar
                       </Button>
                     </TableCell>
@@ -375,7 +375,7 @@ export default function TodosPessoas() {
                   <Button className="flex-1 min-h-[44px]" onClick={() => navigate(`/pessoas/${pessoa.id}`)}>
                     Detalhes
                   </Button>
-                  <Button variant="outline" className="flex-1 min-h-[44px]" onClick={() => navigate(`/cultos/nova-agenda?membroId=${pessoa.id}`)}>
+                  <Button variant="outline" className="flex-1 min-h-[44px]" onClick={() => navigate(`/eventos/nova-agenda?membroId=${pessoa.id}`)}>
                     Agendar
                   </Button>
                 </div>

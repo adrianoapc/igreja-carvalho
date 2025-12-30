@@ -44,9 +44,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import LiturgiaTab from "@/components/eventos/tabs/LiturgiaTab";
-import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
-import MusicaTabContent from "@/components/cultos/MusicaTabContent";
-import EscalasTabContent from "@/components/cultos/EscalasTabContent";
+import LiturgiaTabContent from "@/components/eventos/LiturgiaTabContent";
+import MusicaTabContent from "@/components/eventos/MusicaTabContent";
+import EscalasTabContent from "@/components/eventos/EscalasTabContent";
 import InscricoesTabContent from "@/components/eventos/InscricoesTabContent";
 import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
 import EscalaTimeline from "@/components/escalas/EscalaTimeline";

@@ -1,4 +1,4 @@
-import LiturgiaTabContent from "@/components/cultos/LiturgiaTabContent";
+import LiturgiaTabContent from "@/components/eventos/LiturgiaTabContent";
 
 interface LiturgiaTabProps {
   eventoId: string;

@@ -33,8 +33,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import TimeDialog from "@/components/cultos/TimeDialog";
-import GerenciarTimeDialog from "@/components/cultos/GerenciarTimeDialog";
+import TimeDialog from "@/components/eventos/TimeDialog";
+import GerenciarTimeDialog from "@/components/eventos/GerenciarTimeDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 

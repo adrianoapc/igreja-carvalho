@@ -117,7 +117,7 @@ export function VidaIgrejaFrequencia({ pessoaId }: Props) {
           <CardContent className="p-2 sm:p-4">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-xs text-muted-foreground">Total de Cultos</p>
+                <p className="text-xs text-muted-foreground">Total de Eventos</p>
                 <p className="text-xl sm:text-2xl font-bold">{totalCultos}</p>
               </div>
               <CalendarDays className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground/50 flex-shrink-0" />

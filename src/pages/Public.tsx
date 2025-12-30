@@ -165,11 +165,11 @@ export default function Public() {
         </div>
       </section>
 
-      {/* Próximos Cultos */}
+      {/* Próximos Eventos */}
       <section className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Próximos Cultos</h2>
+            <h2 className="text-2xl font-bold text-foreground">Próximos Eventos</h2>
             <p className="text-muted-foreground text-sm">Venha celebrar conosco</p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/agenda")} className="text-primary">

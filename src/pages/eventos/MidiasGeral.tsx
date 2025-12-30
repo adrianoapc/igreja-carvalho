@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MidiaDialog } from "@/components/cultos/MidiaDialog";
+import { MidiaDialog } from "@/components/eventos/MidiaDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DndContext,
@@ -446,7 +446,7 @@ export default function MidiasGeral() {
     const labels: Record<string, string> = {
       app: "App",
       redes_sociais: "Redes Sociais",
-      telao: "Telão do Culto",
+      telao: "Telão do Evento",
       site: "Site"
     };
     return labels[canal] || canal;

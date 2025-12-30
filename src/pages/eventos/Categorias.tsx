@@ -5,7 +5,7 @@ import { Plus, Edit, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import CategoriaDialog from "@/components/cultos/CategoriaDialog";
+import CategoriaDialog from "@/components/eventos/CategoriaDialog";
 
 interface Categoria {
   id: string;

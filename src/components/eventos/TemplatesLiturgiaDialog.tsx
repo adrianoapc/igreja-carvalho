@@ -165,7 +165,7 @@ export function TemplatesLiturgiaDialog({
       <div className="flex flex-col h-full">
         <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
           <h2 className="text-lg font-semibold leading-none tracking-tight">
-            {template ? "Editar Template" : "Novo Template de Culto"}
+            {template ? "Editar Template" : "Novo Template de Evento"}
           </h2>
         </div>
 
@@ -177,7 +177,7 @@ export function TemplatesLiturgiaDialog({
               id="nome"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Culto Dominical Padrão"
+              placeholder="Ex: Evento Dominical Padrão"
               required
             />
           </div>
@@ -211,7 +211,7 @@ export function TemplatesLiturgiaDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="tipoCulto">Tipo de Culto</Label>
+              <Label htmlFor="tipoCulto">Tipo de Evento</Label>
               <Select value={tipoCulto} onValueChange={setTipoCulto}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />

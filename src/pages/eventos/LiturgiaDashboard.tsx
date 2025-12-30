@@ -166,7 +166,7 @@ export default function LiturgiaDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => navigate("/cultos/templates")} variant="outline">
+          <Button onClick={() => navigate("/eventos/templates")} variant="outline">
             <FileText className="mr-2 h-4 w-4" />
             Gerenciar Templates
           </Button>
@@ -177,7 +177,7 @@ export default function LiturgiaDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Cultos</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Eventos</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

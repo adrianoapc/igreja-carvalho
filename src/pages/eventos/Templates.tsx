@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, FileText, ArrowLeft, Copy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { TemplatesLiturgiaDialog } from "@/components/cultos/TemplatesLiturgiaDialog";
+import { TemplatesLiturgiaDialog } from "@/components/eventos/TemplatesLiturgiaDialog";
 import {
   AlertDialog,
   AlertDialogAction,
