@@ -1,8 +1,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Settings, Edit, ChevronDown, ChevronUp, Search, X, Trash2, Crown } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Plus,
+  Users,
+  Settings,
+  Edit,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  X,
+  Trash2,
+  Crown,
+} from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -14,12 +29,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TimeDialog from "@/components/cultos/TimeDialog";
 import GerenciarTimeDialog from "@/components/cultos/GerenciarTimeDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Membro {
   id: string;
@@ -56,6 +73,10 @@ interface Categoria {
 }
 
 export default function Times() {
+  const [searchParams] = useSearchParams();
+  const focusTeam = searchParams.get("focus");
+  const isIntercessaoFocus = focusTeam === "intercessao";
+
   const [times, setTimes] = useState<Time[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +86,9 @@ export default function Times() {
   const [gerenciarDialogOpen, setGerenciarDialogOpen] = useState(false);
   const [timeGerenciando, setTimeGerenciando] = useState<Time | null>(null);
   const [expandedTimes, setExpandedTimes] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() =>
+    isIntercessaoFocus ? "intercess" : ""
+  );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timeDeletando, setTimeDeletando] = useState<Time | null>(null);
 
@@ -93,7 +116,8 @@ export default function Times() {
     try {
       const { data, error } = await supabase
         .from("times")
-        .select(`
+        .select(
+          `
           *,
           lider:profiles!times_lider_id_fkey(id, nome, avatar_url),
           sublider:profiles!times_sublider_id_fkey(id, nome, avatar_url),
@@ -104,49 +128,79 @@ export default function Times() {
             profiles:pessoa_id(id, nome),
             posicoes_time:posicao_id(nome)
           )
-        `)
+        `
+        )
         .order("categoria", { ascending: true })
         .order("nome", { ascending: true });
 
       if (error) throw error;
 
-      const timesWithCount = data?.map(time => {
-        const membros = time.membros_time
-          ?.filter((m: { profiles?: unknown; ativo?: boolean }) => m.profiles && m.ativo)
-          ?.map((m: { profiles: { id: string; nome: string; avatar_url?: string | null }; posicoes_time?: { nome: string } | null }) => ({
-            id: m.profiles.id,
-            nome: m.profiles.nome,
-            posicao: m.posicoes_time?.nome || null
-          })) || [];
+      const timesWithCount =
+        data?.map((time) => {
+          const membros =
+            time.membros_time
+              ?.filter(
+                (m: { profiles?: unknown; ativo?: boolean }) =>
+                  m.profiles && m.ativo
+              )
+              ?.map(
+                (m: {
+                  profiles: {
+                    id: string;
+                    nome: string;
+                    avatar_url?: string | null;
+                  };
+                  posicoes_time?: { nome: string } | null;
+                }) => ({
+                  id: m.profiles.id,
+                  nome: m.profiles.nome,
+                  posicao: m.posicoes_time?.nome || null,
+                })
+              ) || [];
 
-        return {
-          ...time,
-          lider: time.lider || null,
-          sublider: time.sublider || null,
-          membros_count: membros.length,
-          membros: membros
-        };
-      }) || [];
+          return {
+            ...time,
+            lider: time.lider || null,
+            sublider: time.sublider || null,
+            membros_count: membros.length,
+            membros: membros,
+          };
+        }) || [];
 
       setTimes(timesWithCount as Time[]);
     } catch (error: unknown) {
       toast.error("Erro ao carregar times", {
-        description: error instanceof Error ? error.message : String(error)
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setLoading(false);
     }
   };
 
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const normalizedSearch = useMemo(() => normalize(searchTerm), [searchTerm]);
+
   const timesFiltrados = times
-    .filter(t => categoriaFiltro === "todos" || t.categoria === categoriaFiltro)
-    .filter(t => {
-      if (!searchTerm) return true;
-      const search = searchTerm.toLowerCase();
-      // Busca pelo nome do time
-      if (t.nome.toLowerCase().includes(search)) return true;
-      // Busca pelos nomes dos membros
-      return t.membros.some(m => m.nome.toLowerCase().includes(search));
+    .filter(
+      (t) => categoriaFiltro === "todos" || t.categoria === categoriaFiltro
+    )
+    .filter((t) => {
+      if (isIntercessaoFocus) {
+        return normalize(t.nome).includes("intercessao");
+      }
+
+      if (!normalizedSearch) return true;
+
+      if (normalize(t.nome).includes(normalizedSearch)) return true;
+
+      return t.membros.some((m) =>
+        normalize(m.nome).includes(normalizedSearch)
+      );
     });
 
   const handleNovoTime = () => {
@@ -169,7 +223,7 @@ export default function Times() {
   };
 
   const toggleTime = (timeId: string) => {
-    setExpandedTimes(prev => {
+    setExpandedTimes((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(timeId)) {
         newSet.delete(timeId);
@@ -185,7 +239,8 @@ export default function Times() {
     setCategoriaFiltro("todos");
   };
 
-  const hasActiveFilters = searchTerm !== "" || categoriaFiltro !== "todos";
+  const hasActiveFilters =
+    (!isIntercessaoFocus && searchTerm !== "") || categoriaFiltro !== "todos";
 
   const handleExcluirTime = (time: Time) => {
     setTimeDeletando(time);
@@ -199,7 +254,8 @@ export default function Times() {
       // Verificar se há membros no time
       if (timeDeletando.membros_count > 0) {
         toast.error("Não é possível excluir", {
-          description: "Este time possui membros associados. Remova os membros antes de excluir."
+          description:
+            "Este time possui membros associados. Remova os membros antes de excluir.",
         });
         setDeleteDialogOpen(false);
         return;
@@ -218,7 +274,7 @@ export default function Times() {
       setDeleteDialogOpen(false);
     } catch (error: unknown) {
       toast.error("Erro ao excluir time", {
-        description: error instanceof Error ? error.message : String(error)
+        description: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -242,12 +298,14 @@ export default function Times() {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Times</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Times
+          </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             Gerencie as equipes e departamentos
           </p>
         </div>
-        <Button 
+        <Button
           className="bg-gradient-primary shadow-soft w-full sm:w-auto"
           onClick={handleNovoTime}
         >
@@ -282,6 +340,15 @@ export default function Times() {
         )}
       </div>
 
+      {isIntercessaoFocus && (
+        <Alert>
+          <AlertDescription>
+            Exibindo apenas o time de intercessão para gerenciar os membros da
+            equipe.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Filtros por Categoria */}
       <div className="flex flex-wrap gap-2">
         <Button
@@ -293,7 +360,7 @@ export default function Times() {
           Todos ({times.length})
         </Button>
         {categorias.map((cat) => {
-          const count = times.filter(t => t.categoria === cat.id).length;
+          const count = times.filter((t) => t.categoria === cat.id).length;
           return (
             <Button
               key={cat.id}
@@ -302,8 +369,8 @@ export default function Times() {
               onClick={() => setCategoriaFiltro(cat.id)}
               className="text-xs md:text-sm"
             >
-              <div 
-                className="w-2 h-2 rounded-full mr-2" 
+              <div
+                className="w-2 h-2 rounded-full mr-2"
                 style={{ backgroundColor: cat.cor }}
               />
               {cat.nome} ({count})
@@ -317,42 +384,64 @@ export default function Times() {
         {timesFiltrados.map((time) => {
           const isExpanded = expandedTimes.has(time.id);
           return (
-            <Collapsible key={time.id} open={isExpanded} onOpenChange={() => toggleTime(time.id)}>
+            <Collapsible
+              key={time.id}
+              open={isExpanded}
+              onOpenChange={() => toggleTime(time.id)}
+            >
               <Card className="shadow-soft hover:shadow-medium transition-shadow">
                 <CardHeader className="p-4 md:p-6">
                   <div className="flex flex-col gap-3">
                     {/* Topo: Nome, Categoria e Ações */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-                        <div 
+                        <div
                           className="w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: time.cor || 'hsl(var(--primary))' }}
+                          style={{
+                            backgroundColor: time.cor || "hsl(var(--primary))",
+                          }}
                         >
                           <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <CardTitle className="text-lg md:text-xl">{time.nome}</CardTitle>
-                            {categorias.find(c => c.id === time.categoria) && (
-                              <Badge 
-                                style={{ 
-                                  backgroundColor: categorias.find(c => c.id === time.categoria)?.cor + '20',
-                                  color: categorias.find(c => c.id === time.categoria)?.cor
+                            <CardTitle className="text-lg md:text-xl">
+                              {time.nome}
+                            </CardTitle>
+                            {categorias.find(
+                              (c) => c.id === time.categoria
+                            ) && (
+                              <Badge
+                                style={{
+                                  backgroundColor:
+                                    categorias.find(
+                                      (c) => c.id === time.categoria
+                                    )?.cor + "20",
+                                  color: categorias.find(
+                                    (c) => c.id === time.categoria
+                                  )?.cor,
                                 }}
                               >
-                                {categorias.find(c => c.id === time.categoria)?.nome}
+                                {
+                                  categorias.find(
+                                    (c) => c.id === time.categoria
+                                  )?.nome
+                                }
                               </Badge>
                             )}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={time.ativo ? "default" : "secondary"} className="whitespace-nowrap">
+                        <Badge
+                          variant={time.ativo ? "default" : "secondary"}
+                          className="whitespace-nowrap"
+                        >
                           {time.ativo ? "Ativo" : "Inativo"}
                         </Badge>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="text-xs md:text-sm"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -362,9 +451,9 @@ export default function Times() {
                           <Edit className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
                           <span className="hidden md:inline">Editar</span>
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="text-xs md:text-sm"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -374,9 +463,9 @@ export default function Times() {
                           <Settings className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
                           <span className="hidden md:inline">Gerenciar</span>
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="text-xs md:text-sm text-destructive hover:text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -401,27 +490,39 @@ export default function Times() {
                         {time.lider && (
                           <div className="flex items-center gap-2">
                             <Crown className="w-4 h-4 text-amber-500" />
-                            <span className="text-muted-foreground">Líder:</span>
+                            <span className="text-muted-foreground">
+                              Líder:
+                            </span>
                             <Avatar className="w-5 h-5">
-                              <AvatarImage src={time.lider.avatar_url || undefined} />
+                              <AvatarImage
+                                src={time.lider.avatar_url || undefined}
+                              />
                               <AvatarFallback className="text-xs">
                                 {time.lider.nome.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium">{time.lider.nome}</span>
+                            <span className="font-medium">
+                              {time.lider.nome}
+                            </span>
                           </div>
                         )}
                         {time.sublider && (
                           <div className="flex items-center gap-2">
                             <Crown className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Sub-líder:</span>
+                            <span className="text-muted-foreground">
+                              Sub-líder:
+                            </span>
                             <Avatar className="w-5 h-5">
-                              <AvatarImage src={time.sublider.avatar_url || undefined} />
+                              <AvatarImage
+                                src={time.sublider.avatar_url || undefined}
+                              />
                               <AvatarFallback className="text-xs">
                                 {time.sublider.nome.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium">{time.sublider.nome}</span>
+                            <span className="font-medium">
+                              {time.sublider.nome}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -429,11 +530,16 @@ export default function Times() {
 
                     {/* Contador de membros e botão expandir */}
                     <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-between"
+                      >
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm md:text-base">
-                            {time.membros_count} {time.membros_count === 1 ? "membro" : "membros"}
+                            {time.membros_count}{" "}
+                            {time.membros_count === 1 ? "membro" : "membros"}
                           </span>
                         </div>
                         {isExpanded ? (
@@ -451,11 +557,13 @@ export default function Times() {
                     {time.membros.length > 0 ? (
                       <div className="space-y-2">
                         {time.membros.map((membro) => (
-                          <div 
+                          <div
                             key={membro.id}
                             className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
                           >
-                            <span className="text-sm font-medium">{membro.nome}</span>
+                            <span className="text-sm font-medium">
+                              {membro.nome}
+                            </span>
                             {membro.posicao && (
                               <Badge variant="outline" className="text-xs">
                                 {membro.posicao}
@@ -480,9 +588,11 @@ export default function Times() {
           <Card>
             <CardContent className="p-8 text-center">
               <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Nenhum time encontrado</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                Nenhum time encontrado
+              </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {categoriaFiltro === "todos" 
+                {categoriaFiltro === "todos"
                   ? "Comece criando seu primeiro time."
                   : "Não há times nesta categoria."}
               </p>
@@ -516,7 +626,8 @@ export default function Times() {
               Tem certeza que deseja excluir o time "{timeDeletando?.nome}"?
               {timeDeletando && timeDeletando.membros_count > 0 && (
                 <span className="block mt-2 text-destructive font-medium">
-                  Atenção: Este time possui {timeDeletando.membros_count} {timeDeletando.membros_count === 1 ? "membro" : "membros"}.
+                  Atenção: Este time possui {timeDeletando.membros_count}{" "}
+                  {timeDeletando.membros_count === 1 ? "membro" : "membros"}.
                   Remova os membros antes de excluir.
                 </span>
               )}

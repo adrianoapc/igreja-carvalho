@@ -387,6 +387,42 @@ export default function PessoaDetalhes() {
         </CardContent>
       </Card>
 
+      {/* Quick Actions - Hub de Intercessão */}
+      <Card className="shadow-soft border-l-4 border-l-blue-500">
+        <CardContent className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-start justify-between">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2 mb-1">
+                <Heart className="w-4 h-4 text-blue-600" />
+                Hub de Intercessão
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Faça pedidos de oração e acompanhe as orações
+              </p>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => navigate("/intercessao/meu-hub")}
+              >
+                <Heart className="w-4 h-4 mr-1" />
+                Meus Pedidos
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700"
+                onClick={() => navigate("/intercessao/meu-hub")}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Novo Pedido
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="hidden md:grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">

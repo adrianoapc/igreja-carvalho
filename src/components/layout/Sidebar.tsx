@@ -27,13 +27,15 @@ import {
   Video,
   Home,
   Briefcase,
-  ClipboardCheck, 
-  GraduationCap, 
+  ClipboardCheck,
+  GraduationCap,
   CalendarCheck,
   Megaphone,
   MonitorPlay,
   Share2,
-  Route
+  Heart,
+  Sparkles,
+  Smile,
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 import { usePermissions, Permission } from "@/hooks/usePermissions";
@@ -46,10 +48,11 @@ type MenuItem = {
   url: string;
   icon: LucideIcon;
   permission?: Permission;
-};type MenuGroup = {
+};
+type MenuGroup = {
   label: string;
   items: MenuItem[];
-  permission?: Permission; 
+  permission?: Permission;
 };
 
 const MENU_GROUPS: MenuGroup[] = [
@@ -67,19 +70,67 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "Pessoas & Cuidado",
     items: [
-      { title: "Membros & Visitantes", url: "/pessoas", icon: Users, permission: "pessoas.view" },
-      { title: "Gabinete Pastoral", url: "/gabinete", icon: HeartHandshake, permission: "gabinete.view" },
-      { title: "Pedidos de Oração", url: "/intercessao", icon: MessageSquareHeart }, 
+      {
+        title: "Membros & Visitantes",
+        url: "/pessoas",
+        icon: Users,
+        permission: "pessoas.view",
+      },
+      {
+        title: "Gabinete Pastoral",
+        url: "/gabinete",
+        icon: HeartHandshake,
+        permission: "gabinete.view",
+      },
+    ],
+  },
+  {
+    label: "Hub de Intercessão",
+    items: [
+      { title: "Meu Hub", url: "/intercessao/meu-hub", icon: Heart },
+      {
+        title: "Gestão Completa",
+        url: "/intercessao/gestao",
+        icon: MessageSquareHeart,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Sentimentos",
+        url: "/intercessao/sentimentos",
+        icon: Smile,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Intercessores",
+        url: "/intercessao/intercessores",
+        icon: Users,
+        permission: "ministerio.view",
+      },
     ],
   },
   {
     label: "Comunicação & Mídia",
     items: [
-      { title: "Comunicados (Push)", url: "/comunicados", icon: Megaphone, permission: "ministerio.view" },
-      { title: "Publicação Social", url: "/publicacao", icon: Share2, permission: "ministerio.view" },
-      { title: "Arquivos & Mídias", url: "/midias", icon: Video, permission: "ministerio.view" },
+      {
+        title: "Comunicados (Push)",
+        url: "/comunicados",
+        icon: Megaphone,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Publicação Social",
+        url: "/publicacao",
+        icon: Share2,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Arquivos & Mídias",
+        url: "/midias",
+        icon: Video,
+        permission: "ministerio.view",
+      },
     ],
-    permission: "ministerio.view"
+    permission: "ministerio.view",
   },
   {
     label: "Ministérios & Operação",
@@ -96,9 +147,24 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "Gestão Administrativa",
     items: [
-      { title: "Projetos", url: "/projetos", icon: Briefcase, permission: "ministerio.view" },
-      { title: "Financeiro", url: "/financas", icon: DollarSign, permission: "financeiro.view" },
-      { title: "Configurações", url: "/configuracoes", icon: Settings, permission: "configuracoes.view" },
+      {
+        title: "Projetos",
+        url: "/projetos",
+        icon: Briefcase,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Financeiro",
+        url: "/financas",
+        icon: DollarSign,
+        permission: "financeiro.view",
+      },
+      {
+        title: "Configurações",
+        url: "/configuracoes",
+        icon: Settings,
+        permission: "configuracoes.view",
+      },
     ],
   },
 ];
@@ -107,7 +173,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { checkPermission, isAdmin, loading } = usePermissions();
   const { igrejaConfig } = useAppConfig();
-  
+
   const [filteredGroups, setFilteredGroups] = useState<MenuGroup[]>([]);
   const [isFiltering, setIsFiltering] = useState(true);
 
@@ -128,7 +194,8 @@ export function AppSidebar() {
           if (!item.permission) {
             validItems.push(item);
           } else {
-            const hasAccess = isAdmin || (await checkPermission(item.permission));
+            const hasAccess =
+              isAdmin || (await checkPermission(item.permission));
             if (hasAccess) validItems.push(item);
           }
         }
@@ -155,24 +222,26 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-border/40 px-4 py-3">
         <Link to="/" className="flex items-center gap-3">
           {igrejaConfig?.logo_url ? (
-            <img 
-              src={igrejaConfig.logo_url} 
-              alt="Logo" 
+            <img
+              src={igrejaConfig.logo_url}
+              alt="Logo"
               className="h-8 w-8 rounded-lg object-contain"
             />
           ) : (
             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <span className="text-primary font-bold text-sm">
-                {igrejaConfig?.nome_igreja?.charAt(0) || 'I'}
+                {igrejaConfig?.nome_igreja?.charAt(0) || "I"}
               </span>
             </div>
           )}
           <div className="flex flex-col">
             <span className="font-semibold text-sm text-foreground">
-              {igrejaConfig?.nome_igreja || 'Igreja'}
+              {igrejaConfig?.nome_igreja || "Igreja"}
             </span>
             {igrejaConfig?.subtitulo && (
-              <span className="text-xs text-muted-foreground">{igrejaConfig.subtitulo}</span>
+              <span className="text-xs text-muted-foreground">
+                {igrejaConfig.subtitulo}
+              </span>
             )}
           </div>
         </Link>

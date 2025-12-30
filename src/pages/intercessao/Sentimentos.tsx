@@ -1,36 +1,126 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Heart, Info, TrendingUp, TrendingDown, MessageCircle, Clock, User, Brain, AlertTriangle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ArrowLeft,
+  Heart,
+  Info,
+  TrendingUp,
+  TrendingDown,
+  MessageCircle,
+  Clock,
+  User,
+  Brain,
+  AlertTriangle,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { format, subDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AlertasCriticos from "@/components/sentimentos/AlertasCriticos";
 
-type SentimentoTipo = 'feliz' | 'cuidadoso' | 'abencoado' | 'grato' | 'angustiado' | 'sozinho' | 'triste' | 'doente' | 'com_pouca_fe';
+type SentimentoTipo =
+  | "feliz"
+  | "cuidadoso"
+  | "abencoado"
+  | "grato"
+  | "angustiado"
+  | "sozinho"
+  | "triste"
+  | "doente"
+  | "com_pouca_fe";
 
 interface SentimentoConfig {
   emoji: string;
   label: string;
   color: string;
-  type: 'positive' | 'negative';
+  type: "positive" | "negative";
 }
 
 const sentimentosConfig: Record<SentimentoTipo, SentimentoConfig> = {
-  feliz: { emoji: '😊', label: 'Feliz', color: 'text-green-600', type: 'positive' },
-  cuidadoso: { emoji: '😇', label: 'Cuidadoso', color: 'text-blue-600', type: 'positive' },
-  abencoado: { emoji: '😇', label: 'Abençoado', color: 'text-purple-600', type: 'positive' },
-  grato: { emoji: '😄', label: 'Grato', color: 'text-yellow-600', type: 'positive' },
-  angustiado: { emoji: '😔', label: 'Angustiado', color: 'text-orange-600', type: 'negative' },
-  sozinho: { emoji: '😢', label: 'Sozinho', color: 'text-pink-600', type: 'negative' },
-  triste: { emoji: '😭', label: 'Triste', color: 'text-red-600', type: 'negative' },
-  doente: { emoji: '🤢', label: 'Doente', color: 'text-green-800', type: 'negative' },
-  com_pouca_fe: { emoji: '😰', label: 'Com pouca fé', color: 'text-gray-600', type: 'negative' }
+  feliz: {
+    emoji: "😊",
+    label: "Feliz",
+    color: "text-green-600",
+    type: "positive",
+  },
+  cuidadoso: {
+    emoji: "😇",
+    label: "Cuidadoso",
+    color: "text-blue-600",
+    type: "positive",
+  },
+  abencoado: {
+    emoji: "😇",
+    label: "Abençoado",
+    color: "text-purple-600",
+    type: "positive",
+  },
+  grato: {
+    emoji: "😄",
+    label: "Grato",
+    color: "text-yellow-600",
+    type: "positive",
+  },
+  angustiado: {
+    emoji: "😔",
+    label: "Angustiado",
+    color: "text-orange-600",
+    type: "negative",
+  },
+  sozinho: {
+    emoji: "😢",
+    label: "Sozinho",
+    color: "text-pink-600",
+    type: "negative",
+  },
+  triste: {
+    emoji: "😭",
+    label: "Triste",
+    color: "text-red-600",
+    type: "negative",
+  },
+  doente: {
+    emoji: "🤢",
+    label: "Doente",
+    color: "text-green-800",
+    type: "negative",
+  },
+  com_pouca_fe: {
+    emoji: "😰",
+    label: "Com pouca fé",
+    color: "text-gray-600",
+    type: "negative",
+  },
 };
 
 interface TrendData {
@@ -66,13 +156,15 @@ export default function Sentimentos() {
     sozinho: 0,
     triste: 0,
     doente: 0,
-    com_pouca_fe: 0
+    com_pouca_fe: 0,
   });
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [historico, setHistorico] = useState<SentimentoRecord[]>([]);
   const [expandedComment, setExpandedComment] = useState<string | null>(null);
-  const [filtroSentimento, setFiltroSentimento] = useState<"all" | "positivos" | "negativos">("all");
+  const [filtroSentimento, setFiltroSentimento] = useState<
+    "all" | "positivos" | "negativos"
+  >("all");
 
   useEffect(() => {
     fetchStats();
@@ -86,16 +178,16 @@ export default function Sentimentos() {
       dataInicio.setDate(dataInicio.getDate() - dias);
 
       const { data, error } = await supabase
-        .from('sentimentos_membros')
-        .select('sentimento, data_registro')
-        .gte('data_registro', dataInicio.toISOString())
-        .order('data_registro', { ascending: true });
+        .from("sentimentos_membros")
+        .select("sentimento, data_registro")
+        .gte("data_registro", dataInicio.toISOString())
+        .order("data_registro", { ascending: true });
 
       if (error) throw error;
 
       // Contar sentimentos
       const counts: Record<string, number> = {};
-      data?.forEach(item => {
+      data?.forEach((item) => {
         counts[item.sentimento] = (counts[item.sentimento] || 0) + 1;
       });
 
@@ -108,36 +200,41 @@ export default function Sentimentos() {
         sozinho: counts.sozinho || 0,
         triste: counts.triste || 0,
         doente: counts.doente || 0,
-        com_pouca_fe: counts.com_pouca_fe || 0
+        com_pouca_fe: counts.com_pouca_fe || 0,
       });
 
       setTotalRegistros(data?.length || 0);
 
       // Preparar dados de tendência
-      const trend: Record<string, { positivos: number; negativos: number }> = {};
+      const trend: Record<string, { positivos: number; negativos: number }> =
+        {};
 
-      data?.forEach(item => {
-        const dia = format(new Date(item.data_registro), 'dd/MM', { locale: ptBR });
+      data?.forEach((item) => {
+        const dia = format(new Date(item.data_registro), "dd/MM", {
+          locale: ptBR,
+        });
         if (!trend[dia]) {
           trend[dia] = { positivos: 0, negativos: 0 };
         }
 
         const config = sentimentosConfig[item.sentimento as SentimentoTipo];
-        if (config.type === 'positive') {
+        if (config.type === "positive") {
           trend[dia].positivos++;
         } else {
           trend[dia].negativos++;
         }
       });
 
-      const trendArray: TrendData[] = Object.entries(trend).map(([data, values]) => ({
-        data,
-        ...values
-      }));
+      const trendArray: TrendData[] = Object.entries(trend).map(
+        ([data, values]) => ({
+          data,
+          ...values,
+        })
+      );
 
       setTrendData(trendArray);
     } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
+      console.error("Erro ao buscar estatísticas:", error);
     }
   };
 
@@ -148,8 +245,9 @@ export default function Sentimentos() {
       dataInicio.setDate(dataInicio.getDate() - dias);
 
       const { data, error } = await supabase
-        .from('sentimentos_membros')
-        .select(`
+        .from("sentimentos_membros")
+        .select(
+          `
           id,
           pessoa_id,
           sentimento,
@@ -160,89 +258,130 @@ export default function Sentimentos() {
           analise_ia_gravidade,
           analise_ia_resposta,
           profiles!sentimentos_membros_pessoa_id_fkey(nome)
-        `)
-        .gte('data_registro', dataInicio.toISOString())
-        .order('data_registro', { ascending: false })
+        `
+        )
+        .gte("data_registro", dataInicio.toISOString())
+        .order("data_registro", { ascending: false })
         .limit(50);
 
       if (error) throw error;
       setHistorico(data || []);
     } catch (error) {
-      console.error('Erro ao buscar histórico:', error);
+      console.error("Erro ao buscar histórico:", error);
     }
   };
 
-  const totalPositivos = stats.feliz + stats.cuidadoso + stats.abencoado + stats.grato;
-  const totalNegativos = stats.angustiado + stats.sozinho + stats.triste + stats.doente + stats.com_pouca_fe;
-  const percentualPositivo = totalRegistros > 0 ? ((totalPositivos / totalRegistros) * 100).toFixed(1) : "0";
+  const totalPositivos =
+    stats.feliz + stats.cuidadoso + stats.abencoado + stats.grato;
+  const totalNegativos =
+    stats.angustiado +
+    stats.sozinho +
+    stats.triste +
+    stats.doente +
+    stats.com_pouca_fe;
+  const percentualPositivo =
+    totalRegistros > 0
+      ? ((totalPositivos / totalRegistros) * 100).toFixed(1)
+      : "0";
 
   const pieData = [
-    { name: 'Positivos', value: totalPositivos, color: 'hsl(var(--chart-1))' },
-    { name: 'Negativos', value: totalNegativos, color: 'hsl(var(--chart-2))' }
+    { name: "Positivos", value: totalPositivos, color: "hsl(var(--chart-1))" },
+    { name: "Negativos", value: totalNegativos, color: "hsl(var(--chart-2))" },
   ];
 
   const barData = Object.entries(sentimentosConfig).map(([key, config]) => ({
     name: config.label,
     value: stats[key as SentimentoTipo],
-    fill: config.type === 'positive' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-2))'
+    fill:
+      config.type === "positive"
+        ? "hsl(var(--chart-1))"
+        : "hsl(var(--chart-2))",
   }));
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/intercessao")}
-            className="flex-shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard de Bem-Estar</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Métricas e análise de sentimentos da igreja
-            </p>
-          </div>
+      <div className="flex items-center gap-2 md:gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/intercessao")}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Dashboard de Bem-Estar
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Análise de sentimentos e bem-estar da igreja
+          </p>
         </div>
+        <Select value={periodo} onValueChange={setPeriodo}>
+          <SelectTrigger className="w-24 h-9 text-xs md:text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">7 dias</SelectItem>
+            <SelectItem value="15">15 dias</SelectItem>
+            <SelectItem value="30">30 dias</SelectItem>
+            <SelectItem value="90">90 dias</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Métricas Gerais */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-        <Card>
+        <Card className="shadow-soft">
           <CardHeader className="p-4 md:p-6 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total de Registros</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+              Total de Registros
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
-            <div className="text-2xl md:text-3xl font-bold text-foreground">{totalRegistros}</div>
-            <p className="text-xs text-muted-foreground mt-1">Últimos {periodo} dias</p>
+            <div className="text-2xl md:text-3xl font-bold text-foreground">
+              {totalRegistros}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Últimos {periodo} dias
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-soft border-l-4 border-l-green-500">
           <CardHeader className="p-4 md:p-6 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Sentimentos Positivos</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+              Sentimentos Positivos
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-green-600" />
-              <div className="text-2xl md:text-3xl font-bold text-green-600">{totalPositivos}</div>
+              <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
+              <div className="text-2xl md:text-3xl font-bold text-green-600">
+                {totalPositivos}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{percentualPositivo}% do total</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {percentualPositivo}% do total
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-soft border-l-4 border-l-red-500">
           <CardHeader className="p-4 md:p-6 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Sentimentos Negativos</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+              Sentimentos Negativos
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
             <div className="flex items-center gap-2">
-              <TrendingDown className="w-5 h-5 text-red-600" />
-              <div className="text-2xl md:text-3xl font-bold text-red-600">{totalNegativos}</div>
+              <TrendingDown className="w-4 h-4 md:w-5 md:h-5 text-red-600" />
+              <div className="text-2xl md:text-3xl font-bold text-red-600">
+                {totalNegativos}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{(100 - parseFloat(percentualPositivo)).toFixed(1)}% do total</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {(100 - parseFloat(percentualPositivo)).toFixed(1)}% do total
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -251,202 +390,254 @@ export default function Sentimentos() {
       <AlertasCriticos />
 
       {/* Filtro Visual de Sentimentos */}
-      <Card>
-        <CardHeader className="p-4 md:p-6 border-b">
-          <CardTitle className="text-base md:text-lg mb-4">Filtrar por Sentimento</CardTitle>
+      <Card className="shadow-soft">
+        <CardContent className="p-4 md:p-6">
           <div className="flex flex-wrap gap-2">
             <Button
               variant={filtroSentimento === "all" ? "default" : "outline"}
               onClick={() => setFiltroSentimento("all")}
-              className="text-xs sm:text-sm"
+              className={`text-xs md:text-sm h-9 px-4 ${
+                filtroSentimento === "all"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              }`}
             >
               Todos ({totalRegistros})
             </Button>
             <Button
               variant={filtroSentimento === "positivos" ? "default" : "outline"}
               onClick={() => setFiltroSentimento("positivos")}
-              className="text-xs sm:text-sm bg-green-50 hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400"
+              className={`text-xs md:text-sm h-9 px-4 ${
+                filtroSentimento === "positivos"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400"
+              }`}
             >
               ✓ Positivos ({totalPositivos})
             </Button>
             <Button
               variant={filtroSentimento === "negativos" ? "default" : "outline"}
               onClick={() => setFiltroSentimento("negativos")}
-              className="text-xs sm:text-sm bg-red-50 hover:bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400"
+              className={`text-xs md:text-sm h-9 px-4 ${
+                filtroSentimento === "negativos"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
+              }`}
             >
               ⚠ Negativos ({totalNegativos})
             </Button>
           </div>
-        </CardHeader>
+        </CardContent>
       </Card>
 
       {/* Histórico de Sentimentos com Comentários */}
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-primary" />
-              <CardTitle className="text-base md:text-lg">Registros Recentes</CardTitle>
-            </div>
-            <Select value={periodo} onValueChange={setPeriodo}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">7 dias</SelectItem>
-                <SelectItem value="15">15 dias</SelectItem>
-                <SelectItem value="30">30 dias</SelectItem>
-                <SelectItem value="90">90 dias</SelectItem>
-              </SelectContent>
-            </Select>
+      <Card className="shadow-soft">
+        <CardHeader className="p-4 md:p-6 border-b">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base md:text-lg">
+              Registros Recentes
+            </CardTitle>
           </div>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            Últimos {periodo} dias •{" "}
+            {
+              historico.filter((r) => {
+                if (filtroSentimento === "all") return true;
+                const config = sentimentosConfig[r.sentimento];
+                return filtroSentimento === "positivos"
+                  ? config.type === "positive"
+                  : config.type === "negative";
+              }).length
+            }{" "}
+            registro(s)
+          </p>
         </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
+        <CardContent className="p-4 md:p-6 pt-4">
           {historico.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhum registro no período selecionado.
-            </p>
+            <div className="text-center py-8">
+              <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
+                <Heart className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">
+                Nenhum registro encontrado
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Os registros de sentimentos aparecerão aqui
+              </p>
+            </div>
           ) : (
             <div className="space-y-3">
               {historico
                 .filter((registro) => {
                   if (filtroSentimento === "all") return true;
                   const config = sentimentosConfig[registro.sentimento];
-                  if (filtroSentimento === "positivos") return config.type === "positive";
-                  if (filtroSentimento === "negativos") return config.type === "negative";
+                  if (filtroSentimento === "positivos")
+                    return config.type === "positive";
+                  if (filtroSentimento === "negativos")
+                    return config.type === "negative";
                   return true;
                 })
                 .map((registro) => {
-                const config = sentimentosConfig[registro.sentimento];
-                const hasComment = !!registro.mensagem;
-                const isExpanded = expandedComment === registro.id;
-                const hasAiAnalysis = !!registro.analise_ia_titulo;
+                  const config = sentimentosConfig[registro.sentimento];
+                  const hasComment = !!registro.mensagem;
+                  const isExpanded = expandedComment === registro.id;
+                  const hasAiAnalysis = !!registro.analise_ia_titulo;
 
-                // Severity badge styling
-                const getSeverityBadge = (gravidade: string | null) => {
-                  switch (gravidade) {
-                    case 'critica':
-                      return 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400';
-                    case 'media':
-                      return 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400';
-                    case 'baixa':
-                      return 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400';
-                    default:
-                      return 'bg-muted text-muted-foreground';
-                  }
-                };
+                  // Severity badge styling
+                  const getSeverityBadge = (gravidade: string | null) => {
+                    switch (gravidade) {
+                      case "critica":
+                        return "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400";
+                      case "media":
+                        return "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400";
+                      case "baixa":
+                        return "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400";
+                      default:
+                        return "bg-muted text-muted-foreground";
+                    }
+                  };
 
-                return (
-                  <div
-                    key={registro.id}
-                    className={`flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors ${
-                      registro.analise_ia_gravidade === 'critica' ? 'border-red-300 dark:border-red-700' : ''
-                    }`}
-                  >
-                    <div className="text-2xl flex-shrink-0">{config.emoji}</div>
-                    <div className="flex-1 min-w-0">
-                      {/* AI Title or Member Name */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {hasAiAnalysis ? (
-                          <>
-                            <span className="font-medium text-sm">
-                              {registro.analise_ia_titulo}
-                            </span>
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${getSeverityBadge(registro.analise_ia_gravidade)}`}
-                            >
-                              {registro.analise_ia_gravidade === 'critica' && <AlertTriangle className="w-3 h-3 mr-1" />}
-                              {registro.analise_ia_gravidade || 'Analisando...'}
-                            </Badge>
-                            {registro.analise_ia_motivo && (
-                              <Badge variant="secondary" className="text-xs">
-                                {registro.analise_ia_motivo}
+                  return (
+                    <div
+                      key={registro.id}
+                      className={`flex items-start gap-3 p-3 md:p-4 rounded-lg border bg-card hover:bg-muted/50 transition-all duration-200 shadow-soft ${
+                        registro.analise_ia_gravidade === "critica"
+                          ? "border-red-300 dark:border-red-700 border-l-4"
+                          : ""
+                      }`}
+                    >
+                      <div className="text-xl md:text-2xl flex-shrink-0">
+                        {config.emoji}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {/* AI Title or Member Name */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {hasAiAnalysis ? (
+                            <>
+                              <span className="font-medium text-sm">
+                                {registro.analise_ia_titulo}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getSeverityBadge(
+                                  registro.analise_ia_gravidade
+                                )}`}
+                              >
+                                {registro.analise_ia_gravidade ===
+                                  "critica" && (
+                                  <AlertTriangle className="w-3 h-3 mr-1" />
+                                )}
+                                {registro.analise_ia_gravidade ||
+                                  "Analisando..."}
                               </Badge>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-medium text-sm truncate">
-                              {registro.profiles?.nome || 'Membro'}
-                            </span>
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${config.type === 'negative' ? 'border-destructive/50 text-destructive' : ''}`}
-                            >
-                              {config.label}
-                            </Badge>
-                          </>
-                        )}
-                        {hasComment && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => setExpandedComment(isExpanded ? null : registro.id)}
-                                >
-                                  <MessageCircle className="w-4 h-4 text-primary" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs">
-                                <p className="text-sm">{registro.mensagem}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                        {hasAiAnalysis && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Brain className="w-4 h-4 text-purple-500" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs">
-                                <p className="text-xs font-medium mb-1">Análise IA</p>
-                                <p className="text-xs">{registro.analise_ia_resposta}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </div>
-
-                      {/* Subinfo: Member name (when AI title is shown) + timestamp */}
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        {hasAiAnalysis && (
-                          <>
-                            <User className="w-3 h-3" />
-                            <span>{registro.profiles?.nome || 'Membro'}</span>
-                            <span>•</span>
-                          </>
-                        )}
-                        <Clock className="w-3 h-3" />
-                        <span>
-                          {format(new Date(registro.data_registro), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                        </span>
-                      </div>
-
-                      {/* Expanded comment */}
-                      {hasComment && isExpanded && (
-                        <div className="mt-2 p-2 bg-muted rounded text-sm space-y-2">
-                          <p className="text-foreground">{registro.mensagem}</p>
-                          {registro.analise_ia_resposta && (
-                            <div className="pt-2 border-t border-border">
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                                <Brain className="w-3 h-3" /> Resposta Pastoral IA:
-                              </p>
-                              <p className="text-sm text-primary/90 italic">
-                                "{registro.analise_ia_resposta}"
-                              </p>
-                            </div>
+                              {registro.analise_ia_motivo && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {registro.analise_ia_motivo}
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-medium text-sm truncate">
+                                {registro.profiles?.nome || "Membro"}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${
+                                  config.type === "negative"
+                                    ? "border-destructive/50 text-destructive"
+                                    : ""
+                                }`}
+                              >
+                                {config.label}
+                              </Badge>
+                            </>
+                          )}
+                          {hasComment && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0"
+                                    onClick={() =>
+                                      setExpandedComment(
+                                        isExpanded ? null : registro.id
+                                      )
+                                    }
+                                  >
+                                    <MessageCircle className="w-4 h-4 text-primary" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="text-sm">{registro.mensagem}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {hasAiAnalysis && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Brain className="w-4 h-4 text-purple-500" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="text-xs font-medium mb-1">
+                                    Análise IA
+                                  </p>
+                                  <p className="text-xs">
+                                    {registro.analise_ia_resposta}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
                         </div>
-                      )}
+
+                        {/* Subinfo: Member name (when AI title is shown) + timestamp */}
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          {hasAiAnalysis && (
+                            <>
+                              <User className="w-3 h-3" />
+                              <span>{registro.profiles?.nome || "Membro"}</span>
+                              <span>•</span>
+                            </>
+                          )}
+                          <Clock className="w-3 h-3" />
+                          <span>
+                            {format(
+                              new Date(registro.data_registro),
+                              "dd/MM/yyyy 'às' HH:mm",
+                              { locale: ptBR }
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Expanded comment */}
+                        {hasComment && isExpanded && (
+                          <div className="mt-2 p-2 bg-muted rounded text-sm space-y-2">
+                            <p className="text-foreground">
+                              {registro.mensagem}
+                            </p>
+                            {registro.analise_ia_resposta && (
+                              <div className="pt-2 border-t border-border">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                                  <Brain className="w-3 h-3" /> Resposta
+                                  Pastoral IA:
+                                </p>
+                                <p className="text-sm text-primary/90 italic">
+                                  "{registro.analise_ia_resposta}"
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
         </CardContent>
@@ -455,39 +646,48 @@ export default function Sentimentos() {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         {/* Gráfico de Tendência */}
-        <Card>
+        <Card className="shadow-soft">
           <CardHeader className="p-4 md:p-6">
-            <CardTitle className="text-base md:text-lg">Tendência ao Longo do Tempo</CardTitle>
+            <CardTitle className="text-base md:text-lg">
+              Tendência ao Longo do Tempo
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Evolução dos sentimentos registrados
+            </p>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="data" 
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
                 />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <RechartsTooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                <XAxis
+                  dataKey="data"
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--background))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: "12px",
                   }}
                 />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="positivos" 
-                  stroke="hsl(var(--chart-1))" 
+                <Legend wrapperStyle={{ fontSize: "12px" }} />
+                <Line
+                  type="monotone"
+                  dataKey="positivos"
+                  stroke="hsl(var(--chart-1))"
                   strokeWidth={2}
                   name="Positivos"
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="negativos" 
-                  stroke="hsl(var(--chart-2))" 
+                <Line
+                  type="monotone"
+                  dataKey="negativos"
+                  stroke="hsl(var(--chart-2))"
                   strokeWidth={2}
                   name="Negativos"
                 />
@@ -497,9 +697,14 @@ export default function Sentimentos() {
         </Card>
 
         {/* Gráfico de Pizza - Distribuição */}
-        <Card>
+        <Card className="shadow-soft">
           <CardHeader className="p-4 md:p-6">
-            <CardTitle className="text-base md:text-lg">Distribuição Geral</CardTitle>
+            <CardTitle className="text-base md:text-lg">
+              Distribuição Geral
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Proporção de sentimentos positivos vs negativos
+            </p>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
             <ResponsiveContainer width="100%" height={300}>
@@ -509,20 +714,24 @@ export default function Sentimentos() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) =>
+                    `${name}: ${(percent * 100).toFixed(0)}%`
+                  }
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
+                  style={{ fontSize: "12px" }}
                 >
                   {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <RechartsTooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--background))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: "12px",
                   }}
                 />
               </PieChart>
@@ -532,11 +741,13 @@ export default function Sentimentos() {
       </div>
 
       {/* Detalhamento por Sentimento */}
-      <Card>
+      <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">
           <div className="flex items-center gap-2">
             <Heart className="w-5 h-5 text-primary" />
-            <CardTitle className="text-base md:text-lg">Detalhamento por Sentimento</CardTitle>
+            <CardTitle className="text-base md:text-lg">
+              Detalhamento por Sentimento
+            </CardTitle>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -544,32 +755,40 @@ export default function Sentimentos() {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs text-xs">
-                    Os membros podem registrar diariamente como estão se sentindo.
-                    Sentimentos negativos direcionam para pedidos de oração.
+                    Os membros podem registrar diariamente como estão se
+                    sentindo. Sentimentos negativos direcionam para pedidos de
+                    oração.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Distribuição detalhada por tipo de sentimento
+          </p>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={barData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                dataKey="name" 
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(var(--border))"
+              />
+              <XAxis
+                dataKey="name"
                 stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
+                fontSize={10}
                 angle={-45}
                 textAnchor="end"
                 height={100}
               />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <RechartsTooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
+              <RechartsTooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--background))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "12px",
                 }}
               />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} />
@@ -578,19 +797,29 @@ export default function Sentimentos() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-base md:text-lg">Sobre os Sentimentos</CardTitle>
+          <CardTitle className="text-base md:text-lg">
+            Sobre os Sentimentos
+          </CardTitle>
         </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0 space-y-3 text-sm text-muted-foreground">
+        <CardContent className="p-4 md:p-6 pt-0 space-y-3 text-xs md:text-sm text-muted-foreground">
           <p>
-            <strong>Sentimentos Positivos (Feliz, Cuidadoso):</strong> Membros recebem mensagem de agradecimento.
+            <strong className="text-foreground">
+              Sentimentos Positivos (Feliz, Cuidadoso):
+            </strong>{" "}
+            Membros recebem mensagem de agradecimento.
           </p>
           <p>
-            <strong>Sentimentos de Gratidão (Grato, Abençoado):</strong> Membros são convidados a compartilhar um testemunho.
+            <strong className="text-foreground">
+              Sentimentos de Gratidão (Grato, Abençoado):
+            </strong>{" "}
+            Membros são convidados a compartilhar um testemunho.
           </p>
           <p>
-            <strong>Sentimentos Negativos:</strong> Membros são direcionados para criar um pedido de oração e recebem apoio.
+            <strong className="text-foreground">Sentimentos Negativos:</strong>{" "}
+            Membros são direcionados para criar um pedido de oração e recebem
+            apoio.
           </p>
         </CardContent>
       </Card>

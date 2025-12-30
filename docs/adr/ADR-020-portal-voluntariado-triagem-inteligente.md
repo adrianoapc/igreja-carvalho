@@ -17,6 +17,7 @@ O sistema já possuía gestão de escalas e atribuição manual de voluntários 
 4. **Transparência** sobre requisitos e progresso em trilhas
 
 Isso gerava problemas:
+
 - Líderes escalavam voluntários sem saber se estavam aptos
 - Ministérios sensíveis (Kids, Louvor) recebiam pessoas sem preparo adequado
 - Não havia fluxo claro de "Candidato → Trilha → Aprovado"
@@ -31,6 +32,7 @@ Isso gerava problemas:
 **Decisão**: Criar rota `/voluntariado` com formulário público (sem autenticação necessária).
 
 **Componentes**:
+
 - `Voluntariado.tsx` (+257 linhas)
 - Formulário com:
   - Seleção de ministério (7 opções: Recepção, Louvor, Mídia, Kids, Intercessão, Ação Social, Eventos)
@@ -39,11 +41,13 @@ Isso gerava problemas:
   - Campos de contato (telefone/email) e observações
 
 **Alternativas rejeitadas**:
+
 - ❌ Exigir login → Barreira alta para novos candidatos (visitantes/frequentadores)
 - ❌ Formulário via Google Forms → Perda de integração com sistema, dados isolados
 - ❌ Só permitir indicação por líderes → Limita alcance, não empodera candidatos
 
 **Trade-offs**:
+
 - ✅ **Acesso público**: Atrai mais candidatos, reduz fricção
 - ⚠️ **Spam/Troll**: Requer validação manual posterior (líder revisa inscrições)
 - ✅ **Dados estruturados**: Integração direta com sistema de escalas
@@ -68,11 +72,36 @@ interface RegraMinisterio {
 }
 
 const REGRAS_MINISTERIO: RegraMinisterio[] = [
-  { chave: "kids", palavras: ["kids", "infantil", "crianca"], trilhaTitulo: "Trilha Kids", requerMembro: true },
-  { chave: "louvor", palavras: ["louvor", "musica", "banda"], trilhaTitulo: "Trilha de Louvor", requerMembro: true },
-  { chave: "midia", palavras: ["midia", "som", "projecao"], trilhaTitulo: "Trilha de Mídia", requerMembro: true },
-  { chave: "intercessao", palavras: ["intercessao", "oracao"], trilhaTitulo: "Trilha de Intercessão", requerMembro: false },
-  { chave: "recepcao", palavras: ["recepcao", "acolhimento"], trilhaTilha: "Trilha de Recepção", requerMembro: false },
+  {
+    chave: "kids",
+    palavras: ["kids", "infantil", "crianca"],
+    trilhaTitulo: "Trilha Kids",
+    requerMembro: true,
+  },
+  {
+    chave: "louvor",
+    palavras: ["louvor", "musica", "banda"],
+    trilhaTitulo: "Trilha de Louvor",
+    requerMembro: true,
+  },
+  {
+    chave: "midia",
+    palavras: ["midia", "som", "projecao"],
+    trilhaTitulo: "Trilha de Mídia",
+    requerMembro: true,
+  },
+  {
+    chave: "intercessao",
+    palavras: ["intercessao", "oracao"],
+    trilhaTitulo: "Trilha de Intercessão",
+    requerMembro: false,
+  },
+  {
+    chave: "recepcao",
+    palavras: ["recepcao", "acolhimento"],
+    trilhaTilha: "Trilha de Recepção",
+    requerMembro: false,
+  },
 ];
 
 const TRILHA_INTEGRACAO = "Trilha de Integração"; // Fallback para não-membros
@@ -82,7 +111,7 @@ export const avaliarTriagemVoluntario = (
   ministerio: { nome: string; categoria?: string }
 ): TriagemResultado => {
   const regra = getRegraMinisterio(ministerio);
-  
+
   if (perfilStatus !== "membro") {
     return {
       status: "em_trilha",
@@ -90,7 +119,7 @@ export const avaliarTriagemVoluntario = (
       motivo: "Antes de servir, complete a trilha de integração.",
     };
   }
-  
+
   if (regra) {
     return {
       status: "em_trilha",
@@ -98,28 +127,30 @@ export const avaliarTriagemVoluntario = (
       motivo: "Este ministério exige uma trilha específica.",
     };
   }
-  
+
   return { status: "aprovado" };
 };
 ```
 
 **Regras implementadas**:
 
-| Ministério | Requer Ser Membro? | Trilha Requerida |
-|------------|---------------------|------------------|
-| Kids | ✅ Sim | Trilha Kids |
-| Louvor | ✅ Sim | Trilha de Louvor |
-| Mídia | ✅ Sim | Trilha de Mídia |
-| Intercessão | ❌ Não | Trilha de Intercessão |
-| Recepção | ❌ Não | Trilha de Recepção |
-| **Fallback** (não-membro) | - | **Trilha de Integração** |
+| Ministério                | Requer Ser Membro? | Trilha Requerida         |
+| ------------------------- | ------------------ | ------------------------ |
+| Kids                      | ✅ Sim             | Trilha Kids              |
+| Louvor                    | ✅ Sim             | Trilha de Louvor         |
+| Mídia                     | ✅ Sim             | Trilha de Mídia          |
+| Intercessão               | ❌ Não             | Trilha de Intercessão    |
+| Recepção                  | ❌ Não             | Trilha de Recepção       |
+| **Fallback** (não-membro) | -                  | **Trilha de Integração** |
 
 **Alternativas rejeitadas**:
+
 - ❌ Regras no banco de dados → Overhead de manutenção, complexidade desnecessária para regras estáticas
 - ❌ Validação só no backend → Feedback lento, UX ruim (erro após submissão)
 - ❌ Matching exato de nomes → Frágil (ex: "Louvor" vs "Ministério de Louvor")
 
 **Trade-offs**:
+
 - ✅ **Regras em código**: Versionamento, type-safety, fácil revisão em PRs
 - ⚠️ **Hardcoded**: Adicionar novo ministério requer deploy (aceitável, mudanças raras)
 - ✅ **Normalização**: Remove acentos para matching flexível ("Intercessao" = "Intercessão")
@@ -131,6 +162,7 @@ export const avaliarTriagemVoluntario = (
 **Decisão**: Ao adicionar voluntário em escalas, exibir status de triagem em tempo real.
 
 **Fluxo**:
+
 1. Líder seleciona pessoa no `GerenciarTimeDialog`
 2. Sistema busca:
    - `profiles.tipo` (membro/frequentador/visitante)
@@ -157,17 +189,20 @@ export const avaliarTriagemVoluntario = (
 ```
 
 **Verificação de inscrições em jornadas**:
+
 - Busca `inscricoes_jornada` com join em `jornadas`
 - Filtra por título da trilha (ex: "Trilha Kids")
 - Mostra campo `concluido: true/false`
 - Lista etapas pendentes (se aplicável)
 
 **Alternativas rejeitadas**:
+
 - ❌ Bloqueio hard → Líder não consegue escalar → Inflexível (emergências, exceções)
 - ❌ Sem feedback visual → Líder escala pessoa não apta sem saber
 - ❌ Apenas notificação após escalar → Descoberta tardia
 
 **Trade-offs**:
+
 - ✅ **Soft-block (aviso)**: Transparência sem bloquear operação
 - ⚠️ **Líder pode ignorar**: Requer cultura de disciplina (aceitável, líderes são responsáveis)
 - ✅ **Feedback em tempo real**: Decisão informada no momento certo
@@ -186,6 +221,7 @@ export const avaliarTriagemVoluntario = (
 6. **Trilha de Recepção** (para ministério de Recepção)
 
 **Criação das jornadas**:
+
 - Jornadas já existem no módulo de Ensino (`jornadas` table)
 - Líderes criam manualmente com títulos exatos (case-insensitive, normalizado)
 - Sistema busca por `LOWER(UNACCENT(jornadas.titulo))` para matching
@@ -211,11 +247,13 @@ Candidato                                Líder                           Sistem
 ```
 
 **Alternativas rejeitadas**:
+
 - ❌ Automação completa (inscrição automática em trilhas) → Requer regras complexas, casos de exceção
 - ❌ Trilhas opcionais → Não garante preparo adequado
 - ❌ Um único curso genérico → Ministérios têm necessidades específicas
 
 **Trade-offs**:
+
 - ✅ **Flexibilidade**: Líderes criam conteúdo das trilhas conforme necessidade
 - ⚠️ **Setup manual**: Requer criação inicial das 6 jornadas (one-time)
 - ✅ **Reuso de módulo existente**: Não duplica lógica (Jornadas já tem quiz, certificado, progresso)
@@ -257,22 +295,26 @@ Candidato                                Líder                           Sistem
 ## Implementação
 
 ### Arquivos criados:
+
 - `src/pages/Voluntariado.tsx` (+257 linhas) - Formulário público
 - `src/lib/voluntariado/triagem.ts` (+118 linhas) - Biblioteca de regras
 
 ### Arquivos modificados:
+
 - `src/components/cultos/GerenciarTimeDialog.tsx` (+120 linhas) - Integração triagem
 - `src/App.tsx` (rota `/voluntariado`)
 - `src/components/layout/Sidebar.tsx` (link "Voluntariado")
 - `src/components/layout/AppBreadcrumb.tsx` (breadcrumb)
 
 ### Tabelas afetadas:
+
 - `profiles` (lê `tipo: membro|frequentador|visitante`)
 - `ministerios` (lê `nome` e `categoria`)
 - `jornadas` (busca trilhas por título)
 - `inscricoes_jornada` (verifica inscrição e progresso)
 
 ### Edge Functions:
+
 - Nenhuma (toda lógica é frontend/client-side)
 
 ---

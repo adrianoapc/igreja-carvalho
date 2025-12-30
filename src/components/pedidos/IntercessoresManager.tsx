@@ -4,14 +4,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Users, Edit, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Intercessor {
   id: string;
@@ -29,27 +42,38 @@ export function IntercessoresManager() {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [formData, setFormData] = React.useState({
-    max_pedidos: 10
+    max_pedidos: 10,
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { profile, hasAccess } = useAuth();
+
+  const isLeader = !!(
+    profile?.e_lider ||
+    hasAccess("intercessao", "aprovar_gerenciar") ||
+    hasAccess("eventos", "aprovar_gerenciar") ||
+    hasAccess("eventos", "acesso_completo")
+  );
 
   const fetchIntercessores = async () => {
     try {
       const { data, error } = await supabase
         .from("intercessores")
-        .select(`
+        .select(
+          `
           *,
           pedidos_oracao!intercessor_id(count)
-        `)
+        `
+        )
         .order("nome");
 
       if (error) throw error;
 
-      const intercessoresComContagem = data?.map(i => ({
-        ...i,
-        pedidos_ativos: i.pedidos_oracao?.[0]?.count || 0
-      })) || [];
+      const intercessoresComContagem =
+        data?.map((i) => ({
+          ...i,
+          pedidos_ativos: i.pedidos_oracao?.[0]?.count || 0,
+        })) || [];
 
       setIntercessores(intercessoresComContagem);
     } catch (error) {
@@ -57,7 +81,7 @@ export function IntercessoresManager() {
       toast({
         title: "Erro",
         description: "Não foi possível carregar os intercessores",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -65,12 +89,17 @@ export function IntercessoresManager() {
   };
 
   React.useEffect(() => {
+    if (!isLeader) {
+      setLoading(false);
+      return;
+    }
     fetchIntercessores();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLeader]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!editingId) return;
 
     try {
@@ -83,7 +112,7 @@ export function IntercessoresManager() {
 
       toast({
         title: "Sucesso",
-        description: "Configurações atualizadas com sucesso"
+        description: "Configurações atualizadas com sucesso",
       });
 
       setEditingId(null);
@@ -94,7 +123,7 @@ export function IntercessoresManager() {
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -110,7 +139,9 @@ export function IntercessoresManager() {
 
       toast({
         title: "Sucesso",
-        description: `Intercessor ${!ativo ? "ativado" : "desativado"} com sucesso`
+        description: `Intercessor ${
+          !ativo ? "ativado" : "desativado"
+        } com sucesso`,
       });
 
       fetchIntercessores();
@@ -119,7 +150,7 @@ export function IntercessoresManager() {
       toast({
         title: "Erro",
         description: "Não foi possível atualizar o status",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -127,7 +158,7 @@ export function IntercessoresManager() {
   const handleEdit = (intercessor: Intercessor) => {
     setEditingId(intercessor.id);
     setFormData({
-      max_pedidos: intercessor.max_pedidos
+      max_pedidos: intercessor.max_pedidos,
     });
     setDialogOpen(true);
   };
@@ -140,14 +171,43 @@ export function IntercessoresManager() {
     );
   }
 
+  if (!isLeader) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold">
+              Gerenciar Intercessores
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Apenas líderes podem gerenciar intercessores e equipes
+            </p>
+          </div>
+        </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Você precisa ser líder para acessar estas configurações. Se acredita
+            que é um erro, fale com um administrador.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold">Gerenciar Intercessores</h2>
-          <p className="text-sm text-muted-foreground">Configure status e limite de pedidos dos intercessores</p>
+          <h2 className="text-xl md:text-2xl font-bold">
+            Gerenciar Intercessores
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Configure status e limite de pedidos dos intercessores
+          </p>
         </div>
-        <Button onClick={() => navigate("/cultos/times")}>
+        <Button onClick={() => navigate("/eventos/times?focus=intercessao")}>
           <Users className="w-4 h-4 mr-2" />
           Gerenciar Equipe
         </Button>
@@ -156,7 +216,9 @@ export function IntercessoresManager() {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Para adicionar novos intercessores, adicione-os ao time "Intercessão" no menu de <strong>Equipes/Escalas</strong>. A sincronização é automática.
+          Para adicionar novos intercessores, adicione-os ao time "Intercessão"
+          no menu de <strong>Equipes/Escalas</strong>. A sincronização é
+          automática.
         </AlertDescription>
       </Alert>
 
@@ -168,14 +230,18 @@ export function IntercessoresManager() {
           {intercessores.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>Nenhum intercessor cadastrado.</p>
-              <p className="text-sm mt-2">Adicione membros ao time "Intercessão" para que apareçam aqui.</p>
+              <p className="text-sm mt-2">
+                Adicione membros ao time "Intercessão" para que apareçam aqui.
+              </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
-                  <TableHead className="hidden sm:table-cell">Contato</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Contato
+                  </TableHead>
                   <TableHead>Pedidos</TableHead>
                   <TableHead>Máx.</TableHead>
                   <TableHead>Ativo</TableHead>
@@ -185,15 +251,25 @@ export function IntercessoresManager() {
               <TableBody>
                 {intercessores.map((intercessor) => (
                   <TableRow key={intercessor.id}>
-                    <TableCell className="font-medium">{intercessor.nome}</TableCell>
+                    <TableCell className="font-medium">
+                      {intercessor.nome}
+                    </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <div className="text-sm text-muted-foreground">
                         {intercessor.email && <div>{intercessor.email}</div>}
-                        {intercessor.telefone && <div>{intercessor.telefone}</div>}
+                        {intercessor.telefone && (
+                          <div>{intercessor.telefone}</div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={intercessor.pedidos_ativos! >= intercessor.max_pedidos ? "destructive" : "default"}>
+                      <Badge
+                        variant={
+                          intercessor.pedidos_ativos! >= intercessor.max_pedidos
+                            ? "destructive"
+                            : "default"
+                        }
+                      >
                         {intercessor.pedidos_ativos}
                       </Badge>
                     </TableCell>
@@ -201,7 +277,9 @@ export function IntercessoresManager() {
                     <TableCell>
                       <Switch
                         checked={intercessor.ativo}
-                        onCheckedChange={() => handleToggleAtivo(intercessor.id, intercessor.ativo)}
+                        onCheckedChange={() =>
+                          handleToggleAtivo(intercessor.id, intercessor.ativo)
+                        }
                       />
                     </TableCell>
                     <TableCell className="text-right">
@@ -234,20 +312,28 @@ export function IntercessoresManager() {
                 type="number"
                 min="1"
                 value={formData.max_pedidos}
-                onChange={(e) => setFormData({ ...formData, max_pedidos: parseInt(e.target.value) || 1 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    max_pedidos: parseInt(e.target.value) || 1,
+                  })
+                }
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Define quantos pedidos de oração este intercessor pode receber simultaneamente.
+                Define quantos pedidos de oração este intercessor pode receber
+                simultaneamente.
               </p>
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
                 Cancelar
               </Button>
-              <Button type="submit">
-                Salvar
-              </Button>
+              <Button type="submit">Salvar</Button>
             </div>
           </form>
         </DialogContent>
