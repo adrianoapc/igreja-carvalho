@@ -10,6 +10,20 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Alterado
 
+#### 📄 Documentação: Telas fora da navegação (30 de Dez/2025)
+
+- **Tipo**: refactor
+- **Resumo**: mapeamento de rotas registradas em `App.tsx` que não aparecem na Sidebar e páginas em `src/pages` sem rota.
+- **Módulos afetados**: Documentação, Telas, Navegação
+- **Impacto no usuário**: sem impacto funcional; melhora visibilidade de telas não listadas na navegação.
+
+#### 🧭 Ajustes de Navegação e Dashboards (30 de Dez/2025)
+
+- **Tipo**: refactor
+- **Resumo**: Sidebar reorganizada em 3 blocos (Visão Geral, Ministérios, Gestão & Cuidado); dashboards de **Intercessão** e **Pessoas** atualizados com cards e atalhos alinhados aos novos contextos.
+- **Módulos afetados**: Intercessão, Pessoas, Navegação (Sidebar)
+- **Impacto no usuário**: melhoria de descoberta de funcionalidades e atalhos diretos para ações do dia a dia.
+
 #### 🔄 Refatoração Estrutural: Cultos → Eventos (30 de Dez/2025)
 
 - **Renomeação de Módulo**: Todo o módulo "Cultos" foi renomeado para "Eventos" (commit f425926)
