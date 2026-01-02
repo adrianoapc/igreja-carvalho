@@ -38,13 +38,16 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 	- Intercessão — funcionalidades: [`funcionalidades.md#5-intercessão-oração-e-testemunhos`](funcionalidades.md#5-intercessão-oração-e-testemunhos)
 	- Intercessão — próximos passos: [`PROXIMOS_PASSOS_INTERCESSAO.md`](PROXIMOS_PASSOS_INTERCESSAO.md)
 	- Gabinete Digital — visão funcional: [`funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral`](funcionalidades.md#4-gabinete-digital-e-cuidado-pastoral)
- - Telas & Segurança
+- Telas & Segurança
 	- Catálogo de Telas: [`telas/catalogo-telas.md`](telas/catalogo-telas.md)
 	- Matriz de Permissões (ACL): [`telas/matriz-permissoes.md`](telas/matriz-permissoes.md)
+	- Telas fora da navegação: [`telas/telas-fora-navegacao.md`](telas/telas-fora-navegacao.md)
+	- Índice de Telas: [`telas/README.md`](telas/README.md)
 - Banco de Dados
 	- Esquema SQL: [`database-schema.sql`](database-schema.sql)
 	- Diagrama ER: [`database-er-diagram.md`](database-er-diagram.md)
 	- Diagramas: [`diagramas/`](diagramas/)
+	- Diagrama — Arquitetura Geral & Navegação: [`diagramas/arquitetura-geral.md`](diagramas/arquitetura-geral.md)
  	- Diagrama — Fluxo Kids: [`diagramas/fluxo-kids.md`](diagramas/fluxo-kids.md)
  	- Diagrama — Sequência de Notificações (Kids): [`diagramas/sequencia-kids-notificacoes.md`](diagramas/sequencia-kids-notificacoes.md)
  	- Diagrama — Permissões (Guardians/Kids): [`diagramas/permissoes-kids-guardians.md`](diagramas/permissoes-kids-guardians.md)

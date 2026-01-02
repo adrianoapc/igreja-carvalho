@@ -151,9 +151,14 @@ O sino no canto superior direito mostra suas notificações:
 
 A página inicial do módulo mostra:
 
-- **Estatísticas**: Total de membros, visitantes, frequentadores
-- **Aniversariantes**: Calendário de aniversários
-- **Ações rápidas**: Botões para cadastros
+- **Estatísticas**: Total de pessoas, visitantes, frequentadores e membros
+- **Busca rápida**: campo para pesquisar por nome, email ou telefone (atalho para `/pessoas/todos?buscar=...`)
+- **Acesso rápido**: cards para Visitantes, Membros, Frequentadores e Contatos Agendados
+- **Alterações pendentes**: card com contador e botão "Ver histórico" (rota do botão: `/pessoas/alteracoes-pendentes` — a confirmar; rota configurada em `App.tsx` é `/pessoas/pendentes`)
+- **Aceitaram Jesus**: lista das conversões mais recentes (ordenadas por `data_conversao`) com atalho para `/pessoas/todos?aceitou_jesus=true`
+- **Links externos de cadastro**: atalhos para formulários públicos (quando configurados)
+- **Aniversariantes**: calendário de aniversários
+- **Atividade recente**: área informativa sem eventos (quando não há registros)
 
 ![Pessoas Visão Geral](./screenshots/placeholder-pessoas-geral.png)
 
@@ -1046,19 +1051,19 @@ Se precisar mudar João depois:
 A página inicial `/intercessao` exibe:
 
 - **Módulos Principais** (4 cards):
-  - **Pedidos de Oração**: estatísticas (pendentes, em oração), link para `/intercessao/pedidos`
-  - **Intercessores**: equipe ativa, link para `/intercessao/intercessores`
-  - **Testemunhos**: pendentes de aprovação, link para `/intercessao/testemunhos`
+  - **Diário de Oração**: estatísticas de pedidos pendentes e em oração, link para `/intercessao/diario`
+  - **Sala de Guerra**: estatística de intercessores ativos, link para `/intercessao/sala-de-guerra`
+  - **Gestão de Equipes**: estatística de testemunhos pendentes, link para `/intercessao/equipes`
   - **Sentimentos**: monitoramento emocional, link para `/intercessao/sentimentos`
 - **Ações Rápidas**:
-  - **"Novo Pedido de Oração"**: abre formulário para criar pedido (link com `?novo=true` ou navega para `/intercessao/pedidos?novo=true`)
+  - **"Novo Pedido de Oração"**: abre formulário para criar pedido (link com `?novo=true` ou navega para `/intercessao/pedidos?novo=true`) (a confirmar — rota não configurada em `App.tsx`)
   - **"Alocar Pedidos Pendentes"**: dispara alocação automática balanceada entre intercessores
 
-### 6.2 Pedidos de Oração (`/intercessao/pedidos`)
+### 6.2 Pedidos de Oração (Diário de Oração e Sala de Guerra)
 
 #### Visualizando e Filtrando
 
-1. Acesse **Intercessão → Pedidos de Oração**
+1. Acesse **Intercessão → Diário de Oração** (`/intercessao/diario`) ou **Intercessão → Sala de Guerra** (`/intercessao/sala-de-guerra`)
 2. **Listagem** exibe:
    - Título/descrição do pedido
    - Tipo (saúde, família, financeiro, trabalho, etc.)
@@ -1099,7 +1104,7 @@ A página inicial `/intercessao` exibe:
 
 #### Intercessor: Acompanhando Pedidos
 
-1. Acesse `/intercessao/pedidos` com role `intercessor`
+1. Acesse `/intercessao/sala-de-guerra` com role `intercessor`
 2. Visualize apenas pedidos alocados a você (RLS aplicado)
 3. Para cada pedido:
    - Veja descrição completa, tipo e contato do solicitante
@@ -1107,11 +1112,11 @@ A página inicial `/intercessao` exibe:
    - Botão para marcar como **"Em Oração"** (muda `status = em_oracao`)
    - Botão para marcar como **"Respondido"** (muda `status = respondido`, preenche `data_resposta`)
 
-### 6.3 Intercessores (`/intercessao/intercessores`)
+### 6.3 Gestão de Equipes (`/intercessao/equipes`)
 
 #### Listando Intercessores
 
-1. Acesse **Intercessão → Intercessores**
+1. Acesse **Intercessão → Gestão de Equipes**
 2. **Listagem** exibe:
    - Nome
    - Email / Telefone
@@ -1144,11 +1149,11 @@ A página inicial `/intercessao` exibe:
 3. Ao inativar (`ativo = false`), novos pedidos não são alocados; existentes continuam alocados (a confirmar política)
 4. Clique em **"Salvar"**
 
-### 6.4 Testemunhos (`/intercessao/testemunhos`)
+### 6.4 Testemunhos (Diário de Oração e Sala de Guerra)
 
 #### Visualizando e Filtrando
 
-1. Acesse **Intercessão → Testemunhos**
+1. Acesse **Intercessão → Diário de Oração** (pessoal) ou **Intercessão → Sala de Guerra** (ministério)
 2. **Abas por status**:
    - **Aberto**: testemunhos em submissão, aguardando aprovação
    - **Público**: testemunhos aprovados para publicação
@@ -1167,7 +1172,7 @@ A página inicial `/intercessao` exibe:
 
 #### Membro: Enviar Testemunho
 
-1. Em Dashboard ou via `/intercessao/testemunhos`, clique em **"+ Novo Testemunho"**
+1. Em Dashboard ou no **Diário de Oração**, clique em **"+ Novo Testemunho"**
 2. Preencha:
    - **Título** (obrigatório)
    - **Categoria** (dropdown)
@@ -1180,7 +1185,7 @@ A página inicial `/intercessao` exibe:
 
 #### Admin: Aprovando Testemunhos
 
-1. Na aba **"Aberto"** (`/intercessao/testemunhos` com `statusTab=aberto`), visualize testemunhos em submissão
+1. Na aba **"Aberto"** da **Sala de Guerra**, visualize testemunhos em submissão
 2. Para cada testemunho, clique para abrir detalhes:
    - Revise conteúdo, categoria, autor
    - Botões:
@@ -1218,8 +1223,8 @@ A página inicial `/intercessao` exibe:
 4. **Campo opcional**: "Quer compartilhar?" (texto curto)
 5. Clique em **"Registrar"**
    - Sistema analisa sentimento e oferece **"Redirecionamento Inteligente"**:
-     - **Se positivo (feliz/grato/abençoado)**: sugestão "Compartilhar Testemunho?" → link para `/intercessao/testemunhos?novo=true`
-     - **Se negativo (triste/ansioso/angustiado)**: sugestão "Fazer Pedido de Oração?" → link para `/intercessao/pedidos?novo=true`
+     - **Se positivo (feliz/grato/abençoado)**: sugestão "Compartilhar Testemunho?" → link para `/intercessao/testemunhos?novo=true` (a confirmar — rota não configurada em `App.tsx`)
+     - **Se negativo (triste/ansioso/angustiado)**: sugestão "Fazer Pedido de Oração?" → link para `/intercessao/pedidos?novo=true` (a confirmar — rota não configurada em `App.tsx`)
 6. Sentimento registrado em `sentimentos_membros` com timestamp
 
 #### Direcionar Apoio (Admin)

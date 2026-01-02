@@ -56,8 +56,8 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 
 #### Módulo Pessoas / Membros — visão funcional
 
-- **Funcionalidades disponíveis**: dashboard com estatísticas por status; listagem com ordenação por nome e avatars (quando cadastrados); busca e filtro de status; criação/edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem.
-- **Ações permitidas**: criar pessoa (nome obrigatório, contato recomendado), editar dados pessoais/contatos/status/funções, navegar para detalhes, aplicar busca/filtros, carregar mais itens via scroll, acionar atalhos rápidos para segmentos (membros, visitantes, frequentadores).
+- **Funcionalidades disponíveis**: dashboard com estatísticas por status; busca rápida por nome/email/telefone; listagem com ordenação por nome e avatars (quando cadastrados); criação/edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem; cards de acesso rápido (visitantes, membros, frequentadores, contatos agendados); painel de alterações pendentes; lista das últimas conversões (aceitaram Jesus).
+- **Ações permitidas**: criar pessoa (nome obrigatório, contato recomendado), editar dados pessoais/contatos/status/funções, navegar para detalhes, aplicar busca/filtros, carregar mais itens via scroll, acionar atalhos rápidos para segmentos e contatos agendados, revisar alterações pendentes e acessar lista de conversões recentes.
 - **Regras funcionais**: status restrito a `visitante`/`frequentador`/`membro`; sem deduplicação automática (verificar duplicidade de nome/telefone/email antes de salvar); campos mínimos para cadastro exigem nome; contatos incompletos reduzem eficácia da busca e follow-up; vínculos familiares exibem ambos os lados com inversão de papel; avatars não são obrigatórios e podem exibir fallback.
 - **Links relacionados**: [Manual do Usuário — Pessoas](manual-usuario.md#3-gestão-de-pessoas) · [Produto — Pessoas/Membros](produto/README_PRODUTO.MD#pessoas--membros-visão-de-produto)
 
@@ -762,7 +762,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 
 **Hub Central**
 
-- `/intercessao`: `Intercessao.tsx` — dashboard unificado com cards para acessar os 3 contextos e estatísticas gerais
+- `/intercessao`: `Intercessao.tsx` — dashboard unificado com cards para Diário de Oração, Sala de Guerra, Gestão de Equipes e Sentimentos; exibe estatísticas gerais
 
 ### 5.1 Pedidos de Oração
 
@@ -815,7 +815,7 @@ Centralizar gestão de pedidos de oração, intercessão organizada, registro de
 
 ### 4.5 Integração Frontend
 
-- **Hub Central** (`Intercessao.tsx`): Dashboard com módulos temáticos separados em 3 contextos (Pessoal, Ministério, Admin); cards com estatísticas e navegação direta
+- **Hub Central** (`Intercessao.tsx`): Dashboard com módulos temáticos separados em 3 contextos (Pessoal, Ministério, Admin); cards para **Diário de Oração**, **Sala de Guerra**, **Gestão de Equipes** e **Sentimentos**, com estatísticas de pedidos/intercessores/testemunhos e navegação direta
 - **Diário de Oração** (`DiarioDeOracao.tsx`): Área privada do membro com tabs para pedidos e testemunhos próprios; filtros por status/tipo/categoria; CTAs mobile-friendly
 - **Sala de Guerra** (`SalaDeGuerra.tsx`): Workspace dos intercessores com listagem de pedidos da comunidade; filtros avançados; ações rápidas (atribuir, marcar como orado); exportação
 - **Gestão de Equipes** (`GestaoEquipes.tsx`): Wrapper para `IntercessoresManager` com controle de acesso por role (líder ou hasAccess); navegação com `?focus=intercessao`
