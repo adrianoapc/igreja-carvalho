@@ -17,6 +17,9 @@ type EstadoSessao =
 interface ItemProcessado {
   anexo_original: string;
   anexo_storage: string;
+  anexo_storage_path: string;
+  anexo_content_type: string;
+  anexo_is_pdf: boolean;
   valor: number;
   fornecedor: string | null;
   data_emissao: string | null;
@@ -42,12 +45,19 @@ interface MetaDados {
 }
 
 // Função para fazer download de anexo do WhatsApp e upload para Storage
+interface AnexoPersistido {
+  storagePath: string;
+  signedUrl: string;
+  contentType: string;
+  isPdf: boolean;
+}
+
 async function persistirAnexo(
   // deno-lint-ignore no-explicit-any
   supabase: any,
   urlOriginal: string,
   sessaoId: string
-): Promise<string | null> {
+): Promise<AnexoPersistido | null> {
   try {
     console.log(`[Storage] Baixando anexo: ${urlOriginal.slice(0, 50)}...`);
     
@@ -61,9 +71,24 @@ async function persistirAnexo(
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Detectar tipo de arquivo
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    const extension = contentType.includes("pdf") ? "pdf" : "jpg";
+    // Detectar tipo de arquivo pelo content-type ou magic bytes
+    let contentType = response.headers.get("content-type") || "";
+    
+    // Verificar magic bytes para PDFs (%PDF-)
+    const pdfMagic = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]); // %PDF-
+    const isPdfByMagic = uint8Array.length >= 5 && 
+      pdfMagic.every((byte, i) => uint8Array[i] === byte);
+    
+    // Determinar tipo real
+    const isPdf = isPdfByMagic || contentType.includes("pdf") || contentType.includes("application/octet-stream");
+    
+    if (isPdf) {
+      contentType = "application/pdf";
+    } else if (!contentType || contentType.includes("octet-stream")) {
+      contentType = "image/jpeg";
+    }
+    
+    const extension = isPdf ? "pdf" : (contentType.includes("png") ? "png" : "jpg");
     
     // Nome do arquivo no Storage
     const timestamp = Date.now();
@@ -82,13 +107,34 @@ async function persistirAnexo(
       return null;
     }
     
-    // Gerar URL pública (ou signed se bucket privado)
-    const { data: urlData } = supabase.storage
+    // Gerar signed URL (bucket privado)
+    const { data: signedUrlData, error: signError } = await supabase.storage
       .from("transaction-attachments")
-      .getPublicUrl(fileName);
+      .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 ano de validade
     
-    console.log(`[Storage] Anexo salvo: ${fileName}`);
-    return urlData?.publicUrl || null;
+    if (signError || !signedUrlData?.signedUrl) {
+      console.error(`[Storage] Erro ao gerar signed URL:`, signError);
+      // Fallback para public URL se signed falhar
+      const { data: publicData } = supabase.storage
+        .from("transaction-attachments")
+        .getPublicUrl(fileName);
+      
+      console.log(`[Storage] Anexo salvo (public fallback): ${fileName}`);
+      return {
+        storagePath: fileName,
+        signedUrl: publicData?.publicUrl || "",
+        contentType,
+        isPdf
+      };
+    }
+    
+    console.log(`[Storage] Anexo salvo com signed URL: ${fileName} (${isPdf ? 'PDF' : 'Image'})`);
+    return {
+      storagePath: fileName,
+      signedUrl: signedUrlData.signedUrl,
+      contentType,
+      isPdf
+    };
     
   } catch (error) {
     console.error(`[Storage] Erro ao persistir anexo:`, error);
@@ -96,11 +142,12 @@ async function persistirAnexo(
   }
 }
 
-// Função para processar nota fiscal via edge function
+// Função para processar nota fiscal via edge function (imagens e PDFs)
 async function processarNotaFiscal(
   supabaseUrl: string,
   serviceKey: string,
-  base64Image: string
+  base64Data: string,
+  mimeType: string = "image/jpeg"
 ): Promise<{
   valor: number;
   fornecedor: string | null;
@@ -111,29 +158,42 @@ async function processarNotaFiscal(
   centro_custo_sugerido_id: string | null;
 } | null> {
   try {
+    console.log(`[OCR] Processando arquivo: ${mimeType}`);
+    
     const response = await fetch(`${supabaseUrl}/functions/v1/processar-nota-fiscal`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${serviceKey}`
+        "Authorization": `Bearer ${serviceKey}`,
+        "X-Internal-Call": "true"
       },
-      body: JSON.stringify({ image_base64: base64Image })
+      body: JSON.stringify({ 
+        imageBase64: base64Data,
+        mimeType
+      })
     });
     
     if (!response.ok) {
-      console.error(`[OCR] Erro: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[OCR] Erro: ${response.status} - ${errorText}`);
       return null;
     }
     
     const data = await response.json();
+    
+    if (!data.success || !data.dados) {
+      console.error("[OCR] Resposta sem dados:", data);
+      return null;
+    }
+    
     return {
-      valor: data.valor || 0,
-      fornecedor: data.fornecedor || null,
-      data_emissao: data.data_emissao || null,
-      descricao: data.descricao || null,
-      categoria_sugerida_id: data.categoria_sugerida?.id || null,
-      subcategoria_sugerida_id: data.subcategoria_sugerida?.id || null,
-      centro_custo_sugerido_id: data.centro_custo_sugerido?.id || null
+      valor: data.dados.valor_total || 0,
+      fornecedor: data.dados.fornecedor_nome || null,
+      data_emissao: data.dados.data_emissao || null,
+      descricao: data.dados.descricao || null,
+      categoria_sugerida_id: data.dados.categoria_sugerida_id || null,
+      subcategoria_sugerida_id: data.dados.subcategoria_sugerida_id || null,
+      centro_custo_sugerido_id: data.dados.centro_custo_sugerido_id || null
     };
   } catch (error) {
     console.error(`[OCR] Erro ao processar nota:`, error);
@@ -342,33 +402,38 @@ serve(async (req) => {
         }
 
         // Baixar e salvar no Storage permanentemente
-        const anexoStorage = await persistirAnexo(supabase, url_anexo, sessao.id);
+        const anexoResult = await persistirAnexo(supabase, url_anexo, sessao.id);
         
-        if (!anexoStorage) {
+        if (!anexoResult) {
           return new Response(JSON.stringify({ 
             text: "⚠️ Erro ao salvar o comprovante. Por favor, tente enviar novamente." 
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        // Processar via OCR para extrair dados
+        // Processar via OCR para extrair dados (imagens E PDFs)
         let dadosNota: Awaited<ReturnType<typeof processarNotaFiscal>> = null;
         
-        if (tipo === "image") {
-          try {
-            // Fazer download novamente para base64 (ou usar cache se disponível)
-            const imgResponse = await fetch(url_anexo);
-            const imgBuffer = await imgResponse.arrayBuffer();
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBuffer)));
-            dadosNota = await processarNotaFiscal(supabaseUrl, supabaseKey, base64);
-          } catch (e) {
-            console.error("[OCR] Erro ao converter para base64:", e);
-          }
+        try {
+          // Fazer download novamente para base64
+          const fileResponse = await fetch(url_anexo);
+          const fileBuffer = await fileResponse.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+          
+          // Determinar mimeType
+          const mimeType = anexoResult.isPdf ? "application/pdf" : anexoResult.contentType;
+          
+          dadosNota = await processarNotaFiscal(supabaseUrl, supabaseKey, base64, mimeType);
+        } catch (e) {
+          console.error("[OCR] Erro ao converter para base64:", e);
         }
 
         // Criar item processado
         const novoItem: ItemProcessado = {
           anexo_original: url_anexo,
-          anexo_storage: anexoStorage,
+          anexo_storage: anexoResult.signedUrl,
+          anexo_storage_path: anexoResult.storagePath,
+          anexo_content_type: anexoResult.contentType,
+          anexo_is_pdf: anexoResult.isPdf,
           valor: dadosNota?.valor || 0,
           fornecedor: dadosNota?.fornecedor || null,
           data_emissao: dadosNota?.data_emissao || null,
