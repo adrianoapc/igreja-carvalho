@@ -403,8 +403,9 @@ export default function Reembolsos() {
   const processarNotaFiscalComIA = async (file: File) => {
     setProcessandoIA(true);
     try {
-      // 1. Upload do arquivo para storage (mesmo bucket usado em transações)
-      const fileExt = file.name.split('.').pop();
+      // 1. Upload do arquivo para storage (bucket privado)
+      const fileExt = file.name.split('.').pop()?.toLowerCase();
+      const isPdf = file.type === 'application/pdf' || fileExt === 'pdf';
       const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -416,12 +417,16 @@ export default function Reembolsos() {
 
       if (uploadError) throw uploadError;
 
-      // Obter URL pública
-      const { data: { publicUrl } } = supabase.storage
+      // Gerar signed URL (bucket privado) - 1 ano de validade
+      const { data: signedData, error: signedError } = await supabase.storage
         .from('transaction-attachments')
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365);
 
-      // 2. Converter imagem para base64
+      if (signedError || !signedData?.signedUrl) {
+        throw new Error('Erro ao gerar URL de acesso ao arquivo');
+      }
+
+      // 2. Converter arquivo para base64
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => {
@@ -435,7 +440,7 @@ export default function Reembolsos() {
 
       const imageBase64 = await base64Promise;
 
-      // 3. Chamar edge function para processar
+      // 3. Chamar edge function para processar (suporta imagens e PDFs)
       const { data, error } = await supabase.functions.invoke('processar-nota-fiscal', {
         body: {
           imageBase64,
@@ -468,7 +473,7 @@ export default function Reembolsos() {
           valor: valor_total?.toString() || prev.valor,
           descricao: descricaoResumida || prev.descricao,
           data_item: data_emissao || prev.data_item,
-          anexo_url: publicUrl,
+          anexo_url: signedData.signedUrl,
         }));
 
         toast.success('✨ Nota fiscal lida com sucesso!');
@@ -880,13 +885,13 @@ export default function Reembolsos() {
                 <div className="space-y-2">
                   <Label htmlFor="upload-comprovante" className="flex items-center gap-2">
                     <Upload className="w-4 h-4" />
-                    Foto do Comprovante (Auto-preenchimento com IA)
+                    Comprovante (Imagem ou PDF)
                   </Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="upload-comprovante"
                       type="file"
-                      accept="image/*"
+                      accept="image/*,application/pdf"
                       onChange={handleImageUpload}
                       disabled={processandoIA}
                       className="cursor-pointer"
@@ -894,12 +899,12 @@ export default function Reembolsos() {
                     {processandoIA && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        <span>Lendo nota fiscal... 🤖</span>
+                        <span>Lendo documento... 🤖</span>
                       </div>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    📸 Tire uma foto da nota fiscal e os campos serão preenchidos automaticamente
+                    📸 Envie foto ou PDF da nota fiscal para preenchimento automático com IA
                   </p>
                 </div>
 

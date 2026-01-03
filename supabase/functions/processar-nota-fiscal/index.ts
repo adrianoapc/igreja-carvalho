@@ -193,27 +193,31 @@ serve(async (req) => {
     
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return new Response(
-        JSON.stringify({ error: 'Imagem não fornecida' }),
+        JSON.stringify({ error: 'Imagem/PDF não fornecido' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (imageBase64.length > MAX_IMAGE_SIZE * 1.4) {
       return new Response(
-        JSON.stringify({ error: 'Imagem muito grande. Tamanho máximo: 10MB' }),
+        JSON.stringify({ error: 'Arquivo muito grande. Tamanho máximo: 10MB' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (mimeType && !allowedMimeTypes.includes(mimeType)) {
+    // Suportar imagens e PDFs
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+    const effectiveMimeType = mimeType || 'image/jpeg';
+    
+    if (!allowedMimeTypes.includes(effectiveMimeType)) {
       return new Response(
-        JSON.stringify({ error: 'Tipo de imagem não suportado' }),
+        JSON.stringify({ error: `Tipo de arquivo não suportado: ${effectiveMimeType}. Aceitos: imagens e PDFs.` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[processar-nota-fiscal] Processando nota fiscal...`);
+    const isPdf = effectiveMimeType === 'application/pdf';
+    console.log(`[processar-nota-fiscal] Processando ${isPdf ? 'PDF' : 'imagem'}...`);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -253,12 +257,14 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: 'Extraia as informações desta nota fiscal e sugira a categorização financeira mais adequada:'
+                text: isPdf 
+                  ? 'Extraia as informações deste documento PDF de nota fiscal e sugira a categorização financeira mais adequada:'
+                  : 'Extraia as informações desta imagem de nota fiscal e sugira a categorização financeira mais adequada:'
               },
               {
                 type: 'image_url',
                 image_url: {
-                  url: `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`
+                  url: `data:${effectiveMimeType};base64,${imageBase64}`
                 }
               }
             ]

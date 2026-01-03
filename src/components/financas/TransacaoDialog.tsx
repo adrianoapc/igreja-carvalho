@@ -616,7 +616,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     try {
       const { data: userData } = await supabase.auth.getUser();
 
-      // Upload do anexo se não foi processado ainda
+      // Upload do anexo se não foi processado ainda (bucket privado - usar signed URL)
       let anexoPath = anexoUrl;
       if (anexoFile && !anexoUrl) {
         const fileExt = anexoFile.name.split(".").pop();
@@ -627,9 +627,16 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage.from("transaction-attachments").getPublicUrl(filePath);
+        // Gerar signed URL (bucket privado) - 1 ano de validade
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from("transaction-attachments")
+          .createSignedUrl(filePath, 60 * 60 * 24 * 365);
 
-        anexoPath = urlData.publicUrl;
+        if (signedError || !signedData?.signedUrl) {
+          throw new Error("Erro ao gerar URL de acesso ao arquivo");
+        }
+
+        anexoPath = signedData.signedUrl;
       }
 
       const transacaoData = {
