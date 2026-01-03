@@ -69,7 +69,7 @@ export default function Pessoas() {
       telefone: string | null;
       email: string | null;
       sexo: string | null;
-      data_primeira_visita: string | null;
+      data_conversao: string | null;
       status: string;
     }>
   >([]);
@@ -378,10 +378,10 @@ export default function Pessoas() {
                           {pessoa.sexo}
                         </span>
                       )}
-                      {pessoa.data_primeira_visita && (
+                      {pessoa.data_conversao && (
                         <span className="text-xs text-muted-foreground">
                           {new Date(
-                            pessoa.data_primeira_visita
+                            pessoa.data_conversao
                           ).toLocaleDateString("pt-BR")}
                         </span>
                       )}
