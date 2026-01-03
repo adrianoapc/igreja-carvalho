@@ -56,13 +56,18 @@ async function persistirAnexo(
   // deno-lint-ignore no-explicit-any
   supabase: any,
   urlOriginal: string,
-  sessaoId: string
+  sessaoId: string,
+  whatsappToken?: string
 ): Promise<AnexoPersistido | null> {
   try {
     console.log(`[Storage] Baixando anexo: ${urlOriginal.slice(0, 50)}...`);
     
-    // Download do arquivo do WhatsApp
-    const response = await fetch(urlOriginal);
+    // Download do arquivo do WhatsApp (COM autenticação, igual ao chatbot-triagem)
+    const fetchHeaders: Record<string, string> = {};
+    if (whatsappToken) {
+      fetchHeaders.Authorization = `Bearer ${whatsappToken}`;
+    }
+    const response = await fetch(urlOriginal, { headers: fetchHeaders });
     if (!response.ok) {
       console.error(`[Storage] Erro ao baixar: ${response.status}`);
       return null;
@@ -248,6 +253,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const WHATSAPP_API_TOKEN = Deno.env.get("WHATSAPP_API_TOKEN");
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 1. Recebe o Payload do Make
@@ -442,7 +448,7 @@ serve(async (req) => {
         }
 
         // Baixar e salvar no Storage permanentemente
-        const anexoResult = await persistirAnexo(supabase, url_anexo, sessao.id);
+        const anexoResult = await persistirAnexo(supabase, url_anexo, sessao.id, WHATSAPP_API_TOKEN);
         
         if (!anexoResult) {
           return new Response(JSON.stringify({ 
