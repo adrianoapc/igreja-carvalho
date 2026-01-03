@@ -211,7 +211,7 @@ serve(async (req) => {
     // (ex.: pai/filho ou registros duplicados). Nesse caso, escolhemos o melhor candidato.
     const { data: candidatosAutorizados, error: authError } = await supabase
       .from("profiles")
-      .select("id, nome, telefone, autorizado_bot_financeiro, dados_bancarios, created_at, data_nascimento")
+      .select("id, nome, telefone, autorizado_bot_financeiro, created_at, data_nascimento")
       .eq("autorizado_bot_financeiro", true)
       .filter("telefone", "ilike", `%${telefoneNormalizado.slice(-9)}%`) // Busca pelos 9 dígitos finais
       .limit(5);
