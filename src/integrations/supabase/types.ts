@@ -3477,6 +3477,7 @@ export type Database = {
         Row: {
           aceitou_jesus: boolean | null
           alergias: string | null
+          autorizado_bot_financeiro: boolean | null
           avatar_url: string | null
           bairro: string | null
           batizado: boolean | null
@@ -3527,6 +3528,7 @@ export type Database = {
         Insert: {
           aceitou_jesus?: boolean | null
           alergias?: string | null
+          autorizado_bot_financeiro?: boolean | null
           avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null
@@ -3577,6 +3579,7 @@ export type Database = {
         Update: {
           aceitou_jesus?: boolean | null
           alergias?: string | null
+          autorizado_bot_financeiro?: boolean | null
           avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null

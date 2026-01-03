@@ -25,7 +25,29 @@ serve(async (req) => {
 
     console.log(`[Financeiro] Msg de ${telefone} no canal ${origem_canal}: ${mensagem || tipo}`);
 
-    // 2. Busca Sessão Ativa
+    // 2. Valida se o telefone pertence a um membro autorizado
+    const telefoneNormalizado = telefone.replace(/\D/g, "").slice(-11); // Últimos 11 dígitos
+    const { data: membroAutorizado, error: authError } = await supabase
+      .from("profiles")
+      .select("id, nome, autorizado_bot_financeiro")
+      .or(`telefone.ilike.%${telefoneNormalizado}`)
+      .eq("autorizado_bot_financeiro", true)
+      .maybeSingle();
+
+    if (authError) {
+      console.error("Erro ao validar membro:", authError);
+    }
+
+    if (!membroAutorizado) {
+      console.log(`[Financeiro] Telefone ${telefone} não autorizado para bot financeiro`);
+      return new Response(JSON.stringify({
+        text: "⚠️ Você não está autorizado a usar o assistente financeiro. Solicite acesso à secretaria."
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    console.log(`[Financeiro] Membro autorizado: ${membroAutorizado.nome} (${membroAutorizado.id})`);
+
+    // 3. Busca Sessão Ativa
     const { data: sessao, error: searchError } = await supabase
       .from("atendimentos_bot")
       .select("*")
