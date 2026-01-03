@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.chatbot-triagem]
 verify_jwt = false
+
+[functions.chatbot-financeiro]
+verify_jwt = false
