@@ -251,13 +251,27 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 1. Recebe o Payload do Make
-    const { telefone, mensagem, tipo, url_anexo, origem_canal, nome_perfil } = await req.json();
+    const body = await req.json();
+    const { telefone, mensagem, tipo, origem_canal, nome_perfil } = body;
+    
+    // Suporte a múltiplos campos de URL (imagens vs documentos)
+    // O Make pode enviar como url_anexo, url_documento, document_url, media_url, etc.
+    const url_anexo = body.url_anexo || body.url_documento || body.document_url || body.media_url || body.url || null;
 
     if (!telefone || !origem_canal) {
       throw new Error("Telefone e origem_canal são obrigatórios.");
     }
 
     console.log(`[Financeiro] Msg de ${telefone} no canal ${origem_canal}: ${mensagem || tipo}`);
+    
+    // Log detalhado para debug de anexos
+    if (tipo === "image" || tipo === "document") {
+      console.log(`[Financeiro] Anexo recebido - tipo: ${tipo}, url_anexo: ${url_anexo ? 'presente' : 'AUSENTE'}`);
+      console.log(`[Financeiro] Campos do body:`, Object.keys(body).join(', '));
+      if (!url_anexo) {
+        console.log(`[Financeiro] Body completo para debug:`, JSON.stringify(body).slice(0, 500));
+      }
+    }
 
     // 2. Valida se o telefone pertence a um membro autorizado
     // Normaliza telefone removendo DDI (55) e caracteres não numéricos
