@@ -356,7 +356,27 @@ export default function Reembolsos() {
     mutationFn: async () => {
       if (!solicitacaoSelecionada) throw new Error("Nenhuma solicitação selecionada");
 
-      // 1. Atualizar a solicitação
+      // 1. Criar UMA ÚNICA transação financeira para o pagamento do reembolso (Fluxo de Caixa - ADR-001)
+      const { error: transacaoError } = await supabase
+        .from("transacoes_financeiras")
+        .insert({
+          descricao: `Reembolso - ${solicitacaoSelecionada.solicitante_nome || 'Solicitante'}`,
+          valor: solicitacaoSelecionada.valor_total || 0,
+          tipo: "saida",
+          tipo_lancamento: "unico",
+          data_vencimento: solicitacaoSelecionada.data_vencimento || new Date(dataPagamento).toISOString().split('T')[0],
+          data_pagamento: new Date(dataPagamento).toISOString().split('T')[0],
+          data_competencia: new Date(dataPagamento).toISOString().split('T')[0],
+          status: "pago",
+          conta_id: contaSaida,
+          forma_pagamento: solicitacaoSelecionada.forma_pagamento_preferida || "pix",
+          solicitacao_reembolso_id: solicitacaoSelecionada.id,
+          observacoes: `Pagamento de reembolso #${solicitacaoSelecionada.id?.slice(0, 8).toUpperCase()}`
+        });
+
+      if (transacaoError) throw transacaoError;
+
+      // 2. Atualizar a solicitação como paga
       const { error: solicitacaoError } = await supabase
         .from("solicitacoes_reembolso")
         .update({
@@ -366,18 +386,6 @@ export default function Reembolsos() {
         .eq("id", solicitacaoSelecionada.id);
 
       if (solicitacaoError) throw solicitacaoError;
-
-      // 2. Atualizar todas as transações vinculadas
-      const { error: transacoesError } = await supabase
-        .from("transacoes_financeiras")
-        .update({
-          status: "pago",
-          conta_id: contaSaida,
-          data_pagamento: new Date(dataPagamento).toISOString(),
-        })
-        .eq("solicitacao_reembolso_id", solicitacaoSelecionada.id);
-
-      if (transacoesError) throw transacoesError;
     },
     onSuccess: () => {
       toast.success("Reembolso pago com sucesso!");
