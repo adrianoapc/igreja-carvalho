@@ -22,14 +22,30 @@ export default function NotificationsBell() {
     id: string;
     read: boolean;
     type: string;
+    metadata?: Record<string, unknown>;
   }) => {
     if (!notification.read) {
       markAsRead(notification.id);
     }
 
+    const { type, metadata } = notification;
+
+    // Deep link específico para reembolsos
+    if (type === 'financeiro_reembolso_aprovacao' && metadata?.solicitacao_id) {
+      navigate(`/financas/reembolsos?id=${metadata.solicitacao_id}`);
+      return;
+    }
+
     // Se for notificação de sentimento diário, redirecionar para dashboard com o dialog
-    if (notification.type === 'sentimento_diario') {
+    if (type === 'sentimento_diario') {
       navigate('/?sentimento=true');
+      return;
+    }
+
+    // Fallbacks genéricos por prefixo
+    if (type?.startsWith('financeiro')) {
+      navigate('/financas/dashboard');
+      return;
     }
   };
 

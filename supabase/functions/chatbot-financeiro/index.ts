@@ -643,6 +643,31 @@ serve(async (req) => {
         console.error("Erro ao atualizar status:", updateStatusError);
       }
 
+      // 3.5 Disparar notificação para tesoureiros/admins (apenas após confirmação bem-sucedida)
+      if (!updateStatusError) {
+        try {
+          const solicitanteNome = metaDados.nome_perfil || "Membro";
+          const valorFormatado = formatarValor(metaDados.valor_total_acumulado);
+          
+          await supabase.functions.invoke("disparar-alerta", {
+            body: {
+              evento: "financeiro_reembolso_aprovacao",
+              dados: {
+                solicitante: solicitanteNome,
+                valor: valorFormatado,
+                itens: metaDados.itens.length,
+                solicitacao_id: solicitacao.id,
+                forma_pagamento: formaPagamento,
+                link: `/financas/reembolsos?id=${solicitacao.id}`
+              }
+            }
+          });
+          console.log(`[Financeiro] Notificação de reembolso enviada para tesoureiros`);
+        } catch (notifyErr) {
+          console.error("Erro ao notificar tesoureiro (não bloqueia fluxo):", notifyErr);
+        }
+      }
+
       // 4. Encerrar sessão
       await supabase
         .from("atendimentos_bot")
