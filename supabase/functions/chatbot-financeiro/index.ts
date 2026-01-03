@@ -583,28 +583,16 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // ===== CRIAR SOLICITAÇÃO DE REEMBOLSO E TRANSAÇÕES =====
+      // ===== CRIAR SOLICITAÇÃO DE REEMBOLSO E ITENS (ADR-001) =====
+      // Seguindo arquitetura: itens_reembolso = Fato Gerador (competência)
+      // transacoes_financeiras será criada apenas no momento do PAGAMENTO pelo tesoureiro
       
-      // Buscar conta padrão
-      const { data: contaPadrao } = await supabase
-        .from("contas")
-        .select("id")
-        .eq("ativo", true)
-        .limit(1)
-        .single();
-
-      if (!contaPadrao) {
-        return new Response(JSON.stringify({
-          text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador."
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      // 1. Criar solicitação de reembolso
+      // 1. Criar solicitação de reembolso (status rascunho para RLS, depois pendente)
       const { data: solicitacao, error: solError } = await supabase
         .from("solicitacoes_reembolso")
         .insert({
           solicitante_id: metaDados.pessoa_id,
-          status: "pendente",
+          status: "rascunho", // RLS permite inserir itens apenas com status rascunho
           forma_pagamento_preferida: formaPagamento,
           data_vencimento: metaDados.data_vencimento,
           observacoes: `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`
@@ -619,37 +607,43 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // 2. Criar transações para cada item
-      const transacoesCriadas: string[] = [];
+      // 2. Criar ITENS de reembolso (fato gerador/competência - para DRE)
+      const itensCriados: string[] = [];
       for (const item of metaDados.itens) {
-        const { data: tx, error: txError } = await supabase
-          .from("transacoes_financeiras")
+        const { data: itemReembolso, error: itemError } = await supabase
+          .from("itens_reembolso")
           .insert({
-            descricao: item.descricao || `Reembolso - ${item.fornecedor || 'Comprovante'}`,
+            solicitacao_id: solicitacao.id,
+            descricao: item.descricao || `Comprovante - ${item.fornecedor || 'N/A'}`,
             valor: item.valor || 0,
-            tipo: "saida",
-            tipo_lancamento: "unico",
-            data_vencimento: metaDados.data_vencimento,
-            status: "pendente",
-            conta_id: contaPadrao.id,
+            data_item: item.data_emissao || new Date().toISOString().split('T')[0],
             categoria_id: item.categoria_sugerida_id,
             subcategoria_id: item.subcategoria_sugerida_id,
             centro_custo_id: item.centro_custo_sugerido_id,
-            solicitacao_reembolso_id: solicitacao.id,
-            anexo_url: item.anexo_storage,
-            observacoes: `Fornecedor: ${item.fornecedor || 'N/A'}\nData Emissão: ${item.data_emissao || 'N/A'}`
+            foto_url: item.anexo_storage,
+            // fornecedor_id e base_ministerial_id ficam null por ora (podem ser preenchidos na tela)
           })
           .select("id")
           .single();
 
-        if (!txError && tx) {
-          transacoesCriadas.push(tx.id);
+        if (!itemError && itemReembolso) {
+          itensCriados.push(itemReembolso.id);
         } else {
-          console.error("Erro ao criar transação:", txError);
+          console.error("Erro ao criar item de reembolso:", itemError);
         }
       }
 
-      // 3. Encerrar sessão
+      // 3. Atualizar status para pendente (agora que os itens foram criados)
+      const { error: updateStatusError } = await supabase
+        .from("solicitacoes_reembolso")
+        .update({ status: "pendente" })
+        .eq("id", solicitacao.id);
+
+      if (updateStatusError) {
+        console.error("Erro ao atualizar status:", updateStatusError);
+      }
+
+      // 4. Encerrar sessão
       await supabase
         .from("atendimentos_bot")
         .update({
@@ -660,7 +654,7 @@ serve(async (req) => {
             forma_pagamento: formaPagamento,
             resultado: "REEMBOLSO_CRIADO",
             solicitacao_reembolso_id: solicitacao.id,
-            transacoes_ids: transacoesCriadas
+            itens_ids: itensCriados
           }
         })
         .eq("id", sessao.id);
