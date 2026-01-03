@@ -112,6 +112,7 @@ interface PessoaDetalhesData {
   cadastrado_por: string | null;
   tipo_sanguineo: string | null;
   observacoes: string | null;
+  autorizado_bot_financeiro: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -1053,6 +1054,7 @@ export default function PessoaDetalhes() {
               alergias: pessoa.alergias,
               necessidades_especiais: pessoa.necessidades_especiais,
               observacoes: pessoa.observacoes,
+              autorizado_bot_financeiro: pessoa.autorizado_bot_financeiro,
             }}
             onSuccess={fetchPessoa}
           />
