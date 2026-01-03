@@ -17,7 +17,8 @@ import {
   Clock,
   User,
   BookOpen,
-  UserPlus
+  UserPlus,
+  Route
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -28,6 +29,7 @@ import SalaDialog from "@/components/ensino/SalaDialog";
 import AulaDetailsSheet from "@/components/ensino/AulaDetailsSheet";
 import RegistrarVisitanteFamiliaDialog from "@/components/ensino/RegistrarVisitanteFamiliaDialog";
 import { CheckinManualDialog } from "@/components/ensino/CheckinManualDialog";
+import JornadasContent from "@/pages/Jornadas";
 
 interface Aula {
   id: string;
@@ -168,25 +170,27 @@ export default function Ensino() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2">
-              <BookOpen className="w-7 h-7 text-primary" />
-              Ensino
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie aulas, salas e acompanhe o progresso dos alunos
-            </p>
+        {activeTab !== "jornadas" && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2">
+                <BookOpen className="w-7 h-7 text-primary" />
+                Ensino & Discipulado
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Gerencie aulas, salas e acompanhe o progresso dos alunos
+              </p>
+            </div>
+            <Button onClick={() => setNovaAulaOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nova Aula
+            </Button>
           </div>
-          <Button onClick={() => setNovaAulaOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nova Aula
-          </Button>
-        </div>
+        )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="agenda" className="gap-2">
               <Calendar className="w-4 h-4" />
               <span className="hidden sm:inline">Visão Geral</span>
@@ -201,6 +205,10 @@ export default function Ensino() {
               <Settings className="w-4 h-4" />
               <span className="hidden sm:inline">Configurações</span>
               <span className="sm:hidden">Config</span>
+            </TabsTrigger>
+            <TabsTrigger value="jornadas" className="gap-2">
+              <Route className="w-4 h-4" />
+              <span>Jornadas</span>
             </TabsTrigger>
           </TabsList>
 
@@ -440,6 +448,11 @@ export default function Ensino() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Tab D: Jornadas */}
+          <TabsContent value="jornadas" className="space-y-4">
+            <JornadasContent />
           </TabsContent>
         </Tabs>
       </div>

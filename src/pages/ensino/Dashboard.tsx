@@ -20,7 +20,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
 export default function EnsinoDashboard() {
-  const [selectedPeriod, setSelectedPeriod] = useState<"hoje" | "semana" | "mes">("semana");
+  const [selectedPeriod, setSelectedPeriod] = useState<
+    "hoje" | "semana" | "mes"
+  >("semana");
 
   // Query para estatísticas de ensino
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -61,19 +63,26 @@ export default function EnsinoDashboard() {
 
       if (presencasError) throw presencasError;
 
-      const alunosUnicos = new Set(presencas?.map((p) => p.aluno_id) || []).size;
+      const alunosUnicos = new Set(presencas?.map((p) => p.aluno_id) || [])
+        .size;
 
       // Total de jornadas ativas
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: jornadas, error: jornadasError } = await (supabase as any)
+      const { data: jornadas, error: jornadasError } = (await (supabase as any)
         .from("jornadas")
         .select("id")
-        .eq("ativo", true) as { data: { id: string }[] | null; error: Error | null };
+        .eq("ativo", true)) as {
+        data: { id: string }[] | null;
+        error: Error | null;
+      };
 
       if (jornadasError) throw jornadasError;
 
       // Taxa de conclusão (placeholder - seria baseado em progresso real)
-      const taxaConclusao = aulas && aulas.length > 0 ? Math.round((alunosUnicos / aulas.length) * 10) : 0;
+      const taxaConclusao =
+        aulas && aulas.length > 0
+          ? Math.round((alunosUnicos / aulas.length) * 10)
+          : 0;
 
       return {
         totalAulas: aulas?.length || 0,
@@ -91,11 +100,13 @@ export default function EnsinoDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("aulas")
-        .select(`
+        .select(
+          `
           *,
           sala:salas(nome),
           professor:profiles!aulas_professor_id_fkey(nome, avatar_url)
-        `)
+        `
+        )
         .gte("data_inicio", new Date().toISOString())
         .order("data_inicio", { ascending: true })
         .limit(5);
@@ -109,13 +120,22 @@ export default function EnsinoDashboard() {
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return {
-      date: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
-      time: date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      date: date.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "short",
+      }),
+      time: date.toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+    const statusMap: Record<
+      string,
+      { label: string; variant: "default" | "secondary" | "outline" }
+    > = {
       agendada: { label: "Agendada", variant: "outline" },
       em_andamento: { label: "Em Andamento", variant: "default" },
       concluida: { label: "Concluída", variant: "secondary" },
@@ -174,7 +194,9 @@ export default function EnsinoDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aulas Realizadas</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Aulas Realizadas
+            </CardTitle>
             <BookOpen className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
@@ -182,7 +204,11 @@ export default function EnsinoDashboard() {
               {statsLoading ? "..." : stats?.totalAulas || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {selectedPeriod === "hoje" ? "hoje" : selectedPeriod === "semana" ? "nesta semana" : "neste mês"}
+              {selectedPeriod === "hoje"
+                ? "hoje"
+                : selectedPeriod === "semana"
+                ? "nesta semana"
+                : "neste mês"}
             </p>
           </CardContent>
         </Card>
@@ -197,14 +223,18 @@ export default function EnsinoDashboard() {
               {statsLoading ? "..." : stats?.alunosAtivos || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats?.alunosAtivos === 1 ? "aluno participante" : "alunos participantes"}
+              {stats?.alunosAtivos === 1
+                ? "aluno participante"
+                : "alunos participantes"}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Jornadas Ativas</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Jornadas Ativas
+            </CardTitle>
             <Calendar className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
@@ -212,7 +242,9 @@ export default function EnsinoDashboard() {
               {statsLoading ? "..." : stats?.jornadasAtivas || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats?.jornadasAtivas === 1 ? "jornada em andamento" : "jornadas em andamento"}
+              {stats?.jornadasAtivas === 1
+                ? "jornada em andamento"
+                : "jornadas em andamento"}
             </p>
           </CardContent>
         </Card>
@@ -260,11 +292,17 @@ export default function EnsinoDashboard() {
                   >
                     <div className="flex items-center gap-3 flex-1">
                       <div className="flex flex-col items-center justify-center w-12 h-12 bg-primary/10 rounded-lg">
-                        <span className="text-xs font-medium text-muted-foreground">{date.split(' ')[1]}</span>
-                        <span className="text-lg font-bold text-primary">{date.split(' ')[0]}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {date.split(" ")[1]}
+                        </span>
+                        <span className="text-lg font-bold text-primary">
+                          {date.split(" ")[0]}
+                        </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{aula.tema || "Aula sem tema"}</p>
+                        <p className="font-medium truncate">
+                          {aula.tema || "Aula sem tema"}
+                        </p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="w-3 h-3" />
                           <span>{time}</span>
@@ -307,7 +345,7 @@ export default function EnsinoDashboard() {
         </Card>
 
         <Card className="cursor-pointer hover:border-primary transition-colors">
-          <Link to="/jornadas">
+          <Link to="/ensino/jornadas">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />

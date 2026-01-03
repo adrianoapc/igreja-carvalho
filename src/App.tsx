@@ -36,7 +36,7 @@ const Escalas = lazy(() => import("./pages/Escalas"));
 const MinhasEscalas = lazy(() => import("./pages/MinhasEscalas"));
 const Voluntariado = lazy(() => import("./pages/Voluntariado"));
 const VoluntariadoCandidatos = lazy(
-  () => import("./pages/voluntariado/Candidatos")
+  () => import("./pages/voluntario/Candidatos")
 );
 const VoluntariadoHistorico = lazy(
   () => import("./pages/voluntariado/Historico")
@@ -96,9 +96,9 @@ const Kids = lazy(() => import("./pages/Kids"));
 // Ensino
 const EnsinoDashboard = lazy(() => import("./pages/ensino/Dashboard"));
 const Ensino = lazy(() => import("./pages/Ensino"));
-const Jornadas = lazy(() => import("./pages/Jornadas"));
+const Jornadas = lazy(() => import("./pages/ensino/Jornadas"));
 const DetalhesJornada = lazy(() => import("./pages/ensino/DetalhesJornada"));
-const JornadaBoard = lazy(() => import("./pages/JornadaBoard"));
+const JornadaBoard = lazy(() => import("./pages/ensino/JornadaBoard"));
 const Ensinamentos = lazy(() => import("./pages/Ensinamentos"));
 const MeusCursos = lazy(() => import("./pages/MeusCursos"));
 const CursoPlayer = lazy(() => import("./pages/CursoPlayer"));
@@ -535,7 +535,7 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/jornadas"
+                  path="/ensino/jornadas"
                   element={
                     <AuthGate>
                       <Jornadas />
@@ -543,7 +543,7 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/jornadas/:id"
+                  path="/ensino/jornadas/:id"
                   element={
                     <AuthGate>
                       <DetalhesJornada />
@@ -551,10 +551,35 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/jornadas/:id/board"
+                  path="/ensino/jornadas/:id/board"
                   element={
                     <AuthGate>
                       <JornadaBoard />
+                    </AuthGate>
+                  }
+                />
+                {/* Redirects legado de Jornadas para o módulo de Ensino */}
+                <Route
+                  path="/jornadas"
+                  element={
+                    <AuthGate>
+                      <Navigate to="/ensino/jornadas" replace />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/jornadas/:id"
+                  element={
+                    <AuthGate>
+                      <Navigate to="/ensino/jornadas/:id" replace />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/jornadas/:id/board"
+                  element={
+                    <AuthGate>
+                      <Navigate to="/ensino/jornadas/:id/board" replace />
                     </AuthGate>
                   }
                 />

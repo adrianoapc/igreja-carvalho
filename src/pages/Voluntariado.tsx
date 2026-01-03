@@ -1,58 +1,90 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import MinhaInscricaoCard from "@/components/voluntariado/MinhaInscricaoCard";
-import { Loader2 } from "lucide-react";
+import MinisterioCard from "@/components/voluntario/MinisterioCard";
+import InscricaoModal from "@/components/voluntario/InscricaoModal";
+import StatusTimeline from "@/components/voluntario/StatusTimeline";
+import { Loader2, Heart, Users, Zap, Target } from "lucide-react";
+import { motion } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ministryOptions = [
-  "Recepção",
-  "Louvor",
-  "Mídia",
-  "Kids",
-  "Intercessão",
-  "Ação Social",
-  "Eventos",
-];
-
-const availabilityOptions = [
-  "Domingos (manhã)",
-  "Domingos (noite)",
-  "Durante a semana",
-  "Eventos pontuais",
-  "Flexível",
-];
-
-const experienceOptions = [
-  "Nenhuma experiência (quero aprender)",
-  "Já servi antes",
-  "Sirvo atualmente",
+  {
+    id: "recepcao",
+    nome: "Recepção",
+    descricao: "Acolha visitantes com um sorriso caloroso na entrada",
+    cor: "bg-blue-500",
+    vagas: 5,
+    dificuldade: "fácil" as const,
+    requisitos: ["Simpatia", "Pontualidade", "Disponibilidade nos cultos"],
+  },
+  {
+    id: "louvor",
+    nome: "Louvor",
+    descricao: "Ministrar através da música e adoração",
+    cor: "bg-purple-500",
+    vagas: 3,
+    dificuldade: "avançado" as const,
+    requisitos: ["Habilidades musicais", "Comprometimento semanal", "Experiência em louvor"],
+  },
+  {
+    id: "midia",
+    nome: "Mídia",
+    descricao: "Gerenciar projetor, áudio e transmissão ao vivo",
+    cor: "bg-green-500",
+    vagas: 4,
+    dificuldade: "médio" as const,
+    requisitos: ["Conhecimento técnico básico", "Responsabilidade", "Pontualidade"],
+  },
+  {
+    id: "kids",
+    nome: "Kids",
+    descricao: "Cuidar e ensinar crianças durante os cultos",
+    cor: "bg-pink-500",
+    vagas: 6,
+    dificuldade: "médio" as const,
+    requisitos: ["Paciência", "Afinidade com crianças", "Capacidade de liderança"],
+  },
+  {
+    id: "intercessao",
+    nome: "Intercessão",
+    descricao: "Orar e interceder pelos ministérios e membros",
+    cor: "bg-red-500",
+    vagas: 8,
+    dificuldade: "fácil" as const,
+    requisitos: ["Vida de oração", "Sensibilidade espiritual", "Disponibilidade flexível"],
+  },
+  {
+    id: "acao-social",
+    nome: "Ação Social",
+    descricao: "Ajudar pessoas em situação de vulnerabilidade",
+    cor: "bg-orange-500",
+    vagas: 10,
+    dificuldade: "médio" as const,
+    requisitos: ["Compaixão", "Organização", "Disponibilidade eventual"],
+  },
+  {
+    id: "eventos",
+    nome: "Eventos",
+    descricao: "Organizar e coordenar eventos da igreja",
+    cor: "bg-cyan-500",
+    vagas: 5,
+    dificuldade: "avançado" as const,
+    requisitos: ["Liderança", "Criatividade", "Disponibilidade variável"],
+  },
 ];
 
 type VolunteerFormData = {
-  area: string;
+  ministerio_id: string;
   disponibilidade: string;
   experiencia: string;
   observacoes: string;
-  contato: string;
-  telefone: string;
-  email: string;
-};
-
-const initialFormState: VolunteerFormData = {
-  area: "",
-  disponibilidade: "",
-  experiencia: "",
-  observacoes: "",
-  contato: "",
-  telefone: "",
-  email: "",
+  telefone?: string;
+  email?: string;
 };
 
 interface Candidatura {
@@ -64,26 +96,21 @@ interface Candidatura {
   created_at: string;
 }
 
-// Status que bloqueiam nova candidatura no MESMO ministério
 const STATUS_BLOQUEANTES = ["pendente", "em_analise", "aprovado", "em_trilha"];
 
 export default function Voluntariado() {
   const { toast } = useToast();
   const { user, profile, loading: authLoading } = useAuth();
-  const [formData, setFormData] = useState<VolunteerFormData>(initialFormState);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [minhasCandidaturas, setMinhasCandidaturas] = useState<Candidatura[]>([]);
   const [loadingCandidatura, setLoadingCandidatura] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [ministerioSelecionado, setMinisterioSelecionado] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Preencher dados do perfil se logado
   useEffect(() => {
     if (profile) {
-      setFormData((prev) => ({
-        ...prev,
-        contato: profile.nome || prev.contato,
-        telefone: profile.telefone || prev.telefone,
-        email: profile.email || prev.email,
-      }));
+      // dados carregados do perfil
     }
   }, [profile]);
 
@@ -117,44 +144,35 @@ export default function Voluntariado() {
     .filter(c => STATUS_BLOQUEANTES.includes(c.status))
     .map(c => c.ministerio);
 
-  // Ministérios disponíveis para nova candidatura
-  const ministeriosDisponiveis = ministryOptions.filter(m => !ministeriosBloqueados.includes(m));
+  const handleAbrir = (ministerioId: string) => {
+    setMinisterioSelecionado(ministerioId);
+    setModalOpen(true);
+  };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleInscricao = async (data: {
+    disponibilidade: string;
+    experiencia: string;
+    observacoes: string;
+    telefone?: string;
+    email?: string;
+  }) => {
+    if (!ministerioSelecionado) return;
 
-    if (!formData.area || !formData.disponibilidade || !formData.experiencia) {
-      toast({
-        title: "Preencha os campos obrigatórios",
-        description: "Selecione a área, disponibilidade e experiência para continuar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.contato) {
-      toast({
-        title: "Informe seu nome",
-        description: "Precisamos saber quem está se inscrevendo.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const ministerio = ministryOptions.find(m => m.id === ministerioSelecionado)?.nome || ministerioSelecionado;
 
     setIsSubmitting(true);
-
     try {
-      const { data, error } = await supabase
+      const { data: result, error } = await supabase
         .from("candidatos_voluntario")
         .insert({
           pessoa_id: profile?.id || null,
-          nome_contato: formData.contato,
-          telefone_contato: formData.telefone || null,
-          email_contato: formData.email || null,
-          ministerio: formData.area,
-          disponibilidade: formData.disponibilidade,
-          experiencia: formData.experiencia,
-          observacoes: formData.observacoes || null,
+          nome_contato: profile?.nome || "Visitante",
+          telefone_contato: data.telefone || profile?.telefone || null,
+          email_contato: data.email || profile?.email || null,
+          ministerio: ministerio,
+          disponibilidade: data.disponibilidade,
+          experiencia: data.experiencia,
+          observacoes: data.observacoes || null,
           status: "pendente",
         })
         .select()
@@ -163,23 +181,23 @@ export default function Voluntariado() {
       if (error) throw error;
 
       toast({
-        title: "Inscrição enviada!",
-        description: "Recebemos seu interesse em servir. Em breve entraremos em contato.",
+        title: "Candidatura enviada! 🎉",
+        description: `Sua inscrição para ${ministerio} foi recebida. Entraremos em contato em breve!`,
       });
 
-      // Atualizar estado com a nova candidatura
-      if (data) {
+      if (result) {
         setMinhasCandidaturas(prev => [{
-          id: data.id,
-          ministerio: data.ministerio,
-          disponibilidade: data.disponibilidade,
-          experiencia: data.experiencia,
-          status: data.status,
-          created_at: data.created_at,
+          id: result.id,
+          ministerio: result.ministerio,
+          disponibilidade: result.disponibilidade,
+          experiencia: result.experiencia,
+          status: result.status,
+          created_at: result.created_at,
         }, ...prev]);
       }
 
-      setFormData(initialFormState);
+      setModalOpen(false);
+      setMinisterioSelecionado(null);
     } catch (error: unknown) {
       console.error("Erro ao enviar inscrição:", error);
       toast({
@@ -190,11 +208,7 @@ export default function Voluntariado() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Candidaturas ativas (não rejeitadas)
-  const candidaturasAtivas = minhasCandidaturas.filter(c => c.status !== "rejeitado");
-  const temCandidaturaAtiva = candidaturasAtivas.length > 0;
+  }
 
   if (authLoading || loadingCandidatura) {
     return (
@@ -204,224 +218,174 @@ export default function Voluntariado() {
     );
   }
 
+  const candidaturasAtivas = minhasCandidaturas.filter(c => c.status !== "rejeitado");
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Voluntariado</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Faça sua inscrição para servir em nossos ministérios e projetos.
-        </p>
-      </div>
-
-      {/* Mostrar candidaturas ativas se existirem */}
-      {temCandidaturaAtiva && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Suas Candidaturas</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {candidaturasAtivas.map((candidatura) => (
-              <MinhaInscricaoCard 
-                key={candidatura.id}
-                candidatura={candidatura} 
-              />
-            ))}
-          </div>
-          
-          {ministeriosDisponiveis.length > 0 && (
-            <Card className="border-dashed">
-              <CardContent className="pt-4">
-                <p className="text-sm text-muted-foreground">
-                  Você pode se candidatar a outros ministérios: {ministeriosDisponiveis.join(", ")}
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 via-transparent to-transparent">
+      <div className="space-y-8">
+        {/* Hero Section */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-transparent" />
+          <div className="relative space-y-4 py-12">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-primary/10">
+                <Heart className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-4xl md:text-5xl font-bold">Voluntariado</h1>
+                <p className="text-muted-foreground mt-2 max-w-2xl">
+                  Toda pessoa tem um chamado único. Descubra como você pode servir e fazer diferença em nossa comunidade.
                 </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+              </div>
+            </div>
 
-      {/* Formulário - mostrar se ainda há ministérios disponíveis ou não está logado */}
-      {(ministeriosDisponiveis.length > 0 || !profile) && (
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Formulário de inscrição</CardTitle>
-              <CardDescription>
-                {profile 
-                  ? "Seus dados foram preenchidos automaticamente. Complete os campos restantes."
-                  : "Informe seus interesses e disponibilidade para participarmos do processo."
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contato">Nome completo *</Label>
-                    <Input
-                      id="contato"
-                      placeholder="Seu nome"
-                      value={formData.contato}
-                      onChange={(event) =>
-                        setFormData((prev) => ({ ...prev, contato: event.target.value }))
-                      }
-                      disabled={!!profile?.nome}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="telefone">WhatsApp</Label>
-                    <Input
-                      id="telefone"
-                      placeholder="(11) 99999-9999"
-                      value={formData.telefone}
-                      onChange={(event) =>
-                        setFormData((prev) => ({ ...prev, telefone: event.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={formData.email}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, email: event.target.value }))
-                    }
-                    disabled={!!profile?.email}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="area">Ministério/área *</Label>
-                    <Select
-                      value={formData.area}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, area: value }))}
-                    >
-                      <SelectTrigger id="area">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(profile ? ministeriosDisponiveis : ministryOptions).map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {profile && ministeriosBloqueados.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Você já tem candidatura em: {ministeriosBloqueados.join(", ")}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="disponibilidade">Disponibilidade *</Label>
-                    <Select
-                      value={formData.disponibilidade}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({ ...prev, disponibilidade: value }))
-                      }
-                    >
-                      <SelectTrigger id="disponibilidade">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availabilityOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="experiencia">Experiência *</Label>
-                    <Select
-                      value={formData.experiencia}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({ ...prev, experiencia: value }))
-                      }
-                    >
-                      <SelectTrigger id="experiencia">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {experienceOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Textarea
-                    id="observacoes"
-                    placeholder="Conte um pouco sobre seus dons, horários ou preferência de atuação."
-                    rows={4}
-                    value={formData.observacoes}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, observacoes: event.target.value }))
-                    }
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setFormData(initialFormState)}
-                  >
-                    Limpar
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Enviando...
-                      </>
-                    ) : (
-                      "Enviar inscrição"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Como funciona</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <p>1. Recebemos sua inscrição e alinhamos o ministério ideal.</p>
-                <p>2. Entramos em contato para treinamento e integração.</p>
-                <p>3. Você começa a servir no cronograma combinado.</p>
-              </CardContent>
-            </Card>
-
-            {profile && (
-              <Card className="border-green-200 bg-green-50/50">
-                <CardContent className="pt-4">
-                  <p className="text-sm text-green-700">
-                    ✓ Você está logado como <strong>{profile.nome}</strong>. 
-                    Seus dados foram preenchidos automaticamente.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Stats */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="grid grid-cols-3 gap-4 mt-8"
+            >
+              {[
+                { icon: Zap, label: "Ministérios", value: ministryOptions.length },
+                { icon: Users, label: "Voluntários", value: "200+" },
+                { icon: Target, label: "Impacto", value: "Alto" },
+              ].map((stat, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.3 + idx * 0.1 }}
+                  className="p-4 rounded-lg bg-card border"
+                >
+                  <stat.icon className="w-5 h-5 text-primary mb-2" />
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
-        </div>
-      )}
+        </motion.div>
+
+        {/* Abas */}
+        <Tabs defaultValue="ministerios" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="ministerios">Ministérios</TabsTrigger>
+            {candidaturasAtivas.length > 0 && (
+              <TabsTrigger value="minhas-inscricoes">
+                Minhas Inscrições ({candidaturasAtivas.length})
+              </TabsTrigger>
+            )}
+          </TabsList>
+
+          {/* Tab: Ministérios */}
+          <TabsContent value="ministerios" className="space-y-6 mt-6">
+            <motion.div
+              layout
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {ministryOptions.map((ministerio, idx) => (
+                <MinisterioCard
+                  key={ministerio.id}
+                  nome={ministerio.nome}
+                  descricao={ministerio.descricao}
+                  icone={Heart}
+                  cor={ministerio.cor}
+                  vagas={ministerio.vagas}
+                  dificuldade={ministerio.dificuldade}
+                  requisitos={ministerio.requisitos}
+                  desabilitado={ministeriosBloqueados.includes(ministerio.nome)}
+                  motivo={
+                    ministeriosBloqueados.includes(ministerio.nome)
+                      ? "Você já tem uma candidatura ativa neste ministério"
+                      : undefined
+                  }
+                  onSelect={() => handleAbrir(ministerio.id)}
+                />
+              ))}
+            </motion.div>
+          </TabsContent>
+
+          {/* Tab: Minhas Inscrições */}
+          {candidaturasAtivas.length > 0 && (
+            <TabsContent value="minhas-inscricoes" className="space-y-6 mt-6">
+              <motion.div
+                layout
+                className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+              >
+                {candidaturasAtivas.map((candidatura) => (
+                  <motion.div
+                    key={candidatura.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                  >
+                    <MinhaInscricaoCard candidatura={candidatura} />
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {ministeriosBloqueados.length < ministryOptions.length && (
+                <Card className="border-dashed">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">
+                      💡 Você pode se candidatar a outros ministérios. Volte à aba "Ministérios" para explorar mais oportunidades.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
+
+        {/* Modal de Inscrição */}
+        {ministerioSelecionado && (
+          <InscricaoModal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            ministerio={
+              ministryOptions.find(m => m.id === ministerioSelecionado)?.nome || "Ministério"
+            }
+            perfil={
+              profile
+                ? {
+                    nome: profile.nome || "",
+                    telefone: profile.telefone || "",
+                    email: profile.email || "",
+                  }
+                : undefined
+            }
+            onSubmit={handleInscricao}
+            isSubmitting={isSubmitting}
+          />
+        )}
+
+        {/* Footer CTA */}
+        {candidaturasAtivas.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="py-8 text-center"
+          >
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="pt-8">
+                <p className="text-base text-muted-foreground mb-4">
+                  Quer saber mais sobre o processo de integração?
+                </p>
+                <Button variant="outline" asChild>
+                  <a href="#como-funciona">Ver processo</a>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }

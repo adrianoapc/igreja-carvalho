@@ -75,11 +75,13 @@ export default function JornadaBoard() {
       // Buscar inscrições
       const { data: inscricoesData, error: inscricoesError } = await supabase
         .from("inscricoes_jornada")
-        .select(`
+        .select(
+          `
           *,
           pessoa:profiles!inscricoes_jornada_pessoa_id_fkey(id, nome, avatar_url, telefone),
           responsavel:profiles!inscricoes_jornada_responsavel_id_fkey(id, nome, avatar_url)
-        `)
+        `
+        )
         .eq("jornada_id", id);
 
       if (inscricoesError) throw inscricoesError;
@@ -90,14 +92,18 @@ export default function JornadaBoard() {
         .from("etapas_jornada")
         .select("id")
         .eq("jornada_id", id!);
-      
-      const etapaIds = etapasJornada?.map(e => e.id) || [];
+
+      const etapaIds = etapasJornada?.map((e) => e.id) || [];
 
       // Para cada inscricao, buscar quais etapas foram concluídas (IDs)
       const inscricoesComProgresso = await Promise.all(
         inscricoesData.map(async (inscricao) => {
           if (etapaIds.length === 0) {
-            return { ...inscricao, etapas_concluidas: 0, etapas_concluidas_ids: [] };
+            return {
+              ...inscricao,
+              etapas_concluidas: 0,
+              etapas_concluidas_ids: [],
+            };
           }
 
           const { data: presencas, count } = await supabase
@@ -107,12 +113,13 @@ export default function JornadaBoard() {
             .in("etapa_id", etapaIds)
             .eq("status", "concluido");
 
-          const etapasConcluidasIds = presencas?.map(p => p.etapa_id).filter(Boolean) || [];
+          const etapasConcluidasIds =
+            presencas?.map((p) => p.etapa_id).filter(Boolean) || [];
 
-          return { 
-            ...inscricao, 
+          return {
+            ...inscricao,
             etapas_concluidas: count || 0,
-            etapas_concluidas_ids: etapasConcluidasIds
+            etapas_concluidas_ids: etapasConcluidasIds,
           };
         })
       );
@@ -156,11 +163,11 @@ export default function JornadaBoard() {
     if (!inscricoesFiltradas || !etapas) return {};
 
     const grouped: Record<string, typeof inscricoesFiltradas> = {};
-    
+
     etapas.forEach((etapa) => {
       grouped[etapa.id] = [];
     });
-    
+
     grouped["sem_etapa"] = [];
 
     inscricoesFiltradas.forEach((inscricao) => {
@@ -219,7 +226,8 @@ export default function JornadaBoard() {
   const totalInscritos = inscricoes?.length || 0;
   const totalConcluidos = inscricoes?.filter((i) => i.concluido)?.length || 0;
   const totalAtivos = totalInscritos - totalConcluidos;
-  const taxaRetencao = totalInscritos > 0 ? (totalConcluidos / totalInscritos) * 100 : 0;
+  const taxaRetencao =
+    totalInscritos > 0 ? (totalConcluidos / totalInscritos) * 100 : 0;
 
   if (loadingJornada || loadingEtapas) {
     return (
@@ -243,7 +251,7 @@ export default function JornadaBoard() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/jornadas")}
+              onClick={() => navigate("/ensino/jornadas")}
               className="rounded-full shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -254,16 +262,22 @@ export default function JornadaBoard() {
                 style={{ backgroundColor: jornada?.cor_tema || "#3b82f6" }}
               />
               <div className="min-w-0">
-                <h1 className="text-lg font-semibold truncate">{jornada?.titulo}</h1>
+                <h1 className="text-lg font-semibold truncate">
+                  {jornada?.titulo}
+                </h1>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                   <span>
-                    {totalInscritos} {totalInscritos === 1 ? "inscrito" : "inscritos"}
+                    {totalInscritos}{" "}
+                    {totalInscritos === 1 ? "inscrito" : "inscritos"}
                   </span>
                   <span className="flex items-center gap-1 text-foreground font-semibold">
                     Taxa de Retenção: {taxaRetencao.toFixed(0)}%
                   </span>
                   <span className="flex items-center gap-1">
-                    Total Ativos: <span className="font-semibold text-foreground">{totalAtivos}</span>
+                    Total Ativos:{" "}
+                    <span className="font-semibold text-foreground">
+                      {totalAtivos}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -280,10 +294,16 @@ export default function JornadaBoard() {
               size="sm"
               className="bg-muted rounded-lg p-0.5"
             >
-              <ToggleGroupItem value="todos" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+              <ToggleGroupItem
+                value="todos"
+                className="text-xs px-3 rounded-md data-[state=on]:bg-background"
+              >
                 Todos
               </ToggleGroupItem>
-              <ToggleGroupItem value="minhas" className="text-xs px-3 rounded-md data-[state=on]:bg-background">
+              <ToggleGroupItem
+                value="minhas"
+                className="text-xs px-3 rounded-md data-[state=on]:bg-background"
+              >
                 Minhas
               </ToggleGroupItem>
             </ToggleGroup>

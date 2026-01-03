@@ -36,7 +36,6 @@ import {
   Heart,
   Sparkles,
   Smile,
-  Route,
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 import { usePermissions, Permission } from "@/hooks/usePermissions";
@@ -67,7 +66,6 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
       { title: "Minha Família", url: "/perfil/familia", icon: Home },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },
-      { title: "Jornadas", url: "/jornadas", icon: Route },
     ],
   },
   {
@@ -92,13 +90,19 @@ const MENU_GROUPS: MenuGroup[] = [
         permission: "ministerio.view",
       },
       {
+        title: "Voluntariado › Candidatos",
+        url: "/voluntariado/candidatos",
+        icon: ClipboardCheck,
+        permission: "ministerio.view",
+      },
+      {
         title: "Escalas",
         url: "/escalas",
         icon: CalendarCheck,
         permission: "ministerio.view",
       },
       {
-        title: "Ensino",
+        title: "Ensino & Discipulado",
         url: "/ensino",
         icon: BookOpen,
         permission: "ensino.view",
