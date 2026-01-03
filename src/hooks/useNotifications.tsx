@@ -212,6 +212,12 @@ export function useNotifications() {
           ? `/pessoas/${metadata.pessoa_id}`
           : "/membros";
 
+      case "financeiro_reembolso_aprovacao":
+        // Navegar para reembolso específico
+        return metadata?.solicitacao_id
+          ? `/financas/reembolsos?id=${metadata.solicitacao_id}`
+          : "/financas/reembolsos";
+
       default:
         return "/dashboard";
     }
