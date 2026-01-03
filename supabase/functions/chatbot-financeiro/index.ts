@@ -1,10 +1,184 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { decode as decodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Estados da máquina de estados
+type EstadoSessao = 
+  | "AGUARDANDO_COMPROVANTES" 
+  | "AGUARDANDO_DATA" 
+  | "AGUARDANDO_FORMA_PGTO" 
+  | "FINALIZADO";
+
+interface ItemProcessado {
+  anexo_original: string;
+  anexo_storage: string;
+  valor: number;
+  fornecedor: string | null;
+  data_emissao: string | null;
+  descricao: string | null;
+  categoria_sugerida_id: string | null;
+  subcategoria_sugerida_id: string | null;
+  centro_custo_sugerido_id: string | null;
+  processado_em: string;
+}
+
+interface MetaDados {
+  contexto: string;
+  fluxo: "REEMBOLSO" | "CONTA_UNICA";
+  pessoa_id?: string;
+  nome_perfil?: string;
+  estado_atual: EstadoSessao;
+  itens: ItemProcessado[];
+  valor_total_acumulado: number;
+  data_vencimento?: string;
+  forma_pagamento?: "pix" | "dinheiro";
+  resultado?: string;
+  itens_removidos?: number;
+}
+
+// Função para fazer download de anexo do WhatsApp e upload para Storage
+async function persistirAnexo(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  urlOriginal: string,
+  sessaoId: string
+): Promise<string | null> {
+  try {
+    console.log(`[Storage] Baixando anexo: ${urlOriginal.slice(0, 50)}...`);
+    
+    // Download do arquivo do WhatsApp
+    const response = await fetch(urlOriginal);
+    if (!response.ok) {
+      console.error(`[Storage] Erro ao baixar: ${response.status}`);
+      return null;
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Detectar tipo de arquivo
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const extension = contentType.includes("pdf") ? "pdf" : "jpg";
+    
+    // Nome do arquivo no Storage
+    const timestamp = Date.now();
+    const fileName = `whatsapp/${sessaoId}/${timestamp}.${extension}`;
+    
+    // Upload para o bucket transaction-attachments
+    const { error } = await supabase.storage
+      .from("transaction-attachments")
+      .upload(fileName, uint8Array, {
+        contentType,
+        upsert: false
+      });
+    
+    if (error) {
+      console.error(`[Storage] Erro no upload:`, error);
+      return null;
+    }
+    
+    // Gerar URL pública (ou signed se bucket privado)
+    const { data: urlData } = supabase.storage
+      .from("transaction-attachments")
+      .getPublicUrl(fileName);
+    
+    console.log(`[Storage] Anexo salvo: ${fileName}`);
+    return urlData?.publicUrl || null;
+    
+  } catch (error) {
+    console.error(`[Storage] Erro ao persistir anexo:`, error);
+    return null;
+  }
+}
+
+// Função para processar nota fiscal via edge function
+async function processarNotaFiscal(
+  supabaseUrl: string,
+  serviceKey: string,
+  base64Image: string
+): Promise<{
+  valor: number;
+  fornecedor: string | null;
+  data_emissao: string | null;
+  descricao: string | null;
+  categoria_sugerida_id: string | null;
+  subcategoria_sugerida_id: string | null;
+  centro_custo_sugerido_id: string | null;
+} | null> {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/processar-nota-fiscal`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${serviceKey}`
+      },
+      body: JSON.stringify({ image_base64: base64Image })
+    });
+    
+    if (!response.ok) {
+      console.error(`[OCR] Erro: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    return {
+      valor: data.valor || 0,
+      fornecedor: data.fornecedor || null,
+      data_emissao: data.data_emissao || null,
+      descricao: data.descricao || null,
+      categoria_sugerida_id: data.categoria_sugerida?.id || null,
+      subcategoria_sugerida_id: data.subcategoria_sugerida?.id || null,
+      centro_custo_sugerido_id: data.centro_custo_sugerido?.id || null
+    };
+  } catch (error) {
+    console.error(`[OCR] Erro ao processar nota:`, error);
+    return null;
+  }
+}
+
+// Função para deletar anexos do Storage (rollback)
+async function deletarAnexosSessao(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  itens: ItemProcessado[]
+): Promise<number> {
+  let removidos = 0;
+  
+  for (const item of itens) {
+    if (item.anexo_storage) {
+      try {
+        // Extrair path do URL
+        const url = new URL(item.anexo_storage);
+        const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/transaction-attachments\/(.+)/);
+        if (pathMatch) {
+          const filePath = pathMatch[1];
+          const { error } = await supabase.storage
+            .from("transaction-attachments")
+            .remove([filePath]);
+          
+          if (!error) {
+            removidos++;
+            console.log(`[Storage] Removido: ${filePath}`);
+          }
+        }
+      } catch (e) {
+        console.error(`[Storage] Erro ao remover:`, e);
+      }
+    }
+  }
+  
+  return removidos;
+}
+
+// Formatar valor em reais
+function formatarValor(valor: number): string {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -26,10 +200,10 @@ serve(async (req) => {
     console.log(`[Financeiro] Msg de ${telefone} no canal ${origem_canal}: ${mensagem || tipo}`);
 
     // 2. Valida se o telefone pertence a um membro autorizado
-    const telefoneNormalizado = telefone.replace(/\D/g, "").slice(-11); // Últimos 11 dígitos
+    const telefoneNormalizado = telefone.replace(/\D/g, "").slice(-11);
     const { data: membroAutorizado, error: authError } = await supabase
       .from("profiles")
-      .select("id, nome, autorizado_bot_financeiro")
+      .select("id, nome, autorizado_bot_financeiro, dados_bancarios")
       .or(`telefone.ilike.%${telefoneNormalizado}`)
       .eq("autorizado_bot_financeiro", true)
       .maybeSingle();
@@ -64,93 +238,354 @@ serve(async (req) => {
     // --- CENÁRIO A: SEM SESSÃO ATIVA (Início) ---
     if (!sessao) {
       const texto = (mensagem || "").toLowerCase();
-      const isGatilho = texto.includes("reembolso") || texto.includes("nota") || texto.includes("conta");
+      const isReembolso = texto.includes("reembolso");
+      const isContaUnica = texto.includes("conta") || texto.includes("nota");
+      const isGatilho = isReembolso || isContaUnica;
 
       if (isGatilho) {
+        const metaDadosInicial: MetaDados = {
+          contexto: "FINANCEIRO",
+          fluxo: isReembolso ? "REEMBOLSO" : "CONTA_UNICA",
+          pessoa_id: membroAutorizado.id,
+          nome_perfil: nome_perfil || membroAutorizado.nome,
+          estado_atual: "AGUARDANDO_COMPROVANTES",
+          itens: [],
+          valor_total_acumulado: 0
+        };
+
         await supabase.from("atendimentos_bot").insert({
           telefone,
           origem_canal,
+          pessoa_id: membroAutorizado.id,
           status: "EM_ANDAMENTO",
-          meta_dados: {
-            contexto: "FINANCEIRO",
-            fluxo: texto.includes("reembolso") ? "REEMBOLSO" : "NOVA_CONTA",
-            nome_perfil: nome_perfil,
-            anexos: []
-          }
+          meta_dados: metaDadosInicial
         });
 
+        const tipoFluxo = isReembolso ? "Reembolso" : "Nova Conta";
         return new Response(JSON.stringify({
-          text: "🧾 Modo Financeiro iniciado. Por favor, envie a foto do comprovante ou boleto. Digite 'Fechar' quando terminar."
+          text: `🧾 Modo ${tipoFluxo} iniciado!\n\nEnvie a(s) foto(s) dos comprovantes.\nDigite *Fechar* quando terminar.\nDigite *Cancelar* para desistir.`
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       return new Response(JSON.stringify({
-        text: "Olá! Sou o assistente financeiro. Para enviar um comprovante, digite 'Reembolso' ou 'Nova Conta'."
+        text: "Olá! Sou o assistente financeiro. Para iniciar:\n\n• *Reembolso* - para solicitar ressarcimento\n• *Nova Conta* - para registrar uma despesa"
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // --- CENÁRIO B: SESSÃO ATIVA (Processamento) ---
-    
-    // B1. Recebimento de Arquivos (Imagens/PDFs)
-    if (tipo === "image" || tipo === "document") {
-      if (!url_anexo) {
-        return new Response(JSON.stringify({ text: "Erro: Anexo sem URL." }), { headers: corsHeaders });
+    const metaDados = (sessao.meta_dados || {}) as MetaDados;
+    const estadoAtual = metaDados.estado_atual || "AGUARDANDO_COMPROVANTES";
+
+    // ========== ESTADO: AGUARDANDO_COMPROVANTES ==========
+    if (estadoAtual === "AGUARDANDO_COMPROVANTES") {
+      
+      // B1. Recebimento de Arquivos (Imagens/PDFs)
+      if (tipo === "image" || tipo === "document") {
+        if (!url_anexo) {
+          return new Response(JSON.stringify({ text: "Erro: Anexo sem URL." }), { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          });
+        }
+
+        // Baixar e salvar no Storage permanentemente
+        const anexoStorage = await persistirAnexo(supabase, url_anexo, sessao.id);
+        
+        if (!anexoStorage) {
+          return new Response(JSON.stringify({ 
+            text: "⚠️ Erro ao salvar o comprovante. Por favor, tente enviar novamente." 
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Processar via OCR para extrair dados
+        let dadosNota: Awaited<ReturnType<typeof processarNotaFiscal>> = null;
+        
+        if (tipo === "image") {
+          try {
+            // Fazer download novamente para base64 (ou usar cache se disponível)
+            const imgResponse = await fetch(url_anexo);
+            const imgBuffer = await imgResponse.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(imgBuffer)));
+            dadosNota = await processarNotaFiscal(supabaseUrl, supabaseKey, base64);
+          } catch (e) {
+            console.error("[OCR] Erro ao converter para base64:", e);
+          }
+        }
+
+        // Criar item processado
+        const novoItem: ItemProcessado = {
+          anexo_original: url_anexo,
+          anexo_storage: anexoStorage,
+          valor: dadosNota?.valor || 0,
+          fornecedor: dadosNota?.fornecedor || null,
+          data_emissao: dadosNota?.data_emissao || null,
+          descricao: dadosNota?.descricao || null,
+          categoria_sugerida_id: dadosNota?.categoria_sugerida_id || null,
+          subcategoria_sugerida_id: dadosNota?.subcategoria_sugerida_id || null,
+          centro_custo_sugerido_id: dadosNota?.centro_custo_sugerido_id || null,
+          processado_em: new Date().toISOString()
+        };
+
+        // Atualizar metadados
+        const itensAtualizados = [...metaDados.itens, novoItem];
+        const valorTotal = itensAtualizados.reduce((acc, item) => acc + item.valor, 0);
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: { 
+              ...metaDados, 
+              itens: itensAtualizados,
+              valor_total_acumulado: valorTotal
+            }
+          })
+          .eq("id", sessao.id);
+
+        // Resposta com resumo do item
+        let resposta = `📥 Comprovante ${itensAtualizados.length} recebido!\n`;
+        if (dadosNota?.valor) {
+          resposta += `💰 Valor: ${formatarValor(dadosNota.valor)}\n`;
+        }
+        if (dadosNota?.fornecedor) {
+          resposta += `🏪 ${dadosNota.fornecedor}\n`;
+        }
+        resposta += `\n📊 Total acumulado: ${formatarValor(valorTotal)} (${itensAtualizados.length} ${itensAtualizados.length === 1 ? 'item' : 'itens'})\n`;
+        resposta += `\nEnvie mais ou digite *Fechar* para concluir.`;
+
+        return new Response(JSON.stringify({ text: resposta }), { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
       }
 
-      const metaDados = sessao.meta_dados as Record<string, unknown> || {};
-      const anexosAtuais = (metaDados.anexos as string[]) || [];
-      const novosAnexos = [...anexosAtuais, url_anexo];
+      // B2. Cancelamento
+      if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
+        const itensRemovidos = await deletarAnexosSessao(supabase, metaDados.itens);
+        
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: { 
+              ...metaDados, 
+              estado_atual: "FINALIZADO",
+              resultado: "CANCELADO_PELO_USUARIO",
+              itens_removidos: itensRemovidos
+            }
+          })
+          .eq("id", sessao.id);
 
-      await supabase
-        .from("atendimentos_bot")
-        .update({
-          meta_dados: { ...metaDados, anexos: novosAnexos }
-        })
-        .eq("id", sessao.id);
+        console.log(`[Financeiro] Sessão ${sessao.id} cancelada. ${itensRemovidos} anexos removidos.`);
 
+        return new Response(JSON.stringify({
+          text: `❌ Solicitação cancelada.\n${itensRemovidos > 0 ? `${itensRemovidos} comprovante(s) descartado(s).` : ''}\n\nDigite *Reembolso* ou *Nova Conta* para iniciar novamente.`
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // B3. Finalização (Comando 'Fechar')
+      if (mensagem && mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)) {
+        const qtdItens = metaDados.itens.length;
+        
+        if (qtdItens === 0) {
+          return new Response(JSON.stringify({
+            text: "⚠️ Nenhum comprovante foi enviado ainda.\n\nEnvie a foto antes de fechar ou digite *Cancelar* para desistir."
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // FLUXO CONTA_UNICA: Inserir diretamente
+        if (metaDados.fluxo === "CONTA_UNICA") {
+          // Buscar conta padrão
+          const { data: contaPadrao } = await supabase
+            .from("contas")
+            .select("id")
+            .eq("ativo", true)
+            .limit(1)
+            .single();
+
+          if (!contaPadrao) {
+            return new Response(JSON.stringify({
+              text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador."
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
+          // Criar transações para cada item
+          const transacoesCriadas: string[] = [];
+          for (const item of metaDados.itens) {
+            const { data: tx, error } = await supabase
+              .from("transacoes_financeiras")
+              .insert({
+                descricao: item.descricao || `Despesa - ${item.fornecedor || 'WhatsApp'}`,
+                valor: item.valor || 0,
+                tipo: "saida",
+                tipo_lancamento: "unico",
+                data_vencimento: item.data_emissao || new Date().toISOString().split('T')[0],
+                status: "pendente",
+                conta_id: contaPadrao.id,
+                categoria_id: item.categoria_sugerida_id,
+                subcategoria_id: item.subcategoria_sugerida_id,
+                centro_custo_id: item.centro_custo_sugerido_id,
+                anexo_url: item.anexo_storage,
+                observacoes: `Fornecedor: ${item.fornecedor || 'N/A'}\nOrigem: WhatsApp\nSolicitante: ${metaDados.nome_perfil}`
+              })
+              .select("id")
+              .single();
+
+            if (!error && tx) {
+              transacoesCriadas.push(tx.id);
+            }
+          }
+
+          // Encerrar sessão
+          await supabase
+            .from("atendimentos_bot")
+            .update({
+              status: "CONCLUIDO",
+              meta_dados: { 
+                ...metaDados, 
+                estado_atual: "FINALIZADO",
+                resultado: "CONTA_UNICA_CRIADA",
+                transacoes_ids: transacoesCriadas
+              }
+            })
+            .eq("id", sessao.id);
+
+          return new Response(JSON.stringify({
+            text: `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n\nO financeiro irá processar em breve.`
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // FLUXO REEMBOLSO: Perguntar data
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: { ...metaDados, estado_atual: "AGUARDANDO_DATA" }
+          })
+          .eq("id", sessao.id);
+
+        return new Response(JSON.stringify({
+          text: `📋 *Resumo do Reembolso*\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${qtdItens}\n\n📅 *Quando deseja receber o ressarcimento?*\n\nDigite a data (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*`
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Mensagem genérica
       return new Response(JSON.stringify({
-        text: `📥 Recebido (${novosAnexos.length} no total). Envie mais ou digite 'Fechar' para processar.`
+        text: "📸 Aguardando comprovantes.\n\nEnvie a foto, digite *Fechar* para concluir ou *Cancelar* para desistir."
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // B2. Cancelamento (Comando 'Cancelar' - encerra sem processar)
-    if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
-      const metaDados = sessao.meta_dados as Record<string, unknown> || {};
-      
-      // Encerra sessão com status de cancelamento
+    // ========== ESTADO: AGUARDANDO_DATA ==========
+    if (estadoAtual === "AGUARDANDO_DATA") {
+      // Cancelamento ainda disponível
+      if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
+        const itensRemovidos = await deletarAnexosSessao(supabase, metaDados.itens);
+        
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: { 
+              ...metaDados, 
+              estado_atual: "FINALIZADO",
+              resultado: "CANCELADO_PELO_USUARIO",
+              itens_removidos: itensRemovidos
+            }
+          })
+          .eq("id", sessao.id);
+
+        return new Response(JSON.stringify({
+          text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Processar data informada
+      const textoData = (mensagem || "").toLowerCase().trim();
+      let dataVencimento: string;
+      const hoje = new Date();
+
+      if (textoData.includes("esta semana") || textoData.includes("essa semana")) {
+        // Próxima sexta-feira
+        const diasAteSexta = (5 - hoje.getDay() + 7) % 7 || 7;
+        const sexta = new Date(hoje);
+        sexta.setDate(hoje.getDate() + diasAteSexta);
+        dataVencimento = sexta.toISOString().split('T')[0];
+      } else if (textoData.includes("próximo mês") || textoData.includes("proximo mes")) {
+        // Dia 5 do próximo mês
+        const proximoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 5);
+        dataVencimento = proximoMes.toISOString().split('T')[0];
+      } else {
+        // Tentar parsear data no formato DD/MM ou DD/MM/AAAA
+        const matchData = textoData.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+        if (matchData) {
+          const dia = parseInt(matchData[1]);
+          const mes = parseInt(matchData[2]) - 1;
+          const ano = matchData[3] ? (matchData[3].length === 2 ? 2000 + parseInt(matchData[3]) : parseInt(matchData[3])) : hoje.getFullYear();
+          const dataInformada = new Date(ano, mes, dia);
+          dataVencimento = dataInformada.toISOString().split('T')[0];
+        } else {
+          return new Response(JSON.stringify({
+            text: "⚠️ Não entendi a data.\n\nDigite no formato DD/MM (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*"
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+
+      // Salvar data e avançar para forma de pagamento
       await supabase
         .from("atendimentos_bot")
         .update({
-          status: "CONCLUIDO",
           meta_dados: { 
             ...metaDados, 
-            resultado: "CANCELADO_PELO_USUARIO",
-            motivo: "Usuário solicitou cancelamento",
-            anexos_recebidos: (metaDados.anexos as string[] || []).length
+            estado_atual: "AGUARDANDO_FORMA_PGTO",
+            data_vencimento: dataVencimento
           }
         })
         .eq("id", sessao.id);
 
-      console.log(`[Financeiro] Sessão ${sessao.id} cancelada pelo usuário. Anexos: ${(metaDados.anexos as string[] || []).length}`);
+      const dataFormatada = new Date(dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR');
 
       return new Response(JSON.stringify({
-        text: "❌ Solicitação cancelada. Nenhum dado foi processado. Digite 'Reembolso' ou 'Nova Conta' para iniciar novamente."
+        text: `📅 Data do ressarcimento: *${dataFormatada}*\n\n💳 *Como prefere receber?*\n\n1️⃣ PIX\n2️⃣ Dinheiro\n\nDigite 1 ou 2`
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // B3. Finalização (Comando 'Fechar')
-    if (mensagem && mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)) {
-      const metaDados = sessao.meta_dados as Record<string, unknown> || {};
-      const anexos = (metaDados.anexos as string[]) || [];
-      const qtdAnexos = anexos.length;
-      
-      if (qtdAnexos === 0) {
+    // ========== ESTADO: AGUARDANDO_FORMA_PGTO ==========
+    if (estadoAtual === "AGUARDANDO_FORMA_PGTO") {
+      // Cancelamento
+      if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
+        const itensRemovidos = await deletarAnexosSessao(supabase, metaDados.itens);
+        
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: { 
+              ...metaDados, 
+              estado_atual: "FINALIZADO",
+              resultado: "CANCELADO_PELO_USUARIO",
+              itens_removidos: itensRemovidos
+            }
+          })
+          .eq("id", sessao.id);
+
         return new Response(JSON.stringify({
-          text: "⚠️ Nenhum comprovante foi enviado ainda. Envie a foto antes de fechar ou digite 'Cancelar' para desistir."
+          text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Busca uma conta padrão para vincular a transação
+      // Processar escolha
+      const escolha = (mensagem || "").trim();
+      let formaPagamento: "pix" | "dinheiro";
+
+      if (escolha === "1" || escolha.toLowerCase().includes("pix")) {
+        formaPagamento = "pix";
+      } else if (escolha === "2" || escolha.toLowerCase().includes("dinheiro")) {
+        formaPagamento = "dinheiro";
+      } else {
+        return new Response(JSON.stringify({
+          text: "⚠️ Opção inválida.\n\nDigite:\n1️⃣ PIX\n2️⃣ Dinheiro"
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // ===== CRIAR SOLICITAÇÃO DE REEMBOLSO E TRANSAÇÕES =====
+      
+      // Buscar conta padrão
       const { data: contaPadrao } = await supabase
         .from("contas")
         .select("id")
@@ -159,53 +594,88 @@ serve(async (req) => {
         .single();
 
       if (!contaPadrao) {
-        console.error("Nenhuma conta ativa encontrada");
         return new Response(JSON.stringify({
           text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador."
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Cria transação financeira pendente
-      const fluxo = metaDados.fluxo as string || "REEMBOLSO";
-      const { data: transacao, error: txError } = await supabase
-        .from("transacoes_financeiras")
+      // 1. Criar solicitação de reembolso
+      const { data: solicitacao, error: solError } = await supabase
+        .from("solicitacoes_reembolso")
         .insert({
-          descricao: `Solicitação via WhatsApp (${fluxo})`,
-          valor: 0,
-          tipo: "saida",
-          tipo_lancamento: "unico",
-          data_vencimento: new Date().toISOString().split('T')[0],
+          solicitante_id: metaDados.pessoa_id,
           status: "pendente",
-          conta_id: contaPadrao.id,
-          observacoes: `Anexos: ${anexos.join(", ")}\nOrigem: ${origem_canal}\nNome: ${metaDados.nome_perfil || "N/A"}`
+          forma_pagamento_preferida: formaPagamento,
+          data_vencimento: metaDados.data_vencimento,
+          observacoes: `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`
         })
-        .select()
+        .select("id")
         .single();
 
-      if (txError) {
-        console.error("Erro ao criar transação:", txError);
+      if (solError || !solicitacao) {
+        console.error("Erro ao criar solicitação:", solError);
         return new Response(JSON.stringify({
-          text: "❌ Erro ao criar solicitação. Tente novamente mais tarde."
+          text: "❌ Erro ao criar solicitação. Tente novamente."
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Encerra sessão
+      // 2. Criar transações para cada item
+      const transacoesCriadas: string[] = [];
+      for (const item of metaDados.itens) {
+        const { data: tx, error: txError } = await supabase
+          .from("transacoes_financeiras")
+          .insert({
+            descricao: item.descricao || `Reembolso - ${item.fornecedor || 'Comprovante'}`,
+            valor: item.valor || 0,
+            tipo: "saida",
+            tipo_lancamento: "unico",
+            data_vencimento: metaDados.data_vencimento,
+            status: "pendente",
+            conta_id: contaPadrao.id,
+            categoria_id: item.categoria_sugerida_id,
+            subcategoria_id: item.subcategoria_sugerida_id,
+            centro_custo_id: item.centro_custo_sugerido_id,
+            solicitacao_reembolso_id: solicitacao.id,
+            anexo_url: item.anexo_storage,
+            observacoes: `Fornecedor: ${item.fornecedor || 'N/A'}\nData Emissão: ${item.data_emissao || 'N/A'}`
+          })
+          .select("id")
+          .single();
+
+        if (!txError && tx) {
+          transacoesCriadas.push(tx.id);
+        } else {
+          console.error("Erro ao criar transação:", txError);
+        }
+      }
+
+      // 3. Encerrar sessão
       await supabase
         .from("atendimentos_bot")
         .update({
           status: "CONCLUIDO",
-          meta_dados: { ...metaDados, resultado: "Transação Criada", transacao_id: transacao?.id }
+          meta_dados: { 
+            ...metaDados, 
+            estado_atual: "FINALIZADO",
+            forma_pagamento: formaPagamento,
+            resultado: "REEMBOLSO_CRIADO",
+            solicitacao_reembolso_id: solicitacao.id,
+            transacoes_ids: transacoesCriadas
+          }
         })
         .eq("id", sessao.id);
 
+      const dataFormatada = new Date(metaDados.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+      const formaPgtoTexto = formaPagamento === "pix" ? "PIX" : "Dinheiro";
+
       return new Response(JSON.stringify({
-        text: `✅ Solicitação #${transacao?.id?.slice(0,8)} criada com sucesso! O departamento financeiro foi notificado.`
+        text: `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}\n\n🔖 Protocolo: #${solicitacao.id.slice(0,8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // B4. Mensagem genérica durante sessão
+    // Estado não reconhecido - reset
     return new Response(JSON.stringify({
-      text: "Ainda aguardando seus comprovantes. Envie a foto, digite 'Fechar' para concluir ou 'Cancelar' para desistir."
+      text: "⚠️ Sessão em estado inválido. Digite *Cancelar* para reiniciar."
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error: unknown) {
