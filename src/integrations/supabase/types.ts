@@ -244,6 +244,7 @@ export type Database = {
           historico_conversa: Json | null
           id: string
           meta_dados: Json | null
+          origem_canal: string | null
           pessoa_id: string | null
           status: Database["public"]["Enums"]["status_sessao_chat"] | null
           telefone: string
@@ -256,6 +257,7 @@ export type Database = {
           historico_conversa?: Json | null
           id?: string
           meta_dados?: Json | null
+          origem_canal?: string | null
           pessoa_id?: string | null
           status?: Database["public"]["Enums"]["status_sessao_chat"] | null
           telefone: string
@@ -268,6 +270,7 @@ export type Database = {
           historico_conversa?: Json | null
           id?: string
           meta_dados?: Json | null
+          origem_canal?: string | null
           pessoa_id?: string | null
           status?: Database["public"]["Enums"]["status_sessao_chat"] | null
           telefone?: string
