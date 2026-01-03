@@ -113,7 +113,32 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // B2. Finalização (Comando 'Fechar')
+    // B2. Cancelamento (Comando 'Cancelar' - encerra sem processar)
+    if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
+      const metaDados = sessao.meta_dados as Record<string, unknown> || {};
+      
+      // Encerra sessão com status de cancelamento
+      await supabase
+        .from("atendimentos_bot")
+        .update({
+          status: "CONCLUIDO",
+          meta_dados: { 
+            ...metaDados, 
+            resultado: "CANCELADO_PELO_USUARIO",
+            motivo: "Usuário solicitou cancelamento",
+            anexos_recebidos: (metaDados.anexos as string[] || []).length
+          }
+        })
+        .eq("id", sessao.id);
+
+      console.log(`[Financeiro] Sessão ${sessao.id} cancelada pelo usuário. Anexos: ${(metaDados.anexos as string[] || []).length}`);
+
+      return new Response(JSON.stringify({
+        text: "❌ Solicitação cancelada. Nenhum dado foi processado. Digite 'Reembolso' ou 'Nova Conta' para iniciar novamente."
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // B3. Finalização (Comando 'Fechar')
     if (mensagem && mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)) {
       const metaDados = sessao.meta_dados as Record<string, unknown> || {};
       const anexos = (metaDados.anexos as string[]) || [];
@@ -121,7 +146,7 @@ serve(async (req) => {
       
       if (qtdAnexos === 0) {
         return new Response(JSON.stringify({
-          text: "⚠️ Nenhum comprovante foi enviado ainda. Envie a foto antes de fechar."
+          text: "⚠️ Nenhum comprovante foi enviado ainda. Envie a foto antes de fechar ou digite 'Cancelar' para desistir."
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -178,9 +203,9 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // B3. Mensagem genérica durante sessão
+    // B4. Mensagem genérica durante sessão
     return new Response(JSON.stringify({
-      text: "Ainda aguardando seus comprovantes. Envie a foto ou digite 'Fechar' para concluir."
+      text: "Ainda aguardando seus comprovantes. Envie a foto, digite 'Fechar' para concluir ou 'Cancelar' para desistir."
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error: unknown) {
