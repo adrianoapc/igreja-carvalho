@@ -251,25 +251,51 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 1. Recebe o Payload do Make
+    // Suporta 2 formatos:
+    // (a) Payload "flat" que já vem normalizado pelo Make
+    // (b) Payload bruto do webhook do WhatsApp (messages[].document.url, etc.)
     const body = await req.json();
-    const { telefone, mensagem, tipo, origem_canal, nome_perfil } = body;
-    
-    // Suporte a múltiplos campos de URL (imagens vs documentos)
-    // O Make pode enviar como url_anexo, url_documento, document_url, media_url, etc.
-    const url_anexo = body.url_anexo || body.url_documento || body.document_url || body.media_url || body.url || null;
+
+    const makeMsg = Array.isArray(body?.messages) ? body.messages[0] : null;
+    const makeTipo = makeMsg?.type ?? null;
+
+    const telefone = body.telefone ?? makeMsg?.from ?? body.from ?? body?.contacts?.[0]?.wa_id ?? null;
+    const origem_canal = body.origem_canal ?? body.origem ?? body.messaging_product ?? "whatsapp";
+    const nome_perfil = body.nome_perfil ?? body?.contacts?.[0]?.profile?.name ?? null;
+
+    // Mensagem texto pode vir em diferentes campos
+    const mensagem =
+      body.mensagem ??
+      body.text ??
+      makeMsg?.text?.body ??
+      body.message ??
+      null;
+
+    const tipo = body.tipo ?? makeTipo ?? null;
+
+    // URL do anexo (document/image) pode vir "flat" ou dentro de messages[0].document.url
+    const url_anexo =
+      body.url_anexo ||
+      body.url_documento ||
+      body.document_url ||
+      body.media_url ||
+      body.url ||
+      makeMsg?.document?.url ||
+      makeMsg?.image?.url ||
+      null;
 
     if (!telefone || !origem_canal) {
       throw new Error("Telefone e origem_canal são obrigatórios.");
     }
 
     console.log(`[Financeiro] Msg de ${telefone} no canal ${origem_canal}: ${mensagem || tipo}`);
-    
+
     // Log detalhado para debug de anexos
     if (tipo === "image" || tipo === "document") {
       console.log(`[Financeiro] Anexo recebido - tipo: ${tipo}, url_anexo: ${url_anexo ? 'presente' : 'AUSENTE'}`);
       console.log(`[Financeiro] Campos do body:`, Object.keys(body).join(', '));
       if (!url_anexo) {
-        console.log(`[Financeiro] Body completo para debug:`, JSON.stringify(body).slice(0, 500));
+        console.log(`[Financeiro] Body completo para debug:`, JSON.stringify(body).slice(0, 2000));
       }
     }
 
