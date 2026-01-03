@@ -938,6 +938,18 @@ export default function PessoaDetalhes() {
                           {pessoa.observacoes || "—"}
                         </p>
                       </div>
+                      <div className="col-span-2 border-t pt-3 mt-2">
+                        <p className="text-muted-foreground mb-1">
+                          Autorizado Bot Financeiro
+                        </p>
+                        <p className="font-medium">
+                          {pessoa.autorizado_bot_financeiro ? (
+                            <span className="text-green-600">Sim</span>
+                          ) : (
+                            <span className="text-muted-foreground">Não</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </CollapsibleContent>
