@@ -202,17 +202,65 @@ serve(async (req) => {
     // 2. Valida se o telefone pertence a um membro autorizado
     // Normaliza telefone removendo DDI (55) e caracteres não numéricos
     const telefoneDigitos = telefone.replace(/\D/g, "");
-    const telefoneSemDDI = telefoneDigitos.startsWith("55") && telefoneDigitos.length > 11 
-      ? telefoneDigitos.slice(2) 
+    const telefoneSemDDI = telefoneDigitos.startsWith("55") && telefoneDigitos.length > 11
+      ? telefoneDigitos.slice(2)
       : telefoneDigitos;
     const telefoneNormalizado = telefoneSemDDI.slice(-11); // Últimos 11 dígitos (DDD + número)
-    
-    const { data: membroAutorizado, error: authError } = await supabase
+
+    // OBS: Não usamos maybeSingle aqui porque o mesmo telefone pode estar duplicado em mais de um perfil
+    // (ex.: pai/filho ou registros duplicados). Nesse caso, escolhemos o melhor candidato.
+    const { data: candidatosAutorizados, error: authError } = await supabase
       .from("profiles")
-      .select("id, nome, autorizado_bot_financeiro, dados_bancarios")
+      .select("id, nome, telefone, autorizado_bot_financeiro, dados_bancarios, created_at, data_nascimento")
       .eq("autorizado_bot_financeiro", true)
       .filter("telefone", "ilike", `%${telefoneNormalizado.slice(-9)}%`) // Busca pelos 9 dígitos finais
-      .maybeSingle();
+      .limit(5);
+
+    const normalizarTelefoneDB = (t?: string | null) => {
+      const dig = (t || "").replace(/\D/g, "");
+      const semDDI = dig.startsWith("55") && dig.length > 11 ? dig.slice(2) : dig;
+      return semDDI.slice(-11);
+    };
+
+    const escolherMelhorCandidato = (rows: typeof candidatosAutorizados) => {
+      const lista = rows || [];
+      if (lista.length === 0) return null;
+
+      const alvo11 = telefoneNormalizado;
+      const alvo9 = telefoneNormalizado.slice(-9);
+
+      // 1) Match exato pelos 11 dígitos (DDD + número)
+      const exato11 = lista.find((p) => normalizarTelefoneDB(p.telefone) === alvo11);
+      if (exato11) return exato11;
+
+      // 2) Match pelos 9 dígitos finais (número)
+      const exato9 = lista.find((p) => normalizarTelefoneDB(p.telefone).endsWith(alvo9));
+      if (exato9) return exato9;
+
+      // 3) Fallback: mais antigo (menor data_nascimento) e depois criado primeiro
+      return [...lista].sort((a, b) => {
+        const aNasc = a.data_nascimento ? new Date(a.data_nascimento).getTime() : Number.POSITIVE_INFINITY;
+        const bNasc = b.data_nascimento ? new Date(b.data_nascimento).getTime() : Number.POSITIVE_INFINITY;
+        if (aNasc !== bNasc) return aNasc - bNasc;
+
+        const aCreated = a.created_at ? new Date(a.created_at).getTime() : Number.POSITIVE_INFINITY;
+        const bCreated = b.created_at ? new Date(b.created_at).getTime() : Number.POSITIVE_INFINITY;
+        return aCreated - bCreated;
+      })[0];
+    };
+
+    const membroAutorizado = escolherMelhorCandidato(candidatosAutorizados);
+
+    if (authError) {
+      console.error("Erro ao validar membro:", authError);
+    }
+
+    if ((candidatosAutorizados?.length || 0) > 1) {
+      console.warn(
+        `[Financeiro] Telefone duplicado em perfis autorizados (${telefoneNormalizado}). Candidatos:`,
+        (candidatosAutorizados || []).map((p) => ({ id: p.id, nome: p.nome, telefone: p.telefone }))
+      );
+    }
 
     if (authError) {
       console.error("Erro ao validar membro:", authError);
