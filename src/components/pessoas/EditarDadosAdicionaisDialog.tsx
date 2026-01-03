@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -20,6 +21,7 @@ const dadosAdicionaisSchema = z.object({
   alergias: z.string().max(500).nullable(),
   necessidades_especiais: z.string().max(500).nullable(),
   observacoes: z.string().max(1000).nullable(),
+  autorizado_bot_financeiro: z.boolean().nullable(),
 });
 
 interface EditarDadosAdicionaisDialogProps {
@@ -37,6 +39,7 @@ interface EditarDadosAdicionaisDialogProps {
     alergias: string | null;
     necessidades_especiais: string | null;
     observacoes: string | null;
+    autorizado_bot_financeiro: boolean | null;
   };
   onSuccess: () => void;
 }
@@ -60,6 +63,7 @@ export function EditarDadosAdicionaisDialog({
     alergias: dadosAtuais.alergias || "",
     necessidades_especiais: dadosAtuais.necessidades_especiais || "",
     observacoes: dadosAtuais.observacoes || "",
+    autorizado_bot_financeiro: dadosAtuais.autorizado_bot_financeiro || false,
   });
   const { toast } = useToast();
 
@@ -76,6 +80,7 @@ export function EditarDadosAdicionaisDialog({
         alergias: dadosAtuais.alergias || "",
         necessidades_especiais: dadosAtuais.necessidades_especiais || "",
         observacoes: dadosAtuais.observacoes || "",
+        autorizado_bot_financeiro: dadosAtuais.autorizado_bot_financeiro || false,
       });
     }
   }, [open, dadosAtuais]);
@@ -100,6 +105,7 @@ export function EditarDadosAdicionaisDialog({
           alergias: validatedData.alergias || null,
           necessidades_especiais: validatedData.necessidades_especiais || null,
           observacoes: validatedData.observacoes || null,
+          autorizado_bot_financeiro: validatedData.autorizado_bot_financeiro,
         })
         .eq("id", pessoaId);
 
@@ -266,6 +272,26 @@ export function EditarDadosAdicionaisDialog({
                 placeholder="Informações adicionais sobre a pessoa"
                 className="min-h-[100px]"
               />
+            </div>
+
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autorizado_bot_financeiro" className="text-base">
+                    Autorizado Bot Financeiro
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Permite enviar solicitações de reembolso via WhatsApp
+                  </p>
+                </div>
+                <Switch
+                  id="autorizado_bot_financeiro"
+                  checked={formData.autorizado_bot_financeiro}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, autorizado_bot_financeiro: checked })
+                  }
+                />
+              </div>
             </div>
           </div>
 

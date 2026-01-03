@@ -65,6 +65,7 @@ interface Pessoa {
   cadastrado_por: string | null;
   tipo_sanguineo: string | null;
   observacoes: string | null;
+  autorizado_bot_financeiro: boolean | null;
   disponibilidade_agenda: DisponibilidadeAgenda | null;
 }
 
@@ -530,6 +531,7 @@ export default function EditarPessoa() {
           alergias: pessoa.alergias,
           necessidades_especiais: pessoa.necessidades_especiais,
           observacoes: pessoa.observacoes,
+          autorizado_bot_financeiro: pessoa.autorizado_bot_financeiro,
         }}
         onSuccess={fetchPessoa}
       />
