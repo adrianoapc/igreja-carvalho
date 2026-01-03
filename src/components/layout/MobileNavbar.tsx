@@ -2,25 +2,36 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Home, Users, Calendar, Heart, Menu, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useState, useEffect } from "react";
 
 export function MobileNavbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin, permissions } = usePermissions();
+  const { isAdmin, checkPermission, loading } = usePermissions();
 
-  // --- LÓGICA SMART ---
+  const [hasMinisterioAccess, setHasMinisterioAccess] = useState(false);
+  const [hasPessoasAccess, setHasPessoasAccess] = useState(false);
 
-  // 1. Agenda Smart
-  // Se for admin ou tiver permissão de ministério, vê o Hub de Gestão (/eventos)
-  // Caso contrário, vê apenas a Lista de Programação (/eventos/lista)
-  const hasMinisterioAccess =
-    isAdmin || permissions?.includes("ministerio.view");
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (isAdmin) {
+        setHasMinisterioAccess(true);
+        setHasPessoasAccess(true);
+        return;
+      }
+      const [ministerio, pessoas] = await Promise.all([
+        checkPermission("ministerio.view"),
+        checkPermission("pessoas.view"),
+      ]);
+      setHasMinisterioAccess(ministerio);
+      setHasPessoasAccess(pessoas);
+    };
+    if (!loading) {
+      checkAccess();
+    }
+  }, [isAdmin, checkPermission, loading]);
+
   const agendaPath = hasMinisterioAccess ? "/eventos" : "/eventos/lista";
-
-  // 2. Pessoas Smart
-  // Se tiver permissão de ver pessoas, vai para o Diretório (/pessoas)
-  // Caso contrário, vai para o próprio Perfil (/perfil)
-  const hasPessoasAccess = isAdmin || permissions?.includes("pessoas.view");
   const pessoasPath = hasPessoasAccess ? "/pessoas" : "/perfil";
   const PessoasIcon = hasPessoasAccess ? Users : UserCircle;
   const pessoasLabel = hasPessoasAccess ? "Pessoas" : "Perfil";
