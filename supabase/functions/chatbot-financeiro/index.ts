@@ -200,12 +200,18 @@ serve(async (req) => {
     console.log(`[Financeiro] Msg de ${telefone} no canal ${origem_canal}: ${mensagem || tipo}`);
 
     // 2. Valida se o telefone pertence a um membro autorizado
-    const telefoneNormalizado = telefone.replace(/\D/g, "").slice(-11);
+    // Normaliza telefone removendo DDI (55) e caracteres não numéricos
+    const telefoneDigitos = telefone.replace(/\D/g, "");
+    const telefoneSemDDI = telefoneDigitos.startsWith("55") && telefoneDigitos.length > 11 
+      ? telefoneDigitos.slice(2) 
+      : telefoneDigitos;
+    const telefoneNormalizado = telefoneSemDDI.slice(-11); // Últimos 11 dígitos (DDD + número)
+    
     const { data: membroAutorizado, error: authError } = await supabase
       .from("profiles")
       .select("id, nome, autorizado_bot_financeiro, dados_bancarios")
-      .or(`telefone.ilike.%${telefoneNormalizado}`)
       .eq("autorizado_bot_financeiro", true)
+      .filter("telefone", "ilike", `%${telefoneNormalizado.slice(-9)}%`) // Busca pelos 9 dígitos finais
       .maybeSingle();
 
     if (authError) {
