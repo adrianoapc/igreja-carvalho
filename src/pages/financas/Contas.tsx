@@ -16,11 +16,13 @@ import { MonthPicker } from "@/components/financas/MonthPicker";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function Contas() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [contaDialogOpen, setContaDialogOpen] = useState(false);
   const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<{
@@ -34,20 +36,24 @@ export default function Contas() {
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
   const { data: contas, isLoading } = useQuery({
-    queryKey: ['contas', igrejaId],
+    queryKey: ['contas', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('contas')
         .select('*')
         .eq('ativo', true)
         .eq('igreja_id', igrejaId)
         .order('nome');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const startDate = customRange 
@@ -58,7 +64,7 @@ export default function Contas() {
     : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
 
   const { data: transacoes, isLoading: isLoadingTransacoes } = useQuery({
-    queryKey: ['transacoes-contas', igrejaId, selectedContaIds, selectedMonth, customRange],
+    queryKey: ['transacoes-contas', igrejaId, filialId, isAllFiliais, selectedContaIds, selectedMonth, customRange],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
@@ -74,6 +80,9 @@ export default function Contas() {
         .gte('data_pagamento', startDate)
         .lte('data_pagamento', endDate)
         .order('data_pagamento', { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
       
       if (selectedContaIds.length > 0) {
         query = query.in('conta_id', selectedContaIds);
@@ -83,26 +92,30 @@ export default function Contas() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Buscar todas as transações do período para calcular totais por conta
   const { data: allTransacoesPeriodo } = useQuery({
-    queryKey: ['transacoes-periodo-all', igrejaId, selectedMonth, customRange],
+    queryKey: ['transacoes-periodo-all', igrejaId, filialId, isAllFiliais, selectedMonth, customRange],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('transacoes_financeiras')
         .select('conta_id, tipo, valor')
         .eq('igreja_id', igrejaId)
         .eq('status', 'pago')
         .gte('data_pagamento', startDate)
         .lte('data_pagamento', endDate);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Calcular totais por conta no período

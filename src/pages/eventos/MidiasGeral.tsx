@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { MidiaDialog } from "@/components/eventos/MidiaDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 import {
   DndContext,
   closestCenter,
@@ -260,6 +261,7 @@ export default function MidiasGeral() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagFiltro, setTagFiltro] = useState<string | null>(null);
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -284,21 +286,25 @@ export default function MidiasGeral() {
   }, []);
 
   useEffect(() => {
-    if (!igrejaLoading && igrejaId) {
+    if (!igrejaLoading && !filialLoading && igrejaId) {
       loadMidias();
       loadTags();
     }
-  }, [canalAtivo, igrejaId, igrejaLoading]);
+  }, [canalAtivo, igrejaId, igrejaLoading, filialId, isAllFiliais, filialLoading]);
   
   const loadTags = async () => {
     try {
       if (!igrejaId) return;
-      const { data, error } = await supabase
+      let query = supabase
         .from('tags_midias')
         .select('*')
         .eq('ativo', true)
         .eq('igreja_id', igrejaId)
         .order('nome', { ascending: true });
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       setTags(data || []);
@@ -314,30 +320,42 @@ export default function MidiasGeral() {
         setMidias([]);
         return;
       }
-      const { data: midiasData, error } = await supabase
+      let midiasQuery = supabase
         .from('midias')
         .select('*')
         .eq('canal', canalAtivo)
         .eq('igreja_id', igrejaId)
         .order('ordem', { ascending: true });
+      if (!isAllFiliais && filialId) {
+        midiasQuery = midiasQuery.eq('filial_id', filialId);
+      }
+      const { data: midiasData, error } = await midiasQuery;
 
       if (error) throw error;
       
       // Carregar todas as liturgias para contar uso das mídias
-      const { data: liturgiasData } = await supabase
+      let liturgiaQuery = supabase
         .from('liturgias')
         .select('midias_ids')
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        liturgiaQuery = liturgiaQuery.eq('filial_id', filialId);
+      }
+      const { data: liturgiasData } = await liturgiaQuery;
       
       // Carregar tags de cada mídia e contar uso em liturgias
       const midiasComDados = await Promise.all(
         (midiasData || []).map(async (midia) => {
           // Carregar tags
-          const { data: tagsData } = await supabase
+          let tagsQuery = supabase
             .from('midia_tags')
             .select('tag_id, tags_midias(id, nome, cor)')
             .eq('midia_id', midia.id)
             .eq('igreja_id', igrejaId);
+          if (!isAllFiliais && filialId) {
+            tagsQuery = tagsQuery.eq('filial_id', filialId);
+          }
+          const { data: tagsData } = await tagsQuery;
           
           const tagsParsed = tagsData?.map((t: Record<string, unknown>) => t.tags_midias as { id: string; nome: string; cor: string } | null).filter((t): t is { id: string; nome: string; cor: string } => t !== null) || [];
           
@@ -378,11 +396,15 @@ export default function MidiasGeral() {
         }));
 
         for (const update of updates) {
-          await supabase
+          let updateQuery = supabase
             .from('midias')
             .update({ ordem: update.ordem })
             .eq('id', update.id)
             .eq('igreja_id', igrejaId);
+          if (!isAllFiliais && filialId) {
+            updateQuery = updateQuery.eq('filial_id', filialId);
+          }
+          await updateQuery;
         }
 
         toast.success("Ordem atualizada!");
@@ -427,11 +449,15 @@ export default function MidiasGeral() {
         }
       }
 
-      const { error } = await supabase
+      let deleteQuery = supabase
         .from('midias')
         .delete()
         .eq('id', id)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        deleteQuery = deleteQuery.eq('filial_id', filialId);
+      }
+      const { error } = await deleteQuery;
 
       if (error) throw error;
 
@@ -451,11 +477,15 @@ export default function MidiasGeral() {
         toast.error("Igreja não identificada.");
         return;
       }
-      const { error } = await supabase
+      let updateQuery = supabase
         .from('midias')
         .update({ ativo: !midia.ativo })
         .eq('id', midia.id)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        updateQuery = updateQuery.eq('filial_id', filialId);
+      }
+      const { error } = await updateQuery;
 
       if (error) throw error;
 

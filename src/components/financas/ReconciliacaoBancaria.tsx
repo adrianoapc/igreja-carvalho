@@ -8,42 +8,52 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export function ReconciliacaoBancaria() {
   const [reconciliando, setReconciliando] = useState(false);
   const { formatValue } = useHideValues();
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const { data: contas, refetch } = useQuery({
-    queryKey: ['reconciliacao-contas', igrejaId],
+    queryKey: ['reconciliacao-contas', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('contas')
         .select('*')
         .eq('ativo', true)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const { data: transacoes } = useQuery({
-    queryKey: ['reconciliacao-transacoes', igrejaId],
+    queryKey: ['reconciliacao-transacoes', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('transacoes_financeiras')
         .select('*')
         .eq('status', 'pago')
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
 
@@ -76,11 +86,15 @@ export function ReconciliacaoBancaria() {
       for (const conta of contas) {
         const saldoCalculado = calcularSaldoCalculado(conta.id);
         
-        await supabase
+        let updateQuery = supabase
           .from('contas')
           .update({ saldo_atual: saldoCalculado })
           .eq('id', conta.id)
           .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+        await updateQuery;
       }
       
       await refetch();

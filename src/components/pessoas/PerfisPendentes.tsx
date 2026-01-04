@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User, FileEdit } from 'lucide-react';
 import { AprovarAlteracaoDialog } from './AprovarAlteracaoDialog';
 import { useIgrejaId } from '@/hooks/useIgrejaId';
+import { useFilialId } from '@/hooks/useFilialId';
 
 interface AlteracaoPendente {
   id: string;
@@ -30,6 +31,7 @@ export function PerfisPendentes() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('membro');
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const loadAlteracoes = async () => {
     setLoading(true);
@@ -38,7 +40,7 @@ export function PerfisPendentes() {
         setAlteracoes([]);
         return;
       }
-      const { data, error } = await supabase
+      let query = supabase
         .from('alteracoes_perfil_pendentes')
         .select(`
           id,
@@ -51,17 +53,25 @@ export function PerfisPendentes() {
         .eq('status', 'pendente')
         .eq('igreja_id', igrejaId)
         .order('created_at', { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
 
       // Buscar dados dos perfis associados
       if (data && data.length > 0) {
         const profileIds = [...new Set(data.map(a => a.profile_id))];
-        const { data: profiles } = await supabase
+        let profilesQuery = supabase
           .from('profiles')
           .select('id, nome, avatar_url, data_nascimento, status')
           .in('id', profileIds)
           .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          profilesQuery = profilesQuery.eq('filial_id', filialId);
+        }
+        const { data: profiles } = await profilesQuery;
 
         const alteracoesComPerfil = data.map(alt => ({
           ...alt,
@@ -82,10 +92,10 @@ export function PerfisPendentes() {
   };
 
   useEffect(() => {
-    if (!igrejaLoading) {
+    if (!igrejaLoading && !filialLoading) {
       loadAlteracoes();
     }
-  }, [igrejaLoading, igrejaId]);
+  }, [igrejaLoading, filialLoading, igrejaId, filialId, isAllFiliais]);
 
   const handleOpenAlteracao = (alteracao: AlteracaoPendente) => {
     setSelectedAlteracao(alteracao);

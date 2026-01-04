@@ -10,10 +10,15 @@ const extractUUID = (value: unknown): string | null => {
 interface FilialData {
   filialId: string | null;
   igrejaId: string | null;
+  isAllFiliais: boolean;
 }
 
 export function useFilialId() {
-  const [data, setData] = useState<FilialData>({ filialId: null, igrejaId: null });
+  const [data, setData] = useState<FilialData>({
+    filialId: null,
+    igrejaId: null,
+    isAllFiliais: false,
+  });
   const [loading, setLoading] = useState(true);
 
   const extractFromSession = useCallback((session: any): FilialData => {
@@ -23,20 +28,41 @@ export function useFilialId() {
     const igrejaId =
       extractUUID(session?.user?.app_metadata?.igreja_id) ??
       extractUUID(session?.user?.user_metadata?.igreja_id);
-    return { filialId, igrejaId };
+    return { filialId, igrejaId, isAllFiliais: false };
   }, []);
 
-  const getOverrideFromStorage = (): string | null => {
+  const getOverrideFromStorage = (): { id: string | null; isAll: boolean } | null => {
     try {
       const stored = localStorage.getItem(FILIAL_OVERRIDE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return parsed.id || null;
+        return {
+          id: parsed.id || null,
+          isAll: Boolean(parsed.isAll),
+        };
       }
     } catch {
       // Ignore parsing errors
     }
     return null;
+  };
+
+  const canUseAllFiliais = async (userId?: string | null, igrejaId?: string | null) => {
+    if (!userId || !igrejaId) return false;
+    const { data: roles, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("igreja_id", igrejaId);
+
+    if (error) {
+      console.error("Erro ao validar permissões de filial:", error);
+      return false;
+    }
+
+    return (roles || []).some((r) =>
+      ["admin", "admin_igreja", "super_admin"].includes(r.role)
+    );
   };
 
   useEffect(() => {
@@ -63,17 +89,28 @@ export function useFilialId() {
 
         // Verificar override do localStorage (para admins que trocaram filial)
         const override = getOverrideFromStorage();
-        if (override) {
-          extracted.filialId = override;
+        if (override?.isAll) {
+          const allowed = await canUseAllFiliais(
+            sessionData.session?.user?.id,
+            extracted.igrejaId
+          );
+          if (allowed) {
+            extracted.filialId = null;
+            extracted.isAllFiliais = true;
+          } else {
+            localStorage.removeItem(FILIAL_OVERRIDE_KEY);
+          }
+        } else if (override?.id) {
+          extracted.filialId = override.id;
         }
 
         if (isMounted) {
-          setData(extracted);
+          setData({ ...extracted, isAllFiliais: extracted.isAllFiliais ?? false });
         }
       } catch (err) {
         // Em caso de erro, não travar a aplicação em loading infinito
         if (isMounted) {
-          setData({ filialId: null, igrejaId: null });
+          setData({ filialId: null, igrejaId: null, isAllFiliais: false });
         }
       } finally {
         if (isMounted) {
@@ -106,16 +143,24 @@ export function useFilialId() {
 
         // Verificar override do localStorage (para admins que trocaram filial)
         const override = getOverrideFromStorage();
-        if (override) {
-          extracted.filialId = override;
+        if (override?.isAll) {
+          const allowed = await canUseAllFiliais(session?.user?.id, extracted.igrejaId);
+          if (allowed) {
+            extracted.filialId = null;
+            extracted.isAllFiliais = true;
+          } else {
+            localStorage.removeItem(FILIAL_OVERRIDE_KEY);
+          }
+        } else if (override?.id) {
+          extracted.filialId = override.id;
         }
 
         if (isMounted) {
-          setData(extracted);
+          setData({ ...extracted, isAllFiliais: extracted.isAllFiliais ?? false });
         }
       } catch {
         if (isMounted) {
-          setData({ filialId: null, igrejaId: null });
+          setData({ filialId: null, igrejaId: null, isAllFiliais: false });
         }
       } finally {
         if (isMounted) {
@@ -133,6 +178,7 @@ export function useFilialId() {
   return { 
     filialId: data.filialId, 
     igrejaId: data.igrejaId,
+    isAllFiliais: data.isAllFiliais,
     loading 
   };
 }

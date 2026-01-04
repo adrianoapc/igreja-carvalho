@@ -19,6 +19,7 @@ import { AvatarUpload } from "@/components/perfil/AvatarUpload";
 import { AlterarSenhaDialog } from "@/components/perfil/AlterarSenhaDialog";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface ProfileData {
   id: string;
@@ -80,6 +81,7 @@ export default function Perfil() {
   const { profile, user } = useAuth();
   const { isSupported, isEnabled, enableBiometric, disableBiometric } = useBiometricAuth();
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [funcoes, setFuncoes] = useState<FuncaoIgreja[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -150,18 +152,21 @@ export default function Perfil() {
       setLoading(true);
 
       // Carregar dados do perfil
-      const { data: profileInfo, error: profileError } = await supabase
+      let profileQuery = supabase
         .from("profiles")
         .select("*")
         .eq("id", profile.id)
-        .eq("igreja_id", igrejaId)
-        .single();
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        profileQuery = profileQuery.eq("filial_id", filialId);
+      }
+      const { data: profileInfo, error: profileError } = await profileQuery.single();
 
       if (profileError) throw profileError;
       setProfileData(profileInfo);
 
       // Carregar funções da igreja
-      const { data: funcoesData, error: funcoesError } = await supabase
+      let funcoesQuery = supabase
         .from("membro_funcoes")
         .select(`
           id,
@@ -178,6 +183,10 @@ export default function Perfil() {
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("data_inicio", { ascending: false });
+      if (!isAllFiliais && filialId) {
+        funcoesQuery = funcoesQuery.eq("filial_id", filialId);
+      }
+      const { data: funcoesData, error: funcoesError } = await funcoesQuery;
 
       if (funcoesError) throw funcoesError;
       setFuncoes(funcoesData || []);
@@ -191,22 +200,28 @@ export default function Perfil() {
 
   // Hook para carregar familiares com React Query
   const { data: queryFamilyMembers = [] } = useQuery({
-    queryKey: ['perfil-family-members', igrejaId, profile?.id],
+    queryKey: ['perfil-family-members', igrejaId, filialId, isAllFiliais, profile?.id],
     queryFn: async () => {
       if (!profile?.id || !igrejaId) return [];
 
       // Query bidirecional: busca os dois lados da relação
+      let relationshipsAsPessoaQuery = supabase
+        .from('familias')
+        .select('id, pessoa_id, familiar_id, tipo_parentesco')
+        .eq('pessoa_id', profile.id)
+        .eq('igreja_id', igrejaId);
+      let relationshipsAsFamiliarQuery = supabase
+        .from('familias')
+        .select('id, pessoa_id, familiar_id, tipo_parentesco')
+        .eq('familiar_id', profile.id)
+        .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        relationshipsAsPessoaQuery = relationshipsAsPessoaQuery.eq('filial_id', filialId);
+        relationshipsAsFamiliarQuery = relationshipsAsFamiliarQuery.eq('filial_id', filialId);
+      }
       const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
-        supabase
-          .from('familias')
-          .select('id, pessoa_id, familiar_id, tipo_parentesco')
-          .eq('pessoa_id', profile.id)
-          .eq('igreja_id', igrejaId),
-        supabase
-          .from('familias')
-          .select('id, pessoa_id, familiar_id, tipo_parentesco')
-          .eq('familiar_id', profile.id)
-          .eq('igreja_id', igrejaId)
+        relationshipsAsPessoaQuery,
+        relationshipsAsFamiliarQuery,
       ]);
 
       if (relationshipsAsPessoa.error) throw relationshipsAsPessoa.error;
@@ -256,11 +271,15 @@ export default function Perfil() {
       if (familiarIds.size === 0) return [];
 
       // Buscar dados dos familiares
-      const { data: familiarProfiles, error: profilesError } = await supabase
+      let familiarProfilesQuery = supabase
         .from('profiles')
         .select('id, nome, avatar_url, sexo, data_nascimento')
         .in('id', Array.from(familiarIds))
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        familiarProfilesQuery = familiarProfilesQuery.eq('filial_id', filialId);
+      }
+      const { data: familiarProfiles, error: profilesError } = await familiarProfilesQuery;
 
       if (profilesError) throw profilesError;
 
@@ -292,7 +311,7 @@ export default function Perfil() {
 
       return members;
     },
-    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
+    enabled: !!profile?.id && !igrejaLoading && !filialLoading && !!igrejaId,
     staleTime: 0, // Sempre buscar dados frescos
   });
 
@@ -302,10 +321,10 @@ export default function Perfil() {
   }, [queryFamilyMembers]);
 
   useEffect(() => {
-    if (!igrejaLoading) {
+    if (!igrejaLoading && !filialLoading) {
       loadProfileData();
     }
-  }, [profile?.id, igrejaId, igrejaLoading]);
+  }, [profile?.id, igrejaId, igrejaLoading, filialId, filialLoading, isAllFiliais]);
 
   const handleDataUpdated = () => {
     loadProfileData();

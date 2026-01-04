@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface AjusteSaldoDialogProps {
   open: boolean;
@@ -35,6 +36,7 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +52,7 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
         ? conta.saldo_atual + valorNumerico
         : conta.saldo_atual - valorNumerico;
 
-      const { error } = await supabase
+      let updateQuery = supabase
         .from('contas')
         .update({
           saldo_atual: novoSaldo,
@@ -60,6 +62,11 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
         })
         .eq('id', String(conta.id))
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        updateQuery = updateQuery.eq('filial_id', filialId);
+      }
+
+      const { error } = await updateQuery;
 
       if (error) throw error;
 

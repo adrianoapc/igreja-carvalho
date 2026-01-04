@@ -16,6 +16,7 @@ import { ptBR } from "date-fns/locale";
 import { TagMidiaDialog } from "./TagMidiaDialog";
 import { ImageCaptureInput } from "@/components/ui/image-capture-input";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Tag {
   id: string;
@@ -64,6 +65,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   const [tagsSelecionadas, setTagsSelecionadas] = useState<string[]>([]);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
   
   // Sincronizar dados quando midia mudar
   useEffect(() => {
@@ -97,12 +99,16 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   const loadTags = async () => {
     try {
       if (!igrejaId) return;
-      const { data, error } = await supabase
+      let query = supabase
         .from('tags_midias')
         .select('*')
         .eq('ativo', true)
         .eq('igreja_id', igrejaId)
         .order('nome', { ascending: true });
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       setTags(data || []);
@@ -115,11 +121,15 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
     if (!midia?.id || !igrejaId) return;
     
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('midia_tags')
         .select('tag_id')
         .eq('midia_id', midia.id)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       setTagsSelecionadas(data?.map(t => t.tag_id) || []);
@@ -227,7 +237,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
       
       if (midia) {
         // Editar
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('midias')
           .update({
             titulo,
@@ -242,6 +252,10 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
           })
           .eq('id', midia.id)
           .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+        const { error } = await updateQuery;
 
         if (error) throw error;
         
@@ -255,14 +269,17 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
         toast.success(successMessage);
       } else {
         // Obter próxima ordem
-        const { data: maxOrdem } = await supabase
+        let maxOrdemQuery = supabase
           .from('midias')
           .select('ordem')
           .eq('canal', canal)
           .eq('igreja_id', igrejaId)
           .order('ordem', { ascending: false })
-          .limit(1)
-          .single();
+          .limit(1);
+        if (!isAllFiliais && filialId) {
+          maxOrdemQuery = maxOrdemQuery.eq('filial_id', filialId);
+        }
+        const { data: maxOrdem } = await maxOrdemQuery.single();
 
         const novaOrdem = (maxOrdem?.ordem || 0) + 1;
 
@@ -281,6 +298,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             scheduled_at: scheduledAt?.toISOString() || null,
             expires_at: expiresAt?.toISOString() || null,
             igreja_id: igrejaId,
+            filial_id: !isAllFiliais ? filialId : null,
           })
           .select()
           .single();
@@ -330,11 +348,15 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   const atualizarTags = async (midiaId: string) => {
     if (!igrejaId) return;
     // Remover todas as tags atuais
-    await supabase
+    let deleteQuery = supabase
       .from('midia_tags')
       .delete()
       .eq('midia_id', midiaId)
       .eq('igreja_id', igrejaId);
+    if (!isAllFiliais && filialId) {
+      deleteQuery = deleteQuery.eq('filial_id', filialId);
+    }
+    await deleteQuery;
     
     // Adicionar novas tags
     if (tagsSelecionadas.length > 0) {
@@ -342,6 +364,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
         midia_id: midiaId,
         tag_id: tagId,
         igreja_id: igrejaId,
+        filial_id: !isAllFiliais ? filialId : null,
       }));
       
       await supabase

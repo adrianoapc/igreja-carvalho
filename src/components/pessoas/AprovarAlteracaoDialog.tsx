@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { ArrowRight, User, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { useIgrejaId } from '@/hooks/useIgrejaId';
+import { useFilialId } from '@/hooks/useFilialId';
 
 interface AlteracaoPendente {
   id: string;
@@ -83,6 +84,7 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
   const [loading, setLoading] = useState(false);
   const [camposAprovados, setCamposAprovados] = useState<Record<string, boolean>>({});
   const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   useEffect(() => {
     if (alteracao) {
@@ -129,20 +131,24 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
 
       if (Object.keys(updateData).length > 0) {
         // Atualizar o perfil com os campos aprovados
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            ...updateData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', alteracao.profile_id)
-          .eq('igreja_id', igrejaId);
+      let updateProfileQuery = supabase
+        .from('profiles')
+        .update({
+          ...updateData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', alteracao.profile_id)
+        .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        updateProfileQuery = updateProfileQuery.eq('filial_id', filialId);
+      }
+      const { error: updateError } = await updateProfileQuery;
 
         if (updateError) throw updateError;
       }
 
       // Marcar alteração como aprovada
-      const { error: statusError } = await supabase
+      let statusQuery = supabase
         .from('alteracoes_perfil_pendentes')
         .update({
           status: 'aprovado',
@@ -150,6 +156,10 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
         })
         .eq('id', alteracao.id)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        statusQuery = statusQuery.eq('filial_id', filialId);
+      }
+      const { error: statusError } = await statusQuery;
 
       if (statusError) throw statusError;
 
@@ -180,11 +190,15 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
       if (!igrejaId) {
         throw new Error("Igreja não identificada.");
       }
-      const { error } = await supabase
+      let rejectQuery = supabase
         .from('alteracoes_perfil_pendentes')
         .update({ status: 'rejeitado' })
         .eq('id', alteracao.id)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        rejectQuery = rejectQuery.eq('filial_id', filialId);
+      }
+      const { error } = await rejectQuery;
 
       if (error) throw error;
 

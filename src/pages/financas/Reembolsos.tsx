@@ -51,6 +51,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -106,6 +107,7 @@ export default function Reembolsos() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [userRoles, setUserRoles] = useState<AppRole[]>([]);
   const [novoReembolsoOpen, setNovoReembolsoOpen] = useState(false);
   const [pagarReembolsoOpen, setPagarReembolsoOpen] = useState(false);
@@ -147,11 +149,15 @@ export default function Reembolsos() {
 
   const fetchUserRoles = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user?.id)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -166,148 +172,180 @@ export default function Reembolsos() {
 
   // Query: Minhas solicitações
   const { data: minhasSolicitacoes = [], isLoading: loadingMinhas } = useQuery({
-    queryKey: ["minhas-solicitacoes", igrejaId, profile?.id],
+    queryKey: ["minhas-solicitacoes", igrejaId, filialId, isAllFiliais, profile?.id],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("view_solicitacoes_reembolso")
         .select("*")
         .eq("solicitante_id", profile?.id)
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as SolicitacaoReembolso[];
     },
-    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
+    enabled: !!profile?.id && !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query: Todas as solicitações (para admin/tesoureiro)
   const { data: todasSolicitacoes = [], isLoading: loadingTodas } = useQuery({
-    queryKey: ["todas-solicitacoes", igrejaId],
+    queryKey: ["todas-solicitacoes", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("view_solicitacoes_reembolso")
         .select("*")
         .in("status", ["pendente", "aprovado"])
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as SolicitacaoReembolso[];
     },
-    enabled: isAdmin && !igrejaLoading && !!igrejaId,
+    enabled: isAdmin && !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query: Categorias
   const { data: categorias = [] } = useQuery({
-    queryKey: ["categorias-saida", igrejaId],
+    queryKey: ["categorias-saida", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("categorias_financeiras")
         .select("id, nome")
         .eq("tipo", "saida")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Categoria[];
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query: Subcategorias (baseado na categoria selecionada)
   const { data: subcategorias = [] } = useQuery({
-    queryKey: ["subcategorias", igrejaId, itemAtual.categoria_id],
+    queryKey: ["subcategorias", igrejaId, filialId, isAllFiliais, itemAtual.categoria_id],
     queryFn: async () => {
       if (!itemAtual.categoria_id || !igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("subcategorias_financeiras")
         .select("id, nome, categoria_id")
         .eq("categoria_id", itemAtual.categoria_id)
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Subcategoria[];
     },
-    enabled: !!itemAtual.categoria_id && !igrejaLoading && !!igrejaId,
+    enabled: !!itemAtual.categoria_id && !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query: Fornecedores
   const { data: fornecedores = [] } = useQuery({
-    queryKey: ["fornecedores-ativos", igrejaId],
+    queryKey: ["fornecedores-ativos", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("fornecedores")
         .select("id, nome")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Fornecedor[];
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query: Bases Ministeriais
   const { data: basesMinisteriais = [] } = useQuery({
-    queryKey: ["bases-ministeriais-ativas", igrejaId],
+    queryKey: ["bases-ministeriais-ativas", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("bases_ministeriais")
         .select("id, titulo")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("titulo");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as BaseMinisterial[];
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query: Centros de Custo
   const { data: centrosCusto = [] } = useQuery({
-    queryKey: ["centros-custo-ativos", igrejaId],
+    queryKey: ["centros-custo-ativos", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("centros_custo")
         .select("id, nome")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as CentroCusto[];
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query: Contas bancárias
   const { data: contas = [] } = useQuery({
-    queryKey: ["contas-ativas", igrejaId],
+    queryKey: ["contas-ativas", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("contas")
         .select("id, nome, tipo")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Conta[];
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Definir conta padrão quando contas são carregadas
@@ -338,6 +376,7 @@ export default function Reembolsos() {
           observacoes: observacoes,
           valor_total: valorTotalItens,
           igreja_id: igrejaId,
+          filial_id: !isAllFiliais ? filialId : null,
         })
         .select()
         .single();
@@ -357,6 +396,7 @@ export default function Reembolsos() {
         centro_custo_id: item.centro_custo_id || null,
         foto_url: item.anexo_url || null,
         igreja_id: igrejaId,
+        filial_id: !isAllFiliais ? filialId : null,
       }));
 
       const { error: itensError } = await supabase
@@ -402,12 +442,13 @@ export default function Reembolsos() {
           solicitacao_reembolso_id: solicitacaoSelecionada.id,
           observacoes: `Pagamento de reembolso #${solicitacaoSelecionada.id?.slice(0, 8).toUpperCase()}`,
           igreja_id: igrejaId,
+          filial_id: !isAllFiliais ? filialId : null,
         });
 
       if (transacaoError) throw transacaoError;
 
       // 2. Atualizar a solicitação como paga
-      const { error: solicitacaoError } = await supabase
+      let solicitacaoQuery = supabase
         .from("solicitacoes_reembolso")
         .update({
           status: "pago",
@@ -415,6 +456,10 @@ export default function Reembolsos() {
         })
         .eq("id", solicitacaoSelecionada.id)
         .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        solicitacaoQuery = solicitacaoQuery.eq("filial_id", filialId);
+      }
+      const { error: solicitacaoError } = await solicitacaoQuery;
 
       if (solicitacaoError) throw solicitacaoError;
     },

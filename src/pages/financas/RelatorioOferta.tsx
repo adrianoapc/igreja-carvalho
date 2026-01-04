@@ -17,12 +17,14 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { ConferirOfertaDialog } from "@/components/financas/ConferirOfertaDialog";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function RelatorioOferta() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [loading, setLoading] = useState(false);
   const [dataCulto, setDataCulto] = useState<Date>(new Date());
   const [conferenteId, setConferenteId] = useState("");
@@ -33,25 +35,29 @@ export default function RelatorioOferta() {
 
   // Buscar formas de pagamento
   const { data: formasPagamento } = useQuery({
-    queryKey: ['formas-pagamento-oferta', igrejaId],
+    queryKey: ['formas-pagamento-oferta', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('formas_pagamento')
         .select('id, nome')
         .eq('ativo', true)
         .eq('igreja_id', igrejaId)
         .order('nome');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Buscar membros com permissão financeira para conferente
   const { data: pessoas } = useQuery({
-    queryKey: ['pessoas-conferente', igrejaId, profile?.id],
+    queryKey: ['pessoas-conferente', igrejaId, filialId, isAllFiliais, profile?.id],
     queryFn: async () => {
       if (!igrejaId) return [];
       // Buscar usuários com role de admin ou tesoureiro
@@ -66,35 +72,43 @@ export default function RelatorioOferta() {
       const userIds = userRoles?.map(r => r.user_id) || [];
       
       // Buscar profiles desses usuários, excluindo quem está lançando
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, nome, user_id')
         .in('user_id', userIds)
         .neq('id', profile?.id || '') // Excluir quem está lançando
         .eq('igreja_id', igrejaId)
         .order('nome');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
+    enabled: !!profile?.id && !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Buscar contas
   const { data: contas } = useQuery({
-    queryKey: ['contas-relatorio', igrejaId],
+    queryKey: ['contas-relatorio', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('contas')
         .select('id, nome')
         .eq('ativo', true)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const handleValorChange = (formaId: string, valor: string) => {
@@ -160,6 +174,7 @@ export default function RelatorioOferta() {
           message: `${profile?.nome} criou um relatório de oferta do culto de ${format(dataCulto, 'dd/MM/yyyy')} aguardando sua validação. Total: ${formatCurrency(calcularTotal())}`,
           type: 'conferencia_oferta',
           igreja_id: igrejaId,
+          filial_id: !isAllFiliais ? filialId : null,
           metadata: {
             data_evento: format(dataCulto, 'yyyy-MM-dd'),
             lancado_por: profile?.nome,
@@ -227,7 +242,7 @@ export default function RelatorioOferta() {
       const taxaDebito = metadata.taxa_cartao_debito;
 
       // Buscar categoria padrão de Ofertas (tipo entrada)
-      const { data: categoriaOferta } = await supabase
+      let categoriaQuery = supabase
         .from('categorias_financeiras')
         .select('id')
         .eq('tipo', 'entrada')
@@ -235,6 +250,10 @@ export default function RelatorioOferta() {
         .eq('igreja_id', igrejaId)
         .limit(1)
         .single();
+      if (!isAllFiliais && filialId) {
+        categoriaQuery = categoriaQuery.eq('filial_id', filialId);
+      }
+      const { data: categoriaOferta } = await categoriaQuery;
 
       // Criar transações para cada forma de pagamento com valor
       const transacoes = [];
@@ -292,6 +311,7 @@ export default function RelatorioOferta() {
           observacoes: `Lançado por: ${metadata.lancado_por}\nConferido por: ${profile?.nome}\nForma: ${forma.nome}`,
           lancado_por: userData.user?.id,
           igreja_id: igrejaId,
+          filial_id: !isAllFiliais ? filialId : null,
         };
 
         transacoes.push(transacao);
@@ -305,11 +325,15 @@ export default function RelatorioOferta() {
       if (error) throw error;
 
       // Marcar notificação como lida
-      await supabase
+      let notificationQuery = supabase
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        notificationQuery = notificationQuery.eq('filial_id', filialId);
+      }
+      await notificationQuery;
 
       toast.success(`${transacoes.length} lançamento(s) criado(s) com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ['entradas'] });
@@ -333,12 +357,15 @@ export default function RelatorioOferta() {
         return;
       }
       // Buscar perfil do lançador usando lancado_por_id do metadata
-      const { data: lancadorProfile } = await supabase
+      let lancadorQuery = supabase
         .from('profiles')
         .select('user_id, nome')
         .eq('id', metadata.lancado_por_id)
-        .eq('igreja_id', igrejaId)
-        .single();
+        .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        lancadorQuery = lancadorQuery.eq('filial_id', filialId);
+      }
+      const { data: lancadorProfile } = await lancadorQuery.single();
 
       if (!lancadorProfile?.user_id) {
         toast.error('Erro ao encontrar usuário lançador');
@@ -352,6 +379,7 @@ export default function RelatorioOferta() {
         message: `O conferente ${profile?.nome} rejeitou o relatório de oferta do culto de ${format(new Date(metadata.data_evento), 'dd/MM/yyyy')}. Total: ${formatCurrency(metadata.total)}`,
         type: 'rejeicao_oferta',
         igreja_id: igrejaId,
+        filial_id: !isAllFiliais ? filialId : null,
         metadata: {
           data_evento: format(new Date(metadata.data_evento), 'dd/MM/yyyy'),
           conferente: profile?.nome,
@@ -363,11 +391,15 @@ export default function RelatorioOferta() {
       });
 
       // Marcar notificação original como lida
-      await supabase
+      let notificationQuery = supabase
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId)
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        notificationQuery = notificationQuery.eq('filial_id', filialId);
+      }
+      await notificationQuery;
 
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.info('Conferência rejeitada.');
@@ -379,10 +411,10 @@ export default function RelatorioOferta() {
 
   // Buscar notificações pendentes de conferência para o usuário atual
   const { data: notificacoesPendentes } = useQuery({
-    queryKey: ['notifications-conferencia', igrejaId, profile?.user_id],
+    queryKey: ['notifications-conferencia', igrejaId, filialId, isAllFiliais, profile?.user_id],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*')
         .eq('user_id', profile?.user_id)
@@ -390,11 +422,15 @@ export default function RelatorioOferta() {
         .eq('read', false)
         .eq('igreja_id', igrejaId)
         .order('created_at', { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.user_id && !igrejaLoading && !!igrejaId,
+    enabled: !!profile?.user_id && !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   return (

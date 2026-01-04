@@ -15,6 +15,7 @@ import { Search, UserPlus, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears } from "date-fns";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Kid {
   id: string;
@@ -36,21 +37,26 @@ export default function Criancas() {
   const [ageFilter, setAgeFilter] = useState<string>("todas");
   const [inclusaoFilter, setInclusaoFilter] = useState<string>("todas");
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   // Query para buscar crianças com responsáveis
   const { data: kids = [], isLoading } = useQuery({
-    queryKey: ["kids-directory", igrejaId],
+    queryKey: ["kids-directory", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
       const today = new Date();
 
       // Buscar todos os perfis com data_nascimento (crianças menores de 13 anos)
-      const response = await supabase
+      let profilesQuery = supabase
         .from("profiles")
         .select("id, nome, data_nascimento, avatar_url, alergias, necessidades_especiais, familia_id")
         .not("data_nascimento", "is", null)
         .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        profilesQuery = profilesQuery.eq("filial_id", filialId);
+      }
+      const response = await profilesQuery;
 
       const { data: allProfiles, error: profilesError } = response as { data: unknown[]; error: unknown };
 
@@ -74,17 +80,23 @@ export default function Criancas() {
       const kidsWithResponsaveis = await Promise.all(
         (profiles || []).map(async (kid: { id: string }) => {
           // Query bidirecional: busca os dois lados da relação
+          let relationshipsAsPessoaQuery = supabase
+            .from('familias')
+            .select('id, pessoa_id, familiar_id, tipo_parentesco')
+            .eq('pessoa_id', kid.id)
+            .eq('igreja_id', igrejaId);
+          let relationshipsAsFamiliarQuery = supabase
+            .from('familias')
+            .select('id, pessoa_id, familiar_id, tipo_parentesco')
+            .eq('familiar_id', kid.id)
+            .eq('igreja_id', igrejaId);
+          if (!isAllFiliais && filialId) {
+            relationshipsAsPessoaQuery = relationshipsAsPessoaQuery.eq('filial_id', filialId);
+            relationshipsAsFamiliarQuery = relationshipsAsFamiliarQuery.eq('filial_id', filialId);
+          }
           const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
-            supabase
-              .from('familias')
-              .select('id, pessoa_id, familiar_id, tipo_parentesco')
-              .eq('pessoa_id', kid.id)
-              .eq('igreja_id', igrejaId),
-            supabase
-              .from('familias')
-              .select('id, pessoa_id, familiar_id, tipo_parentesco')
-              .eq('familiar_id', kid.id)
-              .eq('igreja_id', igrejaId)
+            relationshipsAsPessoaQuery,
+            relationshipsAsFamiliarQuery,
           ]);
 
           // Combinar ambas as queries
@@ -125,11 +137,15 @@ export default function Criancas() {
           }
 
           // Buscar dados dos responsáveis
-          const { data: responsavelProfiles } = await supabase
+          let responsavelProfilesQuery = supabase
             .from('profiles')
             .select('id, nome, telefone, data_nascimento')
             .in('id', Array.from(responsavelIds))
             .eq('igreja_id', igrejaId);
+          if (!isAllFiliais && filialId) {
+            responsavelProfilesQuery = responsavelProfilesQuery.eq('filial_id', filialId);
+          }
+          const { data: responsavelProfiles } = await responsavelProfilesQuery;
 
           // Filtrar apenas responsáveis maiores de 18 anos
           const responsaveis = (responsavelProfiles || [])
@@ -170,7 +186,7 @@ export default function Criancas() {
 
       return kidsWithResponsaveis as Kid[];
     },
-    enabled: !igrejaLoading && !!igrejaId,
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Filtros

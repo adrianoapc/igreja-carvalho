@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 import { useNavigate } from "react-router-dom";
 import { differenceInYears, differenceInMonths, format } from "date-fns";
 import { 
@@ -141,6 +142,7 @@ export default function FamilyWallet() {
   const queryClient = useQueryClient();
   const { profile, loading } = useAuth(); 
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
@@ -149,23 +151,30 @@ export default function FamilyWallet() {
 
   // --- BUSCA REAL NO BANCO DE DADOS (BIDIRECIONAL) ---
   const { data: familyMembers, isLoading: isFamilyLoading } = useQuery({
-    queryKey: ['family-members', igrejaId, profile?.id],
+    queryKey: ['family-members', igrejaId, filialId, isAllFiliais, profile?.id],
     queryFn: async () => {
       if (!profile?.id || !igrejaId) return [];
 
       // Query bidirecional: busca os dois lados da relação
       // Fetch duas queries separadas e combina os resultados
+      let relationshipsAsPessoaQuery = supabase
+        .from('familias')
+        .select('id, pessoa_id, familiar_id, tipo_parentesco')
+        .eq('pessoa_id', profile.id)
+        .eq('igreja_id', igrejaId);
+      let relationshipsAsFamiliarQuery = supabase
+        .from('familias')
+        .select('id, pessoa_id, familiar_id, tipo_parentesco')
+        .eq('familiar_id', profile.id)
+        .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        relationshipsAsPessoaQuery = relationshipsAsPessoaQuery.eq('filial_id', filialId);
+        relationshipsAsFamiliarQuery = relationshipsAsFamiliarQuery.eq('filial_id', filialId);
+      }
+
       const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
-        supabase
-          .from('familias')
-          .select('id, pessoa_id, familiar_id, tipo_parentesco')
-          .eq('pessoa_id', profile.id)
-          .eq('igreja_id', igrejaId),
-        supabase
-          .from('familias')
-          .select('id, pessoa_id, familiar_id, tipo_parentesco')
-          .eq('familiar_id', profile.id)
-          .eq('igreja_id', igrejaId)
+        relationshipsAsPessoaQuery,
+        relationshipsAsFamiliarQuery,
       ]);
 
       if (relationshipsAsPessoa.error) throw relationshipsAsPessoa.error;
@@ -216,11 +225,15 @@ export default function FamilyWallet() {
       });
 
       // Busca dados dos familiares
-      const { data: familiarProfiles, error: profilesError } = await supabase
+      let profilesQuery = supabase
         .from('profiles')
         .select('id, nome, data_nascimento, avatar_url, alergias, necessidades_especiais, sexo, responsavel_legal, status')
         .in('id', Array.from(familiarIds))
         .eq('igreja_id', igrejaId);
+      if (!isAllFiliais && filialId) {
+        profilesQuery = profilesQuery.eq('filial_id', filialId);
+      }
+      const { data: familiarProfiles, error: profilesError } = await profilesQuery;
 
       if (profilesError) throw profilesError;
 
@@ -256,13 +269,13 @@ export default function FamilyWallet() {
 
       return members;
     },
-    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
+    enabled: !!profile?.id && !igrejaLoading && !filialLoading && !!igrejaId,
     staleTime: 0, // Sempre buscar dados frescos
   });
 
   // Query para buscar responsáveis/autorizados (pessoas que podem buscar as crianças)
   const { data: responsaveisAutorizados = [] } = useQuery({
-    queryKey: ["responsaveis-autorizados", igrejaId, familyMembers],
+    queryKey: ["responsaveis-autorizados", igrejaId, filialId, isAllFiliais, familyMembers],
     queryFn: async () => {
       if (!familyMembers || familyMembers.length === 0 || !igrejaId) return [];
 
@@ -278,12 +291,16 @@ export default function FamilyWallet() {
       if (childrenIds.length === 0) return [];
 
       // Query: buscar responsáveis que foram vinculados a essas crianças
-      const { data: relationships, error } = await supabase
+      let relationshipsQuery = supabase
         .from("familias")
         .select("pessoa_id, tipo_parentesco")
         .in("familiar_id", childrenIds)
         .neq("pessoa_id", profile?.id)
         .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        relationshipsQuery = relationshipsQuery.eq("filial_id", filialId);
+      }
+      const { data: relationships, error } = await relationshipsQuery;
 
       if (error) {
         console.error("Erro ao buscar responsáveis autorizados:", error);
@@ -296,11 +313,15 @@ export default function FamilyWallet() {
       const pessoasIds = Array.from(new Set(relationships.map(r => r.pessoa_id)));
 
       // Buscar dados das pessoas
-      const { data: pessoas, error: pessoasError } = await supabase
+      let pessoasQuery = supabase
         .from("profiles")
         .select("id, nome, avatar_url, email, telefone")
         .in("id", pessoasIds)
         .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        pessoasQuery = pessoasQuery.eq("filial_id", filialId);
+      }
+      const { data: pessoas, error: pessoasError } = await pessoasQuery;
 
       if (pessoasError) throw pessoasError;
 
@@ -322,20 +343,24 @@ export default function FamilyWallet() {
         parentescos: Array.from(new Set(relationshipMap.get(p.id) || [])),
       }));
     },
-    enabled: !!familyMembers && !igrejaLoading && !!igrejaId,
+    enabled: !!familyMembers && !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Query para buscar check-ins ativos das crianças da família
   const { data: activeCheckins = [], refetch: refetchCheckins } = useQuery({
-    queryKey: ["kids-checkins-ativos", igrejaId, profile?.id],
+    queryKey: ["kids-checkins-ativos", igrejaId, filialId, isAllFiliais, profile?.id],
     queryFn: async () => {
       if (!profile?.id || !igrejaId) return [];
       
-      const { data, error } = await supabase
+      let query = supabase
         .from("view_kids_checkins_ativos")
         .select("*")
         .eq("responsavel_id", profile.id)
         .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) {
         console.error("Erro ao buscar check-ins:", error);
@@ -344,25 +369,29 @@ export default function FamilyWallet() {
 
       return data || [];
     },
-    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
+    enabled: !!profile?.id && !igrejaLoading && !filialLoading && !!igrejaId,
     refetchInterval: 10000, // Atualiza a cada 10 segundos
   });
 
   // Query para buscar diários de hoje das crianças
   const { data: todayDiaries = {} } = useQuery({
-    queryKey: ["kids-diaries-today", igrejaId, familyMembers],
+    queryKey: ["kids-diaries-today", igrejaId, filialId, isAllFiliais, familyMembers],
     queryFn: async () => {
       if (!familyMembers || familyMembers.length === 0 || !igrejaId) return {};
 
       const childrenIds = familyMembers.map(m => m.id);
       const today = format(new Date(), "yyyy-MM-dd");
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("kids_diario")
         .select("*")
         .in("crianca_id", childrenIds)
         .eq("data", today)
         .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) {
         console.error("Erro ao buscar diários:", error);
@@ -377,7 +406,7 @@ export default function FamilyWallet() {
 
       return diaryMap;
     },
-    enabled: !!familyMembers && familyMembers.length > 0 && !igrejaLoading && !!igrejaId,
+    enabled: !!familyMembers && familyMembers.length > 0 && !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const handleEditMember = (member: FamilyMember) => {
@@ -389,7 +418,7 @@ export default function FamilyWallet() {
   const checkoutMutation = useMutation({
     mutationFn: async (checkinId: string) => {
       if (!igrejaId) throw new Error("Igreja não identificada.");
-      const { error } = await supabase
+      let updateQuery = supabase
         .from("kids_checkins")
         .update({
           checkout_at: new Date().toISOString(),
@@ -398,6 +427,10 @@ export default function FamilyWallet() {
         .eq("id", checkinId)
         .is("checkout_at", null)
         .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        updateQuery = updateQuery.eq("filial_id", filialId);
+      }
+      const { error } = await updateQuery;
 
       if (error) throw error;
     },
@@ -431,12 +464,16 @@ export default function FamilyWallet() {
         .map(m => m.id);
 
       // Deletar todos os relacionamentos entre o responsável e as crianças
-      const { error } = await supabase
+      let deleteQuery = supabase
         .from("familias")
         .delete()
         .eq("pessoa_id", responsavelId)
         .in("familiar_id", childrenIds)
         .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        deleteQuery = deleteQuery.eq("filial_id", filialId);
+      }
+      const { error } = await deleteQuery;
 
       if (error) throw error;
     },
