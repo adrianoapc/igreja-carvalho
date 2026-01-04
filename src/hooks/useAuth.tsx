@@ -149,6 +149,19 @@ export function useAuth() {
     setPermissions([]);
   };
 
+  /**
+   * SECURITY NOTE: This function provides CLIENT-SIDE access checks for UX purposes ONLY.
+   * 
+   * ⚠️ NEVER rely on this for actual security! It can be bypassed by:
+   * - Manipulating client-side state via browser dev tools
+   * - Making direct API calls without going through UI validation
+   * 
+   * ✅ All authorization MUST be enforced server-side via:
+   * - RLS (Row Level Security) policies on all Supabase tables
+   * - Server-side validation in Edge Functions for sensitive operations
+   * 
+   * This function exists solely to improve UX by hiding irrelevant options.
+   */
   const hasAccess = (moduleName: string, requiredLevel?: string): boolean => {
     if (!profile) {
       // console.log("hasAccess: No profile found");

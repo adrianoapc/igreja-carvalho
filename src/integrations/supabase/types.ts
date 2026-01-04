@@ -503,6 +503,39 @@ export type Database = {
           },
         ]
       }
+      audit_public_endpoints: {
+        Row: {
+          action: string
+          client_ip: string
+          created_at: string | null
+          endpoint_name: string
+          error_message: string | null
+          id: string
+          request_metadata: Json | null
+          success: boolean | null
+        }
+        Insert: {
+          action: string
+          client_ip: string
+          created_at?: string | null
+          endpoint_name: string
+          error_message?: string | null
+          id?: string
+          request_metadata?: Json | null
+          success?: boolean | null
+        }
+        Update: {
+          action?: string
+          client_ip?: string
+          created_at?: string | null
+          endpoint_name?: string
+          error_message?: string | null
+          id?: string
+          request_metadata?: Json | null
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       aulas: {
         Row: {
           created_at: string | null
@@ -755,6 +788,36 @@ export type Database = {
             referencedColumns: ["pessoa_id"]
           },
         ]
+      }
+      blocked_ips: {
+        Row: {
+          blocked_at: string | null
+          blocked_until: string | null
+          created_by: string | null
+          id: string
+          ip_address: string
+          reason: string
+          violation_count: number | null
+        }
+        Insert: {
+          blocked_at?: string | null
+          blocked_until?: string | null
+          created_by?: string | null
+          id?: string
+          ip_address: string
+          reason: string
+          violation_count?: number | null
+        }
+        Update: {
+          blocked_at?: string | null
+          blocked_until?: string | null
+          created_by?: string | null
+          id?: string
+          ip_address?: string
+          reason?: string
+          violation_count?: number | null
+        }
+        Relationships: []
       }
       cancoes_culto: {
         Row: {
@@ -6711,6 +6774,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_ip_blocked: { Args: { p_ip: string }; Returns: boolean }
       is_member: { Args: { _user_id: string }; Returns: boolean }
       is_midia_active: {
         Args: { p_ativo: boolean; p_expires_at: string; p_scheduled_at: string }
@@ -6730,6 +6794,10 @@ export type Database = {
           p_status: string
         }
         Returns: string
+      }
+      log_rate_limit_violation: {
+        Args: { p_endpoint: string; p_ip: string }
+        Returns: undefined
       }
       mask_cpf_cnpj: { Args: { cpf_cnpj: string }; Returns: string }
       notify_admins: {
