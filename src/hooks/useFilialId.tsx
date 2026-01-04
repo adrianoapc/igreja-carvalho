@@ -43,32 +43,42 @@ export function useFilialId() {
     let isMounted = true;
 
     const resolveSession = async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const extracted = extractFromSession(sessionData.session);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const extracted = extractFromSession(sessionData.session);
 
-      // Se não tiver filial_id no JWT, buscar do profile
-      if (!extracted.filialId && sessionData.session?.user?.id) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("filial_id, igreja_id")
-          .eq("user_id", sessionData.session.user.id)
-          .single();
-        
-        if (profile) {
-          extracted.filialId = profile.filial_id;
-          extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
+        // Se não tiver filial_id no JWT, buscar do profile
+        if (!extracted.filialId && sessionData.session?.user?.id) {
+          const { data: profile, error } = await supabase
+            .from("profiles")
+            .select("filial_id, igreja_id")
+            .eq("user_id", sessionData.session.user.id)
+            .single();
+
+          if (!error && profile) {
+            extracted.filialId = profile.filial_id;
+            extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
+          }
         }
-      }
 
-      // Verificar override do localStorage (para admins que trocaram filial)
-      const override = getOverrideFromStorage();
-      if (override) {
-        extracted.filialId = override;
-      }
+        // Verificar override do localStorage (para admins que trocaram filial)
+        const override = getOverrideFromStorage();
+        if (override) {
+          extracted.filialId = override;
+        }
 
-      if (isMounted) {
-        setData(extracted);
-        setLoading(false);
+        if (isMounted) {
+          setData(extracted);
+        }
+      } catch (err) {
+        // Em caso de erro, não travar a aplicação em loading infinito
+        if (isMounted) {
+          setData({ filialId: null, igrejaId: null });
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -77,31 +87,40 @@ export function useFilialId() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const extracted = extractFromSession(session);
+      try {
+        const extracted = extractFromSession(session);
 
-      // Se não tiver filial_id no JWT, buscar do profile
-      if (!extracted.filialId && session?.user?.id) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("filial_id, igreja_id")
-          .eq("user_id", session.user.id)
-          .single();
-        
-        if (profile) {
-          extracted.filialId = profile.filial_id;
-          extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
+        // Se não tiver filial_id no JWT, buscar do profile
+        if (!extracted.filialId && session?.user?.id) {
+          const { data: profile, error } = await supabase
+            .from("profiles")
+            .select("filial_id, igreja_id")
+            .eq("user_id", session.user.id)
+            .single();
+
+          if (!error && profile) {
+            extracted.filialId = profile.filial_id;
+            extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
+          }
         }
-      }
 
-      // Verificar override do localStorage (para admins que trocaram filial)
-      const override = getOverrideFromStorage();
-      if (override) {
-        extracted.filialId = override;
-      }
+        // Verificar override do localStorage (para admins que trocaram filial)
+        const override = getOverrideFromStorage();
+        if (override) {
+          extracted.filialId = override;
+        }
 
-      if (isMounted) {
-        setData(extracted);
-        setLoading(false);
+        if (isMounted) {
+          setData(extracted);
+        }
+      } catch {
+        if (isMounted) {
+          setData({ filialId: null, igrejaId: null });
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     });
 
