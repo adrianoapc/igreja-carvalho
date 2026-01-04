@@ -6148,6 +6148,8 @@ export type Database = {
           id: string
           igreja_id: string
           secret: string | null
+          secret_encrypted: string | null
+          secret_hint: string | null
           tipo: string
           updated_at: string | null
           url: string | null
@@ -6159,6 +6161,8 @@ export type Database = {
           id?: string
           igreja_id: string
           secret?: string | null
+          secret_encrypted?: string | null
+          secret_hint?: string | null
           tipo: string
           updated_at?: string | null
           url?: string | null
@@ -6170,6 +6174,8 @@ export type Database = {
           id?: string
           igreja_id?: string
           secret?: string | null
+          secret_encrypted?: string | null
+          secret_hint?: string | null
           tipo?: string
           updated_at?: string | null
           url?: string | null
@@ -6536,6 +6542,60 @@ export type Database = {
           },
         ]
       }
+      webhooks_safe: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          filial_id: string | null
+          has_secret: boolean | null
+          id: string | null
+          igreja_id: string | null
+          secret_masked: string | null
+          tipo: string | null
+          updated_at: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          filial_id?: string | null
+          has_secret?: never
+          id?: string | null
+          igreja_id?: string | null
+          secret_masked?: never
+          tipo?: string | null
+          updated_at?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          filial_id?: string | null
+          has_secret?: never
+          id?: string | null
+          igreja_id?: string | null
+          secret_masked?: never
+          tipo?: string | null
+          updated_at?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhooks_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       alocar_pedido_balanceado: {
@@ -6624,6 +6684,10 @@ export type Database = {
         Args: { _module_name: string; _user_id: string }
         Returns: Database["public"]["Enums"]["access_level"]
       }
+      get_webhook_secret: {
+        Args: { p_encryption_key: string; p_igreja_id: string; p_tipo: string }
+        Returns: string
+      }
       has_filial_access: {
         Args: { _filial_id: string; _igreja_id: string }
         Returns: boolean
@@ -6688,6 +6752,15 @@ export type Database = {
       }
       set_audit_context: {
         Args: { p_request_id: string; p_source?: string }
+        Returns: undefined
+      }
+      set_webhook_secret: {
+        Args: {
+          p_encryption_key: string
+          p_igreja_id: string
+          p_secret: string
+          p_tipo: string
+        }
         Returns: undefined
       }
     }
