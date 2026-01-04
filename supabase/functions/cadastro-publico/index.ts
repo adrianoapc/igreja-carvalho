@@ -73,18 +73,61 @@ interface AtualizarMembroData {
   profissao?: string
 }
 
+// Helper to log audit events
+// deno-lint-ignore no-explicit-any
+async function logAudit(
+  supabase: any,
+  endpoint: string,
+  action: string,
+  clientIP: string,
+  success: boolean,
+  errorMessage?: string | null,
+  metadata?: Record<string, unknown>
+) {
+  try {
+    await supabase.from('audit_public_endpoints').insert({
+      endpoint_name: endpoint,
+      action,
+      client_ip: clientIP,
+      success,
+      error_message: errorMessage || null,
+      request_metadata: metadata || {}
+    })
+  } catch (err) {
+    console.error('[cadastro-publico] Failed to log audit:', err)
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Rate limiting check
   const clientIP = getClientIP(req)
+  
+  // Initialize Supabase client early for security checks
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  
+  // Security: Check if IP is blocked
+  const { data: isBlocked } = await supabase.rpc('is_ip_blocked', { p_ip: clientIP })
+  if (isBlocked) {
+    console.log(`[cadastro-publico] Blocked IP attempted access: ${clientIP}`)
+    return new Response(
+      JSON.stringify({ error: 'Acesso temporariamente bloqueado. Tente novamente mais tarde.' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  // Rate limiting check
   const rateCheck = checkRateLimit(clientIP)
   
   if (!rateCheck.allowed) {
     console.log(`[cadastro-publico] Rate limit exceeded for IP: ${clientIP}`)
+    // Log violation and potentially auto-block
+    await supabase.rpc('log_rate_limit_violation', { p_ip: clientIP, p_endpoint: 'cadastro-publico' })
     return new Response(
       JSON.stringify({ error: 'Muitas requisições. Tente novamente em alguns segundos.' }),
       { 
@@ -99,11 +142,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    
     const { action, data } = await req.json()
     
     console.log(`[cadastro-publico] Action: ${action}, IP: ${clientIP}`)
@@ -228,22 +266,25 @@ Deno.serve(async (req) => {
       const { email } = data
       
       if (!email?.trim()) {
+        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Missing email')
         return new Response(
           JSON.stringify({ error: 'Email é obrigatório' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
       
-      // Security: Only return minimal fields, exclude sensitive PII
-      // Address fields (cep, cidade, bairro, estado, endereco) and necessidades_especiais removed for privacy
+      // Security: Only return MINIMAL fields necessary for the update form
+      // Exclude ALL sensitive PII - only return what's needed to display the form
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, profissao, data_batismo')
+        .select('id, nome')
         .eq('email', email.trim().toLowerCase())
         .eq('status', 'membro')
         .single()
       
       if (error || !profile) {
+        // Security: Log failed lookup attempts for audit
+        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Member not found', { email_hash: email.substring(0, 3) + '***' })
         // Security: Use generic error message to prevent email enumeration
         return new Response(
           JSON.stringify({ error: 'Não foi possível processar a solicitação' }),
@@ -251,6 +292,8 @@ Deno.serve(async (req) => {
         )
       }
       
+      // Log successful lookup
+      await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, true, null, { profile_id: profile.id })
       console.log(`[cadastro-publico] Membro encontrado: ${profile.nome}`)
       
       return new Response(

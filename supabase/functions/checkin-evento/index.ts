@@ -74,18 +74,60 @@ function getClientIP(req: Request): string {
          "unknown";
 }
 
+// deno-lint-ignore no-explicit-any
+async function logAudit(
+  supabase: any,
+  endpoint: string,
+  action: string,
+  clientIP: string,
+  success: boolean,
+  errorMessage?: string | null,
+  metadata?: Record<string, unknown>
+) {
+  try {
+    await supabase.from('audit_public_endpoints').insert({
+      endpoint_name: endpoint,
+      action,
+      client_ip: clientIP,
+      success,
+      error_message: errorMessage || null,
+      request_metadata: metadata || {}
+    })
+  } catch (err) {
+    console.error('[checkin-evento] Failed to log audit:', err)
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Rate limiting check
   const clientIP = getClientIP(req);
+  
+  // Initialize Supabase client early for security checks
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  // Security: Check if IP is blocked
+  const { data: isBlocked } = await supabase.rpc('is_ip_blocked', { p_ip: clientIP });
+  if (isBlocked) {
+    console.log(`[checkin-evento] Blocked IP attempted access: ${clientIP}`);
+    return new Response(
+      JSON.stringify({ success: false, message: "Acesso temporariamente bloqueado." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Rate limiting check
   const rateCheck = checkRateLimit(clientIP);
   
   if (!rateCheck.allowed) {
     console.log(`[checkin-evento] Rate limit exceeded for IP: ${clientIP}`);
+    // Log violation and potentially auto-block
+    await supabase.rpc('log_rate_limit_violation', { p_ip: clientIP, p_endpoint: 'checkin-evento' });
     return new Response(
       JSON.stringify({ success: false, message: "Muitas requisições. Tente novamente em alguns segundos." }),
       { 
@@ -106,6 +148,7 @@ Deno.serve(async (req) => {
     console.log(`[checkin-evento] Attempt - Tipo: ${tipo}, Evento: ${evento_id}, Contato: ${contato?.substring(0, 3)}***, IP: ${clientIP}`);
 
     if (!tipo || !evento_id || !contato) {
+      await logAudit(supabase, 'checkin-evento', 'checkin', clientIP, false, 'Dados incompletos');
       return new Response(
         JSON.stringify({ success: false, message: "Dados incompletos" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -118,6 +161,7 @@ Deno.serve(async (req) => {
     
     if (!cooldownCheck.allowed) {
       console.log(`[checkin-evento] Cooldown active for contact at evento ${evento_id}`);
+      await logAudit(supabase, 'checkin-evento', 'checkin', clientIP, false, 'Cooldown active', { evento_id });
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -133,10 +177,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Limpar contato (remover formatação)
     const contatoLimpo = contato.replace(/[^\d@a-zA-Z.]/g, "");
