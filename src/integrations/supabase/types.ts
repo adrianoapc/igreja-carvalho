@@ -1343,47 +1343,6 @@ export type Database = {
           },
         ]
       }
-      webhooks: {
-        Row: {
-          created_at: string | null
-          enabled: boolean
-          id: string
-          igreja_id: string
-          secret: string | null
-          tipo: string
-          updated_at: string | null
-          url: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          enabled?: boolean
-          id?: string
-          igreja_id: string
-          secret?: string | null
-          tipo: string
-          updated_at?: string | null
-          url?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          enabled?: boolean
-          id?: string
-          igreja_id?: string
-          secret?: string | null
-          tipo?: string
-          updated_at?: string | null
-          url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "webhooks_igreja_id_fkey"
-            columns: ["igreja_id"]
-            isOneToOne: false
-            referencedRelation: "igrejas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       contas: {
         Row: {
           agencia: string | null
@@ -2484,6 +2443,7 @@ export type Database = {
           fornecedor_id: string | null
           foto_url: string | null
           id: string
+          igreja_id: string | null
           solicitacao_id: string
           subcategoria_id: string | null
           valor: number
@@ -2498,6 +2458,7 @@ export type Database = {
           fornecedor_id?: string | null
           foto_url?: string | null
           id?: string
+          igreja_id?: string | null
           solicitacao_id: string
           subcategoria_id?: string | null
           valor: number
@@ -2512,6 +2473,7 @@ export type Database = {
           fornecedor_id?: string | null
           foto_url?: string | null
           id?: string
+          igreja_id?: string | null
           solicitacao_id?: string
           subcategoria_id?: string | null
           valor?: number
@@ -2543,6 +2505,13 @@ export type Database = {
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
             referencedColumns: ["id"]
           },
           {
@@ -5123,6 +5092,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "visitantes_leads_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks: {
+        Row: {
+          created_at: string | null
+          enabled: boolean
+          id: string
+          igreja_id: string
+          secret: string | null
+          tipo: string
+          updated_at: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          igreja_id: string
+          secret?: string | null
+          tipo: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          igreja_id?: string
+          secret?: string | null
+          tipo?: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_igreja_id_fkey"
             columns: ["igreja_id"]
             isOneToOne: false
             referencedRelation: "igrejas"
