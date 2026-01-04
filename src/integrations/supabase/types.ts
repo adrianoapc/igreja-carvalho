@@ -22,6 +22,7 @@ export type Database = {
           data_fim: string
           data_inicio: string
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           pastor_id: string
@@ -36,6 +37,7 @@ export type Database = {
           data_fim: string
           data_inicio: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           pastor_id: string
@@ -50,6 +52,7 @@ export type Database = {
           data_fim?: string
           data_inicio?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           pastor_id?: string
@@ -78,6 +81,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "agenda_pastoral_igreja_id_fkey"
@@ -116,6 +126,7 @@ export type Database = {
           created_at: string | null
           dados_antigos: Json
           dados_novos: Json
+          filial_id: string | null
           id: string
           igreja_id: string | null
           observacoes: string | null
@@ -129,6 +140,7 @@ export type Database = {
           created_at?: string | null
           dados_antigos: Json
           dados_novos: Json
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -142,6 +154,7 @@ export type Database = {
           created_at?: string | null
           dados_antigos?: Json
           dados_novos?: Json
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -150,6 +163,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "alteracoes_perfil_pendentes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "alteracoes_perfil_pendentes_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -261,6 +281,7 @@ export type Database = {
       atendimentos_bot: {
         Row: {
           created_at: string | null
+          filial_id: string | null
           historico_conversa: Json | null
           id: string
           igreja_id: string | null
@@ -275,6 +296,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          filial_id?: string | null
           historico_conversa?: Json | null
           id?: string
           igreja_id?: string | null
@@ -289,6 +311,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          filial_id?: string | null
           historico_conversa?: Json | null
           id?: string
           igreja_id?: string | null
@@ -302,6 +325,13 @@ export type Database = {
           visitante_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "atendimentos_bot_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "atendimentos_bot_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -344,6 +374,7 @@ export type Database = {
           conteudo_original: string | null
           created_at: string | null
           data_agendamento: string | null
+          filial_id: string | null
           gravidade: Database["public"]["Enums"]["gravidade_enum"] | null
           historico_evolucao: Json | null
           id: string
@@ -363,6 +394,7 @@ export type Database = {
           conteudo_original?: string | null
           created_at?: string | null
           data_agendamento?: string | null
+          filial_id?: string | null
           gravidade?: Database["public"]["Enums"]["gravidade_enum"] | null
           historico_evolucao?: Json | null
           id?: string
@@ -382,6 +414,7 @@ export type Database = {
           conteudo_original?: string | null
           created_at?: string | null
           data_agendamento?: string | null
+          filial_id?: string | null
           gravidade?: Database["public"]["Enums"]["gravidade_enum"] | null
           historico_evolucao?: Json | null
           id?: string
@@ -398,6 +431,13 @@ export type Database = {
           visitante_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "atendimentos_pastorais_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "atendimentos_pastorais_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -469,6 +509,7 @@ export type Database = {
           data_inicio: string
           duracao_minutos: number | null
           evento_id: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           jornada_id: string | null
@@ -485,6 +526,7 @@ export type Database = {
           data_inicio: string
           duracao_minutos?: number | null
           evento_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           jornada_id?: string | null
@@ -501,6 +543,7 @@ export type Database = {
           data_inicio?: string
           duracao_minutos?: number | null
           evento_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           jornada_id?: string | null
@@ -518,6 +561,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -577,6 +627,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           expires_at: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           image_url: string | null
@@ -591,6 +642,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           expires_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           image_url?: string | null
@@ -605,6 +657,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           expires_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           image_url?: string | null
@@ -615,6 +668,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "banners_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "banners_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -629,6 +689,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           responsavel_id: string | null
@@ -639,6 +700,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           responsavel_id?: string | null
@@ -649,6 +711,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           responsavel_id?: string | null
@@ -656,6 +719,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "bases_ministeriais_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bases_ministeriais_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -694,6 +764,7 @@ export type Database = {
           created_at: string
           duracao_minutos: number | null
           evento_id: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           letra: string | null
@@ -714,6 +785,7 @@ export type Database = {
           created_at?: string
           duracao_minutos?: number | null
           evento_id: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           letra?: string | null
@@ -734,6 +806,7 @@ export type Database = {
           created_at?: string
           duracao_minutos?: number | null
           evento_id?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           letra?: string | null
@@ -753,6 +826,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancoes_culto_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -814,6 +894,7 @@ export type Database = {
           disponibilidade: string
           email_contato: string | null
           experiencia: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           ministerio: string
@@ -832,6 +913,7 @@ export type Database = {
           disponibilidade: string
           email_contato?: string | null
           experiencia: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           ministerio: string
@@ -850,6 +932,7 @@ export type Database = {
           disponibilidade?: string
           email_contato?: string | null
           experiencia?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           ministerio?: string
@@ -882,6 +965,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "candidatos_voluntario_igreja_id_fkey"
@@ -925,6 +1015,7 @@ export type Database = {
           acao: string
           candidato_id: string
           created_at: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           observacoes: string | null
@@ -936,6 +1027,7 @@ export type Database = {
           acao: string
           candidato_id: string
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -947,6 +1039,7 @@ export type Database = {
           acao?: string
           candidato_id?: string
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -960,6 +1053,13 @@ export type Database = {
             columns: ["candidato_id"]
             isOneToOne: false
             referencedRelation: "candidatos_voluntario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_historico_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -997,6 +1097,7 @@ export type Database = {
           ativo: boolean
           cor: string | null
           created_at: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -1008,6 +1109,7 @@ export type Database = {
           ativo?: boolean
           cor?: string | null
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -1019,6 +1121,7 @@ export type Database = {
           ativo?: boolean
           cor?: string | null
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
@@ -1027,6 +1130,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "categorias_financeiras_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "categorias_financeiras_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -1041,6 +1151,7 @@ export type Database = {
           ativo: boolean
           cor: string
           created_at: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -1050,6 +1161,7 @@ export type Database = {
           ativo?: boolean
           cor?: string
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -1059,12 +1171,20 @@ export type Database = {
           ativo?: boolean
           cor?: string
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "categorias_times_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "categorias_times_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -1080,6 +1200,7 @@ export type Database = {
           base_ministerial_id: string | null
           created_at: string
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -1090,6 +1211,7 @@ export type Database = {
           base_ministerial_id?: string | null
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -1100,6 +1222,7 @@ export type Database = {
           base_ministerial_id?: string | null
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
@@ -1111,6 +1234,13 @@ export type Database = {
             columns: ["base_ministerial_id"]
             isOneToOne: false
             referencedRelation: "bases_ministeriais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "centros_custo_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -1174,6 +1304,7 @@ export type Database = {
         Row: {
           created_at: string | null
           evento_id: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           metodo: string | null
@@ -1184,6 +1315,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           evento_id: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           metodo?: string | null
@@ -1194,6 +1326,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           evento_id?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           metodo?: string | null
@@ -1207,6 +1340,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkins_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -1266,6 +1406,7 @@ export type Database = {
           exibir_app: boolean | null
           exibir_site: boolean | null
           exibir_telao: boolean | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           imagem_url: string | null
@@ -1291,6 +1432,7 @@ export type Database = {
           exibir_app?: boolean | null
           exibir_site?: boolean | null
           exibir_telao?: boolean | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           imagem_url?: string | null
@@ -1316,6 +1458,7 @@ export type Database = {
           exibir_app?: boolean | null
           exibir_site?: boolean | null
           exibir_telao?: boolean | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           imagem_url?: string | null
@@ -1335,6 +1478,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comunicados_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -1401,6 +1551,7 @@ export type Database = {
           banco: string | null
           conta_numero: string | null
           created_at: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -1416,6 +1567,7 @@ export type Database = {
           banco?: string | null
           conta_numero?: string | null
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -1431,6 +1583,7 @@ export type Database = {
           banco?: string | null
           conta_numero?: string | null
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
@@ -1441,6 +1594,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contas_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -1531,6 +1691,7 @@ export type Database = {
           data_hora_fim: string | null
           data_hora_inicio: string | null
           evento_id: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           motivo_recusa: string | null
@@ -1550,6 +1711,7 @@ export type Database = {
           data_hora_fim?: string | null
           data_hora_inicio?: string | null
           evento_id: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           motivo_recusa?: string | null
@@ -1569,6 +1731,7 @@ export type Database = {
           data_hora_fim?: string | null
           data_hora_inicio?: string | null
           evento_id?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           motivo_recusa?: string | null
@@ -1586,6 +1749,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -1635,6 +1805,7 @@ export type Database = {
       escalas_template: {
         Row: {
           created_at: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           observacoes: string | null
@@ -1646,6 +1817,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -1657,6 +1829,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -1667,6 +1840,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "escalas_template_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "escalas_template_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -1727,6 +1907,7 @@ export type Database = {
           conteudo_url: string | null
           created_at: string | null
           duracao_estimada_minutos: number | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           jornada_id: string
@@ -1744,6 +1925,7 @@ export type Database = {
           conteudo_url?: string | null
           created_at?: string | null
           duracao_estimada_minutos?: number | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           jornada_id: string
@@ -1761,6 +1943,7 @@ export type Database = {
           conteudo_url?: string | null
           created_at?: string | null
           duracao_estimada_minutos?: number | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           jornada_id?: string
@@ -1771,6 +1954,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "etapas_jornada_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "etapas_jornada_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -1792,6 +1982,7 @@ export type Database = {
           ativo: boolean | null
           cor: string | null
           created_at: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -1802,6 +1993,7 @@ export type Database = {
           ativo?: boolean | null
           cor?: string | null
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -1812,6 +2004,7 @@ export type Database = {
           ativo?: boolean | null
           cor?: string | null
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
@@ -1819,6 +2012,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "evento_subtipos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "evento_subtipos_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -1839,6 +2039,7 @@ export type Database = {
           duracao_minutos: number | null
           endereco: string | null
           exibir_preletor: boolean
+          filial_id: string | null
           id: string
           igreja_id: string | null
           inscricoes_abertas_ate: string | null
@@ -1866,6 +2067,7 @@ export type Database = {
           duracao_minutos?: number | null
           endereco?: string | null
           exibir_preletor?: boolean
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           inscricoes_abertas_ate?: string | null
@@ -1893,6 +2095,7 @@ export type Database = {
           duracao_minutos?: number | null
           endereco?: string | null
           exibir_preletor?: boolean
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           inscricoes_abertas_ate?: string | null
@@ -1926,6 +2129,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "eventos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "eventos_igreja_id_fkey"
             columns: ["igreja_id"]
             isOneToOne: false
@@ -1946,6 +2156,7 @@ export type Database = {
           created_at: string
           enviado_em: string | null
           evento_id: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           motivo_recusa: string | null
@@ -1958,6 +2169,7 @@ export type Database = {
           created_at?: string
           enviado_em?: string | null
           evento_id: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           motivo_recusa?: string | null
@@ -1970,6 +2182,7 @@ export type Database = {
           created_at?: string
           enviado_em?: string | null
           evento_id?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           motivo_recusa?: string | null
@@ -1984,6 +2197,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_convites_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -2020,6 +2240,7 @@ export type Database = {
         Row: {
           created_at: string
           familiar_id: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome_familiar: string | null
@@ -2030,6 +2251,7 @@ export type Database = {
         Insert: {
           created_at?: string
           familiar_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome_familiar?: string | null
@@ -2040,6 +2262,7 @@ export type Database = {
         Update: {
           created_at?: string
           familiar_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome_familiar?: string | null
@@ -2068,6 +2291,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "familias_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "familias_igreja_id_fkey"
@@ -2099,10 +2329,43 @@ export type Database = {
           },
         ]
       }
+      filiais: {
+        Row: {
+          created_at: string | null
+          id: string
+          igreja_id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          igreja_id: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          igreja_id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filiais_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formas_pagamento: {
         Row: {
           ativo: boolean
           created_at: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -2111,6 +2374,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -2119,12 +2383,20 @@ export type Database = {
         Update: {
           ativo?: boolean
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "formas_pagamento_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "formas_pagamento_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -2144,6 +2416,7 @@ export type Database = {
           email: string | null
           endereco: string | null
           estado: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -2161,6 +2434,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           estado?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -2178,6 +2452,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           estado?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
@@ -2187,6 +2462,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fornecedores_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fornecedores_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -2201,6 +2483,7 @@ export type Database = {
           ativo: boolean | null
           created_at: string | null
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -2210,6 +2493,7 @@ export type Database = {
           ativo?: boolean | null
           created_at?: string | null
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -2219,12 +2503,20 @@ export type Database = {
           ativo?: boolean | null
           created_at?: string | null
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "funcoes_igreja_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "funcoes_igreja_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -2259,6 +2551,7 @@ export type Database = {
         Row: {
           created_at: string | null
           evento_id: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           observacoes: string | null
@@ -2271,6 +2564,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           evento_id: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -2283,6 +2577,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           evento_id?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -2298,6 +2593,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -2486,6 +2788,7 @@ export type Database = {
           ativo: boolean | null
           created_at: string | null
           email: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           max_pedidos: number | null
@@ -2501,6 +2804,7 @@ export type Database = {
           ativo?: boolean | null
           created_at?: string | null
           email?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           max_pedidos?: number | null
@@ -2516,6 +2820,7 @@ export type Database = {
           ativo?: boolean | null
           created_at?: string | null
           email?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           max_pedidos?: number | null
@@ -2528,6 +2833,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "intercessores_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "intercessores_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -2545,6 +2857,7 @@ export type Database = {
           created_at: string | null
           data_item: string
           descricao: string
+          filial_id: string | null
           fornecedor_id: string | null
           foto_url: string | null
           id: string
@@ -2560,6 +2873,7 @@ export type Database = {
           created_at?: string | null
           data_item: string
           descricao: string
+          filial_id?: string | null
           fornecedor_id?: string | null
           foto_url?: string | null
           id?: string
@@ -2575,6 +2889,7 @@ export type Database = {
           created_at?: string | null
           data_item?: string
           descricao?: string
+          filial_id?: string | null
           fornecedor_id?: string | null
           foto_url?: string | null
           id?: string
@@ -2603,6 +2918,13 @@ export type Database = {
             columns: ["centro_custo_id"]
             isOneToOne: false
             referencedRelation: "centros_custo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_reembolso_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -2699,6 +3021,7 @@ export type Database = {
           created_at: string | null
           descricao: string | null
           exibir_portal: boolean | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           requer_pagamento: boolean | null
@@ -2713,6 +3036,7 @@ export type Database = {
           created_at?: string | null
           descricao?: string | null
           exibir_portal?: boolean | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           requer_pagamento?: boolean | null
@@ -2727,6 +3051,7 @@ export type Database = {
           created_at?: string | null
           descricao?: string | null
           exibir_portal?: boolean | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           requer_pagamento?: boolean | null
@@ -2736,6 +3061,13 @@ export type Database = {
           valor?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "jornadas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "jornadas_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -2754,6 +3086,7 @@ export type Database = {
           created_at: string | null
           crianca_id: string
           evento_id: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           observacoes: string | null
@@ -2768,6 +3101,7 @@ export type Database = {
           created_at?: string | null
           crianca_id: string
           evento_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -2782,6 +3116,7 @@ export type Database = {
           created_at?: string | null
           crianca_id?: string
           evento_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes?: string | null
@@ -2857,6 +3192,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -2985,6 +3327,7 @@ export type Database = {
         Row: {
           created_at: string | null
           duracao_segundos: number | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           liturgia_item_id: string
@@ -2994,6 +3337,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           duracao_segundos?: number | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           liturgia_item_id: string
@@ -3003,6 +3347,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           duracao_segundos?: number | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           liturgia_item_id?: string
@@ -3010,6 +3355,13 @@ export type Database = {
           ordem?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "liturgia_recursos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "liturgia_recursos_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -3038,6 +3390,7 @@ export type Database = {
           created_at: string | null
           descricao: string | null
           estrutura_json: Json | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -3047,6 +3400,7 @@ export type Database = {
           created_at?: string | null
           descricao?: string | null
           estrutura_json?: Json | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -3056,12 +3410,20 @@ export type Database = {
           created_at?: string | null
           descricao?: string | null
           estrutura_json?: Json | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "liturgia_templates_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "liturgia_templates_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -3079,6 +3441,7 @@ export type Database = {
           descricao: string | null
           duracao_minutos: number | null
           evento_id: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           midias_ids: string[] | null
@@ -3098,6 +3461,7 @@ export type Database = {
           descricao?: string | null
           duracao_minutos?: number | null
           evento_id: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           midias_ids?: string[] | null
@@ -3117,6 +3481,7 @@ export type Database = {
           descricao?: string | null
           duracao_minutos?: number | null
           evento_id?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           midias_ids?: string[] | null
@@ -3135,6 +3500,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liturgias_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -3211,6 +3583,7 @@ export type Database = {
           created_at: string | null
           data_fim: string | null
           data_inicio: string | null
+          filial_id: string | null
           funcao_id: string
           id: string
           igreja_id: string | null
@@ -3222,6 +3595,7 @@ export type Database = {
           created_at?: string | null
           data_fim?: string | null
           data_inicio?: string | null
+          filial_id?: string | null
           funcao_id: string
           id?: string
           igreja_id?: string | null
@@ -3233,6 +3607,7 @@ export type Database = {
           created_at?: string | null
           data_fim?: string | null
           data_inicio?: string | null
+          filial_id?: string | null
           funcao_id?: string
           id?: string
           igreja_id?: string | null
@@ -3240,6 +3615,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "membro_funcoes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "membro_funcoes_funcao_id_fkey"
             columns: ["funcao_id"]
@@ -3282,6 +3664,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           data_entrada: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           pessoa_id: string
@@ -3293,6 +3676,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           data_entrada?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           pessoa_id: string
@@ -3304,6 +3688,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           data_entrada?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           pessoa_id?: string
@@ -3312,6 +3697,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "membros_time_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "membros_time_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -3359,6 +3751,7 @@ export type Database = {
       midia_tags: {
         Row: {
           created_at: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           midia_id: string
@@ -3366,6 +3759,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           midia_id: string
@@ -3373,12 +3767,20 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           midia_id?: string
           tag_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "midia_tags_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "midia_tags_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -3411,6 +3813,7 @@ export type Database = {
           culto_id: string | null
           descricao: string | null
           expires_at: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           ordem: number
@@ -3429,6 +3832,7 @@ export type Database = {
           culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           ordem?: number
@@ -3447,6 +3851,7 @@ export type Database = {
           culto_id?: string | null
           descricao?: string | null
           expires_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           ordem?: number
@@ -3463,6 +3868,13 @@ export type Database = {
             columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "midias_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -3587,6 +3999,7 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           message: string
@@ -3599,6 +4012,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           message: string
@@ -3611,6 +4025,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           message?: string
@@ -3622,6 +4037,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -3644,6 +4066,7 @@ export type Database = {
           data_criacao: string | null
           data_resposta: string | null
           email_solicitante: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           intercessor_id: string | null
@@ -3672,6 +4095,7 @@ export type Database = {
           data_criacao?: string | null
           data_resposta?: string | null
           email_solicitante?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           intercessor_id?: string | null
@@ -3700,6 +4124,7 @@ export type Database = {
           data_criacao?: string | null
           data_resposta?: string | null
           email_solicitante?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           intercessor_id?: string | null
@@ -3717,6 +4142,13 @@ export type Database = {
           visitante_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pedidos_oracao_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pedidos_oracao_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -3773,6 +4205,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -3783,6 +4216,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -3793,6 +4227,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
@@ -3800,6 +4235,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "posicoes_time_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "posicoes_time_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -3825,6 +4267,7 @@ export type Database = {
           checkout_at: string | null
           created_at: string | null
           etapa_id: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           observacoes_seguranca: string | null
@@ -3839,6 +4282,7 @@ export type Database = {
           checkout_at?: string | null
           created_at?: string | null
           etapa_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes_seguranca?: string | null
@@ -3853,6 +4297,7 @@ export type Database = {
           checkout_at?: string | null
           created_at?: string | null
           etapa_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           observacoes_seguranca?: string | null
@@ -3893,6 +4338,13 @@ export type Database = {
             columns: ["etapa_id"]
             isOneToOne: false
             referencedRelation: "etapas_jornada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -3958,6 +4410,7 @@ export type Database = {
           estado: string | null
           estado_civil: string | null
           familia_id: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nacionalidade: string | null
@@ -4010,6 +4463,7 @@ export type Database = {
           estado?: string | null
           estado_civil?: string | null
           familia_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nacionalidade?: string | null
@@ -4062,6 +4516,7 @@ export type Database = {
           estado?: string | null
           estado_civil?: string | null
           familia_id?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nacionalidade?: string | null
@@ -4091,6 +4546,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "profiles_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "profiles_igreja_id_fkey"
             columns: ["igreja_id"]
             isOneToOne: false
@@ -4105,6 +4567,7 @@ export type Database = {
           data_fim: string | null
           data_inicio: string | null
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           lider_id: string | null
@@ -4117,6 +4580,7 @@ export type Database = {
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           lider_id?: string | null
@@ -4129,6 +4593,7 @@ export type Database = {
           data_fim?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           lider_id?: string | null
@@ -4137,6 +4602,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "projetos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projetos_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -4292,6 +4764,7 @@ export type Database = {
           ativo: boolean | null
           capacidade: number | null
           created_at: string | null
+          filial_id: string | null
           id: string
           idade_max: number | null
           idade_min: number | null
@@ -4304,6 +4777,7 @@ export type Database = {
           ativo?: boolean | null
           capacidade?: number | null
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           idade_max?: number | null
           idade_min?: number | null
@@ -4316,6 +4790,7 @@ export type Database = {
           ativo?: boolean | null
           capacidade?: number | null
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           idade_max?: number | null
           idade_min?: number | null
@@ -4325,6 +4800,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "salas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "salas_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -4342,6 +4824,7 @@ export type Database = {
           analise_ia_titulo: string | null
           created_at: string
           data_registro: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           mensagem: string | null
@@ -4356,6 +4839,7 @@ export type Database = {
           analise_ia_titulo?: string | null
           created_at?: string
           data_registro?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           mensagem?: string | null
@@ -4370,6 +4854,7 @@ export type Database = {
           analise_ia_titulo?: string | null
           created_at?: string
           data_registro?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           mensagem?: string | null
@@ -4378,6 +4863,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sentimentos_membros_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sentimentos_membros_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -4416,6 +4908,7 @@ export type Database = {
           data_pagamento: string | null
           data_solicitacao: string
           data_vencimento: string | null
+          filial_id: string | null
           forma_pagamento_preferida: string | null
           id: string
           igreja_id: string | null
@@ -4432,6 +4925,7 @@ export type Database = {
           data_pagamento?: string | null
           data_solicitacao?: string
           data_vencimento?: string | null
+          filial_id?: string | null
           forma_pagamento_preferida?: string | null
           id?: string
           igreja_id?: string | null
@@ -4448,6 +4942,7 @@ export type Database = {
           data_pagamento?: string | null
           data_solicitacao?: string
           data_vencimento?: string | null
+          filial_id?: string | null
           forma_pagamento_preferida?: string | null
           id?: string
           igreja_id?: string | null
@@ -4458,6 +4953,13 @@ export type Database = {
           valor_total?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "solicitacoes_reembolso_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "solicitacoes_reembolso_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -4493,6 +4995,7 @@ export type Database = {
           ativo: boolean
           categoria_id: string
           created_at: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -4502,6 +5005,7 @@ export type Database = {
           ativo?: boolean
           categoria_id: string
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -4511,6 +5015,7 @@ export type Database = {
           ativo?: boolean
           categoria_id?: string
           created_at?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
@@ -4522,6 +5027,13 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcategorias_financeiras_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -4538,6 +5050,7 @@ export type Database = {
           ativo: boolean | null
           cor: string | null
           created_at: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string
@@ -4547,6 +5060,7 @@ export type Database = {
           ativo?: boolean | null
           cor?: string | null
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome: string
@@ -4556,12 +5070,20 @@ export type Database = {
           ativo?: boolean | null
           cor?: string | null
           created_at?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tags_midias_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tags_midias_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -4577,6 +5099,7 @@ export type Database = {
           criado_por: string | null
           data_vencimento: string | null
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           prioridade: string | null
@@ -4591,6 +5114,7 @@ export type Database = {
           criado_por?: string | null
           data_vencimento?: string | null
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           prioridade?: string | null
@@ -4605,6 +5129,7 @@ export type Database = {
           criado_por?: string | null
           data_vencimento?: string | null
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           prioridade?: string | null
@@ -4635,6 +5160,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "tarefas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tarefas_igreja_id_fkey"
@@ -4680,6 +5212,7 @@ export type Database = {
           created_at: string
           descricao: string | null
           duracao_padrao: number | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           incluir_escalas: boolean | null
@@ -4697,6 +5230,7 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           duracao_padrao?: number | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           incluir_escalas?: boolean | null
@@ -4714,6 +5248,7 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           duracao_padrao?: number | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           incluir_escalas?: boolean | null
@@ -4726,6 +5261,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "templates_culto_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "templates_culto_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -4743,6 +5285,7 @@ export type Database = {
           created_at: string
           data_publicacao: string | null
           email_externo: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           mensagem: string
@@ -4761,6 +5304,7 @@ export type Database = {
           created_at?: string
           data_publicacao?: string | null
           email_externo?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           mensagem: string
@@ -4779,6 +5323,7 @@ export type Database = {
           created_at?: string
           data_publicacao?: string | null
           email_externo?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           mensagem?: string
@@ -4811,6 +5356,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "testemunhos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "testemunhos_igreja_id_fkey"
@@ -4849,6 +5401,7 @@ export type Database = {
           cor: string | null
           created_at: string
           descricao: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           lider_id: string | null
@@ -4862,6 +5415,7 @@ export type Database = {
           cor?: string | null
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           lider_id?: string | null
@@ -4875,6 +5429,7 @@ export type Database = {
           cor?: string | null
           created_at?: string
           descricao?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           lider_id?: string | null
@@ -4883,6 +5438,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "times_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "times_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -4948,6 +5510,7 @@ export type Database = {
           data_vencimento: string
           desconto: number | null
           descricao: string
+          filial_id: string | null
           forma_pagamento: string | null
           fornecedor_id: string | null
           id: string
@@ -4982,6 +5545,7 @@ export type Database = {
           data_vencimento: string
           desconto?: number | null
           descricao: string
+          filial_id?: string | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
@@ -5016,6 +5580,7 @@ export type Database = {
           data_vencimento?: string
           desconto?: number | null
           descricao?: string
+          filial_id?: string | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
@@ -5064,6 +5629,13 @@ export type Database = {
             columns: ["conta_id"]
             isOneToOne: false
             referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
             referencedColumns: ["id"]
           },
           {
@@ -5155,6 +5727,7 @@ export type Database = {
         Row: {
           created_at: string | null
           data_contato: string
+          filial_id: string | null
           id: string
           igreja_id: string | null
           membro_responsavel_id: string
@@ -5167,6 +5740,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           data_contato: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           membro_responsavel_id: string
@@ -5179,6 +5753,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           data_contato?: string
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           membro_responsavel_id?: string
@@ -5218,6 +5793,13 @@ export type Database = {
             referencedColumns: ["pessoa_id"]
           },
           {
+            foreignKeyName: "visitante_contatos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visitante_contatos_igreja_id_fkey"
             columns: ["igreja_id"]
             isOneToOne: false
@@ -5232,6 +5814,7 @@ export type Database = {
           data_ultimo_contato: string | null
           email: string | null
           estagio_funil: string | null
+          filial_id: string | null
           id: string
           igreja_id: string | null
           nome: string | null
@@ -5245,6 +5828,7 @@ export type Database = {
           data_ultimo_contato?: string | null
           email?: string | null
           estagio_funil?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string | null
@@ -5258,6 +5842,7 @@ export type Database = {
           data_ultimo_contato?: string | null
           email?: string | null
           estagio_funil?: string | null
+          filial_id?: string | null
           id?: string
           igreja_id?: string | null
           nome?: string | null
@@ -5267,6 +5852,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "visitantes_leads_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "visitantes_leads_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -5280,6 +5872,7 @@ export type Database = {
         Row: {
           created_at: string | null
           enabled: boolean
+          filial_id: string | null
           id: string
           igreja_id: string
           secret: string | null
@@ -5290,6 +5883,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           enabled?: boolean
+          filial_id?: string | null
           id?: string
           igreja_id: string
           secret?: string | null
@@ -5300,6 +5894,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           enabled?: boolean
+          filial_id?: string | null
           id?: string
           igreja_id?: string
           secret?: string | null
@@ -5308,6 +5903,13 @@ export type Database = {
           url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "webhooks_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "webhooks_igreja_id_fkey"
             columns: ["igreja_id"]
@@ -5701,7 +6303,9 @@ export type Database = {
         Args: { p_lat: number; p_long: number; p_telefone: string }
         Returns: Json
       }
+      get_current_user_filial_id: { Args: never; Returns: string }
       get_current_user_igreja_id: { Args: never; Returns: string }
+      get_default_filial_id: { Args: { _igreja_id: string }; Returns: string }
       get_dre_anual: {
         Args: { p_ano: number }
         Returns: {
@@ -5712,6 +6316,8 @@ export type Database = {
           total: number
         }[]
       }
+      get_jwt_filial_id: { Args: never; Returns: string }
+      get_jwt_igreja_id: { Args: never; Returns: string }
       get_minha_lista_chamada: {
         Args: { p_evento_id: string }
         Returns: {
@@ -5739,6 +6345,10 @@ export type Database = {
       get_user_module_access: {
         Args: { _module_name: string; _user_id: string }
         Returns: Database["public"]["Enums"]["access_level"]
+      }
+      has_filial_access: {
+        Args: { _filial_id: string; _igreja_id: string }
+        Returns: boolean
       }
       has_permission: {
         Args: { _permission_slug: string; _user_id: string }
@@ -5819,6 +6429,8 @@ export type Database = {
         | "membro"
         | "basico"
         | "tecnico"
+        | "admin_igreja"
+        | "admin_filial"
       categoria_testemunho:
         | "espiritual"
         | "casamento"
@@ -6003,6 +6615,8 @@ export const Constants = {
         "membro",
         "basico",
         "tecnico",
+        "admin_igreja",
+        "admin_filial",
       ],
       categoria_testemunho: [
         "espiritual",
