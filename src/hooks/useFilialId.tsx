@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
+
 const extractUUID = (value: unknown): string | null => {
   return typeof value === "string" && value.length > 0 ? value : null;
 };
@@ -24,6 +26,19 @@ export function useFilialId() {
     return { filialId, igrejaId };
   }, []);
 
+  const getOverrideFromStorage = (): string | null => {
+    try {
+      const stored = localStorage.getItem(FILIAL_OVERRIDE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.id || null;
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+    return null;
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -43,6 +58,12 @@ export function useFilialId() {
           extracted.filialId = profile.filial_id;
           extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
         }
+      }
+
+      // Verificar override do localStorage (para admins que trocaram filial)
+      const override = getOverrideFromStorage();
+      if (override) {
+        extracted.filialId = override;
       }
 
       if (isMounted) {
@@ -70,6 +91,12 @@ export function useFilialId() {
           extracted.filialId = profile.filial_id;
           extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
         }
+      }
+
+      // Verificar override do localStorage (para admins que trocaram filial)
+      const override = getOverrideFromStorage();
+      if (override) {
+        extracted.filialId = override;
       }
 
       if (isMounted) {

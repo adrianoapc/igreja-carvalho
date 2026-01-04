@@ -42,6 +42,7 @@ import { usePermissions, Permission } from "@/hooks/usePermissions";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import UserMenu from "./UserMenu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FilialSwitcher } from "./FilialSwitcher";
 
 type MenuItem = {
   title: string;
@@ -246,6 +247,7 @@ export function AppSidebar() {
             )}
           </div>
         </Link>
+        <FilialSwitcher className="mt-1" />
       </SidebarHeader>
 
       <SidebarContent className="px-2">
