@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,7 +35,11 @@ const ministryOptions = [
     cor: "bg-purple-500",
     vagas: 3,
     dificuldade: "avançado" as const,
-    requisitos: ["Habilidades musicais", "Comprometimento semanal", "Experiência em louvor"],
+    requisitos: [
+      "Habilidades musicais",
+      "Comprometimento semanal",
+      "Experiência em louvor",
+    ],
   },
   {
     id: "midia",
@@ -38,7 +48,11 @@ const ministryOptions = [
     cor: "bg-green-500",
     vagas: 4,
     dificuldade: "médio" as const,
-    requisitos: ["Conhecimento técnico básico", "Responsabilidade", "Pontualidade"],
+    requisitos: [
+      "Conhecimento técnico básico",
+      "Responsabilidade",
+      "Pontualidade",
+    ],
   },
   {
     id: "kids",
@@ -47,7 +61,11 @@ const ministryOptions = [
     cor: "bg-pink-500",
     vagas: 6,
     dificuldade: "médio" as const,
-    requisitos: ["Paciência", "Afinidade com crianças", "Capacidade de liderança"],
+    requisitos: [
+      "Paciência",
+      "Afinidade com crianças",
+      "Capacidade de liderança",
+    ],
   },
   {
     id: "intercessao",
@@ -56,7 +74,11 @@ const ministryOptions = [
     cor: "bg-red-500",
     vagas: 8,
     dificuldade: "fácil" as const,
-    requisitos: ["Vida de oração", "Sensibilidade espiritual", "Disponibilidade flexível"],
+    requisitos: [
+      "Vida de oração",
+      "Sensibilidade espiritual",
+      "Disponibilidade flexível",
+    ],
   },
   {
     id: "acao-social",
@@ -101,10 +123,14 @@ const STATUS_BLOQUEANTES = ["pendente", "em_analise", "aprovado", "em_trilha"];
 export default function Voluntariado() {
   const { toast } = useToast();
   const { user, profile, loading: authLoading } = useAuth();
-  const [minhasCandidaturas, setMinhasCandidaturas] = useState<Candidatura[]>([]);
+  const [minhasCandidaturas, setMinhasCandidaturas] = useState<Candidatura[]>(
+    []
+  );
   const [loadingCandidatura, setLoadingCandidatura] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [ministerioSelecionado, setMinisterioSelecionado] = useState<string | null>(null);
+  const [ministerioSelecionado, setMinisterioSelecionado] = useState<
+    string | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Preencher dados do perfil se logado
@@ -124,7 +150,9 @@ export default function Voluntariado() {
 
       const { data, error } = await supabase
         .from("candidatos_voluntario")
-        .select("id, ministerio, disponibilidade, experiencia, status, created_at")
+        .select(
+          "id, ministerio, disponibilidade, experiencia, status, created_at"
+        )
         .eq("pessoa_id", profile.id)
         .order("created_at", { ascending: false });
 
@@ -141,8 +169,8 @@ export default function Voluntariado() {
 
   // Ministérios em que já tem candidatura ativa (não pode duplicar)
   const ministeriosBloqueados = minhasCandidaturas
-    .filter(c => STATUS_BLOQUEANTES.includes(c.status))
-    .map(c => c.ministerio);
+    .filter((c) => STATUS_BLOQUEANTES.includes(c.status))
+    .map((c) => c.ministerio);
 
   const handleAbrir = (ministerioId: string) => {
     setMinisterioSelecionado(ministerioId);
@@ -158,7 +186,9 @@ export default function Voluntariado() {
   }) => {
     if (!ministerioSelecionado) return;
 
-    const ministerio = ministryOptions.find(m => m.id === ministerioSelecionado)?.nome || ministerioSelecionado;
+    const ministerio =
+      ministryOptions.find((m) => m.id === ministerioSelecionado)?.nome ||
+      ministerioSelecionado;
 
     setIsSubmitting(true);
     try {
@@ -186,14 +216,17 @@ export default function Voluntariado() {
       });
 
       if (result) {
-        setMinhasCandidaturas(prev => [{
-          id: result.id,
-          ministerio: result.ministerio,
-          disponibilidade: result.disponibilidade,
-          experiencia: result.experiencia,
-          status: result.status,
-          created_at: result.created_at,
-        }, ...prev]);
+        setMinhasCandidaturas((prev) => [
+          {
+            id: result.id,
+            ministerio: result.ministerio,
+            disponibilidade: result.disponibilidade,
+            experiencia: result.experiencia,
+            status: result.status,
+            created_at: result.created_at,
+          },
+          ...prev,
+        ]);
       }
 
       setModalOpen(false);
@@ -208,7 +241,7 @@ export default function Voluntariado() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   if (authLoading || loadingCandidatura) {
     return (
@@ -218,7 +251,9 @@ export default function Voluntariado() {
     );
   }
 
-  const candidaturasAtivas = minhasCandidaturas.filter(c => c.status !== "rejeitado");
+  const candidaturasAtivas = minhasCandidaturas.filter(
+    (c) => c.status !== "rejeitado"
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 via-transparent to-transparent">
@@ -239,7 +274,8 @@ export default function Voluntariado() {
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold">Voluntariado</h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
-                  Toda pessoa tem um chamado único. Descubra como você pode servir e fazer diferença em nossa comunidade.
+                  Toda pessoa tem um chamado único. Descubra como você pode
+                  servir e fazer diferença em nossa comunidade.
                 </p>
               </div>
             </div>
@@ -252,7 +288,11 @@ export default function Voluntariado() {
               className="grid grid-cols-3 gap-4 mt-8"
             >
               {[
-                { icon: Zap, label: "Ministérios", value: ministryOptions.length },
+                {
+                  icon: Zap,
+                  label: "Ministérios",
+                  value: ministryOptions.length,
+                },
                 { icon: Users, label: "Voluntários", value: "200+" },
                 { icon: Target, label: "Impacto", value: "Alto" },
               ].map((stat, idx) => (
@@ -334,7 +374,8 @@ export default function Voluntariado() {
                 <Card className="border-dashed">
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground">
-                      💡 Você pode se candidatar a outros ministérios. Volte à aba "Ministérios" para explorar mais oportunidades.
+                      💡 Você pode se candidatar a outros ministérios. Volte à
+                      aba "Ministérios" para explorar mais oportunidades.
                     </p>
                   </CardContent>
                 </Card>
@@ -349,7 +390,8 @@ export default function Voluntariado() {
             open={modalOpen}
             onOpenChange={setModalOpen}
             ministerio={
-              ministryOptions.find(m => m.id === ministerioSelecionado)?.nome || "Ministério"
+              ministryOptions.find((m) => m.id === ministerioSelecionado)
+                ?.nome || "Ministério"
             }
             perfil={
               profile

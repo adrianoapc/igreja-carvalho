@@ -1,4 +1,49 @@
+# Arquitetura Geral — Sistema Multi-tenant
+
+## 🏢 Visão Geral Multi-tenant
+
+O sistema implementa **arquitetura multi-tenant completa** com isolamento total por igreja. Cada igreja opera em um contexto isolado com dados completamente separados.
+
+```mermaid
+flowchart TD
+    subgraph "Sistema Multi-tenant"
+        subgraph "Igreja A (igreja_id: 1)"
+            FrontendA[Frontend React]
+            ModulosA[Módulos: Pessoas, Eventos, etc.]
+            SupabaseA[(Supabase - Dados Igreja A)]
+        end
+
+        subgraph "Igreja B (igreja_id: 2)"
+            FrontendB[Frontend React]
+            ModulosB[Módulos: Pessoas, Eventos, etc.]
+            SupabaseB[(Supabase - Dados Igreja B)]
+        end
+
+        subgraph "Super Admin (igreja_id: null)"
+            SuperAdmin[Super Admin Dashboard<br/>/superadmin]
+            SupabaseGlobal[(Supabase Global<br/>igrejas, onboarding)]
+        end
+    end
+
+    FrontendA --> ModulosA
+    ModulosA --> SupabaseA
+    FrontendB --> ModulosB
+    ModulosB --> SupabaseB
+    SuperAdmin --> SupabaseGlobal
+
+    SupabaseA -.->|RLS Policies| SupabaseA
+    SupabaseB -.->|RLS Policies| SupabaseB
+```
+
+### Isolamento por Igreja
+
+- **Coluna `igreja_id`**: Presente em 30+ tabelas principais
+- **RLS Policies**: Políticas automáticas garantem acesso apenas aos dados da própria igreja
+- **Hooks de Contexto**: `useIgrejaId()` e `useFilialId()` fornecem contexto automático
+- **Super Admin**: Acesso global para gestão de múltiplas igrejas
+
 ### 📊 Arquitetura Geral
+
 ```mermaid
 flowchart LR
   Frontend[Frontend (React/Vite)]
@@ -23,6 +68,7 @@ flowchart LR
 ```
 
 ### 🧭 Hierarquia de Módulos
+
 ```mermaid
 graph TD
   Sistema[Sistema Igreja Carvalho]
@@ -115,6 +161,7 @@ graph TD
 ```
 
 ### 🧭 Fluxo de Telas / Navegação
+
 ```mermaid
 stateDiagram-v2
   [*] --> Dashboard: /

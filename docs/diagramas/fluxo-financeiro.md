@@ -1,32 +1,38 @@
 # Fluxo Financeiro - Reembolso -> Caixa -> DRE
 
 ## Objetivo
-Visualizar a separação conceitual entre **Fato Gerador** (competência), **Fluxo de Caixa** (pagamentos) e **DRE** (resultado contábil), conforme definido no [ADR-001](../adr/ADR-001-separacao-fato-gerador-caixa-dre.md).
+
+Visualizar a separação conceitual entre **Fato Gerador** (competência), **Fluxo de Caixa** (pagamentos) e **DRE** (resultado contábil), conforme definido no [ADR-001](../adr/ADR-001-separacao-fato-gerador-caixa-dre.md). **Todas as operações são automaticamente filtradas por `igreja_id`** do usuário logado.
 
 ## Contexto
+
 Este fluxo representa o ciclo completo de uma despesa com reembolso:
+
 1. Líder/membro compra algo e envia notas fiscais
-2. Sistema classifica os itens contábeis (fato gerador)
-3. Tesoureiro aprova e escolhe forma de pagamento (caixa)
+2. Sistema classifica os itens contábeis (fato gerador) **scoped por igreja**
+3. Tesoureiro aprova e escolhe forma de pagamento (caixa) **scoped por igreja**
 4. Banco processa o pagamento e retorna extrato
-5. Sistema concilia e atualiza status
-6. View contábil unifica dados para gerar DRE
+5. Sistema concilia e atualiza status **scoped por igreja**
+6. View contábil unifica dados para gerar DRE **scoped por igreja**
 
 ## Principais Conceitos
 
 ### 1. Fato Gerador (Competência)
+
 - **O que é**: Registro da natureza do gasto (categoria, fornecedor, motivo)
 - **Quando acontece**: No momento da decisão de gastar
 - **Onde fica**: `itens_reembolso` ou tabela equivalente de lançamentos
 - **Impacto**: Define o que aparece no DRE
 
 ### 2. Fluxo de Caixa
+
 - **O que é**: Registro de quando e como o dinheiro saiu/entrou
 - **Quando acontece**: No momento do pagamento efetivo
 - **Onde fica**: `transacoes_financeiras`
 - **Impacto**: Altera saldo das contas, gera conciliação bancária
 
 ### 3. DRE (Resultado)
+
 - **O que é**: Relatório contábil por competência
 - **Como é gerado**: View que cruza fato gerador (categoria) + caixa (valor pago)
 - **Independência**: Não é afetado pela forma de pagamento (parcelamento, juros, etc.)
@@ -34,6 +40,7 @@ Este fluxo representa o ciclo completo de uma despesa com reembolso:
 ## Cenários Práticos
 
 ### Cenário A: Despesa à Vista
+
 - Líder compra material de R$ 500
 - Sistema registra fato gerador: "Material Evangelismo" (Despesas Ministeriais)
 - Tesoureiro paga à vista via PIX
@@ -41,6 +48,7 @@ Este fluxo representa o ciclo completo de uma despesa com reembolso:
 - **Caixa**: -R$ 500 no mês (pagamento)
 
 ### Cenário B: Despesa Parcelada
+
 - Líder compra equipamento de R$ 3.000
 - Sistema registra fato gerador: "Equipamento de Som" (Despesas Administrativas)
 - Tesoureiro parcela em 3x sem juros
@@ -48,6 +56,7 @@ Este fluxo representa o ciclo completo de uma despesa com reembolso:
 - **Caixa**: -R$ 1.000 por mês durante 3 meses (regime de caixa)
 
 ### Cenário C: Reembolso
+
 - Líder já pagou R$ 200 do próprio bolso
 - Sistema registra fato gerador: "Material de Escritório" (Despesas Administrativas)
 - Tesoureiro reembolsa o líder
@@ -56,12 +65,14 @@ Este fluxo representa o ciclo completo de uma despesa com reembolso:
 - **Rastreabilidade**: Vínculo entre fato gerador e reembolso
 
 ### Cenário D: Estorno de Fato Gerador
+
 - Lançamento foi feito por engano
 - Tesoureiro estorna o fato gerador
 - **DRE**: Lançamento removido ou marcado como estornado
 - **Caixa**: Se já foi pago, requer estorno de caixa separado
 
 ### Cenário E: Estorno de Caixa (sem alterar fato gerador)
+
 - Pagamento duplicado ou erro bancário
 - Tesoureiro estorna apenas o pagamento
 - **DRE**: Permanece inalterado
@@ -121,18 +132,21 @@ graph TD
 ## Regras de Negócio Importantes
 
 ### O que altera o DRE
+
 - ✅ Criação de novo fato gerador
 - ✅ Reclassificação de categoria de um fato gerador
 - ✅ Estorno de fato gerador
 - ✅ Ajuste de competência (mudança de mês/ano)
 
 ### O que NÃO altera o DRE
+
 - ❌ Forma de pagamento (à vista, parcelado, PIX, boleto)
 - ❌ Data de pagamento diferente da competência
 - ❌ Juros ou descontos aplicados no caixa
 - ❌ Estorno apenas de pagamento (sem estornar fato gerador)
 
 ### O que altera o Caixa
+
 - ✅ Registro de pagamento/recebimento
 - ✅ Conciliação bancária
 - ✅ Ajustes de saldo manual

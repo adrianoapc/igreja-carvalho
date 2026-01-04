@@ -6,76 +6,78 @@ Baseado nos componentes `Comunicados.tsx`, `ComunicadoDialog.tsx`, `PublicacaoSt
 
 ```mermaid
 flowchart TD
-    Start([Usuário acessa /comunicados]) --> CheckAuth{Usuário autenticado<br/>e role admin/secretario?}
-    
+    Start([Usuário acessa /comunicados]) --> GetIgrejaContext[Obter igreja_id<br/>do usuário logado]
+
+    GetIgrejaContext --> CheckAuth{Usuário autenticado<br/>e role admin/secretario<br/>na igreja?}
+
     CheckAuth -->|Não| Denied[Acesso negado<br/>RLS comunicados_gestao_admin]
-    CheckAuth -->|Sim| Dashboard[Dashboard de Comunicados<br/>Lista comunicados existentes]
-    
+    CheckAuth -->|Sim| Dashboard[Dashboard de Comunicados<br/>Lista comunicados<br/>WHERE igreja_id = ?]
+
     Dashboard --> Action{Ação escolhida}
-    
+
     Action -->|Criar novo| WizardStart[Abrir wizard de criação<br/>ComunicadoDialog]
-    Action -->|Editar existente| LoadData[Carregar dados do comunicado<br/>SELECT comunicados WHERE id]
+    Action -->|Editar existente| LoadData[Carregar dados do comunicado<br/>SELECT comunicados<br/>WHERE id AND igreja_id = ?]
     Action -->|Excluir| ConfirmDelete{Confirmar exclusão?}
-    Action -->|Ativar/Desativar| ToggleStatus[UPDATE comunicados<br/>SET ativo = NOT ativo]
-    
+    Action -->|Ativar/Desativar| ToggleStatus[UPDATE comunicados<br/>SET ativo = NOT ativo<br/>WHERE igreja_id = ?]
+
     %% Fluxo de criação/edição
     WizardStart --> Step1[Passo 1: Conteúdo<br/>Título obrigatório<br/>Tipo: banner ou alerta<br/>Descrição se alerta<br/>Imagem storage comunicados<br/>Link de ação opcional]
-    
+
     Step1 --> ValidateContent{Conteúdo válido?<br/>Título preenchido<br/>Mensagem se alerta<br/>Tipo selecionado}
-    
+
     ValidateContent -->|Não| Step1
     ValidateContent -->|Sim| Step2[Passo 2: Canais<br/>Selecionar múltiplos:<br/>☐ App exibir_app<br/>☐ Telão exibir_telao<br/>☐ Site exibir_site<br/>Ordem telão opcional<br/>Arte alternativa telão opcional]
-    
+
     Step2 --> Step3[Passo 3: Agendamento<br/>data_inicio obrigatório<br/>data_fim opcional<br/>Tags array opcional<br/>Categoria mídia opcional<br/>Vincular culto_id opcional<br/>Vincular midia_id opcional]
-    
+
     Step3 --> ValidateDates{Datas válidas?<br/>data_inicio <= data_fim}
-    
+
     ValidateDates -->|Não| Step3
     ValidateDates -->|Sim| UploadImage{Tem imagem<br/>para upload?}
-    
-    UploadImage -->|Sim| StoreImage[Upload para storage bucket<br/>comunicados público]
+
+    UploadImage -->|Sim| StoreImage[Upload para storage bucket<br/>comunicados público<br/>scoped por igreja]
     UploadImage -->|Não| SaveDB
-    
-    StoreImage --> SaveDB[INSERT/UPDATE comunicados<br/>ativo = true default<br/>created_by = auth.uid]
-    
+
+    StoreImage --> SaveDB[INSERT/UPDATE comunicados<br/>igreja_id automático<br/>ativo = true default<br/>created_by = auth.uid]
+
     LoadData --> Step1
-    
+
     %% Fluxo de exclusão
     ConfirmDelete -->|Não| Dashboard
     ConfirmDelete -->|Sim| CheckImage{Comunicado tem<br/>imagem_url?}
-    
-    CheckImage -->|Sim| RemoveStorage[DELETE storage.objects<br/>bucket comunicados]
+
+    CheckImage -->|Sim| RemoveStorage[DELETE storage.objects<br/>bucket comunicados<br/>scoped por igreja]
     CheckImage -->|Não| DeleteRecord
-    
-    RemoveStorage --> DeleteRecord[DELETE comunicados<br/>WHERE id]
-    
+
+    RemoveStorage --> DeleteRecord[DELETE comunicados<br/>WHERE id AND igreja_id = ?]
+
     %% Pós-operação
-    SaveDB --> RefreshList[Atualizar lista de comunicados<br/>SELECT comunicados ORDER BY created_at]
+    SaveDB --> RefreshList[Atualizar lista de comunicados<br/>SELECT comunicados<br/>WHERE igreja_id = ?<br/>ORDER BY created_at]
     DeleteRecord --> RefreshList
     ToggleStatus --> RefreshList
-    
+
     RefreshList --> ShowResult[Exibir comunicados com:<br/>Título tipo status<br/>Canais habilitados<br/>Datas início/fim<br/>Contador de ativos]
-    
+
     %% Exibição nos canais
     ShowResult --> Channels{Canais de exibição}
-    
-    Channels -->|exibir_app = true| AppCarousel[App/Dashboard<br/>BannerCarousel.tsx<br/>Query: ativo AND data válida<br/>Carrossel automático]
-    
+
+    Channels -->|exibir_app = true| AppCarousel[App/Dashboard<br/>BannerCarousel.tsx<br/>Query: ativo AND data válida<br/>AND igreja_id = ?<br/>Carrossel automático]
+
     Channels -->|exibir_telao = true| Telao[Telão/Projetor<br/>Página /telao<br/>Telao.tsx<br/>Ordem por ordem_telao<br/>Controles navegação/pausa]
-    
+
     Channels -->|exibir_site = true| Site[Site Público<br/>Carrossel site<br/>Integração a confirmar]
-    
+
     AppCarousel --> End([Comunicado visível<br/>para membros logados])
     Telao --> End
     Site --> End
-    
+
     %% Estilos
     classDef validation fill:#fff4e6,stroke:#fb923c,stroke-width:2px
     classDef action fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
     classDef storage fill:#dcfce7,stroke:#22c55e,stroke-width:2px
     classDef display fill:#f3e8ff,stroke:#a855f7,stroke-width:2px
     classDef error fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    
+
     class CheckAuth,ValidateContent,ValidateDates,ConfirmDelete,CheckImage,UploadImage validation
     class WizardStart,Step1,Step2,Step3,LoadData action
     class StoreImage,SaveDB,RemoveStorage,DeleteRecord storage

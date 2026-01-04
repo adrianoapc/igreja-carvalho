@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Plus, 
-  Calendar, 
-  MapPin, 
-  Video, 
-  Church, 
-  Users, 
+import {
+  Plus,
+  Calendar,
+  MapPin,
+  Video,
+  Church,
+  Users,
   Baby,
   Settings,
   Copy,
@@ -18,7 +18,7 @@ import {
   User,
   BookOpen,
   UserPlus,
-  Route
+  Route,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -65,7 +65,7 @@ export default function Ensino() {
   const [aulas, setAulas] = useState<Aula[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [novaAulaOpen, setNovaAulaOpen] = useState(false);
   const [salaDialogOpen, setSalaDialogOpen] = useState(false);
   const [selectedSala, setSelectedSala] = useState<Sala | null>(null);
@@ -73,7 +73,8 @@ export default function Ensino() {
   const [aulaDetailsOpen, setAulaDetailsOpen] = useState(false);
   const [visitanteFamiliaOpen, setVisitanteFamiliaOpen] = useState(false);
   const [checkinOpen, setCheckinOpen] = useState(false);
-  const [salaSelecionadaParaCheckin, setSalaSelecionadaParaCheckin] = useState<Sala | null>(null);
+  const [salaSelecionadaParaCheckin, setSalaSelecionadaParaCheckin] =
+    useState<Sala | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -88,13 +89,15 @@ export default function Ensino() {
   const fetchAulas = async () => {
     const { data, error } = await supabase
       .from("aulas")
-      .select(`
+      .select(
+        `
         *,
         sala:salas(id, nome),
         jornada:jornadas(id, titulo),
         evento:eventos(id, titulo),
         professor:profiles!aulas_professor_id_fkey(id, nome, avatar_url)
-      `)
+      `
+      )
       .gte("data_inicio", new Date().toISOString())
       .order("data_inicio", { ascending: true });
 
@@ -106,7 +109,7 @@ export default function Ensino() {
     // Map evento to culto for backward compatibility
     const mappedData = (data || []).map((aula: Record<string, unknown>) => ({
       ...aula,
-      culto: aula.evento
+      culto: aula.evento,
     }));
     setAulas(mappedData as Aula[]);
   };
@@ -131,10 +134,13 @@ export default function Ensino() {
             .from("presencas_aula")
             .select("*", { count: "exact", head: true })
             .is("checkout_at", null)
-            .in("aula_id", 
-              (await supabase.from("aulas").select("id").eq("sala_id", sala.id)).data?.map(a => a.id) || []
+            .in(
+              "aula_id",
+              (
+                await supabase.from("aulas").select("id").eq("sala_id", sala.id)
+              ).data?.map((a) => a.id) || []
             );
-          
+
           return { ...sala, criancas_presentes: count || 0 };
         }
         return { ...sala, criancas_presentes: 0 };
@@ -164,7 +170,7 @@ export default function Ensino() {
     setSalaDialogOpen(true);
   };
 
-  const salaKids = salas.filter(s => s.tipo === "kids");
+  const salaKids = salas.filter((s) => s.tipo === "kids");
 
   return (
     <div className="min-h-screen bg-background">
@@ -189,7 +195,11 @@ export default function Ensino() {
         )}
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="agenda" className="gap-2">
               <Calendar className="w-4 h-4" />
@@ -253,7 +263,11 @@ export default function Ensino() {
                             <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
-                                {format(new Date(aula.data_inicio), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                                {format(
+                                  new Date(aula.data_inicio),
+                                  "dd/MM 'às' HH:mm",
+                                  { locale: ptBR }
+                                )}
                               </span>
                               {aula.jornada && (
                                 <Badge variant="outline" className="text-xs">
@@ -264,9 +278,13 @@ export default function Ensino() {
                             {aula.professor && (
                               <div className="flex items-center gap-2 mt-2">
                                 <Avatar className="w-5 h-5">
-                                  <AvatarImage src={aula.professor.avatar_url || undefined} />
+                                  <AvatarImage
+                                    src={aula.professor.avatar_url || undefined}
+                                  />
                                   <AvatarFallback className="text-[10px]">
-                                    {aula.professor.nome?.substring(0, 2).toUpperCase()}
+                                    {aula.professor.nome
+                                      ?.substring(0, 2)
+                                      .toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
                                 <span className="text-xs text-muted-foreground">
@@ -284,28 +302,33 @@ export default function Ensino() {
                               {aula.sala.nome}
                             </Badge>
                           )}
-                          {aula.modalidade === "online" && aula.link_reuniao && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyLink(aula.link_reuniao!);
-                              }}
-                            >
-                              <Copy className="w-3 h-3" />
-                              Copiar Link
-                            </Button>
-                          )}
+                          {aula.modalidade === "online" &&
+                            aula.link_reuniao && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyLink(aula.link_reuniao!);
+                                }}
+                              >
+                                <Copy className="w-3 h-3" />
+                                Copiar Link
+                              </Button>
+                            )}
                           {aula.evento_id && (
                             <Badge className="gap-1 bg-primary/10 text-primary border-primary/20">
                               <Church className="w-3 h-3" />
                               Vinculado ao Culto
                             </Badge>
                           )}
-                          <Badge 
-                            variant={aula.status === "em_andamento" ? "default" : "outline"}
+                          <Badge
+                            variant={
+                              aula.status === "em_andamento"
+                                ? "default"
+                                : "outline"
+                            }
                             className="capitalize"
                           >
                             {aula.status.replace("_", " ")}
@@ -327,8 +350,8 @@ export default function Ensino() {
                   <Baby className="w-5 h-5" />
                   Salas Kids
                 </CardTitle>
-                <Button 
-                  onClick={() => setVisitanteFamiliaOpen(true)} 
+                <Button
+                  onClick={() => setVisitanteFamiliaOpen(true)}
                   variant="outline"
                   className="gap-2"
                 >
@@ -339,26 +362,31 @@ export default function Ensino() {
               <CardContent>
                 {salaKids.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    Nenhuma sala Kids cadastrada. Vá em Configurações para adicionar.
+                    Nenhuma sala Kids cadastrada. Vá em Configurações para
+                    adicionar.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {salaKids.map((sala) => (
-                      <Card 
-                        key={sala.id} 
+                      <Card
+                        key={sala.id}
                         className="hover:shadow-md transition-shadow cursor-pointer"
                         onClick={() => handleEditSala(sala)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
                             <div>
-                              <h3 className="font-semibold text-foreground">{sala.nome}</h3>
+                              <h3 className="font-semibold text-foreground">
+                                {sala.nome}
+                              </h3>
                               <p className="text-sm text-muted-foreground mt-1">
                                 Capacidade: {sala.capacidade} crianças
                               </p>
-                              {(sala.idade_min !== null || sala.idade_max !== null) && (
+                              {(sala.idade_min !== null ||
+                                sala.idade_max !== null) && (
                                 <p className="text-xs text-muted-foreground">
-                                  Idade: {sala.idade_min || 0} - {sala.idade_max || "∞"} anos
+                                  Idade: {sala.idade_min || 0} -{" "}
+                                  {sala.idade_max || "∞"} anos
                                 </p>
                               )}
                             </div>
@@ -367,12 +395,14 @@ export default function Ensino() {
                                 <Users className="w-4 h-4" />
                                 {sala.criancas_presentes}
                               </div>
-                              <span className="text-xs text-muted-foreground">presentes</span>
+                              <span className="text-xs text-muted-foreground">
+                                presentes
+                              </span>
                             </div>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             className="w-full mt-4 gap-2"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -419,13 +449,15 @@ export default function Ensino() {
                         onClick={() => handleEditSala(sala)}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            sala.tipo === "kids" 
-                              ? "bg-pink-100 text-pink-600" 
-                              : sala.tipo === "hibrido"
-                              ? "bg-purple-100 text-purple-600"
-                              : "bg-blue-100 text-blue-600"
-                          }`}>
+                          <div
+                            className={`p-2 rounded-lg ${
+                              sala.tipo === "kids"
+                                ? "bg-pink-100 text-pink-600"
+                                : sala.tipo === "hibrido"
+                                ? "bg-purple-100 text-purple-600"
+                                : "bg-blue-100 text-blue-600"
+                            }`}
+                          >
                             {sala.tipo === "kids" ? (
                               <Baby className="w-4 h-4" />
                             ) : (
@@ -458,8 +490,8 @@ export default function Ensino() {
       </div>
 
       {/* Drawers & Dialogs */}
-      <NovaAulaDrawer 
-        open={novaAulaOpen} 
+      <NovaAulaDrawer
+        open={novaAulaOpen}
         onOpenChange={setNovaAulaOpen}
         onSuccess={() => {
           fetchAulas();

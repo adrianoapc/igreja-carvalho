@@ -10,6 +10,85 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Alterado
 
+#### 🏢 Multi-tenancy: Isolamento por Igreja e Suporte a Filiais (3-4 Jan/2026)
+
+- **Tipo**: feature + refactor
+- **Resumo**: Implementação completa de arquitetura multi-tenant com isolamento de dados por igreja, gestão hierárquica de filiais e super admin dashboard.
+- **Módulos afetados**: Sistema (completo), Admin, Finanças, Webhooks, Eventos, Pessoas, Intercessão
+- **Impacto no usuário**:
+  - **Super Admins**: Nova tela `/superadmin` para gestão de múltiplas igrejas e filiais; aprovação de onboarding; métricas agregadas por tenant
+  - **Igrejas individuais**: Isolamento total de dados; webhooks configurados por igreja; RLS automático; suporte a múltiplas filiais com hierarquia
+  - **Desenvolvedores**: Hooks `useIgrejaId` e `useFilialId` fornecem contexto automático; RLS policies em 30+ tabelas; schema multi-tenant
+
+**Detalhamento técnico:**
+
+- **Tabelas novas**: `igrejas` (cadastro central), `filiais` (hierarquia), `onboarding_requests` (solicitações públicas)
+- **Colunas adicionadas**: `igreja_id` em 30+ tabelas (profiles, eventos, transacoes, pedidos_oracao, webhooks, etc.)
+- **RLS Policies**: Políticas de Row Level Security em todas tabelas com `igreja_id`
+- **Webhooks refatorados**: Migração de config global para tabela `webhooks` scoped por `igreja_id` e tipo
+- **Edge functions atualizadas**: `disparar-escala`, `notificar-liturgia-make`, `verificar-escalas-pendentes` agora buscam webhooks por `igreja_id`
+- **Super Admin module**:
+  - Dashboard em `/superadmin` (acesso via `profiles.super_admin = true`)
+  - CRUD de igrejas e filiais
+  - Gestão de onboarding (aprovar/rejeitar solicitações)
+  - Métricas agregadas (membros, eventos, transações) por tenant
+  - Componentes: `SuperAdminDashboard`, `NovaIgrejaDialog`, `IgrejaRowExpandable`, `GerenciarFiliaisDialog`
+  - Hook `useSuperAdmin` para queries especializadas
+- **Onboarding público**:
+  - Formulário em `/cadastro/nova-igreja` (sem autenticação)
+  - Submissão cria registro em `onboarding_requests` com status `pendente`
+  - Super admin aprova → igreja + perfil de admin criados automaticamente
+- **Segurança**:
+  - `AuthGate` atualizado para reconhecer `super_admin`
+  - Hook `useSuperAdmin` para validação de acesso
+  - `usePermissions` adaptado para contexto multi-tenant
+- **Configurações**:
+  - `useAppConfig` scoped por `igreja_id`
+  - `ConfiguracoesIgreja` adaptada para contexto de igreja isolada
+
+**Arquivos criados:**
+
+- `src/pages/superadmin/SuperAdminDashboard.tsx`
+- `src/pages/cadastro/NovaIgreja.tsx`
+- `src/components/superadmin/NovaIgrejaDialog.tsx`
+- `src/components/superadmin/IgrejaRowExpandable.tsx`
+- `src/components/superadmin/GerenciarFiliaisDialog.tsx`
+- `src/hooks/useSuperAdmin.tsx`
+- `src/hooks/useIgrejaId.tsx`
+- `src/hooks/useFilialId.tsx`
+
+**Migrações**: 30+ migrations criadas entre 3-4 Jan/2026 (ver commits 83fd49c, 1e7ecb5, fb95b60, d0af664)
+
+#### 💰 Chatbot Financeiro: PDF, OCR e Reembolsos (3-4 Jan/2026)
+
+- **Tipo**: feature + refactor
+- **Resumo**: Melhorias no chatbot financeiro com suporte a PDFs, OCR de notas fiscais, refatoração do fluxo de reembolsos e notificações à tesouraria.
+- **Módulos afetados**: Finanças, Reembolsos, Chatbot, Notificações
+- **Impacto no usuário**:
+  - Processamento de recibos em PDF via OCR
+  - Autenticação WhatsApp integrada ao bot
+  - Fluxo de reembolsos refatorado com validação de anexos
+  - Tesouraria notificada ao fechar reembolsos
+  - Notificações estruturadas para aprovações/rejeições
+
+**Detalhamento técnico:**
+
+- `TransacaoDialog.tsx`: Suporte a upload de PDF como comprovante
+- `Reembolsos.tsx`: Validação de anexos PDF obrigatórios; refatoração do fluxo de aprovação
+- `processar-nota-fiscal` edge function: OCR assistido por Gemini para extração de dados
+- Bot de reembolsos: Notificação automática à tesouraria ao fechar pedido
+- `NotificationsBell.tsx` e `useNotifications.tsx`: Tipos de notificação específicos para tesouraria
+
+**Arquivos modificados:**
+
+- `src/pages/financas/TransacaoDialog.tsx`
+- `src/pages/financas/Reembolsos.tsx`
+- `src/components/NotificationBell.tsx`
+- `src/hooks/useNotifications.tsx`
+- `supabase/functions/processar-nota-fiscal/index.ts`
+
+**Commits relacionados:** 5508bbd, 4c67aed, 1978381
+
 #### 📄 Documentação: Telas fora da navegação (30 de Dez/2025)
 
 - **Tipo**: refactor
@@ -284,7 +363,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 #### 🧭 Agendamento Pastoral e Identidade do Chatbot (23 de Dez/2025)
 
 - **Wizard de agendamento**: Etapa "Pessoa" com autocomplete de membros/visitantes, deduplicação por telefone e criação automática de lead quando necessário; grava `pessoa_id` ou `visitante_id`, `gravidade`, `data_agendamento` e `local_atendimento`
-- **Bloqueio de conflitos**: Slots de 30min com seleção múltipla, respeitando compromissos existentes em `atendimentos_pastorais` e na nova tabela `agenda_pastoral` (compromissos administrativos do pastor)
+- **Bloqueio de conflitos**: Slots de 30min com seleção múltipla, respeitando compromissos existentes em `atendimentos_pastorais` e na nova tabela `agenda_pastal` (compromissos administrativos do pastor)
 - **Deduplicação no chatbot-triagem**: Para telefones com múltiplos perfis, escolhe o candidato mais antigo (data de nascimento > criação) e registra alerta; fallback cria/recupera `visitantes_leads`
 
 **Impacto no usuário:** Pastores evitam conflitos de agenda e conseguem agendar visitas/online/ligação com dados completos do atendido; chatbot reduz erros de vinculação quando há números compartilhados.
@@ -532,8 +611,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
-### Refatorado
-
 #### 📊 Reuso do Widget de Escalas (17 de Dez/2025)
 
 - Unificamos o widget de monitoramento de escalas em um componente compartilhado (`EscalasPendentesWidget`) e o adicionamos aos dashboards de Líder e Admin para reaproveitar lógica de consulta e apresentação.
@@ -669,9 +746,3 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - `categorias_financeiras`: Inserida categoria "Cursos e Treinamentos"
 
 **Módulos afetados:** Jornadas, Finanças
-
----
-
-## Histórico
-
-> Releases anteriores não foram documentadas neste formato.

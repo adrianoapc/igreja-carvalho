@@ -165,7 +165,9 @@ const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const ConfiguracoesIgreja = lazy(() => import("./pages/ConfiguracoesIgreja"));
 
 // Super Admin
-const SuperAdminDashboard = lazy(() => import("./pages/superadmin/SuperAdminDashboard"));
+const SuperAdminDashboard = lazy(
+  () => import("./pages/superadmin/SuperAdminDashboard")
+);
 const NovaIgreja = lazy(() => import("./pages/cadastro/NovaIgreja"));
 
 const queryClient = new QueryClient();
