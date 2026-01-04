@@ -375,6 +375,18 @@ export default function Auth() {
         }
       }
 
+      // Verificar se usuário deve trocar senha
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("deve_trocar_senha")
+        .eq("user_id", data.user.id)
+        .single();
+
+      if (profile?.deve_trocar_senha) {
+        navigate("/trocar-senha", { replace: true });
+        return;
+      }
+
       // Oferecer biometria após login bem-sucedido se ainda não estiver ativada
       if (!isBiometricLoading && isSupported && !isEnabled && data.user) {
         setPendingUserId(data.user.id);

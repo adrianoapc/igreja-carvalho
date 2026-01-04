@@ -24,6 +24,7 @@ const Maintenance = lazy(() => import("./pages/Maintenance"));
 const Install = lazy(() => import("./pages/Install"));
 const BiometricLogin = lazy(() => import("./pages/BiometricLogin"));
 const ContextSelect = lazy(() => import("./pages/ContextSelect"));
+const ForcedPasswordChange = lazy(() => import("./pages/ForcedPasswordChange"));
 
 // Módulos
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -212,6 +213,7 @@ const App = () => (
               <Route path="/auth/reset-password" element={<ResetPassword />} />
               <Route path="/biometric-login" element={<BiometricLogin />} />
               <Route path="/context-select" element={<ContextSelect />} />
+              <Route path="/trocar-senha" element={<ForcedPasswordChange />} />
               <Route path="/maintenance" element={<Maintenance />} />
               <Route path="/install" element={<Install />} />
               <Route path="/public/:slug" element={<Public />} />
