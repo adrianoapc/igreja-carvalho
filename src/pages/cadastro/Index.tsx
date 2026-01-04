@@ -5,23 +5,35 @@ import { PublicHeader } from "@/components/layout/PublicHeader";
 import { Users, UserPlus, Heart } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 export default function CadastroIndex() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [igrejaInfo, setIgrejaInfo] = useState({ nome: "Igreja Carvalho", subtitulo: "" });
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   const aceitouJesus = searchParams.get("aceitou") === "true";
 
   useEffect(() => {
     const fetchIgrejaInfo = async () => {
-      const { data } = await supabase.from("configuracoes_igreja").select("*").single();
+      if (!igrejaId) {
+        return;
+      }
+
+      const { data } = await supabase
+        .from("configuracoes_igreja")
+        .select("*")
+        .eq("igreja_id", igrejaId)
+        .maybeSingle();
       if (data) {
         setIgrejaInfo({ nome: data.nome_igreja, subtitulo: data.subtitulo || "" });
       }
     };
-    fetchIgrejaInfo();
-  }, []);
+    if (!igrejaLoading) {
+      fetchIgrejaInfo();
+    }
+  }, [igrejaId, igrejaLoading]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

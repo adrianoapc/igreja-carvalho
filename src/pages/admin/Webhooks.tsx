@@ -10,6 +10,7 @@ import { Webhook, Save, MessageSquare, Key, Loader2, Link2, ArrowLeft } from "lu
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 // Tipos para os Webhooks Genéricos
 interface WebhookConfig {
@@ -50,6 +51,7 @@ export default function Webhooks({ onBack }: Props) {
   const handleBack = onBack ?? (() => navigate(-1));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   // Estado do Provedor de Mensagem
   const [whatsappConfig, setWhatsappConfig] = useState({
@@ -64,17 +66,25 @@ export default function Webhooks({ onBack }: Props) {
   const [newValue, setNewValue] = useState("");
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!igrejaLoading) {
+      loadData();
+    }
+  }, [igrejaLoading, igrejaId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
+      if (!igrejaId) {
+        setLoading(false);
+        return;
+      }
+
       // 1. Carregar Configuração do Banco (Provedor de Whats)
       const { data: dbConfig, error } = await supabase
         .from("configuracoes_igreja")
         .select("whatsapp_provider, whatsapp_token, whatsapp_instance_id") 
-        .single();
+        .eq("igreja_id", igrejaId)
+        .maybeSingle();
 
       if (!error && dbConfig) {
         setWhatsappConfig({
@@ -101,6 +111,10 @@ export default function Webhooks({ onBack }: Props) {
   const handleSaveWhatsapp = async () => {
     setSaving(true);
     try {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada para salvar configurações.");
+      }
+
       const { error } = await supabase
         .from("configuracoes_igreja")
         .update({
@@ -108,7 +122,7 @@ export default function Webhooks({ onBack }: Props) {
           whatsapp_token: whatsappConfig.token,
           whatsapp_instance_id: whatsappConfig.instanceId
         })
-        .eq('id', (await supabase.from('configuracoes_igreja').select('id').single()).data?.id);
+        .eq('igreja_id', igrejaId);
 
       if (error) throw error;
       toast.success("Configuração de WhatsApp salva!");

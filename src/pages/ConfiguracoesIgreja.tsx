@@ -8,6 +8,7 @@ import { useEffect, useState, type InputHTMLAttributes } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InputMask from "react-input-mask";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface Props {
   onBack?: () => void;
@@ -19,6 +20,7 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   const [config, setConfig] = useState({
     id: "",
@@ -32,8 +34,10 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    loadConfig();
-  }, []);
+    if (!igrejaLoading) {
+      loadConfig();
+    }
+  }, [igrejaLoading, igrejaId]);
 
   useEffect(() => {
     if (novoLogo) {
@@ -45,10 +49,16 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
 
   const loadConfig = async () => {
     try {
+      if (!igrejaId) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("configuracoes_igreja")
         .select("id, nome_igreja, subtitulo, logo_url, telefone_plantao_pastoral")
-        .single();
+        .eq("igreja_id", igrejaId)
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -92,6 +102,10 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada para salvar configurações.");
+      }
+
       let logoUrl = config.logo_url;
 
       // Upload do novo logo se existir
@@ -137,7 +151,7 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
           logo_url: logoUrl,
           telefone_plantao_pastoral: config.telefone_plantao_pastoral?.replace(/\D/g, '') || null
         })
-        .eq("id", config.id);
+        .eq("igreja_id", igrejaId);
 
       if (error) throw error;
 
