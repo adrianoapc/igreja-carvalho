@@ -2528,21 +2528,60 @@ export type Database = {
       }
       igrejas: {
         Row: {
+          admin_responsavel_id: string | null
+          aprovado_em: string | null
+          aprovado_por: string | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
           created_at: string | null
+          email: string | null
+          endereco: string | null
+          estado: string | null
           id: string
+          logo_url: string | null
           nome: string
+          observacoes: string | null
+          status: string
+          telefone: string | null
           updated_at: string | null
         }
         Insert: {
+          admin_responsavel_id?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
           created_at?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
+          logo_url?: string | null
           nome: string
+          observacoes?: string | null
+          status?: string
+          telefone?: string | null
           updated_at?: string | null
         }
         Update: {
+          admin_responsavel_id?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
           created_at?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
+          logo_url?: string | null
           nome?: string
+          observacoes?: string | null
+          status?: string
+          telefone?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -4133,6 +4172,71 @@ export type Database = {
           },
         ]
       }
+      onboarding_requests: {
+        Row: {
+          cidade: string | null
+          cnpj: string | null
+          created_at: string | null
+          email: string
+          estado: string | null
+          id: string
+          igreja_id: string | null
+          nome_igreja: string
+          nome_responsavel: string
+          observacoes: string | null
+          processado_em: string | null
+          processado_por: string | null
+          status: string
+          telefone: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          email: string
+          estado?: string | null
+          id?: string
+          igreja_id?: string | null
+          nome_igreja: string
+          nome_responsavel: string
+          observacoes?: string | null
+          processado_em?: string | null
+          processado_por?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          email?: string
+          estado?: string | null
+          id?: string
+          igreja_id?: string | null
+          nome_igreja?: string
+          nome_responsavel?: string
+          observacoes?: string | null
+          processado_em?: string | null
+          processado_por?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_requests_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos_oracao: {
         Row: {
           analise_ia_gravidade: string | null
@@ -5377,6 +5481,74 @@ export type Database = {
           },
         ]
       }
+      tenant_metricas: {
+        Row: {
+          created_at: string | null
+          data_referencia: string
+          id: string
+          igreja_id: string
+          latencia_media_ms: number | null
+          membros_ativos: number | null
+          storage_bytes: number | null
+          total_chamadas_api: number | null
+          total_checkins: number | null
+          total_erros_api: number | null
+          total_eventos: number | null
+          total_membros: number | null
+          total_midias: number | null
+          total_pedidos_oracao: number | null
+          total_transacoes: number | null
+          updated_at: string | null
+          valor_transacoes: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_referencia: string
+          id?: string
+          igreja_id: string
+          latencia_media_ms?: number | null
+          membros_ativos?: number | null
+          storage_bytes?: number | null
+          total_chamadas_api?: number | null
+          total_checkins?: number | null
+          total_erros_api?: number | null
+          total_eventos?: number | null
+          total_membros?: number | null
+          total_midias?: number | null
+          total_pedidos_oracao?: number | null
+          total_transacoes?: number | null
+          updated_at?: string | null
+          valor_transacoes?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_referencia?: string
+          id?: string
+          igreja_id?: string
+          latencia_media_ms?: number | null
+          membros_ativos?: number | null
+          storage_bytes?: number | null
+          total_chamadas_api?: number | null
+          total_checkins?: number | null
+          total_erros_api?: number | null
+          total_eventos?: number | null
+          total_membros?: number | null
+          total_midias?: number | null
+          total_pedidos_oracao?: number | null
+          total_transacoes?: number | null
+          updated_at?: string | null
+          valor_transacoes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_metricas_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       testemunhos: {
         Row: {
           anonimo: boolean | null
@@ -6370,8 +6542,13 @@ export type Database = {
         Args: { p_pedido_id: string }
         Returns: string
       }
+      aprovar_onboarding: { Args: { p_request_id: string }; Returns: Json }
       buscar_pessoa_por_contato: {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
+        Returns: string
+      }
+      calcular_metricas_tenant: {
+        Args: { p_data?: string; p_igreja_id: string }
         Returns: string
       }
       check_voluntario_conflito:
@@ -6441,6 +6618,7 @@ export type Database = {
           tipo_risco: string
         }[]
       }
+      get_super_admin_dashboard: { Args: never; Returns: Json }
       get_user_familia_id: { Args: { _user_id: string }; Returns: string }
       get_user_module_access: {
         Args: { _module_name: string; _user_id: string }
@@ -6531,6 +6709,7 @@ export type Database = {
         | "tecnico"
         | "admin_igreja"
         | "admin_filial"
+        | "super_admin"
       categoria_testemunho:
         | "espiritual"
         | "casamento"
@@ -6717,6 +6896,7 @@ export const Constants = {
         "tecnico",
         "admin_igreja",
         "admin_filial",
+        "super_admin",
       ],
       categoria_testemunho: [
         "espiritual",
