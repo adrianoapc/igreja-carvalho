@@ -2,16 +2,39 @@
 
 Este documento descreve a estrutura do banco de dados do Igreja App, incluindo todas as tabelas, relacionamentos e regras de negócio.
 
-**Última atualização:** 2024-12-09
+**Última atualização:** 2025-01-04
 
 ## Estatísticas do Banco
 
 | Métrica | Quantidade |
 |---------|------------|
-| **Tabelas** | 56 |
+| **Tabelas** | 60+ |
 | **Views** | 5 |
-| **Funções RPC** | 26 |
-| **Enums** | 9 |
+| **Funções RPC** | 30+ |
+| **Enums** | 12 |
+
+## Arquitetura Multi-Tenant
+
+O sistema opera em dois níveis de isolamento:
+- **Organização (igreja_id)**: Isola dados entre diferentes igrejas/organizações
+- **Unidade (filial_id)**: Isola dados entre filiais da mesma organização
+
+Todas as tabelas operacionais possuem colunas `igreja_id` e `filial_id` com Foreign Keys e índices para garantir isolamento via RLS.
+
+## Hierarquia de Papéis
+
+| Papel | Escopo | Descrição |
+|-------|--------|-----------|
+| `super_admin` | Global | Acesso total à plataforma (portal /superadmin) |
+| `admin` | Global | Administrador legado com acesso total |
+| `admin_igreja` | Organização | Administrador de toda a igreja/organização |
+| `admin_filial` | Filial | Administrador restrito a uma filial específica |
+| `pastor` | Variável | Acesso pastoral e ministerial |
+| `lider` | Variável | Líder de ministério/time |
+| `secretario` | Variável | Gestão administrativa |
+| `tesoureiro` | Variável | Gestão financeira |
+| `membro` | Pessoal | Membro ativo da igreja |
+| `basico` | Pessoal | Acesso inicial (visitantes convertidos) |
 
 ## Como ler este diagrama
 - Módulos são agrupados por blocos e comentários `%%` no Mermaid para facilitar navegação.
@@ -20,25 +43,33 @@ Este documento descreve a estrutura do banco de dados do Igreja App, incluindo t
 - Políticas de RLS não aparecem no Mermaid, mas todas as tabelas expostas a clientes têm RLS habilitado.
 
 ## Contexto de autenticação e RLS
-- Claims do JWT: `sub` (user id), `role` (papel de negócio), `igreja_id` (escopo), usados em políticas.
-- Tabelas críticas: `user_roles`, `user_app_roles`, `module_permissions` controlam o que cada usuário pode ver/editar.
+- Claims do JWT: `sub` (user id), `role` (papel de negócio), `igreja_id` (escopo organização), `filial_id` (escopo filial).
+- Funções de segurança: `get_jwt_igreja_id()`, `get_jwt_filial_id()`, `has_filial_access()`, `has_permission()`, `has_role()`.
+- Tabelas críticas: `user_roles`, `user_app_roles`, `role_permissions` controlam o que cada usuário pode ver/editar.
 - Para detalhes de fluxo e exemplos de política, ver `01-Arquitetura/02-autenticacao-supabase.MD` e `01-Arquitetura/04-rls-e-seguranca.MD`.
 
 ### Diagrama ER resumido
-Visão compacta das entidades principais; veja o diagrama completo mais abaixo para todos os campos. Referências: [`01-Arquitetura/04-rls-e-seguranca.MD`](01-Arquitetura/04-rls-e-seguranca.MD) e [`adr/ADR-003-rls-e-modelo-permissoes.md`](adr/ADR-003-rls-e-modelo-permissoes.md).
+Visão compacta das entidades principais; veja o diagrama completo mais abaixo para todos os campos.
 
 ```mermaid
 erDiagram
     auth_users ||--o{ profiles : owns
     profiles ||--o{ user_roles : tem
-    user_roles ||--o{ module_permissions : controla
-
+    user_roles ||--o{ role_permissions : controla
+    
+    igrejas ||--o{ filiais : possui
+    igrejas ||--o{ profiles : pertence
+    filiais ||--o{ profiles : pertence
+    
     profiles ||--o{ familias : participa
-    profiles ||--o{ funcoes_igreja : exerce
-
+    profiles ||--o{ membro_funcoes : exerce
+    
+    app_roles ||--o{ role_permissions : define
+    app_permissions ||--o{ role_permissions : concede
+    
     contas ||--o{ transacoes_financeiras : movimenta
     transacoes_financeiras ||--o{ fornecedores : paga
-
+    
     comunicados ||--o{ midias : anexa
 ```
 
@@ -46,19 +77,22 @@ erDiagram
 
 | Módulo | Descrição | Tabelas Principais |
 |--------|-----------|-------------------|
-| **Autenticação** | Controle de acesso e permissões | `profiles`, `user_roles`, `module_permissions`, `app_roles`, `app_permissions`, `role_permissions`, `user_app_roles` |
-| **Pessoas** | Gestão de membros, visitantes e famílias | `profiles`, `familias`, `funcoes_igreja`, `membro_funcoes`, `alteracoes_perfil_pendentes`, `visitante_contatos` |
+| **Multi-Tenant** | Isolamento de dados por organização/filial | `igrejas`, `filiais`, `configuracoes_igreja` |
+| **Autenticação** | Controle de acesso e permissões | `profiles`, `user_roles`, `app_roles`, `app_permissions`, `role_permissions`, `user_app_roles` |
+| **Super Admin** | Gestão global da plataforma | `onboarding_requests`, `tenant_metricas` |
+| **Pessoas** | Gestão de membros, visitantes e famílias | `profiles`, `familias`, `funcoes_igreja`, `membro_funcoes`, `alteracoes_perfil_pendentes`, `visitantes_leads` |
 | **Intercessão** | Pedidos de oração, testemunhos e sentimentos | `intercessores`, `pedidos_oracao`, `testemunhos`, `sentimentos_membros` |
-| **Cultos** | Planejamento de cultos e liturgia | `cultos`, `liturgia_culto`, `liturgia_recursos`, `liturgia_templates`, `cancoes_culto`, `presencas_culto` |
-| **Times** | Gestão de ministérios e escalas | `categorias_times`, `times_culto`, `posicoes_time`, `membros_time`, `escalas_culto` |
-| **Templates** | Templates reutilizáveis de cultos | `templates_culto`, `itens_template_culto`, `escalas_template` |
+| **Eventos** | Hub unificado de cultos e eventos | `eventos`, `evento_subtipos`, `checkins`, `escalas`, `cancoes_culto` |
+| **Times** | Gestão de ministérios e escalas | `categorias_times`, `times`, `posicoes_time`, `membros_time`, `escalas` |
+| **Templates** | Templates reutilizáveis de eventos | `templates_culto`, `itens_template_culto`, `escalas_template` |
 | **Mídias** | Gestão de arquivos e comunicados | `midias`, `tags_midias`, `midia_tags`, `comunicados`, `banners` |
-| **Financeiro** | Controle financeiro completo | `contas`, `transacoes_financeiras`, `categorias_financeiras`, `subcategorias_financeiras`, `fornecedores`, `formas_pagamento`, `centros_custo`, `bases_ministeriais` |
+| **Financeiro** | Controle financeiro completo | `contas`, `transacoes_financeiras`, `categorias_financeiras`, `fornecedores`, `formas_pagamento`, `centros_custo`, `bases_ministeriais` |
 | **Jornadas** | Acompanhamento de cursos e discipulado | `jornadas`, `etapas_jornada`, `inscricoes_jornada` |
 | **Ensino** | Gestão de aulas e presenças | `aulas`, `salas`, `presencas_aula` |
 | **Kids** | Ministério infantil | `kids_checkins`, `kids_diario` |
-| **Projetos** | Gestão de projetos e tarefas | `projetos`, `tarefas` |
-| **Configurações** | Configurações do sistema | `configuracoes_igreja`, `edge_function_config`, `notifications` |
+| **Pastoral** | Atendimentos e agenda pastoral | `atendimentos_pastorais`, `atendimentos_bot`, `agenda_pastoral` |
+| **Voluntários** | Gestão de candidatos a voluntário | `candidatos_voluntario`, `candidatos_voluntario_historico` |
+| **Configurações** | Configurações do sistema | `configuracoes_igreja`, `app_config`, `edge_function_config`, `notifications` |
 
 ---
 

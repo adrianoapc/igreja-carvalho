@@ -1,14 +1,29 @@
 -- =====================================================
 -- SCHEMA COMPLETO DO BANCO DE DADOS
 -- Igreja App - Lovable Cloud (Supabase)
--- Gerado em: 2025-12-03
+-- Gerado em: 2025-01-04
 -- =====================================================
 
 -- =====================================================
 -- ENUMS
 -- =====================================================
 
-CREATE TYPE public.app_role AS ENUM ('admin', 'secretario', 'tesoureiro', 'membro', 'basico');
+-- Papéis do sistema (hierarquia multi-tenant)
+CREATE TYPE public.app_role AS ENUM (
+  'super_admin',    -- Acesso global à plataforma
+  'admin',          -- Administrador legado
+  'admin_igreja',   -- Administrador da organização
+  'admin_filial',   -- Administrador de filial específica
+  'pastor',         -- Acesso pastoral
+  'lider',          -- Líder de ministério
+  'secretario',     -- Gestão administrativa
+  'tesoureiro',     -- Gestão financeira
+  'professor',      -- Docente de cursos/jornadas
+  'tecnico',        -- Suporte técnico de eventos
+  'membro',         -- Membro ativo
+  'basico'          -- Acesso inicial
+);
+
 CREATE TYPE public.access_level AS ENUM ('visualizar', 'criar_editar', 'aprovar_gerenciar', 'acesso_completo');
 CREATE TYPE public.user_status AS ENUM ('visitante', 'frequentador', 'membro');
 CREATE TYPE public.status_pedido AS ENUM ('pendente', 'em_oracao', 'respondido', 'arquivado');
@@ -16,6 +31,11 @@ CREATE TYPE public.tipo_pedido AS ENUM ('saude', 'financeiro', 'familiar', 'espi
 CREATE TYPE public.categoria_testemunho AS ENUM ('cura', 'provisao', 'restauracao', 'libertacao', 'outro');
 CREATE TYPE public.status_testemunho AS ENUM ('aberto', 'publico', 'arquivado');
 CREATE TYPE public.tipo_sentimento AS ENUM ('feliz', 'grato', 'em_paz', 'esperancoso', 'angustiado', 'triste', 'sozinho', 'com_medo', 'doente', 'com_pouca_fe');
+CREATE TYPE public.evento_tipo AS ENUM ('culto', 'reuniao', 'evento', 'conferencia', 'retiro', 'outro');
+CREATE TYPE public.gravidade_enum AS ENUM ('baixa', 'media', 'alta', 'urgente');
+CREATE TYPE public.status_atendimento_enum AS ENUM ('aberto', 'em_andamento', 'agendado', 'concluido', 'cancelado');
+CREATE TYPE public.status_sessao_chat AS ENUM ('ativo', 'encerrado', 'transferido');
+CREATE TYPE public.tipo_comunicado AS ENUM ('aviso', 'destaque', 'urgente', 'evento');
 
 -- =====================================================
 -- TABELAS
