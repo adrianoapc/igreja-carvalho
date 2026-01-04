@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.chatbot-financeiro]
 verify_jwt = false
+
+[functions.provisionar-admin-igreja]
+verify_jwt = false
