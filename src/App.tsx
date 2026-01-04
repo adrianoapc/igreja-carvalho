@@ -164,6 +164,10 @@ const AdminChatbots = lazy(() => import("./pages/admin/Chatbots"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const ConfiguracoesIgreja = lazy(() => import("./pages/ConfiguracoesIgreja"));
 
+// Super Admin
+const SuperAdminDashboard = lazy(() => import("./pages/superadmin/SuperAdminDashboard"));
+const NovaIgreja = lazy(() => import("./pages/cadastro/NovaIgreja"));
+
 const queryClient = new QueryClient();
 
 // ScrollToTop component
@@ -213,6 +217,7 @@ const App = () => (
                 element={<CadastroVisitante />}
               />
               <Route path="/cadastro/membro" element={<CadastroMembro />} />
+              <Route path="/cadastro/igreja" element={<NovaIgreja />} />
 
               {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}
               <Route element={<MainLayout />}>
@@ -988,6 +993,16 @@ const App = () => (
                   element={
                     <AuthGate>
                       <Configuracoes />
+                    </AuthGate>
+                  }
+                />
+
+                {/* Super Admin */}
+                <Route
+                  path="/superadmin"
+                  element={
+                    <AuthGate>
+                      <SuperAdminDashboard />
                     </AuthGate>
                   }
                 />
