@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSuperAdmin, type Igreja, type OnboardingRequest, type TenantMetrica } from '@/hooks/useSuperAdmin';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import {
   Building2,
@@ -69,8 +70,11 @@ export default function SuperAdminDashboard() {
   const [rejectMotivo, setRejectMotivo] = useState('');
   const [processing, setProcessing] = useState(false);
 
+  const { user, loading: authLoading } = useAuth();
+
   useEffect(() => {
-    if (!loading && !isSuperAdmin) {
+    // Só redireciona quando AMBOS os loadings terminaram E o usuário está logado mas não é super_admin
+    if (!loading && !authLoading && user && !isSuperAdmin) {
       navigate('/');
       toast({
         title: 'Acesso negado',
@@ -78,7 +82,7 @@ export default function SuperAdminDashboard() {
         variant: 'destructive',
       });
     }
-  }, [loading, isSuperAdmin, navigate, toast]);
+  }, [loading, authLoading, user, isSuperAdmin, navigate, toast]);
 
   useEffect(() => {
     if (isSuperAdmin) {

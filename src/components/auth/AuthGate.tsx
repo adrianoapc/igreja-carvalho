@@ -168,7 +168,7 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
           .eq('user_id', currentUserId);
         if (error) throw error;
         const roles = (data || []).map(r => r.role);
-        const allowed = roles.includes('admin') || roles.includes('tecnico');
+        const allowed = roles.includes('admin') || roles.includes('tecnico') || roles.includes('super_admin');
         if (active) setIsAdminOrTecnico(allowed);
       } catch (err) {
         if (active) setIsAdminOrTecnico(false);
