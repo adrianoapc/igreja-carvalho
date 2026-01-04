@@ -41,7 +41,30 @@ using (
 - Auditar politicas em novas migracoes e vincular ao ADR correspondente.
 - Testar politicas com usuarios de cada papel antes de liberar features.
 
+## Funcoes de Seguranca
+
+| Funcao | Escopo | Descricao |
+|--------|--------|-----------|
+| `has_role(uuid, app_role)` | Global | Verifica papel do usuario |
+| `has_role_in_igreja(uuid, app_role, uuid)` | Por Igreja | Verifica papel em igreja especifica |
+| `has_filial_access(uuid, uuid)` | Por Filial | Valida acesso a filial via JWT |
+| `get_current_user_igreja_id()` | Contexto | Retorna igreja_id do usuario atual |
+| `get_jwt_igreja_id()` | JWT | Extrai igreja_id do token |
+| `get_jwt_filial_id()` | JWT | Extrai filial_id do token |
+
+## Hierarquia de Papeis (ADR-021)
+
+```
+super_admin (global)
+  └── admin / admin_igreja (por tenant)
+        └── admin_filial (por filial)
+              └── pastor / lider / secretario / tecnico / tesoureiro
+                    └── membro / basico
+```
+
 ## Referencias
 - ADR: `adr/ADR-003-rls-e-modelo-permissoes.md`
+- ADR Multi-Tenant: `adr/ADR-021-multi-tenant-arquitetura.md`
+- Controle de Isolamento: `../controle-multi-tenant.md`
 - Autenticacao: `02-autenticacao-supabase.MD`
 - Fluxo de dados: `03-fluxo-de-dados.MD`
