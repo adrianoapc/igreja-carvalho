@@ -347,8 +347,18 @@ export default function Auth() {
         description: "Bem-vindo de volta!",
       });
 
-      // Check if user is super admin for context selection
-      const isSuperAdminUser = await checkIsSuperAdmin(data.user.id);
+      // Check if user is super admin for context selection (with timeout to prevent freezing)
+      let isSuperAdminUser = false;
+      try {
+        const superAdminPromise = checkIsSuperAdmin(data.user.id);
+        const timeoutPromise = new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 3000)
+        );
+        isSuperAdminUser = await Promise.race([superAdminPromise, timeoutPromise]);
+      } catch (err) {
+        console.warn("Super admin check failed or timed out, proceeding as regular user:", err);
+        isSuperAdminUser = false;
+      }
       
       if (isSuperAdminUser) {
         const preferredContext = getPreferredContext();
