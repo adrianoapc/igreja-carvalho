@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useIgrejaId } from '@/hooks/useIgrejaId';
 
 interface AppConfig {
   id?: number;
@@ -34,6 +35,7 @@ export function useAppConfig() {
   const [igrejaConfig, setIgrejaConfig] = useState<IgrejaConfig>(DEFAULT_IGREJA_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -66,10 +68,16 @@ export function useAppConfig() {
 
   const fetchIgrejaConfig = useCallback(async () => {
     try {
+      if (!igrejaId) {
+        setIgrejaConfig(DEFAULT_IGREJA_CONFIG);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('configuracoes_igreja')
         .select('id, nome_igreja, logo_url, subtitulo')
-        .single();
+        .eq('igreja_id', igrejaId)
+        .maybeSingle();
 
       if (error) {
         console.error('Erro ao buscar config igreja:', error);
@@ -86,7 +94,7 @@ export function useAppConfig() {
       console.error('Erro ao buscar config igreja:', error);
       setIgrejaConfig(DEFAULT_IGREJA_CONFIG);
     }
-  }, []);
+  }, [igrejaId]);
 
   const updateConfig = useCallback(
     async (updates: Partial<AppConfig>) => {
@@ -125,7 +133,9 @@ export function useAppConfig() {
       await Promise.all([fetchConfig(), fetchIgrejaConfig()]);
       setIsLoading(false);
     };
-    loadAll();
+    if (!igrejaLoading) {
+      loadAll();
+    }
 
     const subscription = supabase
       .channel('app_config_changes')
@@ -145,7 +155,7 @@ export function useAppConfig() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchConfig, fetchIgrejaConfig]);
+  }, [fetchConfig, fetchIgrejaConfig, igrejaLoading]);
 
   return {
     config,
