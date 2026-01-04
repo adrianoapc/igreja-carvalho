@@ -12,7 +12,9 @@ export type Permission =
   | 'pessoas.admin'
   | 'ministerio.view' 
   | 'configuracoes.view'
-  | 'ensino.view';
+  | 'ensino.view'
+  | 'filiais.view'
+  | 'filiais.manage';
 
 export function usePermissions() {
   const { user, loading: authLoading } = useAuth();
