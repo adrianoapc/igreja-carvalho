@@ -1312,10 +1312,6 @@ export type Database = {
           subtitulo: string | null
           telefone_plantao_pastoral: string | null
           updated_at: string | null
-          webhook_make_liturgia: string | null
-          whatsapp_instance_id: string | null
-          whatsapp_provider: string | null
-          whatsapp_token: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1326,10 +1322,6 @@ export type Database = {
           subtitulo?: string | null
           telefone_plantao_pastoral?: string | null
           updated_at?: string | null
-          webhook_make_liturgia?: string | null
-          whatsapp_instance_id?: string | null
-          whatsapp_provider?: string | null
-          whatsapp_token?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1340,14 +1332,51 @@ export type Database = {
           subtitulo?: string | null
           telefone_plantao_pastoral?: string | null
           updated_at?: string | null
-          webhook_make_liturgia?: string | null
-          whatsapp_instance_id?: string | null
-          whatsapp_provider?: string | null
-          whatsapp_token?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "configuracoes_igreja_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks: {
+        Row: {
+          created_at: string | null
+          enabled: boolean
+          id: string
+          igreja_id: string
+          secret: string | null
+          tipo: string
+          updated_at: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          igreja_id: string
+          secret?: string | null
+          tipo: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          igreja_id?: string
+          secret?: string | null
+          tipo?: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_igreja_id_fkey"
             columns: ["igreja_id"]
             isOneToOne: false
             referencedRelation: "igrejas"

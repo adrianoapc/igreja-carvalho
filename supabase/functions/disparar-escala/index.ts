@@ -27,20 +27,42 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Buscar configurações da igreja para validar se WhatsApp está ativo
-    const { data: configIgreja, error: configError } = await supabase
-      .from('configuracoes_igreja')
-      .select('whatsapp_provider, whatsapp_token, whatsapp_instance_id')
-      .limit(1)
+    // 1. Buscar dados do culto
+    const { data: culto, error: cultoError } = await supabase
+      .from('cultos')
+      .select('id, titulo, data_culto, igreja_id')
+      .eq('id', culto_id)
       .single();
+
+    if (cultoError || !culto) {
+      console.error('Erro ao buscar culto:', cultoError);
+      return new Response(
+        JSON.stringify({ success: false, message: 'Culto não encontrado' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!culto.igreja_id) {
+      return new Response(
+        JSON.stringify({ success: false, message: 'Culto sem igreja associada' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 2. Buscar configurações da igreja para validar se WhatsApp está ativo
+    const whatsappTipos = ['whatsapp_make', 'whatsapp_meta', 'whatsapp_evolution'];
+    const { data: whatsappConfigs, error: configError } = await supabase
+      .from('webhooks')
+      .select('tipo')
+      .eq('igreja_id', culto.igreja_id)
+      .in('tipo', whatsappTipos)
+      .eq('enabled', true);
 
     if (configError) {
       console.error('Erro ao buscar configurações:', configError);
     }
 
-    // Verificar se WhatsApp está configurado
-    const whatsappProvider = configIgreja?.whatsapp_provider;
-    if (!whatsappProvider || whatsappProvider === 'nenhum') {
+    if (!whatsappConfigs || whatsappConfigs.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -50,29 +72,27 @@ serve(async (req) => {
       );
     }
 
-    // Buscar URL do webhook (env var ou poderia vir da config)
-    const webhookUrl = Deno.env.get('MAKE_WEBHOOK_ESCALAS');
+    // Buscar URL do webhook de escalas por igreja
+    const { data: webhookConfig, error: webhookError } = await supabase
+      .from('webhooks')
+      .select('url, enabled')
+      .eq('igreja_id', culto.igreja_id)
+      .eq('tipo', 'make_escalas')
+      .maybeSingle();
 
-    if (!webhookUrl) {
-      console.error('MAKE_WEBHOOK_ESCALAS não configurado');
+    if (webhookError) {
+      console.error('Erro ao buscar webhook de escalas:', webhookError);
       return new Response(
-        JSON.stringify({ success: false, message: 'Webhook de escalas não configurado' }),
+        JSON.stringify({ success: false, message: 'Erro ao buscar webhook de escalas' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // 2. Buscar dados do culto
-    const { data: culto, error: cultoError } = await supabase
-      .from('cultos')
-      .select('id, titulo, data_culto')
-      .eq('id', culto_id)
-      .single();
-
-    if (cultoError || !culto) {
-      console.error('Erro ao buscar culto:', cultoError);
+    if (!webhookConfig?.url || !webhookConfig.enabled) {
+      console.error('Webhook de escalas não configurado');
       return new Response(
-        JSON.stringify({ success: false, message: 'Culto não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, message: 'Webhook de escalas não configurado' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -167,7 +187,7 @@ serve(async (req) => {
       console.log(`Enviando para ${nome} (${telefoneFormatado}): ${funcaoEscala}`);
 
       try {
-        const webhookResponse = await fetch(webhookUrl, {
+        const webhookResponse = await fetch(webhookConfig.url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
