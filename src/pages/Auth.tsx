@@ -16,6 +16,7 @@ import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { parseAuthError } from "@/hooks/useAuthErrors";
 import InputMask from "react-input-mask";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { checkIsSuperAdmin, getPreferredContext } from "@/utils/checkSuperAdminRole";
 
 type AuthView = "login" | "forgot-password" | "signup" | "phone-otp";
 type LoginMethod = "email" | "phone";
@@ -345,6 +346,24 @@ export default function Auth() {
         title: "Login realizado!",
         description: "Bem-vindo de volta!",
       });
+
+      // Check if user is super admin for context selection
+      const isSuperAdminUser = await checkIsSuperAdmin(data.user.id);
+      
+      if (isSuperAdminUser) {
+        const preferredContext = getPreferredContext();
+        if (preferredContext === "superadmin") {
+          navigate("/superadmin", { replace: true });
+          return;
+        } else if (preferredContext === "app") {
+          navigate("/", { replace: true });
+          return;
+        } else {
+          // No preference saved, show selection screen
+          navigate("/context-select", { replace: true });
+          return;
+        }
+      }
 
       // Oferecer biometria após login bem-sucedido se ainda não estiver ativada
       if (!isBiometricLoading && isSupported && !isEnabled && data.user) {
