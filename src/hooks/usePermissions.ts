@@ -33,7 +33,11 @@ export function usePermissions() {
         .select('role')
         .eq('user_id', user.id);
 
-      if (!error && data && data.some(r => r.role === 'admin' || r.role === 'super_admin')) {
+      if (!error && data && data.some(r => 
+        r.role === 'admin' || 
+        r.role === 'super_admin' || 
+        r.role === 'admin_igreja'
+      )) {
         setIsAdmin(true);
       }
     } catch (error) {
