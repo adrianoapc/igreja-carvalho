@@ -5811,6 +5811,8 @@ export type Database = {
         | "acesso_completo"
       app_role:
         | "admin"
+        | "admin_igreja"
+        | "admin_filial"
         | "pastor"
         | "lider"
         | "secretario"
@@ -5995,6 +5997,8 @@ export const Constants = {
       ],
       app_role: [
         "admin",
+        "admin_igreja",
+        "admin_filial",
         "pastor",
         "lider",
         "secretario",
