@@ -11,6 +11,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { MainLayout } from "./components/layout/MainLayout";
+import { SuperAdminLayout } from "./components/layout/SuperAdminLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "next-themes";
 
@@ -166,7 +167,13 @@ const ConfiguracoesIgreja = lazy(() => import("./pages/ConfiguracoesIgreja"));
 
 // Super Admin
 const SuperAdminDashboard = lazy(
-  () => import("./pages/superadmin/SuperAdminDashboard")
+  () => import("./pages/superadmin/Dashboard")
+);
+const SuperAdminIgrejas = lazy(
+  () => import("./pages/superadmin/Igrejas")
+);
+const SuperAdminMetricas = lazy(
+  () => import("./pages/superadmin/Metricas")
 );
 const NovaIgreja = lazy(() => import("./pages/cadastro/NovaIgreja"));
 
@@ -999,15 +1006,13 @@ const App = () => (
                   }
                 />
 
-                {/* Super Admin */}
-                <Route
-                  path="/superadmin"
-                  element={
-                    <AuthGate>
-                      <SuperAdminDashboard />
-                    </AuthGate>
-                  }
-                />
+              </Route>
+
+              {/* --- ROTAS SUPER ADMIN (Layout Separado) --- */}
+              <Route element={<SuperAdminLayout />}>
+                <Route path="/superadmin" element={<SuperAdminDashboard />} />
+                <Route path="/superadmin/igrejas" element={<SuperAdminIgrejas />} />
+                <Route path="/superadmin/metricas" element={<SuperAdminMetricas />} />
               </Route>
 
               {/* Catch-all */}

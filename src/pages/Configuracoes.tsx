@@ -13,6 +13,7 @@ import {
   CreditCard,
   DollarSign,
   FileText,
+  GitBranch,
   LayoutList,
   Settings,
   Shield,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -36,10 +38,12 @@ import Webhooks from "@/pages/admin/Webhooks";
 import Chatbots from "@/pages/admin/Chatbots";
 import Notificacoes from "@/pages/admin/Notificacoes";
 import ContasManutencao from "@/pages/financas/ContasManutencao";
+import FiliaisConfig from "@/pages/configuracoes/Filiais";
 
 type ViewState =
   | "MENU"
   | "IGREJA"
+  | "FILIAIS"
   | "PERMISSOES"
   | "WEBHOOKS"
   | "CHATBOTS"
@@ -51,15 +55,19 @@ type ViewState =
   | "FINANCEIRO_FORMAS"
   | "FINANCEIRO_FORNECEDORES";
 
+import type { Permission } from "@/hooks/usePermissions";
+
 type ConfigItem = {
   id: ViewState;
   title: string;
   description: string;
   icon: React.ElementType;
+  requiredPermission?: Permission;
 };
 
 const GERAL_ITEMS: ConfigItem[] = [
   { id: "IGREJA", title: "Dados da Igreja", description: "Nome, logo e informações de contato", icon: Building2 },
+  { id: "FILIAIS", title: "Filiais", description: "Gerenciar filiais da igreja", icon: GitBranch, requiredPermission: "filiais.manage" },
   { id: "PERMISSOES", title: "Permissões de Acesso", description: "Funções e acessos por módulo", icon: Shield },
   { id: "NOTIFICACOES", title: "Notificações", description: "Regras e canais de notificação", icon: Bell },
   { id: "WEBHOOKS", title: "Webhooks", description: "Integrações externas (Make, etc.)", icon: Webhook },
@@ -95,6 +103,7 @@ function SubPageWrapper({ children, onBack, title }: { children: React.ReactNode
 export default function Configuracoes() {
   const [currentView, setCurrentView] = useState<ViewState>("MENU");
   const { config, isLoading, refetch } = useAppConfig();
+  const { isAdmin, checkPermission } = usePermissions();
 
   const goBack = () => setCurrentView("MENU");
 
@@ -122,10 +131,17 @@ export default function Configuracoes() {
   
   // Pages without onBack - render as-is (they have their own navigation)
   if (currentView === "IGREJA") return <ConfiguracoesIgreja onBack={goBack} />;
+  if (currentView === "FILIAIS") return <FiliaisConfig onBack={goBack} />;
   if (currentView === "PERMISSOES") return <AdminPermissions onBack={goBack} />;
   if (currentView === "WEBHOOKS") return <Webhooks onBack={goBack} />;
   if (currentView === "CHATBOTS") return <Chatbots onBack={goBack} />;
   if (currentView === "NOTIFICACOES") return <Notificacoes onBack={goBack} />;
+
+  // Filtrar itens baseado em permissões
+  const visibleGeralItems = GERAL_ITEMS.filter(item => {
+    if (!item.requiredPermission) return true;
+    return isAdmin || checkPermission(item.requiredPermission);
+  });
 
   return (
       <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
@@ -153,26 +169,26 @@ export default function Configuracoes() {
               <Settings className="h-4 w-4" />
               Geral
             </CardTitle>
-            <CardDescription>Configurações principais do sistema</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            {GERAL_ITEMS.map((item) => (
-              <Button
-                key={item.id}
-                variant="ghost"
-                className="w-full justify-between h-auto py-3 px-4"
-                onClick={() => setCurrentView(item.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className="h-5 w-5 text-muted-foreground" />
-                  <div className="text-left">
-                    <div className="font-medium">{item.title}</div>
-                    <div className="text-xs text-muted-foreground">{item.description}</div>
-                  </div>
+          <CardDescription>Configurações principais do sistema</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          {visibleGeralItems.map((item) => (
+            <Button
+              key={item.id}
+              variant="ghost"
+              className="w-full justify-between h-auto py-3 px-4"
+              onClick={() => setCurrentView(item.id)}
+            >
+              <div className="flex items-center gap-3">
+                <item.icon className="h-5 w-5 text-muted-foreground" />
+                <div className="text-left">
+                  <div className="font-medium">{item.title}</div>
+                  <div className="text-xs text-muted-foreground">{item.description}</div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            ))}
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          ))}
           </CardContent>
         </Card>
 
