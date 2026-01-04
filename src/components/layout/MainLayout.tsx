@@ -17,7 +17,8 @@ import RegistrarSentimentoDialog from "@/components/sentimentos/RegistrarSentime
 import { HideValuesProvider } from "@/hooks/useHideValues";
 import { Separator } from "@/components/ui/separator";
 import { AppBreadcrumb } from "./AppBreadcrumb";
-import { MobileNavbar } from "./MobileNavbar"; // ✅ Nova Importação
+import { MobileNavbar } from "./MobileNavbar";
+import { SuperAdminIndicator } from "./SuperAdminIndicator";
 
 interface MainLayoutProps {
   children?: ReactNode;
@@ -73,6 +74,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
+            <SuperAdminIndicator />
             <NotificationsBell />
           </div>
         </header>
