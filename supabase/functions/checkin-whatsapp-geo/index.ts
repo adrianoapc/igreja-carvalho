@@ -91,6 +91,17 @@ serve(async (req) => {
   
   if (!rateCheck.allowed) {
     console.log(`[checkin-whatsapp-geo] Rate limit exceeded for IP: ${clientIP}`);
+    
+    // Log rate limit violation (may trigger auto-block)
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      await supabase.rpc('log_rate_limit_violation', { p_ip: clientIP, p_endpoint: 'checkin-whatsapp-geo' });
+    } catch (e) {
+      console.error('Failed to log rate limit violation:', e);
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -110,10 +121,42 @@ serve(async (req) => {
   try {
     console.log('=== Check-in WhatsApp Geolocalização ===');
     
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Helper function to log audit events
+    const logAudit = async (action: string, success: boolean, errorMessage?: string, metadata?: Record<string, unknown>) => {
+      try {
+        await supabase.from('audit_public_endpoints').insert({
+          endpoint_name: 'checkin-whatsapp-geo',
+          action,
+          client_ip: clientIP,
+          success,
+          error_message: errorMessage || null,
+          request_metadata: metadata || null,
+        });
+      } catch (e) {
+        console.error('Failed to log audit:', e);
+      }
+    };
+
+    // Check if IP is blocked
+    const { data: isBlocked } = await supabase.rpc('is_ip_blocked', { p_ip: clientIP });
+    if (isBlocked) {
+      console.log(`[checkin-whatsapp-geo] Blocked IP attempted access: ${clientIP}`);
+      await logAudit('blocked_ip_access', false, 'IP is blocked');
+      return new Response(
+        JSON.stringify({ success: false, message: 'Access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // Verificar autenticação do webhook
     const secretCheck = verifyWebhookSecret(req);
     if (!secretCheck.valid) {
       console.error('❌ Falha na verificação do webhook secret:', secretCheck.error);
+      await logAudit('webhook_auth_failed', false, secretCheck.error);
       return new Response(
         JSON.stringify({
           success: false,
@@ -126,15 +169,10 @@ serve(async (req) => {
         }
       );
     }
-    
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
     const body = await req.json();
-    console.log('Dados recebidos:', JSON.stringify(body, null, 2), `IP: ${clientIP}`);
+    console.log('Dados recebidos (telefone masked):', `IP: ${clientIP}`);
 
     const { telefone, latitude, longitude, lat, long } = body;
 
@@ -183,11 +221,11 @@ serve(async (req) => {
 
     if (error) {
       console.error('Erro ao processar check-in:', error);
+      await logAudit('checkin_failed', false, error.message, { telefone_masked: telefone ? `***${telefone.slice(-4)}` : 'N/A' });
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: 'Erro ao processar check-in',
-          error: error.message 
+          message: 'Erro ao processar check-in'
         }),
         { 
           status: 500, 
@@ -196,7 +234,8 @@ serve(async (req) => {
       );
     }
 
-    console.log('Resultado do check-in:', JSON.stringify(data, null, 2));
+    console.log('Resultado do check-in:', data?.success ? 'success' : 'failed');
+    await logAudit('checkin_processed', data?.success || false, data?.success ? undefined : 'Check-in validation failed');
 
     // Retornar resposta da função
     return new Response(
@@ -209,12 +248,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Erro inesperado:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: 'Erro interno do servidor',
-        error: errorMessage 
+        message: 'Erro interno do servidor'
       }),
       { 
         status: 500, 
