@@ -1200,32 +1200,10 @@ export type Database = {
           },
         ]
       }
-      igrejas: {
-        Row: {
-          created_at: string | null
-          id: string
-          nome: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          nome: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          nome?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       configuracoes_igreja: {
         Row: {
           created_at: string | null
           id: string
-          igreja_id: string
           logo_url: string | null
           nome_igreja: string
           subtitulo: string | null
@@ -1239,7 +1217,6 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
-          igreja_id: string
           logo_url?: string | null
           nome_igreja?: string
           subtitulo?: string | null
@@ -1253,7 +1230,6 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
-          igreja_id?: string
           logo_url?: string | null
           nome_igreja?: string
           subtitulo?: string | null
@@ -1264,15 +1240,7 @@ export type Database = {
           whatsapp_provider?: string | null
           whatsapp_token?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "configuracoes_igreja_igreja_id_fkey"
-            columns: ["igreja_id"]
-            isOneToOne: true
-            referencedRelation: "igrejas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       contas: {
         Row: {
