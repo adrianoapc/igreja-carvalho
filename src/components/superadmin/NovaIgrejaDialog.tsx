@@ -58,6 +58,11 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
       return;
     }
 
+    if (!formData.email.trim()) {
+      toast({ title: 'Email é obrigatório para criar o admin', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
     try {
       // 1. Criar a igreja
@@ -80,12 +85,14 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
       if (igrejaError) throw igrejaError;
 
       // 2. Criar a filial Matriz automaticamente
-      const { error: filialError } = await supabase
+      const { data: filial, error: filialError } = await supabase
         .from('filiais')
         .insert({
           igreja_id: igreja.id,
           nome: 'Matriz',
-        });
+        })
+        .select()
+        .single();
 
       if (filialError) {
         console.error('Erro ao criar filial Matriz:', filialError);
@@ -103,7 +110,33 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
         console.error('Erro ao criar configurações:', configError);
       }
 
-      toast({ title: 'Igreja cadastrada com sucesso!' });
+      // 4. Provisionar admin da igreja via Edge Function
+      const { data: adminData, error: adminError } = await supabase.functions.invoke(
+        'provisionar-admin-igreja',
+        {
+          body: {
+            email: formData.email.trim(),
+            nome: `Admin - ${formData.nome.trim()}`,
+            igreja_id: igreja.id,
+            filial_id: filial?.id || null,
+          },
+        }
+      );
+
+      if (adminError) {
+        console.error('Erro ao provisionar admin:', adminError);
+        toast({
+          title: 'Igreja criada, mas houve erro ao criar admin',
+          description: 'Crie o admin manualmente depois.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Igreja cadastrada com sucesso!',
+          description: `Admin criado com senha padrão: ${adminData?.default_password || 'Igreja@2024'}`,
+        });
+      }
+
       setFormData({ nome: '', cnpj: '', email: '', telefone: '', endereco: '', cidade: '', estado: '', cep: '' });
       onOpenChange(false);
       onSuccess();
