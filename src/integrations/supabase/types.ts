@@ -6046,20 +6046,31 @@ export type Database = {
       user_roles: {
         Row: {
           id: string
+          igreja_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           id?: string
+          igreja_id?: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           id?: string
+          igreja_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       visitante_contatos: {
         Row: {
@@ -6764,6 +6775,14 @@ export type Database = {
       }
       has_role: {
         Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role_in_igreja: {
+        Args: {
+          _igreja_id: string
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
