@@ -14,33 +14,48 @@ import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 // Tipos para os Webhooks Genéricos
 interface WebhookConfig {
-  key: string;
+  tipo: string;
   name: string;
   description: string;
   placeholder: string;
   isConfigured: boolean;
+  value: string;
 }
 
-const GENERIC_WEBHOOKS: Omit<WebhookConfig, 'isConfigured'>[] = [
+type WhatsappProvider = "make_webhook" | "meta_official" | "evolution_api";
+
+const WEBHOOK_DEFINITIONS: Omit<WebhookConfig, 'isConfigured' | 'value'>[] = [
   {
-    key: "MAKE_WEBHOOK_URL",
+    tipo: "make_geral",
     name: "Make.com (Geral)",
     description: "Notificações gerais e alertas críticos.",
     placeholder: "https://hook.us1.make.com/...",
   },
   {
-    key: "MAKE_WEBHOOK_ESCALAS",
+    tipo: "make_escalas",
     name: "Make.com (Escalas)",
     description: "Envio de convites e lembretes de voluntários.",
     placeholder: "https://hook.us1.make.com/...",
   },
   {
-    key: "MAKE_WEBHOOK_SECRET",
+    tipo: "make_liturgia",
     name: "Make.com (Liturgia)",
     description: "Distribuição de repertório aos times de louvor.",
     placeholder: "https://hook.us1.make.com/...",
   },
 ];
+
+const WHATSAPP_PROVIDER_TO_TIPO: Record<WhatsappProvider, string> = {
+  make_webhook: "whatsapp_make",
+  meta_official: "whatsapp_meta",
+  evolution_api: "whatsapp_evolution",
+};
+
+const TIPO_TO_WHATSAPP_PROVIDER: Record<string, WhatsappProvider> = {
+  whatsapp_make: "make_webhook",
+  whatsapp_meta: "meta_official",
+  whatsapp_evolution: "evolution_api",
+};
 
 interface Props {
   onBack?: () => void;
@@ -54,10 +69,11 @@ export default function Webhooks({ onBack }: Props) {
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   // Estado do Provedor de Mensagem
-  const [whatsappConfig, setWhatsappConfig] = useState({
-    provider: "make_webhook",
-    token: "",
-    instanceId: ""
+  const [whatsappProvider, setWhatsappProvider] = useState<WhatsappProvider>("make_webhook");
+  const [whatsappConfigs, setWhatsappConfigs] = useState<Record<WhatsappProvider, { token: string; endpoint: string }>>({
+    make_webhook: { token: "", endpoint: "" },
+    meta_official: { token: "", endpoint: "" },
+    evolution_api: { token: "", endpoint: "" },
   });
 
   // Estado dos Webhooks Genéricos
@@ -79,26 +95,42 @@ export default function Webhooks({ onBack }: Props) {
         return;
       }
 
-      // 1. Carregar Configuração do Banco (Provedor de Whats)
-      const { data: dbConfig, error } = await supabase
-        .from("configuracoes_igreja")
-        .select("whatsapp_provider, whatsapp_token, whatsapp_instance_id") 
-        .eq("igreja_id", igrejaId)
-        .maybeSingle();
+      const { data: webhooks, error } = await supabase
+        .from("webhooks")
+        .select("tipo, url, secret, enabled")
+        .eq("igreja_id", igrejaId);
 
-      if (!error && dbConfig) {
-        setWhatsappConfig({
-          provider: dbConfig.whatsapp_provider || "make_webhook",
-          token: dbConfig.whatsapp_token || "",
-          instanceId: dbConfig.whatsapp_instance_id || ""
-        });
-      }
+      if (error) throw error;
 
-      // 2. Mockar status dos secrets
-      const configList = GENERIC_WEBHOOKS.map(webhook => ({
-        ...webhook,
-        isConfigured: true 
-      }));
+      const webhookMap = new Map(webhooks?.map((row) => [row.tipo, row]) ?? []);
+      const activeWhatsappRow = webhooks?.find(
+        (row) => row.enabled && TIPO_TO_WHATSAPP_PROVIDER[row.tipo]
+      );
+
+      setWhatsappProvider(activeWhatsappRow ? TIPO_TO_WHATSAPP_PROVIDER[activeWhatsappRow.tipo] : "make_webhook");
+      setWhatsappConfigs({
+        make_webhook: {
+          token: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.make_webhook)?.secret ?? "",
+          endpoint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.make_webhook)?.url ?? "",
+        },
+        meta_official: {
+          token: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.meta_official)?.secret ?? "",
+          endpoint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.meta_official)?.url ?? "",
+        },
+        evolution_api: {
+          token: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.evolution_api)?.secret ?? "",
+          endpoint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.evolution_api)?.url ?? "",
+        },
+      });
+
+      const configList = WEBHOOK_DEFINITIONS.map((webhook) => {
+        const row = webhookMap.get(webhook.tipo);
+        return {
+          ...webhook,
+          value: row?.url ?? "",
+          isConfigured: Boolean(row?.url),
+        };
+      });
       setConfigs(configList);
 
     } catch (error: unknown) {
@@ -115,14 +147,20 @@ export default function Webhooks({ onBack }: Props) {
         throw new Error("Igreja não identificada para salvar configurações.");
       }
 
+      const payload = (Object.keys(WHATSAPP_PROVIDER_TO_TIPO) as WhatsappProvider[]).map((provider) => {
+        const config = whatsappConfigs[provider];
+        return {
+          igreja_id: igrejaId,
+          tipo: WHATSAPP_PROVIDER_TO_TIPO[provider],
+          url: config.endpoint.trim() ? config.endpoint.trim() : null,
+          secret: config.token.trim() ? config.token.trim() : null,
+          enabled: provider === whatsappProvider,
+        };
+      });
+
       const { error } = await supabase
-        .from("configuracoes_igreja")
-        .update({
-          whatsapp_provider: whatsappConfig.provider,
-          whatsapp_token: whatsappConfig.token,
-          whatsapp_instance_id: whatsappConfig.instanceId
-        })
-        .eq('igreja_id', igrejaId);
+        .from("webhooks")
+        .upsert(payload, { onConflict: "igreja_id,tipo" });
 
       if (error) throw error;
       toast.success("Configuração de WhatsApp salva!");
@@ -133,11 +171,49 @@ export default function Webhooks({ onBack }: Props) {
     }
   };
 
-  const handleSaveWebhook = async (key: string) => {
-    if (!newValue.trim()) return toast.error("Digite a URL");
-    toast.info(`Em produção, isto atualizaria o Secret: ${key}`);
-    setEditingKey(null);
-    setNewValue("");
+  const handleSaveWebhook = async (tipo: string) => {
+    if (!igrejaId) {
+      toast.error("Igreja não identificada.");
+      return;
+    }
+
+    const value = newValue.trim();
+    try {
+      const { error } = await supabase
+        .from("webhooks")
+        .upsert(
+          {
+            igreja_id: igrejaId,
+            tipo,
+            url: value || null,
+            enabled: Boolean(value),
+          },
+          { onConflict: "igreja_id,tipo" }
+        );
+
+      if (error) throw error;
+
+      setConfigs((prev) =>
+        prev.map((config) =>
+          config.tipo === tipo
+            ? { ...config, value, isConfigured: Boolean(value) }
+            : config
+        )
+      );
+      toast.success("Webhook salvo com sucesso!");
+      setEditingKey(null);
+      setNewValue("");
+    } catch (error: unknown) {
+      toast.error("Erro ao salvar: " + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
+  const activeWhatsappConfig = whatsappConfigs[whatsappProvider];
+  const updateActiveWhatsappConfig = (updates: Partial<{ token: string; endpoint: string }>) => {
+    setWhatsappConfigs((prev) => ({
+      ...prev,
+      [whatsappProvider]: { ...prev[whatsappProvider], ...updates },
+    }));
   };
 
   if (loading) {
@@ -188,8 +264,8 @@ export default function Webhooks({ onBack }: Props) {
           <div className="grid gap-2">
             <Label className="text-xs font-semibold uppercase text-muted-foreground">Provedor Ativo</Label>
             <Select
-              value={whatsappConfig.provider}
-              onValueChange={(val) => setWhatsappConfig(prev => ({ ...prev, provider: val }))}
+              value={whatsappProvider}
+              onValueChange={(val) => setWhatsappProvider(val as WhatsappProvider)}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecione..." />
@@ -203,7 +279,7 @@ export default function Webhooks({ onBack }: Props) {
           </div>
 
           {/* Configuração: META */}
-          {whatsappConfig.provider === 'meta_official' && (
+          {whatsappProvider === 'meta_official' && (
             <div className="grid gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-2">
               <div className="grid gap-2">
                 <Label>Token de Acesso (Permanente)</Label>
@@ -213,8 +289,8 @@ export default function Webhooks({ onBack }: Props) {
                     className="pl-9 font-mono text-sm" 
                     type="password"
                     placeholder="EAAG..." 
-                    value={whatsappConfig.token || ""}
-                    onChange={e => setWhatsappConfig(prev => ({ ...prev, token: e.target.value }))}
+                    value={activeWhatsappConfig.token || ""}
+                    onChange={e => updateActiveWhatsappConfig({ token: e.target.value })}
                   />
                 </div>
               </div>
@@ -223,15 +299,15 @@ export default function Webhooks({ onBack }: Props) {
                 <Input 
                   className="font-mono text-sm" 
                   placeholder="123456789..." 
-                  value={whatsappConfig.instanceId || ""}
-                  onChange={e => setWhatsappConfig(prev => ({ ...prev, instanceId: e.target.value }))}
+                  value={activeWhatsappConfig.endpoint || ""}
+                  onChange={e => updateActiveWhatsappConfig({ endpoint: e.target.value })}
                 />
               </div>
             </div>
           )}
 
           {/* Configuração: EVOLUTION */}
-          {whatsappConfig.provider === 'evolution_api' && (
+          {whatsappProvider === 'evolution_api' && (
             <div className="grid gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-2">
               <div className="grid gap-2">
                 <Label>API Key Global</Label>
@@ -241,8 +317,8 @@ export default function Webhooks({ onBack }: Props) {
                     className="pl-9 font-mono text-sm" 
                     type="password"
                     placeholder="Token da API..." 
-                    value={whatsappConfig.token || ""}
-                    onChange={e => setWhatsappConfig(prev => ({ ...prev, token: e.target.value }))}
+                    value={activeWhatsappConfig.token || ""}
+                    onChange={e => updateActiveWhatsappConfig({ token: e.target.value })}
                   />
                 </div>
               </div>
@@ -251,22 +327,36 @@ export default function Webhooks({ onBack }: Props) {
                 <Input 
                   className="font-mono text-sm" 
                   placeholder="Ex: igreja-bot" 
-                  value={whatsappConfig.instanceId || ""}
-                  onChange={e => setWhatsappConfig(prev => ({ ...prev, instanceId: e.target.value }))}
+                  value={activeWhatsappConfig.endpoint || ""}
+                  onChange={e => updateActiveWhatsappConfig({ endpoint: e.target.value })}
                 />
               </div>
             </div>
           )}
 
           {/* Configuração: MAKE */}
-          {whatsappConfig.provider === 'make_webhook' && (
-            <div className="flex items-start gap-3 p-3 border rounded-lg bg-blue-50/50 text-blue-900 animate-in fade-in slide-in-from-top-2">
-              <Webhook className="h-4 w-4 mt-0.5 text-blue-600" />
-              <div className="text-xs leading-relaxed">
-                <p className="font-medium">Modo Webhook</p>
-                <p className="opacity-90">
-                  O sistema enviará os dados para a URL configurada no campo <strong>Make.com (Geral)</strong> abaixo.
-                </p>
+          {whatsappProvider === 'make_webhook' && (
+            <div className="grid gap-4 p-4 border rounded-lg bg-blue-50/50 text-blue-900 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-start gap-3">
+                <Webhook className="h-4 w-4 mt-0.5 text-blue-600" />
+                <div className="text-xs leading-relaxed">
+                  <p className="font-medium">Modo Webhook</p>
+                  <p className="opacity-90">
+                    Configure a URL do webhook que receberá as mensagens do WhatsApp.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>URL do Webhook</Label>
+                <div className="relative">
+                  <Link2 className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9 font-mono text-sm"
+                    placeholder="https://hook.us1.make.com/..."
+                    value={activeWhatsappConfig.endpoint || ""}
+                    onChange={(e) => updateActiveWhatsappConfig({ endpoint: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -291,7 +381,7 @@ export default function Webhooks({ onBack }: Props) {
 
         <div className="grid gap-3">
           {configs.map((config) => (
-            <Card key={config.key} className="overflow-hidden hover:shadow-sm transition-shadow">
+            <Card key={config.tipo} className="overflow-hidden hover:shadow-sm transition-shadow">
               <CardContent className="p-4">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
@@ -304,14 +394,22 @@ export default function Webhooks({ onBack }: Props) {
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-1">{config.description}</p>
                     </div>
-                    {editingKey !== config.key && (
-                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setEditingKey(config.key)}>
+                    {editingKey !== config.tipo && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          setEditingKey(config.tipo);
+                          setNewValue(config.value);
+                        }}
+                      >
                         Alterar
                       </Button>
                     )}
                   </div>
 
-                  {editingKey === config.key && (
+                  {editingKey === config.tipo && (
                     <div className="flex gap-2 items-center animate-in fade-in slide-in-from-left-2 pt-2 border-t mt-1">
                       <Input 
                         value={newValue} 
@@ -320,7 +418,7 @@ export default function Webhooks({ onBack }: Props) {
                         className="font-mono text-xs h-8"
                         autoFocus
                       />
-                      <Button size="sm" className="h-8 text-xs" onClick={() => handleSaveWebhook(config.key)}>Salvar</Button>
+                      <Button size="sm" className="h-8 text-xs" onClick={() => handleSaveWebhook(config.tipo)}>Salvar</Button>
                       <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setEditingKey(null)}>Cancelar</Button>
                     </div>
                   )}

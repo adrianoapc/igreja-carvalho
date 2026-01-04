@@ -35,35 +35,45 @@ Deno.serve(async (req) => {
 
     console.log('Processing liturgy notification for culto:', culto_id);
 
-    // Buscar configuração do webhook
+    // Buscar dados do evento (antes era cultos, agora é eventos)
+    const { data: evento, error: eventoError } = await supabaseClient
+      .from('eventos')
+      .select('titulo, data_evento, igreja_id')
+      .eq('id', culto_id)
+      .maybeSingle();
+
+    if (eventoError) {
+      console.error('Error fetching evento:', eventoError);
+      throw new Error('Erro ao buscar dados do evento');
+    }
+
+    if (!evento) {
+      throw new Error('Evento não encontrado');
+    }
+
+    if (!evento?.igreja_id) {
+      throw new Error('Evento sem igreja associada');
+    }
+
+    // Buscar configuração do webhook por igreja
     const { data: config, error: configError } = await supabaseClient
-      .from('configuracoes_igreja')
-      .select('webhook_make_liturgia')
-      .single();
+      .from('webhooks')
+      .select('url, enabled')
+      .eq('igreja_id', evento.igreja_id)
+      .eq('tipo', 'make_liturgia')
+      .maybeSingle();
 
     if (configError) {
       console.error('Error fetching config:', configError);
       throw new Error('Erro ao buscar configuração');
     }
 
-    if (!config?.webhook_make_liturgia) {
+    if (!config?.url || !config.enabled) {
       console.log('Webhook not configured, skipping notification');
       return new Response(
         JSON.stringify({ message: 'Webhook não configurado' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
-    }
-
-    // Buscar dados do evento (antes era cultos, agora é eventos)
-    const { data: evento, error: eventoError } = await supabaseClient
-      .from('eventos')
-      .select('titulo, data_evento')
-      .eq('id', culto_id)
-      .single();
-
-    if (eventoError) {
-      console.error('Error fetching evento:', eventoError);
-      throw new Error('Erro ao buscar dados do evento');
     }
 
     // Buscar itens da liturgia com responsáveis (tabela renomeada para liturgias)
@@ -114,7 +124,7 @@ Deno.serve(async (req) => {
     console.log('Sending notification to Make webhook:', notification);
 
     // Enviar para o webhook do Make
-    const makeResponse = await fetch(config.webhook_make_liturgia, {
+    const makeResponse = await fetch(config.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
