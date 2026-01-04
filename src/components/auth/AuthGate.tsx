@@ -181,8 +181,19 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
   // --- 3. BLOCO DE VERIFICAÇÃO DE PERMISSÃO (NOVO) ---
   useEffect(() => {
     const checkRequiredPermission = async () => {
-      // Se não exige permissão ou está carregando user, ignora
-      if (!requiredPermission || isLoadingUser || !currentUserId) {
+      // Se não exige permissão, libera direto
+      if (!requiredPermission) {
+        setIsCheckingPermission(false);
+        return;
+      }
+      
+      // Aguardar loading do user e permissions terminarem
+      if (isLoadingUser || permissionsLoading) {
+        return;
+      }
+      
+      // Se não tem usuário, não autoriza
+      if (!currentUserId) {
         setIsCheckingPermission(false);
         return;
       }
@@ -199,8 +210,6 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
       
       if (!hasPerm) {
         console.warn(`⛔ Acesso negado. Requer: ${requiredPermission}`);
-        // Opcional: Redirecionar para dashboard se não tiver acesso
-        // navigate('/dashboard'); 
         setIsPermissionAuthorized(false);
       } else {
         setIsPermissionAuthorized(true);
@@ -209,7 +218,7 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
     };
 
     checkRequiredPermission();
-  }, [requiredPermission, currentUserId, isLoadingUser, isAdmin, checkPermission]);
+  }, [requiredPermission, currentUserId, isLoadingUser, isAdmin, permissionsLoading, checkPermission]);
 
 
   // --- 4. RENDERIZAÇÃO E REDIRECIONAMENTOS ---
@@ -233,7 +242,8 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
   }, [isLoadingUser, isLoadingMaintenanceConfig, location.pathname, config.maintenance_mode, config.allow_public_access, isAdminOrTecnico, isPublicRoute, navigate]);
 
   // Loading Geral
-  if (biometricLoading || isChecking || isLoadingUser || isLoadingMaintenanceConfig || (requiredPermission && isCheckingPermission)) {
+  const isStillCheckingPermissions = requiredPermission && (isCheckingPermission || permissionsLoading);
+  if (biometricLoading || isChecking || isLoadingUser || isLoadingMaintenanceConfig || isStillCheckingPermissions) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground animate-pulse">Verificando credenciais...</p>
