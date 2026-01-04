@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { getWebhookConfig, getActiveWhatsAppProvider } from "../_shared/secrets.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,7 +188,157 @@ async function dispararInApp(
   return true;
 }
 
-// Disparar notificação via WhatsApp (Make webhook)
+// Disparar notificação via WhatsApp (Multi-tenant - busca config por igreja)
+async function dispararWhatsAppMultiTenant(
+  supabase: SupabaseClient,
+  igrejaId: string,
+  telefone: string,
+  mensagem: string,
+  evento: string,
+  templateMeta?: string | null
+): Promise<boolean> {
+  if (!telefone) {
+    console.warn("Telefone não disponível, pulando WhatsApp");
+    return false;
+  }
+
+  // Buscar provedor WhatsApp ativo para a igreja
+  const provider = await getActiveWhatsAppProvider(supabase, igrejaId);
+  
+  if (!provider) {
+    console.warn(`Nenhum provedor WhatsApp configurado para igreja ${igrejaId}`);
+    return false;
+  }
+
+  const { tipo, config } = provider;
+
+  // Rota Make (webhook)
+  if (tipo === "whatsapp_make") {
+    if (!config.url) {
+      console.warn("URL do webhook Make não configurada");
+      return false;
+    }
+
+    try {
+      const payload = {
+        telefone,
+        mensagem,
+        template: evento,
+        timestamp: new Date().toISOString(),
+      };
+
+      const response = await fetch(config.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        console.error(`Erro ao disparar WhatsApp (Make): ${response.statusText}`);
+        return false;
+      }
+
+      console.log(`✅ WhatsApp (Make) disparado para ${telefone}`);
+      return true;
+    } catch (error) {
+      console.error("Erro ao chamar webhook Make:", error);
+      return false;
+    }
+  }
+
+  // Rota Meta Cloud API (direto)
+  if (tipo === "whatsapp_meta") {
+    if (!config.url || !config.secret) {
+      console.warn("Phone Number ID ou Token Meta não configurados");
+      return false;
+    }
+
+    const templateName = templateMeta || evento;
+    const metaUrl = `https://graph.facebook.com/v18.0/${config.url}/messages`;
+
+    try {
+      const payload = {
+        messaging_product: "whatsapp",
+        to: telefone,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: "pt_BR" },
+          components: [
+            {
+              type: "body",
+              parameters: [{ type: "text", text: mensagem.slice(0, 1024) }],
+            },
+          ],
+        },
+      };
+
+      const response = await fetch(metaUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.secret}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`Erro ao disparar WhatsApp (Meta): ${response.status} - ${body}`);
+        return false;
+      }
+
+      console.log(`✅ WhatsApp (Meta) disparado para ${telefone} via template ${templateName}`);
+      return true;
+    } catch (error) {
+      console.error("Erro ao chamar Meta API:", error);
+      return false;
+    }
+  }
+
+  // Rota Evolution API
+  if (tipo === "whatsapp_evolution") {
+    if (!config.url || !config.secret) {
+      console.warn("Instância ou API Key Evolution não configurados");
+      return false;
+    }
+
+    const evolutionUrl = `https://api.evolution-api.com/message/sendText/${config.url}`;
+
+    try {
+      const payload = {
+        number: telefone,
+        text: mensagem,
+      };
+
+      const response = await fetch(evolutionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: config.secret,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`Erro ao disparar WhatsApp (Evolution): ${response.status} - ${body}`);
+        return false;
+      }
+
+      console.log(`✅ WhatsApp (Evolution) disparado para ${telefone}`);
+      return true;
+    } catch (error) {
+      console.error("Erro ao chamar Evolution API:", error);
+      return false;
+    }
+  }
+
+  console.warn(`Provider WhatsApp desconhecido: ${tipo}`);
+  return false;
+}
+
+// Wrapper legado para compatibilidade (usa fallback global se igreja não especificada)
 async function dispararWhatsApp(
   telefone: string,
   mensagem: string,
@@ -202,7 +353,7 @@ async function dispararWhatsApp(
 
   const providerPref = provider || "make";
 
-  // Rota Make (webhook)
+  // Fallback para webhook global (legado)
   if (providerPref === "make") {
     const MAKE_WEBHOOK_URL = Deno.env.get("MAKE_WEBHOOK_URL");
     if (!MAKE_WEBHOOK_URL) {
@@ -229,60 +380,10 @@ async function dispararWhatsApp(
         return false;
       }
 
-      console.log(`✅ WhatsApp (Make) disparado para ${telefone}`);
+      console.log(`✅ WhatsApp (Make/Global) disparado para ${telefone}`);
       return true;
     } catch (error) {
       console.error("Erro ao chamar webhook Make:", error);
-      return false;
-    }
-  }
-
-  // Rota Meta Cloud API (direto)
-  if (providerPref === "meta_direto") {
-    const META_WA_URL = Deno.env.get("META_WA_URL");
-    const META_WA_TOKEN = Deno.env.get("META_WA_TOKEN");
-    const templateName = templateMeta || evento;
-
-    if (!META_WA_URL || !META_WA_TOKEN) {
-      console.warn("META_WA_URL ou META_WA_TOKEN não configurados, pulando Meta direto");
-      return false;
-    }
-
-    try {
-      const payload = {
-        to: telefone,
-        type: "template",
-        template: {
-          name: templateName,
-          language: { code: "pt_BR" },
-          components: [
-            {
-              type: "body",
-              parameters: [{ type: "text", text: mensagem.slice(0, 1024) }],
-            },
-          ],
-        },
-      };
-
-      const response = await fetch(META_WA_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${META_WA_TOKEN}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const body = await response.text();
-        console.error(`Erro ao disparar WhatsApp (Meta): ${response.status} - ${body}`);
-        return false;
-      }
-
-      console.log(`✅ WhatsApp (Meta) disparado para ${telefone} via template ${templateName}`);
-      return true;
-    } catch (error) {
-      console.error("Erro ao chamar Meta API:", error);
       return false;
     }
   }

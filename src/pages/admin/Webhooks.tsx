@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Webhook, Save, MessageSquare, Key, Loader2, Link2, ArrowLeft } from "lucide-react";
+import { Webhook, Save, MessageSquare, Key, Loader2, Link2, ArrowLeft, ShieldCheck, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,13 @@ interface WebhookConfig {
 }
 
 type WhatsappProvider = "make_webhook" | "meta_official" | "evolution_api";
+
+interface WhatsAppConfig {
+  token: string;
+  endpoint: string;
+  hasStoredSecret: boolean;
+  secretHint: string;
+}
 
 const WEBHOOK_DEFINITIONS: Omit<WebhookConfig, 'isConfigured' | 'value'>[] = [
   {
@@ -70,10 +77,10 @@ export default function Webhooks({ onBack }: Props) {
   
   // Estado do Provedor de Mensagem
   const [whatsappProvider, setWhatsappProvider] = useState<WhatsappProvider>("make_webhook");
-  const [whatsappConfigs, setWhatsappConfigs] = useState<Record<WhatsappProvider, { token: string; endpoint: string }>>({
-    make_webhook: { token: "", endpoint: "" },
-    meta_official: { token: "", endpoint: "" },
-    evolution_api: { token: "", endpoint: "" },
+  const [whatsappConfigs, setWhatsappConfigs] = useState<Record<WhatsappProvider, WhatsAppConfig>>({
+    make_webhook: { token: "", endpoint: "", hasStoredSecret: false, secretHint: "" },
+    meta_official: { token: "", endpoint: "", hasStoredSecret: false, secretHint: "" },
+    evolution_api: { token: "", endpoint: "", hasStoredSecret: false, secretHint: "" },
   });
 
   // Estado dos Webhooks Genéricos
@@ -95,9 +102,10 @@ export default function Webhooks({ onBack }: Props) {
         return;
       }
 
+      // Usar a view segura que mascara os secrets
       const { data: webhooks, error } = await supabase
-        .from("webhooks")
-        .select("tipo, url, secret, enabled")
+        .from("webhooks_safe")
+        .select("tipo, url, secret_masked, has_secret, enabled")
         .eq("igreja_id", igrejaId);
 
       if (error) throw error;
@@ -108,18 +116,26 @@ export default function Webhooks({ onBack }: Props) {
       );
 
       setWhatsappProvider(activeWhatsappRow ? TIPO_TO_WHATSAPP_PROVIDER[activeWhatsappRow.tipo] : "make_webhook");
+      
+      // Carregar configs WhatsApp com indicador de secret armazenado
       setWhatsappConfigs({
         make_webhook: {
-          token: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.make_webhook)?.secret ?? "",
+          token: "", // Nunca pré-preenche - segurança
           endpoint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.make_webhook)?.url ?? "",
+          hasStoredSecret: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.make_webhook)?.has_secret ?? false,
+          secretHint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.make_webhook)?.secret_masked ?? "",
         },
         meta_official: {
-          token: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.meta_official)?.secret ?? "",
+          token: "",
           endpoint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.meta_official)?.url ?? "",
+          hasStoredSecret: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.meta_official)?.has_secret ?? false,
+          secretHint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.meta_official)?.secret_masked ?? "",
         },
         evolution_api: {
-          token: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.evolution_api)?.secret ?? "",
+          token: "",
           endpoint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.evolution_api)?.url ?? "",
+          hasStoredSecret: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.evolution_api)?.has_secret ?? false,
+          secretHint: webhookMap.get(WHATSAPP_PROVIDER_TO_TIPO.evolution_api)?.secret_masked ?? "",
         },
       });
 
@@ -147,23 +163,49 @@ export default function Webhooks({ onBack }: Props) {
         throw new Error("Igreja não identificada para salvar configurações.");
       }
 
-      const payload = (Object.keys(WHATSAPP_PROVIDER_TO_TIPO) as WhatsappProvider[]).map((provider) => {
+      // Primeiro, atualizar URLs e status enabled para todos os providers
+      const urlPayload = (Object.keys(WHATSAPP_PROVIDER_TO_TIPO) as WhatsappProvider[]).map((provider) => {
         const config = whatsappConfigs[provider];
         return {
           igreja_id: igrejaId,
           tipo: WHATSAPP_PROVIDER_TO_TIPO[provider],
           url: config.endpoint.trim() ? config.endpoint.trim() : null,
-          secret: config.token.trim() ? config.token.trim() : null,
           enabled: provider === whatsappProvider,
         };
       });
 
-      const { error } = await supabase
+      const { error: urlError } = await supabase
         .from("webhooks")
-        .upsert(payload, { onConflict: "igreja_id,tipo" });
+        .upsert(urlPayload, { onConflict: "igreja_id,tipo" });
 
-      if (error) throw error;
-      toast.success("Configuração de WhatsApp salva!");
+      if (urlError) throw urlError;
+
+      // Depois, salvar secrets criptografados para tokens que foram preenchidos
+      const activeConfig = whatsappConfigs[whatsappProvider];
+      if (activeConfig.token.trim()) {
+        const { error: secretError } = await supabase.rpc("set_webhook_secret", {
+          p_igreja_id: igrejaId,
+          p_tipo: WHATSAPP_PROVIDER_TO_TIPO[whatsappProvider],
+          p_secret: activeConfig.token.trim(),
+          p_encryption_key: import.meta.env.VITE_WEBHOOK_ENCRYPTION_KEY || "default-dev-key",
+        });
+
+        if (secretError) {
+          console.error("Erro ao salvar secret:", secretError);
+          toast.error("Erro ao salvar token de forma segura");
+          return;
+        }
+      }
+
+      toast.success("Configuração de WhatsApp salva com segurança!");
+      
+      // Limpar campo de token e recarregar para mostrar indicador atualizado
+      setWhatsappConfigs(prev => ({
+        ...prev,
+        [whatsappProvider]: { ...prev[whatsappProvider], token: "" }
+      }));
+      await loadData();
+      
     } catch (error: unknown) {
       toast.error("Erro ao salvar: " + (error instanceof Error ? error.message : String(error)));
     } finally {
@@ -209,7 +251,7 @@ export default function Webhooks({ onBack }: Props) {
   };
 
   const activeWhatsappConfig = whatsappConfigs[whatsappProvider];
-  const updateActiveWhatsappConfig = (updates: Partial<{ token: string; endpoint: string }>) => {
+  const updateActiveWhatsappConfig = (updates: Partial<WhatsAppConfig>) => {
     setWhatsappConfigs((prev) => ({
       ...prev,
       [whatsappProvider]: { ...prev[whatsappProvider], ...updates },
@@ -242,6 +284,12 @@ export default function Webhooks({ onBack }: Props) {
           <h1 className="text-3xl font-bold">Integrações</h1>
           <p className="text-muted-foreground">Configure gateways de mensagem e webhooks do sistema.</p>
         </div>
+      </div>
+
+      {/* Security Notice */}
+      <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-700 dark:text-green-300">
+        <ShieldCheck className="h-4 w-4 flex-shrink-0" />
+        <span>Tokens são armazenados de forma criptografada. Por segurança, não é possível visualizar tokens salvos.</span>
       </div>
 
       {/* 1. SEÇÃO WHATSAPP */}
@@ -282,17 +330,31 @@ export default function Webhooks({ onBack }: Props) {
           {whatsappProvider === 'meta_official' && (
             <div className="grid gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-2">
               <div className="grid gap-2">
-                <Label>Token de Acesso (Permanente)</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Token de Acesso (Permanente)</Label>
+                  {activeWhatsappConfig.hasStoredSecret && (
+                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">
+                      <ShieldCheck className="h-3 w-3 mr-1" />
+                      {activeWhatsappConfig.secretHint || "Configurado"}
+                    </Badge>
+                  )}
+                </div>
                 <div className="relative">
                   <Key className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
                     className="pl-9 font-mono text-sm" 
                     type="password"
-                    placeholder="EAAG..." 
-                    value={activeWhatsappConfig.token || ""}
+                    placeholder={activeWhatsappConfig.hasStoredSecret ? "••••••••" : "EAAG..."}
+                    value={activeWhatsappConfig.token}
                     onChange={e => updateActiveWhatsappConfig({ token: e.target.value })}
                   />
                 </div>
+                {activeWhatsappConfig.hasStoredSecret && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    Digite um novo token para atualizar
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Phone Number ID</Label>
@@ -310,17 +372,31 @@ export default function Webhooks({ onBack }: Props) {
           {whatsappProvider === 'evolution_api' && (
             <div className="grid gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-2">
               <div className="grid gap-2">
-                <Label>API Key Global</Label>
+                <div className="flex items-center justify-between">
+                  <Label>API Key Global</Label>
+                  {activeWhatsappConfig.hasStoredSecret && (
+                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">
+                      <ShieldCheck className="h-3 w-3 mr-1" />
+                      {activeWhatsappConfig.secretHint || "Configurado"}
+                    </Badge>
+                  )}
+                </div>
                 <div className="relative">
                   <Key className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
                     className="pl-9 font-mono text-sm" 
                     type="password"
-                    placeholder="Token da API..." 
-                    value={activeWhatsappConfig.token || ""}
+                    placeholder={activeWhatsappConfig.hasStoredSecret ? "••••••••" : "Token da API..."}
+                    value={activeWhatsappConfig.token}
                     onChange={e => updateActiveWhatsappConfig({ token: e.target.value })}
                   />
                 </div>
+                {activeWhatsappConfig.hasStoredSecret && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    Digite um novo token para atualizar
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Nome da Instância</Label>

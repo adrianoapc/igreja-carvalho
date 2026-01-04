@@ -3,6 +3,7 @@ import {
   createClient,
   SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { getWebhookSecret } from "../_shared/secrets.ts";
 
 // --- INTERFACES ---
 interface RequestBody {

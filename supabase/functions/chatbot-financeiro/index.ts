@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { decode as decodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { getWebhookSecret, getActiveWhatsAppProvider } from "../_shared/secrets.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -253,8 +254,10 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const WHATSAPP_API_TOKEN = Deno.env.get("WHATSAPP_API_TOKEN");
     const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Token WhatsApp global como fallback (será substituído por multi-tenant quando tivermos igreja_id)
+    let whatsappToken = Deno.env.get("WHATSAPP_API_TOKEN");
 
     // 1. Recebe o Payload do Make
     // Suporta 2 formatos:
@@ -448,7 +451,7 @@ serve(async (req) => {
         }
 
         // Baixar e salvar no Storage permanentemente
-        const anexoResult = await persistirAnexo(supabase, url_anexo, sessao.id, WHATSAPP_API_TOKEN);
+        const anexoResult = await persistirAnexo(supabase, url_anexo, sessao.id, whatsappToken);
         
         if (!anexoResult) {
           return new Response(JSON.stringify({ 
