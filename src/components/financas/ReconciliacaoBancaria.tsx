@@ -7,35 +7,43 @@ import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useHideValues } from "@/hooks/useHideValues";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 export function ReconciliacaoBancaria() {
   const [reconciliando, setReconciliando] = useState(false);
   const { formatValue } = useHideValues();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   const { data: contas, refetch } = useQuery({
-    queryKey: ['reconciliacao-contas'],
+    queryKey: ['reconciliacao-contas', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('contas')
         .select('*')
-        .eq('ativo', true);
+        .eq('ativo', true)
+        .eq('igreja_id', igrejaId);
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   const { data: transacoes } = useQuery({
-    queryKey: ['reconciliacao-transacoes'],
+    queryKey: ['reconciliacao-transacoes', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select('*')
-        .eq('status', 'pago');
+        .eq('status', 'pago')
+        .eq('igreja_id', igrejaId);
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
 
@@ -61,7 +69,7 @@ export function ReconciliacaoBancaria() {
   };
 
   const reconciliarTodas = async () => {
-    if (!contas) return;
+    if (!contas || !igrejaId) return;
     
     setReconciliando(true);
     try {
@@ -71,7 +79,8 @@ export function ReconciliacaoBancaria() {
         await supabase
           .from('contas')
           .update({ saldo_atual: saldoCalculado })
-          .eq('id', conta.id);
+          .eq('id', conta.id)
+          .eq('igreja_id', igrejaId);
       }
       
       await refetch();

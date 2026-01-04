@@ -26,12 +26,16 @@ Analise a imagem da nota fiscal e extraia as seguintes informações:
 Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`;
 
 // Fetch chatbot config from database
-async function getChatbotConfig(supabase: SupabaseClient): Promise<{ model: string; systemPrompt: string }> {
+async function getChatbotConfig(
+  supabase: SupabaseClient,
+  igrejaId: string
+): Promise<{ model: string; systemPrompt: string }> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
       .select('modelo_visao, role_visao')
       .eq('edge_function_name', FUNCTION_NAME)
+      .eq('igreja_id', igrejaId)
       .eq('ativo', true)
       .single();
 
@@ -51,7 +55,10 @@ async function getChatbotConfig(supabase: SupabaseClient): Promise<{ model: stri
 }
 
 // Fetch categories, subcategories and cost centers from database
-async function getFinancialOptions(supabase: SupabaseClient): Promise<{
+async function getFinancialOptions(
+  supabase: SupabaseClient,
+  igrejaId: string
+): Promise<{
   categorias: Array<{ id: string; nome: string; subcategorias: Array<{ id: string; nome: string }> }>;
   centrosCusto: Array<{ id: string; nome: string; descricao: string | null }>;
 }> {
@@ -67,6 +74,7 @@ async function getFinancialOptions(supabase: SupabaseClient): Promise<{
       `)
       .eq('ativo', true)
       .eq('tipo', 'saida')
+      .eq('igreja_id', igrejaId)
       .order('nome');
 
     if (catError) {
@@ -78,6 +86,7 @@ async function getFinancialOptions(supabase: SupabaseClient): Promise<{
       .from('centros_custo')
       .select('id, nome, descricao')
       .eq('ativo', true)
+      .eq('igreja_id', igrejaId)
       .order('nome');
 
     if (ccError) {
@@ -189,7 +198,14 @@ serve(async (req) => {
       }
     }
 
-    const { imageBase64, mimeType } = await req.json();
+    const { imageBase64, mimeType, igreja_id: igrejaId } = await req.json();
+    
+    if (!igrejaId) {
+      return new Response(
+        JSON.stringify({ error: 'igreja_id é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return new Response(
@@ -230,8 +246,8 @@ serve(async (req) => {
 
     // Use service role client to fetch config and financial options
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
-    const { model, systemPrompt } = await getChatbotConfig(supabaseService);
-    const financialOptions = await getFinancialOptions(supabaseService);
+    const { model, systemPrompt } = await getChatbotConfig(supabaseService, igrejaId);
+    const financialOptions = await getFinancialOptions(supabaseService, igrejaId);
     
     console.log(`[processar-nota-fiscal] Using model: ${model}`);
     console.log(`[processar-nota-fiscal] Found ${financialOptions.categorias.length} categories, ${financialOptions.centrosCusto.length} cost centers`);

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useNavigate } from "react-router-dom";
 import { differenceInYears, differenceInMonths, format } from "date-fns";
 import { 
@@ -139,6 +140,7 @@ export default function FamilyWallet() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile, loading } = useAuth(); 
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
@@ -147,9 +149,9 @@ export default function FamilyWallet() {
 
   // --- BUSCA REAL NO BANCO DE DADOS (BIDIRECIONAL) ---
   const { data: familyMembers, isLoading: isFamilyLoading } = useQuery({
-    queryKey: ['family-members', profile?.id],
+    queryKey: ['family-members', igrejaId, profile?.id],
     queryFn: async () => {
-      if (!profile?.id) return [];
+      if (!profile?.id || !igrejaId) return [];
 
       // Query bidirecional: busca os dois lados da relação
       // Fetch duas queries separadas e combina os resultados
@@ -157,11 +159,13 @@ export default function FamilyWallet() {
         supabase
           .from('familias')
           .select('id, pessoa_id, familiar_id, tipo_parentesco')
-          .eq('pessoa_id', profile.id),
+          .eq('pessoa_id', profile.id)
+          .eq('igreja_id', igrejaId),
         supabase
           .from('familias')
           .select('id, pessoa_id, familiar_id, tipo_parentesco')
           .eq('familiar_id', profile.id)
+          .eq('igreja_id', igrejaId)
       ]);
 
       if (relationshipsAsPessoa.error) throw relationshipsAsPessoa.error;
@@ -215,7 +219,8 @@ export default function FamilyWallet() {
       const { data: familiarProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, nome, data_nascimento, avatar_url, alergias, necessidades_especiais, sexo, responsavel_legal, status')
-        .in('id', Array.from(familiarIds));
+        .in('id', Array.from(familiarIds))
+        .eq('igreja_id', igrejaId);
 
       if (profilesError) throw profilesError;
 
@@ -251,15 +256,15 @@ export default function FamilyWallet() {
 
       return members;
     },
-    enabled: !!profile?.id,
+    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
     staleTime: 0, // Sempre buscar dados frescos
   });
 
   // Query para buscar responsáveis/autorizados (pessoas que podem buscar as crianças)
   const { data: responsaveisAutorizados = [] } = useQuery({
-    queryKey: ["responsaveis-autorizados", familyMembers],
+    queryKey: ["responsaveis-autorizados", igrejaId, familyMembers],
     queryFn: async () => {
-      if (!familyMembers || familyMembers.length === 0) return [];
+      if (!familyMembers || familyMembers.length === 0 || !igrejaId) return [];
 
       // Buscar todas as pessoas que foram vinculadas às crianças da família
       const childrenIds = familyMembers
@@ -277,7 +282,8 @@ export default function FamilyWallet() {
         .from("familias")
         .select("pessoa_id, tipo_parentesco")
         .in("familiar_id", childrenIds)
-        .neq("pessoa_id", profile?.id);
+        .neq("pessoa_id", profile?.id)
+        .eq("igreja_id", igrejaId);
 
       if (error) {
         console.error("Erro ao buscar responsáveis autorizados:", error);
@@ -293,7 +299,8 @@ export default function FamilyWallet() {
       const { data: pessoas, error: pessoasError } = await supabase
         .from("profiles")
         .select("id, nome, avatar_url, email, telefone")
-        .in("id", pessoasIds);
+        .in("id", pessoasIds)
+        .eq("igreja_id", igrejaId);
 
       if (pessoasError) throw pessoasError;
 
@@ -315,19 +322,20 @@ export default function FamilyWallet() {
         parentescos: Array.from(new Set(relationshipMap.get(p.id) || [])),
       }));
     },
-    enabled: !!familyMembers,
+    enabled: !!familyMembers && !igrejaLoading && !!igrejaId,
   });
 
   // Query para buscar check-ins ativos das crianças da família
   const { data: activeCheckins = [], refetch: refetchCheckins } = useQuery({
-    queryKey: ["kids-checkins-ativos", profile?.id],
+    queryKey: ["kids-checkins-ativos", igrejaId, profile?.id],
     queryFn: async () => {
-      if (!profile?.id) return [];
+      if (!profile?.id || !igrejaId) return [];
       
       const { data, error } = await supabase
         .from("view_kids_checkins_ativos")
         .select("*")
-        .eq("responsavel_id", profile.id);
+        .eq("responsavel_id", profile.id)
+        .eq("igreja_id", igrejaId);
 
       if (error) {
         console.error("Erro ao buscar check-ins:", error);
@@ -336,15 +344,15 @@ export default function FamilyWallet() {
 
       return data || [];
     },
-    enabled: !!profile?.id,
+    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
     refetchInterval: 10000, // Atualiza a cada 10 segundos
   });
 
   // Query para buscar diários de hoje das crianças
   const { data: todayDiaries = {} } = useQuery({
-    queryKey: ["kids-diaries-today", familyMembers],
+    queryKey: ["kids-diaries-today", igrejaId, familyMembers],
     queryFn: async () => {
-      if (!familyMembers || familyMembers.length === 0) return {};
+      if (!familyMembers || familyMembers.length === 0 || !igrejaId) return {};
 
       const childrenIds = familyMembers.map(m => m.id);
       const today = format(new Date(), "yyyy-MM-dd");
@@ -353,7 +361,8 @@ export default function FamilyWallet() {
         .from("kids_diario")
         .select("*")
         .in("crianca_id", childrenIds)
-        .eq("data", today);
+        .eq("data", today)
+        .eq("igreja_id", igrejaId);
 
       if (error) {
         console.error("Erro ao buscar diários:", error);
@@ -368,7 +377,7 @@ export default function FamilyWallet() {
 
       return diaryMap;
     },
-    enabled: !!familyMembers && familyMembers.length > 0,
+    enabled: !!familyMembers && familyMembers.length > 0 && !igrejaLoading && !!igrejaId,
   });
 
   const handleEditMember = (member: FamilyMember) => {
@@ -379,6 +388,7 @@ export default function FamilyWallet() {
   // Mutation para fazer checkout de uma criança
   const checkoutMutation = useMutation({
     mutationFn: async (checkinId: string) => {
+      if (!igrejaId) throw new Error("Igreja não identificada.");
       const { error } = await supabase
         .from("kids_checkins")
         .update({
@@ -386,7 +396,8 @@ export default function FamilyWallet() {
           checkout_por: profile?.id,
         })
         .eq("id", checkinId)
-        .is("checkout_at", null);
+        .is("checkout_at", null)
+        .eq("igreja_id", igrejaId);
 
       if (error) throw error;
     },
@@ -409,6 +420,7 @@ export default function FamilyWallet() {
   // Mutation para remover um responsável autorizado
   const removerResponsavelMutation = useMutation({
     mutationFn: async (responsavelId: string) => {
+      if (!igrejaId) throw new Error("Igreja não identificada.");
       // Buscar todas as crianças da família
       const childrenIds = familyMembers
         .filter(m => {
@@ -423,7 +435,8 @@ export default function FamilyWallet() {
         .from("familias")
         .delete()
         .eq("pessoa_id", responsavelId)
-        .in("familiar_id", childrenIds);
+        .in("familiar_id", childrenIds)
+        .eq("igreja_id", igrejaId);
 
       if (error) throw error;
     },

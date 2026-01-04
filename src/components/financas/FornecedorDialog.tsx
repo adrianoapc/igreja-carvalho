@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import InputMask from "react-input-mask";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface FornecedorDialogProps {
   open: boolean;
@@ -41,12 +42,17 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
   const [observacoes, setObservacoes] = useState(fornecedor?.observacoes || "");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId } = useIgrejaId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       if (fornecedor) {
         const { error } = await supabase
           .from('fornecedores')
@@ -62,7 +68,8 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
             cep,
             observacoes,
           })
-          .eq('id', String(fornecedor.id));
+          .eq('id', String(fornecedor.id))
+          .eq('igreja_id', igrejaId);
 
         if (error) throw error;
         toast.success("Fornecedor atualizado com sucesso!");
@@ -81,6 +88,7 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
             cep,
             observacoes,
             ativo: true,
+            igreja_id: igrejaId,
           });
 
         if (error) throw error;

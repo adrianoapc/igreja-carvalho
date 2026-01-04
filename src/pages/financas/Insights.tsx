@@ -10,12 +10,14 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 const COLORS = ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444'];
 
 export default function Insights() {
   const [periodo, setPeriodo] = useState<"3" | "6" | "12">("6");
   const { formatValue } = useHideValues();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   // Calcular data inicial baseada no período selecionado
   const dataInicial = startOfMonth(subMonths(new Date(), parseInt(periodo)));
@@ -23,8 +25,9 @@ export default function Insights() {
 
   // Buscar todas as transações do período
   const { data: transacoes, isLoading } = useQuery({
-    queryKey: ['insights-transacoes', periodo],
+    queryKey: ['insights-transacoes', igrejaId, periodo],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select(`
@@ -34,6 +37,7 @@ export default function Insights() {
           conta:contas(nome)
         `)
         .eq('tipo', 'saida')
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', dataInicial.toISOString())
         .lte('data_vencimento', dataFinal.toISOString())
         .order('data_vencimento', { ascending: true });
@@ -41,6 +45,7 @@ export default function Insights() {
       if (error) throw error;
       return data || [];
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Processar dados para insights

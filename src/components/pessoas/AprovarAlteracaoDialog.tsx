@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ArrowRight, User, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
+import { useIgrejaId } from '@/hooks/useIgrejaId';
 
 interface AlteracaoPendente {
   id: string;
@@ -81,6 +82,7 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [camposAprovados, setCamposAprovados] = useState<Record<string, boolean>>({});
+  const { igrejaId } = useIgrejaId();
 
   useEffect(() => {
     if (alteracao) {
@@ -114,6 +116,9 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
     
     setLoading(true);
     try {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada.");
+      }
       // Construir objeto com apenas os campos aprovados
       const updateData: Record<string, string | null> = {};
       Object.keys(camposAprovados).forEach(key => {
@@ -130,7 +135,8 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
             ...updateData,
             updated_at: new Date().toISOString()
           })
-          .eq('id', alteracao.profile_id);
+          .eq('id', alteracao.profile_id)
+          .eq('igreja_id', igrejaId);
 
         if (updateError) throw updateError;
       }
@@ -142,7 +148,8 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
           status: 'aprovado',
           campos_aprovados: camposAprovados
         })
-        .eq('id', alteracao.id);
+        .eq('id', alteracao.id)
+        .eq('igreja_id', igrejaId);
 
       if (statusError) throw statusError;
 
@@ -170,10 +177,14 @@ export function AprovarAlteracaoDialog({ alteracao, open, onOpenChange, onSucces
     
     setLoading(true);
     try {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada.");
+      }
       const { error } = await supabase
         .from('alteracoes_perfil_pendentes')
         .update({ status: 'rejeitado' })
-        .eq('id', alteracao.id);
+        .eq('id', alteracao.id)
+        .eq('igreja_id', igrejaId);
 
       if (error) throw error;
 

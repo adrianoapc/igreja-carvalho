@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface AjusteSaldoDialogProps {
   open: boolean;
@@ -33,12 +34,17 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
   const [descricao, setDescricao] = useState("");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId } = useIgrejaId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       const valorNumerico = parseFloat(valor.replace(',', '.')) || 0;
       const novoSaldo = tipoAjuste === "entrada" 
         ? conta.saldo_atual + valorNumerico
@@ -52,7 +58,8 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
             ? `${conta.observacoes}\n\nAjuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
             : `Ajuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
         })
-        .eq('id', String(conta.id));
+        .eq('id', String(conta.id))
+        .eq('igreja_id', igrejaId);
 
       if (error) throw error;
 

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface SubcategoriaDialogProps {
   open: boolean;
@@ -28,17 +29,23 @@ export function SubcategoriaDialog({
   const [nome, setNome] = useState(subcategoria?.nome || "");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId } = useIgrejaId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       if (subcategoria) {
         const { error } = await supabase
           .from('subcategorias_financeiras')
           .update({ nome })
-          .eq('id', String(subcategoria.id));
+          .eq('id', String(subcategoria.id))
+          .eq('igreja_id', igrejaId);
 
         if (error) throw error;
         toast.success("Subcategoria atualizada com sucesso!");
@@ -49,6 +56,7 @@ export function SubcategoriaDialog({
             nome,
             categoria_id: categoriaId,
             ativo: true,
+            igreja_id: igrejaId,
           });
 
         if (error) throw error;

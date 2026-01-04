@@ -10,6 +10,7 @@ import { Play, Clock, CheckCircle, XCircle, Loader2, Settings } from "lucide-rea
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import EdgeFunctionConfigDialog from "./EdgeFunctionConfigDialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 interface EdgeFunctionCardProps {
   title: string;
   description: string;
@@ -38,15 +39,22 @@ export default function EdgeFunctionCard({
     timestamp: Date;
     message?: string;
   } | null>(null);
+  const { igrejaId } = useIgrejaId();
   useEffect(() => {
     loadConfig();
-  }, [functionName]);
+  }, [functionName, igrejaId]);
   const loadConfig = async () => {
     try {
+      if (!igrejaId) return;
       const {
         data,
         error
-      } = await supabase.from('edge_function_config').select('*').eq('function_name', functionName).single();
+      } = await supabase
+        .from('edge_function_config')
+        .select('*')
+        .eq('function_name', functionName)
+        .eq('igreja_id', igrejaId)
+        .single();
       if (error) throw error;
       if (data) {
         setIsEnabled(data.enabled);
@@ -67,11 +75,14 @@ export default function EdgeFunctionCard({
   };
   const toggleEnabled = async (enabled: boolean) => {
     try {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada.");
+      }
       const {
         error
       } = await supabase.from('edge_function_config').update({
         enabled
-      }).eq('function_name', functionName);
+      }).eq('function_name', functionName).eq('igreja_id', igrejaId);
       if (error) throw error;
       setIsEnabled(enabled);
       toast({
@@ -98,7 +109,8 @@ export default function EdgeFunctionCard({
         error
       } = await supabase.functions.invoke(functionName, {
         body: {
-          time: new Date().toISOString()
+          time: new Date().toISOString(),
+          igreja_id: igrejaId
         }
       });
       if (error) {

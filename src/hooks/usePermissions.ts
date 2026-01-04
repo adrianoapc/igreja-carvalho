@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
+import { useIgrejaId } from './useIgrejaId';
 import { supabase } from '@/integrations/supabase/client';
 
 // Lista de permissões conhecidas (baseado no teu SQL)
@@ -18,6 +19,7 @@ export type Permission =
 
 export function usePermissions() {
   const { user, loading: authLoading } = useAuth();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -26,12 +28,13 @@ export function usePermissions() {
 
   // 1. Verifica se é Admin Global (Superusuário)
   const checkAdminStatus = useCallback(async () => {
-    if (!user) return;
+    if (!user || !igrejaId) return;
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('igreja_id', igrejaId);
 
       if (!error && data && data.some(r => 
         r.role === 'admin' || 
@@ -45,21 +48,21 @@ export function usePermissions() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, igrejaId]);
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !igrejaLoading) {
       if (user) {
         checkAdminStatus();
       } else {
         setLoading(false);
       }
     }
-  }, [user, authLoading, checkAdminStatus]);
+  }, [user, authLoading, igrejaLoading, checkAdminStatus]);
 
   // 2. Função para verificar uma permissão específica no Banco
   const checkPermission = useCallback(async (perm: Permission): Promise<boolean> => {
-    if (!user) return false;
+    if (!user || !igrejaId) return false;
     if (isAdmin) return true; // Admin tem acesso a tudo
     if (permissionsCache[perm] !== undefined) return permissionsCache[perm];
 
@@ -67,7 +70,7 @@ export function usePermissions() {
       // Chama a função RPC criada no banco
       const { data, error } = await supabase.rpc('has_permission', {
         _user_id: user.id,
-        _permission_slug: perm
+        _permission_slug: perm,
       });
       
       if (error) {
@@ -82,11 +85,11 @@ export function usePermissions() {
       console.error(`Erro ao verificar permissão ${perm}:`, error);
       return false;
     }
-  }, [user, isAdmin, permissionsCache]);
+  }, [user, igrejaId, isAdmin, permissionsCache]);
 
   return { 
     checkPermission, 
     isAdmin, 
-    loading: loading || authLoading 
+    loading: loading || authLoading || igrejaLoading 
   };
 }

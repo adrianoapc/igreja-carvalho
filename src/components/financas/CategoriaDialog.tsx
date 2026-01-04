@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface CategoriaDialogProps {
   open: boolean;
@@ -38,12 +39,17 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
   const [secaoDre, setSecaoDre] = useState(categoria?.secao_dre || "Não faz parte do DRE");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId } = useIgrejaId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       if (categoria) {
         const { error } = await supabase
           .from('categorias_financeiras')
@@ -52,7 +58,8 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
             tipo,
             secao_dre: secaoDre,
           })
-          .eq('id', String(categoria.id));
+          .eq('id', String(categoria.id))
+          .eq('igreja_id', igrejaId);
 
         if (error) throw error;
         toast.success("Categoria atualizada com sucesso!");
@@ -64,6 +71,7 @@ export function CategoriaDialog({ open, onOpenChange, categoria }: CategoriaDial
             tipo,
             secao_dre: secaoDre,
             ativo: true,
+            igreja_id: igrejaId,
           });
 
         if (error) throw error;

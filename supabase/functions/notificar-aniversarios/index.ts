@@ -23,6 +23,18 @@ Deno.serve(async (req) => {
   try {
     console.log('Iniciando verificação de aniversários...')
 
+    const requestBody = await req.json().catch(() => ({} as Record<string, unknown>));
+    const igrejaId =
+      (requestBody as { igreja_id?: string }).igreja_id ??
+      new URL(req.url).searchParams.get('igreja_id');
+
+    if (!igrejaId) {
+      return new Response(
+        JSON.stringify({ error: 'igreja_id é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -33,6 +45,7 @@ Deno.serve(async (req) => {
       .from('edge_function_config')
       .select('enabled')
       .eq('function_name', 'notificar-aniversarios')
+      .eq('igreja_id', igrejaId)
       .single();
 
     if (configError) {
@@ -64,6 +77,7 @@ Deno.serve(async (req) => {
       .from('profiles')
       .select('id, nome, data_nascimento, data_casamento, data_batismo, status')
       .or('data_nascimento.not.is.null,data_casamento.not.is.null,data_batismo.not.is.null')
+      .eq('igreja_id', igrejaId)
 
     if (fetchError) {
       console.error('Erro ao buscar pessoas:', fetchError)

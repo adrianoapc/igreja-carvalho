@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MidiaDialog } from "@/components/eventos/MidiaDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 import {
   DndContext,
   closestCenter,
@@ -258,6 +259,7 @@ export default function MidiasGeral() {
   const [midiaParaDeletar, setMidiaParaDeletar] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagFiltro, setTagFiltro] = useState<string | null>(null);
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -282,16 +284,20 @@ export default function MidiasGeral() {
   }, []);
 
   useEffect(() => {
-    loadMidias();
-    loadTags();
-  }, [canalAtivo]);
+    if (!igrejaLoading && igrejaId) {
+      loadMidias();
+      loadTags();
+    }
+  }, [canalAtivo, igrejaId, igrejaLoading]);
   
   const loadTags = async () => {
     try {
+      if (!igrejaId) return;
       const { data, error } = await supabase
         .from('tags_midias')
         .select('*')
         .eq('ativo', true)
+        .eq('igreja_id', igrejaId)
         .order('nome', { ascending: true });
       
       if (error) throw error;
@@ -304,10 +310,15 @@ export default function MidiasGeral() {
   const loadMidias = async () => {
     setLoading(true);
     try {
+      if (!igrejaId) {
+        setMidias([]);
+        return;
+      }
       const { data: midiasData, error } = await supabase
         .from('midias')
         .select('*')
         .eq('canal', canalAtivo)
+        .eq('igreja_id', igrejaId)
         .order('ordem', { ascending: true });
 
       if (error) throw error;
@@ -315,7 +326,8 @@ export default function MidiasGeral() {
       // Carregar todas as liturgias para contar uso das mídias
       const { data: liturgiasData } = await supabase
         .from('liturgias')
-        .select('midias_ids');
+        .select('midias_ids')
+        .eq('igreja_id', igrejaId);
       
       // Carregar tags de cada mídia e contar uso em liturgias
       const midiasComDados = await Promise.all(
@@ -324,7 +336,8 @@ export default function MidiasGeral() {
           const { data: tagsData } = await supabase
             .from('midia_tags')
             .select('tag_id, tags_midias(id, nome, cor)')
-            .eq('midia_id', midia.id);
+            .eq('midia_id', midia.id)
+            .eq('igreja_id', igrejaId);
           
           const tagsParsed = tagsData?.map((t: Record<string, unknown>) => t.tags_midias as { id: string; nome: string; cor: string } | null).filter((t): t is { id: string; nome: string; cor: string } => t !== null) || [];
           
@@ -358,6 +371,7 @@ export default function MidiasGeral() {
 
       // Atualizar ordem no banco
       try {
+        if (!igrejaId) return;
         const updates = newMidias.map((midia, index) => ({
           id: midia.id,
           ordem: index + 1
@@ -367,7 +381,8 @@ export default function MidiasGeral() {
           await supabase
             .from('midias')
             .update({ ordem: update.ordem })
-            .eq('id', update.id);
+            .eq('id', update.id)
+            .eq('igreja_id', igrejaId);
         }
 
         toast.success("Ordem atualizada!");
@@ -398,6 +413,10 @@ export default function MidiasGeral() {
 
   const handleDeletar = async (id: string) => {
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       // Buscar URL da mídia para deletar do storage
       const midia = midias.find(m => m.id === id);
       if (midia?.url) {
@@ -411,7 +430,8 @@ export default function MidiasGeral() {
       const { error } = await supabase
         .from('midias')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('igreja_id', igrejaId);
 
       if (error) throw error;
 
@@ -427,10 +447,15 @@ export default function MidiasGeral() {
 
   const handleToggleAtivo = async (midia: Midia) => {
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       const { error } = await supabase
         .from('midias')
         .update({ ativo: !midia.ativo })
-        .eq('id', midia.id);
+        .eq('id', midia.id)
+        .eq('igreja_id', igrejaId);
 
       if (error) throw error;
 

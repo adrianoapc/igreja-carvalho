@@ -5,6 +5,7 @@ import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { BiometricUnlockScreen } from './BiometricUnlockScreen';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { usePermissions, Permission } from '@/hooks/usePermissions'; // <--- NOVO
+import { useIgrejaId } from '@/hooks/useIgrejaId';
 
 interface AuthGateProps {
   children: React.ReactNode;
@@ -21,6 +22,7 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
   // Hooks existentes preservados
   const { isEnabled, isLoading: biometricLoading, getStoredUserId, disableBiometric } = useBiometricAuth();
   const { config, isLoading: isLoadingMaintenanceConfig } = useAppConfig();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   // Hook de Permissões (NOVO)
   const { checkPermission, loading: permissionsLoading, isAdmin } = usePermissions();
@@ -157,7 +159,7 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
         setIsAdminOrTecnico(false);
         return;
       }
-      if (!currentUserId) {
+      if (!currentUserId || !igrejaId) {
         setIsAdminOrTecnico(false);
         return;
       }
@@ -165,7 +167,8 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
         const { data, error } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', currentUserId);
+          .eq('user_id', currentUserId)
+          .eq('igreja_id', igrejaId);
         if (error) throw error;
         const roles = (data || []).map(r => r.role);
         const allowed = roles.includes('admin') || roles.includes('tecnico') || roles.includes('super_admin');
@@ -176,7 +179,7 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
     };
     checkRoles();
     return () => { active = false; };
-  }, [config.maintenance_mode, currentUserId]);
+  }, [config.maintenance_mode, currentUserId, igrejaId]);
 
   // --- 3. BLOCO DE VERIFICAÇÃO DE PERMISSÃO (NOVO) ---
   useEffect(() => {
@@ -243,7 +246,7 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
 
   // Loading Geral
   const isStillCheckingPermissions = requiredPermission && (isCheckingPermission || permissionsLoading);
-  if (biometricLoading || isChecking || isLoadingUser || isLoadingMaintenanceConfig || isStillCheckingPermissions) {
+  if (biometricLoading || isChecking || isLoadingUser || isLoadingMaintenanceConfig || igrejaLoading || isStillCheckingPermissions) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground animate-pulse">Verificando credenciais...</p>

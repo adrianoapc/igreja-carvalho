@@ -25,6 +25,7 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 // Sub-pages
 import BasesMinisteriais from "@/pages/financas/BasesMinisteriais";
@@ -104,15 +105,21 @@ export default function Configuracoes() {
   const [currentView, setCurrentView] = useState<ViewState>("MENU");
   const { config, isLoading, refetch } = useAppConfig();
   const { isAdmin, checkPermission } = usePermissions();
+  const { igrejaId } = useIgrejaId();
 
   const goBack = () => setCurrentView("MENU");
 
   const quickToggleMaintenance = async (checked: boolean) => {
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       const { error } = await supabase
         .from('app_config')
         .update({ maintenance_mode: checked })
-        .eq('id', 1);
+        .eq('id', 1)
+        .eq('igreja_id', igrejaId);
       if (error) throw error;
       await refetch();
       toast.success(checked ? "Manutenção ATIVADA" : "Manutenção DESATIVADA");

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface FormaPagamentoDialogProps {
   open: boolean;
@@ -17,6 +18,7 @@ export function FormaPagamentoDialog({ open, onOpenChange, formaPagamento }: For
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [nome, setNome] = useState("");
+  const { igrejaId } = useIgrejaId();
 
   useEffect(() => {
     if (formaPagamento) {
@@ -28,16 +30,20 @@ export function FormaPagamentoDialog({ open, onOpenChange, formaPagamento }: For
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada.");
+      }
       if (formaPagamento) {
         const { error } = await supabase
           .from('formas_pagamento')
           .update({ nome })
-          .eq('id', String(formaPagamento.id));
+          .eq('id', String(formaPagamento.id))
+          .eq('igreja_id', igrejaId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('formas_pagamento')
-          .insert({ nome });
+          .insert({ nome, igreja_id: igrejaId });
         if (error) throw error;
       }
     },

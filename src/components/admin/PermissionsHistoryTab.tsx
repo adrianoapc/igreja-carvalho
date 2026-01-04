@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useIgrejaId } from '@/hooks/useIgrejaId';
 
 interface AppRole {
   id: number;
@@ -79,19 +80,28 @@ export function PermissionsHistoryTab({ roles, permissions, onRollbackSuccess }:
   });
   const [rollingBack, setRollingBack] = useState(false);
   const { toast } = useToast();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   useEffect(() => {
-    fetchAuditLog();
-  }, []);
+    if (!igrejaLoading) {
+      fetchAuditLog();
+    }
+  }, [igrejaLoading, igrejaId]);
 
   const fetchAuditLog = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      if (!igrejaId) {
+        setAuditLog([]);
+        return;
+      }
+
       const { data, error: queryError } = await supabase
         .from('role_permissions_audit')
         .select('*')
+        .eq('igreja_id', igrejaId)
         .order('created_at', { ascending: false })
         .limit(500);
 

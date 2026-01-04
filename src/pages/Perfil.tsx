@@ -18,6 +18,7 @@ import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDados
 import { AvatarUpload } from "@/components/perfil/AvatarUpload";
 import { AlterarSenhaDialog } from "@/components/perfil/AlterarSenhaDialog";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface ProfileData {
   id: string;
@@ -78,6 +79,7 @@ interface FamilyMember {
 export default function Perfil() {
   const { profile, user } = useAuth();
   const { isSupported, isEnabled, enableBiometric, disableBiometric } = useBiometricAuth();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [funcoes, setFuncoes] = useState<FuncaoIgreja[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -142,7 +144,7 @@ export default function Perfil() {
   }
 
   const loadProfileData = async () => {
-    if (!profile?.id) return;
+    if (!profile?.id || !igrejaId) return;
 
     try {
       setLoading(true);
@@ -152,6 +154,7 @@ export default function Perfil() {
         .from("profiles")
         .select("*")
         .eq("id", profile.id)
+        .eq("igreja_id", igrejaId)
         .single();
 
       if (profileError) throw profileError;
@@ -173,6 +176,7 @@ export default function Perfil() {
         `)
         .eq("membro_id", profile.id)
         .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
         .order("data_inicio", { ascending: false });
 
       if (funcoesError) throw funcoesError;
@@ -187,20 +191,22 @@ export default function Perfil() {
 
   // Hook para carregar familiares com React Query
   const { data: queryFamilyMembers = [] } = useQuery({
-    queryKey: ['perfil-family-members', profile?.id],
+    queryKey: ['perfil-family-members', igrejaId, profile?.id],
     queryFn: async () => {
-      if (!profile?.id) return [];
+      if (!profile?.id || !igrejaId) return [];
 
       // Query bidirecional: busca os dois lados da relação
       const [relationshipsAsPessoa, relationshipsAsFamiliar] = await Promise.all([
         supabase
           .from('familias')
           .select('id, pessoa_id, familiar_id, tipo_parentesco')
-          .eq('pessoa_id', profile.id),
+          .eq('pessoa_id', profile.id)
+          .eq('igreja_id', igrejaId),
         supabase
           .from('familias')
           .select('id, pessoa_id, familiar_id, tipo_parentesco')
           .eq('familiar_id', profile.id)
+          .eq('igreja_id', igrejaId)
       ]);
 
       if (relationshipsAsPessoa.error) throw relationshipsAsPessoa.error;
@@ -253,7 +259,8 @@ export default function Perfil() {
       const { data: familiarProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, nome, avatar_url, sexo, data_nascimento')
-        .in('id', Array.from(familiarIds));
+        .in('id', Array.from(familiarIds))
+        .eq('igreja_id', igrejaId);
 
       if (profilesError) throw profilesError;
 
@@ -285,7 +292,7 @@ export default function Perfil() {
 
       return members;
     },
-    enabled: !!profile?.id,
+    enabled: !!profile?.id && !igrejaLoading && !!igrejaId,
     staleTime: 0, // Sempre buscar dados frescos
   });
 
@@ -295,8 +302,10 @@ export default function Perfil() {
   }, [queryFamilyMembers]);
 
   useEffect(() => {
-    loadProfileData();
-  }, [profile?.id]);
+    if (!igrejaLoading) {
+      loadProfileData();
+    }
+  }, [profile?.id, igrejaId, igrejaLoading]);
 
   const handleDataUpdated = () => {
     loadProfileData();

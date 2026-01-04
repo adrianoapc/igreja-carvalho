@@ -28,7 +28,17 @@ serve(async (req) => {
     );
 
     // Pega o body da requisição para ver se tem evento_id
-    const { evento_id } = await req.json().catch(() => ({ evento_id: null }));
+    const { evento_id, igreja_id: igrejaId } = await req.json().catch(() => ({ evento_id: null }));
+    const igrejaIdFromQuery = new URL(req.url).searchParams.get("igreja_id");
+    const resolvedIgrejaId = igrejaId ?? igrejaIdFromQuery;
+
+    if (!resolvedIgrejaId) {
+      return new Response(
+        JSON.stringify({ error: "igreja_id é obrigatório" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("[playlist-oracao] evento_id recebido:", evento_id);
 
     // --- 1. BLOCO ALERTA & GRATIDÃO (Inteligência Espiritual) ---
@@ -39,6 +49,7 @@ serve(async (req) => {
     const { data: sentimentos, error: errSentimentos } = await supabaseClient
       .from("sentimentos_membros")
       .select("sentimento, analise_ia_motivo")
+      .eq("igreja_id", resolvedIgrejaId)
       .gte("created_at", ontem.toISOString());
 
     if (errSentimentos) {
@@ -91,6 +102,7 @@ serve(async (req) => {
       .from("testemunhos")
       .select("id, titulo, mensagem, categoria, anonimo")
       .eq("status", "publico")
+      .eq("igreja_id", resolvedIgrejaId)
       .order("created_at", { ascending: false })
       .limit(3);
 
@@ -109,6 +121,7 @@ serve(async (req) => {
     const { data: visitantes, error: errVisitantes } = await supabaseClient
       .from("visitantes_leads")
       .select("id, nome, estagio_funil, origem")
+      .eq("igreja_id", resolvedIgrejaId)
       .gte("created_at", semanaPassada.toISOString())
       .order("created_at", { ascending: false })
       .limit(5);
@@ -130,6 +143,7 @@ serve(async (req) => {
       )
       .eq("status", "em_oracao")
       .eq("classificacao", "BROADCAST")
+      .eq("igreja_id", resolvedIgrejaId)
       .order("created_at", { ascending: false })
       .limit(5);
 
@@ -147,6 +161,7 @@ serve(async (req) => {
       .select("id, pedido, tipo, nome_solicitante, anonimo")
       .eq("status", "em_oracao")
       .eq("classificacao", "PESSOAL")
+      .eq("igreja_id", resolvedIgrejaId)
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -165,6 +180,7 @@ serve(async (req) => {
         .from("liturgias")
         .select("*")
         .eq("evento_id", evento_id)
+        .eq("igreja_id", resolvedIgrejaId)
         .order("ordem", { ascending: true });
 
       if (errLiturgia) {

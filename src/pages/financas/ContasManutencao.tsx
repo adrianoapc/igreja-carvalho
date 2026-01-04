@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface Conta {
   id: string;
@@ -33,6 +34,7 @@ interface Props {
 
 export default function ContasManutencao({ onBack }: Props) {
   const queryClient = useQueryClient();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<Conta | null>(null);
@@ -49,26 +51,31 @@ export default function ContasManutencao({ onBack }: Props) {
 
   // Query contas
   const { data: contas = [], isLoading, error: contasError } = useQuery({
-    queryKey: ['contas-manutencao'],
+    queryKey: ['contas-manutencao', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('contas')
         .select('*')
+        .eq('igreja_id', igrejaId)
         .order('nome');
       if (error) throw error;
       return data as Conta[];
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Query transações por conta
   const { data: transacoesPorConta = {}, error: transacoesError } = useQuery({
-    queryKey: ['transacoes-por-conta'],
+    queryKey: ['transacoes-por-conta', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return {};
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select('conta_id')
         .not('conta_id', 'is', null)
-        .eq('status', 'pago');
+        .eq('status', 'pago')
+        .eq('igreja_id', igrejaId);
       
       if (error) throw error;
       
@@ -80,6 +87,7 @@ export default function ContasManutencao({ onBack }: Props) {
       });
       return contagem;
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Show error toast if query fails
@@ -94,6 +102,7 @@ export default function ContasManutencao({ onBack }: Props) {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      if (!igrejaId) throw new Error("Igreja não identificada.");
       const { error } = await supabase
         .from('contas')
         .insert({
@@ -106,6 +115,7 @@ export default function ContasManutencao({ onBack }: Props) {
           saldo_atual: data.saldo_inicial,
           ativo: data.ativo,
           observacoes: data.observacoes || null,
+          igreja_id: igrejaId,
         });
       if (error) throw error;
     },
@@ -122,6 +132,7 @@ export default function ContasManutencao({ onBack }: Props) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
+      if (!igrejaId) throw new Error("Igreja não identificada.");
       const { error } = await supabase
         .from('contas')
         .update({
@@ -134,7 +145,8 @@ export default function ContasManutencao({ onBack }: Props) {
           ativo: data.ativo,
           observacoes: data.observacoes || null,
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('igreja_id', igrejaId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -150,7 +162,12 @@ export default function ContasManutencao({ onBack }: Props) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('contas').delete().eq('id', id);
+      if (!igrejaId) throw new Error("Igreja não identificada.");
+      const { error } = await supabase
+        .from('contas')
+        .delete()
+        .eq('id', id)
+        .eq('igreja_id', igrejaId);
       if (error) throw error;
     },
     onSuccess: () => {

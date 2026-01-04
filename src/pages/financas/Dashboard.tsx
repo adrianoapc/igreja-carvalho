@@ -14,10 +14,12 @@ import { ContasAPagarWidget } from "@/components/financas/ContasAPagarWidget";
 import { useState } from "react";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   // MonthPicker states
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -48,35 +50,42 @@ export default function Dashboard() {
 
   // Buscar contas e categorias para filtros
   const { data: contas } = useQuery({
-    queryKey: ['contas-filtro'],
+    queryKey: ['contas-filtro', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('contas')
         .select('*')
         .eq('ativo', true)
+        .eq('igreja_id', igrejaId)
         .order('nome');
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ['categorias-filtro'],
+    queryKey: ['categorias-filtro', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('categorias_financeiras')
         .select('*')
         .eq('ativo', true)
+        .eq('igreja_id', igrejaId)
         .order('nome');
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Dados do período filtrado
   const { data: transacoesMesAtual } = useQuery({
-    queryKey: ['dashboard-mes-atual', dateRange, contaId, categoriaId, status],
+    queryKey: ['dashboard-mes-atual', igrejaId, dateRange, contaId, categoriaId, status],
     queryFn: async () => {
+      if (!igrejaId) return [];
       let query = supabase
         .from('transacoes_financeiras')
         .select(`
@@ -84,6 +93,7 @@ export default function Dashboard() {
           categoria:categoria_id(nome, cor),
           solicitacao_reembolso:solicitacao_reembolso_id(status)
         `)
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', dateRange.inicio)
         .lte('data_vencimento', dateRange.fim);
       
@@ -106,18 +116,21 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       ) || [];
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Dados do mês anterior
   const { data: transacoesMesAnterior } = useQuery({
-    queryKey: ['dashboard-mes-anterior'],
+    queryKey: ['dashboard-mes-anterior', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select(`
           *,
           solicitacao_reembolso:solicitacao_reembolso_id(status)
         `)
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', startOfMonth(mesAnterior).toISOString().split('T')[0])
         .lte('data_vencimento', endOfMonth(mesAnterior).toISOString().split('T')[0]);
       
@@ -129,6 +142,7 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       ) || [];
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Pendências críticas da semana
@@ -136,8 +150,9 @@ export default function Dashboard() {
   const fimSemana = addDays(hoje, 7);
 
   const { data: pendenciasSemana = [] } = useQuery({
-    queryKey: ['dashboard-contas-semana'],
+    queryKey: ['dashboard-contas-semana', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select(`
@@ -146,6 +161,7 @@ export default function Dashboard() {
         `)
         .eq('tipo', 'saida')
         .eq('status', 'pendente')
+        .eq('igreja_id', igrejaId)
         .lte('data_vencimento', format(fimSemana, 'yyyy-MM-dd'));
 
       if (error) throw error;
@@ -156,6 +172,7 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       );
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   const vencidasSemana = pendenciasSemana.filter((item) => parseISO(item.data_vencimento) < hoje);

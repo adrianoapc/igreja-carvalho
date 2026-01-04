@@ -14,6 +14,7 @@ import { KidCard } from "@/components/kids/KidCard";
 import { Search, UserPlus, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears } from "date-fns";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface Kid {
   id: string;
@@ -34,11 +35,13 @@ export default function Criancas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [ageFilter, setAgeFilter] = useState<string>("todas");
   const [inclusaoFilter, setInclusaoFilter] = useState<string>("todas");
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   // Query para buscar crianças com responsáveis
   const { data: kids = [], isLoading } = useQuery({
-    queryKey: ["kids-directory"],
+    queryKey: ["kids-directory", igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const today = new Date();
 
       // Buscar todos os perfis com data_nascimento (crianças menores de 13 anos)
@@ -46,6 +49,7 @@ export default function Criancas() {
         .from("profiles")
         .select("id, nome, data_nascimento, avatar_url, alergias, necessidades_especiais, familia_id")
         .not("data_nascimento", "is", null)
+        .eq("igreja_id", igrejaId)
         .order("nome");
 
       const { data: allProfiles, error: profilesError } = response as { data: unknown[]; error: unknown };
@@ -74,11 +78,13 @@ export default function Criancas() {
             supabase
               .from('familias')
               .select('id, pessoa_id, familiar_id, tipo_parentesco')
-              .eq('pessoa_id', kid.id),
+              .eq('pessoa_id', kid.id)
+              .eq('igreja_id', igrejaId),
             supabase
               .from('familias')
               .select('id, pessoa_id, familiar_id, tipo_parentesco')
               .eq('familiar_id', kid.id)
+              .eq('igreja_id', igrejaId)
           ]);
 
           // Combinar ambas as queries
@@ -122,7 +128,8 @@ export default function Criancas() {
           const { data: responsavelProfiles } = await supabase
             .from('profiles')
             .select('id, nome, telefone, data_nascimento')
-            .in('id', Array.from(responsavelIds));
+            .in('id', Array.from(responsavelIds))
+            .eq('igreja_id', igrejaId);
 
           // Filtrar apenas responsáveis maiores de 18 anos
           const responsaveis = (responsavelProfiles || [])
@@ -163,6 +170,7 @@ export default function Criancas() {
 
       return kidsWithResponsaveis as Kid[];
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Filtros

@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface FormaPagamento {
   id: string;
@@ -27,6 +28,7 @@ export default function FormasPagamento({ onBack }: Props) {
   const navigate = useNavigate();
   const handleBack = onBack ?? (() => navigate('/financas'));
   const queryClient = useQueryClient();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingForma, setEditingForma] = useState<FormaPagamento | null>(null);
@@ -37,15 +39,18 @@ export default function FormasPagamento({ onBack }: Props) {
 
   // Query formas
   const { data: formas = [], isLoading, error: formasError } = useQuery({
-    queryKey: ['formas-pagamento'],
+    queryKey: ['formas-pagamento', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase
         .from('formas_pagamento')
         .select('*')
+        .eq('igreja_id', igrejaId)
         .order('nome');
       if (error) throw error;
       return data as FormaPagamento[];
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Show error toast if query fails
@@ -56,9 +61,10 @@ export default function FormasPagamento({ onBack }: Props) {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      if (!igrejaId) throw new Error("Igreja não identificada.");
       const { error } = await supabase
         .from('formas_pagamento')
-        .insert({ nome: data.nome, ativo: data.ativo });
+        .insert({ nome: data.nome, ativo: data.ativo, igreja_id: igrejaId });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -74,10 +80,12 @@ export default function FormasPagamento({ onBack }: Props) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
+      if (!igrejaId) throw new Error("Igreja não identificada.");
       const { error } = await supabase
         .from('formas_pagamento')
         .update({ nome: data.nome, ativo: data.ativo })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('igreja_id', igrejaId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -93,7 +101,12 @@ export default function FormasPagamento({ onBack }: Props) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('formas_pagamento').delete().eq('id', id);
+      if (!igrejaId) throw new Error("Igreja não identificada.");
+      const { error } = await supabase
+        .from('formas_pagamento')
+        .delete()
+        .eq('id', id)
+        .eq('igreja_id', igrejaId);
       if (error) throw error;
     },
     onSuccess: () => {

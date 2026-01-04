@@ -9,45 +9,53 @@ import { ptBR } from "date-fns/locale";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 export default function Projecao() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   // Buscar transações dos últimos 12 meses para análise
   const { data: historicoTransacoes } = useQuery({
-    queryKey: ['historico-transacoes-12meses'],
+    queryKey: ['historico-transacoes-12meses', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const dataInicio = subMonths(new Date(), 12);
       
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select('*')
         .eq('status', 'pago')
+        .eq('igreja_id', igrejaId)
         .gte('data_pagamento', dataInicio.toISOString().split('T')[0])
         .order('data_pagamento');
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   // Buscar transações futuras (pendentes)
   const { data: transacoesFuturas } = useQuery({
-    queryKey: ['transacoes-futuras'],
+    queryKey: ['transacoes-futuras', igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const hoje = new Date();
       
       const { data, error } = await supabase
         .from('transacoes_financeiras')
         .select('*')
         .eq('status', 'pendente')
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', hoje.toISOString().split('T')[0])
         .order('data_vencimento');
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !!igrejaId,
   });
 
   const formatCurrency = (value: number) => formatValue(value);

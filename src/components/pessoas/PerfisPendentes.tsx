@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { User, FileEdit } from 'lucide-react';
 import { AprovarAlteracaoDialog } from './AprovarAlteracaoDialog';
+import { useIgrejaId } from '@/hooks/useIgrejaId';
 
 interface AlteracaoPendente {
   id: string;
@@ -28,10 +29,15 @@ export function PerfisPendentes() {
   const [selectedAlteracao, setSelectedAlteracao] = useState<AlteracaoPendente | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('membro');
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   const loadAlteracoes = async () => {
     setLoading(true);
     try {
+      if (!igrejaId) {
+        setAlteracoes([]);
+        return;
+      }
       const { data, error } = await supabase
         .from('alteracoes_perfil_pendentes')
         .select(`
@@ -43,6 +49,7 @@ export function PerfisPendentes() {
           created_at
         `)
         .eq('status', 'pendente')
+        .eq('igreja_id', igrejaId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -53,7 +60,8 @@ export function PerfisPendentes() {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, nome, avatar_url, data_nascimento, status')
-          .in('id', profileIds);
+          .in('id', profileIds)
+          .eq('igreja_id', igrejaId);
 
         const alteracoesComPerfil = data.map(alt => ({
           ...alt,
@@ -74,8 +82,10 @@ export function PerfisPendentes() {
   };
 
   useEffect(() => {
-    loadAlteracoes();
-  }, []);
+    if (!igrejaLoading) {
+      loadAlteracoes();
+    }
+  }, [igrejaLoading, igrejaId]);
 
   const handleOpenAlteracao = (alteracao: AlteracaoPendente) => {
     setSelectedAlteracao(alteracao);
