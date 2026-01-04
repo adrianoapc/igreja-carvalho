@@ -23,6 +23,8 @@ import {
   TrendingUp,
   Database,
   Activity,
+  Plus,
+  GitBranch,
 } from 'lucide-react';
 import {
   Table,
@@ -43,6 +45,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { NovaIgrejaDialog } from '@/components/superadmin/NovaIgrejaDialog';
+import { GerenciarFiliaisDialog } from '@/components/superadmin/GerenciarFiliaisDialog';
 
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -69,6 +73,8 @@ export default function SuperAdminDashboard() {
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [rejectMotivo, setRejectMotivo] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [novaIgrejaOpen, setNovaIgrejaOpen] = useState(false);
+  const [filiaisDialog, setFiliaisDialog] = useState<{ open: boolean; igreja: Igreja | null }>({ open: false, igreja: null });
 
   const { user, loading: authLoading } = useAuth();
 
@@ -298,8 +304,12 @@ export default function SuperAdminDashboard() {
         {/* Tab Igrejas */}
         <TabsContent value="igrejas" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Igrejas Cadastradas</CardTitle>
+              <Button onClick={() => setNovaIgrejaOpen(true)} size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Igreja
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -331,7 +341,16 @@ export default function SuperAdminDashboard() {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => setFiliaisDialog({ open: true, igreja })}
+                          title="Gerenciar Filiais"
+                        >
+                          <GitBranch className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => handleViewMetricas(igreja)}
+                          title="Ver Métricas"
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -609,6 +628,23 @@ export default function SuperAdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog Nova Igreja */}
+      <NovaIgrejaDialog
+        open={novaIgrejaOpen}
+        onOpenChange={setNovaIgrejaOpen}
+        onSuccess={() => {
+          loadIgrejas();
+          loadDashboard();
+        }}
+      />
+
+      {/* Dialog Gerenciar Filiais */}
+      <GerenciarFiliaisDialog
+        open={filiaisDialog.open}
+        onOpenChange={(open) => setFiliaisDialog({ open, igreja: open ? filiaisDialog.igreja : null })}
+        igreja={filiaisDialog.igreja}
+      />
     </div>
   );
 }
