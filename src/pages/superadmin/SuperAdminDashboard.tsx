@@ -329,6 +329,7 @@ export default function SuperAdminDashboard() {
                       igreja={igreja}
                       onViewMetricas={handleViewMetricas}
                       onStatusChange={handleStatusChange}
+                      onIgrejaUpdated={loadIgrejas}
                       processing={processing}
                     />
                   ))}

@@ -4,6 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   ChevronDown,
   ChevronRight,
@@ -45,6 +52,7 @@ interface IgrejaRowExpandableProps {
   igreja: Igreja;
   onViewMetricas: (igreja: Igreja) => void;
   onStatusChange: (igrejaId: string, newStatus: string) => void;
+  onIgrejaUpdated: () => void;
   processing: boolean;
 }
 
@@ -52,6 +60,7 @@ export function IgrejaRowExpandable({
   igreja,
   onViewMetricas,
   onStatusChange,
+  onIgrejaUpdated,
   processing,
 }: IgrejaRowExpandableProps) {
   const [expanded, setExpanded] = useState(false);
@@ -61,7 +70,47 @@ export function IgrejaRowExpandable({
   const [editingNome, setEditingNome] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editIgrejaOpen, setEditIgrejaOpen] = useState(false);
+  const [igrejaForm, setIgrejaForm] = useState({
+    nome: igreja.nome,
+    cnpj: igreja.cnpj || '',
+    email: igreja.email || '',
+    telefone: igreja.telefone || '',
+    cidade: igreja.cidade || '',
+    estado: igreja.estado || '',
+  });
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+
+  const handleUpdateIgreja = async () => {
+    if (!igrejaForm.nome.trim()) {
+      toast({ title: 'Nome é obrigatório', variant: 'destructive' });
+      return;
+    }
+
+    setSaving(true);
+    const { error } = await supabase
+      .from('igrejas')
+      .update({
+        nome: igrejaForm.nome.trim(),
+        cnpj: igrejaForm.cnpj.trim() || null,
+        email: igrejaForm.email.trim() || null,
+        telefone: igrejaForm.telefone.trim() || null,
+        cidade: igrejaForm.cidade.trim() || null,
+        estado: igrejaForm.estado.trim() || null,
+      })
+      .eq('id', igreja.id);
+
+    setSaving(false);
+
+    if (error) {
+      toast({ title: 'Erro ao atualizar igreja', variant: 'destructive' });
+    } else {
+      toast({ title: 'Igreja atualizada com sucesso!' });
+      setEditIgrejaOpen(false);
+      onIgrejaUpdated();
+    }
+  };
 
   const loadFiliais = async () => {
     setLoadingFiliais(true);
@@ -179,6 +228,24 @@ export function IgrejaRowExpandable({
         </TableCell>
         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setIgrejaForm({
+                  nome: igreja.nome,
+                  cnpj: igreja.cnpj || '',
+                  email: igreja.email || '',
+                  telefone: igreja.telefone || '',
+                  cidade: igreja.cidade || '',
+                  estado: igreja.estado || '',
+                });
+                setEditIgrejaOpen(true);
+              }}
+              title="Editar Igreja"
+            >
+              <Pencil className="w-4 h-4" />
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -339,6 +406,85 @@ export function IgrejaRowExpandable({
           </TableCell>
         </TableRow>
       )}
+
+      {/* Dialog de Edição da Igreja */}
+      <Dialog open={editIgrejaOpen} onOpenChange={setEditIgrejaOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Igreja</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="nome">Nome *</Label>
+              <Input
+                id="nome"
+                value={igrejaForm.nome}
+                onChange={(e) => setIgrejaForm({ ...igrejaForm, nome: e.target.value })}
+                placeholder="Nome da igreja"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cnpj">CNPJ</Label>
+                <Input
+                  id="cnpj"
+                  value={igrejaForm.cnpj}
+                  onChange={(e) => setIgrejaForm({ ...igrejaForm, cnpj: e.target.value })}
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="telefone">Telefone</Label>
+                <Input
+                  id="telefone"
+                  value={igrejaForm.telefone}
+                  onChange={(e) => setIgrejaForm({ ...igrejaForm, telefone: e.target.value })}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                value={igrejaForm.email}
+                onChange={(e) => setIgrejaForm({ ...igrejaForm, email: e.target.value })}
+                placeholder="contato@igreja.com"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cidade">Cidade</Label>
+                <Input
+                  id="cidade"
+                  value={igrejaForm.cidade}
+                  onChange={(e) => setIgrejaForm({ ...igrejaForm, cidade: e.target.value })}
+                  placeholder="Cidade"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="estado">Estado</Label>
+                <Input
+                  id="estado"
+                  value={igrejaForm.estado}
+                  onChange={(e) => setIgrejaForm({ ...igrejaForm, estado: e.target.value })}
+                  placeholder="SP"
+                  maxLength={2}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setEditIgrejaOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdateIgreja} disabled={saving}>
+                {saving ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
