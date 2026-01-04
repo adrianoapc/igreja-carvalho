@@ -2674,7 +2674,9 @@ export type Database = {
           data_entrada: string | null
           data_mudanca_fase: string | null
           etapa_atual_id: string | null
+          filial_id: string | null
           id: string
+          igreja_id: string | null
           jornada_id: string
           pessoa_id: string
           responsavel_id: string | null
@@ -2688,7 +2690,9 @@ export type Database = {
           data_entrada?: string | null
           data_mudanca_fase?: string | null
           etapa_atual_id?: string | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           jornada_id: string
           pessoa_id: string
           responsavel_id?: string | null
@@ -2702,7 +2706,9 @@ export type Database = {
           data_entrada?: string | null
           data_mudanca_fase?: string | null
           etapa_atual_id?: string | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           jornada_id?: string
           pessoa_id?: string
           responsavel_id?: string | null
@@ -2716,6 +2722,20 @@ export type Database = {
             columns: ["etapa_atual_id"]
             isOneToOne: false
             referencedRelation: "etapas_jornada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
             referencedColumns: ["id"]
           },
           {
@@ -2969,7 +2989,9 @@ export type Database = {
           created_at: string
           descricao: string | null
           duracao_minutos: number | null
+          filial_id: string | null
           id: string
+          igreja_id: string | null
           midias_ids: string[] | null
           ordem: number
           responsavel_externo: string | null
@@ -2982,7 +3004,9 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           duracao_minutos?: number | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           midias_ids?: string[] | null
           ordem: number
           responsavel_externo?: string | null
@@ -2995,7 +3019,9 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           duracao_minutos?: number | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           midias_ids?: string[] | null
           ordem?: number
           responsavel_externo?: string | null
@@ -3005,6 +3031,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "itens_template_culto_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_template_culto_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "itens_template_culto_template_id_fkey"
             columns: ["template_id"]
@@ -3238,8 +3278,10 @@ export type Database = {
           crianca_id: string
           culto_id: string | null
           data: string
+          filial_id: string | null
           humor: string | null
           id: string
+          igreja_id: string | null
           necessidades_tags: string[] | null
           observacoes: string | null
           professor_id: string
@@ -3251,8 +3293,10 @@ export type Database = {
           crianca_id: string
           culto_id?: string | null
           data?: string
+          filial_id?: string | null
           humor?: string | null
           id?: string
+          igreja_id?: string | null
           necessidades_tags?: string[] | null
           observacoes?: string | null
           professor_id: string
@@ -3264,8 +3308,10 @@ export type Database = {
           crianca_id?: string
           culto_id?: string | null
           data?: string
+          filial_id?: string | null
           humor?: string | null
           id?: string
+          igreja_id?: string | null
           necessidades_tags?: string[] | null
           observacoes?: string | null
           professor_id?: string
@@ -3298,6 +3344,20 @@ export type Database = {
             columns: ["culto_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
             referencedColumns: ["id"]
           },
           {
@@ -3542,7 +3602,9 @@ export type Database = {
       logs_auditoria_chat: {
         Row: {
           ator: string
+          filial_id: string | null
           id: string
+          igreja_id: string | null
           ip_origem: string | null
           payload_raw: Json
           sessao_id: string | null
@@ -3551,7 +3613,9 @@ export type Database = {
         }
         Insert: {
           ator: string
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           ip_origem?: string | null
           payload_raw: Json
           sessao_id?: string | null
@@ -3560,7 +3624,9 @@ export type Database = {
         }
         Update: {
           ator?: string
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           ip_origem?: string | null
           payload_raw?: Json
           sessao_id?: string | null
@@ -3568,6 +3634,20 @@ export type Database = {
           tipo_evento?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "logs_auditoria_chat_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logs_auditoria_chat_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "logs_auditoria_chat_sessao_id_fkey"
             columns: ["sessao_id"]
@@ -4644,7 +4724,9 @@ export type Database = {
           aprovado: boolean | null
           created_at: string | null
           etapa_id: string | null
+          filial_id: string | null
           id: string
+          igreja_id: string | null
           inscricao_id: string | null
           nota_obtida: number | null
           respostas: Json
@@ -4654,7 +4736,9 @@ export type Database = {
           aprovado?: boolean | null
           created_at?: string | null
           etapa_id?: string | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           inscricao_id?: string | null
           nota_obtida?: number | null
           respostas: Json
@@ -4664,7 +4748,9 @@ export type Database = {
           aprovado?: boolean | null
           created_at?: string | null
           etapa_id?: string | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           inscricao_id?: string | null
           nota_obtida?: number | null
           respostas?: Json
@@ -4676,6 +4762,20 @@ export type Database = {
             columns: ["etapa_id"]
             isOneToOne: false
             referencedRelation: "etapas_jornada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_quiz_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_quiz_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
             referencedColumns: ["id"]
           },
           {
