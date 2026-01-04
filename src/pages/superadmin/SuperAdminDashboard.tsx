@@ -24,7 +24,6 @@ import {
   Database,
   Activity,
   Plus,
-  GitBranch,
 } from 'lucide-react';
 import {
   Table,
@@ -46,7 +45,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NovaIgrejaDialog } from '@/components/superadmin/NovaIgrejaDialog';
-import { GerenciarFiliaisDialog } from '@/components/superadmin/GerenciarFiliaisDialog';
+import { IgrejaRowExpandable } from '@/components/superadmin/IgrejaRowExpandable';
 
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -74,7 +73,7 @@ export default function SuperAdminDashboard() {
   const [rejectMotivo, setRejectMotivo] = useState('');
   const [processing, setProcessing] = useState(false);
   const [novaIgrejaOpen, setNovaIgrejaOpen] = useState(false);
-  const [filiaisDialog, setFiliaisDialog] = useState<{ open: boolean; igreja: Igreja | null }>({ open: false, igreja: null });
+  
 
   const { user, loading: authLoading } = useAuth();
 
@@ -325,57 +324,13 @@ export default function SuperAdminDashboard() {
                 </TableHeader>
                 <TableBody>
                   {igrejas.map((igreja) => (
-                    <TableRow key={igreja.id}>
-                      <TableCell className="font-medium">{igreja.nome}</TableCell>
-                      <TableCell>
-                        {igreja.cidade && igreja.estado
-                          ? `${igreja.cidade}/${igreja.estado}`
-                          : '-'}
-                      </TableCell>
-                      <TableCell>{igreja.email || '-'}</TableCell>
-                      <TableCell>{getStatusBadge(igreja.status)}</TableCell>
-                      <TableCell>
-                        {format(new Date(igreja.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setFiliaisDialog({ open: true, igreja })}
-                          title="Gerenciar Filiais"
-                        >
-                          <GitBranch className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleViewMetricas(igreja)}
-                          title="Ver Métricas"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        {igreja.status === 'ativo' && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleStatusChange(igreja.id, 'suspenso')}
-                            disabled={processing}
-                          >
-                            Suspender
-                          </Button>
-                        )}
-                        {igreja.status === 'suspenso' && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleStatusChange(igreja.id, 'ativo')}
-                            disabled={processing}
-                          >
-                            Reativar
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                    <IgrejaRowExpandable
+                      key={igreja.id}
+                      igreja={igreja}
+                      onViewMetricas={handleViewMetricas}
+                      onStatusChange={handleStatusChange}
+                      processing={processing}
+                    />
                   ))}
                   {igrejas.length === 0 && (
                     <TableRow>
@@ -639,12 +594,6 @@ export default function SuperAdminDashboard() {
         }}
       />
 
-      {/* Dialog Gerenciar Filiais */}
-      <GerenciarFiliaisDialog
-        open={filiaisDialog.open}
-        onOpenChange={(open) => setFiliaisDialog({ open, igreja: open ? filiaisDialog.igreja : null })}
-        igreja={filiaisDialog.igreja}
-      />
     </div>
   );
 }
