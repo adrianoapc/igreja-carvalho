@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Users, Heart, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useFilialInfo } from "@/hooks/useFilialInfo";
 import { WelcomeHeader } from "./WelcomeHeader";
 
 export default function DashboardVisitante() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { igrejaNome } = useFilialInfo();
   const firstName = profile?.nome?.split(" ")[0] || "Visitante";
 
   return (
@@ -23,7 +25,7 @@ export default function DashboardVisitante() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-lg text-foreground mb-2">
-                Seja bem-vindo(a) à Igreja Carvalho!
+                Seja bem-vindo(a) à {igrejaNome || "nossa igreja"}!
               </h3>
               <p className="text-muted-foreground text-sm mb-4">
                 Ficamos muito felizes em ter você conosco. Esta é uma área especial onde você pode acessar informações sobre a igreja e interagir com a comunidade.
