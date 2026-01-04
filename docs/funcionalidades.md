@@ -15,23 +15,70 @@ Sistema completo de gestão eclesiástica desenvolvido para igrejas, oferecendo 
 - **RLS Policies**: Políticas de Row Level Security aplicadas em ~30 tabelas para garantir acesso seguro por contexto de igreja
 - **Hooks de contexto**: `useIgrejaId` e `useFilialId` fornecem contexto automático para todas as queries
 
-### 0.2 Super Admin Dashboard
+### 0.2 Super Admin Portal
 
-- **Rota**: `/superadmin` (acesso restrito a `profiles.super_admin = true`)
-- **Gestão de Igrejas**:
+O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas igrejas.
+
+#### Layout e Navegação
+
+- **Layout Dedicado**: `SuperAdminLayout` com header próprio e navegação horizontal
+- **Navegação**: Dashboard | Igrejas | Métricas | Billing | Configurações
+- **Rota Base**: `/superadmin/*` (acesso restrito a role `super_admin` via `user_roles`)
+- **Proteção**: `SuperAdminGate` verifica role antes de renderizar
+
+#### Tela de Seleção de Contexto
+
+- **Rota**: `/context-select` (apenas para super admins após login)
+- **Opções**: 
+  - **Painel SaaS** → navega para `/superadmin`
+  - **Aplicativo Igreja** → navega para `/`
+- **Preferência**: Checkbox "Lembrar minha escolha" salva em `localStorage`
+- **Fluxo**: Login → verifica `super_admin` → verifica `preferred_context` → redireciona ou exibe seleção
+
+#### Gestão de Igrejas
+
+- **Rota**: `/superadmin/igrejas`
+- **Funcionalidades**:
   - Listar todas as igrejas cadastradas no sistema
-  - Visualizar métricas agregadas por tenant (membros, eventos, transações)
-  - Editar dados básicos de igreja (nome, CNPJ, responsável)
-- **Gestão de Filiais**:
-  - Criar/editar/remover filiais vinculadas a uma igreja
-  - Drill-down hierárquico igreja → filiais
-  - Modal `GerenciarFiliaisDialog` com lista expansível
-- **Onboarding de Igrejas**:
-  - Dashboard de solicitações pendentes via `onboarding_requests`
-  - Aprovar/rejeitar solicitações com feedback
-  - Criação automática de igreja + perfil de admin ao aprovar
-- **Componentes**: `SuperAdminDashboard`, `NovaIgrejaDialog`, `IgrejaRowExpandable`, `GerenciarFiliaisDialog`
-- **Hooks**: `useSuperAdmin` (queries de igrejas, filiais, métricas, onboarding)
+  - Buscar por nome
+  - Alterar status (ativo/inativo/suspenso)
+  - Expandir row para ver/gerenciar filiais
+- **Componente Reutilizável**: `FilialManager` para CRUD de filiais (usado também em Configurações)
+
+#### Métricas por Tenant
+
+- **Rota**: `/superadmin/metricas`
+- **Funcionalidades**:
+  - Selecionar igreja via dropdown
+  - Visualizar KPIs: membros, eventos, check-ins, movimentação financeira
+  - Botão para recalcular métricas via RPC
+
+#### Troca de Contexto
+
+- **Do Portal SaaS**: Botão "Ir para App Igreja" no header
+- **Do App Normal**: Ícone Shield no header (visível apenas para super admins via `SuperAdminIndicator`)
+
+#### Componentes
+
+| Componente | Descrição |
+|------------|-----------|
+| `SuperAdminLayout` | Layout com header e navegação do portal SaaS |
+| `SuperAdminGate` | Gate de proteção que verifica role `super_admin` |
+| `ContextSelect` | Tela de seleção de contexto pós-login |
+| `SuperAdminIndicator` | Ícone Shield no MainLayout para acesso rápido |
+| `FilialManager` | CRUD reutilizável de filiais |
+| `IgrejaRowExpandable` | Row expansível com detalhes da igreja |
+
+#### Hooks e Utilitários
+
+- `useSuperAdmin` - queries de igrejas, filiais, métricas, onboarding
+- `checkIsSuperAdmin(userId)` - verifica role super_admin
+- `getPreferredContext()` / `clearPreferredContext()` - gerencia preferência de contexto
+
+#### Diagramas
+
+- [Fluxo Super Admin](diagramas/fluxo-superadmin.md)
+- [Sequência Super Admin](diagramas/sequencia-superadmin.md)
 
 ### 0.3 Onboarding Público de Igrejas
 
