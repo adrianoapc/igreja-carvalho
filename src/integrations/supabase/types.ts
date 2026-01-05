@@ -3759,6 +3759,57 @@ export type Database = {
           },
         ]
       }
+      logs_replicacao_cadastros: {
+        Row: {
+          created_at: string | null
+          filiais_destino_ids: string[]
+          filial_origem_id: string
+          id: string
+          igreja_id: string
+          overwrite: boolean | null
+          resultado: Json
+          tabelas: string[]
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          filiais_destino_ids: string[]
+          filial_origem_id: string
+          id?: string
+          igreja_id: string
+          overwrite?: boolean | null
+          resultado: Json
+          tabelas: string[]
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          filiais_destino_ids?: string[]
+          filial_origem_id?: string
+          id?: string
+          igreja_id?: string
+          overwrite?: boolean | null
+          resultado?: Json
+          tabelas?: string[]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logs_replicacao_cadastros_filial_origem_id_fkey"
+            columns: ["filial_origem_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logs_replicacao_cadastros_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membro_funcoes: {
         Row: {
           ativo: boolean | null
