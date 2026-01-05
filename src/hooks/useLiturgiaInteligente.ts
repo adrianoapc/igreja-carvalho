@@ -6,7 +6,10 @@ interface PlaylistItem {
   titulo: string;
   url?: string;
   duracao?: number;
-  [key: string]: any;
+  tipo?: string;
+  tipo_conteudo?: string;
+  ordem?: number;
+  [key: string]: unknown;
 }
 
 interface AlertaEspiritual {
@@ -17,13 +20,22 @@ interface AlertaEspiritual {
   percentualNegativos?: number;
 }
 
+interface LiturgiaSlide {
+  id?: string;
+  titulo?: string;
+  tipo?: string;
+  tipo_conteudo?: string;
+  ordem?: number;
+  [key: string]: unknown;
+}
+
 interface LiturgiaPlaylist {
   alerta?: AlertaEspiritual;
   testemunhos: PlaylistItem[];
   visitantes: PlaylistItem[];
   broadcast: PlaylistItem[];
   pessoais: PlaylistItem[];
-  slides?: any[]; // Slides prontos retornados pela Edge Function
+  slides?: LiturgiaSlide[]; // Slides prontos retornados pela Edge Function
 }
 
 export function useLiturgiaInteligente(eventoId?: string) {

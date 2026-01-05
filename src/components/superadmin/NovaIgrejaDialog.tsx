@@ -64,6 +64,18 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
     }
 
     setLoading(true);
+    
+    // Timeout de segurança para evitar freeze eterno
+    const timeoutId = setTimeout(() => {
+      console.warn('NovaIgrejaDialog: Timeout reached, resetting loading state');
+      setLoading(false);
+      toast({ 
+        title: 'Operação demorando muito', 
+        description: 'Tente novamente. Se o problema persistir, contate o suporte.',
+        variant: 'destructive' 
+      });
+    }, 30000); // 30 segundos timeout
+
     try {
       // 1. Criar a igreja
       const { data: igreja, error: igrejaError } = await supabase
@@ -133,7 +145,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
       } else {
         toast({
           title: 'Igreja cadastrada com sucesso!',
-          description: `Admin criado com senha padrão: ${adminData?.default_password || 'Igreja@2024'}`,
+          description: `Admin criado com senha temporária: ${adminData?.temp_password || 'Erro ao gerar senha'}`,
         });
       }
 
@@ -145,6 +157,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
       toast({ title: 'Erro', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
+      clearTimeout(timeoutId);
     }
   };
 

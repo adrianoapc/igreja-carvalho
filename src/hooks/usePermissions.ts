@@ -64,28 +64,51 @@ export function usePermissions() {
   const checkPermission = useCallback(async (perm: Permission): Promise<boolean> => {
     if (!user || !igrejaId) return false;
     if (isAdmin) return true; // Admin tem acesso a tudo
-    if (permissionsCache[perm] !== undefined) return permissionsCache[perm];
-
+    
+    // TEMPORÁRIO: Lógica simplificada até implementar o sistema completo de permissões
+    // Por enquanto, permite acesso baseado em roles básicas
     try {
-      // Chama a função RPC criada no banco
-      const { data, error } = await supabase.rpc('has_permission', {
-        _user_id: user.id,
-        _permission_slug: perm,
-      });
-      
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('igreja_id', igrejaId);
+
       if (error) {
-        console.error(`Erro RPC has_permission (${perm}):`, error);
+        console.error(`Erro ao verificar permissão ${perm}:`, error);
         return false;
       }
 
-      const hasPerm = !!data;
-      setPermissionsCache(prev => ({ ...prev, [perm]: hasPerm }));
-      return hasPerm;
+      const roles = (data || []).map(r => r.role);
+      
+      // Lógica básica de permissões baseada em roles
+      switch (perm) {
+        case 'financeiro.view':
+        case 'financeiro.admin':
+          return roles.includes('admin') || roles.includes('tesoureiro');
+        case 'gabinete.view':
+        case 'gabinete.admin':
+          return roles.includes('admin') || roles.includes('pastor');
+        case 'pessoas.view':
+        case 'pessoas.admin':
+          return roles.includes('admin') || roles.includes('secretario');
+        case 'ministerio.view':
+          return roles.includes('admin') || roles.includes('pastor') || roles.includes('lider');
+        case 'configuracoes.view':
+          return roles.includes('admin');
+        case 'ensino.view':
+          return roles.includes('admin') || roles.includes('lider');
+        case 'filiais.view':
+        case 'filiais.manage':
+          return roles.includes('admin');
+        default:
+          return false;
+      }
     } catch (error) {
       console.error(`Erro ao verificar permissão ${perm}:`, error);
       return false;
     }
-  }, [user, igrejaId, isAdmin, permissionsCache]);
+  }, [user, igrejaId, isAdmin]);
 
   return { 
     checkPermission, 

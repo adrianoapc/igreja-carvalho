@@ -37,7 +37,7 @@ interface RegistrarSentimentoDialogProps {
 export default function RegistrarSentimentoDialog({ open, onOpenChange }: RegistrarSentimentoDialogProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { igrejaId } = useIgrejaId();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const [step, setStep] = useState<'select' | 'message' | 'result' | 'already_registered'>('select');
   const [selectedSentimento, setSelectedSentimento] = useState<SentimentoTipo | null>(null);
   const [mensagem, setMensagem] = useState("");
@@ -95,7 +95,30 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
     
     if (config.type === 'positive') {
       // Sentimentos positivos: apenas agradecer
-      saveSentimento(sentimento, "");
+      if (igrejaLoading) {
+        // Se ainda está carregando a igreja, aguardar um pouco
+        setLoading(true);
+        setTimeout(() => {
+          if (igrejaId) {
+            saveSentimento(sentimento, "");
+          } else {
+            toast({
+              title: "Erro",
+              description: "Não foi possível identificar sua igreja. Tente novamente.",
+              variant: "destructive",
+            });
+            setLoading(false);
+          }
+        }, 1000);
+      } else if (igrejaId) {
+        saveSentimento(sentimento, "");
+      } else {
+        toast({
+          title: "Erro",
+          description: "Não foi possível identificar sua igreja. Tente novamente.",
+          variant: "destructive",
+        });
+      }
     } else {
       // Outros sentimentos: mostrar próximo passo
       setStep('message');
@@ -106,10 +129,14 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
     try {
       setLoading(true);
 
+      // Verificar se igrejaId está disponível
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada. Tente novamente em alguns instantes.");
+      }
+
       // Buscar pessoa_id do usuário autenticado
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
-      if (!igrejaId) throw new Error("Igreja não identificada.");
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -175,9 +202,10 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
       });
     } catch (error) {
       console.error('Erro ao salvar sentimento:', error);
+      const errorMessage = error instanceof Error ? error.message : "Não foi possível registrar seu sentimento.";
       toast({
         title: "Erro",
-        description: "Não foi possível registrar seu sentimento.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -187,6 +215,21 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
 
   const handleSubmitMessage = () => {
     if (selectedSentimento) {
+      if (igrejaLoading) {
+        toast({
+          title: "Aguarde",
+          description: "Carregando informações da igreja...",
+        });
+        return;
+      }
+      if (!igrejaId) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível identificar sua igreja. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
       saveSentimento(selectedSentimento, mensagem);
     }
   };

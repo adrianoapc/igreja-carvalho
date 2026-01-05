@@ -657,9 +657,9 @@ export default function Eventos() {
 
         <TabsContent value="calendario" className="mt-4">
           <CalendarioMensal
-            cultos={filteredEventos as any}
+            cultos={filteredEventos}
             escalasCount={{}}
-            onCultoClick={(e) => handleAbrirEvento(e as any)}
+            onCultoClick={(e) => handleAbrirEvento(e)}
           />
         </TabsContent>
       </Tabs>
@@ -667,7 +667,7 @@ export default function Eventos() {
       <EventoDialog
         open={eventoDialogOpen}
         onOpenChange={setEventoDialogOpen}
-        evento={editingEvento as any}
+        evento={editingEvento}
         onSuccess={() => {
           loadEventos();
           loadKPIs();

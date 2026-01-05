@@ -41,6 +41,24 @@ interface LiturgiaItem {
   ordem: number;
 }
 
+interface LiturgiaData {
+  id: string;
+  tipo?: string;
+  titulo?: string;
+  descricao?: string;
+  duracao_minutos?: number;
+  ordem: number;
+}
+
+interface Pedido {
+  id: string;
+  pedido: string;
+  tipo: string;
+  status: string;
+  data_criacao: string;
+  nome_solicitante?: string;
+}
+
 interface EscalaInfo {
   id: string;
   data_hora_inicio: string;
@@ -160,7 +178,7 @@ export default function PrayerPlayer() {
         if (liturgiaData && liturgiaData.length > 0) {
           // Caso contrário, constrói o roteiro manualmente
           // Mapear para o formato local
-          const items: LiturgiaItem[] = liturgiaData.map((l: any) => ({
+          const items: LiturgiaItem[] = liturgiaData.map((l: LiturgiaData) => ({
             id: l.id,
             tipo: l.tipo || "AVISO",
             titulo: l.titulo || "Momento de Oração",
@@ -170,7 +188,7 @@ export default function PrayerPlayer() {
           }));
 
           // Construir roteiro final com slides inteligentes
-          let roteiroFinal = [...items];
+          const roteiroFinal = [...items];
 
           // A. BLOCO DE GRATIDÃO (Testemunhos)
           if (testemunhos && testemunhos.length > 0 && !loadingSmart) {
@@ -559,7 +577,7 @@ export default function PrayerPlayer() {
                 try {
                   const pedidos = JSON.parse(currentSlide.conteudo);
                   return Array.isArray(pedidos) && pedidos.length > 0 ? (
-                    pedidos.map((pedido: any) => {
+                    pedidos.map((pedido: Pedido) => {
                       const orou = pedidosOrados.has(pedido.id);
                       return (
                         <div

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Session } from "@supabase/supabase-js";
 
 const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
 
@@ -21,7 +22,7 @@ export function useFilialId() {
   });
   const [loading, setLoading] = useState(true);
 
-  const extractFromSession = useCallback((session: any): FilialData => {
+  const extractFromSession = useCallback((session: Session): FilialData => {
     const filialId =
       extractUUID(session?.user?.app_metadata?.filial_id) ??
       extractUUID(session?.user?.user_metadata?.filial_id);
