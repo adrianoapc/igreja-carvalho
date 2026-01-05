@@ -103,7 +103,7 @@ export function useFilialId() {
     igrejaId?: string | null
   ) => {
     if (!userId || !igrejaId) return false;
-    
+
     try {
       // Primeiro verificar se tem restrições explícitas em user_filial_access
       const { data: restrictionsData } = await supabase
@@ -112,29 +112,29 @@ export function useFilialId() {
         .eq("user_id", userId)
         .eq("igreja_id", igrejaId)
         .limit(1);
-      
+
       // Se tem restrições explícitas, NÃO pode ver todas as filiais
       if (restrictionsData && restrictionsData.length > 0) {
         return false;
       }
-      
+
       const queryPromise = supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
         .eq("igreja_id", igrejaId);
-      
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 3000)
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Query timeout")), 3000)
       );
-      
+
       const result = await Promise.race([queryPromise, timeoutPromise]);
-      
-      if ('error' in result && result.error) {
+
+      if ("error" in result && result.error) {
         console.error("Erro ao validar permissões de filial:", result.error);
         return false;
       }
-      
+
       // Só admins SEM restrições podem ver todas as filiais
       return (result.data || []).some((r: { role: string }) =>
         ["admin", "admin_igreja", "super_admin"].includes(r.role)

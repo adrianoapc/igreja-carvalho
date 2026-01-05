@@ -77,16 +77,6 @@ export function ContasAPagarWidget() {
         query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
-      if (!isAllFiliais && filialId) {
-        // need new query builder: re-run?
-      }
-      if (!isAllFiliais && filialId) {
-        // Reexecute with filial filter
-      }
-      // We cannot alter after await; better apply in query before executing:
-    },
-  });
-
       if (error) throw error;
 
       const rows = (data ?? []) as TransacaoRow[];

@@ -21,7 +21,10 @@ export default defineConfig(({ mode }) => ({
           "vendor-date": ["date-fns"],
           "vendor-charts": ["recharts"],
           "vendor-html2canvas": ["html2canvas"],
-          "vendor-carousel": ["embla-carousel-react", "embla-carousel-autoplay"],
+          "vendor-carousel": [
+            "embla-carousel-react",
+            "embla-carousel-autoplay",
+          ],
         },
       },
     },
