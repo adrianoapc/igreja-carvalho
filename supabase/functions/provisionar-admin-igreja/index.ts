@@ -6,7 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DEFAULT_PASSWORD = "Igreja@2024";
+// Função para gerar senha aleatória segura
+function generateSecurePassword(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+  let password = "";
+  
+  // Garantir pelo menos um de cada tipo
+  password += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(Math.random() * 26)]; // Maiúscula
+  password += "abcdefghijklmnopqrstuvwxyz"[Math.floor(Math.random() * 26)]; // Minúscula  
+  password += "0123456789"[Math.floor(Math.random() * 10)]; // Número
+  password += "!@#$%^&*"[Math.floor(Math.random() * 8)]; // Especial
+  
+  // Preencher o resto aleatoriamente
+  for (let i = 4; i < 16; i++) {
+    password += chars[Math.floor(Math.random() * chars.length)];
+  }
+  
+  // Embaralhar a senha
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -23,6 +41,9 @@ serve(async (req) => {
       );
     }
 
+    // Gerar senha segura aleatória
+    const tempPassword = generateSecurePassword();
+
     // Create admin client with service role
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -30,13 +51,15 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // 1. Create auth user with default password
+    // 1. Create auth user with temporary password
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email.toLowerCase().trim(),
-      password: DEFAULT_PASSWORD,
+      password: tempPassword,
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         nome,
+      },
+      app_metadata: {
         igreja_id,
         filial_id,
       },
@@ -63,7 +86,7 @@ serve(async (req) => {
         igreja_id,
         filial_id,
         deve_trocar_senha: true,
-        observacoes: `Admin criado automaticamente ao cadastrar igreja. Senha padrão: ${DEFAULT_PASSWORD}`,
+        observacoes: `Admin criado automaticamente ao cadastrar igreja. Senha temporária gerada automaticamente - deve ser alterada no primeiro login.`,
       })
       .select()
       .single();
@@ -99,7 +122,7 @@ serve(async (req) => {
         message: "Admin criado com sucesso",
         profile_id: profile.id,
         user_id: userId,
-        default_password: DEFAULT_PASSWORD,
+        temp_password: tempPassword,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

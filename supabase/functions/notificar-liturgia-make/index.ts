@@ -31,7 +31,11 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { culto_id }: { culto_id: string } = await req.json();
+    const { culto_id, igreja_id: igrejaId }: { culto_id: string; igreja_id?: string } = await req.json();
+
+    if (!igrejaId) {
+      throw new Error('igreja_id é obrigatório');
+    }
 
     console.log('Processing liturgy notification for culto:', culto_id);
 
@@ -40,6 +44,7 @@ Deno.serve(async (req) => {
       .from('eventos')
       .select('titulo, data_evento, igreja_id')
       .eq('id', culto_id)
+      .eq('igreja_id', igrejaId)
       .maybeSingle();
 
     if (eventoError) {
@@ -91,6 +96,7 @@ Deno.serve(async (req) => {
         )
       `)
       .eq('evento_id', culto_id)
+      .eq('igreja_id', evento.igreja_id)
       .order('ordem');
 
     if (itensError) {

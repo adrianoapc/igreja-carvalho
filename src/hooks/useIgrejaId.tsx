@@ -11,38 +11,120 @@ export function useIgrejaId() {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const resolveSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
-      const igrejaIdFromMetadata =
-        extractIgrejaId(session?.user?.app_metadata?.igreja_id) ??
-        extractIgrejaId(session?.user?.user_metadata?.igreja_id);
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = data.session;
 
-      if (isMounted) {
-        setIgrejaId(igrejaIdFromMetadata);
-        setLoading(false);
+        // Se não há sessão válida, definir como null e parar loading
+        if (!session?.user?.id) {
+          if (isMounted) {
+            setIgrejaId(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        let igrejaIdFromMetadata =
+          extractIgrejaId(session?.user?.app_metadata?.igreja_id) ??
+          extractIgrejaId(session?.user?.user_metadata?.igreja_id);
+
+        // Se não encontrou nos metadados JWT, buscar do perfil do usuário
+        if (!igrejaIdFromMetadata && session?.user?.id) {
+          const { data: profile, error } = await supabase
+            .from("profiles")
+            .select("igreja_id")
+            .eq("user_id", session.user.id)
+            .single();
+
+          if (!error && profile?.igreja_id) {
+            igrejaIdFromMetadata = profile.igreja_id;
+          }
+        }
+
+        if (isMounted) {
+          setIgrejaId(igrejaIdFromMetadata);
+          setLoading(false);
+          // Limpar timeout se conseguiu resolver
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao resolver igrejaId:', error);
+        if (isMounted) {
+          setIgrejaId(null);
+          setLoading(false);
+        }
       }
     };
 
     resolveSession();
 
+    // Timeout fallback para evitar loop infinito
+    timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('useIgrejaId: Timeout reached, setting igrejaId to null');
+        setIgrejaId(null);
+        setLoading(false);
+      }
+    }, 5000); // 5 segundos timeout
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      const igrejaIdFromMetadata =
-        extractIgrejaId(session?.user?.app_metadata?.igreja_id) ??
-        extractIgrejaId(session?.user?.user_metadata?.igreja_id);
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        // Se não há sessão válida, definir como null e parar loading
+        if (!session?.user?.id) {
+          if (isMounted) {
+            setIgrejaId(null);
+            setLoading(false);
+          }
+          return;
+        }
 
-      if (isMounted) {
-        setIgrejaId(igrejaIdFromMetadata);
-        setLoading(false);
+        let igrejaIdFromMetadata =
+          extractIgrejaId(session?.user?.app_metadata?.igreja_id) ??
+          extractIgrejaId(session?.user?.user_metadata?.igreja_id);
+
+        // Se não encontrou nos metadados JWT, buscar do perfil do usuário
+        if (!igrejaIdFromMetadata && session?.user?.id) {
+          const { data: profile, error } = await supabase
+            .from("profiles")
+            .select("igreja_id")
+            .eq("user_id", session.user.id)
+            .single();
+
+          if (!error && profile?.igreja_id) {
+            igrejaIdFromMetadata = profile.igreja_id;
+          }
+        }
+
+        if (isMounted) {
+          setIgrejaId(igrejaIdFromMetadata);
+          setLoading(false);
+          // Limpar timeout se conseguiu resolver
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao resolver igrejaId no auth change:', error);
+        if (isMounted) {
+          setIgrejaId(null);
+          setLoading(false);
+        }
       }
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, []);
 

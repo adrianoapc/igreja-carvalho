@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Json } from "@/integrations/supabase/types";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface AlertaCritico {
   id: string;
@@ -25,14 +26,21 @@ interface AlertaMetadata {
 export default function AlertasCriticos() {
   const [alertas, setAlertas] = useState<AlertaCritico[]>([]);
   const [loading, setLoading] = useState(true);
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
 
   useEffect(() => {
-    fetchAlertas();
-  }, []);
+    if (!igrejaLoading) {
+      fetchAlertas();
+    }
+  }, [igrejaLoading, igrejaId]);
 
   const fetchAlertas = async () => {
     try {
       setLoading(true);
+      if (!igrejaId) {
+        setAlertas([]);
+        return;
+      }
       
       // Buscar alertas dos últimos 7 dias
       const seteDiasAtras = new Date();
@@ -42,6 +50,7 @@ export default function AlertasCriticos() {
         .from('notifications')
         .select('*')
         .eq('type', 'alerta_sentimento_critico')
+        .eq('igreja_id', igrejaId)
         .gte('created_at', seteDiasAtras.toISOString())
         .order('created_at', { ascending: false });
 

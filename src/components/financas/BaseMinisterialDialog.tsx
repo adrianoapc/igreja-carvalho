@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface BaseMinisterialDialogProps {
   open: boolean;
@@ -23,17 +25,29 @@ export function BaseMinisterialDialog({ open, onOpenChange, base }: BaseMinister
   const [descricao, setDescricao] = useState(base?.descricao || "");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       if (base) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('bases_ministeriais')
           .update({ titulo, descricao })
-          .eq('id', String(base.id));
+          .eq('id', String(base.id))
+          .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+
+        const { error } = await updateQuery;
 
         if (error) throw error;
         toast.success("Base ministerial atualizada com sucesso!");
@@ -44,6 +58,8 @@ export function BaseMinisterialDialog({ open, onOpenChange, base }: BaseMinister
             titulo,
             descricao,
             ativo: true,
+            igreja_id: igrejaId,
+            filial_id: !isAllFiliais ? filialId : null,
           });
 
         if (error) throw error;

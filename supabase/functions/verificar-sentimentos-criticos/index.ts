@@ -30,12 +30,24 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('Iniciando verificação de sentimentos críticos...');
+    const requestBody = await req.json().catch(() => ({} as Record<string, unknown>));
+    const igrejaId =
+      (requestBody as { igreja_id?: string }).igreja_id ??
+      new URL(req.url).searchParams.get('igreja_id');
+
+    if (!igrejaId) {
+      return new Response(
+        JSON.stringify({ error: 'igreja_id é obrigatório' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     // Verificar se a função está ativa
     const { data: config, error: configError } = await supabase
       .from('edge_function_config')
       .select('enabled')
       .eq('function_name', 'verificar-sentimentos-criticos')
+      .eq('igreja_id', igrejaId)
       .single();
 
     if (configError) {
@@ -62,6 +74,7 @@ Deno.serve(async (req) => {
     const { data: sentimentos, error: sentimentosError } = await supabase
       .from('sentimentos_membros')
       .select('pessoa_id, sentimento, data_registro')
+      .eq('igreja_id', igrejaId)
       .gte('data_registro', seteDiasAtras.toISOString())
       .order('pessoa_id', { ascending: true })
       .order('data_registro', { ascending: true });
@@ -143,7 +156,8 @@ Deno.serve(async (req) => {
       const { data: pessoas, error: pessoasError } = await supabase
         .from('profiles')
         .select('id, nome, email, telefone')
-        .in('id', pessoasEmRisco);
+        .in('id', pessoasEmRisco)
+        .eq('igreja_id', igrejaId);
 
       if (pessoasError) {
         console.error('Erro ao buscar informações das pessoas:', pessoasError);
@@ -165,7 +179,8 @@ Deno.serve(async (req) => {
             pessoa_nome: pessoa.nome,
             pessoa_email: pessoa.email,
             pessoa_telefone: pessoa.telefone,
-            data_alerta: new Date().toISOString()
+            data_alerta: new Date().toISOString(),
+            igreja_id: igrejaId,
           }
         });
 
@@ -199,7 +214,8 @@ Deno.serve(async (req) => {
               tipo: 'ALERTA_EMOCIONAL',
               dataAlerta: new Date().toISOString(),
               totalMembros: membrosAlerta.length,
-              membros: membrosAlerta
+              membros: membrosAlerta,
+              igreja_id: igrejaId
             })
           });
 

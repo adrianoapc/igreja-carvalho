@@ -9,45 +9,63 @@ import { ptBR } from "date-fns/locale";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function Projecao() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   // Buscar transações dos últimos 12 meses para análise
   const { data: historicoTransacoes } = useQuery({
-    queryKey: ['historico-transacoes-12meses'],
+    queryKey: ['historico-transacoes-12meses', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const dataInicio = subMonths(new Date(), 12);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('transacoes_financeiras')
         .select('*')
         .eq('status', 'pago')
+        .eq('igreja_id', igrejaId)
         .gte('data_pagamento', dataInicio.toISOString().split('T')[0])
         .order('data_pagamento');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Buscar transações futuras (pendentes)
   const { data: transacoesFuturas } = useQuery({
-    queryKey: ['transacoes-futuras'],
+    queryKey: ['transacoes-futuras', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const hoje = new Date();
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('transacoes_financeiras')
         .select('*')
         .eq('status', 'pendente')
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', hoje.toISOString().split('T')[0])
         .order('data_vencimento');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const formatCurrency = (value: number) => formatValue(value);

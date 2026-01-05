@@ -14,10 +14,14 @@ import { ContasAPagarWidget } from "@/components/financas/ContasAPagarWidget";
 import { useState } from "react";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   
   // MonthPicker states
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -48,35 +52,50 @@ export default function Dashboard() {
 
   // Buscar contas e categorias para filtros
   const { data: contas } = useQuery({
-    queryKey: ['contas-filtro'],
+    queryKey: ['contas-filtro', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from('contas')
         .select('*')
         .eq('ativo', true)
+        .eq('igreja_id', igrejaId)
         .order('nome');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ['categorias-filtro'],
+    queryKey: ['categorias-filtro', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from('categorias_financeiras')
         .select('*')
         .eq('ativo', true)
+        .eq('igreja_id', igrejaId)
         .order('nome');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Dados do período filtrado
   const { data: transacoesMesAtual } = useQuery({
-    queryKey: ['dashboard-mes-atual', dateRange, contaId, categoriaId, status],
+    queryKey: ['dashboard-mes-atual', igrejaId, filialId, isAllFiliais, dateRange, contaId, categoriaId, status],
     queryFn: async () => {
+      if (!igrejaId) return [];
       let query = supabase
         .from('transacoes_financeiras')
         .select(`
@@ -84,8 +103,12 @@ export default function Dashboard() {
           categoria:categoria_id(nome, cor),
           solicitacao_reembolso:solicitacao_reembolso_id(status)
         `)
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', dateRange.inicio)
         .lte('data_vencimento', dateRange.fim);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
       
       if (contaId !== 'all') {
         query = query.eq('conta_id', contaId);
@@ -106,20 +129,27 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       ) || [];
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Dados do mês anterior
   const { data: transacoesMesAnterior } = useQuery({
-    queryKey: ['dashboard-mes-anterior'],
+    queryKey: ['dashboard-mes-anterior', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from('transacoes_financeiras')
         .select(`
           *,
           solicitacao_reembolso:solicitacao_reembolso_id(status)
         `)
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', startOfMonth(mesAnterior).toISOString().split('T')[0])
         .lte('data_vencimento', endOfMonth(mesAnterior).toISOString().split('T')[0]);
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       
@@ -129,6 +159,7 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       ) || [];
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Pendências críticas da semana
@@ -136,9 +167,10 @@ export default function Dashboard() {
   const fimSemana = addDays(hoje, 7);
 
   const { data: pendenciasSemana = [] } = useQuery({
-    queryKey: ['dashboard-contas-semana'],
+    queryKey: ['dashboard-contas-semana', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from('transacoes_financeiras')
         .select(`
           id, valor, data_vencimento, solicitacao_reembolso_id,
@@ -146,7 +178,12 @@ export default function Dashboard() {
         `)
         .eq('tipo', 'saida')
         .eq('status', 'pendente')
+        .eq('igreja_id', igrejaId)
         .lte('data_vencimento', format(fimSemana, 'yyyy-MM-dd'));
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -156,6 +193,7 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       );
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const vencidasSemana = pendenciasSemana.filter((item) => parseISO(item.data_vencimento) < hoje);

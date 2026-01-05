@@ -9,6 +9,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import InputMask from "react-input-mask";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface FornecedorDialogProps {
   open: boolean;
@@ -41,14 +43,20 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
   const [observacoes, setObservacoes] = useState(fornecedor?.observacoes || "");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       if (fornecedor) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('fornecedores')
           .update({
             nome,
@@ -62,7 +70,13 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
             cep,
             observacoes,
           })
-          .eq('id', String(fornecedor.id));
+          .eq('id', String(fornecedor.id))
+          .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+
+        const { error } = await updateQuery;
 
         if (error) throw error;
         toast.success("Fornecedor atualizado com sucesso!");
@@ -81,6 +95,8 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
             cep,
             observacoes,
             ativo: true,
+            igreja_id: igrejaId,
+            filial_id: !isAllFiliais ? filialId : null,
           });
 
         if (error) throw error;

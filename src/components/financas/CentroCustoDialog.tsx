@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface CentroCustoDialogProps {
   open: boolean;
@@ -26,19 +28,28 @@ export function CentroCustoDialog({ open, onOpenChange, centro }: CentroCustoDia
   const [baseMinisterialId, setBaseMinisterialId] = useState(centro?.base_ministerial_id || "");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const { data: bases } = useQuery({
-    queryKey: ['bases-ministeriais-select'],
+    queryKey: ['bases-ministeriais-select', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from('bases_ministeriais')
         .select('id, titulo')
         .eq('ativo', true)
+        .eq('igreja_id', igrejaId)
         .order('titulo');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,15 +57,25 @@ export function CentroCustoDialog({ open, onOpenChange, centro }: CentroCustoDia
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       if (centro) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('centros_custo')
           .update({
             nome,
             descricao,
             base_ministerial_id: baseMinisterialId || null,
           })
-          .eq('id', String(centro.id));
+          .eq('id', String(centro.id))
+          .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+
+        const { error } = await updateQuery;
 
         if (error) throw error;
         toast.success("Centro de custo atualizado com sucesso!");
@@ -66,6 +87,8 @@ export function CentroCustoDialog({ open, onOpenChange, centro }: CentroCustoDia
             descricao,
             base_ministerial_id: baseMinisterialId || null,
             ativo: true,
+            igreja_id: igrejaId,
+            filial_id: !isAllFiliais ? filialId : null,
           });
 
         if (error) throw error;

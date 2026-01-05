@@ -51,6 +51,7 @@ interface RequestPayload {
   telefone: string;
   conteudo_texto: string;
   nome_perfil?: string;
+  igreja_id?: string;
 }
 
 interface ChatbotConfig {
@@ -61,12 +62,13 @@ interface ChatbotConfig {
 // ============= HELPER FUNCTIONS =============
 
 // Fetch chatbot config from database with fallback
-async function getChatbotConfig(supabase: SupabaseClient): Promise<ChatbotConfig> {
+async function getChatbotConfig(supabase: SupabaseClient, igrejaId: string): Promise<ChatbotConfig> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
       .select('modelo_texto, role_texto')
       .eq('edge_function_name', FUNCTION_NAME)
+      .eq('igreja_id', igrejaId)
       .eq('ativo', true)
       .single();
 
@@ -92,7 +94,12 @@ function normalizePhone(phone: string): string {
 }
 
 // Find or create user in profiles or visitantes_leads
-async function identificarUsuario(supabase: SupabaseClient, telefone: string, nomePerfil?: string): Promise<{
+async function identificarUsuario(
+  supabase: SupabaseClient,
+  telefone: string,
+  igrejaId: string,
+  nomePerfil?: string
+): Promise<{
   pessoa_id: string | null;
   visitante_id: string | null;
   lider_id: string | null;
@@ -105,6 +112,7 @@ async function identificarUsuario(supabase: SupabaseClient, telefone: string, no
     .from('profiles')
     .select('id, nome, user_id')
     .or(`telefone.ilike.%${phoneNormalized}%,telefone.ilike.%${telefone}%`)
+    .eq('igreja_id', igrejaId)
     .limit(1)
     .maybeSingle();
 
@@ -123,6 +131,7 @@ async function identificarUsuario(supabase: SupabaseClient, telefone: string, no
         )
       `)
       .eq('pessoa_id', profile.id)
+      .eq('igreja_id', igrejaId)
       .eq('ativo', true)
       .limit(1);
 
@@ -145,6 +154,7 @@ async function identificarUsuario(supabase: SupabaseClient, telefone: string, no
     .from('visitantes_leads')
     .select('id, nome, telefone')
     .or(`telefone.ilike.%${phoneNormalized}%,telefone.ilike.%${telefone}%`)
+    .eq('igreja_id', igrejaId)
     .limit(1)
     .maybeSingle();
 
@@ -166,7 +176,8 @@ async function identificarUsuario(supabase: SupabaseClient, telefone: string, no
       telefone: telefone,
       nome: nomePerfil || null,
       origem: 'WABA',
-      estagio_funil: 'NOVO'
+      estagio_funil: 'NOVO',
+      igreja_id: igrejaId
     })
     .select('id, nome')
     .single();
@@ -283,13 +294,21 @@ serve(async (req) => {
   
   try {
     const payload: RequestPayload = await req.json();
-    const { telefone, conteudo_texto, nome_perfil } = payload;
+    const { telefone, conteudo_texto, nome_perfil, igreja_id: igrejaId } = payload;
 
     // Validation
     if (!telefone || !conteudo_texto) {
       console.error('Campos obrigatórios ausentes:', { telefone: !!telefone, conteudo_texto: !!conteudo_texto });
       return new Response(JSON.stringify({ 
         error: 'Campos obrigatórios: telefone, conteudo_texto' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!igrejaId) {
+      return new Response(JSON.stringify({ 
+        error: 'Campo obrigatório: igreja_id' 
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -304,10 +323,10 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // 0. Fetch dynamic config from database
-    const config = await getChatbotConfig(supabase);
+    const config = await getChatbotConfig(supabase, igrejaId);
 
     // 1. Identificar usuário
-    const usuario = await identificarUsuario(supabase, telefone, nome_perfil);
+    const usuario = await identificarUsuario(supabase, telefone, igrejaId, nome_perfil);
     console.log(`Usuário identificado:`, usuario);
 
     // 2. Analisar com IA (usando config dinâmica)
@@ -363,7 +382,8 @@ serve(async (req) => {
       gravidade: analise.gravidade.toLowerCase(),
       pastor_responsavel_id: pastorResponsavelId,
       status: 'pendente',
-      historico_evolucao: historicoInicial
+      historico_evolucao: historicoInicial,
+      igreja_id: igrejaId
     };
 
     console.log('Criando atendimento pastoral:', atendimentoData);
@@ -399,7 +419,8 @@ serve(async (req) => {
             atendimento_id: atendimento.id,
             pessoa_nome: usuario.nome,
             gravidade: analise.gravidade,
-            pastor_responsavel_id: pastorResponsavelId
+            pastor_responsavel_id: pastorResponsavelId,
+            igreja_id: igrejaId
           }
         });
       } catch (notifyError) {

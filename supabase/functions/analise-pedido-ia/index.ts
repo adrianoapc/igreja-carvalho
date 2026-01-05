@@ -51,12 +51,13 @@ interface AnaliseResult {
 // ============= HELPER FUNCTIONS =============
 
 // Fetch chatbot config from database with fallback
-async function getChatbotConfig(supabase: SupabaseClient): Promise<ChatbotConfig> {
+async function getChatbotConfig(supabase: SupabaseClient, igrejaId: string): Promise<ChatbotConfig> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
       .select('modelo_texto, role_texto')
       .eq('edge_function_name', FUNCTION_NAME)
+      .eq('igreja_id', igrejaId)
       .eq('ativo', true)
       .single();
 
@@ -93,11 +94,17 @@ serve(async (req) => {
   }
 
   try {
-    const { pedido_id } = await req.json();
+    const { pedido_id, igreja_id: igrejaId } = await req.json();
 
     if (!pedido_id) {
       console.error('Missing pedido_id');
       return new Response(JSON.stringify({ error: 'pedido_id is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!igrejaId) {
+      return new Response(JSON.stringify({ error: 'igreja_id is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -108,7 +115,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Fetch chatbot configuration from database
-    const config = await getChatbotConfig(supabase);
+    const config = await getChatbotConfig(supabase, igrejaId);
     console.log(`[${FUNCTION_NAME}] Using model: ${config.textModel}`);
 
     // Fetch prayer request
@@ -124,6 +131,7 @@ serve(async (req) => {
         )
       `)
       .eq('id', pedido_id)
+      .eq('igreja_id', igrejaId)
       .single();
 
     if (fetchError || !pedido) {
@@ -218,7 +226,8 @@ Pedido de oração:
         analise_ia_resposta: analysis.resposta,
         tipo: analysis.motivo?.toLowerCase().replace(/[^a-z]/g, '') || pedido.tipo
       })
-      .eq('id', pedido_id);
+      .eq('id', pedido_id)
+      .eq('igreja_id', igrejaId);
 
     if (updateError) {
       console.error('Error updating prayer request:', updateError);

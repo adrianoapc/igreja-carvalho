@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface ContaDialogProps {
   open: boolean;
@@ -34,16 +36,22 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
   const [observacoes, setObservacoes] = useState(conta?.observacoes || "");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       const saldoValue = parseFloat(saldoInicial.replace(',', '.')) || 0;
 
       if (conta) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('contas')
           .update({
             nome,
@@ -53,7 +61,13 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
             conta_numero: tipo === 'bancaria' ? contaNumero : null,
             observacoes,
           })
-          .eq('id', String(conta.id));
+          .eq('id', String(conta.id))
+          .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+
+        const { error } = await updateQuery;
 
         if (error) throw error;
         toast.success("Conta atualizada com sucesso!");
@@ -70,6 +84,8 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
             conta_numero: tipo === 'bancaria' ? contaNumero : null,
             observacoes,
             ativo: true,
+            igreja_id: igrejaId,
+            filial_id: !isAllFiliais ? filialId : null,
           });
 
         if (error) throw error;

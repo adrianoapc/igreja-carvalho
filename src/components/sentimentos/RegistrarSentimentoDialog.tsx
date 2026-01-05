@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Heart, MessageCircle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { startOfDay, endOfDay } from "date-fns";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 type SentimentoTipo = 'feliz' | 'cuidadoso' | 'abencoado' | 'grato' | 'angustiado' | 'sozinho' | 'triste' | 'doente' | 'com_pouca_fe';
 
@@ -36,6 +37,7 @@ interface RegistrarSentimentoDialogProps {
 export default function RegistrarSentimentoDialog({ open, onOpenChange }: RegistrarSentimentoDialogProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const [step, setStep] = useState<'select' | 'message' | 'result' | 'already_registered'>('select');
   const [selectedSentimento, setSelectedSentimento] = useState<SentimentoTipo | null>(null);
   const [mensagem, setMensagem] = useState("");
@@ -47,17 +49,19 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
     if (open) {
       checkExistingToday();
     }
-  }, [open]);
+  }, [open, igrejaId]);
 
   const checkExistingToday = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      if (!igrejaId) return;
 
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
         .eq('user_id', user.id)
+        .eq('igreja_id', igrejaId)
         .maybeSingle();
 
       if (!profile) return;
@@ -70,6 +74,7 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
         .from('sentimentos_membros')
         .select('sentimento')
         .eq('pessoa_id', profile.id)
+        .eq('igreja_id', igrejaId)
         .gte('data_registro', dayStart)
         .lte('data_registro', dayEnd)
         .limit(1)
@@ -90,7 +95,30 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
     
     if (config.type === 'positive') {
       // Sentimentos positivos: apenas agradecer
-      saveSentimento(sentimento, "");
+      if (igrejaLoading) {
+        // Se ainda está carregando a igreja, aguardar um pouco
+        setLoading(true);
+        setTimeout(() => {
+          if (igrejaId) {
+            saveSentimento(sentimento, "");
+          } else {
+            toast({
+              title: "Erro",
+              description: "Não foi possível identificar sua igreja. Tente novamente.",
+              variant: "destructive",
+            });
+            setLoading(false);
+          }
+        }, 1000);
+      } else if (igrejaId) {
+        saveSentimento(sentimento, "");
+      } else {
+        toast({
+          title: "Erro",
+          description: "Não foi possível identificar sua igreja. Tente novamente.",
+          variant: "destructive",
+        });
+      }
     } else {
       // Outros sentimentos: mostrar próximo passo
       setStep('message');
@@ -101,6 +129,11 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
     try {
       setLoading(true);
 
+      // Verificar se igrejaId está disponível
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada. Tente novamente em alguns instantes.");
+      }
+
       // Buscar pessoa_id do usuário autenticado
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
@@ -109,6 +142,7 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
         .from('profiles')
         .select('id')
         .eq('user_id', user.id)
+        .eq('igreja_id', igrejaId)
         .single();
 
       if (!profile) throw new Error("Perfil não encontrado");
@@ -122,6 +156,7 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
         .from('sentimentos_membros')
         .select('sentimento')
         .eq('pessoa_id', profile.id)
+        .eq('igreja_id', igrejaId)
         .gte('data_registro', dayStart)
         .lte('data_registro', dayEnd)
         .limit(1)
@@ -142,7 +177,8 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
         .insert({
           pessoa_id: profile.id,
           sentimento,
-          mensagem: msg || null
+          mensagem: msg || null,
+          igreja_id: igrejaId,
         })
         .select('id')
         .single();
@@ -152,7 +188,7 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
       // Trigger AI analysis in background (non-blocking)
       if (msg && insertedData?.id) {
         supabase.functions.invoke('analise-sentimento-ia', {
-          body: { sentimento_id: insertedData.id }
+          body: { sentimento_id: insertedData.id, igreja_id: igrejaId }
         }).catch(err => {
           console.error('AI analysis background error:', err);
         });
@@ -166,9 +202,10 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
       });
     } catch (error) {
       console.error('Erro ao salvar sentimento:', error);
+      const errorMessage = error instanceof Error ? error.message : "Não foi possível registrar seu sentimento.";
       toast({
         title: "Erro",
-        description: "Não foi possível registrar seu sentimento.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -178,6 +215,21 @@ export default function RegistrarSentimentoDialog({ open, onOpenChange }: Regist
 
   const handleSubmitMessage = () => {
     if (selectedSentimento) {
+      if (igrejaLoading) {
+        toast({
+          title: "Aguarde",
+          description: "Carregando informações da igreja...",
+        });
+        return;
+      }
+      if (!igrejaId) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível identificar sua igreja. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
       saveSentimento(selectedSentimento, mensagem);
     }
   };

@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface TagMidiaDialogProps {
   open: boolean;
@@ -34,6 +36,8 @@ export function TagMidiaDialog({ open, onOpenChange, tag, onSuccess }: TagMidiaD
   const [nome, setNome] = useState(tag?.nome || "");
   const [cor, setCor] = useState(tag?.cor || "#8B5CF6");
   const [saving, setSaving] = useState(false);
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   const handleSave = async () => {
     if (!nome.trim()) {
@@ -43,12 +47,21 @@ export function TagMidiaDialog({ open, onOpenChange, tag, onSuccess }: TagMidiaD
 
     setSaving(true);
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       if (tag) {
         // Editar
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('tags_midias')
           .update({ nome: nome.trim(), cor })
-          .eq('id', tag.id);
+          .eq('id', tag.id)
+          .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+        const { error } = await updateQuery;
 
         if (error) throw error;
         toast.success("Tag atualizada com sucesso!");
@@ -56,7 +69,7 @@ export function TagMidiaDialog({ open, onOpenChange, tag, onSuccess }: TagMidiaD
         // Criar
         const { error } = await supabase
           .from('tags_midias')
-          .insert({ nome: nome.trim(), cor });
+          .insert({ nome: nome.trim(), cor, igreja_id: igrejaId, filial_id: !isAllFiliais ? filialId : null });
 
         if (error) throw error;
         toast.success("Tag criada com sucesso!");

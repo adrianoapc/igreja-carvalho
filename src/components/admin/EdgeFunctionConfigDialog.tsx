@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface EdgeFunctionConfigDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export default function EdgeFunctionConfigDialog({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState(currentSchedule);
+  const { igrejaId } = useIgrejaId();
 
   useEffect(() => {
     setSelectedSchedule(currentSchedule);
@@ -47,6 +49,9 @@ export default function EdgeFunctionConfigDialog({
   const handleSave = async () => {
     setIsLoading(true);
     try {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada.");
+      }
       const selectedOption = scheduleOptions.find(opt => opt.value === selectedSchedule);
       
       const { error } = await supabase
@@ -55,7 +60,8 @@ export default function EdgeFunctionConfigDialog({
           schedule_cron: selectedSchedule,
           schedule_description: selectedOption?.label || selectedSchedule
         })
-        .eq('function_name', functionName);
+        .eq('function_name', functionName)
+        .eq('igreja_id', igrejaId);
 
       if (error) throw error;
 

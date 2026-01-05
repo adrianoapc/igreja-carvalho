@@ -39,6 +39,19 @@ interface ConvitePendente {
   };
 }
 
+interface ConviteComEvento {
+  id: string;
+  status: string;
+  enviado_em: string | null;
+  evento: {
+    id: string;
+    titulo: string;
+    data_evento: string;
+    local: string | null;
+    tipo: string;
+  } | null;
+}
+
 export default function ConvitesPendentesWidget() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -71,11 +84,21 @@ export default function ConvitesPendentesWidget() {
         )
         .eq("pessoa_id", user?.id)
         .eq("status", "pendente")
-        .gt("evento.data_evento", now)
-        .order("evento.data_evento", { ascending: true });
+        .order("enviado_em", { ascending: false });
 
       if (error) throw error;
-      return data as ConvitePendente[];
+
+      // Filtrar eventos futuros no cliente (PostgREST não suporta filtros em campos relacionados)
+      const convitesFiltrados = (data || []).filter((convite: ConviteComEvento) => {
+        return convite.evento && new Date(convite.evento.data_evento) > new Date(now);
+      });
+
+      // Ordenar por data do evento
+      convitesFiltrados.sort((a: ConviteComEvento, b: ConviteComEvento) => {
+        return new Date(a.evento!.data_evento).getTime() - new Date(b.evento!.data_evento).getTime();
+      });
+
+      return convitesFiltrados as ConvitePendente[];
     },
     enabled: !!user?.id,
   });

@@ -22,10 +22,15 @@ serve(async (req) => {
     )
 
     // 1. Receber o ID do Evento
-    const { evento_id } = await req.json()
+    const { evento_id, igreja_id: igrejaId } = await req.json()
+    const igrejaIdFromQuery = new URL(req.url).searchParams.get('igreja_id')
+    const resolvedIgrejaId = igrejaId ?? igrejaIdFromQuery
 
     if (!evento_id) {
       throw new Error("Evento ID é obrigatório")
+    }
+    if (!resolvedIgrejaId) {
+      throw new Error("Igreja ID é obrigatório")
     }
 
     console.log(`[liturgy-player] Buscando liturgia para evento: ${evento_id}`)
@@ -35,6 +40,7 @@ serve(async (req) => {
       .from('liturgias')
       .select('*')
       .eq('evento_id', evento_id)
+      .eq('igreja_id', resolvedIgrejaId)
       .order('ordem')
 
     if (errLiturgia) {
@@ -68,6 +74,7 @@ serve(async (req) => {
           .from('testemunhos')
           .select('id, titulo, mensagem, categoria, anonimo')
           .eq('status', 'publico')
+          .eq('igreja_id', resolvedIgrejaId)
           .order('created_at', { ascending: false })
           .limit(3)
         
@@ -90,6 +97,7 @@ serve(async (req) => {
         const { data: sentimentos } = await supabaseClient
           .from('sentimentos_membros')
           .select('sentimento, analise_ia_motivo')
+          .eq('igreja_id', resolvedIgrejaId)
           .gte('created_at', ontem.toISOString())
 
         let alerta = null
@@ -130,6 +138,7 @@ serve(async (req) => {
         const { data: visitantes } = await supabaseClient
           .from('visitantes_leads')
           .select('id, nome, estagio_funil, origem')
+          .eq('igreja_id', resolvedIgrejaId)
           .gte('created_at', semanaPassada.toISOString())
           .order('created_at', { ascending: false })
           .limit(5)
@@ -155,6 +164,7 @@ serve(async (req) => {
           .from('pedidos_oracao')
           .select('id, pedido, tipo, nome_solicitante, analise_ia_gravidade, analise_ia_titulo, anonimo')
           .eq('status', 'em_oracao')
+          .eq('igreja_id', resolvedIgrejaId)
           .order('created_at', { ascending: false })
           .limit(10)
         

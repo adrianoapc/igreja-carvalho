@@ -153,7 +153,8 @@ async function processarNotaFiscal(
   supabaseUrl: string,
   serviceKey: string,
   base64Data: string,
-  mimeType: string = "image/jpeg"
+  mimeType: string = "image/jpeg",
+  igrejaId?: string
 ): Promise<{
   valor: number;
   fornecedor: string | null;
@@ -175,7 +176,8 @@ async function processarNotaFiscal(
       },
       body: JSON.stringify({ 
         imageBase64: base64Data,
-        mimeType
+        mimeType,
+        igreja_id: igrejaId
       })
     });
     
@@ -264,6 +266,14 @@ serve(async (req) => {
     // (a) Payload "flat" que já vem normalizado pelo Make
     // (b) Payload bruto do webhook do WhatsApp (messages[].document.url, etc.)
     const body = await req.json();
+    const igrejaId = body?.igreja_id ?? new URL(req.url).searchParams.get("igreja_id");
+
+    if (!igrejaId) {
+      return new Response(
+        JSON.stringify({ error: "igreja_id é obrigatório" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const makeMsg = Array.isArray(body?.messages) ? body.messages[0] : null;
     const makeTipo = makeMsg?.type ?? null;
@@ -322,6 +332,7 @@ serve(async (req) => {
       .from("profiles")
       .select("id, nome, telefone, autorizado_bot_financeiro, created_at, data_nascimento")
       .eq("autorizado_bot_financeiro", true)
+      .eq("igreja_id", igrejaId)
       .filter("telefone", "ilike", `%${telefoneNormalizado.slice(-9)}%`) // Busca pelos 9 dígitos finais
       .limit(5);
 
@@ -390,6 +401,7 @@ serve(async (req) => {
       .select("*")
       .eq("telefone", telefone)
       .eq("origem_canal", origem_canal)
+      .eq("igreja_id", igrejaId)
       .neq("status", "CONCLUIDO")
       .maybeSingle();
 
@@ -421,7 +433,8 @@ serve(async (req) => {
           origem_canal,
           pessoa_id: membroAutorizado.id,
           status: "EM_ANDAMENTO",
-          meta_dados: metaDadosInicial
+          meta_dados: metaDadosInicial,
+          igreja_id: igrejaId
         });
 
         const tipoFluxo = isReembolso ? "Reembolso" : "Nova Conta";
@@ -471,7 +484,7 @@ serve(async (req) => {
           // Determinar mimeType
           const mimeType = anexoResult.isPdf ? "application/pdf" : anexoResult.contentType;
           
-          dadosNota = await processarNotaFiscal(supabaseUrl, supabaseKey, base64, mimeType);
+          dadosNota = await processarNotaFiscal(supabaseUrl, supabaseKey, base64, mimeType, igrejaId);
         } catch (e) {
           console.error("[OCR] Erro ao converter para base64:", e);
         }
@@ -506,7 +519,8 @@ serve(async (req) => {
               valor_total_acumulado: valorTotal
             }
           })
-          .eq("id", sessao.id);
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
 
         // Resposta com resumo do item
         let resposta = `📥 Comprovante ${itensAtualizados.length} recebido!\n`;
@@ -539,7 +553,8 @@ serve(async (req) => {
               itens_removidos: itensRemovidos
             }
           })
-          .eq("id", sessao.id);
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
 
         console.log(`[Financeiro] Sessão ${sessao.id} cancelada. ${itensRemovidos} anexos removidos.`);
 
@@ -565,6 +580,7 @@ serve(async (req) => {
             .from("contas")
             .select("id")
             .eq("ativo", true)
+            .eq("igreja_id", igrejaId)
             .limit(1)
             .single();
 
@@ -591,7 +607,8 @@ serve(async (req) => {
                 subcategoria_id: item.subcategoria_sugerida_id,
                 centro_custo_id: item.centro_custo_sugerido_id,
                 anexo_url: item.anexo_storage,
-                observacoes: `Fornecedor: ${item.fornecedor || 'N/A'}\nOrigem: WhatsApp\nSolicitante: ${metaDados.nome_perfil}`
+                observacoes: `Fornecedor: ${item.fornecedor || 'N/A'}\nOrigem: WhatsApp\nSolicitante: ${metaDados.nome_perfil}`,
+                igreja_id: igrejaId
               })
               .select("id")
               .single();
@@ -613,7 +630,8 @@ serve(async (req) => {
                 transacoes_ids: transacoesCriadas
               }
             })
-            .eq("id", sessao.id);
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
 
           return new Response(JSON.stringify({
             text: `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n\nO financeiro irá processar em breve.`
@@ -626,7 +644,8 @@ serve(async (req) => {
           .update({
             meta_dados: { ...metaDados, estado_atual: "AGUARDANDO_DATA" }
           })
-          .eq("id", sessao.id);
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
 
         return new Response(JSON.stringify({
           text: `📋 *Resumo do Reembolso*\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${qtdItens}\n\n📅 *Quando deseja receber o ressarcimento?*\n\nDigite a data (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*`
@@ -656,7 +675,8 @@ serve(async (req) => {
               itens_removidos: itensRemovidos
             }
           })
-          .eq("id", sessao.id);
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
 
         return new Response(JSON.stringify({
           text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`
@@ -704,7 +724,8 @@ serve(async (req) => {
             data_vencimento: dataVencimento
           }
         })
-        .eq("id", sessao.id);
+        .eq("id", sessao.id)
+        .eq("igreja_id", igrejaId);
 
       const dataFormatada = new Date(dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR');
 
@@ -730,7 +751,8 @@ serve(async (req) => {
               itens_removidos: itensRemovidos
             }
           })
-          .eq("id", sessao.id);
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
 
         return new Response(JSON.stringify({
           text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`
@@ -763,7 +785,8 @@ serve(async (req) => {
           status: "rascunho", // RLS permite inserir itens apenas com status rascunho
           forma_pagamento_preferida: formaPagamento,
           data_vencimento: metaDados.data_vencimento,
-          observacoes: `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`
+          observacoes: `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`,
+          igreja_id: igrejaId
         })
         .select("id")
         .single();
@@ -790,6 +813,7 @@ serve(async (req) => {
             centro_custo_id: item.centro_custo_sugerido_id,
             foto_url: item.anexo_storage,
             // fornecedor_id e base_ministerial_id ficam null por ora (podem ser preenchidos na tela)
+            igreja_id: igrejaId,
           })
           .select("id")
           .single();
@@ -805,7 +829,8 @@ serve(async (req) => {
       const { error: updateStatusError } = await supabase
         .from("solicitacoes_reembolso")
         .update({ status: "pendente" })
-        .eq("id", solicitacao.id);
+        .eq("id", solicitacao.id)
+        .eq("igreja_id", igrejaId);
 
       if (updateStatusError) {
         console.error("Erro ao atualizar status:", updateStatusError);
@@ -827,7 +852,8 @@ serve(async (req) => {
                 solicitacao_id: solicitacao.id,
                 forma_pagamento: formaPagamento,
                 link: `/financas/reembolsos?id=${solicitacao.id}`
-              }
+              },
+              igreja_id: igrejaId
             }
           });
           console.log(`[Financeiro] Notificação de reembolso enviada para tesoureiros`);
@@ -850,7 +876,8 @@ serve(async (req) => {
             itens_ids: itensCriados
           }
         })
-        .eq("id", sessao.id);
+        .eq("id", sessao.id)
+        .eq("igreja_id", igrejaId);
 
       const dataFormatada = new Date(metaDados.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
       const formaPgtoTexto = formaPagamento === "pix" ? "PIX" : "Dinheiro";

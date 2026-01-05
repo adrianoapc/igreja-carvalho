@@ -7,11 +7,13 @@ import DashboardLeader from "@/components/dashboard/DashboardLeader";
 import DashboardMember from "@/components/dashboard/DashboardMember";
 import DashboardVisitante from "@/components/dashboard/DashboardVisitante";
 import { usePermissions } from "@/hooks/usePermissions"; // <--- Importe o novo hook
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 type UserRole = 'admin' | 'pastor' | 'lider' | 'secretario' | 'tesoureiro' | 'membro' | 'basico';
 
 export default function Dashboard() {
   const { user, profile, loading: authLoading } = useAuth();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,19 +43,20 @@ export default function Dashboard() {
   }, [user, isAdmin, checkPermission]);
   // --- FIM DO BLOCO DE TESTE RBAC ---
   useEffect(() => {
-    if (user) {
+    if (user && igrejaId) {
       fetchUserRoles();
-    } else if (!authLoading) {
+    } else if (!authLoading && !igrejaLoading) {
       setLoading(false);
     }
-  }, [user, authLoading]);
+  }, [user, igrejaId, authLoading, igrejaLoading]);
 
   const fetchUserRoles = async () => {
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user?.id);
+        .eq('user_id', user?.id)
+        .eq('igreja_id', igrejaId);
 
       if (error) throw error;
       
@@ -67,7 +70,7 @@ export default function Dashboard() {
   };
 
   // Loading state
-  if (loading || authLoading) {
+  if (loading || authLoading || igrejaLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />

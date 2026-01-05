@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Loader2, Upload, FileText, Image as ImageIcon, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageCaptureInput } from "@/components/ui/image-capture-input";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface NotaFiscalData {
   fornecedor_cnpj_cpf?: string;
@@ -34,6 +35,7 @@ export default function ProcessarNotaFiscalDialog({
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const { igrejaId } = useIgrejaId();
 
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
@@ -57,6 +59,10 @@ export default function ProcessarNotaFiscalDialog({
     setLoading(true);
 
     try {
+      if (!igrejaId) {
+        toast.error("Igreja não identificada.");
+        return;
+      }
       // Converter para base64
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -68,7 +74,8 @@ export default function ProcessarNotaFiscalDialog({
         const { data, error } = await supabase.functions.invoke('processar-nota-fiscal', {
           body: {
             imageBase64: base64,
-            mimeType: file.type
+            mimeType: file.type,
+            igreja_id: igrejaId,
           }
         });
 

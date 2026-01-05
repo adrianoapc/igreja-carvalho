@@ -17,10 +17,14 @@ import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function Entradas() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
+  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
+  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<{
@@ -53,10 +57,11 @@ export default function Entradas() {
   const dateRange = getDateRange();
 
   const { data: transacoes, isLoading, refetch } = useQuery({
-    queryKey: ['entradas', selectedMonth, customRange],
+    queryKey: ['entradas', igrejaId, filialId, isAllFiliais, selectedMonth, customRange],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const dateRange = getDateRange();
-      const { data, error } = await supabase
+      let query = supabase
         .from('transacoes_financeiras')
         .select(`
           *,
@@ -68,41 +73,61 @@ export default function Entradas() {
           fornecedor:fornecedor_id(nome)
         `)
         .eq('tipo', 'entrada')
+        .eq('igreja_id', igrejaId)
         .gte('data_vencimento', dateRange.inicio.toISOString().split('T')[0])
         .lte('data_vencimento', dateRange.fim.toISOString().split('T')[0])
         .order('data_vencimento', { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Buscar contas e categorias para os filtros
   const { data: contas } = useQuery({
-    queryKey: ['contas-filtro'],
+    queryKey: ['contas-filtro', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from('contas')
         .select('id, nome')
         .eq('ativo', true)
+        .eq('igreja_id', igrejaId)
         .order('nome');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ['categorias-filtro-entrada'],
+    queryKey: ['categorias-filtro-entrada', igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from('categorias_financeiras')
         .select('id, nome')
         .eq('ativo', true)
         .eq('tipo', 'entrada')
+        .eq('igreja_id', igrejaId)
         .order('nome');
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
   // Aplicar filtros

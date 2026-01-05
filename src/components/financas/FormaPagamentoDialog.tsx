@@ -6,6 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface FormaPagamentoDialogProps {
   open: boolean;
@@ -17,6 +19,8 @@ export function FormaPagamentoDialog({ open, onOpenChange, formaPagamento }: For
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [nome, setNome] = useState("");
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   useEffect(() => {
     if (formaPagamento) {
@@ -28,16 +32,24 @@ export function FormaPagamentoDialog({ open, onOpenChange, formaPagamento }: For
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!igrejaId) {
+        throw new Error("Igreja não identificada.");
+      }
       if (formaPagamento) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('formas_pagamento')
           .update({ nome })
-          .eq('id', String(formaPagamento.id));
+          .eq('id', String(formaPagamento.id))
+          .eq('igreja_id', igrejaId);
+        if (!isAllFiliais && filialId) {
+          updateQuery = updateQuery.eq('filial_id', filialId);
+        }
+        const { error } = await updateQuery;
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('formas_pagamento')
-          .insert({ nome });
+          .insert({ nome, igreja_id: igrejaId, filial_id: !isAllFiliais ? filialId : null });
         if (error) throw error;
       }
     },
