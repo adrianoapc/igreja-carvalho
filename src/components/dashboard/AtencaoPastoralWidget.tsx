@@ -6,6 +6,7 @@ import { AlertTriangle, MessageCircle, ChevronRight, CalendarX, HeartCrack, Part
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface OvelhaEmRisco {
   id: string;
@@ -19,9 +20,10 @@ interface OvelhaEmRisco {
 
 export default function AtencaoPastoralWidget() {
   const navigate = useNavigate();
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const { data: alerts = [], isLoading } = useQuery({
-    queryKey: ["ovelhas-em-risco"],
+    queryKey: ["ovelhas-em-risco", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       // Verificar se está autenticado antes de chamar RPC
       const { data: { session } } = await supabase.auth.getSession();
@@ -29,6 +31,7 @@ export default function AtencaoPastoralWidget() {
         console.warn('Usuário não autenticado, pulando chamada RPC');
         return [];
       }
+      if (!igrejaId) return [];
 
       try {
         // Tentar usar a RPC se disponível
@@ -40,6 +43,8 @@ export default function AtencaoPastoralWidget() {
             .from('sentimentos_membros')
             .select('id, pessoa_id, sentimento, created_at')
             .in('sentimento', ['angustiado', 'triste', 'sozinho', 'com_pouca_fe', 'doente'])
+            .eq('igreja_id', igrejaId)
+            .eq('filial_id', isAllFiliais ? null : filialId)
             .order('created_at', { ascending: false })
             .limit(10);
           
@@ -50,10 +55,13 @@ export default function AtencaoPastoralWidget() {
 
           // Fetch profile data separately to avoid deep type instantiation
           const pessoaIds = (sentimentos || []).map(s => s.pessoa_id).filter(Boolean) as string[];
-          const { data: profiles } = await supabase
+          let profilesQuery = supabase
             .from('profiles')
             .select('id, nome, avatar_url, telefone')
             .in('id', pessoaIds.length > 0 ? pessoaIds : ['00000000-0000-0000-0000-000000000000']);
+          if (igrejaId) profilesQuery = profilesQuery.eq('igreja_id', igrejaId);
+          if (!isAllFiliais && filialId) profilesQuery = profilesQuery.eq('filial_id', filialId);
+          const { data: profiles } = await profilesQuery;
           
           const profilesMap = new Map((profiles || []).map(p => [p.id, p]));
 
@@ -80,6 +88,7 @@ export default function AtencaoPastoralWidget() {
       }
     },
     retry: false,
+    enabled: !!igrejaId && !filialLoading,
   });
 
   const openWhatsApp = (telefone: string | null, nome: string, tipoRisco: string) => {

@@ -47,6 +47,7 @@ import {
 import { format, subDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AlertasCriticos from "@/components/sentimentos/AlertasCriticos";
+import { useFilialId } from "@/hooks/useFilialId";
 
 type SentimentoTipo =
   | "feliz"
@@ -146,6 +147,7 @@ interface SentimentoRecord {
 
 export default function Sentimentos() {
   const navigate = useNavigate();
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [periodo, setPeriodo] = useState("7");
   const [stats, setStats] = useState<Record<SentimentoTipo, number>>({
     feliz: 0,
@@ -169,7 +171,7 @@ export default function Sentimentos() {
   useEffect(() => {
     fetchStats();
     fetchHistorico();
-  }, [periodo]);
+  }, [periodo, igrejaId, filialId, isAllFiliais, filialLoading]);
 
   const fetchStats = async () => {
     try {
@@ -177,11 +179,17 @@ export default function Sentimentos() {
       const dataInicio = new Date();
       dataInicio.setDate(dataInicio.getDate() - dias);
 
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+
+      let statsQuery = supabase
         .from("sentimentos_membros")
         .select("sentimento, data_registro")
         .gte("data_registro", dataInicio.toISOString())
+        .eq("igreja_id", igrejaId)
         .order("data_registro", { ascending: true });
+      if (!isAllFiliais && filialId) statsQuery = statsQuery.eq("filial_id", filialId);
+
+      const { data, error } = await statsQuery;
 
       if (error) throw error;
 
@@ -244,7 +252,8 @@ export default function Sentimentos() {
       const dataInicio = new Date();
       dataInicio.setDate(dataInicio.getDate() - dias);
 
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let historicoQuery = supabase
         .from("sentimentos_membros")
         .select(
           `
@@ -261,8 +270,12 @@ export default function Sentimentos() {
         `
         )
         .gte("data_registro", dataInicio.toISOString())
+        .eq("igreja_id", igrejaId)
         .order("data_registro", { ascending: false })
         .limit(50);
+      if (!isAllFiliais && filialId) historicoQuery = historicoQuery.eq("filial_id", filialId);
+
+      const { data, error } = await historicoQuery;
 
       if (error) throw error;
       setHistorico(data || []);
