@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmarPagamentoDialog } from "@/components/financas/ConfirmarPagamentoDialog";
 import { useHideValues } from "@/hooks/useHideValues";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface TransacaoPendente {
   id: string;
@@ -55,11 +56,13 @@ export function ContasAPagarWidget() {
   const { formatValue } = useHideValues();
   const queryClient = useQueryClient();
   const [transacaoSelecionada, setTransacaoSelecionada] = useState<string | null>(null);
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const { data: transacoes = [], isLoading } = useQuery({
-    queryKey: ["contas-a-pagar-widget"],
+    queryKey: ["contas-a-pagar-widget", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from("transacoes_financeiras")
         .select(`
           id, descricao, valor, data_vencimento, solicitacao_reembolso_id,
@@ -67,8 +70,22 @@ export function ContasAPagarWidget() {
         `)
         .eq("tipo", "saida")
         .eq("status", "pendente")
+        .eq("igreja_id", igrejaId)
         .order("data_vencimento", { ascending: true })
         .limit(20); // Buscar mais pois vamos filtrar
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
+      if (!isAllFiliais && filialId) {
+        // need new query builder: re-run?
+      }
+      if (!isAllFiliais && filialId) {
+        // Reexecute with filial filter
+      }
+      // We cannot alter after await; better apply in query before executing:
+    },
+  });
 
       if (error) throw error;
 
@@ -85,6 +102,7 @@ export function ContasAPagarWidget() {
         data_vencimento: t.data_vencimento,
       }));
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   const totalPendencias = useMemo(

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { BookOpen, Play, ChevronRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useConfiguracaoFinanceiraEnsino } from "@/hooks/useConfiguracaoFinanceiraEnsino";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface InscricaoComProgresso {
   id: string;
@@ -48,6 +49,7 @@ interface JornadaDisponivel {
 export default function MeusCursos() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [inscricoes, setInscricoes] = useState<InscricaoComProgresso[]>([]);
   const [jornadasDisponiveis, setJornadasDisponiveis] = useState<JornadaDisponivel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,6 +212,8 @@ export default function MeusCursos() {
           conta_id: contaId,
           categoria_id: categoriaId,
           base_ministerial_id: baseMinisterialId,
+          igreja_id: igrejaId,
+          filial_id: isAllFiliais ? null : filialId,
         })
         .select("id")
         .single();

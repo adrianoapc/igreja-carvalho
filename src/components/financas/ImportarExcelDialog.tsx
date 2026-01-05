@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface ImportarExcelDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
   const [fileName, setFileName] = useState<string>("");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const queryClient = useQueryClient();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -168,6 +170,11 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
         return;
       }
 
+      if (!igrejaId) {
+        toast.error("Contexto da igreja não identificado. Recarregue e tente novamente.");
+        return;
+      }
+
       const transacoes = [];
       const erros = [];
 
@@ -244,6 +251,8 @@ export function ImportarExcelDialog({ open, onOpenChange, tipo }: ImportarExcelD
             categoria_id: categoriaId,
             fornecedor_id: fornecedorId,
             observacoes,
+            igreja_id: igrejaId,
+            filial_id: isAllFiliais ? null : filialId,
           });
         } catch (error) {
           erros.push(`Linha ${i + 1}: ${error}`);

@@ -10,6 +10,7 @@ import { MonthPicker } from "@/components/financas/MonthPicker";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useState } from "react";
+import { useFilialId } from "@/hooks/useFilialId";
 import {
   LineChart,
   Line,
@@ -47,6 +48,7 @@ export default function DashboardOfertas() {
   const { formatValue } = useHideValues();
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const getDatasIntervalo = () => {
     if (customRange?.from && customRange?.to) {
@@ -65,36 +67,50 @@ export default function DashboardOfertas() {
   const datas = getDatasIntervalo();
 
   const { data: transacoes, isLoading } = useQuery({
-    queryKey: ["ofertas-dashboard", selectedMonth, customRange],
+    queryKey: ["ofertas-dashboard", selectedMonth, customRange, igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from("transacoes_financeiras")
         .select("*")
         .eq("tipo", "entrada")
         .ilike("descricao", "%oferta%")
         .gte("data_vencimento", datas.inicio)
         .lte("data_vencimento", datas.fim)
+        .eq("igreja_id", igrejaId)
         .order("data_vencimento", { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data || [];
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   // Buscar histórico de rejeições
   const { data: rejeicoes } = useQuery({
-    queryKey: ["rejeicoes-oferta"],
+    queryKey: ["rejeicoes-oferta", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from("notifications")
         .select("*, related_user_id")
         .eq("type", "rejeicao_oferta")
+        .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false })
         .limit(10);
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data || [];
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   const processarDados = () => {

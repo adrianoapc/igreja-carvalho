@@ -32,6 +32,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { generatePdfThumbnail } from "@/lib/pdfUtils";
 import { TransacaoUploadSection } from "./TransacaoUploadSection";
 import { TransacaoDocumentViewer } from "./TransacaoDocumentViewer";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface TransacaoDialogProps {
   open: boolean;
@@ -68,6 +69,7 @@ interface TransacaoDialogProps {
 export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: TransacaoDialogProps) {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
 
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
@@ -611,6 +613,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       return;
     }
 
+    if (!igrejaId) {
+      toast.error("Contexto da igreja não identificado. Recarregue e tente novamente.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -667,6 +674,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         multas: foiPago && multas ? parseFloat(multas.replace(",", ".")) : 0,
         desconto: foiPago && desconto ? parseFloat(desconto.replace(",", ".")) : 0,
         taxas_administrativas: foiPago && taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(",", ".")) : 0,
+        igreja_id: igrejaId,
+        filial_id: isAllFiliais ? null : filialId,
       };
 
       let error;

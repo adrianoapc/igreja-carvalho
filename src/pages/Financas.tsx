@@ -21,80 +21,106 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function Financas() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const { data: contas } = useQuery({
-    queryKey: ["contas-resumo"],
+    queryKey: ["contas-resumo", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase.from("contas").select("saldo_atual").eq("ativo", true);
+      if (!igrejaId) return [];
+      let query = supabase.from("contas").select("saldo_atual").eq("ativo", true).eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       return data;
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   // Calcular entradas e saídas do mês atual
   const { data: transacoesEntrada } = useQuery({
-    queryKey: ["entradas-mes-atual"],
+    queryKey: ["entradas-mes-atual", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("transacoes_financeiras")
         .select("valor")
         .eq("tipo", "entrada")
         .eq("status", "pago")
         .gte("data_pagamento", firstDay.toISOString().split("T")[0])
-        .lte("data_pagamento", lastDay.toISOString().split("T")[0]);
+        .lte("data_pagamento", lastDay.toISOString().split("T")[0])
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data;
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   const { data: transacoesSaida } = useQuery({
-    queryKey: ["saidas-mes-atual"],
+    queryKey: ["saidas-mes-atual", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("transacoes_financeiras")
         .select("valor")
         .eq("tipo", "saida")
         .eq("status", "pago")
         .gte("data_pagamento", firstDay.toISOString().split("T")[0])
-        .lte("data_pagamento", lastDay.toISOString().split("T")[0]);
+        .lte("data_pagamento", lastDay.toISOString().split("T")[0])
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data;
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ["categorias-count"],
+    queryKey: ["categorias-count", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase.from("categorias_financeiras").select("id").eq("ativo", true);
+      if (!igrejaId) return [];
+      let query = supabase.from("categorias_financeiras").select("id").eq("ativo", true).eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       return data;
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   const { data: fornecedores } = useQuery({
-    queryKey: ["fornecedores-count"],
+    queryKey: ["fornecedores-count", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase.from("fornecedores").select("id").eq("ativo", true);
+      if (!igrejaId) return [];
+      let query = supabase.from("fornecedores").select("id").eq("ativo", true).eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       return data;
     },
+    enabled: !!igrejaId && !filialLoading,
   });
 
   const totalEmCaixa = contas?.reduce((sum, conta) => sum + Number(conta.saldo_atual), 0) || 0;
