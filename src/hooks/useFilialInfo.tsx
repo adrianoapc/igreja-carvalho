@@ -8,17 +8,19 @@ interface FilialInfo {
   igrejaId: string | null;
   igrejaNome: string | null;
   filiais: Array<{ id: string; nome: string }>;
+  isAllFiliais: boolean;
   loading: boolean;
 }
 
 export function useFilialInfo(): FilialInfo {
-  const { filialId, igrejaId, loading: contextLoading } = useFilialId();
+  const { filialId, igrejaId, isAllFiliais, loading: contextLoading } = useFilialId();
   const [info, setInfo] = useState<Omit<FilialInfo, 'loading'>>({
     filialId: null,
     filialNome: null,
     igrejaId: null,
     igrejaNome: null,
     filiais: [],
+    isAllFiliais: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -69,12 +71,13 @@ export function useFilialInfo(): FilialInfo {
         igrejaId,
         igrejaNome,
         filiais,
+        isAllFiliais,
       });
       setLoading(false);
     };
 
     fetchInfo();
-  }, [filialId, igrejaId, contextLoading]);
+  }, [filialId, igrejaId, isAllFiliais, contextLoading]);
 
   return { ...info, loading: loading || contextLoading };
 }

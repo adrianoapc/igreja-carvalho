@@ -56,20 +56,32 @@ export function useFilialId() {
     igrejaId?: string | null
   ) => {
     if (!userId || !igrejaId) return false;
-    const { data: roles, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("igreja_id", igrejaId);
-
-    if (error) {
-      console.error("Erro ao validar permissões de filial:", error);
+    
+    try {
+      const queryPromise = supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("igreja_id", igrejaId);
+      
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 3000)
+      );
+      
+      const result = await Promise.race([queryPromise, timeoutPromise]);
+      
+      if ('error' in result && result.error) {
+        console.error("Erro ao validar permissões de filial:", result.error);
+        return false;
+      }
+      
+      return (result.data || []).some((r: { role: string }) =>
+        ["admin", "admin_igreja", "super_admin"].includes(r.role)
+      );
+    } catch (err) {
+      console.warn("Timeout ou erro ao validar permissões de filial:", err);
       return false;
     }
-
-    return (roles || []).some((r) =>
-      ["admin", "admin_igreja", "super_admin"].includes(r.role)
-    );
   };
 
   useEffect(() => {
@@ -131,6 +143,15 @@ export function useFilialId() {
 
     resolveSession();
 
+    // Timeout fallback para evitar loop infinito
+    const timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('useFilialId: Timeout reached, forcing completion');
+        setData({ filialId: null, igrejaId: null, isAllFiliais: false });
+        setLoading(false);
+      }
+    }, 5000);
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -187,9 +208,10 @@ export function useFilialId() {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [extractFromSession]);
+  }, [extractFromSession, loading]);
 
   return {
     filialId: data.filialId,
