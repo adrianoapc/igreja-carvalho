@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MapPin, ChevronDown, Building2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -13,6 +13,8 @@ import { useFilialInfo } from "@/hooks/useFilialInfo";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCurrentUserFilialAccess } from "@/hooks/useUserFilialAccess";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
 
@@ -24,10 +26,12 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
   const { filialId, filialNome, filiais, igrejaId, isAllFiliais, loading } = useFilialInfo();
   const { isAdmin, loading: permLoading } = usePermissions();
   const { allowedFilialIds, hasExplicitRestrictions, isLoading: accessLoading } = useCurrentUserFilialAccess(igrejaId || undefined);
+  const { session } = useAuth();
   
   const [selectedFilialId, setSelectedFilialId] = useState<string | null>(null);
   const [selectedFilialNome, setSelectedFilialNome] = useState<string | null>(null);
   const [selectedIsAll, setSelectedIsAll] = useState(false);
+  const [isPersisting, setIsPersisting] = useState(false);
 
   // Carregar override do localStorage
   useEffect(() => {
@@ -57,7 +61,37 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
     }
   }, [filialId, filialNome, isAllFiliais, selectedFilialId]);
 
-  const handleSelectFilial = (id: string | null, nome: string | null, isAll = false) => {
+  const persistSelection = async (id: string | null, isAll: boolean) => {
+    if (!session?.user?.id || !igrejaId) return;
+
+    try {
+      setIsPersisting(true);
+      const targetFilial = isAll ? null : id;
+
+      await supabase
+        .from("profiles")
+        .update({
+          igreja_id: igrejaId,
+          filial_id: targetFilial,
+        })
+        .eq("user_id", session.user.id);
+
+      await supabase.auth.updateUser({
+        data: {
+          igreja_id: igrejaId,
+          filial_id: targetFilial,
+        },
+      });
+
+      await supabase.auth.refreshSession();
+    } catch (error) {
+      console.error("Erro ao persistir troca de filial:", error);
+    } finally {
+      setIsPersisting(false);
+    }
+  };
+
+  const handleSelectFilial = async (id: string | null, nome: string | null, isAll = false) => {
     setSelectedFilialId(id);
     setSelectedFilialNome(nome);
     setSelectedIsAll(isAll);
@@ -67,7 +101,8 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
     } else {
       localStorage.removeItem(FILIAL_OVERRIDE_KEY);
     }
-    
+    await persistSelection(id, isAll);
+
     // Recarregar a página para aplicar o novo contexto
     window.location.reload();
   };
@@ -133,6 +168,7 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
             <DropdownMenuItem 
               onClick={() => handleSelectFilial(null, "Todas as filiais", true)}
               className={cn(isAllSelected && "bg-accent")}
+              disabled={isPersisting}
             >
               <Building2 className="h-4 w-4 mr-2" />
               <span>Todas as filiais</span>
@@ -141,15 +177,16 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
           </>
         )}
         {displayFiliais.map((filial) => (
-          <DropdownMenuItem
-            key={filial.id}
-            onClick={() => handleSelectFilial(filial.id, filial.nome, false)}
-            className={cn(selectedFilialId === filial.id && !isAllSelected && "bg-accent")}
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            <span>{filial.nome}</span>
-          </DropdownMenuItem>
-        ))}
+            <DropdownMenuItem
+              key={filial.id}
+              onClick={() => handleSelectFilial(filial.id, filial.nome, false)}
+              className={cn(selectedFilialId === filial.id && !isAllSelected && "bg-accent")}
+              disabled={isPersisting}
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              <span>{filial.nome}</span>
+            </DropdownMenuItem>
+          ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

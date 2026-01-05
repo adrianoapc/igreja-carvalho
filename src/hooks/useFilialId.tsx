@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 
@@ -21,6 +21,8 @@ export function useFilialId() {
     isAllFiliais: false,
   });
   const [loading, setLoading] = useState(true);
+  const metadataSynced = useRef(false);
+  const lastUserId = useRef<string | null>(null);
 
   const extractFromSession = useCallback((session: Session): FilialData => {
     const filialId =
@@ -49,6 +51,51 @@ export function useFilialId() {
       // Ignore parsing errors
     }
     return null;
+  };
+
+  const syncSessionMetadata = async (
+    session: Session | null,
+    igrejaId: string | null,
+    filialId: string | null,
+    isAllFiliais: boolean
+  ): Promise<Session | null> => {
+    if (session?.user?.id !== lastUserId.current) {
+      metadataSynced.current = false;
+      lastUserId.current = session?.user?.id ?? null;
+    }
+    if (!session?.user?.id || !igrejaId) return session;
+    if (metadataSynced.current) return session;
+
+    const metaIgreja =
+      extractUUID(session.user.app_metadata?.igreja_id) ??
+      extractUUID(session.user.user_metadata?.igreja_id);
+    const metaFilial =
+      extractUUID(session.user.app_metadata?.filial_id) ??
+      extractUUID(session.user.user_metadata?.filial_id);
+
+    const targetFilial = isAllFiliais ? null : filialId;
+    const needsSync =
+      (igrejaId && metaIgreja !== igrejaId) ||
+      (targetFilial !== undefined && metaFilial !== targetFilial);
+
+    if (!needsSync) return session;
+
+    metadataSynced.current = true;
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          igreja_id: igrejaId,
+          filial_id: targetFilial,
+        },
+      });
+
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      return refreshed.session ?? session;
+    } catch (error) {
+      console.error("Erro ao sincronizar metadata de filial:", error);
+      metadataSynced.current = false; // permitir nova tentativa se falhar
+      return session;
+    }
   };
 
   const canUseAllFiliais = async (
@@ -117,6 +164,7 @@ export function useFilialId() {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const extracted = extractFromSession(sessionData.session);
+        let profileFilialId: string | null = null;
 
         // Se não tiver filial_id no JWT, buscar do profile
         if (!extracted.filialId && sessionData.session?.user?.id) {
@@ -127,6 +175,7 @@ export function useFilialId() {
             .single();
 
           if (!error && profile) {
+            profileFilialId = profile.filial_id;
             extracted.filialId = profile.filial_id;
             extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
           }
@@ -147,6 +196,19 @@ export function useFilialId() {
           }
         } else if (override?.id) {
           extracted.filialId = override.id;
+        }
+
+        const syncedSession = await syncSessionMetadata(
+          sessionData.session,
+          extracted.igrejaId,
+          extracted.filialId ?? profileFilialId,
+          extracted.isAllFiliais ?? false
+        );
+
+        if (syncedSession && syncedSession !== sessionData.session) {
+          const reExtracted = extractFromSession(syncedSession);
+          extracted.filialId = reExtracted.filialId ?? extracted.filialId;
+          extracted.igrejaId = reExtracted.igrejaId ?? extracted.igrejaId;
         }
 
         finish({
@@ -175,6 +237,7 @@ export function useFilialId() {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
         const extracted = extractFromSession(session);
+        let profileFilialId: string | null = null;
 
         // Se não tiver filial_id no JWT, buscar do profile
         if (!extracted.filialId && session?.user?.id) {
@@ -185,6 +248,7 @@ export function useFilialId() {
             .single();
 
           if (!error && profile) {
+            profileFilialId = profile.filial_id;
             extracted.filialId = profile.filial_id;
             extracted.igrejaId = profile.igreja_id ?? extracted.igrejaId;
           }
@@ -205,6 +269,19 @@ export function useFilialId() {
           }
         } else if (override?.id) {
           extracted.filialId = override.id;
+        }
+
+        const syncedSession = await syncSessionMetadata(
+          session,
+          extracted.igrejaId,
+          extracted.filialId ?? profileFilialId,
+          extracted.isAllFiliais ?? false
+        );
+
+        if (syncedSession && syncedSession !== session) {
+          const reExtracted = extractFromSession(syncedSession);
+          extracted.filialId = reExtracted.filialId ?? extracted.filialId;
+          extracted.igrejaId = reExtracted.igrejaId ?? extracted.igrejaId;
         }
 
         finish({

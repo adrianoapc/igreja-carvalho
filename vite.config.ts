@@ -12,6 +12,19 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: "esnext",
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-date": ["date-fns"],
+          "vendor-charts": ["recharts"],
+          "vendor-html2canvas": ["html2canvas"],
+          "vendor-carousel": ["embla-carousel-react", "embla-carousel-autoplay"],
+        },
+      },
+    },
   },
   optimizeDeps: {
     esbuildOptions: {
