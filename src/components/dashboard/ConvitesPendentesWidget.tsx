@@ -89,13 +89,21 @@ export default function ConvitesPendentesWidget() {
       if (error) throw error;
 
       // Filtrar eventos futuros no cliente (PostgREST não suporta filtros em campos relacionados)
-      const convitesFiltrados = (data || []).filter((convite: ConviteComEvento) => {
-        return convite.evento && new Date(convite.evento.data_evento) > new Date(now);
-      });
+      const convitesFiltrados = (data || []).filter(
+        (convite: ConviteComEvento) => {
+          return (
+            convite.evento &&
+            new Date(convite.evento.data_evento) > new Date(now)
+          );
+        }
+      );
 
       // Ordenar por data do evento
       convitesFiltrados.sort((a: ConviteComEvento, b: ConviteComEvento) => {
-        return new Date(a.evento!.data_evento).getTime() - new Date(b.evento!.data_evento).getTime();
+        return (
+          new Date(a.evento!.data_evento).getTime() -
+          new Date(b.evento!.data_evento).getTime()
+        );
       });
 
       return convitesFiltrados as ConvitePendente[];
@@ -113,7 +121,10 @@ export default function ConvitesPendentesWidget() {
       status: "confirmado" | "recusado";
       motivo?: string;
     }) => {
-      const payload: { status: "confirmado" | "recusado"; motivo_recusa?: string } = { status };
+      const payload: {
+        status: "confirmado" | "recusado";
+        motivo_recusa?: string;
+      } = { status };
       if (motivo) {
         payload.motivo_recusa = motivo;
       }
@@ -133,7 +144,8 @@ export default function ConvitesPendentesWidget() {
       setSelectedConvite(null);
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : "Erro ao atualizar convite";
+      const message =
+        error instanceof Error ? error.message : "Erro ao atualizar convite";
       console.error("Erro ao atualizar convite:", error);
       toast.error(message);
     },

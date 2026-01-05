@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -9,11 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { formatarCPF, formatarTelefone, formatarCEP, removerFormatacao } from '@/lib/validators';
-import { Loader2 } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  formatarCPF,
+  formatarTelefone,
+  formatarCEP,
+  removerFormatacao,
+} from "@/lib/validators";
+import { Loader2 } from "lucide-react";
 
 interface NovaIgrejaDialogProps {
   open: boolean;
@@ -21,75 +26,90 @@ interface NovaIgrejaDialogProps {
   onSuccess: () => void;
 }
 
-export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDialogProps) {
+export function NovaIgrejaDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: NovaIgrejaDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    nome: '',
-    cnpj: '',
-    email: '',
-    telefone: '',
-    endereco: '',
-    cidade: '',
-    estado: '',
-    cep: '',
+    nome: "",
+    cnpj: "",
+    email: "",
+    telefone: "",
+    endereco: "",
+    cidade: "",
+    estado: "",
+    cep: "",
   });
 
   const handleChange = (field: string, value: string) => {
     let formattedValue = value;
-    
-    if (field === 'cnpj') {
+
+    if (field === "cnpj") {
       const digits = removerFormatacao(value);
       if (digits.length <= 14) {
-        formattedValue = digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+        formattedValue = digits.replace(
+          /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+          "$1.$2.$3/$4-$5"
+        );
       }
-    } else if (field === 'telefone') {
+    } else if (field === "telefone") {
       formattedValue = formatarTelefone(value);
-    } else if (field === 'cep') {
+    } else if (field === "cep") {
       formattedValue = formatarCEP(value);
     }
-    
-    setFormData(prev => ({ ...prev, [field]: formattedValue }));
+
+    setFormData((prev) => ({ ...prev, [field]: formattedValue }));
   };
 
   const handleSubmit = async () => {
     if (!formData.nome.trim()) {
-      toast({ title: 'Nome da igreja é obrigatório', variant: 'destructive' });
+      toast({ title: "Nome da igreja é obrigatório", variant: "destructive" });
       return;
     }
 
     if (!formData.email.trim()) {
-      toast({ title: 'Email é obrigatório para criar o admin', variant: 'destructive' });
+      toast({
+        title: "Email é obrigatório para criar o admin",
+        variant: "destructive",
+      });
       return;
     }
 
     setLoading(true);
-    
+
     // Timeout de segurança para evitar freeze eterno
     const timeoutId = setTimeout(() => {
-      console.warn('NovaIgrejaDialog: Timeout reached, resetting loading state');
+      console.warn(
+        "NovaIgrejaDialog: Timeout reached, resetting loading state"
+      );
       setLoading(false);
-      toast({ 
-        title: 'Operação demorando muito', 
-        description: 'Tente novamente. Se o problema persistir, contate o suporte.',
-        variant: 'destructive' 
+      toast({
+        title: "Operação demorando muito",
+        description:
+          "Tente novamente. Se o problema persistir, contate o suporte.",
+        variant: "destructive",
       });
     }, 30000); // 30 segundos timeout
 
     try {
       // 1. Criar a igreja
       const { data: igreja, error: igrejaError } = await supabase
-        .from('igrejas')
+        .from("igrejas")
         .insert({
           nome: formData.nome.trim(),
           cnpj: formData.cnpj ? removerFormatacao(formData.cnpj) : null,
           email: formData.email.trim() || null,
-          telefone: formData.telefone ? removerFormatacao(formData.telefone) : null,
+          telefone: formData.telefone
+            ? removerFormatacao(formData.telefone)
+            : null,
           endereco: formData.endereco.trim() || null,
           cidade: formData.cidade.trim() || null,
           estado: formData.estado.trim().toUpperCase() || null,
           cep: formData.cep ? removerFormatacao(formData.cep) : null,
-          status: 'ativo',
+          status: "ativo",
         })
         .select()
         .single();
@@ -98,63 +118,73 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
 
       // 2. Criar a filial Matriz automaticamente
       const { data: filial, error: filialError } = await supabase
-        .from('filiais')
+        .from("filiais")
         .insert({
           igreja_id: igreja.id,
-          nome: 'Matriz',
+          nome: "Matriz",
         })
         .select()
         .single();
 
       if (filialError) {
-        console.error('Erro ao criar filial Matriz:', filialError);
+        console.error("Erro ao criar filial Matriz:", filialError);
       }
 
       // 3. Criar configurações padrão
       const { error: configError } = await supabase
-        .from('configuracoes_igreja')
+        .from("configuracoes_igreja")
         .insert({
           igreja_id: igreja.id,
           nome_igreja: formData.nome.trim(),
         });
 
       if (configError) {
-        console.error('Erro ao criar configurações:', configError);
+        console.error("Erro ao criar configurações:", configError);
       }
 
       // 4. Provisionar admin da igreja via Edge Function
-      const { data: adminData, error: adminError } = await supabase.functions.invoke(
-        'provisionar-admin-igreja',
-        {
+      const { data: adminData, error: adminError } =
+        await supabase.functions.invoke("provisionar-admin-igreja", {
           body: {
             email: formData.email.trim(),
             nome: `Admin - ${formData.nome.trim()}`,
             igreja_id: igreja.id,
             filial_id: filial?.id || null,
           },
-        }
-      );
+        });
 
       if (adminError) {
-        console.error('Erro ao provisionar admin:', adminError);
+        console.error("Erro ao provisionar admin:", adminError);
         toast({
-          title: 'Igreja criada, mas houve erro ao criar admin',
-          description: 'Crie o admin manualmente depois.',
-          variant: 'destructive',
+          title: "Igreja criada, mas houve erro ao criar admin",
+          description: "Crie o admin manualmente depois.",
+          variant: "destructive",
         });
       } else {
         toast({
-          title: 'Igreja cadastrada com sucesso!',
-          description: `Admin criado com senha temporária: ${adminData?.temp_password || 'Erro ao gerar senha'}`,
+          title: "Igreja cadastrada com sucesso!",
+          description: `Admin criado com senha temporária: ${
+            adminData?.temp_password || "Erro ao gerar senha"
+          }`,
         });
       }
 
-      setFormData({ nome: '', cnpj: '', email: '', telefone: '', endereco: '', cidade: '', estado: '', cep: '' });
+      setFormData({
+        nome: "",
+        cnpj: "",
+        email: "",
+        telefone: "",
+        endereco: "",
+        cidade: "",
+        estado: "",
+        cep: "",
+      });
       onOpenChange(false);
       onSuccess();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erro ao cadastrar igreja';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      const message =
+        error instanceof Error ? error.message : "Erro ao cadastrar igreja";
+      toast({ title: "Erro", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
       clearTimeout(timeoutId);
@@ -177,7 +207,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
             <Input
               id="nome"
               value={formData.nome}
-              onChange={(e) => handleChange('nome', e.target.value)}
+              onChange={(e) => handleChange("nome", e.target.value)}
               placeholder="Nome da igreja"
             />
           </div>
@@ -188,7 +218,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
               <Input
                 id="cnpj"
                 value={formData.cnpj}
-                onChange={(e) => handleChange('cnpj', e.target.value)}
+                onChange={(e) => handleChange("cnpj", e.target.value)}
                 placeholder="00.000.000/0000-00"
                 maxLength={18}
               />
@@ -198,7 +228,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
               <Input
                 id="telefone"
                 value={formData.telefone}
-                onChange={(e) => handleChange('telefone', e.target.value)}
+                onChange={(e) => handleChange("telefone", e.target.value)}
                 placeholder="(00) 00000-0000"
                 maxLength={15}
               />
@@ -211,7 +241,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
               id="email"
               type="email"
               value={formData.email}
-              onChange={(e) => handleChange('email', e.target.value)}
+              onChange={(e) => handleChange("email", e.target.value)}
               placeholder="contato@igreja.com"
             />
           </div>
@@ -221,7 +251,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
             <Input
               id="endereco"
               value={formData.endereco}
-              onChange={(e) => handleChange('endereco', e.target.value)}
+              onChange={(e) => handleChange("endereco", e.target.value)}
               placeholder="Rua, número, bairro"
             />
           </div>
@@ -232,7 +262,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
               <Input
                 id="cidade"
                 value={formData.cidade}
-                onChange={(e) => handleChange('cidade', e.target.value)}
+                onChange={(e) => handleChange("cidade", e.target.value)}
                 placeholder="Cidade"
               />
             </div>
@@ -241,7 +271,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
               <Input
                 id="estado"
                 value={formData.estado}
-                onChange={(e) => handleChange('estado', e.target.value)}
+                onChange={(e) => handleChange("estado", e.target.value)}
                 placeholder="SP"
                 maxLength={2}
               />
@@ -251,7 +281,7 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
               <Input
                 id="cep"
                 value={formData.cep}
-                onChange={(e) => handleChange('cep', e.target.value)}
+                onChange={(e) => handleChange("cep", e.target.value)}
                 placeholder="00000-000"
                 maxLength={9}
               />
@@ -260,7 +290,11 @@ export function NovaIgrejaDialog({ open, onOpenChange, onSuccess }: NovaIgrejaDi
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={loading}>

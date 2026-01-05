@@ -141,7 +141,9 @@ export default function Eventos() {
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<
+    { from: Date; to: Date } | undefined
+  >(undefined);
 
   // KPIs
   const [kpis, setKpis] = useState({
@@ -430,7 +432,11 @@ export default function Eventos() {
                     mode="range"
                     defaultMonth={dateRange?.from}
                     selected={dateRange}
-                    onSelect={(range) => setDateRange(range as { from: Date; to: Date } | undefined)}
+                    onSelect={(range) =>
+                      setDateRange(
+                        range as { from: Date; to: Date } | undefined
+                      )
+                    }
                     numberOfMonths={2}
                   />
                 </PopoverContent>
