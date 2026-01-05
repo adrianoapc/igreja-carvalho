@@ -69,7 +69,7 @@ import CalendarioMensal from "@/components/eventos/CalendarioMensal";
 
 interface Evento {
   id: string;
-  tipo: string;
+  tipo: "CULTO" | "EVENTO" | "OUTRO" | "RELOGIO" | "TAREFA";
   titulo: string;
   descricao: string | null;
   data_evento: string;
@@ -166,7 +166,7 @@ export default function Eventos() {
 
       if (error) throw error;
 
-      setEventos((data || []) as Evento[]);
+      setEventos((data || []).map(e => ({ ...e, tipo: e.tipo as Evento["tipo"] })) as Evento[]);
     } catch (error: unknown) {
       toast.error("Erro ao carregar eventos", {
         description: error instanceof Error ? error.message : String(error),
@@ -206,7 +206,7 @@ export default function Eventos() {
 
       setKpis({
         eventosMes: eventosMes || 0,
-        proximoEvento: proximoEvento || null,
+        proximoEvento: proximoEvento ? { ...proximoEvento, tipo: proximoEvento.tipo as Evento["tipo"] } as Evento : null,
         escalasPendentes: escalasPendentes || 0,
       });
     } catch (error) {
@@ -663,9 +663,9 @@ export default function Eventos() {
 
         <TabsContent value="calendario" className="mt-4">
           <CalendarioMensal
-            cultos={filteredEventos}
+            cultos={filteredEventos as any}
             escalasCount={{}}
-            onCultoClick={(e) => handleAbrirEvento(e)}
+            onCultoClick={(e) => handleAbrirEvento(e as Evento)}
           />
         </TabsContent>
       </Tabs>

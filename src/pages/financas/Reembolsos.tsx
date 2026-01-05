@@ -149,7 +149,7 @@ export default function Reembolsos() {
 
   const fetchUserRoles = async () => {
     try {
-      let query = supabase
+      let query = (supabase as any)
         .from('user_roles')
         .select('role')
         .eq('user_id', user?.id)
@@ -175,7 +175,7 @@ export default function Reembolsos() {
     queryKey: ["minhas-solicitacoes", igrejaId, filialId, isAllFiliais, profile?.id],
     queryFn: async () => {
       if (!igrejaId) return [];
-      let query = supabase
+      let query = (supabase as any)
         .from("view_solicitacoes_reembolso")
         .select("*")
         .eq("solicitante_id", profile?.id)
@@ -197,7 +197,7 @@ export default function Reembolsos() {
     queryKey: ["todas-solicitacoes", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      let query = supabase
+      let query = (supabase as any)
         .from("view_solicitacoes_reembolso")
         .select("*")
         .in("status", ["pendente", "aprovado"])

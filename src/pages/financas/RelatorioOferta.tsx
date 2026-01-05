@@ -248,12 +248,11 @@ export default function RelatorioOferta() {
         .eq('tipo', 'entrada')
         .ilike('nome', '%oferta%')
         .eq('igreja_id', igrejaId)
-        .limit(1)
-        .single();
+        .limit(1);
       if (!isAllFiliais && filialId) {
         categoriaQuery = categoriaQuery.eq('filial_id', filialId);
       }
-      const { data: categoriaOferta } = await categoriaQuery;
+      const { data: categoriaOferta } = await categoriaQuery.maybeSingle();
 
       // Criar transações para cada forma de pagamento com valor
       const transacoes = [];
