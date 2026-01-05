@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   MessageCircle
 } from "lucide-react";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Time {
   id: string;
@@ -57,39 +58,46 @@ export default function Escalas() {
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const mesAtual = format(currentDate, "MMMM yyyy", { locale: ptBR });
   const inicioMes = startOfMonth(currentDate);
   const fimMes = endOfMonth(currentDate);
 
   useEffect(() => {
-    loadTimes();
-  }, []);
+    if (!filialLoading && igrejaId) {
+      loadTimes();
+    }
+  }, [filialLoading, igrejaId]);
 
   useEffect(() => {
     if (timeSelecionado) {
       loadMembros();
     }
-  }, [timeSelecionado]);
+  }, [timeSelecionado, igrejaId, filialId, isAllFiliais, filialLoading]);
 
   useEffect(() => {
     loadCultos();
-  }, [currentDate]);
+  }, [currentDate, igrejaId, filialId, isAllFiliais, filialLoading]);
 
   useEffect(() => {
     if (timeSelecionado && cultos.length > 0) {
       loadEscalas();
     }
-  }, [timeSelecionado, cultos]);
+  }, [timeSelecionado, cultos, igrejaId, filialId, isAllFiliais, filialLoading]);
 
   const loadTimes = async () => {
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let query = supabase
         .from("times")
         .select("*")
         .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
         .order("categoria")
         .order("nome");
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       setTimes(data || []);
@@ -104,11 +112,14 @@ export default function Escalas() {
   const loadMembros = async () => {
     if (!timeSelecionado) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("membros_time")
         .select(`*, profiles:pessoa_id(nome), posicoes_time:posicao_id(nome)`)
         .eq("time_id", timeSelecionado)
         .eq("ativo", true);
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       setMembros(data || []);
@@ -120,12 +131,16 @@ export default function Escalas() {
   const loadCultos = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let query = supabase
         .from("eventos")
         .select("id, titulo, data_evento, tipo")
         .gte("data_evento", inicioMes.toISOString())
         .lte("data_evento", fimMes.toISOString())
+        .eq("igreja_id", igrejaId)
         .order("data_evento", { ascending: true });
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       setCultos((data || []) as Evento[]);
@@ -140,11 +155,15 @@ export default function Escalas() {
     if (!timeSelecionado || cultos.length === 0) return;
     try {
       const cultoIds = cultos.map(c => c.id);
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let query = supabase
         .from("escalas")
         .select("*")
         .eq("time_id", timeSelecionado)
-        .in("evento_id", cultoIds);
+        .in("evento_id", cultoIds)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       setEscalas(data || []);

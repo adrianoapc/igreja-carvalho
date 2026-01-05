@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Intercessor {
   id: string;
@@ -47,6 +48,7 @@ export function IntercessoresManager() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { profile, hasAccess } = useAuth();
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const isLeader = !!(
     profile?.e_lider ||
@@ -57,7 +59,8 @@ export function IntercessoresManager() {
 
   const fetchIntercessores = async () => {
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let query = supabase
         .from("intercessores")
         .select(
           `
@@ -65,7 +68,10 @@ export function IntercessoresManager() {
           pedidos_oracao!intercessor_id(count)
         `
         )
+        .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -93,9 +99,11 @@ export function IntercessoresManager() {
       setLoading(false);
       return;
     }
-    fetchIntercessores();
+    if (!filialLoading) {
+      fetchIntercessores();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLeader]);
+  }, [isLeader, filialLoading, igrejaId, filialId, isAllFiliais]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

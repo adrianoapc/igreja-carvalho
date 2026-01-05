@@ -15,6 +15,7 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Baby, Users, MapPin, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Sala {
   id: string;
@@ -41,6 +42,7 @@ export default function SalaDialog({ open, onOpenChange, sala, onSuccess }: Sala
   const [idadeMax, setIdadeMax] = useState("");
   const [tipo, setTipo] = useState("adultos");
   const [ativo, setAtivo] = useState(true);
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
 
   useEffect(() => {
     if (sala) {
@@ -70,6 +72,11 @@ export default function SalaDialog({ open, onOpenChange, sala, onSuccess }: Sala
       return;
     }
 
+    if (!igrejaId) {
+      toast.error("Contexto da igreja não identificado");
+      return;
+    }
+
     setLoading(true);
 
     const salaData = {
@@ -79,6 +86,8 @@ export default function SalaDialog({ open, onOpenChange, sala, onSuccess }: Sala
       idade_max: idadeMax ? parseInt(idadeMax) : null,
       tipo,
       ativo,
+      igreja_id: igrejaId,
+      filial_id: isAllFiliais ? null : filialId,
     };
 
     let error;

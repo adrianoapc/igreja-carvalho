@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import SalaDialog from "@/components/ensino/SalaDialog";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Sala {
   id: string;
@@ -29,18 +30,27 @@ export default function KidsConfig() {
   const [loading, setLoading] = useState(true);
   const [salaDialogOpen, setSalaDialogOpen] = useState(false);
   const [selectedSala, setSelectedSala] = useState<Sala | null>(null);
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   useEffect(() => {
-    fetchSalas();
-  }, []);
+    if (!filialLoading) {
+      fetchSalas();
+    }
+  }, [filialLoading, igrejaId, filialId, isAllFiliais]);
 
   const fetchSalas = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    if (!igrejaId) return;
+    let query = supabase
       .from("salas")
       .select("*")
       .eq("tipo", "kids")
+      .eq("igreja_id", igrejaId)
       .order("nome", { ascending: true });
+    if (!isAllFiliais && filialId) {
+      query = query.eq("filial_id", filialId);
+    }
+    const { data, error } = await query;
 
     if (error) {
       console.error("Erro ao carregar salas:", error);

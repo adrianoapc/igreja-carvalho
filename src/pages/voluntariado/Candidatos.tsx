@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale";
 import { Search, MoreVertical, CheckCircle, XCircle, BookOpen, Clock, Users, History, Route } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getRegraMinisterio } from "@/lib/voluntariado/triagem";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Candidato {
   id: string;
@@ -50,27 +51,43 @@ export default function Candidatos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   useEffect(() => {
-    fetchCandidatos();
-    fetchJornadas();
-  }, [statusFilter]);
+    if (!filialLoading) {
+      fetchCandidatos();
+      fetchJornadas();
+    }
+  }, [statusFilter, filialLoading, igrejaId, filialId, isAllFiliais]);
 
   const fetchJornadas = async () => {
-    const { data } = await supabase
+    if (!igrejaId) return;
+    let query = supabase
       .from("jornadas")
       .select("id, titulo")
       .eq("ativo", true)
+      .eq("igreja_id", igrejaId)
       .order("titulo");
+    if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+    const { data } = await query;
     if (data) setJornadas(data);
   };
 
   const fetchCandidatos = async () => {
     setLoading(true);
+    if (!igrejaId) {
+      setLoading(false);
+      return;
+    }
     let query = supabase
       .from("candidatos_voluntario")
       .select("*")
+      .eq("igreja_id", igrejaId)
       .order("created_at", { ascending: false });
+
+    if (!isAllFiliais && filialId) {
+      query = query.eq("filial_id", filialId);
+    }
 
     if (statusFilter !== "todos") {
       query = query.eq("status", statusFilter);

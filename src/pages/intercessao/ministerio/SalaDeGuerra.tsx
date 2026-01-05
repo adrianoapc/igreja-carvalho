@@ -38,6 +38,7 @@ import { NovoPedidoDialog } from "@/components/pedidos/NovoPedidoDialog";
 import { PedidoDetailsDialog } from "@/components/pedidos/PedidoDetailsDialog";
 import { NovoTestemunhoDialog } from "@/components/testemunhos/NovoTestemunhoDialog";
 import { TestemunhoDetailsDialog } from "@/components/testemunhos/TestemunhoDetailsDialog";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Pedido {
   id: string;
@@ -116,11 +117,13 @@ export default function SalaDeGuerra() {
   const [testemunhoDetailsOpen, setTestemunhoDetailsOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
 
   // Fetch Pedidos
   const fetchPedidos = async () => {
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let query = supabase
         .from("pedidos_oracao")
         .select(
           `
@@ -129,7 +132,11 @@ export default function SalaDeGuerra() {
           profiles!pedidos_oracao_pessoa_id_fkey(nome)
         `
         )
+        .eq("igreja_id", igrejaId)
         .order("data_criacao", { ascending: false });
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setPedidos(data || []);
@@ -142,7 +149,8 @@ export default function SalaDeGuerra() {
   // Fetch Testemunhos
   const fetchTestemunhos = async () => {
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let query = supabase
         .from("testemunhos")
         .select(
           `
@@ -150,7 +158,11 @@ export default function SalaDeGuerra() {
           profiles!testemunhos_autor_id_fkey(nome)
         `
         )
+        .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setTestemunhos(data || []);
@@ -167,7 +179,7 @@ export default function SalaDeGuerra() {
       setLoading(false);
     };
     fetchData();
-  }, []);
+  }, [igrejaId, filialId, isAllFiliais]);
 
   // Filtros Pedidos
   const filteredPedidos = pedidos.filter((p) => {
