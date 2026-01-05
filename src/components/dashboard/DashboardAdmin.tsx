@@ -69,6 +69,7 @@ import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader"; // <--- Novo
 import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
 import CandidatosPendentesWidget from "@/components/dashboard/CandidatosPendentesWidget";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Comunicado {
   id: string;
@@ -145,6 +146,7 @@ export default function DashboardAdmin() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
+  const { filialId, igrejaId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   useEffect(() => {
     if (searchParams.get("sentimento") === "true") {
@@ -155,13 +157,14 @@ export default function DashboardAdmin() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
+    if (filialLoading) return;
     fetchComunicados();
     fetchFinancialData();
     fetchConsolidationData();
     fetchPedidosOracao();
     fetchTestemunhos();
     checkTodaySentimento();
-  }, [profile?.id]);
+  }, [profile?.id, filialId, igrejaId, isAllFiliais, filialLoading]);
 
   const checkTodaySentimento = async () => {
     if (!profile?.id) return;
@@ -212,10 +215,10 @@ export default function DashboardAdmin() {
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-    const { data: contasData } = await supabase
-      .from("contas")
-      .select("saldo_atual")
-      .eq("ativo", true);
+    let contasQuery = supabase.from("contas").select("saldo_atual").eq("ativo", true);
+    if (igrejaId) contasQuery = contasQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) contasQuery = contasQuery.eq("filial_id", filialId);
+    const { data: contasData } = await contasQuery;
 
     if (contasData) {
       const total = contasData.reduce(
@@ -225,19 +228,29 @@ export default function DashboardAdmin() {
       setSaldoTotalContas(total);
     }
 
-    const { data: currentData } = await supabase
+    let currentQuery = supabase
       .from("transacoes_financeiras")
       .select("tipo, valor, categoria:categorias_financeiras(nome)")
       .gte("data_vencimento", currentMonthStart.toISOString())
       .lte("data_vencimento", currentMonthEnd.toISOString())
       .eq("status", "pago");
-
-    const { data: lastMonthData } = await supabase
+    let lastMonthQuery = supabase
       .from("transacoes_financeiras")
       .select("tipo, valor")
       .gte("data_vencimento", lastMonthStart.toISOString())
       .lte("data_vencimento", lastMonthEnd.toISOString())
       .eq("status", "pago");
+    if (igrejaId) {
+      currentQuery = currentQuery.eq("igreja_id", igrejaId);
+      lastMonthQuery = lastMonthQuery.eq("igreja_id", igrejaId);
+    }
+    if (!isAllFiliais && filialId) {
+      currentQuery = currentQuery.eq("filial_id", filialId);
+      lastMonthQuery = lastMonthQuery.eq("filial_id", filialId);
+    }
+
+    const { data: currentData } = await currentQuery;
+    const { data: lastMonthData } = await lastMonthQuery;
 
     if (currentData) {
       const entradas = currentData
@@ -276,12 +289,16 @@ export default function DashboardAdmin() {
       const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
 
-      const { data: monthData } = await supabase
+      let monthQuery = supabase
         .from("transacoes_financeiras")
         .select("tipo, valor")
         .gte("data_vencimento", monthStart.toISOString())
         .lte("data_vencimento", monthEnd.toISOString())
         .eq("status", "pago");
+      if (igrejaId) monthQuery = monthQuery.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) monthQuery = monthQuery.eq("filial_id", filialId);
+
+      const { data: monthData } = await monthQuery;
 
       const monthEntradas =
         monthData
@@ -302,20 +319,16 @@ export default function DashboardAdmin() {
   };
 
   const fetchConsolidationData = async () => {
-    const { data: visitors } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("status", "visitante");
+    const buildProfilesQuery = () => {
+      let query = supabase.from("profiles").select("id");
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      return query;
+    };
 
-    const { data: frequenters } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("status", "frequentador");
-
-    const { data: members } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("status", "membro");
+    const { data: visitors } = await buildProfilesQuery().eq("status", "visitante");
+    const { data: frequenters } = await buildProfilesQuery().eq("status", "frequentador");
+    const { data: members } = await buildProfilesQuery().eq("status", "membro");
 
     setConsolidationData([
       {
@@ -337,7 +350,7 @@ export default function DashboardAdmin() {
   };
 
   const fetchPedidosOracao = async () => {
-    const { data } = await supabase
+    let pedidosQuery = supabase
       .from("pedidos_oracao")
       .select(
         `
@@ -350,6 +363,10 @@ export default function DashboardAdmin() {
       .in("status", ["pendente", "em_oracao"])
       .order("created_at", { ascending: false })
       .limit(5);
+    if (igrejaId) pedidosQuery = pedidosQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) pedidosQuery = pedidosQuery.eq("filial_id", filialId);
+
+    const { data } = await pedidosQuery;
 
     if (data) {
       const pedidosWithPessoa = await Promise.all(
@@ -365,7 +382,7 @@ export default function DashboardAdmin() {
   };
 
   const fetchTestemunhos = async () => {
-    const { data } = await supabase
+    let testemunhosQuery = supabase
       .from("testemunhos")
       .select(
         `
@@ -378,6 +395,10 @@ export default function DashboardAdmin() {
       .eq("status", "publico")
       .order("created_at", { ascending: false })
       .limit(5);
+    if (igrejaId) testemunhosQuery = testemunhosQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) testemunhosQuery = testemunhosQuery.eq("filial_id", filialId);
+
+    const { data } = await testemunhosQuery;
 
     if (data) {
       const testemunhosWithPessoa = data.map((t) => ({

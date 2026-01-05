@@ -7,6 +7,7 @@ import { Plus, FolderKanban } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProjetoCard from "@/components/projetos/ProjetoCard";
 import ProjetoDialog from "@/components/projetos/ProjetoDialog";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Projeto {
   id: string;
@@ -23,18 +24,26 @@ interface Projeto {
 export default function Projetos() {
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const { data: projetos, isLoading, refetch } = useQuery({
-    queryKey: ["projetos"],
+    queryKey: ["projetos", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from("projetos")
         .select(`
           *,
           lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url),
           tarefas(status)
         `)
+        .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Erro ao carregar projetos:", error);
@@ -42,6 +51,7 @@ export default function Projetos() {
       }
       return data as Projeto[];
     },
+    enabled: !filialLoading && !!igrejaId,
   });
 
   const calcularProgresso = (tarefas: { status: string }[] | undefined) => {
