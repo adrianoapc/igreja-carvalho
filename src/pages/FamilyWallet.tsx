@@ -352,7 +352,7 @@ export default function FamilyWallet() {
     queryFn: async () => {
       if (!profile?.id || !igrejaId) return [];
       
-      let query = supabase
+      let query = (supabase as any)
         .from("view_kids_checkins_ativos")
         .select("*")
         .eq("responsavel_id", profile.id)

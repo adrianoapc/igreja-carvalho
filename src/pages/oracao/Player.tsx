@@ -36,8 +36,8 @@ interface LiturgiaItem {
     | "CUSTOM_SENTIMENTO"
     | "CUSTOM_VISITANTES";
   titulo: string;
-  conteudo: string | null; // URL do video, Texto do versículo, JSON stringificado, etc.
-  duracao_sugerida_min: number;
+  conteudo?: string | null; // URL do video, Texto do versículo, JSON stringificado, etc.
+  duracao_sugerida_min?: number;
   ordem: number;
 }
 
@@ -180,7 +180,7 @@ export default function PrayerPlayer() {
           // Mapear para o formato local
           const items: LiturgiaItem[] = liturgiaData.map((l: LiturgiaData) => ({
             id: l.id,
-            tipo: l.tipo || "AVISO",
+            tipo: (l.tipo || "AVISO") as LiturgiaItem["tipo"],
             titulo: l.titulo || "Momento de Oração",
             conteudo: l.descricao || "",
             duracao_sugerida_min: l.duracao_minutos || 5,
@@ -328,7 +328,7 @@ export default function PrayerPlayer() {
         "🎯 Atualizando slides com dados da Edge Function:",
         slidesFromEdge
       );
-      setSlides(slidesFromEdge);
+      setSlides(slidesFromEdge as LiturgiaItem[]);
       setLoading(false);
     }
   }, [slidesFromEdge]);

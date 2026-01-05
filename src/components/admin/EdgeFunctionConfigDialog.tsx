@@ -54,7 +54,7 @@ export default function EdgeFunctionConfigDialog({
       }
       const selectedOption = scheduleOptions.find(opt => opt.value === selectedSchedule);
       
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('edge_function_config')
         .update({
           schedule_cron: selectedSchedule,

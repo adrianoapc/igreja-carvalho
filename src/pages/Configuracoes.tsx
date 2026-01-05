@@ -115,7 +115,7 @@ export default function Configuracoes() {
         toast.error("Igreja não identificada.");
         return;
       }
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('app_config')
         .update({ maintenance_mode: checked })
         .eq('id', 1)

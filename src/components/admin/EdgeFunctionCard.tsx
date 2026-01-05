@@ -46,10 +46,7 @@ export default function EdgeFunctionCard({
   const loadConfig = async () => {
     try {
       if (!igrejaId) return;
-      const {
-        data,
-        error
-      } = await supabase
+      const { data, error } = await (supabase as any)
         .from('edge_function_config')
         .select('*')
         .eq('function_name', functionName)
@@ -80,7 +77,7 @@ export default function EdgeFunctionCard({
       }
       const {
         error
-      } = await supabase.from('edge_function_config').update({
+      } = await (supabase as any).from('edge_function_config').update({
         enabled
       }).eq('function_name', functionName).eq('igreja_id', igrejaId);
       if (error) throw error;

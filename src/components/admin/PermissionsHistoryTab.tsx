@@ -98,7 +98,7 @@ export function PermissionsHistoryTab({ roles, permissions, onRollbackSuccess }:
         return;
       }
 
-      const { data, error: queryError } = await supabase
+      const { data, error: queryError } = await (supabase as any)
         .from('role_permissions_audit')
         .select('*')
         .eq('igreja_id', igrejaId)
