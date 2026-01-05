@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFilialInfo } from "@/hooks/useFilialInfo";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCurrentUserFilialAccess } from "@/hooks/useUserFilialAccess";
 import { cn } from "@/lib/utils";
 
 const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
@@ -20,8 +21,10 @@ interface FilialSwitcherProps {
 }
 
 export function FilialSwitcher({ className }: FilialSwitcherProps) {
-  const { filialId, filialNome, filiais, isAllFiliais, loading } = useFilialInfo();
+  const { filialId, filialNome, filiais, igrejaId, isAllFiliais, loading } = useFilialInfo();
   const { isAdmin, loading: permLoading } = usePermissions();
+  const { allowedFilialIds, hasExplicitRestrictions, isLoading: accessLoading } = useCurrentUserFilialAccess(igrejaId || undefined);
+  
   const [selectedFilialId, setSelectedFilialId] = useState<string | null>(null);
   const [selectedFilialNome, setSelectedFilialNome] = useState<string | null>(null);
   const [selectedIsAll, setSelectedIsAll] = useState(false);
@@ -69,8 +72,8 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
     window.location.reload();
   };
 
-  // Não mostrar para usuários sem permissão ou se só há uma filial
-  if (loading || permLoading) {
+  // Carregando
+  if (loading || permLoading || accessLoading) {
     return (
       <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
         <MapPin className="h-3 w-3" />
@@ -79,22 +82,37 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
     );
   }
 
+  // Determinar quais filiais mostrar
+  // Se tem restrições explícitas em user_filial_access, usar essas
+  // Se não tem restrições e é admin, mostrar todas
+  // Se não tem restrições e não é admin, mostrar apenas a filial do perfil
+  const displayFiliais = hasExplicitRestrictions
+    ? filiais.filter(f => allowedFilialIds?.includes(f.id))
+    : isAdmin
+      ? filiais
+      : filiais.filter(f => f.id === filialId);
+
   const displayNome = selectedFilialNome || filialNome || "Matriz";
-  const canSwitch = isAdmin && filiais.length > 1;
+  
+  // Pode trocar se tem mais de uma filial disponível
+  const canSwitch = displayFiliais.length > 1;
+  
+  // Pode ver "Todas as filiais" apenas se é admin E não tem restrições explícitas
+  const canViewAll = isAdmin && !hasExplicitRestrictions;
+  
   const isAllSelected = selectedIsAll || isAllFiliais;
 
-  // Usuário comum: apenas indicador visual
-  if (!canSwitch) {
+  // Usuário com apenas uma filial: apenas indicador visual
+  if (!canSwitch && !canViewAll) {
     return (
       <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
         <MapPin className="h-3 w-3" />
         <span>{displayNome}</span>
-        {isAllSelected && <Badge variant="outline">Todas</Badge>}
       </div>
     );
   }
 
-  // Admin: dropdown para trocar filial
+  // Dropdown para trocar filial
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -110,15 +128,19 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
-        <DropdownMenuItem 
-          onClick={() => handleSelectFilial(null, "Todas as filiais", true)}
-          className={cn(isAllSelected && "bg-accent")}
-        >
-          <Building2 className="h-4 w-4 mr-2" />
-          <span>Todas as filiais</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {filiais.map((filial) => (
+        {canViewAll && (
+          <>
+            <DropdownMenuItem 
+              onClick={() => handleSelectFilial(null, "Todas as filiais", true)}
+              className={cn(isAllSelected && "bg-accent")}
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              <span>Todas as filiais</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {displayFiliais.map((filial) => (
           <DropdownMenuItem
             key={filial.id}
             onClick={() => handleSelectFilial(filial.id, filial.nome, false)}

@@ -15,6 +15,7 @@ import {
   FileText,
   GitBranch,
   LayoutList,
+  MapPin,
   Settings,
   Shield,
   Users,
@@ -40,11 +41,13 @@ import Chatbots from "@/pages/admin/Chatbots";
 import Notificacoes from "@/pages/admin/Notificacoes";
 import ContasManutencao from "@/pages/financas/ContasManutencao";
 import FiliaisConfig from "@/pages/configuracoes/Filiais";
+import { UserFilialAccessManager } from "@/components/admin/UserFilialAccessManager";
 
 type ViewState =
   | "MENU"
   | "IGREJA"
   | "FILIAIS"
+  | "FILIAL_ACCESS"
   | "PERMISSOES"
   | "WEBHOOKS"
   | "CHATBOTS"
@@ -69,6 +72,7 @@ type ConfigItem = {
 const GERAL_ITEMS: ConfigItem[] = [
   { id: "IGREJA", title: "Dados da Igreja", description: "Nome, logo e informações de contato", icon: Building2 },
   { id: "FILIAIS", title: "Filiais", description: "Gerenciar filiais da igreja", icon: GitBranch, requiredPermission: "filiais.manage" },
+  { id: "FILIAL_ACCESS", title: "Acesso por Filial", description: "Definir quais filiais cada usuário pode acessar", icon: MapPin },
   { id: "PERMISSOES", title: "Permissões de Acesso", description: "Funções e acessos por módulo", icon: Shield },
   { id: "NOTIFICACOES", title: "Notificações", description: "Regras e canais de notificação", icon: Bell },
   { id: "WEBHOOKS", title: "Webhooks", description: "Integrações externas (Make, etc.)", icon: Webhook },
@@ -139,6 +143,11 @@ export default function Configuracoes() {
   // Pages without onBack - render as-is (they have their own navigation)
   if (currentView === "IGREJA") return <ConfiguracoesIgreja onBack={goBack} />;
   if (currentView === "FILIAIS") return <FiliaisConfig onBack={goBack} />;
+  if (currentView === "FILIAL_ACCESS") return (
+    <SubPageWrapper onBack={goBack} title="Acesso por Filial">
+      <UserFilialAccessManager />
+    </SubPageWrapper>
+  );
   if (currentView === "PERMISSOES") return <AdminPermissions onBack={goBack} />;
   if (currentView === "WEBHOOKS") return <Webhooks onBack={goBack} />;
   if (currentView === "CHATBOTS") return <Chatbots onBack={goBack} />;

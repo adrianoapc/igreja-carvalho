@@ -58,6 +58,19 @@ export function useFilialId() {
     if (!userId || !igrejaId) return false;
     
     try {
+      // Primeiro verificar se tem restrições explícitas em user_filial_access
+      const { data: restrictionsData } = await supabase
+        .from("user_filial_access")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("igreja_id", igrejaId)
+        .limit(1);
+      
+      // Se tem restrições explícitas, NÃO pode ver todas as filiais
+      if (restrictionsData && restrictionsData.length > 0) {
+        return false;
+      }
+      
       const queryPromise = supabase
         .from("user_roles")
         .select("role")
@@ -75,6 +88,7 @@ export function useFilialId() {
         return false;
       }
       
+      // Só admins SEM restrições podem ver todas as filiais
       return (result.data || []).some((r: { role: string }) =>
         ["admin", "admin_igreja", "super_admin"].includes(r.role)
       );
