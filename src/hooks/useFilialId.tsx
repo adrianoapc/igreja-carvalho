@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 
 const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
+const FILIAL_CACHE_KEY = "filial_context_cache";
 
 const extractUUID = (value: unknown): string | null => {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -98,6 +99,29 @@ export function useFilialId() {
     }
   };
 
+  const saveCache = (next: FilialData) => {
+    try {
+      localStorage.setItem(FILIAL_CACHE_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const loadCache = (): FilialData | null => {
+    try {
+      const raw = localStorage.getItem(FILIAL_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return {
+        filialId: parsed.filialId ?? null,
+        igrejaId: parsed.igrejaId ?? null,
+        isAllFiliais: Boolean(parsed.isAllFiliais),
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const canUseAllFiliais = async (
     userId?: string | null,
     igrejaId?: string | null
@@ -150,11 +174,17 @@ export function useFilialId() {
     let timeoutId: NodeJS.Timeout | null = null;
     let resolved = false;
 
+    const cached = loadCache();
+    if (cached) {
+      setData(cached);
+    }
+
     const finish = (next: FilialData) => {
       if (!isMounted || resolved) return;
       resolved = true;
       setData(next);
       setLoading(false);
+      saveCache(next);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -228,9 +258,10 @@ export function useFilialId() {
     timeoutId = setTimeout(() => {
       if (isMounted && !resolved) {
         console.warn("useFilialId: Timeout reached, forcing neutral context");
-        finish({ filialId: null, igrejaId: null, isAllFiliais: false });
+        const cached = loadCache();
+        finish(cached ?? { filialId: null, igrejaId: null, isAllFiliais: false });
       }
-    }, 6000);
+    }, 10000);
 
     const {
       data: { subscription },
@@ -302,7 +333,7 @@ export function useFilialId() {
         clearTimeout(timeoutId);
       }
     };
-  }, [extractFromSession, loading]);
+  }, [extractFromSession]);
 
   return {
     filialId: data.filialId,
