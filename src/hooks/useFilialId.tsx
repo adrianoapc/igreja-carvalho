@@ -100,6 +100,18 @@ export function useFilialId() {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let resolved = false;
+
+    const finish = (next: FilialData) => {
+      if (!isMounted || resolved) return;
+      resolved = true;
+      setData(next);
+      setLoading(false);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
 
     const resolveSession = async () => {
       try {
@@ -137,34 +149,26 @@ export function useFilialId() {
           extracted.filialId = override.id;
         }
 
-        if (isMounted) {
-          setData({
-            ...extracted,
-            isAllFiliais: extracted.isAllFiliais ?? false,
-          });
-        }
+        finish({
+          filialId: extracted.filialId,
+          igrejaId: extracted.igrejaId,
+          isAllFiliais: extracted.isAllFiliais ?? false,
+        });
       } catch (err) {
         // Em caso de erro, não travar a aplicação em loading infinito
-        if (isMounted) {
-          setData({ filialId: null, igrejaId: null, isAllFiliais: false });
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        finish({ filialId: null, igrejaId: null, isAllFiliais: false });
       }
     };
 
     resolveSession();
 
-    // Timeout fallback para evitar loop infinito
-    const timeoutId = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('useFilialId: Timeout reached, forcing completion');
-        setData({ filialId: null, igrejaId: null, isAllFiliais: false });
-        setLoading(false);
+    // Fallback para evitar loading infinito
+    timeoutId = setTimeout(() => {
+      if (isMounted && !resolved) {
+        console.warn("useFilialId: Timeout reached, forcing neutral context");
+        finish({ filialId: null, igrejaId: null, isAllFiliais: false });
       }
-    }, 5000);
+    }, 6000);
 
     const {
       data: { subscription },
@@ -203,27 +207,23 @@ export function useFilialId() {
           extracted.filialId = override.id;
         }
 
-        if (isMounted) {
-          setData({
-            ...extracted,
-            isAllFiliais: extracted.isAllFiliais ?? false,
-          });
-        }
+        finish({
+          filialId: extracted.filialId,
+          igrejaId: extracted.igrejaId,
+          isAllFiliais: extracted.isAllFiliais ?? false,
+        });
       } catch {
-        if (isMounted) {
-          setData({ filialId: null, igrejaId: null, isAllFiliais: false });
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        finish({ filialId: null, igrejaId: null, isAllFiliais: false });
       }
     });
 
     return () => {
       isMounted = false;
-      clearTimeout(timeoutId);
+      resolved = true;
       subscription.unsubscribe();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, [extractFromSession, loading]);
 

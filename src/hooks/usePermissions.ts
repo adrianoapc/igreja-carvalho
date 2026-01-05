@@ -30,7 +30,13 @@ export function usePermissions() {
 
   // 1. Verifica se é Admin Global (Superusuário)
   const checkAdminStatus = useCallback(async () => {
-    if (!user || !igrejaId) return;
+    // Sem usuário ou igreja, não temos como validar permissões; finalize carregamento
+    if (!user || !igrejaId) {
+      setIsAdmin(false);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from("user_roles")
@@ -49,9 +55,12 @@ export function usePermissions() {
         )
       ) {
         setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
       }
     } catch (error) {
       console.error("Erro ao verificar admin:", error);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -62,6 +71,7 @@ export function usePermissions() {
       if (user) {
         checkAdminStatus();
       } else {
+        setIsAdmin(false);
         setLoading(false);
       }
     }

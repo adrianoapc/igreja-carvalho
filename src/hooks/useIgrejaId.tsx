@@ -12,6 +12,17 @@ export function useIgrejaId() {
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
+    let resolved = false;
+
+    const finish = (value: string | null) => {
+      if (!isMounted) return;
+      resolved = true;
+      setIgrejaId(value);
+      setLoading(false);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
 
     const resolveSession = async () => {
       try {
@@ -20,10 +31,7 @@ export function useIgrejaId() {
 
         // Se não há sessão válida, definir como null e parar loading
         if (!session?.user?.id) {
-          if (isMounted) {
-            setIgrejaId(null);
-            setLoading(false);
-          }
+          finish(null);
           return;
         }
 
@@ -44,20 +52,10 @@ export function useIgrejaId() {
           }
         }
 
-        if (isMounted) {
-          setIgrejaId(igrejaIdFromMetadata);
-          setLoading(false);
-          // Limpar timeout se conseguiu resolver
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-        }
+        finish(igrejaIdFromMetadata ?? null);
       } catch (error) {
-        console.error('Erro ao resolver igrejaId:', error);
-        if (isMounted) {
-          setIgrejaId(null);
-          setLoading(false);
-        }
+        console.error("Erro ao resolver igrejaId:", error);
+        finish(null);
       }
     };
 
@@ -65,8 +63,8 @@ export function useIgrejaId() {
 
     // Timeout fallback para evitar loop infinito
     timeoutId = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('useIgrejaId: Timeout reached, setting igrejaId to null');
+      if (isMounted && !resolved) {
+        console.warn("useIgrejaId: Timeout reached, setting igrejaId to null");
         setIgrejaId(null);
         setLoading(false);
       }
@@ -78,10 +76,7 @@ export function useIgrejaId() {
       try {
         // Se não há sessão válida, definir como null e parar loading
         if (!session?.user?.id) {
-          if (isMounted) {
-            setIgrejaId(null);
-            setLoading(false);
-          }
+          finish(null);
           return;
         }
 
@@ -102,25 +97,16 @@ export function useIgrejaId() {
           }
         }
 
-        if (isMounted) {
-          setIgrejaId(igrejaIdFromMetadata);
-          setLoading(false);
-          // Limpar timeout se conseguiu resolver
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-        }
+        finish(igrejaIdFromMetadata ?? null);
       } catch (error) {
-        console.error('Erro ao resolver igrejaId no auth change:', error);
-        if (isMounted) {
-          setIgrejaId(null);
-          setLoading(false);
-        }
+        console.error("Erro ao resolver igrejaId no auth change:", error);
+        finish(null);
       }
     });
 
     return () => {
       isMounted = false;
+      resolved = true;
       subscription.unsubscribe();
       if (timeoutId) {
         clearTimeout(timeoutId);
