@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { KidsRoomOccupancy } from "@/components/kids/KidsRoomOccupancy";
 import { KidsAbsentAlert } from "@/components/kids/KidsAbsentAlert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Sala {
   id: string;

@@ -25,7 +25,7 @@ interface Ministerio {
   descricao: string;
   cor: string;
   vagas_necessarias: number;
-  dificuldade: string;
+  dificuldade: "fácil" | "médio" | "avançado";
   requisitos?: string[];
 }
 
