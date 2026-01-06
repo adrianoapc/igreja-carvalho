@@ -144,7 +144,6 @@ export default function Escalas() {
   };
 
   const loadCultos = async () => {
-    setLoading(true);
     try {
       if (!igrejaId) return;
       let query = supabase
@@ -163,8 +162,6 @@ export default function Escalas() {
       toast.error("Erro ao carregar cultos", {
         description: error instanceof Error ? error.message : String(error),
       });
-    } finally {
-      setLoading(false);
     }
   };
 

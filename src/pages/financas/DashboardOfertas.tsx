@@ -58,7 +58,7 @@ export default function DashboardOfertas() {
     filialId,
     isAllFiliais,
     loading: filialLoading,
-  } = useFilialId();
+  } = useAuthContext();
 
   const getDatasIntervalo = () => {
     if (customRange?.from && customRange?.to) {
