@@ -2394,6 +2394,7 @@ export type Database = {
       }
       filiais: {
         Row: {
+          ativo: boolean | null
           created_at: string | null
           id: string
           igreja_id: string
@@ -2402,6 +2403,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ativo?: boolean | null
           created_at?: string | null
           id?: string
           igreja_id: string
@@ -2410,6 +2412,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ativo?: boolean | null
           created_at?: string | null
           id?: string
           igreja_id?: string
