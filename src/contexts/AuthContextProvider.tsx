@@ -31,29 +31,29 @@ export interface AuthContextData {
   // Auth state
   user: User | null;
   session: Session | null;
-  
+
   // Profile data
   profile: ProfileData | null;
-  
+
   // Roles and permissions
   roles: string[];
   isAdmin: boolean;
-  
+
   // Filial context
   filialId: string | null;
   filialNome: string | null;
   igrejaId: string | null;
   igrejaNome: string | null;
   isAllFiliais: boolean;
-  
+
   // Filial access restrictions
   hasExplicitAccess: boolean;
   allowedFilialIds: string[] | null; // null = no restriction
   filiais: FilialData[];
-  
+
   // Loading state
   loading: boolean;
-  
+
   // Actions
   refreshContext: () => Promise<void>;
   setFilialOverride: (filialId: string | null, isAll: boolean) => void;
@@ -148,14 +148,15 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasExplicitAccess, setHasExplicitAccess] = useState(false);
-  const [allowedFilialIds, setAllowedFilialIds] = useState<string[] | null>(null);
+  const [allowedFilialIds, setAllowedFilialIds] = useState<string[] | null>(
+    null
+  );
   const [filiais, setFiliais] = useState<FilialData[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Filial override state
-  const [filialOverride, setFilialOverrideState] = useState<FilialOverride | null>(
-    loadFilialOverride()
-  );
+  const [filialOverride, setFilialOverrideState] =
+    useState<FilialOverride | null>(loadFilialOverride());
 
   // Computed filial context based on override or profile
   const computeFilialContext = useCallback(() => {
@@ -170,7 +171,7 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
     }
 
     const override = filialOverride;
-    
+
     // Check if user can use "all filiais"
     const canUseAllFiliais =
       isAdmin || (allowedFilialIds === null && !hasExplicitAccess);
@@ -190,7 +191,7 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
       const isAllowed =
         allowedFilialIds === null ||
         allowedFilialIds.includes(override.filialId);
-      
+
       if (isAllowed) {
         const filial = filiais.find((f) => f.id === override.filialId);
         return {
@@ -211,24 +212,106 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
       igrejaNome: profile.igreja_nome,
       isAllFiliais: false,
     };
-  }, [profile, filialOverride, isAdmin, allowedFilialIds, hasExplicitAccess, filiais]);
+  }, [
+    profile,
+    filialOverride,
+    isAdmin,
+    allowedFilialIds,
+    hasExplicitAccess,
+    filiais,
+  ]);
 
   const filialContext = computeFilialContext();
 
-  const fetchUserContext = useCallback(async (userId: string): Promise<void> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const fetchUserContext = useCallback(
+    async (userId: string): Promise<void> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-    try {
-      const { data, error } = await supabase.rpc("get_user_auth_context", {
-        p_user_id: userId,
-      });
+      try {
+        const { data, error } = await supabase.rpc("get_user_auth_context", {
+          p_user_id: userId,
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (error) {
-        console.error("Error fetching auth context:", error);
-        // Try to use cache on error
+        if (error) {
+          console.error("Error fetching auth context:", error);
+          // Try to use cache on error
+          const cached = loadCache();
+          if (cached) {
+            setProfile(cached.profile);
+            setRoles(cached.roles);
+            setIsAdmin(cached.isAdmin);
+            setHasExplicitAccess(cached.hasExplicitAccess);
+            setAllowedFilialIds(cached.allowedFilialIds);
+            setFiliais(cached.filiais);
+          }
+          return;
+        }
+
+        const result = data as unknown as {
+          success: boolean;
+          error?: string;
+          profile?: {
+            id: string;
+            igreja_id: string | null;
+            filial_id: string | null;
+            nome: string | null;
+            igreja_nome: string | null;
+            filial_nome: string | null;
+          };
+          roles?: string[];
+          is_admin?: boolean;
+          has_explicit_access?: boolean;
+          allowed_filial_ids?: string[] | null;
+          filiais?: Array<{ id: string; nome: string }>;
+        };
+
+        if (!result?.success) {
+          console.error("Auth context fetch failed:", result?.error);
+          setLoading(false); // GARANTIR que loading seja false mesmo em erro
+          return;
+        }
+
+        const newProfile = result.profile
+          ? {
+              id: result.profile.id,
+              igreja_id: result.profile.igreja_id,
+              filial_id: result.profile.filial_id,
+              nome: result.profile.nome,
+              igreja_nome: result.profile.igreja_nome,
+              filial_nome: result.profile.filial_nome,
+            }
+          : null;
+
+        const newRoles = result.roles ?? [];
+        const newIsAdmin = result.is_admin ?? false;
+        const newHasExplicitAccess = result.has_explicit_access ?? false;
+        const newAllowedFilialIds = result.allowed_filial_ids ?? null;
+        const newFiliais = result.filiais ?? [];
+
+        setProfile(newProfile);
+        setRoles(newRoles);
+        setIsAdmin(newIsAdmin);
+        setHasExplicitAccess(newHasExplicitAccess);
+        setAllowedFilialIds(newAllowedFilialIds);
+        setFiliais(newFiliais);
+
+        // Save to cache
+        saveCache({
+          profile: newProfile,
+          roles: newRoles,
+          isAdmin: newIsAdmin,
+          hasExplicitAccess: newHasExplicitAccess,
+          allowedFilialIds: newAllowedFilialIds,
+          filiais: newFiliais,
+        });
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.warn("Auth context fetch timeout or error:", err);
+
+        // Try to use cache on timeout
         const cached = loadCache();
         if (cached) {
           setProfile(cached.profile);
@@ -238,85 +321,13 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
           setAllowedFilialIds(cached.allowedFilialIds);
           setFiliais(cached.filiais);
         }
-        return;
+      } finally {
+        // SEMPRE desligar loading após buscar contexto
+        setLoading(false);
       }
-
-      const result = data as unknown as {
-        success: boolean;
-        error?: string;
-        profile?: {
-          id: string;
-          igreja_id: string | null;
-          filial_id: string | null;
-          nome: string | null;
-          igreja_nome: string | null;
-          filial_nome: string | null;
-        };
-        roles?: string[];
-        is_admin?: boolean;
-        has_explicit_access?: boolean;
-        allowed_filial_ids?: string[] | null;
-        filiais?: Array<{ id: string; nome: string }>;
-      };
-
-      if (!result?.success) {
-        console.error("Auth context fetch failed:", result?.error);
-        setLoading(false); // GARANTIR que loading seja false mesmo em erro
-        return;
-      }
-
-      const newProfile = result.profile
-        ? {
-            id: result.profile.id,
-            igreja_id: result.profile.igreja_id,
-            filial_id: result.profile.filial_id,
-            nome: result.profile.nome,
-            igreja_nome: result.profile.igreja_nome,
-            filial_nome: result.profile.filial_nome,
-          }
-        : null;
-
-      const newRoles = result.roles ?? [];
-      const newIsAdmin = result.is_admin ?? false;
-      const newHasExplicitAccess = result.has_explicit_access ?? false;
-      const newAllowedFilialIds = result.allowed_filial_ids ?? null;
-      const newFiliais = result.filiais ?? [];
-
-      setProfile(newProfile);
-      setRoles(newRoles);
-      setIsAdmin(newIsAdmin);
-      setHasExplicitAccess(newHasExplicitAccess);
-      setAllowedFilialIds(newAllowedFilialIds);
-      setFiliais(newFiliais);
-
-      // Save to cache
-      saveCache({
-        profile: newProfile,
-        roles: newRoles,
-        isAdmin: newIsAdmin,
-        hasExplicitAccess: newHasExplicitAccess,
-        allowedFilialIds: newAllowedFilialIds,
-        filiais: newFiliais,
-      });
-    } catch (err) {
-      clearTimeout(timeoutId);
-      console.warn("Auth context fetch timeout or error:", err);
-      
-      // Try to use cache on timeout
-      const cached = loadCache();
-      if (cached) {
-        setProfile(cached.profile);
-        setRoles(cached.roles);
-        setIsAdmin(cached.isAdmin);
-        setHasExplicitAccess(cached.hasExplicitAccess);
-        setAllowedFilialIds(cached.allowedFilialIds);
-        setFiliais(cached.filiais);
-      }
-    } finally {
-      // SEMPRE desligar loading após buscar contexto
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   const refreshContext = useCallback(async () => {
     if (user) {
@@ -353,8 +364,10 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
+
         if (!isMounted) return;
 
         if (currentSession?.user) {
@@ -373,31 +386,31 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        if (!isMounted) return;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!isMounted) return;
 
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
 
-        if (event === "SIGNED_IN" && newSession?.user) {
-          await fetchUserContext(newSession.user.id);
-        } else if (event === "SIGNED_OUT") {
-          // Clear all state
-          setProfile(null);
-          setRoles([]);
-          setIsAdmin(false);
-          setHasExplicitAccess(false);
-          setAllowedFilialIds(null);
-          setFiliais([]);
-          setFilialOverrideState(null);
-          localStorage.removeItem(AUTH_CACHE_KEY);
-          localStorage.removeItem(FILIAL_OVERRIDE_KEY);
-        }
-
-        setLoading(false);
+      if (event === "SIGNED_IN" && newSession?.user) {
+        await fetchUserContext(newSession.user.id);
+      } else if (event === "SIGNED_OUT") {
+        // Clear all state
+        setProfile(null);
+        setRoles([]);
+        setIsAdmin(false);
+        setHasExplicitAccess(false);
+        setAllowedFilialIds(null);
+        setFiliais([]);
+        setFilialOverrideState(null);
+        localStorage.removeItem(AUTH_CACHE_KEY);
+        localStorage.removeItem(FILIAL_OVERRIDE_KEY);
       }
-    );
+
+      setLoading(false);
+    });
 
     return () => {
       isMounted = false;

@@ -13,14 +13,14 @@ export function WelcomeHeader() {
   useEffect(() => {
     // 1. Pegar o nome do usuário
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         // Tenta pegar do metadata (nome) ou email
-        const name = user.user_metadata?.nome || user.email?.split('@')[0];
+        const name = user.user_metadata?.nome || user.email?.split("@")[0];
         // Pega só o primeiro nome
-        setUserName(name?.split(' ')[0] || "Membro");
-
-        
+        setUserName(name?.split(" ")[0] || "Membro");
       }
     };
     getUser();
@@ -38,7 +38,8 @@ export function WelcomeHeader() {
         {greeting}, {firstName}.
       </h1>
       <p className="text-muted-foreground">
-        Que bom te ver por aqui! Confira as novidades de hoje, {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
+        Que bom te ver por aqui! Confira as novidades de hoje,{" "}
+        {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
       </p>
     </div>
   );
