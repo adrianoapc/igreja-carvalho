@@ -99,33 +99,48 @@ interface FilialOverride {
 
 function loadCache(): CachedData | null {
   try {
+    console.log("[DEBUG] loadCache: Attempting to load from localStorage...");
     const raw = localStorage.getItem(AUTH_CACHE_KEY);
-    if (!raw) return null;
+    if (!raw) {
+      console.log("[DEBUG] loadCache: No cache found in localStorage");
+      return null;
+    }
+
+    console.log("[DEBUG] loadCache: Raw cache found, parsing...");
     const parsed = JSON.parse(raw);
-    
+
     // Validar estrutura do cache
-    if (!parsed || typeof parsed !== 'object') {
-      console.warn('Cache inválido: estrutura incorreta');
+    if (!parsed || typeof parsed !== "object") {
+      console.warn("[DEBUG] loadCache: Cache inválido - estrutura incorreta");
       localStorage.removeItem(AUTH_CACHE_KEY);
       return null;
     }
-    
+
     // Validar que profile tem 'nome' (não 'full_name')
-    if (parsed.profile && 'full_name' in parsed.profile) {
-      console.warn('Cache obsoleto detectado (full_name encontrado), limpando...');
+    if (parsed.profile && "full_name" in parsed.profile) {
+      console.warn(
+        "[DEBUG] loadCache: Cache obsoleto detectado (full_name encontrado), limpando..."
+      );
       localStorage.removeItem(AUTH_CACHE_KEY);
       return null;
     }
-    
+
     // Cache válido por 5 minutos
     if (Date.now() - parsed.timestamp > 5 * 60 * 1000) {
+      console.log("[DEBUG] loadCache: Cache expirado (> 5 minutos)");
       localStorage.removeItem(AUTH_CACHE_KEY);
       return null;
     }
-    
+
+    console.log(
+      "[DEBUG] loadCache: Valid cache loaded, expires in:",
+      (5 * 60 * 1000 - (Date.now() - parsed.timestamp)) / 1000,
+      "seconds"
+    );
+
     return parsed;
   } catch (error) {
-    console.error('Erro ao carregar cache:', error);
+    console.error("Erro ao carregar cache:", error);
     localStorage.removeItem(AUTH_CACHE_KEY);
     return null;
   }
@@ -244,30 +259,45 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
 
   const fetchUserContext = useCallback(
     async (userId: string): Promise<void> => {
+      console.log("[DEBUG] fetchUserContext START - userId:", userId);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
       try {
+        console.log("[DEBUG] Calling RPC get_user_auth_context...");
         const { data, error } = await supabase.rpc("get_user_auth_context", {
           p_user_id: userId,
         });
 
         clearTimeout(timeoutId);
 
+        console.log("[DEBUG] RPC response received");
+        console.log("[DEBUG] RPC data:", data);
+        console.log("[DEBUG] RPC error:", error);
+
         if (error) {
-          console.error("Error fetching auth context:", error);
+          console.error(
+            "[ERROR] RPC error details:",
+            JSON.stringify(error, null, 2)
+          );
+          console.log("[DEBUG] Tentando usar cache...");
           // Try to use cache on error
           const cached = loadCache();
           if (cached) {
+            console.log("[DEBUG] Cache encontrado, usando dados:", cached);
             setProfile(cached.profile);
             setRoles(cached.roles);
             setIsAdmin(cached.isAdmin);
             setHasExplicitAccess(cached.hasExplicitAccess);
             setAllowedFilialIds(cached.allowedFilialIds);
             setFiliais(cached.filiais);
+          } else {
+            console.warn("[DEBUG] Cache não disponível");
           }
           return;
         }
+
+        console.log("[DEBUG] RPC success, data:", data);
 
         const result = data as unknown as {
           success: boolean;
@@ -288,10 +318,15 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         };
 
         if (!result?.success) {
-          console.error("Auth context fetch failed:", result?.error);
-          setLoading(false); // GARANTIR que loading seja false mesmo em erro
+          console.error("[ERROR] Auth context not successful:", result?.error);
+          setLoading(false);
           return;
         }
+
+        console.log("[DEBUG] RPC result successful");
+        console.log("[DEBUG] Profile:", result.profile);
+        console.log("[DEBUG] Roles:", result.roles);
+        console.log("[DEBUG] Is Admin:", result.is_admin);
 
         const newProfile = result.profile
           ? {
@@ -309,6 +344,12 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         const newHasExplicitAccess = result.has_explicit_access ?? false;
         const newAllowedFilialIds = result.allowed_filial_ids ?? null;
         const newFiliais = result.filiais ?? [];
+
+        console.log("[DEBUG] Setting state with:", {
+          profile: newProfile,
+          roles: newRoles,
+          isAdmin: newIsAdmin,
+        });
 
         setProfile(newProfile);
         setRoles(newRoles);
@@ -328,17 +369,21 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         });
       } catch (err) {
         clearTimeout(timeoutId);
+        console.error("[ERROR] Catch block - Auth context fetch error:", err);
         console.warn("Auth context fetch timeout or error:", err);
 
         // Try to use cache on timeout
         const cached = loadCache();
         if (cached) {
+          console.log("[DEBUG] Cache disponível no catch, usando...");
           setProfile(cached.profile);
           setRoles(cached.roles);
           setIsAdmin(cached.isAdmin);
           setHasExplicitAccess(cached.hasExplicitAccess);
           setAllowedFilialIds(cached.allowedFilialIds);
           setFiliais(cached.filiais);
+        } else {
+          console.warn("[DEBUG] Nenhum cache disponível");
         }
       } finally {
         // SEMPRE desligar loading após buscar contexto
@@ -369,11 +414,13 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
-    
+
+    console.log("[DEBUG] AuthContextProvider INITIALIZING");
+
     // Timeout de segurança: se após 10s ainda estiver loading, forçar false
     const safetyTimeout = setTimeout(() => {
       if (isMounted) {
-        console.warn('⚠️ Auth loading timeout - forçando loading=false');
+        console.warn("⚠️ Auth loading timeout - forçando loading=false");
         setLoading(false);
       }
     }, 10000);
@@ -381,57 +428,91 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
     // Load cache immediately for faster initial render
     const cached = loadCache();
     if (cached) {
+      console.log("[DEBUG] Cache loaded:", cached);
       setProfile(cached.profile);
       setRoles(cached.roles);
       setIsAdmin(cached.isAdmin);
       setHasExplicitAccess(cached.hasExplicitAccess);
       setAllowedFilialIds(cached.allowedFilialIds);
       setFiliais(cached.filiais);
+    } else {
+      console.log("[DEBUG] No cache available");
     }
 
     const initializeAuth = async () => {
+      console.log("[DEBUG] initializeAuth START");
       try {
+        console.log("[DEBUG] Calling supabase.auth.getSession()...");
         const {
           data: { session: currentSession },
         } = await supabase.auth.getSession();
+        console.log("[DEBUG] getSession response:", currentSession?.user?.id);
 
-        if (!isMounted) return;
+        if (!isMounted) {
+          console.log("[DEBUG] Component unmounted, skipping auth init");
+          return;
+        }
 
         if (currentSession?.user) {
+          console.log("[DEBUG] Session found, user:", currentSession.user.id);
           setSession(currentSession);
           setUser(currentSession.user);
+          console.log("[DEBUG] Session set, fetching user context...");
           await fetchUserContext(currentSession.user.id);
+          console.log("[DEBUG] fetchUserContext completed");
         } else {
-          // Sem sessão ativa, definir loading como false imediatamente
+          console.log("[DEBUG] No session found, setting loading=false");
           setLoading(false);
         }
       } catch (err) {
-        console.error("Error initializing auth:", err);
+        console.error("[DEBUG] Error initializing auth:", err);
+        setLoading(false);
       } finally {
         if (isMounted) {
+          console.log(
+            "[DEBUG] initializeAuth finally block, setting loading=false"
+          );
           setLoading(false);
         }
       }
     };
 
+    console.log("[DEBUG] Calling initializeAuth...");
     initializeAuth();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (!isMounted) return;
+      console.log(
+        "[DEBUG] onAuthStateChange event:",
+        event,
+        "user:",
+        newSession?.user?.id
+      );
+
+      if (!isMounted) {
+        console.log("[DEBUG] Component unmounted, ignoring auth change");
+        return;
+      }
 
       setSession(newSession);
       setUser(newSession?.user ?? null);
+      console.log("[DEBUG] Session/User set from auth event");
 
       if (event === "SIGNED_IN" && newSession?.user) {
+        console.log(
+          "[DEBUG] SIGNED_IN event, fetching context for:",
+          newSession.user.id
+        );
         try {
           await fetchUserContext(newSession.user.id);
+          console.log("[DEBUG] fetchUserContext completed");
         } catch (err) {
-          console.error("Error fetching context on sign in:", err);
+          console.error("[DEBUG] Error fetching context on sign in:", err);
           setLoading(false);
         }
       } else if (event === "SIGNED_OUT") {
+        console.log("[DEBUG] SIGNED_OUT event, clearing state");
         // Clear all state
         setProfile(null);
         setRoles([]);
@@ -443,9 +524,13 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(AUTH_CACHE_KEY);
         localStorage.removeItem(FILIAL_OVERRIDE_KEY);
         setLoading(false);
+        console.log("[DEBUG] SIGNED_OUT complete");
       } else {
-        // Para outros eventos, garantir que loading seja false
-        setLoading(false);
+        console.log(
+          "[DEBUG] Other auth event:",
+          event,
+          "- keeping existing state"
+        );
       }
     });
 
