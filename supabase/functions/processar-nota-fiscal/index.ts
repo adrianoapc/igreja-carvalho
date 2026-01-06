@@ -25,31 +25,30 @@ Analise a imagem da nota fiscal e extraia as seguintes informações:
 
 Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`;
 
-// Fetch chatbot config from database
+// Fetch chatbot config from database (global, not per igreja)
 async function getChatbotConfig(
-  supabase: SupabaseClient,
-  igrejaId: string
+  supabase: SupabaseClient
 ): Promise<{ model: string; systemPrompt: string }> {
   try {
     const { data: config, error } = await supabase
       .from('chatbot_configs')
       .select('modelo_visao, role_visao')
       .eq('edge_function_name', FUNCTION_NAME)
-      .eq('igreja_id', igrejaId)
       .eq('ativo', true)
       .single();
 
     if (error || !config) {
-      console.log(`No config found for ${FUNCTION_NAME}, using defaults`);
+      console.log(`[${FUNCTION_NAME}] No config found, using defaults. Error: ${error?.message || 'none'}`);
       return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_VISION_PROMPT };
     }
 
+    console.log(`[${FUNCTION_NAME}] Config loaded successfully from database`);
     return {
       model: config.modelo_visao || DEFAULT_MODEL,
       systemPrompt: config.role_visao || DEFAULT_VISION_PROMPT
     };
   } catch (err) {
-    console.error('Error fetching chatbot config:', err);
+    console.error(`[${FUNCTION_NAME}] Error fetching chatbot config:`, err);
     return { model: DEFAULT_MODEL, systemPrompt: DEFAULT_VISION_PROMPT };
   }
 }
@@ -246,7 +245,10 @@ serve(async (req) => {
 
     // Use service role client to fetch config and financial options
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
-    const { model, systemPrompt } = await getChatbotConfig(supabaseService, igrejaId);
+    
+    console.log(`[${FUNCTION_NAME}] Igreja ID: ${igrejaId}`);
+    
+    const { model, systemPrompt } = await getChatbotConfig(supabaseService);
     const financialOptions = await getFinancialOptions(supabaseService, igrejaId);
     
     console.log(`[processar-nota-fiscal] Using model: ${model}`);
