@@ -2,10 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
-const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const BASE58_ALPHABET =
+  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 type LinkType = "cadastro" | "visitante" | "aceitou" | "membro";
 
@@ -32,7 +34,9 @@ function decodeBase58(str: string): Uint8Array {
 /**
  * Decodifica slug para extrair filial_id e tipo
  */
-function decodeSlug(slug: string): { filialId: string; linkType: LinkType } | null {
+function decodeSlug(
+  slug: string
+): { filialId: string; linkType: LinkType } | null {
   try {
     const bytes = decodeBase58(slug);
     if (bytes.length < 13) return null;
@@ -43,7 +47,10 @@ function decodeSlug(slug: string): { filialId: string; linkType: LinkType } | nu
       .join("");
 
     // Formato UUID: 8-4-4-4-12
-    const filialId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 24)}000000000000`;
+    const filialId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
+      12,
+      16
+    )}-${hex.slice(16, 20)}-${hex.slice(20, 24)}000000000000`;
 
     // Extrair tipo do último byte
     const typeChar = String.fromCharCode(bytes[12]);
@@ -89,11 +96,14 @@ Deno.serve(async (req) => {
 
   // Extrair slug do path: /s/<slug> ou /short-links/<slug>
   const slugMatch = pathname.match(/\/(s|short-links)\/([^\/]+)/);
-  
+
   if (!slugMatch || !slugMatch[2]) {
     return new Response(
       JSON.stringify({ error: "Slug não encontrado no path" }),
-      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 
@@ -104,7 +114,10 @@ Deno.serve(async (req) => {
   if (!decoded) {
     return new Response(
       JSON.stringify({ error: "Slug inválido ou corrompido" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 
