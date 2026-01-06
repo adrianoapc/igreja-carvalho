@@ -6873,23 +6873,18 @@ export type Database = {
         Args: { p_lat: number; p_long: number; p_telefone: string }
         Returns: Json
       }
-      create_filial_short_links:
-        | { Args: { p_filial_id: string }; Returns: undefined }
-        | {
-            Args: {
-              p_filial_id: string
-              p_filial_nome: string
-              p_igreja_id: string
-            }
-            Returns: undefined
-          }
-      create_igreja_short_links: {
-        Args: { p_filial_id?: string; p_igreja_id: string }
+      create_filial_short_links: {
+        Args: {
+          p_filial_id: string
+          p_filial_nome: string
+          p_igreja_id: string
+        }
         Returns: undefined
       }
-      generate_filial_slug:
-        | { Args: { p_nome: string }; Returns: string }
-        | { Args: { p_igreja_id: string; p_nome: string }; Returns: string }
+      generate_filial_slug: {
+        Args: { p_igreja_id: string; p_nome: string }
+        Returns: string
+      }
       get_current_user_filial_id: { Args: never; Returns: string }
       get_current_user_igreja_id: { Args: never; Returns: string }
       get_default_filial_id: { Args: { _igreja_id: string }; Returns: string }
@@ -7019,7 +7014,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      remove_accents: { Args: { p_text: string }; Returns: string }
       rollback_audit_batch: {
         Args: { target_request_id: string }
         Returns: undefined
