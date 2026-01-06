@@ -175,9 +175,11 @@ export default function SalaDeGuerra() {
     enabled: !authLoading && !!igrejaId,
   });
 
-  // Dados planos
-  const pedidos = flattenPaginatedData(pedidosPages) as Pedido[];
-  const testemunhos = flattenPaginatedData(testemunhosPages) as Testemunho[];
+  // Dados planos - extract pages from the query result
+  const pedidosPagesData = (pedidosPages as unknown as { pages?: unknown[][] })?.pages || [];
+  const testemunhosPagesData = (testemunhosPages as unknown as { pages?: unknown[][] })?.pages || [];
+  const pedidos = flattenPaginatedData(pedidosPagesData as Record<string, unknown>[][]) as unknown as Pedido[];
+  const testemunhos = flattenPaginatedData(testemunhosPagesData as Record<string, unknown>[][]) as unknown as Testemunho[];
 
   // Filtros Pedidos - Client side (para busca textual)
   const filteredPedidos = useMemo(() => {
@@ -657,7 +659,7 @@ export default function SalaDeGuerra() {
             </div>
 
             {/* Lista de Testemunhos */}
-            {loading ? (
+            {isLoadingTestemunhos ? (
               <Card className="shadow-soft">
                 <CardContent className="p-8 text-center">
                   <p className="text-muted-foreground">

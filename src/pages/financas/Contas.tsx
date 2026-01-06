@@ -146,7 +146,7 @@ export default function Contas() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Calcular totais por conta no período

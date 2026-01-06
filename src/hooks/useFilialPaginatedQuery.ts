@@ -1,7 +1,6 @@
 import {
   useInfiniteQuery,
   UseInfiniteQueryResult,
-  UndefinedInitialDataOptions,
 } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -31,23 +30,6 @@ export interface UsePaginatedQueryOptions {
  * - Cache gerenciado pelo React Query
  * - Retry automático com exponential backoff
  * - Deduplicação de queries
- *
- * Exemplo de uso:
- * ```tsx
- * const { data, fetchNextPage, hasNextPage, isLoading } = useFilialPaginatedQuery({
- *   table: 'pedidos_oracao',
- *   select: '*,intercessores(nome),profiles!pedidos_oracao_pessoa_id_fkey(nome)',
- *   filters: {
- *     status: tipoFilterPedidos !== 'todos' ? tipoFilterPedidos : undefined,
- *   },
- *   orderBy: { column: 'data_criacao', ascending: false },
- *   igrejaId,
- *   filialId,
- *   isAllFiliais,
- * });
- *
- * const items = flattenPaginatedData(data?.pages || []);
- * ```
  */
 export function useFilialPaginatedQuery(
   options: UsePaginatedQueryOptions
@@ -72,31 +54,33 @@ export function useFilialPaginatedQuery(
       isAllFiliais,
       JSON.stringify(filters),
       JSON.stringify(orderBy),
-    ] as const,
+    ],
     queryFn: async ({ pageParam = 0 }) => {
       if (!igrejaId) return [];
 
-      // Construir query
-      let query = supabase.from(table).select(select);
+      // Construir query - usar type assertion para contornar tipagem excessiva do Supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const query = supabase.from(table as any).select(select) as any;
+      let q = query;
 
       // Sempre filtrar por igreja
-      query = query.eq("igreja_id", igrejaId);
+      q = q.eq("igreja_id", igrejaId);
 
       // Filtrar por filial se especificado (não é multi-filial)
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        q = q.eq("filial_id", filialId);
       }
 
       // Aplicar filtros customizados (ignorar undefined/null)
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
+          q = q.eq(key, value);
         }
       });
 
       // Aplicar ordenação
       if (orderBy) {
-        query = query.order(orderBy.column, {
+        q = q.order(orderBy.column, {
           ascending: orderBy.ascending ?? true,
           nullsFirst: false,
         });
@@ -105,9 +89,9 @@ export function useFilialPaginatedQuery(
       // Paginação: range(from, to) inclusive
       const from = (pageParam as number) * pageSize;
       const to = from + pageSize - 1;
-      query = query.range(from, to);
+      q = q.range(from, to);
 
-      const { data, error } = await query;
+      const { data, error } = await q;
 
       if (error) {
         console.error(`Error fetching ${table}:`, error);
@@ -126,19 +110,14 @@ export function useFilialPaginatedQuery(
     },
     enabled: !!igrejaId && enabled,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos (antigo: cacheTime)
+    gcTime: 1000 * 60 * 10, // 10 minutos
     retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff max 30s
-  } as unknown as UndefinedInitialDataOptions<Array<Record<string, unknown>>, Error, Array<Array<Record<string, unknown>>>, Array<string | number | unknown>, 0>);
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  }) as UseInfiniteQueryResult<Array<Record<string, unknown>>, Error>;
 }
 
 /**
  * Utility para extrair dados planos de uma resposta paginada
- *
- * Exemplo:
- * ```tsx
- * const items = flattenPaginatedData(data?.pages || []);
- * ```
  */
 export function flattenPaginatedData(
   pages: Array<Array<Record<string, unknown>>>
