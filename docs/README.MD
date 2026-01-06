@@ -12,6 +12,11 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 - 05-padroes-e-convencoes
 
 ## Índice Geral
+- **Changelog**
+	- Changelog completo: [`CHANGELOG.md`](CHANGELOG.md)
+	- Hook de paginação: [`PAGINATED_QUERY_HOOK.md`](PAGINATED_QUERY_HOOK.md)
+	- Multi-tenancy (Backlog): [`BACKLOG_MULTI_TENANCY.md`](BACKLOG_MULTI_TENANCY.md)
+	- Controle Multi-Tenant: [`controle-multi-tenant.md`](controle-multi-tenant.md)
 - Arquitetura
 	- Visão geral: [`01-Arquitetura/01-arquitetura-geral.MD`](01-Arquitetura/01-arquitetura-geral.MD)
 	- Autenticação Supabase: [`01-Arquitetura/02-autenticacao-supabase.MD`](01-Arquitetura/02-autenticacao-supabase.MD)
