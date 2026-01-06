@@ -17,88 +17,17 @@ import StatusTimeline from "@/components/voluntario/StatusTimeline";
 import { Loader2, Heart, Users, Zap, Target } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useFilialId } from "@/hooks/useFilialId";
 
-const ministryOptions = [
-  {
-    id: "recepcao",
-    nome: "Recepção",
-    descricao: "Acolha visitantes com um sorriso caloroso na entrada",
-    cor: "bg-blue-500",
-    vagas: 5,
-    dificuldade: "fácil" as const,
-    requisitos: ["Simpatia", "Pontualidade", "Disponibilidade nos cultos"],
-  },
-  {
-    id: "louvor",
-    nome: "Louvor",
-    descricao: "Ministrar através da música e adoração",
-    cor: "bg-purple-500",
-    vagas: 3,
-    dificuldade: "avançado" as const,
-    requisitos: [
-      "Habilidades musicais",
-      "Comprometimento semanal",
-      "Experiência em louvor",
-    ],
-  },
-  {
-    id: "midia",
-    nome: "Mídia",
-    descricao: "Gerenciar projetor, áudio e transmissão ao vivo",
-    cor: "bg-green-500",
-    vagas: 4,
-    dificuldade: "médio" as const,
-    requisitos: [
-      "Conhecimento técnico básico",
-      "Responsabilidade",
-      "Pontualidade",
-    ],
-  },
-  {
-    id: "kids",
-    nome: "Kids",
-    descricao: "Cuidar e ensinar crianças durante os cultos",
-    cor: "bg-pink-500",
-    vagas: 6,
-    dificuldade: "médio" as const,
-    requisitos: [
-      "Paciência",
-      "Afinidade com crianças",
-      "Capacidade de liderança",
-    ],
-  },
-  {
-    id: "intercessao",
-    nome: "Intercessão",
-    descricao: "Orar e interceder pelos ministérios e membros",
-    cor: "bg-red-500",
-    vagas: 8,
-    dificuldade: "fácil" as const,
-    requisitos: [
-      "Vida de oração",
-      "Sensibilidade espiritual",
-      "Disponibilidade flexível",
-    ],
-  },
-  {
-    id: "acao-social",
-    nome: "Ação Social",
-    descricao: "Ajudar pessoas em situação de vulnerabilidade",
-    cor: "bg-orange-500",
-    vagas: 10,
-    dificuldade: "médio" as const,
-    requisitos: ["Compaixão", "Organização", "Disponibilidade eventual"],
-  },
-  {
-    id: "eventos",
-    nome: "Eventos",
-    descricao: "Organizar e coordenar eventos da igreja",
-    cor: "bg-cyan-500",
-    vagas: 5,
-    dificuldade: "avançado" as const,
-    requisitos: ["Liderança", "Criatividade", "Disponibilidade variável"],
-  },
-];
+interface Ministerio {
+  id: string;
+  nome: string;
+  descricao: string;
+  cor: string;
+  vagas_necessarias: number;
+  dificuldade: string;
+  requisitos?: string[];
+}
 
 type VolunteerFormData = {
   ministerio_id: string;
@@ -123,15 +52,22 @@ const STATUS_BLOQUEANTES = ["pendente", "em_analise", "aprovado", "em_trilha"];
 export default function Voluntariado() {
   const { toast } = useToast();
   const { user, profile, loading: authLoading } = useAuth();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [minhasCandidaturas, setMinhasCandidaturas] = useState<Candidatura[]>(
     []
   );
+  const [ministerios, setMinisterios] = useState<Ministerio[]>([]);
   const [loadingCandidatura, setLoadingCandidatura] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [ministerioSelecionado, setMinisterioSelecionado] = useState<
     string | null
   >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statsHero, setStatsHero] = useState({
+    ministerios: 0,
+    voluntarios: 0,
+    aprovacoesMes: 0,
+  });
 
   // Preencher dados do perfil se logado
   useEffect(() => {
@@ -167,6 +103,91 @@ export default function Voluntariado() {
     }
   }, [profile?.id, authLoading]);
 
+  // Carregar estatísticas reais do herói
+  useEffect(() => {
+    const loadHeroStats = async () => {
+      if (!igrejaId) return;
+
+      // Contar times ativos
+      let timesQuery = supabase
+        .from("times")
+        .select("id", { count: "exact", head: true })
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+      // times pode não ter filial_id em todos os ambientes
+      if (!isAllFiliais && filialId) {
+        try {
+          // tenta aplicar filial_id se existir
+          timesQuery = (timesQuery as any).eq("filial_id", filialId);
+        } catch {}
+      }
+      const timesRes = await timesQuery;
+
+      // Contar membros de times ativos
+      let membrosQuery = supabase
+        .from("membros_time")
+        .select("id", { count: "exact", head: true })
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) membrosQuery = membrosQuery.eq("filial_id", filialId);
+      const membrosRes = await membrosQuery;
+
+      // Aprovações no mês
+      const now = new Date();
+      const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      let aprovQuery = supabase
+        .from("candidatos_voluntario")
+        .select("id", { count: "exact" })
+        .eq("status", "aprovado")
+        .eq("igreja_id", igrejaId)
+        .gte("data_avaliacao", startMonth)
+        .lt("data_avaliacao", nextMonth);
+      if (!isAllFiliais && filialId) aprovQuery = aprovQuery.eq("filial_id", filialId);
+      const aprovRes = await aprovQuery;
+
+      setStatsHero({
+        ministerios: timesRes.count || 0,
+        voluntarios: membrosRes.count || 0,
+        aprovacoesMes: aprovRes.count || 0,
+      });
+    };
+    loadHeroStats();
+  }, [igrejaId, filialId, isAllFiliais]);
+
+  // Carregar ministérios reais da tabela times
+  useEffect(() => {
+    const loadMinisterios = async () => {
+      if (!igrejaId) return;
+
+      let query = supabase
+        .from("times")
+        .select("id, nome, descricao, cor, vagas_necessarias, dificuldade, ativo")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query.order("nome");
+
+      if (!error && data) {
+        setMinisterios(
+          data.map((t: any) => ({
+            id: t.id,
+            nome: t.nome,
+            descricao: t.descricao || "Ministério da igreja",
+            cor: t.cor || "bg-blue-500",
+            vagas_necessarias: t.vagas_necessarias || 1,
+            dificuldade: t.dificuldade || "médio",
+          }))
+        );
+      }
+    };
+    loadMinisterios();
+  }, [igrejaId, filialId, isAllFiliais]);
+
   // Ministérios em que já tem candidatura ativa (não pode duplicar)
   const ministeriosBloqueados = minhasCandidaturas
     .filter((c) => STATUS_BLOQUEANTES.includes(c.status))
@@ -187,8 +208,9 @@ export default function Voluntariado() {
     if (!ministerioSelecionado) return;
 
     const ministerio =
-      ministryOptions.find((m) => m.id === ministerioSelecionado)?.nome ||
+      ministerios.find((m) => m.id === ministerioSelecionado)?.nome ||
       ministerioSelecionado;
+
 
     setIsSubmitting(true);
     try {
@@ -288,13 +310,9 @@ export default function Voluntariado() {
               className="grid grid-cols-3 gap-4 mt-8"
             >
               {[
-                {
-                  icon: Zap,
-                  label: "Ministérios",
-                  value: ministryOptions.length,
-                },
-                { icon: Users, label: "Voluntários", value: "200+" },
-                { icon: Target, label: "Impacto", value: "Alto" },
+                { icon: Zap, label: "Ministérios", value: statsHero.ministerios },
+                { icon: Users, label: "Voluntários", value: statsHero.voluntarios },
+                { icon: Target, label: "Aprovações no mês", value: statsHero.aprovacoesMes },
               ].map((stat, idx) => (
                 <motion.div
                   key={idx}
@@ -325,30 +343,38 @@ export default function Voluntariado() {
 
           {/* Tab: Ministérios */}
           <TabsContent value="ministerios" className="space-y-6 mt-6">
-            <motion.div
-              layout
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {ministryOptions.map((ministerio, idx) => (
-                <MinisterioCard
-                  key={ministerio.id}
-                  nome={ministerio.nome}
-                  descricao={ministerio.descricao}
-                  icone={Heart}
-                  cor={ministerio.cor}
-                  vagas={ministerio.vagas}
-                  dificuldade={ministerio.dificuldade}
-                  requisitos={ministerio.requisitos}
-                  desabilitado={ministeriosBloqueados.includes(ministerio.nome)}
-                  motivo={
-                    ministeriosBloqueados.includes(ministerio.nome)
-                      ? "Você já tem uma candidatura ativa neste ministério"
-                      : undefined
-                  }
-                  onSelect={() => handleAbrir(ministerio.id)}
-                />
-              ))}
-            </motion.div>
+            {ministerios.length === 0 ? (
+              <Card>
+                <CardContent className="pt-8 text-center text-muted-foreground">
+                  <p>Nenhum ministério cadastrado para essa filial.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <motion.div
+                layout
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              >
+                {ministerios.map((ministerio, idx) => (
+                  <MinisterioCard
+                    key={ministerio.id}
+                    nome={ministerio.nome}
+                    descricao={ministerio.descricao}
+                    icone={Heart}
+                    cor={ministerio.cor}
+                    vagas={ministerio.vagas_necessarias}
+                    dificuldade={ministerio.dificuldade}
+                    requisitos={ministerio.requisitos || []}
+                    desabilitado={ministeriosBloqueados.includes(ministerio.nome)}
+                    motivo={
+                      ministeriosBloqueados.includes(ministerio.nome)
+                        ? "Você já tem uma candidatura ativa neste ministério"
+                        : undefined
+                    }
+                    onSelect={() => handleAbrir(ministerio.id)}
+                  />
+                ))}
+              </motion.div>
+            )}
           </TabsContent>
 
           {/* Tab: Minhas Inscrições */}
@@ -370,7 +396,7 @@ export default function Voluntariado() {
                 ))}
               </motion.div>
 
-              {ministeriosBloqueados.length < ministryOptions.length && (
+              {ministeriosBloqueados.length < ministerios.length && (
                 <Card className="border-dashed">
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground">
@@ -390,7 +416,7 @@ export default function Voluntariado() {
             open={modalOpen}
             onOpenChange={setModalOpen}
             ministerio={
-              ministryOptions.find((m) => m.id === ministerioSelecionado)
+              ministerios.find((m) => m.id === ministerioSelecionado)
                 ?.nome || "Ministério"
             }
             perfil={

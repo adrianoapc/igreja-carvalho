@@ -27,6 +27,7 @@ export default function Kids() {
   const [selectedSala, setSelectedSala] = useState<string>("all");
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   
   // Stats
   const [totalCheckinsToday, setTotalCheckinsToday] = useState(0);
@@ -34,16 +35,21 @@ export default function Kids() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [igrejaId, filialId, isAllFiliais]);
 
   const fetchData = async () => {
     try {
       // Fetch salas (kids type only)
-      const { data: salasData } = await supabase
+      let salasQuery = supabase
         .from("salas")
         .select("id, nome, idade_min, idade_max, capacidade")
         .eq("tipo", "kids")
         .eq("ativo", true);
+      
+      if (igrejaId) salasQuery = salasQuery.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) salasQuery = salasQuery.eq("filial_id", filialId);
+      
+      const { data: salasData } = await salasQuery;
 
       setSalas(salasData || []);
 

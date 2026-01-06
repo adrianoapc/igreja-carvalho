@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { motion } from "framer-motion";
 import { MetricCard, InsightCard } from "@/components/voluntario/MetricsComponents";
+import { useFilialId } from "@/hooks/useFilialId";
 import {
   Users,
   TrendingUp,
@@ -30,6 +31,9 @@ interface CandidatoStats {
   rejeitados: number;
   por_ministerio: { ministerio: string; total: number }[];
   por_mes: { mes: string; total: number }[];
+  aprovacoes_mes?: { mes: string; candidatos: number; aprovacoes: number }[];
+  tempo_medio_dias?: number;
+  maior_crescimento?: { ministerio: string; percentual: number } | null;
 }
 
 interface Candidato {
@@ -54,6 +58,7 @@ const STATUS_CONFIG = {
 
 export default function Candidatos() {
   const { profile } = useAuth();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [stats, setStats] = useState<CandidatoStats | null>(null);
   const [candidatos, setCandidatos] = useState<Candidato[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -62,16 +67,20 @@ export default function Candidatos() {
 
   useEffect(() => {
     fetchDados();
-  }, []);
+  }, [igrejaId, filialId, isAllFiliais]);
 
   const fetchDados = async () => {
     setLoading(true);
     try {
       // Buscar todos os candidatos
-      const { data: candidatosData, error } = await supabase
+      let query = supabase
         .from("candidatos_voluntario")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*");
+      
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      
+      const { data: candidatosData, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -106,6 +115,77 @@ export default function Candidatos() {
         .slice(-6)
         .map(([mes, total]) => ({ mes, total }));
 
+      // Aprovações por mês (últimos 3 meses)
+      const hoje = new Date();
+      const ultimos3meses = Array.from({ length: 3 }, (_, i) => {
+        const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        return { mes: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }), data: d };
+      }).reverse();
+
+      const aprovacoes_mes = ultimos3meses.map(({ mes, data }) => {
+        const inicioMes = new Date(data.getFullYear(), data.getMonth(), 1);
+        const fimMes = new Date(data.getFullYear(), data.getMonth() + 1, 0);
+        
+        const totalMes = candidatosData?.filter(c => {
+          const datac = new Date(c.created_at);
+          return datac >= inicioMes && datac <= fimMes;
+        }).length || 0;
+
+        const aprovadosMes = candidatosData?.filter(c => {
+          const datac = new Date(c.created_at);
+          return c.status === "aprovado" && datac >= inicioMes && datac <= fimMes;
+        }).length || 0;
+
+        return { mes, candidatos: totalMes, aprovacoes: aprovadosMes };
+      });
+
+      // Tempo médio de análise
+      const candidatosAnalisados = candidatosData?.filter(c => c.status !== "pendente") || [];
+      let tempoMedioDias = 0;
+      if (candidatosAnalisados.length > 0) {
+        const totalDias = candidatosAnalisados.reduce((acc, c) => {
+          const inicio = new Date(c.created_at).getTime();
+          const fim = new Date(c.data_avaliacao || new Date()).getTime();
+          return acc + (fim - inicio) / (1000 * 60 * 60 * 24);
+        }, 0);
+        tempoMedioDias = Math.round((totalDias / candidatosAnalisados.length) * 10) / 10;
+      }
+
+      // Calcular maior crescimento por ministério (comparar últimos 2 meses)
+      let maiorCrescimento: { ministerio: string; percentual: number } | null = null;
+      const mesAtual = new Date();
+      const mesAnterior = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
+      const inicioMesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
+      const fimMesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0);
+      const inicioMesAnterior = new Date(mesAnterior.getFullYear(), mesAnterior.getMonth(), 1);
+      const fimMesAnterior = new Date(mesAnterior.getFullYear(), mesAnterior.getMonth() + 1, 0);
+
+      const ministerios = [...new Set(candidatosData?.map(c => c.ministerio) || [])];
+      const crescimentos = ministerios.map(ministerio => {
+        const candidatosMesAtual = candidatosData?.filter(c => {
+          const data = new Date(c.created_at);
+          return c.ministerio === ministerio && data >= inicioMesAtual && data <= fimMesAtual;
+        }).length || 0;
+
+        const candidatosMesAnterior = candidatosData?.filter(c => {
+          const data = new Date(c.created_at);
+          return c.ministerio === ministerio && data >= inicioMesAnterior && data <= fimMesAnterior;
+        }).length || 0;
+
+        if (candidatosMesAnterior === 0) {
+          return { ministerio, percentual: candidatosMesAtual > 0 ? 100 : 0 };
+        }
+        
+        const percentual = Math.round(((candidatosMesAtual - candidatosMesAnterior) / candidatosMesAnterior) * 100);
+        return { ministerio, percentual };
+      }).filter(c => c.percentual > 0);
+
+      if (crescimentos.length > 0) {
+        maiorCrescimento = crescimentos.reduce((max, curr) => 
+          curr.percentual > max.percentual ? curr : max
+        );
+      }
+
       setStats({
         total,
         pendentes,
@@ -114,6 +194,9 @@ export default function Candidatos() {
         rejeitados,
         por_ministerio,
         por_mes,
+        aprovacoes_mes,
+        tempo_medio_dias: tempoMedioDias,
+        maior_crescimento: maiorCrescimento,
       });
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
@@ -237,21 +320,27 @@ export default function Candidatos() {
         />
         <InsightCard
           tipo="meta"
-          titulo="Meta de aprovação mensal"
-          descricao="Você está no caminho certo para atingir a meta deste mês."
-          valor="75% concluído"
+          titulo="Aprovações neste mês"
+          descricao={`${stats?.aprovacoes_mes?.[2]?.candidatos || 0} candidatos inscritos, ${stats?.aprovacoes_mes?.[2]?.aprovacoes || 0} aprovados`}
+          valor={stats?.aprovacoes_mes?.[2]?.aprovacoes || 0 > 0 
+            ? `${Math.round(((stats?.aprovacoes_mes?.[2]?.aprovacoes || 0) / (stats?.aprovacoes_mes?.[2]?.candidatos || 1)) * 100)}%` 
+            : "0%"}
         />
         <InsightCard
           tipo="tempo"
           titulo="Tempo médio de análise"
           descricao="Média de tempo entre inscrição e primeira resposta."
-          valor="3.5 dias"
+          valor={`${stats?.tempo_medio_dias || 0} dias`}
         />
         <InsightCard
           tipo="conquista"
           titulo="Maior crescimento"
-          descricao="O ministério Kids teve o maior crescimento em candidaturas."
-          valor="+45% este mês"
+          descricao={stats?.maior_crescimento 
+            ? `O ministério ${stats.maior_crescimento.ministerio} teve o maior crescimento em candidaturas.`
+            : "Nenhum crescimento registrado este mês."}
+          valor={stats?.maior_crescimento 
+            ? `+${stats.maior_crescimento.percentual}% este mês`
+            : "0%"}
         />
       </div>
 

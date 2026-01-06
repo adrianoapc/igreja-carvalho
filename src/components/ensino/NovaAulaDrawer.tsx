@@ -21,6 +21,7 @@ import {
 import { Calendar, MapPin, Video, Church, BookOpen, User, Clock, Link } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useFilialId } from "@/hooks/useFilialId";
 import { format } from "date-fns";
 
 interface NovaAulaDrawerProps {
@@ -51,6 +52,7 @@ interface Profile {
 }
 
 export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAulaDrawerProps) {
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
@@ -107,11 +109,15 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
     setJornadas(jornadasData || []);
 
     // Fetch salas
-    const { data: salasData } = await supabase
+    let salasQuery = supabase
       .from("salas")
       .select("id, nome")
-      .eq("ativo", true)
-      .order("nome");
+      .eq("ativo", true);
+    
+    if (igrejaId) salasQuery = salasQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) salasQuery = salasQuery.eq("filial_id", filialId);
+    
+    const { data: salasData } = await salasQuery.order("nome");
     setSalas(salasData || []);
 
     // Fetch cultos futuros

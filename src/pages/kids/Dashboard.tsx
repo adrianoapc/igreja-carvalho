@@ -32,8 +32,10 @@ import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function KidsDashboard() {
+    const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [selectedPeriod, setSelectedPeriod] = useState<"hoje" | "semana" | "mes">("hoje");
   const [termometroOpen, setTermometroOpen] = useState(true);
   const [carinhoOpen, setCarinhoOpen] = useState(true);
@@ -41,7 +43,7 @@ export default function KidsDashboard() {
 
   // Query para estatísticas de check-ins
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["kids-stats", selectedPeriod],
+     queryKey: ["kids-stats", selectedPeriod, igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       try {
         const now = new Date();
@@ -64,10 +66,19 @@ export default function KidsDashboard() {
 
         // Total de crianças cadastradas
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: todosProfiles, error: criancasError } = await (supabase as any)
+          let profilesQuery = (supabase as any)
           .from("profiles")
-          .select("id, data_nascimento")
-          .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null; error: Error | null };
+            .select("id, data_nascimento");
+        
+          if (igrejaId) {
+            profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
+          }
+          if (!isAllFiliais && filialId) {
+            profilesQuery = profilesQuery.eq("filial_id", filialId);
+          }
+        
+          const { data: todosProfiles, error: criancasError } = await profilesQuery
+            .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null; error: Error | null };
 
         if (criancasError) throw criancasError;
 
@@ -97,11 +108,18 @@ export default function KidsDashboard() {
         }
 
         // Presenças de crianças no período (via checkins)
-        const { data: presencas, error: presencasError } = await supabase
+        let presencasQuery = supabase
           .from("checkins")
           .select("pessoa_id, evento_id, created_at")
           .in("pessoa_id", criancaIds)
           .gte("created_at", startDate.toISOString());
+        if (igrejaId) {
+          presencasQuery = presencasQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          presencasQuery = presencasQuery.eq("filial_id", filialId);
+        }
+        const { data: presencas, error: presencasError } = await presencasQuery;
 
         if (presencasError) throw presencasError;
 
@@ -109,20 +127,34 @@ export default function KidsDashboard() {
         const criancasUnicas = new Set(presencas?.map((p) => p.pessoa_id) || []).size;
         
         // Crianças presentes AGORA (culto ativo)
-        const { data: cultoAtivo } = await supabase
+        let cultoQuery = supabase
           .from("eventos")
           .select("id")
           .gte("data_evento", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-          .lte("data_evento", new Date().toISOString())
-          .maybeSingle();
+          .lte("data_evento", new Date().toISOString());
+        if (igrejaId) {
+          cultoQuery = cultoQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          // eventos pode não ter filial_id em todos os registros; aplicar quando disponível
+          cultoQuery = cultoQuery.eq("filial_id", filialId);
+        }
+        const { data: cultoAtivo } = await cultoQuery.maybeSingle();
 
         let checkinsAtivos = 0;
         if (cultoAtivo) {
-          const { data: presencasHoje } = await supabase
+          let presencasHojeQuery = supabase
             .from("checkins")
             .select("pessoa_id")
             .eq("evento_id", cultoAtivo.id)
             .in("pessoa_id", criancas?.map(c => c.id) || []);
+          if (igrejaId) {
+            presencasHojeQuery = presencasHojeQuery.eq("igreja_id", igrejaId);
+          }
+          if (!isAllFiliais && filialId) {
+            presencasHojeQuery = presencasHojeQuery.eq("filial_id", filialId);
+          }
+          const { data: presencasHoje } = await presencasHojeQuery;
           
           checkinsAtivos = presencasHoje?.length || 0;
         }
@@ -156,15 +188,24 @@ export default function KidsDashboard() {
 
   // Query para últimos check-ins
   const { data: ultimosCheckins, isLoading: checkinsLoading } = useQuery({
-    queryKey: ["kids-ultimos-checkins"],
+      queryKey: ["kids-ultimos-checkins", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       try {
         const today = new Date();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: todosProfiles } = await (supabase as any)
+          let profilesQuery = (supabase as any)
           .from("profiles")
-          .select("id, data_nascimento")
-          .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null };
+            .select("id, data_nascimento");
+        
+          if (igrejaId) {
+            profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
+          }
+          if (!isAllFiliais && filialId) {
+            profilesQuery = profilesQuery.eq("filial_id", filialId);
+          }
+        
+          const { data: todosProfiles } = await profilesQuery
+            .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null };
 
         // Filtrar apenas crianças menores de 13 anos
         const criancas = (todosProfiles || []).filter((p: { data_nascimento: string }) => {
@@ -180,12 +221,19 @@ export default function KidsDashboard() {
         if (!criancas || criancas.length === 0) return [];
 
         // Buscar presenças recentes de crianças
-        const { data, error } = await supabase
+        let ultimosCheckinsQuery = supabase
           .from("checkins")
           .select("id, pessoa_id, evento_id, created_at")
           .in("pessoa_id", criancas.map(c => c.id))
           .order("created_at", { ascending: false })
           .limit(5);
+        if (igrejaId) {
+          ultimosCheckinsQuery = ultimosCheckinsQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          ultimosCheckinsQuery = ultimosCheckinsQuery.eq("filial_id", filialId);
+        }
+        const { data, error } = await ultimosCheckinsQuery;
 
         if (error) throw error;
 
@@ -215,15 +263,24 @@ export default function KidsDashboard() {
 
   // Query para alergias e saúde
   const { data: healthStats } = useQuery({
-    queryKey: ["kids-health-stats"],
+      queryKey: ["kids-health-stats", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       try {
         const today = new Date();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: todosProfiles, error } = await (supabase as any)
+          let profilesQuery = (supabase as any)
           .from("profiles")
-          .select("id, alergias, necessidades_especiais, data_nascimento")
-          .not("data_nascimento", "is", null) as { data: Array<{ id: string; alergias: string | null; necessidades_especiais: string | null; data_nascimento: string }> | null; error: Error | null };
+            .select("id, alergias, necessidades_especiais, data_nascimento");
+        
+          if (igrejaId) {
+            profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
+          }
+          if (!isAllFiliais && filialId) {
+            profilesQuery = profilesQuery.eq("filial_id", filialId);
+          }
+        
+          const { data: todosProfiles, error } = await profilesQuery
+            .not("data_nascimento", "is", null) as { data: Array<{ id: string; alergias: string | null; necessidades_especiais: string | null; data_nascimento: string }> | null; error: Error | null };
 
         if (error) throw error;
 
@@ -277,10 +334,17 @@ export default function KidsDashboard() {
             break;
         }
 
-        const { data: diarios, error } = await supabase
+        let diarioQuery = supabase
           .from("kids_diario")
           .select("humor")
           .gte("created_at", startDate.toISOString());
+        if (igrejaId) {
+          diarioQuery = diarioQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          diarioQuery = diarioQuery.eq("filial_id", filialId);
+        }
+        const { data: diarios, error } = await diarioQuery;
 
         if (error) throw error;
 
@@ -339,11 +403,18 @@ export default function KidsDashboard() {
         }
 
         // Buscar diários com humor preocupante
-        const { data: preocupantes, error } = await supabase
+        let preocupantesQuery = supabase
           .from("kids_diario")
           .select("crianca_id, humor, crianca:profiles!kids_diario_crianca_id_fkey(nome, avatar_url)")
           .gte("created_at", startDate.toISOString())
           .in("humor", ["choroso", "triste", "agitado"]);
+        if (igrejaId) {
+          preocupantesQuery = preocupantesQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          preocupantesQuery = preocupantesQuery.eq("filial_id", filialId);
+        }
+        const { data: preocupantes, error } = await preocupantesQuery;
 
         if (error) throw error;
 

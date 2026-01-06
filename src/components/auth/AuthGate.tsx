@@ -20,7 +20,16 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
   const location = useLocation();
 
   // AuthContext unificado - única fonte de verdade
-  const { user, igrejaId, roles, isAdmin, loading: authLoading } = useAuthContext();
+  const authContext = useAuthContext();
+  
+  // Safe destructuring with fallbacks
+  const {
+    user = null,
+    igrejaId = null,
+    roles = [],
+    isAdmin = false,
+    loading: authLoading = true
+  } = authContext || {};
 
   // Hooks existentes preservados
   const {

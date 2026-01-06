@@ -24,6 +24,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useFilialId } from "@/hooks/useFilialId";
 import NovaAulaDrawer from "@/components/ensino/NovaAulaDrawer";
 import SalaDialog from "@/components/ensino/SalaDialog";
 import AulaDetailsSheet from "@/components/ensino/AulaDetailsSheet";
@@ -61,6 +62,7 @@ interface Sala {
 }
 
 export default function Ensino() {
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [activeTab, setActiveTab] = useState("agenda");
   const [aulas, setAulas] = useState<Aula[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -78,7 +80,7 @@ export default function Ensino() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [igrejaId, filialId, isAllFiliais]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -115,11 +117,15 @@ export default function Ensino() {
   };
 
   const fetchSalas = async () => {
-    const { data: salasData, error: salasError } = await supabase
+    let salasQuery = supabase
       .from("salas")
       .select("*")
-      .eq("ativo", true)
-      .order("nome");
+      .eq("ativo", true);
+    
+    if (igrejaId) salasQuery = salasQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) salasQuery = salasQuery.eq("filial_id", filialId);
+    
+    const { data: salasData, error: salasError } = await salasQuery.order("nome");
 
     if (salasError) {
       console.error("Erro ao carregar salas:", salasError);

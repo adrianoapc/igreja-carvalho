@@ -81,7 +81,13 @@ const defaultContext: AuthContextData = {
 
 const AuthContext = createContext<AuthContextData>(defaultContext);
 
-export const useAuthContext = () => useContext(AuthContext);
+export const useAuthContext = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuthContext must be used within AuthContextProvider');
+  }
+  return context;
+};
 
 interface CachedData {
   profile: ProfileData | null;
