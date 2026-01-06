@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { MapPin, ChevronDown, Building2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -9,138 +8,68 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useFilialInfo } from "@/hooks/useFilialInfo";
-import { usePermissions } from "@/hooks/usePermissions";
-import { useCurrentUserFilialAccess } from "@/hooks/useUserFilialAccess";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-
-const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
 
 interface FilialSwitcherProps {
   className?: string;
 }
 
 export function FilialSwitcher({ className }: FilialSwitcherProps) {
-  const { filialId, filialNome, filiais, igrejaId, isAllFiliais, loading } = useFilialInfo();
-  const { isAdmin, loading: permLoading } = usePermissions();
-  const { allowedFilialIds, hasExplicitRestrictions, isLoading: accessLoading } = useCurrentUserFilialAccess(igrejaId || undefined);
-  const { session } = useAuth();
-  
-  const [selectedFilialId, setSelectedFilialId] = useState<string | null>(null);
-  const [selectedFilialNome, setSelectedFilialNome] = useState<string | null>(null);
-  const [selectedIsAll, setSelectedIsAll] = useState(false);
-  const [isPersisting, setIsPersisting] = useState(false);
+  const {
+    filialId,
+    filialNome,
+    filiais,
+    igrejaId,
+    isAllFiliais,
+    isAdmin,
+    hasExplicitAccess,
+    allowedFilialIds,
+    loading,
+    setFilialOverride,
+  } = useAuthContext();
 
-  // Carregar override do localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(FILIAL_OVERRIDE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setSelectedFilialId(parsed.id);
-        setSelectedFilialNome(parsed.nome);
-        setSelectedIsAll(Boolean(parsed.isAll));
-      } catch {
-        localStorage.removeItem(FILIAL_OVERRIDE_KEY);
-      }
-    }
-  }, []);
-
-  // Sincronizar com contexto quando não há override
-  useEffect(() => {
-    if (!selectedFilialId && filialId) {
-      setSelectedFilialId(filialId);
-      setSelectedFilialNome(filialNome);
-      setSelectedIsAll(false);
-    } else if (isAllFiliais) {
-      setSelectedFilialId(null);
-      setSelectedFilialNome("Todas as filiais");
-      setSelectedIsAll(true);
-    }
-  }, [filialId, filialNome, isAllFiliais, selectedFilialId]);
-
-  const persistSelection = async (id: string | null, isAll: boolean) => {
-    if (!session?.user?.id || !igrejaId) return;
-
-    try {
-      setIsPersisting(true);
-      const targetFilial = isAll ? null : id;
-
-      await supabase
-        .from("profiles")
-        .update({
-          igreja_id: igrejaId,
-          filial_id: targetFilial,
-        })
-        .eq("user_id", session.user.id);
-
-      await supabase.auth.updateUser({
-        data: {
-          igreja_id: igrejaId,
-          filial_id: targetFilial,
-        },
-      });
-
-      await supabase.auth.refreshSession();
-    } catch (error) {
-      console.error("Erro ao persistir troca de filial:", error);
-    } finally {
-      setIsPersisting(false);
-    }
-  };
-
-  const handleSelectFilial = async (id: string | null, nome: string | null, isAll = false) => {
-    setSelectedFilialId(id);
-    setSelectedFilialNome(nome);
-    setSelectedIsAll(isAll);
-    
-    if ((id && nome) || isAll) {
-      localStorage.setItem(FILIAL_OVERRIDE_KEY, JSON.stringify({ id, nome, isAll }));
-    } else {
-      localStorage.removeItem(FILIAL_OVERRIDE_KEY);
-    }
-    await persistSelection(id, isAll);
-
+  const handleSelectFilial = (id: string | null, isAll = false) => {
+    setFilialOverride(id, isAll);
     // Recarregar a página para aplicar o novo contexto
     window.location.reload();
   };
 
-  // Carregando
-  if (loading || permLoading || accessLoading) {
+  // Skeleton loading - não bloqueia UI
+  if (loading) {
     return (
-      <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
-        <MapPin className="h-3 w-3" />
-        <span>Carregando...</span>
+      <div className={cn("flex items-center gap-2", className)}>
+        <Skeleton className="h-4 w-4 rounded-full" />
+        <Skeleton className="h-4 w-24" />
       </div>
     );
   }
 
   // Determinar quais filiais mostrar
-  // Se tem restrições explícitas em user_filial_access, usar essas
-  // Se não tem restrições e é admin, mostrar todas
-  // Se não tem restrições e não é admin, mostrar apenas a filial do perfil
-  const displayFiliais = hasExplicitRestrictions
-    ? filiais.filter(f => allowedFilialIds?.includes(f.id))
+  const displayFiliais = hasExplicitAccess
+    ? filiais.filter((f) => allowedFilialIds?.includes(f.id))
     : isAdmin
       ? filiais
-      : filiais.filter(f => f.id === filialId);
+      : filiais.filter((f) => f.id === filialId);
 
-  const displayNome = selectedFilialNome || filialNome || "Matriz";
-  
+  const displayNome = filialNome || "Matriz";
+
   // Pode trocar se tem mais de uma filial disponível
   const canSwitch = displayFiliais.length > 1;
-  
+
   // Pode ver "Todas as filiais" apenas se é admin E não tem restrições explícitas
-  const canViewAll = isAdmin && !hasExplicitRestrictions;
-  
-  const isAllSelected = selectedIsAll || isAllFiliais;
+  const canViewAll = isAdmin && !hasExplicitAccess;
 
   // Usuário com apenas uma filial: apenas indicador visual
   if (!canSwitch && !canViewAll) {
     return (
-      <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
+      <div
+        className={cn(
+          "flex items-center gap-2 text-xs text-muted-foreground",
+          className
+        )}
+      >
         <MapPin className="h-3 w-3" />
         <span>{displayNome}</span>
       </div>
@@ -151,24 +80,26 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className={cn("h-auto py-1 px-2 text-xs text-muted-foreground hover:text-foreground gap-1", className)}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "h-auto py-1 px-2 text-xs text-muted-foreground hover:text-foreground gap-1",
+            className
+          )}
         >
           <MapPin className="h-3 w-3" />
           <span>{displayNome}</span>
-          {isAllSelected && <Badge variant="outline">Todas</Badge>}
+          {isAllFiliais && <Badge variant="outline">Todas</Badge>}
           <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
         {canViewAll && (
           <>
-            <DropdownMenuItem 
-              onClick={() => handleSelectFilial(null, "Todas as filiais", true)}
-              className={cn(isAllSelected && "bg-accent")}
-              disabled={isPersisting}
+            <DropdownMenuItem
+              onClick={() => handleSelectFilial(null, true)}
+              className={cn(isAllFiliais && "bg-accent")}
             >
               <Building2 className="h-4 w-4 mr-2" />
               <span>Todas as filiais</span>
@@ -177,16 +108,17 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
           </>
         )}
         {displayFiliais.map((filial) => (
-            <DropdownMenuItem
-              key={filial.id}
-              onClick={() => handleSelectFilial(filial.id, filial.nome, false)}
-              className={cn(selectedFilialId === filial.id && !isAllSelected && "bg-accent")}
-              disabled={isPersisting}
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              <span>{filial.nome}</span>
-            </DropdownMenuItem>
-          ))}
+          <DropdownMenuItem
+            key={filial.id}
+            onClick={() => handleSelectFilial(filial.id, false)}
+            className={cn(
+              filialId === filial.id && !isAllFiliais && "bg-accent"
+            )}
+          >
+            <MapPin className="h-4 w-4 mr-2" />
+            <span>{filial.nome}</span>
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
