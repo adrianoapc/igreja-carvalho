@@ -5847,6 +5847,7 @@ export type Database = {
           cor: string | null
           created_at: string
           descricao: string | null
+          dificuldade: string | null
           filial_id: string | null
           id: string
           igreja_id: string | null
@@ -5854,6 +5855,7 @@ export type Database = {
           nome: string
           sublider_id: string | null
           updated_at: string
+          vagas_necessarias: number | null
         }
         Insert: {
           ativo?: boolean
@@ -5861,6 +5863,7 @@ export type Database = {
           cor?: string | null
           created_at?: string
           descricao?: string | null
+          dificuldade?: string | null
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
@@ -5868,6 +5871,7 @@ export type Database = {
           nome: string
           sublider_id?: string | null
           updated_at?: string
+          vagas_necessarias?: number | null
         }
         Update: {
           ativo?: boolean
@@ -5875,6 +5879,7 @@ export type Database = {
           cor?: string | null
           created_at?: string
           descricao?: string | null
+          dificuldade?: string | null
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
@@ -5882,6 +5887,7 @@ export type Database = {
           nome?: string
           sublider_id?: string | null
           updated_at?: string
+          vagas_necessarias?: number | null
         }
         Relationships: [
           {
