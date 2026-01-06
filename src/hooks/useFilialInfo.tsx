@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useFilialId } from "./useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface FilialInfo {
   filialId: string | null;
@@ -12,72 +10,28 @@ interface FilialInfo {
   loading: boolean;
 }
 
+/**
+ * Hook simplificado que consome dados do AuthContext
+ * Mantém a mesma interface pública para retrocompatibilidade
+ */
 export function useFilialInfo(): FilialInfo {
-  const { filialId, igrejaId, isAllFiliais, loading: contextLoading } = useFilialId();
-  const [info, setInfo] = useState<Omit<FilialInfo, 'loading'>>({
-    filialId: null,
-    filialNome: null,
-    igrejaId: null,
-    igrejaNome: null,
-    filiais: [],
-    isAllFiliais: false,
-  });
-  const [loading, setLoading] = useState(true);
+  const {
+    filialId,
+    filialNome,
+    igrejaId,
+    igrejaNome,
+    filiais,
+    isAllFiliais,
+    loading,
+  } = useAuthContext();
 
-  useEffect(() => {
-    if (contextLoading) return;
-
-    const fetchInfo = async () => {
-      setLoading(true);
-      
-      let filialNome: string | null = null;
-      let igrejaNome: string | null = null;
-      let filiais: Array<{ id: string; nome: string }> = [];
-
-      // Buscar nome da filial atual
-      if (filialId) {
-        const { data: filialData } = await supabase
-          .from("filiais")
-          .select("nome")
-          .eq("id", filialId)
-          .single();
-        
-        filialNome = filialData?.nome ?? null;
-      }
-
-      // Buscar nome da igreja e lista de filiais
-      if (igrejaId) {
-        const { data: igrejaData } = await supabase
-          .from("igrejas")
-          .select("nome")
-          .eq("id", igrejaId)
-          .single();
-        
-        igrejaNome = igrejaData?.nome ?? null;
-
-        // Buscar todas as filiais da igreja
-        const { data: filiaisData } = await supabase
-          .from("filiais")
-          .select("id, nome")
-          .eq("igreja_id", igrejaId)
-          .order("nome");
-        
-        filiais = filiaisData ?? [];
-      }
-
-      setInfo({
-        filialId,
-        filialNome,
-        igrejaId,
-        igrejaNome,
-        filiais,
-        isAllFiliais,
-      });
-      setLoading(false);
-    };
-
-    fetchInfo();
-  }, [filialId, igrejaId, isAllFiliais, contextLoading]);
-
-  return { ...info, loading: loading || contextLoading };
+  return {
+    filialId,
+    filialNome,
+    igrejaId,
+    igrejaNome,
+    filiais,
+    isAllFiliais,
+    loading,
+  };
 }

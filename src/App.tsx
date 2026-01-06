@@ -14,6 +14,7 @@ import { MainLayout } from "./components/layout/MainLayout";
 import { SuperAdminLayout } from "./components/layout/SuperAdminLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "next-themes";
+import { AuthContextProvider } from "./contexts/AuthContextProvider";
 
 // Pages Imports
 const Index = lazy(() => import("./pages/Index"));
@@ -199,14 +200,15 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <ScrollToTop />
-          <Suspense
-            fallback={
-              <div className="p-6 text-center text-muted-foreground">
-                Carregando...
-              </div>
-            }
-          >
+          <AuthContextProvider>
+            <ScrollToTop />
+            <Suspense
+              fallback={
+                <div className="p-6 text-center text-muted-foreground">
+                  Carregando...
+                </div>
+              }
+            >
             <Routes>
               {/* --- ROTAS PÚBLICAS (Sem AuthGate ou AuthGate liberado) --- */}
               <Route path="/auth/*" element={<Auth />} />
@@ -1023,6 +1025,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </AuthContextProvider>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

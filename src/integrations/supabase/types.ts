@@ -6855,6 +6855,7 @@ export type Database = {
         }[]
       }
       get_super_admin_dashboard: { Args: never; Returns: Json }
+      get_user_auth_context: { Args: { p_user_id: string }; Returns: Json }
       get_user_familia_id: { Args: { _user_id: string }; Returns: string }
       get_user_module_access: {
         Args: { _module_name: string; _user_id: string }
