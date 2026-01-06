@@ -6848,18 +6848,31 @@ export type Database = {
           tipo_grupo: string
         }[]
       }
-      get_ovelhas_em_risco: {
-        Args: never
-        Returns: {
-          avatar_url: string
-          detalhe: string
-          gravidade: number
-          id: string
-          nome: string
-          telefone: string
-          tipo_risco: string
-        }[]
-      }
+      get_ovelhas_em_risco:
+        | {
+            Args: never
+            Returns: {
+              avatar_url: string
+              detalhe: string
+              gravidade: number
+              id: string
+              nome: string
+              telefone: string
+              tipo_risco: string
+            }[]
+          }
+        | {
+            Args: { p_filial_id: string; p_is_all?: boolean }
+            Returns: {
+              avatar_url: string
+              detalhe: string
+              gravidade: number
+              id: string
+              nome: string
+              telefone: string
+              tipo_risco: string
+            }[]
+          }
       get_super_admin_dashboard: { Args: never; Returns: Json }
       get_user_auth_context: { Args: { p_user_id: string }; Returns: Json }
       get_user_familia_id: { Args: { _user_id: string }; Returns: string }
