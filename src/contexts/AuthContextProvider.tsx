@@ -9,7 +9,7 @@ import React, {
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 
-const AUTH_CACHE_KEY = "auth_context_cache_v1";
+const AUTH_CACHE_KEY = "auth_context_cache_v2"; // v2: mudança full_name -> nome
 const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
 const TIMEOUT_MS = 3000;
 
@@ -102,12 +102,31 @@ function loadCache(): CachedData | null {
     const raw = localStorage.getItem(AUTH_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Cache valid for 5 minutes
-    if (Date.now() - parsed.timestamp > 5 * 60 * 1000) {
+    
+    // Validar estrutura do cache
+    if (!parsed || typeof parsed !== 'object') {
+      console.warn('Cache inválido: estrutura incorreta');
+      localStorage.removeItem(AUTH_CACHE_KEY);
       return null;
     }
+    
+    // Validar que profile tem 'nome' (não 'full_name')
+    if (parsed.profile && 'full_name' in parsed.profile) {
+      console.warn('Cache obsoleto detectado (full_name encontrado), limpando...');
+      localStorage.removeItem(AUTH_CACHE_KEY);
+      return null;
+    }
+    
+    // Cache válido por 5 minutos
+    if (Date.now() - parsed.timestamp > 5 * 60 * 1000) {
+      localStorage.removeItem(AUTH_CACHE_KEY);
+      return null;
+    }
+    
     return parsed;
-  } catch {
+  } catch (error) {
+    console.error('Erro ao carregar cache:', error);
+    localStorage.removeItem(AUTH_CACHE_KEY);
     return null;
   }
 }
@@ -350,6 +369,14 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
+    
+    // Timeout de segurança: se após 10s ainda estiver loading, forçar false
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn('⚠️ Auth loading timeout - forçando loading=false');
+        setLoading(false);
+      }
+    }, 10000);
 
     // Load cache immediately for faster initial render
     const cached = loadCache();
@@ -374,6 +401,9 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
           setSession(currentSession);
           setUser(currentSession.user);
           await fetchUserContext(currentSession.user.id);
+        } else {
+          // Sem sessão ativa, definir loading como false imediatamente
+          setLoading(false);
         }
       } catch (err) {
         console.error("Error initializing auth:", err);
@@ -395,7 +425,12 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
       setUser(newSession?.user ?? null);
 
       if (event === "SIGNED_IN" && newSession?.user) {
-        await fetchUserContext(newSession.user.id);
+        try {
+          await fetchUserContext(newSession.user.id);
+        } catch (err) {
+          console.error("Error fetching context on sign in:", err);
+          setLoading(false);
+        }
       } else if (event === "SIGNED_OUT") {
         // Clear all state
         setProfile(null);
@@ -407,13 +442,16 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         setFilialOverrideState(null);
         localStorage.removeItem(AUTH_CACHE_KEY);
         localStorage.removeItem(FILIAL_OVERRIDE_KEY);
+        setLoading(false);
+      } else {
+        // Para outros eventos, garantir que loading seja false
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [fetchUserContext]);
