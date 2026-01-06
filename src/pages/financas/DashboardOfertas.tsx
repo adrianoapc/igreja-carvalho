@@ -9,8 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MonthPicker } from "@/components/financas/MonthPicker";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useState } from "react";
-import { useFilialId } from "@/hooks/useFilialId";
+
 import {
   LineChart,
   Line,

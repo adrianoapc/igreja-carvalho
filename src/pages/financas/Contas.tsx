@@ -15,14 +15,12 @@ import { cn } from "@/lib/utils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 export default function Contas() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
   const [contaDialogOpen, setContaDialogOpen] = useState(false);
   const [ajusteSaldoDialogOpen, setAjusteSaldoDialogOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<{
@@ -53,7 +51,7 @@ export default function Contas() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   const startDate = customRange 
@@ -92,7 +90,7 @@ export default function Contas() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Buscar todas as transações do período para calcular totais por conta

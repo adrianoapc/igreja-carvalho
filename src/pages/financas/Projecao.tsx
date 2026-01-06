@@ -9,14 +9,15 @@ import { ptBR } from "date-fns/locale";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
+
+
 
 export default function Projecao() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  
 
   // Buscar transações dos últimos 12 meses para análise
   const { data: historicoTransacoes } = useQuery({
@@ -40,7 +41,7 @@ export default function Projecao() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Buscar transações futuras (pendentes)
@@ -65,7 +66,7 @@ export default function Projecao() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   const formatCurrency = (value: number) => formatValue(value);

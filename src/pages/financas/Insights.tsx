@@ -10,16 +10,17 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
+
+
 
 const COLORS = ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444'];
 
 export default function Insights() {
   const [periodo, setPeriodo] = useState<"3" | "6" | "12">("6");
   const { formatValue } = useHideValues();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  
 
   // Calcular data inicial baseada no período selecionado
   const dataInicial = startOfMonth(subMonths(new Date(), parseInt(periodo)));
@@ -51,7 +52,7 @@ export default function Insights() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Processar dados para insights

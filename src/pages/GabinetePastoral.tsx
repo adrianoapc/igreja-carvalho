@@ -15,10 +15,17 @@ import { AgendamentoDialog } from "@/components/gabinete/AgendamentoDialog";
 import { PastoralCalendarView } from "@/components/gabinete/PastoralCalendarView";
 
 // Lazy load Kanban (heavy with DnD)
-const PastoralKanbanView = lazy(() => import("@/components/gabinete/PastoralKanbanView"));
+const PastoralKanbanView = lazy(
+  () => import("@/components/gabinete/PastoralKanbanView")
+);
 
 type GravidadeEnum = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
-type StatusEnum = "PENDENTE" | "TRIAGEM" | "AGENDADO" | "EM_ACOMPANHAMENTO" | "CONCLUIDO";
+type StatusEnum =
+  | "PENDENTE"
+  | "TRIAGEM"
+  | "AGENDADO"
+  | "EM_ACOMPANHAMENTO"
+  | "CONCLUIDO";
 
 interface AtendimentoPastoral {
   id: string;
@@ -34,7 +41,12 @@ interface AtendimentoPastoral {
   data_agendamento: string | null;
   local_atendimento: string | null;
   observacoes_internas: string | null;
-  historico_evolucao: Array<{ data: string; autor: string; acao: string; detalhes?: string }> | null;
+  historico_evolucao: Array<{
+    data: string;
+    autor: string;
+    acao: string;
+    detalhes?: string;
+  }> | null;
   pessoa?: { nome: string | null; telefone: string | null } | null;
   visitante?: { nome: string | null; telefone: string | null } | null;
   pastor?: { nome: string | null } | null;
@@ -43,16 +55,26 @@ interface AtendimentoPastoral {
 export default function GabinetePastoral() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: filialLoading,
+  } = useFilialId();
 
   // States
   const [filtroMeus, setFiltroMeus] = useState(false);
-  const [filtroGravidade, setFiltroGravidade] = useState<GravidadeEnum | "TODAS">("TODAS");
+  const [filtroGravidade, setFiltroGravidade] = useState<
+    GravidadeEnum | "TODAS"
+  >("TODAS");
   const [busca, setBusca] = useState("");
   const [filtroOrigem, setFiltroOrigem] = useState("TODAS");
-  const [viewMode, setViewMode] = useState<"list" | "kanban" | "agenda">("list");
+  const [viewMode, setViewMode] = useState<"list" | "kanban" | "agenda">(
+    "list"
+  );
   const [agendamentoDialogOpen, setAgendamentoDialogOpen] = useState(false);
-  const [atendimentoParaAgendar, setAtendimentoParaAgendar] = useState<AtendimentoPastoral | null>(null);
+  const [atendimentoParaAgendar, setAtendimentoParaAgendar] =
+    useState<AtendimentoPastoral | null>(null);
 
   // Fetch atendimentos
   const { data: atendimentos, isLoading } = useQuery({
@@ -60,12 +82,14 @@ export default function GabinetePastoral() {
     queryFn: async () => {
       let query = supabase
         .from("atendimentos_pastorais")
-        .select(`
+        .select(
+          `
           *,
           pessoa:profiles!atendimentos_pastorais_pessoa_id_fkey(nome, telefone),
           visitante:visitantes_leads!atendimentos_pastorais_visitante_id_fkey(nome, telefone),
           pastor:profiles!atendimentos_pastorais_pastor_responsavel_id_fkey(nome)
-        `)
+        `
+        )
         .order("created_at", { ascending: false });
 
       if (igrejaId) query = query.eq("igreja_id", igrejaId);
@@ -77,7 +101,9 @@ export default function GabinetePastoral() {
 
       const normalized = (data || []).map((row: Record<string, unknown>) => ({
         ...row,
-        historico_evolucao: Array.isArray(row.historico_evolucao) ? row.historico_evolucao : null,
+        historico_evolucao: Array.isArray(row.historico_evolucao)
+          ? row.historico_evolucao
+          : null,
       }));
 
       return normalized as AtendimentoPastoral[];
@@ -113,7 +139,14 @@ export default function GabinetePastoral() {
       }
       return true;
     });
-  }, [atendimentos, filtroMeus, filtroGravidade, filtroOrigem, busca, profile?.id]);
+  }, [
+    atendimentos,
+    filtroMeus,
+    filtroGravidade,
+    filtroOrigem,
+    busca,
+    profile?.id,
+  ]);
 
   const handleAgendar = useCallback((atendimento: AtendimentoPastoral) => {
     setAtendimentoParaAgendar(atendimento);
@@ -163,7 +196,10 @@ export default function GabinetePastoral() {
       />
 
       {/* Tabs */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "list" | "kanban" | "agenda")}>
+      <Tabs
+        value={viewMode}
+        onValueChange={(v) => setViewMode(v as "list" | "kanban" | "agenda")}
+      >
         <TabsList className="grid w-full max-w-[300px] grid-cols-3 h-9">
           <TabsTrigger value="list" className="text-xs gap-1.5">
             <List className="h-3.5 w-3.5" />
@@ -187,13 +223,15 @@ export default function GabinetePastoral() {
         </TabsContent>
 
         <TabsContent value="kanban" className="mt-3">
-          <Suspense fallback={
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-64" />
-              ))}
-            </div>
-          }>
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-64" />
+                ))}
+              </div>
+            }
+          >
             <PastoralKanbanView
               atendimentos={atendimentosFiltrados}
               allAtendimentos={atendimentos || []}

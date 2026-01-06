@@ -14,14 +14,14 @@ import { ContasAPagarWidget } from "@/components/financas/ContasAPagarWidget";
 import { useState } from "react";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  const queryClient = useQueryClient();
   
   // MonthPicker states
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -68,7 +68,7 @@ export default function Dashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   const { data: categorias } = useQuery({
@@ -88,7 +88,7 @@ export default function Dashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Dados do período filtrado
@@ -129,7 +129,7 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       ) || [];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Dados do mês anterior
@@ -159,7 +159,7 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       ) || [];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Pendências críticas da semana
@@ -193,7 +193,7 @@ export default function Dashboard() {
         t.solicitacao_reembolso?.status === 'pago'
       );
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   const vencidasSemana = pendenciasSemana.filter((item) => parseISO(item.data_vencimento) < hoje);

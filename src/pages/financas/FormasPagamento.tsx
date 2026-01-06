@@ -10,10 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Plus, Pencil, Trash2, Search, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+
+
 
 interface FormaPagamento {
   id: string;
@@ -29,8 +30,8 @@ export default function FormasPagamento({ onBack }: Props) {
   const navigate = useNavigate();
   const handleBack = onBack ?? (() => navigate('/financas'));
   const queryClient = useQueryClient();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingForma, setEditingForma] = useState<FormaPagamento | null>(null);
@@ -56,7 +57,7 @@ export default function FormasPagamento({ onBack }: Props) {
       if (error) throw error;
       return data as FormaPagamento[];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Show error toast if query fails

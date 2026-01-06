@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Database } from "@/integrations/supabase/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -50,8 +51,8 @@ import {
   Upload,
   FileText,
 } from "lucide-react";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+
+
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -106,8 +107,8 @@ interface Conta {
 export default function Reembolsos() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  
   const [userRoles, setUserRoles] = useState<AppRole[]>([]);
   const [novoReembolsoOpen, setNovoReembolsoOpen] = useState(false);
   const [pagarReembolsoOpen, setPagarReembolsoOpen] = useState(false);
@@ -189,7 +190,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as SolicitacaoReembolso[];
     },
-    enabled: !!profile?.id && !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !!profile?.id && !loading && !!igrejaId,
   });
 
   // Query: Todas as solicitações (para admin/tesoureiro)
@@ -211,7 +212,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as SolicitacaoReembolso[];
     },
-    enabled: isAdmin && !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: isAdmin && !loading && !!igrejaId,
   });
 
   // Query: Categorias
@@ -234,7 +235,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as Categoria[];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Query: Subcategorias (baseado na categoria selecionada)
@@ -257,7 +258,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as Subcategoria[];
     },
-    enabled: !!itemAtual.categoria_id && !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !!itemAtual.categoria_id && !loading && !!igrejaId,
   });
 
   // Query: Fornecedores
@@ -279,7 +280,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as Fornecedor[];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Query: Bases Ministeriais
@@ -301,7 +302,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as BaseMinisterial[];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Query: Centros de Custo
@@ -323,7 +324,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as CentroCusto[];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Query: Contas bancárias
@@ -345,7 +346,7 @@ export default function Reembolsos() {
       if (error) throw error;
       return data as Conta[];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Definir conta padrão quando contas são carregadas

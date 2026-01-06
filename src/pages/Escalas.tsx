@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   MessageCircle
 } from "lucide-react";
-import { useFilialId } from "@/hooks/useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Time {
   id: string;
@@ -56,35 +57,39 @@ export default function Escalas() {
   const [membros, setMembros] = useState<MembroTime[]>([]);
   const [cultos, setCultos] = useState<Evento[]>([]);
   const [escalas, setEscalas] = useState<Escala[]>([]);
-  const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  const queryClient = useQueryClient();
 
   const mesAtual = format(currentDate, "MMMM yyyy", { locale: ptBR });
   const inicioMes = startOfMonth(currentDate);
   const fimMes = endOfMonth(currentDate);
 
+  // Carregamento inicial de times
   useEffect(() => {
-    if (!filialLoading && igrejaId) {
+    if (!loading && igrejaId) {
       loadTimes();
     }
-  }, [filialLoading, igrejaId]);
+  }, [loading, igrejaId]);
 
+  // Carregamento de membros quando time muda
   useEffect(() => {
     if (timeSelecionado) {
       loadMembros();
     }
-  }, [timeSelecionado, igrejaId, filialId, isAllFiliais, filialLoading]);
+  }, [timeSelecionado, igrejaId, filialId, isAllFiliais]);
 
+  // Carregamento de eventos do mês
   useEffect(() => {
     loadCultos();
-  }, [currentDate, igrejaId, filialId, isAllFiliais, filialLoading]);
+  }, [currentDate, igrejaId, filialId, isAllFiliais]);
 
+  // Carregamento de escalas
   useEffect(() => {
     if (timeSelecionado && cultos.length > 0) {
       loadEscalas();
     }
-  }, [timeSelecionado, cultos, igrejaId, filialId, isAllFiliais, filialLoading]);
+  }, [timeSelecionado, cultos, igrejaId, filialId, isAllFiliais]);
 
   const loadTimes = async () => {
     try {
@@ -220,6 +225,7 @@ export default function Escalas() {
       }
     }
 
+    queryClient.invalidateQueries({ queryKey: ["escalas"] });
     loadEscalas();
   };
 

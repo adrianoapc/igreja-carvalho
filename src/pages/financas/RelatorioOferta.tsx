@@ -15,16 +15,17 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { ConferirOfertaDialog } from "@/components/financas/ConferirOfertaDialog";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+
+
 
 export default function RelatorioOferta() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading: authLoading } = useAuthContext();
+  
   const [loading, setLoading] = useState(false);
   const [dataCulto, setDataCulto] = useState<Date>(new Date());
   const [conferenteId, setConferenteId] = useState("");
@@ -52,7 +53,7 @@ export default function RelatorioOferta() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !authLoading && !!igrejaId,
   });
 
   // Buscar membros com permissão financeira para conferente
@@ -87,7 +88,7 @@ export default function RelatorioOferta() {
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.id && !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !!profile?.id && !loading && !!igrejaId,
   });
 
   // Buscar contas
@@ -108,7 +109,7 @@ export default function RelatorioOferta() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !authLoading && !!igrejaId,
   });
 
   const handleValorChange = (formaId: string, valor: string) => {
@@ -429,7 +430,7 @@ export default function RelatorioOferta() {
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.user_id && !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !!profile?.user_id && !loading && !!igrejaId,
   });
 
   return (

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,16 +30,21 @@ import {
   User,
   CheckCircle,
   UserPlus,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { exportToExcel, formatDateTimeForExport } from "@/lib/exportUtils";
 import { NovoPedidoDialog } from "@/components/pedidos/NovoPedidoDialog";
 import { PedidoDetailsDialog } from "@/components/pedidos/PedidoDetailsDialog";
 import { NovoTestemunhoDialog } from "@/components/testemunhos/NovoTestemunhoDialog";
 import { TestemunhoDetailsDialog } from "@/components/testemunhos/TestemunhoDetailsDialog";
-import { useFilialId } from "@/hooks/useFilialId";
+import {
+  useFilialPaginatedQuery,
+  flattenPaginatedData,
+} from "@/hooks/useFilialPaginatedQuery";
 
 interface Pedido {
   id: string;
@@ -92,12 +98,13 @@ const CATEGORIAS_TESTEMUNHOS = [
 export default function SalaDeGuerra() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { igrejaId, filialId, isAllFiliais, loading: authLoading } = useAuthContext();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"pedidos" | "testemunhos">(
     "pedidos"
   );
 
-  // Pedidos
-  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  // Pedidos - State
   const [searchPedidos, setSearchPedidos] = useState("");
   const [statusFilterPedidos, setStatusFilterPedidos] = useState("todos");
   const [tipoFilterPedidos, setTipoFilterPedidos] = useState("todos");
@@ -105,8 +112,7 @@ export default function SalaDeGuerra() {
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [pedidoDetailsOpen, setPedidoDetailsOpen] = useState(false);
 
-  // Testemunhos
-  const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
+  // Testemunhos - State
   const [searchTestemunhos, setSearchTestemunhos] = useState("");
   const [statusFilterTestemunhos, setStatusFilterTestemunhos] =
     useState("aberto");
@@ -116,98 +122,79 @@ export default function SalaDeGuerra() {
     useState<Testemunho | null>(null);
   const [testemunhoDetailsOpen, setTestemunhoDetailsOpen] = useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const { igrejaId, filialId, isAllFiliais } = useFilialId();
-
-  // Fetch Pedidos
-  const fetchPedidos = async () => {
-    try {
-      if (!igrejaId) return;
-      let query = supabase
-        .from("pedidos_oracao")
-        .select(
-          `
-          *,
-          intercessores(nome),
-          profiles!pedidos_oracao_pessoa_id_fkey(nome)
-        `
-        )
-        .eq("igreja_id", igrejaId)
-        .order("data_criacao", { ascending: false });
-      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setPedidos(data || []);
-    } catch (error) {
-      console.error("Erro ao buscar pedidos:", error);
-      toast.error("Não foi possível carregar os pedidos");
-    }
-  };
-
-  // Fetch Testemunhos
-  const fetchTestemunhos = async () => {
-    try {
-      if (!igrejaId) return;
-      let query = supabase
-        .from("testemunhos")
-        .select(
-          `
-          *,
-          profiles!testemunhos_autor_id_fkey(nome)
-        `
-        )
-        .eq("igreja_id", igrejaId)
-        .order("created_at", { ascending: false });
-      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setTestemunhos(data || []);
-    } catch (error) {
-      console.error("Erro ao buscar testemunhos:", error);
-      toast.error("Não foi possível carregar os testemunhos");
-    }
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      await Promise.all([fetchPedidos(), fetchTestemunhos()]);
-      setLoading(false);
-    };
-    fetchData();
-  }, [igrejaId, filialId, isAllFiliais]);
-
-  // Filtros Pedidos
-  const filteredPedidos = pedidos.filter((p) => {
-    const matchSearch =
-      p.pedido?.toLowerCase().includes(searchPedidos.toLowerCase()) ||
-      p.nome_solicitante?.toLowerCase().includes(searchPedidos.toLowerCase());
-    const matchStatus =
-      statusFilterPedidos === "todos" || p.status === statusFilterPedidos;
-    const matchTipo =
-      tipoFilterPedidos === "todos" || p.tipo === tipoFilterPedidos;
-    return matchSearch && matchStatus && matchTipo;
+  // Pedidos - Query com Paginação
+  const {
+    data: pedidosPages = [],
+    fetchNextPage: fetchNextPagePedidos,
+    hasNextPage: hasNextPagePedidos,
+    isLoading: isLoadingPedidos,
+    error: errorPedidos,
+  } = useFilialPaginatedQuery({
+    table: "pedidos_oracao",
+    select: `
+      *,
+      intercessores(nome),
+      profiles!pedidos_oracao_pessoa_id_fkey(nome)
+    `,
+    filters: {
+      status: statusFilterPedidos !== "todos" ? statusFilterPedidos : undefined,
+      tipo: tipoFilterPedidos !== "todos" ? tipoFilterPedidos : undefined,
+    },
+    orderBy: { column: "data_criacao", ascending: false },
+    igrejaId: igrejaId || null,
+    filialId: filialId || null,
+    isAllFiliais: isAllFiliais ?? false,
+    enabled: !authLoading && !!igrejaId,
   });
 
-  // Filtros Testemunhos
-  const filteredTestemunhos = testemunhos.filter((t) => {
-    const matchSearch =
-      t.titulo?.toLowerCase().includes(searchTestemunhos.toLowerCase()) ||
-      t.mensagem?.toLowerCase().includes(searchTestemunhos.toLowerCase());
-    const matchCategoria =
-      categoriaFilter === "todos" || t.categoria === categoriaFilter;
-    const matchStatus =
-      statusFilterTestemunhos === "aberto"
-        ? t.status === "aberto"
-        : statusFilterTestemunhos === "publico"
-        ? t.publicar === true
-        : t.status === "arquivado";
-    return matchSearch && matchCategoria && matchStatus;
+  // Testemunhos - Query com Paginação
+  const {
+    data: testemunhosPages = [],
+    fetchNextPage: fetchNextPageTestemunhos,
+    hasNextPage: hasNextPageTestemunhos,
+    isLoading: isLoadingTestemunhos,
+    error: errorTestemunhos,
+  } = useFilialPaginatedQuery({
+    table: "testemunhos",
+    select: `
+      *,
+      profiles!testemunhos_autor_id_fkey(nome)
+    `,
+    filters: {
+      publicar: statusFilterTestemunhos === "publico" ? true : undefined,
+    },
+    orderBy: { column: "created_at", ascending: false },
+    igrejaId: igrejaId || null,
+    filialId: filialId || null,
+    isAllFiliais: isAllFiliais ?? false,
+    enabled: !authLoading && !!igrejaId,
   });
+
+  // Dados planos
+  const pedidos = flattenPaginatedData(pedidosPages) as Pedido[];
+  const testemunhos = flattenPaginatedData(testemunhosPages) as Testemunho[];
+
+  // Filtros Pedidos - Client side (para busca textual)
+  const filteredPedidos = useMemo(() => {
+    return pedidos.filter((p) => {
+      const matchSearch =
+        p.pedido?.toLowerCase().includes(searchPedidos.toLowerCase()) ||
+        p.nome_solicitante?.toLowerCase().includes(searchPedidos.toLowerCase());
+      return matchSearch;
+    });
+  }, [pedidos, searchPedidos]);
+
+  // Filtros Testemunhos - Client side (para busca textual)
+  const filteredTestemunhos = useMemo(() => {
+    return testemunhos.filter((t) => {
+      const matchSearch =
+        t.titulo?.toLowerCase().includes(searchTestemunhos.toLowerCase()) ||
+        t.mensagem?.toLowerCase().includes(searchTestemunhos.toLowerCase());
+      const matchCategoria =
+        categoriaFilter === "todos" || t.categoria === categoriaFilter;
+      return matchSearch && matchCategoria;
+    });
+  }, [testemunhos, searchTestemunhos, categoriaFilter]);
 
   // Helper para exibir nome do solicitante
   const getNomeSolicitante = (pedido: Pedido) => {
@@ -230,6 +217,7 @@ export default function SalaDeGuerra() {
     }
 
     try {
+      // Atribuir pedido ao usuário atual
       const { error } = await supabase
         .from("pedidos_oracao")
         .update({
@@ -242,7 +230,8 @@ export default function SalaDeGuerra() {
       if (error) throw error;
 
       toast.success("Pedido atribuído com sucesso!");
-      fetchPedidos();
+      // Revalidar queries de pedidos
+      queryClient.invalidateQueries({ queryKey: ["pedidos_oracao-paginated"] });
     } catch (error) {
       console.error("Erro ao atribuir pedido:", error);
       toast.error("Erro ao atribuir pedido");
@@ -268,7 +257,8 @@ export default function SalaDeGuerra() {
       if (error) throw error;
 
       toast.success("Pedido marcado como respondido!");
-      fetchPedidos();
+      // Revalidar queries de pedidos
+      queryClient.invalidateQueries({ queryKey: ["pedidos_oracao-paginated"] });
     } catch (error) {
       console.error("Erro ao marcar pedido:", error);
       toast.error("Erro ao marcar pedido");
@@ -456,10 +446,18 @@ export default function SalaDeGuerra() {
             </div>
 
             {/* Lista de Pedidos */}
-            {loading ? (
+            {isLoadingPedidos ? (
               <Card className="shadow-soft">
                 <CardContent className="p-8 text-center">
                   <p className="text-muted-foreground">Carregando pedidos...</p>
+                </CardContent>
+              </Card>
+            ) : errorPedidos ? (
+              <Card className="shadow-soft">
+                <CardContent className="p-8 text-center">
+                  <p className="text-red-600">
+                    Erro ao carregar pedidos: {errorPedidos.message}
+                  </p>
                 </CardContent>
               </Card>
             ) : filteredPedidos.length === 0 ? (
@@ -559,6 +557,20 @@ export default function SalaDeGuerra() {
                     </CardHeader>
                   </Card>
                 ))}
+              </div>
+            )}
+
+            {/* Botão "Carregar mais" - Pedidos */}
+            {hasNextPagePedidos && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={() => fetchNextPagePedidos()}
+                  variant="outline"
+                  disabled={isLoadingPedidos}
+                >
+                  <ChevronDown className="w-4 h-4 mr-2" />
+                  {isLoadingPedidos ? "Carregando..." : "Carregar mais pedidos"}
+                </Button>
               </div>
             )}
           </TabsContent>
@@ -713,6 +725,20 @@ export default function SalaDeGuerra() {
                 ))}
               </div>
             )}
+
+            {/* Botão "Carregar mais" - Testemunhos */}
+            {hasNextPageTestemunhos && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={() => fetchNextPageTestemunhos()}
+                  variant="outline"
+                  disabled={isLoadingTestemunhos}
+                >
+                  <ChevronDown className="w-4 h-4 mr-2" />
+                  {isLoadingTestemunhos ? "Carregando..." : "Carregar mais testemunhos"}
+                </Button>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -721,30 +747,30 @@ export default function SalaDeGuerra() {
       <NovoPedidoDialog
         open={novoPedidoOpen}
         onOpenChange={setNovoPedidoOpen}
-        onSuccess={fetchPedidos}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["pedidos_oracao-paginated"] })}
       />
       {selectedPedido && (
         <PedidoDetailsDialog
           open={pedidoDetailsOpen}
           onOpenChange={setPedidoDetailsOpen}
           pedido={selectedPedido}
-          onUpdate={fetchPedidos}
+          onUpdate={() => queryClient.invalidateQueries({ queryKey: ["pedidos_oracao-paginated"] })}
         />
       )}
       <NovoTestemunhoDialog
         open={novoTestemunhoOpen}
         onOpenChange={setNovoTestemunhoOpen}
-        onSuccess={fetchTestemunhos}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["testemunhos-paginated"] })}
       />
       {selectedTestemunho && (
         <TestemunhoDetailsDialog
           open={testemunhoDetailsOpen}
           onOpenChange={(open) => {
             setTestemunhoDetailsOpen(open);
-            if (!open) fetchTestemunhos();
+            if (!open) queryClient.invalidateQueries({ queryKey: ["testemunhos-paginated"] });
           }}
           testemunho={selectedTestemunho}
-          onSuccess={fetchTestemunhos}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["testemunhos-paginated"] })}
         />
       )}
     </div>

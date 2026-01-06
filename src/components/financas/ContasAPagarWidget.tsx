@@ -42,21 +42,40 @@ function resolverStatus(dataVencimento: string): AlertaStatus {
 function badgeProps(status: AlertaStatus) {
   switch (status) {
     case "vencido":
-      return { label: "Vencido", className: "bg-red-100 text-red-700 border-red-200" };
+      return {
+        label: "Vencido",
+        className: "bg-red-100 text-red-700 border-red-200",
+      };
     case "hoje":
-      return { label: "Vence Hoje!", className: "bg-orange-100 text-orange-700 border-orange-200" };
+      return {
+        label: "Vence Hoje!",
+        className: "bg-orange-100 text-orange-700 border-orange-200",
+      };
     case "breve":
-      return { label: "Atenção", className: "bg-yellow-100 text-yellow-800 border-yellow-200" };
+      return {
+        label: "Atenção",
+        className: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      };
     default:
-      return { label: "No prazo", className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+      return {
+        label: "No prazo",
+        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+      };
   }
 }
 
 export function ContasAPagarWidget() {
   const { formatValue } = useHideValues();
   const queryClient = useQueryClient();
-  const [transacaoSelecionada, setTransacaoSelecionada] = useState<string | null>(null);
-  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const [transacaoSelecionada, setTransacaoSelecionada] = useState<
+    string | null
+  >(null);
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: filialLoading,
+  } = useFilialId();
 
   const { data: transacoes = [], isLoading } = useQuery({
     queryKey: ["contas-a-pagar-widget", igrejaId, filialId, isAllFiliais],
@@ -64,10 +83,12 @@ export function ContasAPagarWidget() {
       if (!igrejaId) return [];
       let query = supabase
         .from("transacoes_financeiras")
-        .select(`
+        .select(
+          `
           id, descricao, valor, data_vencimento, solicitacao_reembolso_id,
           solicitacao_reembolso:solicitacao_reembolso_id(status)
-        `)
+        `
+        )
         .eq("tipo", "saida")
         .eq("status", "pendente")
         .eq("igreja_id", igrejaId)
@@ -81,8 +102,10 @@ export function ContasAPagarWidget() {
 
       const rows = (data ?? []) as TransacaoRow[];
       // Filtrar: exclui transações de reembolso que NÃO estão pagas
-      const filtered = rows.filter((t) =>
-        !t.solicitacao_reembolso_id || t.solicitacao_reembolso?.status === "pago"
+      const filtered = rows.filter(
+        (t) =>
+          !t.solicitacao_reembolso_id ||
+          t.solicitacao_reembolso?.status === "pago"
       );
 
       return filtered.slice(0, 10).map((t) => ({
@@ -119,9 +142,15 @@ export function ContasAPagarWidget() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isLoading && <p className="text-sm text-muted-foreground">Carregando contas a pagar...</p>}
+        {isLoading && (
+          <p className="text-sm text-muted-foreground">
+            Carregando contas a pagar...
+          </p>
+        )}
         {!isLoading && transacoes.length === 0 && (
-          <p className="text-sm text-muted-foreground">Nenhuma conta pendente.</p>
+          <p className="text-sm text-muted-foreground">
+            Nenhuma conta pendente.
+          </p>
         )}
 
         {!isLoading && transacoes.length > 0 && (
@@ -129,7 +158,11 @@ export function ContasAPagarWidget() {
             {transacoes.map((transacao) => {
               const status = resolverStatus(transacao.data_vencimento);
               const { label, className } = badgeProps(status);
-              const dataFormatada = format(parseISO(transacao.data_vencimento), "dd/MM", { locale: ptBR });
+              const dataFormatada = format(
+                parseISO(transacao.data_vencimento),
+                "dd/MM",
+                { locale: ptBR }
+              );
 
               return (
                 <div
@@ -141,13 +174,20 @@ export function ContasAPagarWidget() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{transacao.descricao}</p>
+                    <p className="text-sm font-medium truncate">
+                      {transacao.descricao}
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <div className="text-right">
-                      <p className="text-sm font-semibold">{formatValue(Number(transacao.valor))}</p>
-                      <Badge variant="outline" className={`text-xs ${className}`}>
+                      <p className="text-sm font-semibold">
+                        {formatValue(Number(transacao.valor))}
+                      </p>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${className}`}
+                      >
                         {label}
                       </Badge>
                     </div>

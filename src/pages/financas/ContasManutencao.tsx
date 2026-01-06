@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Plus, Pencil, Trash2, Search, Building2, AlertTriangle, Landmark } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+
+
 
 interface Conta {
   id: string;
@@ -35,8 +36,8 @@ interface Props {
 
 export default function ContasManutencao({ onBack }: Props) {
   const queryClient = useQueryClient();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<Conta | null>(null);
@@ -68,7 +69,7 @@ export default function ContasManutencao({ onBack }: Props) {
       if (error) throw error;
       return data as Conta[];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Query transações por conta
@@ -97,7 +98,7 @@ export default function ContasManutencao({ onBack }: Props) {
       });
       return contagem;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Show error toast if query fails

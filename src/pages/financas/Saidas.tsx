@@ -17,14 +17,14 @@ import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Saidas() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
-  const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<{
@@ -92,7 +92,7 @@ export default function Saidas() {
         t.solicitacao_reembolso?.status === 'pago'
       ) || [];
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Buscar contas, categorias e fornecedores para os filtros
@@ -113,7 +113,7 @@ export default function Saidas() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   const { data: categorias } = useQuery({
@@ -134,7 +134,7 @@ export default function Saidas() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   const { data: fornecedores } = useQuery({
@@ -154,7 +154,7 @@ export default function Saidas() {
       if (error) throw error;
       return data;
     },
-    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    enabled: !loading && !!igrejaId,
   });
 
   // Aplicar filtros
