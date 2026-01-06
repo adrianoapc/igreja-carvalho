@@ -5227,6 +5227,57 @@ export type Database = {
           },
         ]
       }
+      short_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          is_all_filiais: boolean
+          slug: string
+          target_url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          is_all_filiais?: boolean
+          slug: string
+          target_url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          is_all_filiais?: boolean
+          slug?: string
+          target_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "short_links_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "short_links_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       solicitacoes_reembolso: {
         Row: {
           comprovante_pagamento_url: string | null
