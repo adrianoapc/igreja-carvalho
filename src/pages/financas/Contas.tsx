@@ -1,6 +1,19 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Building2, Landmark, Wallet, Edit, Settings, TrendingUp, TrendingDown, List, Check, Calendar } from "lucide-react";
+import {
+  Plus,
+  ArrowLeft,
+  Building2,
+  Landmark,
+  Wallet,
+  Edit,
+  Settings,
+  TrendingUp,
+  TrendingDown,
+  List,
+  Check,
+  Calendar,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,61 +44,74 @@ export default function Contas() {
   } | null>(null);
   const [selectedContaIds, setSelectedContaIds] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [customRange, setCustomRange] = useState<{
+    from: Date;
+    to: Date;
+  } | null>(null);
 
   const { data: contas, isLoading } = useQuery({
-    queryKey: ['contas', igrejaId, filialId, isAllFiliais],
+    queryKey: ["contas", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
-        .from('contas')
-        .select('*')
-        .eq('ativo', true)
-        .eq('igreja_id', igrejaId)
-        .order('nome');
+        .from("contas")
+        .select("*")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
+        .order("nome");
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
-      
+
       if (error) throw error;
       return data;
     },
     enabled: !loading && !!igrejaId,
   });
 
-  const startDate = customRange 
-    ? format(customRange.from, 'yyyy-MM-dd')
-    : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-  const endDate = customRange 
-    ? format(customRange.to, 'yyyy-MM-dd')
-    : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+  const startDate = customRange
+    ? format(customRange.from, "yyyy-MM-dd")
+    : format(startOfMonth(selectedMonth), "yyyy-MM-dd");
+  const endDate = customRange
+    ? format(customRange.to, "yyyy-MM-dd")
+    : format(endOfMonth(selectedMonth), "yyyy-MM-dd");
 
   const { data: transacoes, isLoading: isLoadingTransacoes } = useQuery({
-    queryKey: ['transacoes-contas', igrejaId, filialId, isAllFiliais, selectedContaIds, selectedMonth, customRange],
+    queryKey: [
+      "transacoes-contas",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      selectedContaIds,
+      selectedMonth,
+      customRange,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
-        .from('transacoes_financeiras')
-        .select(`
+        .from("transacoes_financeiras")
+        .select(
+          `
           *,
           categorias_financeiras(nome, cor),
           fornecedores(nome),
           contas(nome)
-        `)
-        .eq('igreja_id', igrejaId)
-        .eq('status', 'pago')
-        .gte('data_pagamento', startDate)
-        .lte('data_pagamento', endDate)
-        .order('data_pagamento', { ascending: false });
+        `
+        )
+        .eq("igreja_id", igrejaId)
+        .eq("status", "pago")
+        .gte("data_pagamento", startDate)
+        .lte("data_pagamento", endDate)
+        .order("data_pagamento", { ascending: false });
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
-      
+
       if (selectedContaIds.length > 0) {
-        query = query.in('conta_id', selectedContaIds);
+        query = query.in("conta_id", selectedContaIds);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -95,21 +121,28 @@ export default function Contas() {
 
   // Buscar todas as transações do período para calcular totais por conta
   const { data: allTransacoesPeriodo } = useQuery({
-    queryKey: ['transacoes-periodo-all', igrejaId, filialId, isAllFiliais, selectedMonth, customRange],
+    queryKey: [
+      "transacoes-periodo-all",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      selectedMonth,
+      customRange,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
-        .from('transacoes_financeiras')
-        .select('conta_id, tipo, valor')
-        .eq('igreja_id', igrejaId)
-        .eq('status', 'pago')
-        .gte('data_pagamento', startDate)
-        .lte('data_pagamento', endDate);
+        .from("transacoes_financeiras")
+        .select("conta_id, tipo, valor")
+        .eq("igreja_id", igrejaId)
+        .eq("status", "pago")
+        .gte("data_pagamento", startDate)
+        .lte("data_pagamento", endDate);
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
-      
+
       if (error) throw error;
       return data;
     },
@@ -119,12 +152,12 @@ export default function Contas() {
   // Calcular totais por conta no período
   const totaisPorConta = useMemo(() => {
     if (!allTransacoesPeriodo) return {};
-    
+
     return allTransacoesPeriodo.reduce((acc, t) => {
       if (!acc[t.conta_id]) {
         acc[t.conta_id] = { entradas: 0, saidas: 0 };
       }
-      if (t.tipo === 'entrada') {
+      if (t.tipo === "entrada") {
         acc[t.conta_id].entradas += Number(t.valor);
       } else {
         acc[t.conta_id].saidas += Number(t.valor);
@@ -135,19 +168,27 @@ export default function Contas() {
 
   const getTipoIcon = (tipo: string) => {
     switch (tipo) {
-      case 'bancaria': return <Landmark className="w-4 h-4" />;
-      case 'fisica': return <Wallet className="w-4 h-4" />;
-      case 'virtual': return <Building2 className="w-4 h-4" />;
-      default: return <Wallet className="w-4 h-4" />;
+      case "bancaria":
+        return <Landmark className="w-4 h-4" />;
+      case "fisica":
+        return <Wallet className="w-4 h-4" />;
+      case "virtual":
+        return <Building2 className="w-4 h-4" />;
+      default:
+        return <Wallet className="w-4 h-4" />;
     }
   };
 
   const getTipoLabel = (tipo: string) => {
     switch (tipo) {
-      case 'bancaria': return 'Bancária';
-      case 'fisica': return 'Física';
-      case 'virtual': return 'Virtual';
-      default: return tipo;
+      case "bancaria":
+        return "Bancária";
+      case "fisica":
+        return "Física";
+      case "virtual":
+        return "Virtual";
+      default:
+        return tipo;
     }
   };
 
@@ -156,9 +197,9 @@ export default function Contas() {
   };
 
   const toggleContaSelection = (contaId: string) => {
-    setSelectedContaIds(prev => 
-      prev.includes(contaId) 
-        ? prev.filter(id => id !== contaId)
+    setSelectedContaIds((prev) =>
+      prev.includes(contaId)
+        ? prev.filter((id) => id !== contaId)
         : [...prev, contaId]
     );
   };
@@ -167,8 +208,14 @@ export default function Contas() {
     setSelectedContaIds([]);
   };
 
-  const totalEntradas = transacoes?.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalSaidas = transacoes?.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalEntradas =
+    transacoes
+      ?.filter((t) => t.tipo === "entrada")
+      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalSaidas =
+    transacoes
+      ?.filter((t) => t.tipo === "saida")
+      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const saldoPeriodo = totalEntradas - totalSaidas;
 
   type TransacaoLista = {
@@ -184,27 +231,36 @@ export default function Contas() {
   const renderTransactionList = (filteredTransacoes: TransacaoLista[]) => (
     <div className="space-y-2">
       {isLoadingTransacoes ? (
-        <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+        <p className="text-sm text-muted-foreground text-center py-4">
+          Carregando...
+        </p>
       ) : filteredTransacoes && filteredTransacoes.length > 0 ? (
         filteredTransacoes.map((t) => (
-          <div 
-            key={t.id} 
+          <div
+            key={t.id}
             className={cn(
               "flex items-center justify-between p-3 rounded-lg",
-              t.tipo === 'entrada' ? "bg-green-50 dark:bg-green-950/20" : "bg-red-50 dark:bg-red-950/20"
+              t.tipo === "entrada"
+                ? "bg-green-50 dark:bg-green-950/20"
+                : "bg-red-50 dark:bg-red-950/20"
             )}
           >
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{t.descricao}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <p className="text-xs text-muted-foreground">
-                  {t.data_pagamento && format(new Date(t.data_pagamento), "dd/MM/yyyy", { locale: ptBR })}
+                  {t.data_pagamento &&
+                    format(new Date(t.data_pagamento), "dd/MM/yyyy", {
+                      locale: ptBR,
+                    })}
                 </p>
-                {(selectedContaIds.length === 0 || selectedContaIds.length > 1) && t.contas && (
-                  <Badge variant="secondary" className="text-xs">
-                    {t.contas.nome}
-                  </Badge>
-                )}
+                {(selectedContaIds.length === 0 ||
+                  selectedContaIds.length > 1) &&
+                  t.contas && (
+                    <Badge variant="secondary" className="text-xs">
+                      {t.contas.nome}
+                    </Badge>
+                  )}
                 {t.categorias_financeiras && (
                   <Badge variant="outline" className="text-xs">
                     {t.categorias_financeiras.nome}
@@ -213,14 +269,21 @@ export default function Contas() {
               </div>
             </div>
             <div className="text-right ml-2">
-              <p className={`text-sm font-bold ${t.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                {t.tipo === 'entrada' ? '+' : '-'} {formatCurrency(Number(t.valor))}
+              <p
+                className={`text-sm font-bold ${
+                  t.tipo === "entrada" ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {t.tipo === "entrada" ? "+" : "-"}{" "}
+                {formatCurrency(Number(t.valor))}
               </p>
             </div>
           </div>
         ))
       ) : (
-        <p className="text-sm text-muted-foreground text-center py-4">Nenhum lançamento encontrado</p>
+        <p className="text-sm text-muted-foreground text-center py-4">
+          Nenhum lançamento encontrado
+        </p>
       )}
     </div>
   );
@@ -235,14 +298,18 @@ export default function Contas() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/financas')}
+              onClick={() => navigate("/financas")}
               className="flex-shrink-0"
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Contas</h1>
-              <p className="text-sm md:text-base text-muted-foreground mt-0.5">Gerencie contas bancárias e caixas</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                Contas
+              </h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-0.5">
+                Gerencie contas bancárias e caixas
+              </p>
             </div>
           </div>
           <HideValuesToggle />
@@ -267,8 +334,11 @@ export default function Contas() {
       <div className="flex items-center justify-between">
         <Badge variant="outline" className="gap-1.5">
           <Calendar className="w-3 h-3" />
-          {customRange 
-            ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
+          {customRange
+            ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
+                customRange.to,
+                "dd/MM/yyyy"
+              )}`
             : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
         </Badge>
         <MonthPicker
@@ -283,19 +353,24 @@ export default function Contas() {
       {isLoading ? (
         <Card className="shadow-soft">
           <CardContent className="p-6">
-            <p className="text-center text-muted-foreground">Carregando contas...</p>
+            <p className="text-center text-muted-foreground">
+              Carregando contas...
+            </p>
           </CardContent>
         </Card>
       ) : contas && contas.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {contas.map((conta) => {
             const isSelected = selectedContaIds.includes(conta.id);
-            const contaTotais = totaisPorConta[conta.id] || { entradas: 0, saidas: 0 };
+            const contaTotais = totaisPorConta[conta.id] || {
+              entradas: 0,
+              saidas: 0,
+            };
             const saldoContaPeriodo = contaTotais.entradas - contaTotais.saidas;
 
             return (
-              <Card 
-                key={conta.id} 
+              <Card
+                key={conta.id}
                 className={cn(
                   "shadow-soft cursor-pointer transition-all hover:shadow-md relative",
                   isSelected && "ring-2 ring-primary bg-primary/5"
@@ -311,7 +386,9 @@ export default function Contas() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       {getTipoIcon(conta.tipo)}
-                      <span className="text-sm font-medium truncate">{conta.nome}</span>
+                      <span className="text-sm font-medium truncate">
+                        {conta.nome}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <Button
@@ -340,15 +417,21 @@ export default function Contas() {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-muted-foreground">Saldo Atual</p>
-                        <p className={cn(
-                          "text-lg font-bold",
-                          conta.saldo_atual >= 0 ? "text-foreground" : "text-destructive"
-                        )}>
+                        <p className="text-xs text-muted-foreground">
+                          Saldo Atual
+                        </p>
+                        <p
+                          className={cn(
+                            "text-lg font-bold",
+                            conta.saldo_atual >= 0
+                              ? "text-foreground"
+                              : "text-destructive"
+                          )}
+                        >
                           {formatCurrency(conta.saldo_atual)}
                         </p>
                       </div>
@@ -360,23 +443,33 @@ export default function Contas() {
                     {/* Totais do período */}
                     <div className="grid grid-cols-3 gap-1 pt-2 border-t">
                       <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground">Entradas</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Entradas
+                        </p>
                         <p className="text-xs font-semibold text-green-600">
                           {formatCurrency(contaTotais.entradas)}
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground">Saídas</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Saídas
+                        </p>
                         <p className="text-xs font-semibold text-red-600">
                           {formatCurrency(contaTotais.saidas)}
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground">Saldo</p>
-                        <p className={cn(
-                          "text-xs font-semibold",
-                          saldoContaPeriodo >= 0 ? "text-green-600" : "text-red-600"
-                        )}>
+                        <p className="text-[10px] text-muted-foreground">
+                          Saldo
+                        </p>
+                        <p
+                          className={cn(
+                            "text-xs font-semibold",
+                            saldoContaPeriodo >= 0
+                              ? "text-green-600"
+                              : "text-red-600"
+                          )}
+                        >
                           {formatCurrency(saldoContaPeriodo)}
                         </p>
                       </div>
@@ -396,7 +489,9 @@ export default function Contas() {
       ) : (
         <Card className="shadow-soft">
           <CardContent className="p-6">
-            <p className="text-center text-muted-foreground">Nenhuma conta cadastrada</p>
+            <p className="text-center text-muted-foreground">
+              Nenhuma conta cadastrada
+            </p>
           </CardContent>
         </Card>
       )}
@@ -411,7 +506,9 @@ export default function Contas() {
               {selectedContaIds.length > 0 && (
                 <>
                   <Badge variant="secondary" className="text-xs">
-                    {selectedContaIds.length} conta{selectedContaIds.length > 1 ? 's' : ''} selecionada{selectedContaIds.length > 1 ? 's' : ''}
+                    {selectedContaIds.length} conta
+                    {selectedContaIds.length > 1 ? "s" : ""} selecionada
+                    {selectedContaIds.length > 1 ? "s" : ""}
                   </Badge>
                   <Button
                     variant="ghost"
@@ -443,10 +540,12 @@ export default function Contas() {
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground mb-1">Saldo</p>
-                <p className={cn(
-                  "text-sm font-bold",
-                  saldoPeriodo >= 0 ? "text-green-600" : "text-red-600"
-                )}>
+                <p
+                  className={cn(
+                    "text-sm font-bold",
+                    saldoPeriodo >= 0 ? "text-green-600" : "text-red-600"
+                  )}
+                >
                   {formatCurrency(saldoPeriodo)}
                 </p>
               </div>
@@ -470,26 +569,52 @@ export default function Contas() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="todos" className="max-h-[500px] overflow-y-auto">
+            <TabsContent
+              value="todos"
+              className="max-h-[500px] overflow-y-auto"
+            >
               {renderTransactionList(transacoes || [])}
             </TabsContent>
 
-            <TabsContent value="entradas" className="max-h-[500px] overflow-y-auto">
-              {renderTransactionList(transacoes?.filter(t => t.tipo === 'entrada') || [])}
+            <TabsContent
+              value="entradas"
+              className="max-h-[500px] overflow-y-auto"
+            >
+              {renderTransactionList(
+                transacoes?.filter((t) => t.tipo === "entrada") || []
+              )}
             </TabsContent>
 
-            <TabsContent value="saidas" className="max-h-[500px] overflow-y-auto">
-              {renderTransactionList(transacoes?.filter(t => t.tipo === 'saida') || [])}
+            <TabsContent
+              value="saidas"
+              className="max-h-[500px] overflow-y-auto"
+            >
+              {renderTransactionList(
+                transacoes?.filter((t) => t.tipo === "saida") || []
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
       {/* Dialogs */}
-      <ContaDialog 
+      <ContaDialog
         open={contaDialogOpen}
         onOpenChange={setContaDialogOpen}
-        conta={selectedConta as { id: string; nome: string; tipo: "bancaria" | "fisica" | "virtual"; saldo_inicial?: number; banco?: string; agencia?: string; conta_numero?: string; observacoes?: string } | undefined}
+        conta={
+          selectedConta as
+            | {
+                id: string;
+                nome: string;
+                tipo: "bancaria" | "fisica" | "virtual";
+                saldo_inicial?: number;
+                banco?: string;
+                agencia?: string;
+                conta_numero?: string;
+                observacoes?: string;
+              }
+            | undefined
+        }
       />
 
       <AjusteSaldoDialog

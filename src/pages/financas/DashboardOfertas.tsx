@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar } from "lucide-react";
+import {
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Calendar,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,48 +33,58 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { 
-  format, 
-  parseISO, 
-  startOfMonth, 
-  endOfMonth, 
-} from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const COLORS = {
-  "Dinheiro": "#10b981",
-  "PIX": "#8b5cf6",
+  Dinheiro: "#10b981",
+  PIX: "#8b5cf6",
   "Cartão de Crédito": "#f59e0b",
   "Cartão de Débito": "#3b82f6",
-  "Boleto": "#ef4444",
-  "Transferência": "#06b6d4",
+  Boleto: "#ef4444",
+  Transferência: "#06b6d4",
 };
 
 export default function DashboardOfertas() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
-  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const [customRange, setCustomRange] = useState<{
+    from: Date;
+    to: Date;
+  } | null>(null);
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: filialLoading,
+  } = useFilialId();
 
   const getDatasIntervalo = () => {
     if (customRange?.from && customRange?.to) {
       return {
         inicio: format(customRange.from, "yyyy-MM-dd"),
-        fim: format(customRange.to, "yyyy-MM-dd")
+        fim: format(customRange.to, "yyyy-MM-dd"),
       };
     }
-    
+
     return {
       inicio: format(startOfMonth(selectedMonth), "yyyy-MM-dd"),
-      fim: format(endOfMonth(selectedMonth), "yyyy-MM-dd")
+      fim: format(endOfMonth(selectedMonth), "yyyy-MM-dd"),
     };
   };
 
   const datas = getDatasIntervalo();
 
   const { data: transacoes, isLoading } = useQuery({
-    queryKey: ["ofertas-dashboard", selectedMonth, customRange, igrejaId, filialId, isAllFiliais],
+    queryKey: [
+      "ofertas-dashboard",
+      selectedMonth,
+      customRange,
+      igrejaId,
+      filialId,
+      isAllFiliais,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
@@ -142,23 +158,24 @@ export default function DashboardOfertas() {
 
     // Evolução temporal - agrupado por dia
     const evolucaoMap: Record<string, Record<string, number>> = {};
-    
+
     transacoes.forEach((t) => {
       const data = parseISO(t.data_vencimento);
       const chave = format(data, "dd/MM", { locale: ptBR });
-      
+
       if (!evolucaoMap[chave]) {
         evolucaoMap[chave] = {};
       }
-      
+
       const forma = t.forma_pagamento || "Não especificado";
-      evolucaoMap[chave][forma] = (evolucaoMap[chave][forma] || 0) + Number(t.valor);
+      evolucaoMap[chave][forma] =
+        (evolucaoMap[chave][forma] || 0) + Number(t.valor);
     });
 
     const evolucaoMensal = Object.entries(evolucaoMap)
       .sort((a, b) => {
-        const [diaA, mesA] = a[0].split('/').map(Number);
-        const [diaB, mesB] = b[0].split('/').map(Number);
+        const [diaA, mesA] = a[0].split("/").map(Number);
+        const [diaB, mesB] = b[0].split("/").map(Number);
         return (mesA || 0) - (mesB || 0) || (diaA || 0) - (diaB || 0);
       })
       .map(([chave, formas]) => ({
@@ -215,14 +232,20 @@ export default function DashboardOfertas() {
   }
 
   const formasPagamento = Array.from(
-    new Set(transacoes?.map((t) => t.forma_pagamento || "Não especificado") || [])
+    new Set(
+      transacoes?.map((t) => t.forma_pagamento || "Não especificado") || []
+    )
   );
 
   return (
     <div className="container mx-auto p-4 space-y-6">
       <div className="space-y-4 mb-6">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => navigate("/financas")}>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate("/financas")}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
@@ -241,15 +264,17 @@ export default function DashboardOfertas() {
             />
           </div>
         </div>
-        
+
         {/* Period Badge */}
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline" className="gap-1.5">
             <Calendar className="w-3 h-3" />
-            {customRange 
-              ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
-              : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })
-            }
+            {customRange
+              ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
+                  customRange.to,
+                  "dd/MM/yyyy"
+                )}`
+              : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
           </Badge>
         </div>
       </div>
@@ -258,7 +283,9 @@ export default function DashboardOfertas() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Ofertas</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total de Ofertas
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -290,17 +317,22 @@ export default function DashboardOfertas() {
               {dados.tendencia.percentual.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {dados.tendencia.valor >= 0 ? "Crescimento" : "Redução"} no período
+              {dados.tendencia.valor >= 0 ? "Crescimento" : "Redução"} no
+              período
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Formas de Pagamento</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Formas de Pagamento
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dados.porFormaPagamento.length}</div>
+            <div className="text-2xl font-bold">
+              {dados.porFormaPagamento.length}
+            </div>
             <p className="text-xs text-muted-foreground">
               Métodos utilizados nas ofertas
             </p>
@@ -334,7 +366,9 @@ export default function DashboardOfertas() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{metadata?.data_evento}</p>
+                        <p className="font-medium text-sm">
+                          {metadata?.data_evento}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           Lançado por: {metadata?.lancado_por}
                         </p>
@@ -350,9 +384,13 @@ export default function DashboardOfertas() {
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {rejeicao.created_at &&
-                          format(parseISO(rejeicao.created_at), "dd/MM/yyyy HH:mm", {
-                            locale: ptBR,
-                          })}
+                          format(
+                            parseISO(rejeicao.created_at),
+                            "dd/MM/yyyy HH:mm",
+                            {
+                              locale: ptBR,
+                            }
+                          )}
                       </div>
                     </div>
                   </div>
@@ -388,13 +426,13 @@ export default function DashboardOfertas() {
                   {dados.porFormaPagamento.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={COLORS[entry.name as keyof typeof COLORS] || "#6b7280"}
+                      fill={
+                        COLORS[entry.name as keyof typeof COLORS] || "#6b7280"
+                      }
                     />
                   ))}
                 </Pie>
-                <Tooltip
-                  formatter={(value: number) => formatValue(value)}
-                />
+                <Tooltip formatter={(value: number) => formatValue(value)} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -411,9 +449,7 @@ export default function DashboardOfertas() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="mes" />
                 <YAxis />
-                <Tooltip
-                  formatter={(value: number) => formatValue(value)}
-                />
+                <Tooltip formatter={(value: number) => formatValue(value)} />
                 <Legend />
                 {formasPagamento.map((forma) => (
                   <Line
@@ -442,9 +478,7 @@ export default function DashboardOfertas() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mes" />
               <YAxis />
-              <Tooltip
-                formatter={(value: number) => formatValue(value)}
-              />
+              <Tooltip formatter={(value: number) => formatValue(value)} />
               <Legend />
               {formasPagamento.map((forma) => (
                 <Bar

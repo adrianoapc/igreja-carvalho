@@ -3,20 +3,40 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Pencil, Trash2, Search, Building2, AlertTriangle, Landmark } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ArrowLeft,
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Building2,
+  AlertTriangle,
+  Landmark,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
-
-
 
 interface Conta {
   id: string;
@@ -37,7 +57,7 @@ interface Props {
 export default function ContasManutencao({ onBack }: Props) {
   const queryClient = useQueryClient();
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<Conta | null>(null);
@@ -53,17 +73,21 @@ export default function ContasManutencao({ onBack }: Props) {
   });
 
   // Query contas
-  const { data: contas = [], isLoading, error: contasError } = useQuery({
-    queryKey: ['contas-manutencao', igrejaId, filialId, isAllFiliais],
+  const {
+    data: contas = [],
+    isLoading,
+    error: contasError,
+  } = useQuery({
+    queryKey: ["contas-manutencao", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
-        .from('contas')
-        .select('*')
-        .eq('igreja_id', igrejaId)
-        .order('nome');
+        .from("contas")
+        .select("*")
+        .eq("igreja_id", igrejaId)
+        .order("nome");
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
       if (error) throw error;
@@ -74,24 +98,24 @@ export default function ContasManutencao({ onBack }: Props) {
 
   // Query transações por conta
   const { data: transacoesPorConta = {}, error: transacoesError } = useQuery({
-    queryKey: ['transacoes-por-conta', igrejaId, filialId, isAllFiliais],
+    queryKey: ["transacoes-por-conta", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return {};
       let query = supabase
-        .from('transacoes_financeiras')
-        .select('conta_id')
-        .not('conta_id', 'is', null)
-        .eq('status', 'pago')
-        .eq('igreja_id', igrejaId);
+        .from("transacoes_financeiras")
+        .select("conta_id")
+        .not("conta_id", "is", null)
+        .eq("status", "pago")
+        .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
-      
+
       if (error) throw error;
-      
+
       const contagem: Record<string, number> = {};
-      data?.forEach(t => {
+      data?.forEach((t) => {
         if (t.conta_id) {
           contagem[t.conta_id] = (contagem[t.conta_id] || 0) + 1;
         }
@@ -103,42 +127,46 @@ export default function ContasManutencao({ onBack }: Props) {
 
   // Show error toast if query fails
   if (contasError) {
-    toast.error("Erro ao carregar contas", { description: (contasError as Error).message });
+    toast.error("Erro ao carregar contas", {
+      description: (contasError as Error).message,
+    });
   }
-  
+
   if (transacoesError) {
-    toast.error("Erro ao carregar transações", { description: (transacoesError as Error).message });
+    toast.error("Erro ao carregar transações", {
+      description: (transacoesError as Error).message,
+    });
   }
 
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       if (!igrejaId) throw new Error("Igreja não identificada.");
-      const { error } = await supabase
-        .from('contas')
-        .insert({
-          nome: data.nome,
-          tipo: data.tipo,
-          banco: data.banco || null,
-          agencia: data.agencia || null,
-          conta_numero: data.conta_numero || null,
-          saldo_inicial: data.saldo_inicial,
-          saldo_atual: data.saldo_inicial,
-          ativo: data.ativo,
-          observacoes: data.observacoes || null,
-          igreja_id: igrejaId,
-          filial_id: !isAllFiliais ? filialId : null,
-        });
+      const { error } = await supabase.from("contas").insert({
+        nome: data.nome,
+        tipo: data.tipo,
+        banco: data.banco || null,
+        agencia: data.agencia || null,
+        conta_numero: data.conta_numero || null,
+        saldo_inicial: data.saldo_inicial,
+        saldo_atual: data.saldo_inicial,
+        ativo: data.ativo,
+        observacoes: data.observacoes || null,
+        igreja_id: igrejaId,
+        filial_id: !isAllFiliais ? filialId : null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Conta criada com sucesso");
-      queryClient.invalidateQueries({ queryKey: ['contas-manutencao'] });
+      queryClient.invalidateQueries({ queryKey: ["contas-manutencao"] });
       setDialogOpen(false);
       resetForm();
     },
     onError: (error: unknown) => {
-      toast.error("Erro ao criar conta", { description: error instanceof Error ? error.message : String(error) });
+      toast.error("Erro ao criar conta", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 
@@ -146,7 +174,7 @@ export default function ContasManutencao({ onBack }: Props) {
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
       if (!igrejaId) throw new Error("Igreja não identificada.");
       let updateQuery = supabase
-        .from('contas')
+        .from("contas")
         .update({
           nome: data.nome,
           tipo: data.tipo,
@@ -157,22 +185,24 @@ export default function ContasManutencao({ onBack }: Props) {
           ativo: data.ativo,
           observacoes: data.observacoes || null,
         })
-        .eq('id', id)
-        .eq('igreja_id', igrejaId);
+        .eq("id", id)
+        .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) {
-        updateQuery = updateQuery.eq('filial_id', filialId);
+        updateQuery = updateQuery.eq("filial_id", filialId);
       }
       const { error } = await updateQuery;
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Conta atualizada");
-      queryClient.invalidateQueries({ queryKey: ['contas-manutencao'] });
+      queryClient.invalidateQueries({ queryKey: ["contas-manutencao"] });
       setDialogOpen(false);
       resetForm();
     },
     onError: (error: unknown) => {
-      toast.error("Erro ao atualizar", { description: error instanceof Error ? error.message : String(error) });
+      toast.error("Erro ao atualizar", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 
@@ -180,22 +210,24 @@ export default function ContasManutencao({ onBack }: Props) {
     mutationFn: async (id: string) => {
       if (!igrejaId) throw new Error("Igreja não identificada.");
       let deleteQuery = supabase
-        .from('contas')
+        .from("contas")
         .delete()
-        .eq('id', id)
-        .eq('igreja_id', igrejaId);
+        .eq("id", id)
+        .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) {
-        deleteQuery = deleteQuery.eq('filial_id', filialId);
+        deleteQuery = deleteQuery.eq("filial_id", filialId);
       }
       const { error } = await deleteQuery;
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Conta excluída");
-      queryClient.invalidateQueries({ queryKey: ['contas-manutencao'] });
+      queryClient.invalidateQueries({ queryKey: ["contas-manutencao"] });
     },
     onError: (error: unknown) => {
-      toast.error("Erro ao excluir", { description: error instanceof Error ? error.message : String(error) });
+      toast.error("Erro ao excluir", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 
@@ -215,8 +247,8 @@ export default function ContasManutencao({ onBack }: Props) {
   const handleDelete = (conta: Conta) => {
     const transacoesCount = transacoesPorConta[conta.id] || 0;
     if (transacoesCount > 0) {
-      toast.error("Não é possível excluir", { 
-        description: `Esta conta possui ${transacoesCount} transações vinculadas` 
+      toast.error("Não é possível excluir", {
+        description: `Esta conta possui ${transacoesCount} transações vinculadas`,
       });
       return;
     }
@@ -253,9 +285,10 @@ export default function ContasManutencao({ onBack }: Props) {
     });
   };
 
-  const filteredContas = contas.filter((c) =>
-    c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.banco?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredContas = contas.filter(
+    (c) =>
+      c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.banco?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getTipoLabel = (tipo: string) => {
@@ -277,8 +310,12 @@ export default function ContasManutencao({ onBack }: Props) {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Contas Bancárias</h1>
-              <p className="text-muted-foreground text-sm">Gerencie contas e caixas</p>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Contas Bancárias
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Gerencie contas e caixas
+              </p>
             </div>
           </div>
         </div>
@@ -294,7 +331,11 @@ export default function ContasManutencao({ onBack }: Props) {
             className="pl-9 text-base h-10"
           />
         </div>
-        <Button onClick={() => setDialogOpen(true)} size="sm" className="text-xs">
+        <Button
+          onClick={() => setDialogOpen(true)}
+          size="sm"
+          className="text-xs"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nova Conta
         </Button>
@@ -310,9 +351,13 @@ export default function ContasManutencao({ onBack }: Props) {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-center text-muted-foreground py-8">Carregando...</p>
+            <p className="text-center text-muted-foreground py-8">
+              Carregando...
+            </p>
           ) : filteredContas.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">Nenhuma conta encontrada</p>
+            <p className="text-center text-muted-foreground py-8">
+              Nenhuma conta encontrada
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -330,7 +375,9 @@ export default function ContasManutencao({ onBack }: Props) {
                     <TableCell className="font-medium">{conta.nome}</TableCell>
                     <TableCell>{getTipoLabel(conta.tipo)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {conta.banco ? `${conta.banco} ${conta.agencia || ''}` : '-'}
+                      {conta.banco
+                        ? `${conta.banco} ${conta.agencia || ""}`
+                        : "-"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={conta.ativo ? "default" : "secondary"}>
@@ -339,12 +386,16 @@ export default function ContasManutencao({ onBack }: Props) {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(conta)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(conta)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleDelete(conta)}
                           disabled={(transacoesPorConta[conta.id] || 0) > 0}
                         >
@@ -367,11 +418,15 @@ export default function ContasManutencao({ onBack }: Props) {
       {/* Cards - Mobile */}
       <div className="block md:hidden space-y-3">
         {isLoading ? (
-          <p className="text-center text-muted-foreground py-8">Carregando...</p>
+          <p className="text-center text-muted-foreground py-8">
+            Carregando...
+          </p>
         ) : filteredContas.length === 0 ? (
           <Card>
             <CardContent className="py-8">
-              <p className="text-center text-muted-foreground">Nenhuma conta encontrada</p>
+              <p className="text-center text-muted-foreground">
+                Nenhuma conta encontrada
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -380,7 +435,9 @@ export default function ContasManutencao({ onBack }: Props) {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base truncate">{conta.nome}</h3>
+                    <h3 className="font-semibold text-base truncate">
+                      {conta.nome}
+                    </h3>
                     <div className="space-y-1 mt-2">
                       <p className="text-sm text-muted-foreground">
                         Tipo: {getTipoLabel(conta.tipo)}
@@ -388,7 +445,8 @@ export default function ContasManutencao({ onBack }: Props) {
                       {conta.banco && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <Landmark className="h-3 w-3" />
-                          {conta.banco} {conta.agencia && `- Ag: ${conta.agencia}`}
+                          {conta.banco}{" "}
+                          {conta.agencia && `- Ag: ${conta.agencia}`}
                         </p>
                       )}
                       {conta.conta_numero && (
@@ -398,23 +456,26 @@ export default function ContasManutencao({ onBack }: Props) {
                       )}
                     </div>
                   </div>
-                  <Badge variant={conta.ativo ? "default" : "secondary"} className="flex-shrink-0">
+                  <Badge
+                    variant={conta.ativo ? "default" : "secondary"}
+                    className="flex-shrink-0"
+                  >
                     {conta.ativo ? "Ativa" : "Inativa"}
                   </Badge>
                 </div>
                 <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => openEdit(conta)}
                     className="flex-1"
                   >
                     <Pencil className="h-4 w-4 mr-2" />
                     Editar
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleDelete(conta)}
                     disabled={(transacoesPorConta[conta.id] || 0) > 0}
                     className="flex-1"
@@ -453,14 +514,19 @@ export default function ContasManutencao({ onBack }: Props) {
             <Input
               id="nome"
               value={formData.nome}
-              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, nome: e.target.value })
+              }
               placeholder="Ex: Bradesco Principal"
               className="text-base h-10"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="tipo">Tipo</Label>
-            <Select value={formData.tipo} onValueChange={(v) => setFormData({ ...formData, tipo: v })}>
+            <Select
+              value={formData.tipo}
+              onValueChange={(v) => setFormData({ ...formData, tipo: v })}
+            >
               <SelectTrigger className="h-10">
                 <SelectValue />
               </SelectTrigger>
@@ -478,7 +544,9 @@ export default function ContasManutencao({ onBack }: Props) {
               <Input
                 id="banco"
                 value={formData.banco}
-                onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, banco: e.target.value })
+                }
                 placeholder="Bradesco"
                 className="text-base h-10"
               />
@@ -488,7 +556,9 @@ export default function ContasManutencao({ onBack }: Props) {
               <Input
                 id="agencia"
                 value={formData.agencia}
-                onChange={(e) => setFormData({ ...formData, agencia: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, agencia: e.target.value })
+                }
                 placeholder="1234"
                 className="text-base h-10"
               />
@@ -500,7 +570,9 @@ export default function ContasManutencao({ onBack }: Props) {
               <Input
                 id="conta_numero"
                 value={formData.conta_numero}
-                onChange={(e) => setFormData({ ...formData, conta_numero: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, conta_numero: e.target.value })
+                }
                 placeholder="12345-6"
                 className="text-base h-10"
               />
@@ -512,7 +584,12 @@ export default function ContasManutencao({ onBack }: Props) {
                 type="number"
                 step="0.01"
                 value={formData.saldo_inicial}
-                onChange={(e) => setFormData({ ...formData, saldo_inicial: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    saldo_inicial: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="text-base h-10"
               />
             </div>
@@ -522,7 +599,9 @@ export default function ContasManutencao({ onBack }: Props) {
             <Textarea
               id="observacoes"
               value={formData.observacoes}
-              onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, observacoes: e.target.value })
+              }
               placeholder="Observações opcionais"
               rows={2}
               className="text-base"
@@ -533,11 +612,13 @@ export default function ContasManutencao({ onBack }: Props) {
             <Switch
               id="ativo"
               checked={formData.ativo}
-              onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, ativo: checked })
+              }
             />
           </div>
-          <Button 
-            onClick={handleSubmit} 
+          <Button
+            onClick={handleSubmit}
             className="w-full"
             disabled={createMutation.isPending || updateMutation.isPending}
           >

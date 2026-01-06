@@ -52,13 +52,12 @@ import {
   FileText,
 } from "lucide-react";
 
-
-
 type AppRole = Database["public"]["Enums"]["app_role"];
 
-const ADMIN_ROLES: AppRole[] = ['admin', 'tesoureiro'];
+const ADMIN_ROLES: AppRole[] = ["admin", "tesoureiro"];
 
-type SolicitacaoReembolso = Database["public"]["Views"]["view_solicitacoes_reembolso"]["Row"];
+type SolicitacaoReembolso =
+  Database["public"]["Views"]["view_solicitacoes_reembolso"]["Row"];
 
 interface ItemReembolso {
   descricao: string;
@@ -108,11 +107,12 @@ export default function Reembolsos() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
-  
+
   const [userRoles, setUserRoles] = useState<AppRole[]>([]);
   const [novoReembolsoOpen, setNovoReembolsoOpen] = useState(false);
   const [pagarReembolsoOpen, setPagarReembolsoOpen] = useState(false);
-  const [solicitacaoSelecionada, setSolicitacaoSelecionada] = useState<SolicitacaoReembolso | null>(null);
+  const [solicitacaoSelecionada, setSolicitacaoSelecionada] =
+    useState<SolicitacaoReembolso | null>(null);
   const [etapaWizard, setEtapaWizard] = useState(1);
 
   // Estado do formulário - Cabeçalho
@@ -138,7 +138,9 @@ export default function Reembolsos() {
 
   // Estado do pagamento
   const [contaSaida, setContaSaida] = useState("");
-  const [dataPagamento, setDataPagamento] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [dataPagamento, setDataPagamento] = useState(
+    format(new Date(), "yyyy-MM-dd")
+  );
   const [contaPadrao, setContaPadrao] = useState("");
 
   // Buscar roles do usuário
@@ -151,29 +153,35 @@ export default function Reembolsos() {
   const fetchUserRoles = async () => {
     try {
       let query = (supabase as any)
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user?.id)
-        .eq('igreja_id', igrejaId);
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user?.id)
+        .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
 
       if (error) throw error;
-      
-      const roles = data?.map(r => r.role as AppRole) || [];
+
+      const roles = data?.map((r) => r.role as AppRole) || [];
       setUserRoles(roles);
     } catch (error) {
-      console.error('Error fetching user roles:', error);
+      console.error("Error fetching user roles:", error);
     }
   };
 
-  const isAdmin = userRoles.some(role => ADMIN_ROLES.includes(role));
+  const isAdmin = userRoles.some((role) => ADMIN_ROLES.includes(role));
 
   // Query: Minhas solicitações
   const { data: minhasSolicitacoes = [], isLoading: loadingMinhas } = useQuery({
-    queryKey: ["minhas-solicitacoes", igrejaId, filialId, isAllFiliais, profile?.id],
+    queryKey: [
+      "minhas-solicitacoes",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      profile?.id,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = (supabase as any)
@@ -240,7 +248,13 @@ export default function Reembolsos() {
 
   // Query: Subcategorias (baseado na categoria selecionada)
   const { data: subcategorias = [] } = useQuery({
-    queryKey: ["subcategorias", igrejaId, filialId, isAllFiliais, itemAtual.categoria_id],
+    queryKey: [
+      "subcategorias",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      itemAtual.categoria_id,
+    ],
     queryFn: async () => {
       if (!itemAtual.categoria_id || !igrejaId) return [];
       let query = supabase
@@ -389,7 +403,7 @@ export default function Reembolsos() {
         solicitacao_id: solicitacao.id,
         descricao: item.descricao,
         valor: Math.abs(item.valor),
-        data_item: item.data_item || new Date().toISOString().split('T')[0],
+        data_item: item.data_item || new Date().toISOString().split("T")[0],
         categoria_id: item.categoria_id || null,
         subcategoria_id: item.subcategoria_id || null,
         fornecedor_id: item.fornecedor_id || null,
@@ -423,25 +437,33 @@ export default function Reembolsos() {
   // Mutation: Pagar reembolso
   const pagarReembolsoMutation = useMutation({
     mutationFn: async () => {
-      if (!solicitacaoSelecionada) throw new Error("Nenhuma solicitação selecionada");
+      if (!solicitacaoSelecionada)
+        throw new Error("Nenhuma solicitação selecionada");
       if (!igrejaId) throw new Error("Igreja não identificada.");
 
       // 1. Criar UMA ÚNICA transação financeira para o pagamento do reembolso (Fluxo de Caixa - ADR-001)
       const { error: transacaoError } = await supabase
         .from("transacoes_financeiras")
         .insert({
-          descricao: `Reembolso - ${solicitacaoSelecionada.solicitante_nome || 'Solicitante'}`,
+          descricao: `Reembolso - ${
+            solicitacaoSelecionada.solicitante_nome || "Solicitante"
+          }`,
           valor: solicitacaoSelecionada.valor_total || 0,
           tipo: "saida",
           tipo_lancamento: "unico",
-          data_vencimento: solicitacaoSelecionada.data_vencimento || new Date(dataPagamento).toISOString().split('T')[0],
-          data_pagamento: new Date(dataPagamento).toISOString().split('T')[0],
-          data_competencia: new Date(dataPagamento).toISOString().split('T')[0],
+          data_vencimento:
+            solicitacaoSelecionada.data_vencimento ||
+            new Date(dataPagamento).toISOString().split("T")[0],
+          data_pagamento: new Date(dataPagamento).toISOString().split("T")[0],
+          data_competencia: new Date(dataPagamento).toISOString().split("T")[0],
           status: "pago",
           conta_id: contaSaida,
-          forma_pagamento: solicitacaoSelecionada.forma_pagamento_preferida || "pix",
+          forma_pagamento:
+            solicitacaoSelecionada.forma_pagamento_preferida || "pix",
           solicitacao_reembolso_id: solicitacaoSelecionada.id,
-          observacoes: `Pagamento de reembolso #${solicitacaoSelecionada.id?.slice(0, 8).toUpperCase()}`,
+          observacoes: `Pagamento de reembolso #${solicitacaoSelecionada.id
+            ?.slice(0, 8)
+            .toUpperCase()}`,
           igreja_id: igrejaId,
           filial_id: !isAllFiliais ? filialId : null,
         });
@@ -484,26 +506,26 @@ export default function Reembolsos() {
         throw new Error("Igreja não identificada.");
       }
       // 1. Upload do arquivo para storage (bucket privado)
-      const fileExt = file.name.split('.').pop()?.toLowerCase();
-      const isPdf = file.type === 'application/pdf' || fileExt === 'pdf';
+      const fileExt = file.name.split(".").pop()?.toLowerCase();
+      const isPdf = file.type === "application/pdf" || fileExt === "pdf";
       const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
-      
+
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('transaction-attachments')
+        .from("transaction-attachments")
         .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
+          cacheControl: "3600",
+          upsert: false,
         });
 
       if (uploadError) throw uploadError;
 
       // Gerar signed URL (bucket privado) - 1 ano de validade
       const { data: signedData, error: signedError } = await supabase.storage
-        .from('transaction-attachments')
+        .from("transaction-attachments")
         .createSignedUrl(fileName, 60 * 60 * 24 * 365);
 
       if (signedError || !signedData?.signedUrl) {
-        throw new Error('Erro ao gerar URL de acesso ao arquivo');
+        throw new Error("Erro ao gerar URL de acesso ao arquivo");
       }
 
       // 2. Converter arquivo para base64
@@ -511,7 +533,7 @@ export default function Reembolsos() {
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => {
           const base64 = reader.result as string;
-          const base64Data = base64.split(',')[1];
+          const base64Data = base64.split(",")[1];
           resolve(base64Data);
         };
         reader.onerror = reject;
@@ -521,35 +543,46 @@ export default function Reembolsos() {
       const imageBase64 = await base64Promise;
 
       // 3. Chamar edge function para processar (suporta imagens e PDFs)
-      const { data, error } = await supabase.functions.invoke('processar-nota-fiscal', {
-        body: {
-          imageBase64,
-          mimeType: file.type,
-          igreja_id: igrejaId,
-        },
-      });
+      const { data, error } = await supabase.functions.invoke(
+        "processar-nota-fiscal",
+        {
+          body: {
+            imageBase64,
+            mimeType: file.type,
+            igreja_id: igrejaId,
+          },
+        }
+      );
 
       if (error) throw error;
 
       if (data?.success && data?.dados) {
-        const { valor_total, fornecedor_nome, data_emissao, descricao, tipo_documento } = data.dados;
-        
+        const {
+          valor_total,
+          fornecedor_nome,
+          data_emissao,
+          descricao,
+          tipo_documento,
+        } = data.dados;
+
         // Gerar descrição resumida (máximo 60 caracteres)
-        let descricaoResumida = '';
+        let descricaoResumida = "";
         if (fornecedor_nome) {
-          descricaoResumida = fornecedor_nome.length > 40 
-            ? fornecedor_nome.substring(0, 37) + '...' 
-            : fornecedor_nome;
+          descricaoResumida =
+            fornecedor_nome.length > 40
+              ? fornecedor_nome.substring(0, 37) + "..."
+              : fornecedor_nome;
         } else if (descricao) {
           // Pegar primeira linha ou primeiras palavras
-          const primeiraLinha = descricao.split('\n')[0];
-          descricaoResumida = primeiraLinha.length > 40
-            ? primeiraLinha.substring(0, 37) + '...'
-            : primeiraLinha;
+          const primeiraLinha = descricao.split("\n")[0];
+          descricaoResumida =
+            primeiraLinha.length > 40
+              ? primeiraLinha.substring(0, 37) + "..."
+              : primeiraLinha;
         }
-        
+
         // Auto-preencher campos
-        setItemAtual(prev => ({
+        setItemAtual((prev) => ({
           ...prev,
           valor: valor_total?.toString() || prev.valor,
           descricao: descricaoResumida || prev.descricao,
@@ -557,13 +590,17 @@ export default function Reembolsos() {
           anexo_url: signedData.signedUrl,
         }));
 
-        toast.success('✨ Nota fiscal lida com sucesso!');
+        toast.success("✨ Nota fiscal lida com sucesso!");
       } else {
-        throw new Error('Não foi possível extrair dados da nota');
+        throw new Error("Não foi possível extrair dados da nota");
       }
     } catch (error: unknown) {
-      console.error('Erro ao processar nota fiscal:', error);
-      toast.error(error instanceof Error ? error.message : String(error) || 'Erro ao processar nota fiscal com IA');
+      console.error("Erro ao processar nota fiscal:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : String(error) || "Erro ao processar nota fiscal com IA"
+      );
     } finally {
       setProcessandoIA(false);
     }
@@ -573,8 +610,8 @@ export default function Reembolsos() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Por favor, selecione uma imagem');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor, selecione uma imagem");
       return;
     }
 
@@ -589,16 +626,16 @@ export default function Reembolsos() {
     setDadosBancarios("");
     setObservacoes("");
     setItens([]);
-    setItemAtual({ 
-      descricao: "", 
-      valor: "", 
-      categoria_id: "", 
+    setItemAtual({
+      descricao: "",
+      valor: "",
+      categoria_id: "",
       subcategoria_id: "",
       fornecedor_id: "",
       base_ministerial_id: "",
       centro_custo_id: "",
-      data_item: "", 
-      anexo_url: "" 
+      data_item: "",
+      anexo_url: "",
     });
   };
 
@@ -615,16 +652,16 @@ export default function Reembolsos() {
         valor: parseFloat(itemAtual.valor),
       },
     ]);
-    setItemAtual({ 
-      descricao: "", 
-      valor: "", 
-      categoria_id: "", 
+    setItemAtual({
+      descricao: "",
+      valor: "",
+      categoria_id: "",
       subcategoria_id: "",
       fornecedor_id: "",
       base_ministerial_id: "",
       centro_custo_id: "",
-      data_item: "", 
-      anexo_url: "" 
+      data_item: "",
+      anexo_url: "",
     });
     toast.success("Item adicionado!");
   };
@@ -636,7 +673,14 @@ export default function Reembolsos() {
   const valorTotal = itens.reduce((sum, item) => sum + item.valor, 0);
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string; icon: ElementType }> = {
+    const variants: Record<
+      string,
+      {
+        variant: "default" | "secondary" | "destructive";
+        label: string;
+        icon: ElementType;
+      }
+    > = {
       rascunho: { variant: "secondary", label: "Rascunho", icon: FileText },
       pendente: { variant: "default", label: "Pendente", icon: Clock },
       aprovado: { variant: "default", label: "Aprovado", icon: CheckCircle },
@@ -685,7 +729,10 @@ export default function Reembolsos() {
         {/* ABA 1: Meus Pedidos */}
         <TabsContent value="meus" className="space-y-4">
           <div className="flex justify-end">
-            <Button onClick={() => setNovoReembolsoOpen(true)} className="gap-2">
+            <Button
+              onClick={() => setNovoReembolsoOpen(true)}
+              className="gap-2"
+            >
               <Plus className="w-4 h-4" />
               Novo Reembolso
             </Button>
@@ -719,9 +766,21 @@ export default function Reembolsos() {
                           Solicitação #{solicitacao.id.slice(0, 8)}
                         </CardTitle>
                         <CardDescription>
-                          {format(new Date(solicitacao.data_solicitacao), "dd/MM/yyyy", { locale: ptBR })}
+                          {format(
+                            new Date(solicitacao.data_solicitacao),
+                            "dd/MM/yyyy",
+                            { locale: ptBR }
+                          )}
                           {solicitacao.data_vencimento && (
-                            <> • Vencimento: {format(new Date(solicitacao.data_vencimento), "dd/MM/yyyy", { locale: ptBR })}</>
+                            <>
+                              {" "}
+                              • Vencimento:{" "}
+                              {format(
+                                new Date(solicitacao.data_vencimento),
+                                "dd/MM/yyyy",
+                                { locale: ptBR }
+                              )}
+                            </>
                           )}
                         </CardDescription>
                       </div>
@@ -738,7 +797,9 @@ export default function Reembolsos() {
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Itens</p>
-                        <p className="font-medium">{/* solicitacao.quantidade_itens */} -</p>
+                        <p className="font-medium">
+                          {/* solicitacao.quantidade_itens */} -
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Pagamento</p>
@@ -750,14 +811,19 @@ export default function Reembolsos() {
                         <div>
                           <p className="text-muted-foreground">Pago em</p>
                           <p className="font-medium">
-                            {format(new Date(solicitacao.data_pagamento), "dd/MM/yyyy")}
+                            {format(
+                              new Date(solicitacao.data_pagamento),
+                              "dd/MM/yyyy"
+                            )}
                           </p>
                         </div>
                       )}
                     </div>
                     {solicitacao.observacoes && (
                       <div className="mt-4 p-3 bg-muted/30 rounded-md">
-                        <p className="text-sm text-muted-foreground mb-1">Observações:</p>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          Observações:
+                        </p>
                         <p className="text-sm">{solicitacao.observacoes}</p>
                       </div>
                     )}
@@ -799,7 +865,12 @@ export default function Reembolsos() {
                             {solicitacao.solicitante_nome}
                           </CardTitle>
                           <CardDescription>
-                            Solicitado em: {format(new Date(solicitacao.data_solicitacao), "dd/MM/yyyy", { locale: ptBR })}
+                            Solicitado em:{" "}
+                            {format(
+                              new Date(solicitacao.data_solicitacao),
+                              "dd/MM/yyyy",
+                              { locale: ptBR }
+                            )}
                           </CardDescription>
                         </div>
                         {getStatusBadge(solicitacao.status)}
@@ -815,7 +886,9 @@ export default function Reembolsos() {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Itens</p>
-                          <p className="font-medium">{/* solicitacao.quantidade_itens */} -</p>
+                          <p className="font-medium">
+                            {/* solicitacao.quantidade_itens */} -
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Pagamento</p>
@@ -824,7 +897,9 @@ export default function Reembolsos() {
                           </p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Dados Bancários</p>
+                          <p className="text-muted-foreground">
+                            Dados Bancários
+                          </p>
                           <p className="font-medium text-xs">
                             {solicitacao.dados_bancarios || "—"}
                           </p>
@@ -879,8 +954,13 @@ export default function Reembolsos() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="formaPagamento">Forma de Pagamento Preferida</Label>
-                <Select value={formaPagamento} onValueChange={setFormaPagamento}>
+                <Label htmlFor="formaPagamento">
+                  Forma de Pagamento Preferida
+                </Label>
+                <Select
+                  value={formaPagamento}
+                  onValueChange={setFormaPagamento}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -935,7 +1015,9 @@ export default function Reembolsos() {
                         className="flex items-center justify-between p-3 bg-muted/30 rounded-md"
                       >
                         <div className="flex-1">
-                          <p className="font-medium text-sm">{item.descricao}</p>
+                          <p className="font-medium text-sm">
+                            {item.descricao}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             R$ {item.valor.toFixed(2)}
                           </p>
@@ -964,7 +1046,10 @@ export default function Reembolsos() {
 
                 {/* Upload de Comprovante com IA */}
                 <div className="space-y-2">
-                  <Label htmlFor="upload-comprovante" className="flex items-center gap-2">
+                  <Label
+                    htmlFor="upload-comprovante"
+                    className="flex items-center gap-2"
+                  >
                     <Upload className="w-4 h-4" />
                     Comprovante (Imagem ou PDF)
                   </Label>
@@ -985,7 +1070,8 @@ export default function Reembolsos() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    📸 Envie foto ou PDF da nota fiscal para preenchimento automático com IA
+                    📸 Envie foto ou PDF da nota fiscal para preenchimento
+                    automático com IA
                   </p>
                 </div>
 
@@ -1025,7 +1111,10 @@ export default function Reembolsos() {
                       type="date"
                       value={itemAtual.data_item}
                       onChange={(e) =>
-                        setItemAtual({ ...itemAtual, data_item: e.target.value })
+                        setItemAtual({
+                          ...itemAtual,
+                          data_item: e.target.value,
+                        })
                       }
                       disabled={processandoIA}
                     />
@@ -1039,7 +1128,11 @@ export default function Reembolsos() {
                     <Select
                       value={itemAtual.categoria_id}
                       onValueChange={(value) =>
-                        setItemAtual({ ...itemAtual, categoria_id: value, subcategoria_id: "" })
+                        setItemAtual({
+                          ...itemAtual,
+                          categoria_id: value,
+                          subcategoria_id: "",
+                        })
                       }
                       disabled={processandoIA}
                     >
@@ -1066,11 +1159,19 @@ export default function Reembolsos() {
                       disabled={processandoIA || !itemAtual.categoria_id}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={itemAtual.categoria_id ? "Selecione" : "Selecione categoria"} />
+                        <SelectValue
+                          placeholder={
+                            itemAtual.categoria_id
+                              ? "Selecione"
+                              : "Selecione categoria"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {subcategorias.length === 0 ? (
-                          <SelectItem value="none" disabled>Nenhuma subcategoria</SelectItem>
+                          <SelectItem value="none" disabled>
+                            Nenhuma subcategoria
+                          </SelectItem>
                         ) : (
                           subcategorias.map((sub) => (
                             <SelectItem key={sub.id} value={sub.id}>
@@ -1113,7 +1214,10 @@ export default function Reembolsos() {
                     <Select
                       value={itemAtual.base_ministerial_id}
                       onValueChange={(value) =>
-                        setItemAtual({ ...itemAtual, base_ministerial_id: value })
+                        setItemAtual({
+                          ...itemAtual,
+                          base_ministerial_id: value,
+                        })
                       }
                       disabled={processandoIA}
                     >
@@ -1153,9 +1257,9 @@ export default function Reembolsos() {
                   </div>
                 </div>
 
-                <Button 
-                  onClick={adicionarItem} 
-                  variant="outline" 
+                <Button
+                  onClick={adicionarItem}
+                  variant="outline"
                   className="w-full gap-2"
                   disabled={processandoIA}
                 >
@@ -1176,7 +1280,9 @@ export default function Reembolsos() {
                   <div>
                     <p className="text-muted-foreground">Vencimento</p>
                     <p className="font-medium">
-                      {dataVencimento ? format(new Date(dataVencimento), "dd/MM/yyyy") : "—"}
+                      {dataVencimento
+                        ? format(new Date(dataVencimento), "dd/MM/yyyy")
+                        : "—"}
                     </p>
                   </div>
                   <div>
@@ -1185,7 +1291,9 @@ export default function Reembolsos() {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Dados Bancários</p>
-                    <p className="font-medium text-xs">{dadosBancarios || "—"}</p>
+                    <p className="font-medium text-xs">
+                      {dadosBancarios || "—"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Total de Itens</p>
@@ -1194,13 +1302,19 @@ export default function Reembolsos() {
                 </div>
 
                 <div className="p-4 bg-primary/5 rounded-md">
-                  <p className="text-sm text-muted-foreground mb-1">Valor Total</p>
-                  <p className="text-2xl font-bold">R$ {valorTotal.toFixed(2)}</p>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Valor Total
+                  </p>
+                  <p className="text-2xl font-bold">
+                    R$ {valorTotal.toFixed(2)}
+                  </p>
                 </div>
 
                 {observacoes && (
                   <div className="p-3 bg-muted/30 rounded-md">
-                    <p className="text-sm text-muted-foreground mb-1">Observações:</p>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      Observações:
+                    </p>
                     <p className="text-sm">{observacoes}</p>
                   </div>
                 )}
@@ -1267,7 +1381,9 @@ export default function Reembolsos() {
 
           <div className="space-y-4">
             <div className="p-4 bg-muted/30 rounded-md">
-              <p className="text-sm text-muted-foreground mb-1">Valor a Pagar</p>
+              <p className="text-sm text-muted-foreground mb-1">
+                Valor a Pagar
+              </p>
               <p className="text-2xl font-bold">
                 R$ {solicitacaoSelecionada?.valor_total.toFixed(2)}
               </p>

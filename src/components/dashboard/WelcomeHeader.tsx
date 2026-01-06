@@ -15,9 +15,8 @@ export function WelcomeHeader() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Tenta pegar do metadata (se salvou lá) ou perfil
-        // Ajuste conforme onde você salva o nome
-        const name = user.user_metadata?.full_name || user.email?.split('@')[0];
+        // Tenta pegar do metadata (nome) ou email
+        const name = user.user_metadata?.nome || user.email?.split('@')[0];
         // Pega só o primeiro nome
         setUserName(name?.split(' ')[0] || "Membro");
 

@@ -98,7 +98,12 @@ const CATEGORIAS_TESTEMUNHOS = [
 export default function SalaDeGuerra() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { igrejaId, filialId, isAllFiliais, loading: authLoading } = useAuthContext();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"pedidos" | "testemunhos">(
     "pedidos"
@@ -735,7 +740,9 @@ export default function SalaDeGuerra() {
                   disabled={isLoadingTestemunhos}
                 >
                   <ChevronDown className="w-4 h-4 mr-2" />
-                  {isLoadingTestemunhos ? "Carregando..." : "Carregar mais testemunhos"}
+                  {isLoadingTestemunhos
+                    ? "Carregando..."
+                    : "Carregar mais testemunhos"}
                 </Button>
               </div>
             )}
@@ -747,30 +754,47 @@ export default function SalaDeGuerra() {
       <NovoPedidoDialog
         open={novoPedidoOpen}
         onOpenChange={setNovoPedidoOpen}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["pedidos_oracao-paginated"] })}
+        onSuccess={() =>
+          queryClient.invalidateQueries({
+            queryKey: ["pedidos_oracao-paginated"],
+          })
+        }
       />
       {selectedPedido && (
         <PedidoDetailsDialog
           open={pedidoDetailsOpen}
           onOpenChange={setPedidoDetailsOpen}
           pedido={selectedPedido}
-          onUpdate={() => queryClient.invalidateQueries({ queryKey: ["pedidos_oracao-paginated"] })}
+          onUpdate={() =>
+            queryClient.invalidateQueries({
+              queryKey: ["pedidos_oracao-paginated"],
+            })
+          }
         />
       )}
       <NovoTestemunhoDialog
         open={novoTestemunhoOpen}
         onOpenChange={setNovoTestemunhoOpen}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["testemunhos-paginated"] })}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ["testemunhos-paginated"] })
+        }
       />
       {selectedTestemunho && (
         <TestemunhoDetailsDialog
           open={testemunhoDetailsOpen}
           onOpenChange={(open) => {
             setTestemunhoDetailsOpen(open);
-            if (!open) queryClient.invalidateQueries({ queryKey: ["testemunhos-paginated"] });
+            if (!open)
+              queryClient.invalidateQueries({
+                queryKey: ["testemunhos-paginated"],
+              });
           }}
           testemunho={selectedTestemunho}
-          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["testemunhos-paginated"] })}
+          onSuccess={() =>
+            queryClient.invalidateQueries({
+              queryKey: ["testemunhos-paginated"],
+            })
+          }
         />
       )}
     </div>

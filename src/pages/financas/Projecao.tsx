@@ -1,43 +1,68 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, BarChart3 } from "lucide-react";
+import {
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  BarChart3,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { addMonths, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import {
+  addMonths,
+  format,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
-
-
 
 export default function Projecao() {
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
-  
 
   // Buscar transações dos últimos 12 meses para análise
   const { data: historicoTransacoes } = useQuery({
-    queryKey: ['historico-transacoes-12meses', igrejaId, filialId, isAllFiliais],
+    queryKey: [
+      "historico-transacoes-12meses",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
       const dataInicio = subMonths(new Date(), 12);
-      
+
       let query = supabase
-        .from('transacoes_financeiras')
-        .select('*')
-        .eq('status', 'pago')
-        .eq('igreja_id', igrejaId)
-        .gte('data_pagamento', dataInicio.toISOString().split('T')[0])
-        .order('data_pagamento');
+        .from("transacoes_financeiras")
+        .select("*")
+        .eq("status", "pago")
+        .eq("igreja_id", igrejaId)
+        .gte("data_pagamento", dataInicio.toISOString().split("T")[0])
+        .order("data_pagamento");
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
-      
+
       if (error) throw error;
       return data;
     },
@@ -46,23 +71,23 @@ export default function Projecao() {
 
   // Buscar transações futuras (pendentes)
   const { data: transacoesFuturas } = useQuery({
-    queryKey: ['transacoes-futuras', igrejaId, filialId, isAllFiliais],
+    queryKey: ["transacoes-futuras", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
       const hoje = new Date();
-      
+
       let query = supabase
-        .from('transacoes_financeiras')
-        .select('*')
-        .eq('status', 'pendente')
-        .eq('igreja_id', igrejaId)
-        .gte('data_vencimento', hoje.toISOString().split('T')[0])
-        .order('data_vencimento');
+        .from("transacoes_financeiras")
+        .select("*")
+        .eq("status", "pendente")
+        .eq("igreja_id", igrejaId)
+        .gte("data_vencimento", hoje.toISOString().split("T")[0])
+        .order("data_vencimento");
       if (!isAllFiliais && filialId) {
-        query = query.eq('filial_id', filialId);
+        query = query.eq("filial_id", filialId);
       }
       const { data, error } = await query;
-      
+
       if (error) throw error;
       return data;
     },
@@ -81,11 +106,11 @@ export default function Projecao() {
     let totalEntradas = 0;
     let totalSaidas = 0;
 
-    historicoTransacoes.forEach(t => {
-      const mesAno = format(new Date(t.data_pagamento!), 'yyyy-MM');
+    historicoTransacoes.forEach((t) => {
+      const mesAno = format(new Date(t.data_pagamento!), "yyyy-MM");
       mesesUnicos.add(mesAno);
-      
-      if (t.tipo === 'entrada') {
+
+      if (t.tipo === "entrada") {
         totalEntradas += Number(t.valor);
       } else {
         totalSaidas += Number(t.valor);
@@ -109,34 +134,37 @@ export default function Projecao() {
 
     for (let i = 0; i < 6; i++) {
       const mes = addMonths(hoje, i);
-      const mesAno = format(mes, 'MMM/yy', { locale: ptBR });
+      const mesAno = format(mes, "MMM/yy", { locale: ptBR });
       const inicioMes = startOfMonth(mes);
       const fimMes = endOfMonth(mes);
 
       // Transações confirmadas para este mês
-      const transacoesMes = transacoesFuturas?.filter(t => {
-        const dataVenc = new Date(t.data_vencimento);
-        return dataVenc >= inicioMes && dataVenc <= fimMes;
-      }) || [];
+      const transacoesMes =
+        transacoesFuturas?.filter((t) => {
+          const dataVenc = new Date(t.data_vencimento);
+          return dataVenc >= inicioMes && dataVenc <= fimMes;
+        }) || [];
 
       const entradasConfirmadas = transacoesMes
-        .filter(t => t.tipo === 'entrada')
+        .filter((t) => t.tipo === "entrada")
         .reduce((sum, t) => sum + Number(t.valor), 0);
 
       const saidasConfirmadas = transacoesMes
-        .filter(t => t.tipo === 'saida')
+        .filter((t) => t.tipo === "saida")
         .reduce((sum, t) => sum + Number(t.valor), 0);
 
       // Projeção baseada em médias históricas + confirmadas
-      const entradasProjetadas = i === 0 ? entradasConfirmadas : mediaEntradas + entradasConfirmadas;
-      const saidasProjetadas = i === 0 ? saidasConfirmadas : mediaSaidas + saidasConfirmadas;
+      const entradasProjetadas =
+        i === 0 ? entradasConfirmadas : mediaEntradas + entradasConfirmadas;
+      const saidasProjetadas =
+        i === 0 ? saidasConfirmadas : mediaSaidas + saidasConfirmadas;
 
       projecao.push({
         mes: mesAno,
         Entradas: entradasProjetadas,
         Saidas: saidasProjetadas,
         Saldo: entradasProjetadas - saidasProjetadas,
-        tipo: i === 0 ? 'atual' : 'projecao',
+        tipo: i === 0 ? "atual" : "projecao",
       });
     }
 
@@ -148,7 +176,7 @@ export default function Projecao() {
   // Calcular saldo acumulado projetado
   const saldoAcumuladoProjetado = () => {
     let saldoAcumulado = 0;
-    return projecao.map(p => {
+    return projecao.map((p) => {
       saldoAcumulado += p.Saldo;
       return {
         mes: p.mes,
@@ -166,7 +194,7 @@ export default function Projecao() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/financas')}
+          onClick={() => navigate("/financas")}
           className="w-fit"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -176,7 +204,9 @@ export default function Projecao() {
           <HideValuesToggle />
         </div>
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Projeção Financeira</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Projeção Financeira
+          </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             Análise preditiva baseada em histórico e transações agendadas
           </p>
@@ -192,9 +222,15 @@ export default function Projecao() {
                 <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Média Mensal de Entradas</p>
-                <p className="text-lg font-bold">{formatCurrency(mediaEntradas)}</p>
-                <p className="text-xs text-muted-foreground">Baseado em 12 meses</p>
+                <p className="text-xs text-muted-foreground">
+                  Média Mensal de Entradas
+                </p>
+                <p className="text-lg font-bold">
+                  {formatCurrency(mediaEntradas)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Baseado em 12 meses
+                </p>
               </div>
             </div>
           </CardContent>
@@ -207,9 +243,15 @@ export default function Projecao() {
                 <TrendingDown className="w-5 h-5 text-red-600" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Média Mensal de Saídas</p>
-                <p className="text-lg font-bold">{formatCurrency(mediaSaidas)}</p>
-                <p className="text-xs text-muted-foreground">Baseado em 12 meses</p>
+                <p className="text-xs text-muted-foreground">
+                  Média Mensal de Saídas
+                </p>
+                <p className="text-lg font-bold">
+                  {formatCurrency(mediaSaidas)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Baseado em 12 meses
+                </p>
               </div>
             </div>
           </CardContent>
@@ -222,11 +264,21 @@ export default function Projecao() {
                 <BarChart3 className="w-5 h-5 text-blue-600" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Saldo Médio Mensal</p>
-                <p className={`text-lg font-bold ${mediaEntradas - mediaSaidas >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p className="text-xs text-muted-foreground">
+                  Saldo Médio Mensal
+                </p>
+                <p
+                  className={`text-lg font-bold ${
+                    mediaEntradas - mediaSaidas >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
                   {formatCurrency(mediaEntradas - mediaSaidas)}
                 </p>
-                <p className="text-xs text-muted-foreground">Tendência histórica</p>
+                <p className="text-xs text-muted-foreground">
+                  Tendência histórica
+                </p>
               </div>
             </div>
           </CardContent>
@@ -247,9 +299,12 @@ export default function Projecao() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mes" />
               <YAxis tickFormatter={(value) => formatCurrency(value)} />
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number) => formatCurrency(value)}
-                contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                contentStyle={{
+                  backgroundColor: "hsl(var(--background))",
+                  border: "1px solid hsl(var(--border))",
+                }}
               />
               <Legend />
               <Bar dataKey="Entradas" fill="#10b981" />
@@ -263,7 +318,9 @@ export default function Projecao() {
       {/* Saldo Acumulado Projetado */}
       <Card className="shadow-soft">
         <CardHeader>
-          <CardTitle className="text-lg">Fluxo de Caixa Projetado (Acumulado)</CardTitle>
+          <CardTitle className="text-lg">
+            Fluxo de Caixa Projetado (Acumulado)
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -271,15 +328,18 @@ export default function Projecao() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mes" />
               <YAxis tickFormatter={(value) => formatCurrency(value)} />
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number) => formatCurrency(value)}
-                contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                contentStyle={{
+                  backgroundColor: "hsl(var(--background))",
+                  border: "1px solid hsl(var(--border))",
+                }}
               />
               <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="SaldoAcumulado" 
-                stroke="#8b5cf6" 
+              <Line
+                type="monotone"
+                dataKey="SaldoAcumulado"
+                stroke="#8b5cf6"
                 strokeWidth={2}
                 dot={{ r: 4 }}
               />
@@ -299,22 +359,34 @@ export default function Projecao() {
               <div key={idx} className="p-4 rounded-lg border bg-muted/30">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold">{item.mes}</h4>
-                  {item.tipo === 'atual' && (
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Mês Atual</span>
+                  {item.tipo === "atual" && (
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                      Mês Atual
+                    </span>
                   )}
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Entradas</p>
-                    <p className="font-semibold text-green-600">{formatCurrency(item.Entradas)}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Entradas
+                    </p>
+                    <p className="font-semibold text-green-600">
+                      {formatCurrency(item.Entradas)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Saídas</p>
-                    <p className="font-semibold text-red-600">{formatCurrency(item.Saidas)}</p>
+                    <p className="font-semibold text-red-600">
+                      {formatCurrency(item.Saidas)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Saldo</p>
-                    <p className={`font-semibold ${item.Saldo >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                    <p
+                      className={`font-semibold ${
+                        item.Saldo >= 0 ? "text-blue-600" : "text-orange-600"
+                      }`}
+                    >
                       {formatCurrency(item.Saldo)}
                     </p>
                   </div>

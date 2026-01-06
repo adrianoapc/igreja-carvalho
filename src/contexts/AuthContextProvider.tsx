@@ -22,7 +22,7 @@ interface ProfileData {
   id: string;
   igreja_id: string | null;
   filial_id: string | null;
-  full_name: string | null;
+  nome: string | null;
   igreja_nome: string | null;
   filial_nome: string | null;
 }
@@ -248,7 +248,7 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
           id: string;
           igreja_id: string | null;
           filial_id: string | null;
-          full_name: string | null;
+          nome: string | null;
           igreja_nome: string | null;
           filial_nome: string | null;
         };
@@ -261,6 +261,7 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
 
       if (!result?.success) {
         console.error("Auth context fetch failed:", result?.error);
+        setLoading(false); // GARANTIR que loading seja false mesmo em erro
         return;
       }
 
@@ -269,7 +270,7 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
             id: result.profile.id,
             igreja_id: result.profile.igreja_id,
             filial_id: result.profile.filial_id,
-            full_name: result.profile.full_name,
+            nome: result.profile.nome,
             igreja_nome: result.profile.igreja_nome,
             filial_nome: result.profile.filial_nome,
           }
@@ -311,6 +312,9 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         setAllowedFilialIds(cached.allowedFilialIds);
         setFiliais(cached.filiais);
       }
+    } finally {
+      // SEMPRE desligar loading após buscar contexto
+      setLoading(false);
     }
   }, []);
 
