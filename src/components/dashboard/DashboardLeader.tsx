@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import {
   format,
   addDays,
@@ -42,6 +43,12 @@ export default function DashboardLeader() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
   const firstName = profile?.nome?.split(" ")[0] || "Líder";
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   const [stats, setStats] = useState({
     membrosCelula: 0,
@@ -53,10 +60,11 @@ export default function DashboardLeader() {
   const [alreadyRegisteredToday, setAlreadyRegisteredToday] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     fetchStats();
     fetchAniversariantes();
     checkTodaySentimento();
-  }, [profile?.id]);
+  }, [profile?.id, igrejaId, filialId, isAllFiliais, authLoading]);
 
   useEffect(() => {
     if (searchParams.get("sentimento") === "true") {
@@ -86,28 +94,40 @@ export default function DashboardLeader() {
 
   const fetchStats = async () => {
     // Membros na célula (simplified - count members in teams where user is leader)
-    const { data: teams } = await supabase
+    let teamsQuery = supabase
       .from("times")
       .select("id")
       .or(`lider_id.eq.${profile?.id},sublider_id.eq.${profile?.id}`);
+    if (igrejaId) teamsQuery = teamsQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId)
+      teamsQuery = teamsQuery.eq("filial_id", filialId);
+    const { data: teams } = await teamsQuery;
 
     if (teams && teams.length > 0) {
       const teamIds = teams.map((t) => t.id);
-      const { count } = await supabase
+      let membrosQuery = supabase
         .from("membros_time")
         .select("*", { count: "exact", head: true })
         .in("time_id", teamIds)
         .eq("ativo", true);
+      if (igrejaId) membrosQuery = membrosQuery.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId)
+        membrosQuery = membrosQuery.eq("filial_id", filialId);
+      const { count } = await membrosQuery;
 
       setStats((prev) => ({ ...prev, membrosCelula: count || 0 }));
     }
 
     // Visitantes pendentes de contato
-    const { count: visitantesCount } = await supabase
+    let visitantesQuery = supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
       .eq("status", "visitante")
       .eq("deseja_contato", true);
+    if (igrejaId) visitantesQuery = visitantesQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId)
+      visitantesQuery = visitantesQuery.eq("filial_id", filialId);
+    const { count: visitantesCount } = await visitantesQuery;
 
     setStats((prev) => ({
       ...prev,
@@ -119,10 +139,14 @@ export default function DashboardLeader() {
     const today = new Date();
     const endOfWeek = addDays(today, 7);
 
-    const { data } = await supabase
+    let aniversQuery = supabase
       .from("profiles")
       .select("id, nome, avatar_url, data_nascimento")
       .not("data_nascimento", "is", null);
+    if (igrejaId) aniversQuery = aniversQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId)
+      aniversQuery = aniversQuery.eq("filial_id", filialId);
+    const { data } = await aniversQuery;
 
     if (data) {
       const aniversariantesSemana = data

@@ -1,47 +1,114 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Copy, QrCode, Link2, Heart, Users, UserPlus } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { generateShortUrl } from "@/lib/shortLinkUtils";
 
 export function LinksExternosCard() {
   const { toast } = useToast();
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
-  const [selectedLink, setSelectedLink] = useState<{ title: string; url: string } | null>(null);
-  
+  const [selectedLink, setSelectedLink] = useState<{
+    title: string;
+    url: string;
+  } | null>(null);
+  const [shortLinks, setShortLinks] = useState<Record<string, string>>({});
+  const { igrejaId, filialId, isAllFiliais } = useAuthContext();
+
   const baseUrl = window.location.origin;
-  
-  const links = [
-    {
-      title: "Link Geral",
-      description: "Página inicial de cadastro (membro ou visitante)",
-      url: `${baseUrl}/cadastro`,
-      icon: Link2,
-      color: "bg-primary/10 text-primary",
-    },
-    {
-      title: "Link para Visitantes",
-      description: "Cadastro direto de visitantes do culto",
-      url: `${baseUrl}/cadastro/visitante`,
-      icon: UserPlus,
-      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
-    },
-    {
-      title: "Link para quem aceitou Jesus",
-      description: "Cadastro especial para novos convertidos",
-      url: `${baseUrl}/cadastro?aceitou=true`,
-      icon: Heart,
-      color: "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400",
-    },
-    {
-      title: "Link para Membros",
-      description: "Atualização de cadastro de membros",
-      url: `${baseUrl}/cadastro/membro`,
-      icon: Users,
-      color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
-    },
-  ];
+
+  const buildContextParams = () => {
+    const params = new URLSearchParams();
+    if (igrejaId) params.set("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) params.set("filial_id", filialId);
+    if (isAllFiliais) params.set("todas_filiais", "true");
+    return params.toString();
+  };
+
+  const withContext = (
+    path: string,
+    extra?: Record<string, string | boolean>
+  ) => {
+    const params = new URLSearchParams(buildContextParams());
+    if (extra) {
+      Object.entries(extra).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.set(key, String(value));
+        }
+      });
+    }
+    const query = params.toString();
+    const separator = path.includes("?") ? "&" : "?";
+    return query
+      ? `${baseUrl}${path}${separator}${query}`
+      : `${baseUrl}${path}`;
+  };
+
+  const links = useMemo(
+    () => [
+      {
+        title: "Link Geral",
+        description: "Página inicial de cadastro (membro ou visitante)",
+        url: withContext("/cadastro"),
+        icon: Link2,
+        color: "bg-primary/10 text-primary",
+        linkType: "cadastro" as const,
+      },
+      {
+        title: "Link para Visitantes",
+        description: "Cadastro direto de visitantes do culto",
+        url: withContext("/cadastro/visitante"),
+        icon: UserPlus,
+        color:
+          "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
+        linkType: "visitante" as const,
+      },
+      {
+        title: "Link para quem aceitou Jesus",
+        description: "Cadastro especial para novos convertidos",
+        url: withContext("/cadastro", { aceitou: true }),
+        icon: Heart,
+        color: "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400",
+        linkType: "aceitou" as const,
+      },
+      {
+        title: "Link para Membros",
+        description: "Atualização de cadastro de membros",
+        url: withContext("/cadastro/membro"),
+        icon: Users,
+        color:
+          "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
+        linkType: "membro" as const,
+      },
+    ],
+    [baseUrl, igrejaId, filialId, isAllFiliais]
+  );
+
+  useEffect(() => {
+    if (!igrejaId || isAllFiliais || !filialId) return;
+
+    // Gerar slugs curtos localmente (determinísticos)
+    links.forEach((link) => {
+      const shortUrl = generateShortUrl(baseUrl, filialId, link.linkType);
+      setShortLinks((prev) => ({
+        ...prev,
+        [link.url]: shortUrl,
+      }));
+    });
+  }, [links, igrejaId, filialId, isAllFiliais, baseUrl]);
 
   const copyToClipboard = async (url: string, title: string) => {
     try {
@@ -99,54 +166,77 @@ export function LinksExternosCard() {
             Links Externos de Cadastro
           </CardTitle>
           <CardDescription>
-            Compartilhe estes links para que membros e visitantes possam se cadastrar ou atualizar seus dados.
+            Compartilhe estes links para que membros e visitantes possam se
+            cadastrar ou atualizar seus dados.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
-          <div className="space-y-3">
-            {links.map((link) => {
-              const Icon = link.icon;
-              return (
-                <div
-                  key={link.title}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-border"
-                >
-                  <div className={`p-2 rounded-full ${link.color} flex-shrink-0 w-fit`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm">{link.title}</h3>
-                    <p className="text-xs text-muted-foreground">{link.description}</p>
-                    <p className="text-xs text-primary truncate mt-1">{link.url}</p>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => copyToClipboard(link.url, link.title)}
+          {isAllFiliais ? (
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>⚠️ Selecione uma filial</strong> para gerar links de
+                cadastro específicos. Links compartilháveis devem estar
+                vinculados a uma filial para garantir que os cadastros sejam
+                atribuídos corretamente.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {links.map((link) => {
+                const Icon = link.icon;
+                const finalUrl = shortLinks[link.url] ?? link.url;
+                return (
+                  <div
+                    key={link.title}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-border"
+                  >
+                    <div
+                      className={`p-2 rounded-full ${link.color} flex-shrink-0 w-fit`}
                     >
-                      <Copy className="w-4 h-4 mr-1" />
-                      Copiar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => showQrCode(link.title, link.url)}
-                    >
-                      <QrCode className="w-4 h-4 mr-1" />
-                      QR Code
-                    </Button>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm">{link.title}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {link.description}
+                      </p>
+                      <p className="text-xs text-primary truncate mt-1">
+                        {finalUrl}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(finalUrl, link.title)}
+                      >
+                        <Copy className="w-4 h-4 mr-1" />
+                        Copiar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => showQrCode(link.title, finalUrl)}
+                      >
+                        <QrCode className="w-4 h-4 mr-1" />
+                        QR Code
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
-          <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              <strong>💡 Dica:</strong> Você pode criar um banner ou notícia com estes links para que os membros da igreja possam atualizar seus dados pelo app/site!
-            </p>
-          </div>
+          {!isAllFiliais && (
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <strong>💡 Dica:</strong> Você pode criar um banner ou notícia
+                com estes links para que os membros da igreja possam atualizar
+                seus dados pelo app/site!
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -160,7 +250,9 @@ export function LinksExternosCard() {
               <>
                 <div className="p-4 bg-white rounded-lg">
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(selectedLink.url)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                      selectedLink.url
+                    )}`}
                     alt={`QR Code para ${selectedLink.title}`}
                     className="w-48 h-48"
                   />
@@ -170,7 +262,9 @@ export function LinksExternosCard() {
                 </p>
                 <Button
                   className="w-full"
-                  onClick={() => copyToClipboard(selectedLink.url, selectedLink.title)}
+                  onClick={() =>
+                    copyToClipboard(selectedLink.url, selectedLink.title)
+                  }
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copiar Link

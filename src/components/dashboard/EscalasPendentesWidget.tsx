@@ -5,21 +5,29 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  XCircle, 
+import {
+  Calendar,
+  CheckCircle2,
+  Clock,
+  XCircle,
   AlertTriangle,
   MessageCircle,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface EscalaCulto {
   id: string;
@@ -61,16 +69,24 @@ const COLORS = {
 
 export default function EscalasPendentesWidget() {
   const navigate = useNavigate();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   const { data: escalas = [], isLoading } = useQuery({
-    queryKey: ["escalas-proximos-7-dias"],
+    queryKey: ["escalas-proximos-7-dias", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const hoje = new Date();
       const proximos7Dias = addDays(hoje, 7);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("escalas")
-        .select(`
+        .select(
+          `
           id,
           confirmado,
           status_confirmacao,
@@ -89,30 +105,42 @@ export default function EscalasPendentesWidget() {
             nome,
             telefone
           )
-        `)
+        `
+        )
         .gte("culto.data_evento", hoje.toISOString())
         .lte("culto.data_evento", proximos7Dias.toISOString())
         .order("culto(data_evento)", { ascending: true });
 
+      query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
-      return (data || []).filter(e => e.culto !== null) as EscalaCulto[];
+      return (data || []).filter((e) => e.culto !== null) as EscalaCulto[];
     },
     refetchInterval: 60000,
+    enabled: !!igrejaId && !authLoading,
   });
 
   const stats = {
     total: escalas.length,
-    confirmados: escalas.filter(e => 
-      e.confirmado || e.status_confirmacao === "aceito"
+    confirmados: escalas.filter(
+      (e) => e.confirmado || e.status_confirmacao === "aceito"
     ).length,
-    pendentes: escalas.filter(e => 
-      !e.confirmado && (!e.status_confirmacao || e.status_confirmacao === "pendente")
+    pendentes: escalas.filter(
+      (e) =>
+        !e.confirmado &&
+        (!e.status_confirmacao || e.status_confirmacao === "pendente")
     ).length,
-    recusados: escalas.filter(e => e.status_confirmacao === "recusado").length,
+    recusados: escalas.filter((e) => e.status_confirmacao === "recusado")
+      .length,
   };
 
   const timesSummary: Map<string, TimeSummary> = new Map();
-  escalas.forEach(escala => {
+  escalas.forEach((escala) => {
     const timeId = escala.time.id;
     if (!timesSummary.has(timeId)) {
       timesSummary.set(timeId, {
@@ -137,23 +165,30 @@ export default function EscalasPendentesWidget() {
     }
   });
   const timesArray = Array.from(timesSummary.values())
-    .map(t => ({
+    .map((t) => ({
       ...t,
       percentualPendente: t.total > 0 ? (t.pendentes / t.total) * 100 : 0,
     }))
     .sort((a, b) => b.percentualPendente - a.percentualPendente);
-  const timesEmAlerta = timesArray.filter(t => t.percentualPendente > 30 && t.pendentes > 0);
+  const timesEmAlerta = timesArray.filter(
+    (t) => t.percentualPendente > 30 && t.pendentes > 0
+  );
   const chartData = [
-    { name: "Confirmados", value: stats.confirmados, color: COLORS.confirmados },
+    {
+      name: "Confirmados",
+      value: stats.confirmados,
+      color: COLORS.confirmados,
+    },
     { name: "Pendentes", value: stats.pendentes, color: COLORS.pendentes },
     { name: "Recusados", value: stats.recusados, color: COLORS.recusados },
-  ].filter(d => d.value > 0);
+  ].filter((d) => d.value > 0);
 
   const handleNotificarPendentes = async () => {
-    const pendentes = escalas.filter(e => 
-      !e.confirmado && 
-      (!e.status_confirmacao || e.status_confirmacao === "pendente") &&
-      e.pessoa.telefone
+    const pendentes = escalas.filter(
+      (e) =>
+        !e.confirmado &&
+        (!e.status_confirmacao || e.status_confirmacao === "pendente") &&
+        e.pessoa.telefone
     );
     if (pendentes.length === 0) {
       toast.info("Não há voluntários pendentes com telefone cadastrado");
@@ -200,9 +235,8 @@ export default function EscalasPendentesWidget() {
     );
   }
 
-  const percentualConfirmados = stats.total > 0 
-    ? Math.round((stats.confirmados / stats.total) * 100) 
-    : 0;
+  const percentualConfirmados =
+    stats.total > 0 ? Math.round((stats.confirmados / stats.total) * 100) : 0;
 
   return (
     <Card className="shadow-soft">
@@ -212,7 +246,7 @@ export default function EscalasPendentesWidget() {
             <Calendar className="w-5 h-5" />
             Escalas dos Próximos 7 Dias
           </CardTitle>
-          <Badge 
+          <Badge
             variant={percentualConfirmados >= 70 ? "default" : "destructive"}
             className="text-sm"
           >
@@ -228,7 +262,9 @@ export default function EscalasPendentesWidget() {
             <p className="text-2xl font-bold text-green-700 dark:text-green-400">
               {stats.confirmados}
             </p>
-            <p className="text-xs text-green-600 dark:text-green-500">Confirmados</p>
+            <p className="text-xs text-green-600 dark:text-green-500">
+              Confirmados
+            </p>
           </div>
 
           <div className="text-center p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
@@ -236,7 +272,9 @@ export default function EscalasPendentesWidget() {
             <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
               {stats.pendentes}
             </p>
-            <p className="text-xs text-yellow-600 dark:text-yellow-500">Pendentes</p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-500">
+              Pendentes
+            </p>
           </div>
 
           <div className="text-center p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
@@ -267,10 +305,13 @@ export default function EscalasPendentesWidget() {
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend 
-                  verticalAlign="bottom" 
+                <Legend
+                  verticalAlign="bottom"
                   height={36}
-                  formatter={(value: string, entry: { payload?: { value?: number } }) => (
+                  formatter={(
+                    value: string,
+                    entry: { payload?: { value?: number } }
+                  ) => (
                     <span className="text-xs">
                       {value}: {entry.payload?.value ?? 0}
                     </span>
@@ -289,21 +330,23 @@ export default function EscalasPendentesWidget() {
               <span>Ministérios que precisam de atenção:</span>
             </div>
             <div className="space-y-2">
-              {timesEmAlerta.map(time => (
-                <div 
+              {timesEmAlerta.map((time) => (
+                <div
                   key={time.timeId}
                   className="flex items-center justify-between p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div 
+                    <div
                       className="w-2 h-8 rounded"
                       style={{ backgroundColor: time.timeCor }}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{time.timeNome}</p>
+                      <p className="font-medium text-sm truncate">
+                        {time.timeNome}
+                      </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <Progress 
-                          value={(time.confirmados / time.total) * 100} 
+                        <Progress
+                          value={(time.confirmados / time.total) * 100}
                           className="h-1.5 flex-1"
                         />
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -312,7 +355,10 @@ export default function EscalasPendentesWidget() {
                       </div>
                     </div>
                   </div>
-                  <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                  <Badge
+                    variant="outline"
+                    className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700"
+                  >
                     {time.pendentes} pendentes
                   </Badge>
                 </div>
@@ -322,7 +368,9 @@ export default function EscalasPendentesWidget() {
         )}
 
         {/* Times OK */}
-        {timesArray.filter(t => t.percentualPendente <= 30 || t.pendentes === 0).length > 0 && (
+        {timesArray.filter(
+          (t) => t.percentualPendente <= 30 || t.pendentes === 0
+        ).length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium text-green-600">
               <CheckCircle2 className="w-4 h-4" />
@@ -330,21 +378,26 @@ export default function EscalasPendentesWidget() {
             </div>
             <div className="space-y-1">
               {timesArray
-                .filter(t => t.percentualPendente <= 30 || t.pendentes === 0)
+                .filter((t) => t.percentualPendente <= 30 || t.pendentes === 0)
                 .slice(0, 3)
-                .map(time => (
-                  <div 
+                .map((time) => (
+                  <div
                     key={time.timeId}
                     className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-950/20"
                   >
                     <div className="flex items-center gap-2">
-                      <div 
+                      <div
                         className="w-1.5 h-6 rounded"
                         style={{ backgroundColor: time.timeCor }}
                       />
-                      <span className="text-sm font-medium">{time.timeNome}</span>
+                      <span className="text-sm font-medium">
+                        {time.timeNome}
+                      </span>
                     </div>
-                    <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                    >
                       {time.confirmados}/{time.total} ✓
                     </Badge>
                   </div>
@@ -380,17 +433,26 @@ export default function EscalasPendentesWidget() {
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Status geral para os próximos eventos</span>
             {percentualConfirmados >= 80 ? (
-              <Badge variant="outline" className="gap-1 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400">
+              <Badge
+                variant="outline"
+                className="gap-1 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+              >
                 <TrendingUp className="w-3 h-3" />
                 Excelente
               </Badge>
             ) : percentualConfirmados >= 60 ? (
-              <Badge variant="outline" className="gap-1 bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400">
+              <Badge
+                variant="outline"
+                className="gap-1 bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400"
+              >
                 <AlertTriangle className="w-3 h-3" />
                 Atenção
               </Badge>
             ) : (
-              <Badge variant="outline" className="gap-1 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400">
+              <Badge
+                variant="outline"
+                className="gap-1 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+              >
                 <XCircle className="w-3 h-3" />
                 Crítico
               </Badge>

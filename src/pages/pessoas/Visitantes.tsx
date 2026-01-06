@@ -23,7 +23,19 @@ import {
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Search, Plus, Phone, Mail, Check, X, Gift, Calendar, PhoneCall, ArrowLeft, Filter } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Phone,
+  Mail,
+  Check,
+  X,
+  Gift,
+  Calendar,
+  PhoneCall,
+  ArrowLeft,
+  Filter,
+} from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +45,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { formatarTelefone } from "@/lib/validators";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface Visitante {
   id: string;
@@ -54,26 +67,47 @@ interface Visitante {
 const ITEMS_PER_PAGE = 10;
 
 export default function Visitantes() {
-  const [displayedVisitantes, setDisplayedVisitantes] = useState<Visitante[]>([]);
+  const [displayedVisitantes, setDisplayedVisitantes] = useState<Visitante[]>(
+    []
+  );
   const [allVisitantes, setAllVisitantes] = useState<Visitante[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "visitante" | "frequentador">("todos");
+  const [statusFilter, setStatusFilter] = useState<
+    "todos" | "visitante" | "frequentador"
+  >("todos");
   const [registrarOpen, setRegistrarOpen] = useState(false);
   const [agendarContatoOpen, setAgendarContatoOpen] = useState(false);
-  const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(null);
+  const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(
+    null
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [filterHasEmail, setFilterHasEmail] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   const fetchVisitantes = async () => {
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+
+      let query = supabase
         .from("profiles")
         .select("*")
         .in("status", ["visitante", "frequentador"])
+        .eq("igreja_id", igrejaId)
         .order("data_primeira_visita", { ascending: false });
+
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setAllVisitantes(data || []);
@@ -89,10 +123,20 @@ export default function Visitantes() {
   };
 
   useEffect(() => {
-    fetchVisitantes();
-  }, []);
+    if (!authLoading) {
+      fetchVisitantes();
+    }
+  }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
-  const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll();
+  const {
+    loadMoreRef,
+    isLoading,
+    hasMore,
+    page,
+    setIsLoading,
+    setHasMore,
+    setPage,
+  } = useInfiniteScroll();
 
   useEffect(() => {
     if (page === 1 || allVisitantes.length === 0) return;
@@ -104,7 +148,9 @@ export default function Visitantes() {
     if (newItems.length > 0) {
       setDisplayedVisitantes((prev) => {
         const existingIds = new Set(prev.map((v) => v.id));
-        const uniqueNewItems = newItems.filter((item) => !existingIds.has(item.id));
+        const uniqueNewItems = newItems.filter(
+          (item) => !existingIds.has(item.id)
+        );
         return [...prev, ...uniqueNewItems];
       });
     }
@@ -121,7 +167,8 @@ export default function Visitantes() {
         v.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         v.telefone?.includes(searchTerm) ||
         v.email?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "todos" || v.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "todos" || v.status === statusFilter;
       return matchesSearch && matchesStatus;
     })
     .filter((v) => (filterHasPhone ? !!v.telefone : true))
@@ -130,7 +177,8 @@ export default function Visitantes() {
   const countByStatus = {
     todos: allVisitantes.length,
     visitante: allVisitantes.filter((v) => v.status === "visitante").length,
-    frequentador: allVisitantes.filter((v) => v.status === "frequentador").length,
+    frequentador: allVisitantes.filter((v) => v.status === "frequentador")
+      .length,
   };
 
   const handleOpenDetails = (visitante: Visitante) => {
@@ -144,14 +192,21 @@ export default function Visitantes() {
 
   const renderStatusBadges = (visitante: Visitante) => (
     <div className="flex flex-wrap items-center gap-2">
-      <Badge variant={visitante.status === "visitante" ? "default" : "secondary"} className="text-xs">
+      <Badge
+        variant={visitante.status === "visitante" ? "default" : "secondary"}
+        className="text-xs"
+      >
         {visitante.status === "visitante" ? "Visitante" : "Frequentador"}
       </Badge>
       <Badge variant="outline" className="text-xs bg-primary/10">
-        {visitante.numero_visitas} {visitante.numero_visitas === 1 ? "visita" : "visitas"}
+        {visitante.numero_visitas}{" "}
+        {visitante.numero_visitas === 1 ? "visita" : "visitas"}
       </Badge>
       {visitante.status === "visitante" && visitante.numero_visitas >= 2 && (
-        <Badge variant="outline" className="text-xs bg-accent/10 text-accent-foreground">
+        <Badge
+          variant="outline"
+          className="text-xs bg-accent/10 text-accent-foreground"
+        >
           Próxima visita = Frequentador
         </Badge>
       )}
@@ -181,16 +236,25 @@ export default function Visitantes() {
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div className="flex items-center gap-2 md:gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/pessoas")}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/pessoas")}
+        >
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Visitantes</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Visitantes
+          </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             Registre e acompanhe visitantes e frequentadores
           </p>
         </div>
-        <Button className="bg-gradient-primary shadow-soft w-full sm:w-auto" onClick={() => setRegistrarOpen(true)}>
+        <Button
+          className="bg-gradient-primary shadow-soft w-full sm:w-auto"
+          onClick={() => setRegistrarOpen(true)}
+        >
           <Plus className="w-4 h-4 mr-2" />
           <span className="hidden sm:inline">Registrar Pessoa</span>
           <span className="sm:hidden">Registrar</span>
@@ -209,17 +273,32 @@ export default function Visitantes() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) =>
+                setStatusFilter(value as typeof statusFilter)
+              }
+            >
               <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos ({countByStatus.todos})</SelectItem>
-                <SelectItem value="visitante">Visitantes ({countByStatus.visitante})</SelectItem>
-                <SelectItem value="frequentador">Frequentadores ({countByStatus.frequentador})</SelectItem>
+                <SelectItem value="todos">
+                  Todos ({countByStatus.todos})
+                </SelectItem>
+                <SelectItem value="visitante">
+                  Visitantes ({countByStatus.visitante})
+                </SelectItem>
+                <SelectItem value="frequentador">
+                  Frequentadores ({countByStatus.frequentador})
+                </SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="md:w-auto" onClick={() => setFiltersOpen(true)}>
+            <Button
+              variant="outline"
+              className="md:w-auto"
+              onClick={() => setFiltersOpen(true)}
+            >
               <Filter className="w-4 h-4 mr-2" />
               Filtros
             </Button>
@@ -241,20 +320,33 @@ export default function Visitantes() {
               </TableHeader>
               <TableBody>
                 {filteredVisitantes.map((visitante, index) => (
-                  <TableRow key={visitante.id} ref={index === filteredVisitantes.length - 1 ? loadMoreRef : null}>
+                  <TableRow
+                    key={visitante.id}
+                    ref={
+                      index === filteredVisitantes.length - 1
+                        ? loadMoreRef
+                        : null
+                    }
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
-                          <AvatarImage src={visitante.avatar_url || undefined} alt={visitante.nome} />
+                          <AvatarImage
+                            src={visitante.avatar_url || undefined}
+                            alt={visitante.nome}
+                          />
                           <AvatarFallback className="bg-gradient-accent text-accent-foreground font-bold">
                             {visitante.nome.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium text-foreground">{visitante.nome}</p>
+                          <p className="font-medium text-foreground">
+                            {visitante.nome}
+                          </p>
                           {visitante.user_id && (
                             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <Check className="w-3 h-3" /> Usuário da plataforma
+                              <Check className="w-3 h-3" /> Usuário da
+                              plataforma
                             </span>
                           )}
                         </div>
@@ -277,28 +369,52 @@ export default function Visitantes() {
                         {visitante.data_primeira_visita && (
                           <span className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
-                            1ª visita: {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                            1ª visita:{" "}
+                            {format(
+                              new Date(visitante.data_primeira_visita),
+                              "dd/MM/yyyy",
+                              { locale: ptBR }
+                            )}
                           </span>
                         )}
                         {visitante.data_ultima_visita && (
                           <span className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
-                            Última: {format(new Date(visitante.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}
+                            Última:{" "}
+                            {format(
+                              new Date(visitante.data_ultima_visita),
+                              "dd/MM/yyyy",
+                              { locale: ptBR }
+                            )}
                           </span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>{renderStatusBadges(visitante)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs bg-primary/10">
-                        {visitante.numero_visitas} {visitante.numero_visitas === 1 ? "visita" : "visitas"}
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-primary/10"
+                      >
+                        {visitante.numero_visitas}{" "}
+                        {visitante.numero_visitas === 1 ? "visita" : "visitas"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => handleOpenDetails(visitante)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px]"
+                        onClick={() => handleOpenDetails(visitante)}
+                      >
                         Detalhes
                       </Button>
-                      <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => handleAgendarContato(visitante)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="min-h-[44px]"
+                        onClick={() => handleAgendarContato(visitante)}
+                      >
                         Agendar
                       </Button>
                     </TableCell>
@@ -321,8 +437,13 @@ export default function Visitantes() {
 
                 {!isLoading && filteredVisitantes.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                      {searchTerm ? "Nenhum visitante encontrado" : "Nenhum visitante cadastrado"}
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-sm text-muted-foreground"
+                    >
+                      {searchTerm
+                        ? "Nenhum visitante encontrado"
+                        : "Nenhum visitante cadastrado"}
                     </TableCell>
                   </TableRow>
                 )}
@@ -334,18 +455,25 @@ export default function Visitantes() {
             {filteredVisitantes.map((visitante, index) => (
               <div
                 key={visitante.id}
-                ref={index === filteredVisitantes.length - 1 ? loadMoreRef : null}
+                ref={
+                  index === filteredVisitantes.length - 1 ? loadMoreRef : null
+                }
                 className="flex flex-col gap-3 p-3 rounded-lg bg-[#eff0cf]"
               >
                 <div className="flex items-start gap-3">
                   <Avatar className="w-10 h-10 flex-shrink-0">
-                    <AvatarImage src={visitante.avatar_url || undefined} alt={visitante.nome} />
+                    <AvatarImage
+                      src={visitante.avatar_url || undefined}
+                      alt={visitante.nome}
+                    />
                     <AvatarFallback className="bg-gradient-accent text-accent-foreground font-bold">
                       {visitante.nome.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{visitante.nome}</p>
+                    <p className="font-medium text-foreground truncate">
+                      {visitante.nome}
+                    </p>
                     <div className="flex flex-col gap-1 mt-1">
                       {visitante.telefone && (
                         <span className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -362,13 +490,23 @@ export default function Visitantes() {
                       {visitante.data_primeira_visita && (
                         <span className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4" />
-                          1ª visita: {format(new Date(visitante.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                          1ª visita:{" "}
+                          {format(
+                            new Date(visitante.data_primeira_visita),
+                            "dd/MM/yyyy",
+                            { locale: ptBR }
+                          )}
                         </span>
                       )}
                       {visitante.data_ultima_visita && (
                         <span className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4" />
-                          Última: {format(new Date(visitante.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}
+                          Última:{" "}
+                          {format(
+                            new Date(visitante.data_ultima_visita),
+                            "dd/MM/yyyy",
+                            { locale: ptBR }
+                          )}
                         </span>
                       )}
                     </div>
@@ -378,10 +516,17 @@ export default function Visitantes() {
                 {renderStatusBadges(visitante)}
 
                 <div className="flex gap-2">
-                  <Button className="flex-1 min-h-[44px]" onClick={() => handleOpenDetails(visitante)}>
+                  <Button
+                    className="flex-1 min-h-[44px]"
+                    onClick={() => handleOpenDetails(visitante)}
+                  >
                     Detalhes
                   </Button>
-                  <Button variant="outline" className="flex-1 min-h-[44px]" onClick={() => handleAgendarContato(visitante)}>
+                  <Button
+                    variant="outline"
+                    className="flex-1 min-h-[44px]"
+                    onClick={() => handleAgendarContato(visitante)}
+                  >
                     Agendar
                   </Button>
                 </div>
@@ -391,7 +536,10 @@ export default function Visitantes() {
             {isLoading && (
               <div className="space-y-3">
                 {[1, 2].map((i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-secondary"
+                  >
                     <Skeleton className="w-10 h-10 rounded-full" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-32" />
@@ -404,7 +552,9 @@ export default function Visitantes() {
 
             {filteredVisitantes.length === 0 && !isLoading && (
               <div className="text-center py-8 text-sm text-muted-foreground">
-                {searchTerm ? "Nenhum visitante encontrado" : "Nenhum visitante cadastrado"}
+                {searchTerm
+                  ? "Nenhum visitante encontrado"
+                  : "Nenhum visitante cadastrado"}
               </div>
             )}
           </div>
@@ -429,33 +579,48 @@ export default function Visitantes() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Label className="text-sm">Somente com telefone</Label>
-                <p className="text-xs text-muted-foreground">Oculta visitantes sem número cadastrado.</p>
+                <p className="text-xs text-muted-foreground">
+                  Oculta visitantes sem número cadastrado.
+                </p>
               </div>
-              <Switch checked={filterHasPhone} onCheckedChange={setFilterHasPhone} />
+              <Switch
+                checked={filterHasPhone}
+                onCheckedChange={setFilterHasPhone}
+              />
             </div>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Label className="text-sm">Somente com e-mail</Label>
-                <p className="text-xs text-muted-foreground">Oculta visitantes sem e-mail cadastrado.</p>
+                <p className="text-xs text-muted-foreground">
+                  Oculta visitantes sem e-mail cadastrado.
+                </p>
               </div>
-              <Switch checked={filterHasEmail} onCheckedChange={setFilterHasEmail} />
+              <Switch
+                checked={filterHasEmail}
+                onCheckedChange={setFilterHasEmail}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => {
-              setFilterHasPhone(false);
-              setFilterHasEmail(false);
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFilterHasPhone(false);
+                setFilterHasEmail(false);
+              }}
+            >
               Limpar
             </Button>
-            <Button onClick={() => setFiltersOpen(false)}>
-              Aplicar
-            </Button>
+            <Button onClick={() => setFiltersOpen(false)}>Aplicar</Button>
           </div>
         </div>
       </ResponsiveDialog>
 
-      <RegistrarVisitanteDialog open={registrarOpen} onOpenChange={setRegistrarOpen} onSuccess={fetchVisitantes} />
+      <RegistrarVisitanteDialog
+        open={registrarOpen}
+        onOpenChange={setRegistrarOpen}
+        onSuccess={fetchVisitantes}
+      />
       {selectedVisitante && (
         <AgendarContatoDialog
           open={agendarContatoOpen}

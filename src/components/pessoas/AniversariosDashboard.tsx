@@ -10,14 +10,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
-import { format, isToday, isThisWeek, isThisMonth, isSameDay, parseISO } from "date-fns";
+import {
+  format,
+  isToday,
+  isThisWeek,
+  isThisMonth,
+  isSameDay,
+  parseISO,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, Cake, Heart, Droplets, Phone, Mail } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  Cake,
+  Heart,
+  Droplets,
+  Phone,
+  Mail,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { formatarTelefone } from "@/lib/validators";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface Pessoa {
   id: string;
@@ -43,19 +62,36 @@ interface AniversarioItem {
 export function AniversariosDashboard() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [tipoFilter, setTipoFilter] = useState<"todos" | "nascimento" | "casamento" | "batismo">("todos");
+  const [tipoFilter, setTipoFilter] = useState<
+    "todos" | "nascimento" | "casamento" | "batismo"
+  >("todos");
   const navigate = useNavigate();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   useEffect(() => {
+    if (authLoading || !igrejaId) return;
     fetchPessoas();
-  }, []);
+  }, [authLoading, igrejaId, filialId, isAllFiliais]);
 
   const fetchPessoas = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("profiles")
-        .select("id, nome, telefone, email, data_nascimento, data_casamento, data_batismo, status")
-        .order("nome");
+        .select(
+          "id, nome, telefone, email, data_nascimento, data_casamento, data_batismo, status"
+        )
+        .order("nome")
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setPessoas(data || []);
@@ -117,7 +153,11 @@ export function AniversariosDashboard() {
     // Filtrar por data selecionada
     if (selectedDate) {
       filtered = filtered.filter((a) => {
-        const aniverDate = new Date(selectedDate.getFullYear(), a.data.getMonth(), a.data.getDate());
+        const aniverDate = new Date(
+          selectedDate.getFullYear(),
+          a.data.getMonth(),
+          a.data.getDate()
+        );
         return isSameDay(aniverDate, selectedDate);
       });
     }
@@ -134,7 +174,11 @@ export function AniversariosDashboard() {
 
     aniversarios.forEach((aniv) => {
       // Criar data do aniversário no ano atual
-      const aniverDate = new Date(now.getFullYear(), aniv.data.getMonth(), aniv.data.getDate());
+      const aniverDate = new Date(
+        now.getFullYear(),
+        aniv.data.getMonth(),
+        aniv.data.getDate()
+      );
 
       if (isToday(aniverDate)) {
         hoje.push(aniv);
@@ -180,7 +224,11 @@ export function AniversariosDashboard() {
 
   const renderAniversarioCard = (aniv: AniversarioItem) => {
     const now = new Date();
-    const aniverDate = new Date(now.getFullYear(), aniv.data.getMonth(), aniv.data.getDate());
+    const aniverDate = new Date(
+      now.getFullYear(),
+      aniv.data.getMonth(),
+      aniv.data.getDate()
+    );
     const idade = now.getFullYear() - aniv.data.getFullYear();
 
     return (
@@ -201,7 +249,9 @@ export function AniversariosDashboard() {
                 {format(aniverDate, "dd/MMM", { locale: ptBR })}
               </span>
               {aniv.tipo === "nascimento" && (
-                <span className="text-xs text-muted-foreground">({idade} anos)</span>
+                <span className="text-xs text-muted-foreground">
+                  ({idade} anos)
+                </span>
               )}
             </div>
           </div>
@@ -233,7 +283,10 @@ export function AniversariosDashboard() {
             Aniversários
           </CardTitle>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as typeof tipoFilter)}>
+            <Select
+              value={tipoFilter}
+              onValueChange={(v) => setTipoFilter(v as typeof tipoFilter)}
+            >
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>
@@ -261,9 +314,15 @@ export function AniversariosDashboard() {
             </Select>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                >
                   <CalendarIcon className="w-4 h-4 mr-2" />
-                  {selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Filtrar por data"}
+                  {selectedDate
+                    ? format(selectedDate, "dd/MM/yyyy")
+                    : "Filtrar por data"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -300,7 +359,9 @@ export function AniversariosDashboard() {
               </h3>
               {filteredAniversarios.length > 0 ? (
                 <div className="space-y-2">
-                  {filteredAniversarios.map((aniv) => renderAniversarioCard(aniv))}
+                  {filteredAniversarios.map((aniv) =>
+                    renderAniversarioCard(aniv)
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -349,11 +410,13 @@ export function AniversariosDashboard() {
                 </div>
               )}
 
-              {hoje.length === 0 && estaSemana.length === 0 && esteMes.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Nenhum aniversário próximo
-                </p>
-              )}
+              {hoje.length === 0 &&
+                estaSemana.length === 0 &&
+                esteMes.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhum aniversário próximo
+                  </p>
+                )}
             </div>
           )}
         </div>

@@ -69,7 +69,7 @@ import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader"; // <--- Novo
 import EscalasPendentesWidget from "@/components/dashboard/EscalasPendentesWidget";
 import CandidatosPendentesWidget from "@/components/dashboard/CandidatosPendentesWidget";
-import { useFilialId } from "@/hooks/useFilialId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface Comunicado {
   id: string;
@@ -146,7 +146,12 @@ export default function DashboardAdmin() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const { formatValue } = useHideValues();
-  const { filialId, igrejaId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const {
+    filialId,
+    igrejaId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   useEffect(() => {
     if (searchParams.get("sentimento") === "true") {
@@ -157,14 +162,14 @@ export default function DashboardAdmin() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (filialLoading) return;
+    if (authLoading) return;
     fetchComunicados();
     fetchFinancialData();
     fetchConsolidationData();
     fetchPedidosOracao();
     fetchTestemunhos();
     checkTodaySentimento();
-  }, [profile?.id, filialId, igrejaId, isAllFiliais, filialLoading]);
+  }, [profile?.id, filialId, igrejaId, isAllFiliais, authLoading]);
 
   const checkTodaySentimento = async () => {
     if (!profile?.id) return;
@@ -186,7 +191,7 @@ export default function DashboardAdmin() {
 
   const fetchComunicados = async () => {
     const now = new Date().toISOString();
-    const { data } = await supabase
+    let query = supabase
       .from("comunicados")
       .select(
         "id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao"
@@ -195,6 +200,11 @@ export default function DashboardAdmin() {
       .lte("data_inicio", now)
       .or(`data_fim.is.null,data_fim.gte.${now}`)
       .order("created_at", { ascending: false });
+
+    if (igrejaId) query = query.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+
+    const { data } = await query;
 
     if (data) {
       const alertasList = data.filter(
@@ -215,9 +225,13 @@ export default function DashboardAdmin() {
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-    let contasQuery = supabase.from("contas").select("saldo_atual").eq("ativo", true);
+    let contasQuery = supabase
+      .from("contas")
+      .select("saldo_atual")
+      .eq("ativo", true);
     if (igrejaId) contasQuery = contasQuery.eq("igreja_id", igrejaId);
-    if (!isAllFiliais && filialId) contasQuery = contasQuery.eq("filial_id", filialId);
+    if (!isAllFiliais && filialId)
+      contasQuery = contasQuery.eq("filial_id", filialId);
     const { data: contasData } = await contasQuery;
 
     if (contasData) {
@@ -296,7 +310,8 @@ export default function DashboardAdmin() {
         .lte("data_vencimento", monthEnd.toISOString())
         .eq("status", "pago");
       if (igrejaId) monthQuery = monthQuery.eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) monthQuery = monthQuery.eq("filial_id", filialId);
+      if (!isAllFiliais && filialId)
+        monthQuery = monthQuery.eq("filial_id", filialId);
 
       const { data: monthData } = await monthQuery;
 
@@ -326,8 +341,14 @@ export default function DashboardAdmin() {
       return query;
     };
 
-    const { data: visitors } = await buildProfilesQuery().eq("status", "visitante");
-    const { data: frequenters } = await buildProfilesQuery().eq("status", "frequentador");
+    const { data: visitors } = await buildProfilesQuery().eq(
+      "status",
+      "visitante"
+    );
+    const { data: frequenters } = await buildProfilesQuery().eq(
+      "status",
+      "frequentador"
+    );
     const { data: members } = await buildProfilesQuery().eq("status", "membro");
 
     setConsolidationData([
@@ -364,7 +385,8 @@ export default function DashboardAdmin() {
       .order("created_at", { ascending: false })
       .limit(5);
     if (igrejaId) pedidosQuery = pedidosQuery.eq("igreja_id", igrejaId);
-    if (!isAllFiliais && filialId) pedidosQuery = pedidosQuery.eq("filial_id", filialId);
+    if (!isAllFiliais && filialId)
+      pedidosQuery = pedidosQuery.eq("filial_id", filialId);
 
     const { data } = await pedidosQuery;
 
@@ -396,7 +418,8 @@ export default function DashboardAdmin() {
       .order("created_at", { ascending: false })
       .limit(5);
     if (igrejaId) testemunhosQuery = testemunhosQuery.eq("igreja_id", igrejaId);
-    if (!isAllFiliais && filialId) testemunhosQuery = testemunhosQuery.eq("filial_id", filialId);
+    if (!isAllFiliais && filialId)
+      testemunhosQuery = testemunhosQuery.eq("filial_id", filialId);
 
     const { data } = await testemunhosQuery;
 

@@ -19,9 +19,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboard";
 import { LinksExternosCard } from "@/components/pessoas/LinksExternosCard";
 import { PerfisPendentes } from "@/components/pessoas/PerfisPendentes";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 export default function Pessoas() {
   const navigate = useNavigate();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState("");
   const [stats, setStats] = useState([
     {
@@ -76,10 +83,17 @@ export default function Pessoas() {
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (authLoading || !igrejaId) return;
+
       try {
-        const { data: profiles, error } = await supabase
+        let profilesQuery = supabase
           .from("profiles")
-          .select("status");
+          .select("status")
+          .eq("igreja_id", igrejaId);
+        if (!isAllFiliais && filialId) {
+          profilesQuery = profilesQuery.eq("filial_id", filialId);
+        }
+        const { data: profiles, error } = await profilesQuery;
 
         if (error) throw error;
 
@@ -98,28 +112,38 @@ export default function Pessoas() {
           { ...prev[3], value: membros.toString() },
         ]);
 
-        // Buscar contatos agendados
+        // Buscar contatos agendados (filtrados por igreja/filial)
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
 
-        const { count } = await supabase
+        let contatosQuery = supabase
           .from("visitante_contatos")
           .select("*", { count: "exact", head: true })
           .gte("data_contato", hoje.toISOString())
-          .in("status", ["agendado", "pendente"]);
+          .in("status", ["agendado", "pendente"])
+          .eq("igreja_id", igrejaId);
+        if (!isAllFiliais && filialId) {
+          contatosQuery = contatosQuery.eq("filial_id", filialId);
+        }
+        const { count } = await contatosQuery;
 
         setContatosCount(count || 0);
 
-        // Buscar alterações pendentes
-        const { count: pendentes } = await supabase
+        // Buscar alterações pendentes (filtradas)
+        let pendentesQuery = supabase
           .from("alteracoes_perfil_pendentes")
           .select("*", { count: "exact", head: true })
-          .eq("status", "pendente");
+          .eq("status", "pendente")
+          .eq("igreja_id", igrejaId);
+        if (!isAllFiliais && filialId) {
+          pendentesQuery = pendentesQuery.eq("filial_id", filialId);
+        }
+        const { count: pendentes } = await pendentesQuery;
 
         setPendentesCount(pendentes || 0);
 
-        // Buscar pessoas que aceitaram Jesus recentemente
-        const { data: aceitaram } = await supabase
+        // Buscar pessoas que aceitaram Jesus recentemente (filtradas)
+        let aceitaramQuery = supabase
           .from("profiles")
           .select(
             "id, nome, avatar_url, telefone, email, sexo, data_conversao, status"
@@ -127,7 +151,12 @@ export default function Pessoas() {
           .eq("aceitou_jesus", true)
           .not("data_conversao", "is", null)
           .order("data_conversao", { ascending: false })
-          .limit(5);
+          .limit(5)
+          .eq("igreja_id", igrejaId);
+        if (!isAllFiliais && filialId) {
+          aceitaramQuery = aceitaramQuery.eq("filial_id", filialId);
+        }
+        const { data: aceitaram } = await aceitaramQuery;
 
         setAceitaramJesus(aceitaram || []);
       } catch (error) {
@@ -136,7 +165,7 @@ export default function Pessoas() {
     };
 
     fetchStats();
-  }, []);
+  }, [authLoading, igrejaId, filialId, isAllFiliais]);
 
   const quickActions = [
     {
@@ -380,9 +409,9 @@ export default function Pessoas() {
                       )}
                       {pessoa.data_conversao && (
                         <span className="text-xs text-muted-foreground">
-                          {new Date(
-                            pessoa.data_conversao
-                          ).toLocaleDateString("pt-BR")}
+                          {new Date(pessoa.data_conversao).toLocaleDateString(
+                            "pt-BR"
+                          )}
                         </span>
                       )}
                     </div>

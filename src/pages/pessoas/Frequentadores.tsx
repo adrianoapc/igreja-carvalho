@@ -16,7 +16,15 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Search, Phone, Mail, Calendar, UserCheck, ArrowLeft, Filter } from "lucide-react";
+import {
+  Search,
+  Phone,
+  Mail,
+  Calendar,
+  UserCheck,
+  ArrowLeft,
+  Filter,
+} from "lucide-react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +32,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { formatarTelefone } from "@/lib/validators";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface Frequentador {
   id: string;
@@ -40,24 +49,43 @@ interface Frequentador {
 const ITEMS_PER_PAGE = 10;
 
 export default function Frequentadores() {
-  const [displayedFrequentadores, setDisplayedFrequentadores] = useState<Frequentador[]>([]);
-  const [allFrequentadores, setAllFrequentadores] = useState<Frequentador[]>([]);
+  const [displayedFrequentadores, setDisplayedFrequentadores] = useState<
+    Frequentador[]
+  >([]);
+  const [allFrequentadores, setAllFrequentadores] = useState<Frequentador[]>(
+    []
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [filterHasEmail, setFilterHasEmail] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   const fetchFrequentadores = async () => {
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+
+      let query = supabase
         .from("profiles")
         .select(
           "id, nome, telefone, email, avatar_url, data_primeira_visita, data_ultima_visita, numero_visitas, user_id"
         )
         .eq("status", "frequentador")
+        .eq("igreja_id", igrejaId)
         .order("nome");
+
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -74,10 +102,20 @@ export default function Frequentadores() {
   };
 
   useEffect(() => {
-    fetchFrequentadores();
-  }, []);
+    if (!authLoading) {
+      fetchFrequentadores();
+    }
+  }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
-  const { loadMoreRef, isLoading, hasMore, page, setIsLoading, setHasMore, setPage } = useInfiniteScroll();
+  const {
+    loadMoreRef,
+    isLoading,
+    hasMore,
+    page,
+    setIsLoading,
+    setHasMore,
+    setPage,
+  } = useInfiniteScroll();
 
   useEffect(() => {
     if (page === 1 || allFrequentadores.length === 0) return;
@@ -89,7 +127,9 @@ export default function Frequentadores() {
     if (newItems.length > 0) {
       setDisplayedFrequentadores((prev) => {
         const existingIds = new Set(prev.map((f) => f.id));
-        const uniqueNewItems = newItems.filter((item) => !existingIds.has(item.id));
+        const uniqueNewItems = newItems.filter(
+          (item) => !existingIds.has(item.id)
+        );
         return [...prev, ...uniqueNewItems];
       });
     }
@@ -113,11 +153,17 @@ export default function Frequentadores() {
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       <div className="flex items-center gap-2 md:gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/pessoas")}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/pessoas")}
+        >
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Frequentadores</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Frequentadores
+          </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             Pessoas que visitaram mais de 2 vezes e têm acesso ao app
           </p>
@@ -136,7 +182,11 @@ export default function Frequentadores() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="md:w-auto" onClick={() => setFiltersOpen(true)}>
+            <Button
+              variant="outline"
+              className="md:w-auto"
+              onClick={() => setFiltersOpen(true)}
+            >
               <Filter className="w-4 h-4 mr-2" />
               Filtros
             </Button>
@@ -156,19 +206,33 @@ export default function Frequentadores() {
               </TableHeader>
               <TableBody>
                 {filteredFrequentadores.map((freq, index) => (
-                  <TableRow key={freq.id} ref={index === filteredFrequentadores.length - 1 ? loadMoreRef : null}>
+                  <TableRow
+                    key={freq.id}
+                    ref={
+                      index === filteredFrequentadores.length - 1
+                        ? loadMoreRef
+                        : null
+                    }
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
-                          <AvatarImage src={freq.avatar_url || undefined} alt={freq.nome} />
+                          <AvatarImage
+                            src={freq.avatar_url || undefined}
+                            alt={freq.nome}
+                          />
                           <AvatarFallback className="bg-gradient-to-br from-secondary to-secondary/60 text-secondary-foreground font-semibold">
                             {freq.nome.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="space-y-1">
-                          <p className="font-medium text-foreground">{freq.nome}</p>
+                          <p className="font-medium text-foreground">
+                            {freq.nome}
+                          </p>
                           <div className="flex flex-wrap gap-2">
-                            <Badge variant="secondary" className="text-xs">Frequentador</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Frequentador
+                            </Badge>
                             {freq.user_id && (
                               <Badge variant="outline" className="text-xs">
                                 <UserCheck className="w-3 h-3 mr-1" /> Acesso
@@ -195,20 +259,34 @@ export default function Frequentadores() {
                         {freq.data_primeira_visita && (
                           <span className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
-                            1ª visita: {format(new Date(freq.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}
+                            1ª visita:{" "}
+                            {format(
+                              new Date(freq.data_primeira_visita),
+                              "dd/MM/yyyy",
+                              { locale: ptBR }
+                            )}
                           </span>
                         )}
                         {freq.data_ultima_visita && (
                           <span className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
-                            Última: {format(new Date(freq.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}
+                            Última:{" "}
+                            {format(
+                              new Date(freq.data_ultima_visita),
+                              "dd/MM/yyyy",
+                              { locale: ptBR }
+                            )}
                           </span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs bg-primary/10">
-                        {freq.numero_visitas} {freq.numero_visitas === 1 ? "visita" : "visitas"}
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-primary/10"
+                      >
+                        {freq.numero_visitas}{" "}
+                        {freq.numero_visitas === 1 ? "visita" : "visitas"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -240,7 +318,10 @@ export default function Frequentadores() {
 
                 {!isLoading && filteredFrequentadores.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={4}
+                      className="text-center text-sm text-muted-foreground"
+                    >
                       Nenhum frequentador encontrado
                     </TableCell>
                   </TableRow>
@@ -251,20 +332,35 @@ export default function Frequentadores() {
 
           <div className="block md:hidden space-y-4">
             {filteredFrequentadores.map((freq, index) => (
-              <Card key={freq.id} ref={index === filteredFrequentadores.length - 1 ? loadMoreRef : null} className="shadow-sm">
+              <Card
+                key={freq.id}
+                ref={
+                  index === filteredFrequentadores.length - 1
+                    ? loadMoreRef
+                    : null
+                }
+                className="shadow-sm"
+              >
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar className="w-10 h-10 flex-shrink-0">
-                        <AvatarImage src={freq.avatar_url || undefined} alt={freq.nome} />
+                        <AvatarImage
+                          src={freq.avatar_url || undefined}
+                          alt={freq.nome}
+                        />
                         <AvatarFallback className="bg-gradient-to-br from-secondary to-secondary/60 text-secondary-foreground font-semibold">
                           {freq.nome.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="font-semibold text-base text-foreground truncate">{freq.nome}</p>
+                        <p className="font-semibold text-base text-foreground truncate">
+                          {freq.nome}
+                        </p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          <Badge variant="secondary" className="text-xs">Frequentador</Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            Frequentador
+                          </Badge>
                           {freq.user_id && (
                             <Badge variant="outline" className="text-xs">
                               <UserCheck className="w-3 h-3 mr-1" /> Acesso
@@ -274,7 +370,8 @@ export default function Frequentadores() {
                       </div>
                     </div>
                     <Badge variant="outline" className="text-xs bg-primary/10">
-                      {freq.numero_visitas} {freq.numero_visitas === 1 ? "visita" : "visitas"}
+                      {freq.numero_visitas}{" "}
+                      {freq.numero_visitas === 1 ? "visita" : "visitas"}
                     </Badge>
                   </div>
 
@@ -294,19 +391,38 @@ export default function Frequentadores() {
                     {freq.data_primeira_visita && (
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
-                        <span>1ª visita: {format(new Date(freq.data_primeira_visita), "dd/MM/yyyy", { locale: ptBR })}</span>
+                        <span>
+                          1ª visita:{" "}
+                          {format(
+                            new Date(freq.data_primeira_visita),
+                            "dd/MM/yyyy",
+                            { locale: ptBR }
+                          )}
+                        </span>
                       </div>
                     )}
                     {freq.data_ultima_visita && (
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
-                        <span>Última: {format(new Date(freq.data_ultima_visita), "dd/MM/yyyy", { locale: ptBR })}</span>
+                        <span>
+                          Última:{" "}
+                          {format(
+                            new Date(freq.data_ultima_visita),
+                            "dd/MM/yyyy",
+                            { locale: ptBR }
+                          )}
+                        </span>
                       </div>
                     )}
                   </div>
 
                   <div className="flex gap-2 pt-1">
-                    <Button variant="secondary" size="sm" className="flex-1 min-h-[44px]" onClick={() => navigate(`/pessoas/${freq.id}`)}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1 min-h-[44px]"
+                      onClick={() => navigate(`/pessoas/${freq.id}`)}
+                    >
                       Ver Perfil
                     </Button>
                   </div>
@@ -317,7 +433,10 @@ export default function Frequentadores() {
             {isLoading && (
               <div className="space-y-3">
                 {[1, 2].map((i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-secondary"
+                  >
                     <Skeleton className="w-10 h-10 rounded-full" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-32" />
@@ -330,7 +449,9 @@ export default function Frequentadores() {
 
             {filteredFrequentadores.length === 0 && !isLoading && (
               <div className="text-center py-8 text-sm text-muted-foreground">
-                {searchTerm ? "Nenhum frequentador encontrado" : "Nenhum frequentador cadastrado"}
+                {searchTerm
+                  ? "Nenhum frequentador encontrado"
+                  : "Nenhum frequentador cadastrado"}
               </div>
             )}
           </div>
@@ -355,28 +476,39 @@ export default function Frequentadores() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Label className="text-sm">Somente com telefone</Label>
-                <p className="text-xs text-muted-foreground">Oculta frequentadores sem número cadastrado.</p>
+                <p className="text-xs text-muted-foreground">
+                  Oculta frequentadores sem número cadastrado.
+                </p>
               </div>
-              <Switch checked={filterHasPhone} onCheckedChange={setFilterHasPhone} />
+              <Switch
+                checked={filterHasPhone}
+                onCheckedChange={setFilterHasPhone}
+              />
             </div>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Label className="text-sm">Somente com e-mail</Label>
-                <p className="text-xs text-muted-foreground">Oculta frequentadores sem e-mail cadastrado.</p>
+                <p className="text-xs text-muted-foreground">
+                  Oculta frequentadores sem e-mail cadastrado.
+                </p>
               </div>
-              <Switch checked={filterHasEmail} onCheckedChange={setFilterHasEmail} />
+              <Switch
+                checked={filterHasEmail}
+                onCheckedChange={setFilterHasEmail}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => {
-              setFilterHasPhone(false);
-              setFilterHasEmail(false);
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFilterHasPhone(false);
+                setFilterHasEmail(false);
+              }}
+            >
               Limpar
             </Button>
-            <Button onClick={() => setFiltersOpen(false)}>
-              Aplicar
-            </Button>
+            <Button onClick={() => setFiltersOpen(false)}>Aplicar</Button>
           </div>
         </div>
       </ResponsiveDialog>

@@ -3,13 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock, Calendar, CheckCircle2, Users, ArrowRight } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  Calendar,
+  CheckCircle2,
+  Users,
+  ArrowRight,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { isToday, isThisWeek } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 type GravidadeEnum = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
-type StatusEnum = "PENDENTE" | "TRIAGEM" | "AGENDADO" | "EM_ACOMPANHAMENTO" | "CONCLUIDO";
+type StatusEnum =
+  | "PENDENTE"
+  | "TRIAGEM"
+  | "AGENDADO"
+  | "EM_ACOMPANHAMENTO"
+  | "CONCLUIDO";
 
 interface AtendimentoPastoral {
   id: string;
@@ -23,16 +36,27 @@ export function GabinetePastoralWidget() {
   const navigate = useNavigate();
   const [atendimentos, setAtendimentos] = useState<AtendimentoPastoral[]>([]);
   const [loading, setLoading] = useState(true);
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   useEffect(() => {
-    fetchAtendimentos();
-  }, []);
+    if (!authLoading) {
+      fetchAtendimentos();
+    }
+  }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
   const fetchAtendimentos = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("atendimentos_pastorais")
         .select("id, created_at, gravidade, status, data_agendamento");
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
 
       if (error) throw error;
       setAtendimentos((data as AtendimentoPastoral[]) || []);
@@ -59,9 +83,7 @@ export function GabinetePastoralWidget() {
     (a) => a.status === "CONCLUIDO" && isThisWeek(new Date(a.created_at))
   ).length;
 
-  const emAberto = atendimentos.filter(
-    (a) => a.status !== "CONCLUIDO"
-  ).length;
+  const emAberto = atendimentos.filter((a) => a.status !== "CONCLUIDO").length;
 
   const hasUrgent = criticos > 0;
 
@@ -109,10 +131,12 @@ export function GabinetePastoralWidget() {
   ];
 
   return (
-    <Card className={cn(
-      "shadow-soft transition-all",
-      hasUrgent && "ring-2 ring-red-500/50"
-    )}>
+    <Card
+      className={cn(
+        "shadow-soft transition-all",
+        hasUrgent && "ring-2 ring-red-500/50"
+      )}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -130,7 +154,10 @@ export function GabinetePastoralWidget() {
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-8 bg-muted/50 rounded-lg animate-pulse" />
+              <div
+                key={i}
+                className="h-8 bg-muted/50 rounded-lg animate-pulse"
+              />
             ))}
           </div>
         ) : (

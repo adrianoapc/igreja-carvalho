@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEffect, useState } from "react";
@@ -47,11 +48,18 @@ export default function DashboardMember() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
   const [alreadyRegisteredToday, setAlreadyRegisteredToday] = useState(false);
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   useEffect(() => {
+    if (authLoading) return;
     fetchBanners();
     checkTodaySentimento();
-  }, [profile?.id]);
+  }, [profile?.id, igrejaId, filialId, isAllFiliais, authLoading]);
 
   useEffect(() => {
     if (searchParams.get("sentimento") === "true") {
@@ -81,7 +89,7 @@ export default function DashboardMember() {
 
   const fetchBanners = async () => {
     const now = new Date().toISOString();
-    const { data } = await supabase
+    let query = supabase
       .from("comunicados")
       .select("id, titulo, descricao, imagem_url, link_acao")
       .eq("ativo", true)
@@ -91,6 +99,9 @@ export default function DashboardMember() {
       .or(`data_fim.is.null,data_fim.gte.${now}`)
       .order("created_at", { ascending: false })
       .limit(5);
+    if (igrejaId) query = query.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+    const { data } = await query;
 
     if (data) {
       setBanners(data as Banner[]);

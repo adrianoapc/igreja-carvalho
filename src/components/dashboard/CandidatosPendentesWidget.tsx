@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface Candidato {
   id: string;
@@ -24,18 +25,33 @@ export default function CandidatosPendentesWidget() {
   const [candidatos, setCandidatos] = useState<Candidato[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   useEffect(() => {
-    fetchCandidatos();
-  }, []);
+    if (!authLoading) {
+      fetchCandidatos();
+    }
+  }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
   const fetchCandidatos = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("candidatos_voluntario")
-      .select("id, nome_contato, ministerio, disponibilidade, experiencia, status, created_at")
+      .select(
+        "id, nome_contato, ministerio, disponibilidade, experiencia, status, created_at"
+      )
       .in("status", ["pendente", "em_analise"])
       .order("created_at", { ascending: false })
       .limit(5);
+
+    if (igrejaId) query = query.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+
+    const { data, error } = await query;
 
     if (!error && data) {
       setCandidatos(data);
@@ -46,21 +62,37 @@ export default function CandidatosPendentesWidget() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pendente":
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pendente</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-yellow-50 text-yellow-700 border-yellow-200"
+          >
+            Pendente
+          </Badge>
+        );
       case "em_analise":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Em Análise</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-blue-50 text-blue-700 border-blue-200"
+          >
+            Em Análise
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   const getInitials = (name: string) => {
-    return name
-      ?.split(" ")
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?";
+    return (
+      name
+        ?.split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase() || "?"
+    );
   };
 
   if (loading) {
@@ -94,11 +126,13 @@ export default function CandidatosPendentesWidget() {
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="h-4 w-4 text-primary" />
             Candidatos a Voluntário
-            <Badge variant="secondary" className="ml-2">{candidatos.length}</Badge>
+            <Badge variant="secondary" className="ml-2">
+              {candidatos.length}
+            </Badge>
           </CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate("/voluntariado/candidatos")}
             className="text-xs"
           >
@@ -114,7 +148,9 @@ export default function CandidatosPendentesWidget() {
               <div
                 key={candidato.id}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                onClick={() => navigate(`/voluntariado/candidatos?id=${candidato.id}`)}
+                onClick={() =>
+                  navigate(`/voluntariado/candidatos?id=${candidato.id}`)
+                }
               >
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className="text-xs bg-primary/10 text-primary">
@@ -122,15 +158,17 @@ export default function CandidatosPendentesWidget() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{candidato.nome_contato}</p>
+                  <p className="text-sm font-medium truncate">
+                    {candidato.nome_contato}
+                  </p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{candidato.ministerio}</span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {formatDistanceToNow(new Date(candidato.created_at), { 
-                        addSuffix: true, 
-                        locale: ptBR 
+                      {formatDistanceToNow(new Date(candidato.created_at), {
+                        addSuffix: true,
+                        locale: ptBR,
                       })}
                     </span>
                   </div>

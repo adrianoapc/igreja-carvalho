@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import {
   Dialog,
   DialogContent,
@@ -58,15 +59,27 @@ export default function ConvitesPendentesWidget() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [motivoRecusa, setMotivoRecusa] = useState("");
   const [selectedConvite, setSelectedConvite] = useState<string | null>(null);
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: authLoading,
+  } = useAuthContext();
 
   const { data: convites = [], isLoading } = useQuery({
-    queryKey: ["convites-pendentes", user?.id],
+    queryKey: [
+      "convites-pendentes",
+      user?.id,
+      igrejaId,
+      filialId,
+      isAllFiliais,
+    ],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id || !igrejaId) return [];
 
       const now = new Date().toISOString();
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("eventos_convites")
         .select(
           `
@@ -85,6 +98,11 @@ export default function ConvitesPendentesWidget() {
         .eq("pessoa_id", user?.id)
         .eq("status", "pendente")
         .order("enviado_em", { ascending: false });
+
+      query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -108,7 +126,7 @@ export default function ConvitesPendentesWidget() {
 
       return convitesFiltrados as ConvitePendente[];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!igrejaId && !authLoading,
   });
 
   const updateConviteMutation = useMutation({
