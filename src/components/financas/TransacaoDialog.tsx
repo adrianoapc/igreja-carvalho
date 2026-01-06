@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -730,8 +730,45 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Formulário principal
-  const FormContent = () => (
+  // Handler para formatar valor monetário (aceita apenas números e vírgula)
+  const handleValorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    let inputValue = e.target.value;
+    
+    // Remove tudo que não é número ou vírgula
+    inputValue = inputValue.replace(/[^\d,]/g, "");
+    
+    // Permite apenas uma vírgula
+    const parts = inputValue.split(",");
+    if (parts.length > 2) {
+      inputValue = parts[0] + "," + parts.slice(1).join("");
+    }
+    
+    // Limita casas decimais a 2
+    if (parts.length === 2 && parts[1].length > 2) {
+      inputValue = parts[0] + "," + parts[1].substring(0, 2);
+    }
+    
+    setValor(inputValue);
+  }, []);
+
+  // Handler para formatar valores de juros/multas/desconto/taxas
+  const handleDecimalChange = useCallback((setter: React.Dispatch<React.SetStateAction<string>>) => {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      let inputValue = e.target.value;
+      inputValue = inputValue.replace(/[^\d,]/g, "");
+      const parts = inputValue.split(",");
+      if (parts.length > 2) {
+        inputValue = parts[0] + "," + parts.slice(1).join("");
+      }
+      if (parts.length === 2 && parts[1].length > 2) {
+        inputValue = parts[0] + "," + parts[1].substring(0, 2);
+      }
+      setter(inputValue);
+    };
+  }, []);
+
+  // Formulário principal - JSX inline para evitar re-render
+  const formContent = (
     <div className="space-y-4">
       {/* Tipo de lançamento */}
       <div>
@@ -859,7 +896,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             type="text"
             inputMode="decimal"
             value={valor}
-            onChange={(e) => setValor(e.target.value)}
+            onChange={handleValorChange}
             placeholder="0,00"
             required
             className="md:hidden text-lg h-12 border-2 border-primary bg-primary/5"
@@ -869,7 +906,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             type="text"
             inputMode="decimal"
             value={valor}
-            onChange={(e) => setValor(e.target.value)}
+            onChange={handleValorChange}
             placeholder="0,00"
             required
             className="hidden md:block text-base h-10"
@@ -1112,7 +1149,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   type="text"
                   inputMode="decimal"
                   value={juros}
-                  onChange={(e) => setJuros(e.target.value)}
+                  onChange={handleDecimalChange(setJuros)}
                   placeholder="0,00"
                 />
               </div>
@@ -1122,7 +1159,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   type="text"
                   inputMode="decimal"
                   value={multas}
-                  onChange={(e) => setMultas(e.target.value)}
+                  onChange={handleDecimalChange(setMultas)}
                   placeholder="0,00"
                 />
               </div>
@@ -1132,7 +1169,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   type="text"
                   inputMode="decimal"
                   value={desconto}
-                  onChange={(e) => setDesconto(e.target.value)}
+                  onChange={handleDecimalChange(setDesconto)}
                   placeholder="0,00"
                 />
               </div>
@@ -1142,7 +1179,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   type="text"
                   inputMode="decimal"
                   value={taxasAdministrativas}
-                  onChange={(e) => setTaxasAdministrativas(e.target.value)}
+                  onChange={handleDecimalChange(setTaxasAdministrativas)}
                   placeholder="0,00"
                 />
               </div>
@@ -1169,92 +1206,6 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setImagePreviewOpen(true);
   };
 
-  // Conteúdo do Dialog/Drawer
-  const DialogContentInner = () => (
-    <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
-      {/* Desktop: Split View */}
-      <div className="hidden md:flex md:gap-6 flex-1 min-h-0">
-        {/* Coluna esquerda: Imagem */}
-        <div className="w-[340px] shrink-0 flex flex-col gap-4">
-          <h3 className="font-semibold text-sm">Documento</h3>
-          <TransacaoUploadSection
-            anexoPreview={anexoPreview}
-            anexoUrl={anexoUrl}
-            anexoFile={anexoFile}
-            anexoIsPdf={anexoIsPdf}
-            isMobile={isMobile}
-            aiProcessing={aiProcessing}
-            onFileSelected={handleFileSelected}
-            onClear={clearAnexo}
-            onViewDocument={handleViewDocument}
-          />
-
-          {!anexoPreview && !anexoUrl && !anexoFile && (
-            <div className="bg-muted/50 p-3 rounded-lg">
-              <p className="text-xs font-medium mb-1">Dicas:</p>
-              <ul className="text-xs text-muted-foreground space-y-0.5">
-                <li>• Foto nítida e bem iluminada</li>
-                <li>• Enquadre toda a nota</li>
-                <li>• PDFs funcionam melhor</li>
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* Coluna direita: Formulário com scroll */}
-        <ScrollArea className="flex-1 min-w-0 pl-4 border-l h-[calc(90vh-180px)]">
-          <div className="pr-4">
-            <FormContent />
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* Mobile: Coluna única */}
-      <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 pb-20">
-        {/* Upload em destaque no topo */}
-        {tipo === "saida" && !transacao && (
-          <TransacaoUploadSection
-            anexoPreview={anexoPreview}
-            anexoUrl={anexoUrl}
-            anexoFile={anexoFile}
-            anexoIsPdf={anexoIsPdf}
-            isMobile={isMobile}
-            aiProcessing={aiProcessing}
-            onFileSelected={handleFileSelected}
-            onClear={clearAnexo}
-            onViewDocument={handleViewDocument}
-          />
-        )}
-
-        <FormContent />
-      </div>
-
-      {/* Botões de ação - Sticky no mobile */}
-      <div
-        className={cn(
-          "flex gap-2 pt-4 border-t bg-background shrink-0",
-          isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg",
-        )}
-      >
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={loading || aiProcessing} className="flex-1">
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Salvando...
-            </>
-          ) : transacao ? (
-            "Atualizar"
-          ) : (
-            "Salvar"
-          )}
-        </Button>
-      </div>
-    </form>
-  );
-
   const title = transacao ? "Editar" : tipo === "entrada" ? "Nova Entrada" : "Nova Saída";
 
   return (
@@ -1276,7 +1227,88 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
-            <DialogContentInner />
+            <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
+              {/* Desktop: Split View */}
+              <div className="hidden md:flex md:gap-6 flex-1 min-h-0">
+                {/* Coluna esquerda: Imagem */}
+                <div className="w-[340px] shrink-0 flex flex-col gap-4">
+                  <h3 className="font-semibold text-sm">Documento</h3>
+                  <TransacaoUploadSection
+                    anexoPreview={anexoPreview}
+                    anexoUrl={anexoUrl}
+                    anexoFile={anexoFile}
+                    anexoIsPdf={anexoIsPdf}
+                    isMobile={isMobile}
+                    aiProcessing={aiProcessing}
+                    onFileSelected={handleFileSelected}
+                    onClear={clearAnexo}
+                    onViewDocument={handleViewDocument}
+                  />
+
+                  {!anexoPreview && !anexoUrl && !anexoFile && (
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-xs font-medium mb-1">Dicas:</p>
+                      <ul className="text-xs text-muted-foreground space-y-0.5">
+                        <li>• Foto nítida e bem iluminada</li>
+                        <li>• Enquadre toda a nota</li>
+                        <li>• PDFs funcionam melhor</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Coluna direita: Formulário com scroll */}
+                <ScrollArea className="flex-1 min-w-0 pl-4 border-l h-[calc(90vh-180px)]">
+                  <div className="pr-4">
+                    {formContent}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {/* Mobile: Coluna única */}
+              <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 pb-20">
+                {/* Upload em destaque no topo */}
+                {tipo === "saida" && !transacao && (
+                  <TransacaoUploadSection
+                    anexoPreview={anexoPreview}
+                    anexoUrl={anexoUrl}
+                    anexoFile={anexoFile}
+                    anexoIsPdf={anexoIsPdf}
+                    isMobile={isMobile}
+                    aiProcessing={aiProcessing}
+                    onFileSelected={handleFileSelected}
+                    onClear={clearAnexo}
+                    onViewDocument={handleViewDocument}
+                  />
+                )}
+
+                {formContent}
+              </div>
+
+              {/* Botões de ação - Sticky no mobile */}
+              <div
+                className={cn(
+                  "flex gap-2 pt-4 border-t bg-background shrink-0",
+                  isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg",
+                )}
+              >
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={loading || aiProcessing} className="flex-1">
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : transacao ? (
+                    "Atualizar"
+                  ) : (
+                    "Salvar"
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       </ResponsiveDialog>
