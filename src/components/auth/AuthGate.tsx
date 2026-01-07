@@ -21,14 +21,14 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
 
   // AuthContext unificado - única fonte de verdade
   const authContext = useAuthContext();
-  
+
   // Safe destructuring with fallbacks
   const {
     user = null,
     igrejaId = null,
     roles = [],
     isAdmin = false,
-    loading: authLoading = true
+    loading: authLoading = true,
   } = authContext || {};
 
   // Hooks existentes preservados
@@ -44,7 +44,9 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [userName, setUserName] = useState<string | undefined>();
-  const [isAdminOrTecnico, setIsAdminOrTecnico] = useState<boolean | null>(null);
+  const [isAdminOrTecnico, setIsAdminOrTecnico] = useState<boolean | null>(
+    null
+  );
   const [hasAuthRedirected, setHasAuthRedirected] = useState(false);
   const [isPermissionAuthorized, setIsPermissionAuthorized] = useState(true);
 
@@ -248,7 +250,12 @@ export function AuthGate({ children, requiredPermission }: AuthGateProps) {
   // --- 6. RENDERIZAÇÃO ---
 
   // Loading unificado - baseado apenas em authLoading
-  if (biometricLoading || isChecking || authLoading || isLoadingMaintenanceConfig) {
+  if (
+    biometricLoading ||
+    isChecking ||
+    authLoading ||
+    isLoadingMaintenanceConfig
+  ) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground animate-pulse">

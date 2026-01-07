@@ -564,6 +564,7 @@ export default function Reembolsos() {
             imageBase64,
             mimeType: file.type,
             igreja_id: igrejaId,
+            filial_id: !isAllFiliais ? filialId : null,
           },
           headers: {
             Authorization: `Bearer ${sessionData.session.access_token}`,
@@ -583,6 +584,12 @@ export default function Reembolsos() {
           data_emissao,
           descricao,
           tipo_documento,
+          categoria_sugerida_id,
+          subcategoria_sugerida_id,
+          centro_custo_sugerido_id,
+          fornecedor_id,
+          conta_sugerida_id,
+          forma_pagamento_sugerida,
         } = data.dados;
 
         // Gerar descrição resumida (máximo 60 caracteres)
@@ -610,7 +617,16 @@ export default function Reembolsos() {
           descricao: descricaoResumida || prev.descricao,
           data_item: data_emissao || prev.data_item,
           anexo_url: signedData.signedUrl,
+          categoria_id: categoria_sugerida_id || prev.categoria_id,
+          subcategoria_id: subcategoria_sugerida_id || prev.subcategoria_id,
+          centro_custo_id: centro_custo_sugerido_id || prev.centro_custo_id,
+          fornecedor_id: fornecedor_id || prev.fornecedor_id,
         }));
+
+        // Aplicar forma de pagamento e conta sugeridas quando disponível
+        if (forma_pagamento_sugerida)
+          setFormaPagamento(forma_pagamento_sugerida);
+        if (conta_sugerida_id) setContaPadrao(conta_sugerida_id);
 
         toast.success("✨ Nota fiscal lida com sucesso!");
       } else {

@@ -8,6 +8,8 @@ import {
   DollarSign,
   PieChart,
   Calendar,
+  ReceiptText,
+  FileText,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -267,6 +269,52 @@ export default function Dashboard() {
     return formatValue(value);
   };
 
+  // Reembolsos em aberto (pendente/aprovado)
+  const { data: reembolsosAbertos = [] } = useQuery({
+    queryKey: ["reembolsos-abertos", igrejaId, filialId, isAllFiliais, dateRange],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+      let query = (supabase as any)
+        .from("view_solicitacoes_reembolso")
+        .select("id, status, created_at")
+        .in("status", ["pendente", "aprovado"]) // aguardando pagamento
+        .eq("igreja_id", igrejaId)
+        .gte("created_at", dateRange.inicio)
+        .lte("created_at", dateRange.fim)
+        .order("created_at", { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !loading && !!igrejaId,
+  });
+
+  // Relatórios de oferta (solicitações de conferência no período)
+  const { data: relatoriosOferta = [] } = useQuery({
+    queryKey: ["relatorios-oferta", igrejaId, filialId, isAllFiliais, dateRange],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+      let query = supabase
+        .from("notifications")
+        .select("id, created_at")
+        .eq("type", "conferencia_oferta")
+        .eq("igreja_id", igrejaId)
+        .gte("created_at", dateRange.inicio)
+        .lte("created_at", dateRange.fim)
+        .order("created_at", { ascending: false });
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !loading && !!igrejaId,
+  });
+
   // Cálculos do mês atual
   const receitasMesAtual =
     transacoesMesAtual
@@ -525,6 +573,45 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">
                       {saldoMesAtual >= 0 ? "Superávit" : "Déficit"}
                     </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Atalhos Rápidos */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-2">
+            <Card
+              className="shadow-soft hover:shadow-md transition-all cursor-pointer"
+              onClick={() => navigate("/financas/reembolsos")}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center">
+                    <ReceiptText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Reembolsos</p>
+                    <p className="text-lg font-bold">{reembolsosAbertos.length} em aberto</p>
+                    <p className="text-xs text-muted-foreground">Acesse e gerencie solicitações</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="shadow-soft hover:shadow-md transition-all cursor-pointer"
+              onClick={() => navigate("/financas/relatorio-oferta")}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/20 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-violet-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Relatório de Ofertas</p>
+                    <p className="text-lg font-bold">{relatoriosOferta.length} no período</p>
+                    <p className="text-xs text-muted-foreground">Conferir e exportar valores</p>
                   </div>
                 </div>
               </CardContent>

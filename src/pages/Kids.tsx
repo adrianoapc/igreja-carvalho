@@ -1,12 +1,31 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Baby, Users, LogIn, Search, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { KidsRoomOccupancy } from "@/components/kids/KidsRoomOccupancy";
@@ -29,7 +48,7 @@ export default function Kids() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
-  
+
   // Stats
   const [totalCheckinsToday, setTotalCheckinsToday] = useState(0);
   const [activeSalasCount, setActiveSalasCount] = useState(0);
@@ -46,10 +65,11 @@ export default function Kids() {
         .select("id, nome, idade_min, idade_max, capacidade")
         .eq("tipo", "kids")
         .eq("ativo", true);
-      
+
       if (igrejaId) salasQuery = salasQuery.eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) salasQuery = salasQuery.eq("filial_id", filialId);
-      
+      if (!isAllFiliais && filialId)
+        salasQuery = salasQuery.eq("filial_id", filialId);
+
       const { data: salasData } = await salasQuery;
 
       setSalas(salasData || []);
@@ -57,7 +77,7 @@ export default function Kids() {
       // Count today's checkins
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const { count: checkinsCount } = await supabase
         .from("presencas_aula")
         .select("*", { count: "exact", head: true })
@@ -70,9 +90,9 @@ export default function Kids() {
         .from("view_room_occupancy")
         .select("sala_id, current_count");
 
-      const activeCount = occupancyData?.filter(r => r.current_count > 0).length || 0;
+      const activeCount =
+        occupancyData?.filter((r) => r.current_count > 0).length || 0;
       setActiveSalasCount(activeCount);
-
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -97,8 +117,12 @@ export default function Kids() {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Kids</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">Gerenciamento de crianças e salas</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Kids
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Gerenciamento de crianças e salas
+          </p>
         </div>
         <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
           <DialogTrigger asChild>
@@ -155,16 +179,22 @@ export default function Kids() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="observacoes">Observações Médicas/Alergias</Label>
-                <Textarea 
-                  id="observacoes" 
+                <Label htmlFor="observacoes">
+                  Observações Médicas/Alergias
+                </Label>
+                <Textarea
+                  id="observacoes"
                   placeholder="Alergias, medicamentos, restrições alimentares, etc."
                   rows={3}
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsRegisterOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsRegisterOpen(false)}
+                >
                   Cancelar
                 </Button>
                 <Button type="submit">Cadastrar</Button>
@@ -178,7 +208,9 @@ export default function Kids() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Crianças Hoje</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total de Crianças Hoje
+            </CardTitle>
             <Baby className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -214,7 +246,9 @@ export default function Kids() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Salas</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total de Salas
+            </CardTitle>
             <LogIn className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -253,7 +287,8 @@ export default function Kids() {
             </div>
           ) : salas.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nenhuma sala cadastrada. Acesse Ensino → Configurações para criar salas.
+              Nenhuma sala cadastrada. Acesse Ensino → Configurações para criar
+              salas.
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

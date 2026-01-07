@@ -129,13 +129,22 @@ export default function Voluntariado() {
         .select("id", { count: "exact", head: true })
         .eq("ativo", true)
         .eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) membrosQuery = membrosQuery.eq("filial_id", filialId);
+      if (!isAllFiliais && filialId)
+        membrosQuery = membrosQuery.eq("filial_id", filialId);
       const membrosRes = await membrosQuery;
 
       // Aprovações no mês
       const now = new Date();
-      const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      const startMonth = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1
+      ).toISOString();
+      const nextMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        1
+      ).toISOString();
       let aprovQuery = supabase
         .from("candidatos_voluntario")
         .select("id", { count: "exact" })
@@ -143,7 +152,8 @@ export default function Voluntariado() {
         .eq("igreja_id", igrejaId)
         .gte("data_avaliacao", startMonth)
         .lt("data_avaliacao", nextMonth);
-      if (!isAllFiliais && filialId) aprovQuery = aprovQuery.eq("filial_id", filialId);
+      if (!isAllFiliais && filialId)
+        aprovQuery = aprovQuery.eq("filial_id", filialId);
       const aprovRes = await aprovQuery;
 
       setStatsHero({
@@ -162,7 +172,9 @@ export default function Voluntariado() {
 
       let query = supabase
         .from("times")
-        .select("id, nome, descricao, cor, vagas_necessarias, dificuldade, ativo")
+        .select(
+          "id, nome, descricao, cor, vagas_necessarias, dificuldade, ativo"
+        )
         .eq("ativo", true)
         .eq("igreja_id", igrejaId);
 
@@ -210,7 +222,6 @@ export default function Voluntariado() {
     const ministerio =
       ministerios.find((m) => m.id === ministerioSelecionado)?.nome ||
       ministerioSelecionado;
-
 
     setIsSubmitting(true);
     try {
@@ -310,9 +321,21 @@ export default function Voluntariado() {
               className="grid grid-cols-3 gap-4 mt-8"
             >
               {[
-                { icon: Zap, label: "Ministérios", value: statsHero.ministerios },
-                { icon: Users, label: "Voluntários", value: statsHero.voluntarios },
-                { icon: Target, label: "Aprovações no mês", value: statsHero.aprovacoesMes },
+                {
+                  icon: Zap,
+                  label: "Ministérios",
+                  value: statsHero.ministerios,
+                },
+                {
+                  icon: Users,
+                  label: "Voluntários",
+                  value: statsHero.voluntarios,
+                },
+                {
+                  icon: Target,
+                  label: "Aprovações no mês",
+                  value: statsHero.aprovacoesMes,
+                },
               ].map((stat, idx) => (
                 <motion.div
                   key={idx}
@@ -364,7 +387,9 @@ export default function Voluntariado() {
                     vagas={ministerio.vagas_necessarias}
                     dificuldade={ministerio.dificuldade}
                     requisitos={ministerio.requisitos || []}
-                    desabilitado={ministeriosBloqueados.includes(ministerio.nome)}
+                    desabilitado={ministeriosBloqueados.includes(
+                      ministerio.nome
+                    )}
                     motivo={
                       ministeriosBloqueados.includes(ministerio.nome)
                         ? "Você já tem uma candidatura ativa neste ministério"
@@ -416,8 +441,8 @@ export default function Voluntariado() {
             open={modalOpen}
             onOpenChange={setModalOpen}
             ministerio={
-              ministerios.find((m) => m.id === ministerioSelecionado)
-                ?.nome || "Ministério"
+              ministerios.find((m) => m.id === ministerioSelecionado)?.nome ||
+              "Ministério"
             }
             perfil={
               profile

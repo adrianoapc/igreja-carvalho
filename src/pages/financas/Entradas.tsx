@@ -539,6 +539,10 @@ export default function Entradas() {
                       <TableRow
                         key={transacao.id}
                         className="hover:bg-muted/50"
+                        onDoubleClick={() => {
+                          setEditingTransacao(transacao as any);
+                          setDialogOpen(true);
+                        }}
                       >
                         <TableCell className="text-sm font-medium">
                           {transacao.descricao}
@@ -604,6 +608,10 @@ export default function Entradas() {
                   <div
                     key={transacao.id}
                     className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    onDoubleClick={() => {
+                      setEditingTransacao(transacao as any);
+                      setDialogOpen(true);
+                    }}
                   >
                     {/* Data Compact - Mobile */}
                     <div className="flex-shrink-0 text-center w-12">

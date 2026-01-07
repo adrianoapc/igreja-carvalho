@@ -35,15 +35,17 @@ import { Badge } from "@/components/ui/badge";
 import { useFilialId } from "@/hooks/useFilialId";
 
 export default function KidsDashboard() {
-    const { igrejaId, filialId, isAllFiliais } = useFilialId();
-  const [selectedPeriod, setSelectedPeriod] = useState<"hoje" | "semana" | "mes">("hoje");
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
+  const [selectedPeriod, setSelectedPeriod] = useState<
+    "hoje" | "semana" | "mes"
+  >("hoje");
   const [termometroOpen, setTermometroOpen] = useState(true);
   const [carinhoOpen, setCarinhoOpen] = useState(true);
   const [checkinsOpen, setCheckinsOpen] = useState(true);
 
   // Query para estatísticas de check-ins
   const { data: stats, isLoading: statsLoading } = useQuery({
-     queryKey: ["kids-stats", selectedPeriod, igrejaId, filialId, isAllFiliais],
+    queryKey: ["kids-stats", selectedPeriod, igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       try {
         const now = new Date();
@@ -66,36 +68,43 @@ export default function KidsDashboard() {
 
         // Total de crianças cadastradas
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let profilesQuery = (supabase as any)
+        let profilesQuery = (supabase as any)
           .from("profiles")
-            .select("id, data_nascimento");
-        
-          if (igrejaId) {
-            profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
-          }
-          if (!isAllFiliais && filialId) {
-            profilesQuery = profilesQuery.eq("filial_id", filialId);
-          }
-        
-          const { data: todosProfiles, error: criancasError } = await profilesQuery
-            .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null; error: Error | null };
+          .select("id, data_nascimento");
+
+        if (igrejaId) {
+          profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          profilesQuery = profilesQuery.eq("filial_id", filialId);
+        }
+
+        const { data: todosProfiles, error: criancasError } =
+          (await profilesQuery.not("data_nascimento", "is", null)) as {
+            data: { id: string; data_nascimento: string }[] | null;
+            error: Error | null;
+          };
 
         if (criancasError) throw criancasError;
 
         // Filtrar apenas crianças menores de 13 anos
         const today = new Date();
-        const criancas = (todosProfiles || []).filter((p: { data_nascimento?: string | null; status?: string }) => {
-          const birthDate = new Date(p.data_nascimento);
-          const age = today.getFullYear() - birthDate.getFullYear();
-          const monthDiff = today.getMonth() - birthDate.getMonth();
-          const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
-            ? age - 1 
-            : age;
-          return actualAge < 13;
-        });
+        const criancas = (todosProfiles || []).filter(
+          (p: { data_nascimento?: string | null; status?: string }) => {
+            const birthDate = new Date(p.data_nascimento);
+            const age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            const actualAge =
+              monthDiff < 0 ||
+              (monthDiff === 0 && today.getDate() < birthDate.getDate())
+                ? age - 1
+                : age;
+            return actualAge < 13;
+          }
+        );
 
         const criancaIds = criancas?.map((c: { id: string }) => c.id) || [];
-        
+
         // Se não há crianças cadastradas, retornar valores zerados
         if (criancaIds.length === 0) {
           return {
@@ -124,13 +133,17 @@ export default function KidsDashboard() {
         if (presencasError) throw presencasError;
 
         // Crianças únicas que tiveram presença
-        const criancasUnicas = new Set(presencas?.map((p) => p.pessoa_id) || []).size;
-        
+        const criancasUnicas = new Set(presencas?.map((p) => p.pessoa_id) || [])
+          .size;
+
         // Crianças presentes AGORA (culto ativo)
         let cultoQuery = supabase
           .from("eventos")
           .select("id")
-          .gte("data_evento", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+          .gte(
+            "data_evento",
+            new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+          )
           .lte("data_evento", new Date().toISOString());
         if (igrejaId) {
           cultoQuery = cultoQuery.eq("igreja_id", igrejaId);
@@ -147,7 +160,7 @@ export default function KidsDashboard() {
             .from("checkins")
             .select("pessoa_id")
             .eq("evento_id", cultoAtivo.id)
-            .in("pessoa_id", criancas?.map(c => c.id) || []);
+            .in("pessoa_id", criancas?.map((c) => c.id) || []);
           if (igrejaId) {
             presencasHojeQuery = presencasHojeQuery.eq("igreja_id", igrejaId);
           }
@@ -155,7 +168,7 @@ export default function KidsDashboard() {
             presencasHojeQuery = presencasHojeQuery.eq("filial_id", filialId);
           }
           const { data: presencasHoje } = await presencasHojeQuery;
-          
+
           checkinsAtivos = presencasHoje?.length || 0;
         }
 
@@ -188,35 +201,42 @@ export default function KidsDashboard() {
 
   // Query para últimos check-ins
   const { data: ultimosCheckins, isLoading: checkinsLoading } = useQuery({
-      queryKey: ["kids-ultimos-checkins", igrejaId, filialId, isAllFiliais],
+    queryKey: ["kids-ultimos-checkins", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       try {
         const today = new Date();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let profilesQuery = (supabase as any)
+        let profilesQuery = (supabase as any)
           .from("profiles")
-            .select("id, data_nascimento");
-        
-          if (igrejaId) {
-            profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
-          }
-          if (!isAllFiliais && filialId) {
-            profilesQuery = profilesQuery.eq("filial_id", filialId);
-          }
-        
-          const { data: todosProfiles } = await profilesQuery
-            .not("data_nascimento", "is", null) as { data: { id: string; data_nascimento: string }[] | null };
+          .select("id, data_nascimento");
+
+        if (igrejaId) {
+          profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          profilesQuery = profilesQuery.eq("filial_id", filialId);
+        }
+
+        const { data: todosProfiles } = (await profilesQuery.not(
+          "data_nascimento",
+          "is",
+          null
+        )) as { data: { id: string; data_nascimento: string }[] | null };
 
         // Filtrar apenas crianças menores de 13 anos
-        const criancas = (todosProfiles || []).filter((p: { data_nascimento: string }) => {
-          const birthDate = new Date(p.data_nascimento);
-          const age = today.getFullYear() - birthDate.getFullYear();
-          const monthDiff = today.getMonth() - birthDate.getMonth();
-          const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
-            ? age - 1 
-            : age;
-          return actualAge < 13;
-        });
+        const criancas = (todosProfiles || []).filter(
+          (p: { data_nascimento: string }) => {
+            const birthDate = new Date(p.data_nascimento);
+            const age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            const actualAge =
+              monthDiff < 0 ||
+              (monthDiff === 0 && today.getDate() < birthDate.getDate())
+                ? age - 1
+                : age;
+            return actualAge < 13;
+          }
+        );
 
         if (!criancas || criancas.length === 0) return [];
 
@@ -224,7 +244,10 @@ export default function KidsDashboard() {
         let ultimosCheckinsQuery = supabase
           .from("checkins")
           .select("id, pessoa_id, evento_id, created_at")
-          .in("pessoa_id", criancas.map(c => c.id))
+          .in(
+            "pessoa_id",
+            criancas.map((c) => c.id)
+          )
           .order("created_at", { ascending: false })
           .limit(5);
         if (igrejaId) {
@@ -238,15 +261,15 @@ export default function KidsDashboard() {
         if (error) throw error;
 
         // Buscar dados das pessoas
-        const pessoaIds = [...new Set((data || []).map(d => d.pessoa_id))];
+        const pessoaIds = [...new Set((data || []).map((d) => d.pessoa_id))];
         const { data: pessoasData } = await supabase
           .from("profiles")
           .select("id, nome, avatar_url")
           .in("id", pessoaIds);
-        
-        const pessoasMap = new Map((pessoasData || []).map(p => [p.id, p]));
-        
-        return (data || []).map(item => ({
+
+        const pessoasMap = new Map((pessoasData || []).map((p) => [p.id, p]));
+
+        return (data || []).map((item) => ({
           id: item.id,
           crianca_nome: pessoasMap.get(item.pessoa_id)?.nome || "Sem nome",
           crianca_avatar: pessoasMap.get(item.pessoa_id)?.avatar_url,
@@ -263,50 +286,85 @@ export default function KidsDashboard() {
 
   // Query para alergias e saúde
   const { data: healthStats } = useQuery({
-      queryKey: ["kids-health-stats", igrejaId, filialId, isAllFiliais],
+    queryKey: ["kids-health-stats", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       try {
         const today = new Date();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let profilesQuery = (supabase as any)
+        let profilesQuery = (supabase as any)
           .from("profiles")
-            .select("id, alergias, necessidades_especiais, data_nascimento");
-        
-          if (igrejaId) {
-            profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
-          }
-          if (!isAllFiliais && filialId) {
-            profilesQuery = profilesQuery.eq("filial_id", filialId);
-          }
-        
-          const { data: todosProfiles, error } = await profilesQuery
-            .not("data_nascimento", "is", null) as { data: Array<{ id: string; alergias: string | null; necessidades_especiais: string | null; data_nascimento: string }> | null; error: Error | null };
+          .select("id, alergias, necessidades_especiais, data_nascimento");
+
+        if (igrejaId) {
+          profilesQuery = profilesQuery.eq("igreja_id", igrejaId);
+        }
+        if (!isAllFiliais && filialId) {
+          profilesQuery = profilesQuery.eq("filial_id", filialId);
+        }
+
+        const { data: todosProfiles, error } = (await profilesQuery.not(
+          "data_nascimento",
+          "is",
+          null
+        )) as {
+          data: Array<{
+            id: string;
+            alergias: string | null;
+            necessidades_especiais: string | null;
+            data_nascimento: string;
+          }> | null;
+          error: Error | null;
+        };
 
         if (error) throw error;
 
         // Filtrar apenas crianças menores de 13 anos
-        const criancas = (todosProfiles || []).filter((p: { data_nascimento: string }) => {
-          const birthDate = new Date(p.data_nascimento);
-          const age = today.getFullYear() - birthDate.getFullYear();
-          const monthDiff = today.getMonth() - birthDate.getMonth();
-          const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
-            ? age - 1 
-            : age;
-          return actualAge < 13;
-        });
+        const criancas = (todosProfiles || []).filter(
+          (p: { data_nascimento: string }) => {
+            const birthDate = new Date(p.data_nascimento);
+            const age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            const actualAge =
+              monthDiff < 0 ||
+              (monthDiff === 0 && today.getDate() < birthDate.getDate())
+                ? age - 1
+                : age;
+            return actualAge < 13;
+          }
+        );
 
-        const comAlergias = criancas?.filter((c: { alergias?: string | null }) => c.alergias && c.alergias.trim().length > 0).length || 0;
-        const comNecessidades = criancas?.filter((c: { necessidades_especiais?: string | null }) => c.necessidades_especiais && c.necessidades_especiais.trim().length > 0).length || 0;
+        const comAlergias =
+          criancas?.filter(
+            (c: { alergias?: string | null }) =>
+              c.alergias && c.alergias.trim().length > 0
+          ).length || 0;
+        const comNecessidades =
+          criancas?.filter(
+            (c: { necessidades_especiais?: string | null }) =>
+              c.necessidades_especiais &&
+              c.necessidades_especiais.trim().length > 0
+          ).length || 0;
 
         return {
           totalComAlergias: comAlergias,
-          percentualAlergias: criancas && criancas.length > 0 ? Math.round((comAlergias / criancas.length) * 100) : 0,
+          percentualAlergias:
+            criancas && criancas.length > 0
+              ? Math.round((comAlergias / criancas.length) * 100)
+              : 0,
           totalComNecessidades: comNecessidades,
-          percentualNecessidades: criancas && criancas.length > 0 ? Math.round((comNecessidades / criancas.length) * 100) : 0,
+          percentualNecessidades:
+            criancas && criancas.length > 0
+              ? Math.round((comNecessidades / criancas.length) * 100)
+              : 0,
         };
       } catch (error) {
         console.error("Erro ao carregar health stats:", error);
-        return { totalComAlergias: 0, percentualAlergias: 0, totalComNecessidades: 0, percentualNecessidades: 0 };
+        return {
+          totalComAlergias: 0,
+          percentualAlergias: 0,
+          totalComNecessidades: 0,
+          percentualNecessidades: 0,
+        };
       }
     },
   });
@@ -357,19 +415,23 @@ export default function KidsDashboard() {
           sonolento: 0,
         };
 
-        diarios?.forEach(d => {
+        diarios?.forEach((d) => {
           if (d.humor && d.humor in humorCounts) {
             humorCounts[d.humor as keyof typeof humorCounts]++;
           }
         });
 
         const total = Object.values(humorCounts).reduce((a, b) => a + b, 0);
-        const percentages = total === 0
-          ? humorCounts
-          : Object.entries(humorCounts).reduce((acc, [key, val]) => ({
-              ...acc,
-              [key]: Math.round((val / total) * 100)
-            }), {} as Record<string, number>);
+        const percentages =
+          total === 0
+            ? humorCounts
+            : Object.entries(humorCounts).reduce(
+                (acc, [key, val]) => ({
+                  ...acc,
+                  [key]: Math.round((val / total) * 100),
+                }),
+                {} as Record<string, number>
+              );
 
         return { counts: humorCounts, percentages };
       } catch (error) {
@@ -405,7 +467,9 @@ export default function KidsDashboard() {
         // Buscar diários com humor preocupante
         let preocupantesQuery = supabase
           .from("kids_diario")
-          .select("crianca_id, humor, crianca:profiles!kids_diario_crianca_id_fkey(nome, avatar_url)")
+          .select(
+            "crianca_id, humor, crianca:profiles!kids_diario_crianca_id_fkey(nome, avatar_url)"
+          )
           .gte("created_at", startDate.toISOString())
           .in("humor", ["choroso", "triste", "agitado"]);
         if (igrejaId) {
@@ -419,10 +483,21 @@ export default function KidsDashboard() {
         if (error) throw error;
 
         // Contar ocorrências por criança
-        const childIssues: Record<string, { nome: string; avatar_url: string | null; count: number; moods: string[] }> = {};
+        const childIssues: Record<
+          string,
+          {
+            nome: string;
+            avatar_url: string | null;
+            count: number;
+            moods: string[];
+          }
+        > = {};
 
-        preocupantes?.forEach(record => {
-          const crianca = record.crianca as { nome: string; avatar_url: string | null } | null;
+        preocupantes?.forEach((record) => {
+          const crianca = record.crianca as {
+            nome: string;
+            avatar_url: string | null;
+          } | null;
           if (!childIssues[record.crianca_id]) {
             childIssues[record.crianca_id] = {
               nome: crianca?.nome || "Desconhecido",
@@ -432,7 +507,10 @@ export default function KidsDashboard() {
             };
           }
           childIssues[record.crianca_id].count++;
-          if (record.humor && !childIssues[record.crianca_id].moods.includes(record.humor)) {
+          if (
+            record.humor &&
+            !childIssues[record.crianca_id].moods.includes(record.humor)
+          ) {
             childIssues[record.crianca_id].moods.push(record.humor);
           }
         });
@@ -525,7 +603,9 @@ export default function KidsDashboard() {
               {statsLoading ? "..." : stats?.checkinsAtivos || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats?.checkinsAtivos === 1 ? "criança presente" : "crianças presentes"}
+              {stats?.checkinsAtivos === 1
+                ? "criança presente"
+                : "crianças presentes"}
             </p>
           </CardContent>
         </Card>
@@ -533,7 +613,12 @@ export default function KidsDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Check-ins {selectedPeriod === "hoje" ? "Hoje" : selectedPeriod === "semana" ? "na Semana" : "no Mês"}
+              Check-ins{" "}
+              {selectedPeriod === "hoje"
+                ? "Hoje"
+                : selectedPeriod === "semana"
+                ? "na Semana"
+                : "no Mês"}
             </CardTitle>
             <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
@@ -542,14 +627,19 @@ export default function KidsDashboard() {
               {statsLoading ? "..." : stats?.totalCheckins || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats?.criancasUnicas || 0} {stats?.criancasUnicas === 1 ? "criança única" : "crianças únicas"}
+              {stats?.criancasUnicas || 0}{" "}
+              {stats?.criancasUnicas === 1
+                ? "criança única"
+                : "crianças únicas"}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Cadastrados</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Cadastrados
+            </CardTitle>
             <Users className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
@@ -564,7 +654,9 @@ export default function KidsDashboard() {
 
         <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-amber-900 dark:text-amber-100">Com Alergias</CardTitle>
+            <CardTitle className="text-sm font-medium text-amber-900 dark:text-amber-100">
+              Com Alergias
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
@@ -579,7 +671,9 @@ export default function KidsDashboard() {
 
         <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Inclusão (Necessidades Especiais)</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Inclusão (Necessidades Especiais)
+            </CardTitle>
             <HeartPulse className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
@@ -594,7 +688,9 @@ export default function KidsDashboard() {
 
         <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100">Precisam Atenção</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100">
+              Precisam Atenção
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
@@ -602,7 +698,9 @@ export default function KidsDashboard() {
               {behaviorAlerts?.length || 0}
             </div>
             <p className="text-xs text-red-700 dark:text-red-400">
-              {behaviorAlerts && behaviorAlerts.length > 0 ? "precisam de carinho" : "tudo bem! 🎉"}
+              {behaviorAlerts && behaviorAlerts.length > 0
+                ? "precisam de carinho"
+                : "tudo bem! 🎉"}
             </p>
           </CardContent>
         </Card>
@@ -633,44 +731,78 @@ export default function KidsDashboard() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent>
-            {moodStats && Object.keys(moodStats.percentages).length > 0 && Object.values(moodStats.counts).some(c => c > 0) ? (
-              <div className="space-y-3">
-                {[
-                  { mood: "feliz", label: "Feliz", color: "bg-green-500", emoji: "😊" },
-                  { mood: "neutro", label: "Neutro", color: "bg-blue-500", emoji: "😐" },
-                  { mood: "agitado", label: "Agitado", color: "bg-yellow-500", emoji: "🤪" },
-                  { mood: "sonolento", label: "Sonolento", color: "bg-purple-500", emoji: "😴" },
-                  { mood: "triste", label: "Triste", color: "bg-indigo-500", emoji: "😔" },
-                  { mood: "choroso", label: "Choroso", color: "bg-red-500", emoji: "😢" },
-                ].map(({ mood, label, color, emoji }) => {
-                  const percentage = (moodStats.percentages[mood] as number) || 0;
-                  const count = (moodStats.counts[mood] as number) || 0;
-                  
-                  if (count === 0) return null;
-                  
-                  return (
-                    <div key={mood} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium flex items-center gap-2">
-                          <span className="text-base">{emoji}</span> <span className="text-sm">{label}</span>
-                        </span>
-                        <span className="text-muted-foreground text-xs">
-                          {percentage}% ({count})
-                        </span>
-                      </div>
-                      <Progress value={percentage} className="h-2" />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  Nenhum registro de humor no momento.
-                </AlertDescription>
-              </Alert>
-            )}
+                {moodStats &&
+                Object.keys(moodStats.percentages).length > 0 &&
+                Object.values(moodStats.counts).some((c) => c > 0) ? (
+                  <div className="space-y-3">
+                    {[
+                      {
+                        mood: "feliz",
+                        label: "Feliz",
+                        color: "bg-green-500",
+                        emoji: "😊",
+                      },
+                      {
+                        mood: "neutro",
+                        label: "Neutro",
+                        color: "bg-blue-500",
+                        emoji: "😐",
+                      },
+                      {
+                        mood: "agitado",
+                        label: "Agitado",
+                        color: "bg-yellow-500",
+                        emoji: "🤪",
+                      },
+                      {
+                        mood: "sonolento",
+                        label: "Sonolento",
+                        color: "bg-purple-500",
+                        emoji: "😴",
+                      },
+                      {
+                        mood: "triste",
+                        label: "Triste",
+                        color: "bg-indigo-500",
+                        emoji: "😔",
+                      },
+                      {
+                        mood: "choroso",
+                        label: "Choroso",
+                        color: "bg-red-500",
+                        emoji: "😢",
+                      },
+                    ].map(({ mood, label, color, emoji }) => {
+                      const percentage =
+                        (moodStats.percentages[mood] as number) || 0;
+                      const count = (moodStats.counts[mood] as number) || 0;
+
+                      if (count === 0) return null;
+
+                      return (
+                        <div key={mood} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium flex items-center gap-2">
+                              <span className="text-base">{emoji}</span>{" "}
+                              <span className="text-sm">{label}</span>
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                              {percentage}% ({count})
+                            </span>
+                          </div>
+                          <Progress value={percentage} className="h-2" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      Nenhum registro de humor no momento.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </CollapsibleContent>
           </Card>
@@ -678,12 +810,24 @@ export default function KidsDashboard() {
 
         {/* Coluna 2: Lista de Atenção */}
         <Collapsible open={carinhoOpen} onOpenChange={setCarinhoOpen}>
-          <Card className={behaviorAlerts && behaviorAlerts.length > 0 ? "border-l-4 border-l-red-500" : ""}>
+          <Card
+            className={
+              behaviorAlerts && behaviorAlerts.length > 0
+                ? "border-l-4 border-l-red-500"
+                : ""
+            }
+          >
             <CollapsibleTrigger asChild>
               <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                 <CardTitle className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Heart className={behaviorAlerts && behaviorAlerts.length > 0 ? "w-5 h-5 fill-red-600 text-red-600" : "w-5 h-5 text-green-600"} />
+                    <Heart
+                      className={
+                        behaviorAlerts && behaviorAlerts.length > 0
+                          ? "w-5 h-5 fill-red-600 text-red-600"
+                          : "w-5 h-5 text-green-600"
+                      }
+                    />
                     Precisam de Carinho ❤️
                   </div>
                   {carinhoOpen ? (
@@ -693,54 +837,68 @@ export default function KidsDashboard() {
                   )}
                 </CardTitle>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-              {behaviorAlerts && behaviorAlerts.length > 0 
-                ? "Crianças com sinais de tristeza ou agitação" 
-                : "Acompanhamento emocional da turma"}
-              </p>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent>
-            {!behaviorAlerts || behaviorAlerts.length === 0 ? (
-              <Alert className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900">
-                <Smile className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-                  <strong>Tudo tranquilo por enquanto! 🎉</strong>
-                  <p className="text-xs mt-1">Nenhuma criança apresentou sinais de desconforto emocional no período.</p>
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="space-y-2">
-                {behaviorAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="flex items-start gap-3 p-2.5 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900"
-                  >
-                    <Avatar className="w-9 h-9 shrink-0">
-                      <AvatarImage src={alert.avatar_url || undefined} />
-                      <AvatarFallback className="bg-red-100 text-red-600">
-                        <Baby className="w-4 h-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-red-900 dark:text-red-100">{alert.nome}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {alert.moods.map((mood) => (
-                          <Badge key={mood} variant="outline" className="text-xs bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-200">
-                            {mood === "choroso" ? "😢 Choroso" : mood === "triste" ? "😔 Triste" : "🤪 Agitado"}
-                          </Badge>
-                        ))}
-                      </div>
-                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                        {alert.count} {alert.count === 1 ? "ocorrência" : "ocorrências"}
+                  {behaviorAlerts && behaviorAlerts.length > 0
+                    ? "Crianças com sinais de tristeza ou agitação"
+                    : "Acompanhamento emocional da turma"}
+                </p>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                {!behaviorAlerts || behaviorAlerts.length === 0 ? (
+                  <Alert className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900">
+                    <Smile className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
+                      <strong>Tudo tranquilo por enquanto! 🎉</strong>
+                      <p className="text-xs mt-1">
+                        Nenhuma criança apresentou sinais de desconforto
+                        emocional no período.
                       </p>
-                    </div>
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="space-y-2">
+                    {behaviorAlerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className="flex items-start gap-3 p-2.5 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900"
+                      >
+                        <Avatar className="w-9 h-9 shrink-0">
+                          <AvatarImage src={alert.avatar_url || undefined} />
+                          <AvatarFallback className="bg-red-100 text-red-600">
+                            <Baby className="w-4 h-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                            {alert.nome}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {alert.moods.map((mood) => (
+                              <Badge
+                                key={mood}
+                                variant="outline"
+                                className="text-xs bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-200"
+                              >
+                                {mood === "choroso"
+                                  ? "😢 Choroso"
+                                  : mood === "triste"
+                                  ? "😔 Triste"
+                                  : "🤪 Agitado"}
+                              </Badge>
+                            ))}
+                          </div>
+                          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                            {alert.count}{" "}
+                            {alert.count === 1 ? "ocorrência" : "ocorrências"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-            </CardContent>
-          </CollapsibleContent>
+                )}
+              </CardContent>
+            </CollapsibleContent>
           </Card>
         </Collapsible>
       </div>
@@ -765,46 +923,50 @@ export default function KidsDashboard() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent>
-          {!ultimosCheckins || ultimosCheckins.length === 0 ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                Nenhum check-in registrado no momento.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-2">
-              {ultimosCheckins.map((checkin) => (
-                <div
-                  key={checkin.id}
-                  className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="w-9 h-9">
-                      <AvatarImage src={checkin.crianca_avatar || undefined} />
-                      <AvatarFallback className="bg-primary/10">
-                        <Baby className="w-4 h-4 text-primary" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{checkin.crianca_nome}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {checkin.culto_titulo}
-                      </p>
+              {!ultimosCheckins || ultimosCheckins.length === 0 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    Nenhum check-in registrado no momento.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-2">
+                  {ultimosCheckins.map((checkin) => (
+                    <div
+                      key={checkin.id}
+                      className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-9 h-9">
+                          <AvatarImage
+                            src={checkin.crianca_avatar || undefined}
+                          />
+                          <AvatarFallback className="bg-primary/10">
+                            <Baby className="w-4 h-4 text-primary" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {checkin.crianca_nome}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {checkin.culto_titulo}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium">
+                          {formatTime(checkin.checkin_at)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatRelativeTime(checkin.checkin_at)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-medium">
-                      {formatTime(checkin.checkin_at)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatRelativeTime(checkin.checkin_at)}
-                    </p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
             </CardContent>
           </CollapsibleContent>
         </Card>
@@ -825,7 +987,8 @@ export default function KidsDashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Abrir o scanner QR Code para registrar entrada e saída de crianças
+                Abrir o scanner QR Code para registrar entrada e saída de
+                crianças
               </p>
             </CardContent>
           </Link>

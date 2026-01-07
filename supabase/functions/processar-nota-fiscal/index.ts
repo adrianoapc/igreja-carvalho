@@ -64,7 +64,8 @@ async function getChatbotConfig(
 // Fetch categories, subcategories and cost centers from database
 async function getFinancialOptions(
   supabase: SupabaseClient,
-  igrejaId: string
+  igrejaId: string,
+  filialId?: string | null
 ): Promise<{
   categorias: Array<{
     id: string;
@@ -74,33 +75,94 @@ async function getFinancialOptions(
   centrosCusto: Array<{ id: string; nome: string; descricao: string | null }>;
 }> {
   try {
-    // Fetch categories with subcategories
-    const { data: categorias, error: catError } = await supabase
-      .from("categorias_financeiras")
-      .select(
-        `
+    // Fetch categories with subcategories (with optional filial filter)
+    let categorias: any[] | null = null;
+    let catError: any = null;
+    try {
+      let query = supabase
+        .from("categorias_financeiras")
+        .select(
+          `
         id,
         nome,
         tipo,
         subcategorias_financeiras(id, nome)
       `
-      )
-      .eq("ativo", true)
-      .eq("tipo", "saida")
-      .eq("igreja_id", igrejaId)
-      .order("nome");
+        )
+        .eq("ativo", true)
+        .eq("tipo", "saida")
+        .eq("igreja_id", igrejaId)
+        .order("nome");
+
+      if (filialId) {
+        // If filial_id column exists, filter by it or null (global)
+        // @ts-ignore runtime-level handling
+        query = query.or(`filial_id.is.null,filial_id.eq.${filialId}`);
+      }
+
+      const res = await query;
+      categorias = res.data as any[] | null;
+      catError = res.error;
+      if (catError) throw catError;
+    } catch (e) {
+      console.warn(
+        "Categorias: fallback sem filtro de filial:",
+        (e as Error)?.message
+      );
+      const res = await supabase
+        .from("categorias_financeiras")
+        .select(
+          `
+        id,
+        nome,
+        tipo,
+        subcategorias_financeiras(id, nome)
+      `
+        )
+        .eq("ativo", true)
+        .eq("tipo", "saida")
+        .eq("igreja_id", igrejaId)
+        .order("nome");
+      categorias = res.data as any[] | null;
+      catError = res.error;
+    }
 
     if (catError) {
       console.error("Error fetching categories:", catError);
     }
 
-    // Fetch cost centers
-    const { data: centrosCusto, error: ccError } = await supabase
-      .from("centros_custo")
-      .select("id, nome, descricao")
-      .eq("ativo", true)
-      .eq("igreja_id", igrejaId)
-      .order("nome");
+    // Fetch cost centers (with optional filial filter)
+    let centrosCusto: any[] | null = null;
+    let ccError: any = null;
+    try {
+      let queryCc = supabase
+        .from("centros_custo")
+        .select("id, nome, descricao")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
+        .order("nome");
+      if (filialId) {
+        // @ts-ignore runtime-level handling
+        queryCc = queryCc.or(`filial_id.is.null,filial_id.eq.${filialId}`);
+      }
+      const resCc = await queryCc;
+      centrosCusto = resCc.data as any[] | null;
+      ccError = resCc.error;
+      if (ccError) throw ccError;
+    } catch (e) {
+      console.warn(
+        "Centros de custo: fallback sem filtro de filial:",
+        (e as Error)?.message
+      );
+      const resCc = await supabase
+        .from("centros_custo")
+        .select("id, nome, descricao")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
+        .order("nome");
+      centrosCusto = resCc.data as any[] | null;
+      ccError = resCc.error;
+    }
 
     if (ccError) {
       console.error("Error fetching cost centers:", ccError);
@@ -177,23 +239,29 @@ serve(async (req) => {
 
     // For internal calls, skip user auth but still use service role
     let userId: string | null = null;
-    
+
     if (!isInternalCall) {
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         console.error("Auth header missing or invalid format");
-        return new Response(JSON.stringify({ error: "Token de autenticação ausente" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "Token de autenticação ausente" }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       const token = authHeader.slice("Bearer ".length).trim();
       if (!token) {
         console.error("Empty token after extraction");
-        return new Response(JSON.stringify({ error: "Token de autenticação vazio" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "Token de autenticação vazio" }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       console.log(`[${FUNCTION_NAME}] Token length: ${token.length}`);
@@ -201,13 +269,20 @@ serve(async (req) => {
       // Use service role to validate JWT via getUser(token)
       const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
-      const { data: userData, error: authError } = await supabaseService.auth.getUser(token);
+      const { data: userData, error: authError } =
+        await supabaseService.auth.getUser(token);
       if (authError || !userData?.user) {
-        console.error("JWT validation error:", authError?.message || "No user found");
-        return new Response(JSON.stringify({ error: "Sessão inválida ou expirada" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        console.error(
+          "JWT validation error:",
+          authError?.message || "No user found"
+        );
+        return new Response(
+          JSON.stringify({ error: "Sessão inválida ou expirada" }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       userId = userData.user.id;
@@ -251,6 +326,7 @@ serve(async (req) => {
     }
 
     const { imageBase64, mimeType, igreja_id: igrejaId } = await req.json();
+    const { filial_id: filialId } = await req.json();
 
     if (!igrejaId) {
       return new Response(
@@ -310,8 +386,19 @@ serve(async (req) => {
     );
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
+    // Choose provider (prefer Gemini, fallback to OpenAI)
+    const GEMINI_API_KEY =
+      Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const provider = GEMINI_API_KEY
+      ? "gemini"
+      : OPENAI_API_KEY
+      ? "openai"
+      : null;
+    if (!provider) {
+      console.error(
+        "Nenhum provedor de IA configurado (GEMINI_API_KEY/GOOGLE_API_KEY ou OPENAI_API_KEY)"
+      );
       return new Response(
         JSON.stringify({ error: "Serviço de processamento não configurado" }),
         {
@@ -329,7 +416,8 @@ serve(async (req) => {
     const { model, systemPrompt } = await getChatbotConfig(supabaseService);
     const financialOptions = await getFinancialOptions(
       supabaseService,
-      igrejaId
+      igrejaId,
+      filialId
     );
 
     console.log(`[processar-nota-fiscal] Using model: ${model}`);
@@ -341,21 +429,21 @@ serve(async (req) => {
     const enhancedPrompt =
       systemPrompt + buildCategoryContext(financialOptions);
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
+    let notaFiscalData: any = null;
+    if (provider === "openai") {
+      const mappedModel = model?.startsWith("google/")
+        ? "gpt-4o-mini"
+        : model || "gpt-4o-mini";
+      const oaResp = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: model,
+          model: mappedModel,
           messages: [
-            {
-              role: "system",
-              content: enhancedPrompt,
-            },
+            { role: "system", content: enhancedPrompt },
             {
               role: "user",
               content: [
@@ -384,69 +472,23 @@ serve(async (req) => {
                 parameters: {
                   type: "object",
                   properties: {
-                    fornecedor_cnpj_cpf: {
-                      type: "string",
-                      description: "CNPJ ou CPF do fornecedor (apenas números)",
-                    },
-                    fornecedor_nome: {
-                      type: "string",
-                      description: "Nome ou Razão Social do fornecedor",
-                    },
-                    data_emissao: {
-                      type: "string",
-                      description: "Data de emissão no formato YYYY-MM-DD",
-                    },
-                    valor_total: {
-                      type: "number",
-                      description: "Valor total da nota fiscal",
-                    },
-                    data_vencimento: {
-                      type: "string",
-                      description:
-                        "Data de vencimento se houver, formato YYYY-MM-DD, ou null",
-                    },
-                    descricao: {
-                      type: "string",
-                      description: "Descrição resumida dos itens/serviços",
-                    },
-                    numero_nota: {
-                      type: "string",
-                      description: "Número da nota fiscal",
-                    },
+                    fornecedor_cnpj_cpf: { type: "string" },
+                    fornecedor_nome: { type: "string" },
+                    data_emissao: { type: "string" },
+                    valor_total: { type: "number" },
+                    data_vencimento: { type: "string" },
+                    descricao: { type: "string" },
+                    numero_nota: { type: "string" },
                     tipo_documento: {
                       type: "string",
                       enum: ["nfe", "nfce", "cupom_fiscal", "recibo", "outro"],
-                      description: "Tipo de documento fiscal",
                     },
-                    categoria_sugerida_id: {
-                      type: "string",
-                      description:
-                        "ID da categoria financeira mais adequada baseada na descrição",
-                    },
-                    categoria_sugerida_nome: {
-                      type: "string",
-                      description: "Nome da categoria sugerida para exibição",
-                    },
-                    subcategoria_sugerida_id: {
-                      type: "string",
-                      description:
-                        "ID da subcategoria mais adequada baseada na descrição",
-                    },
-                    subcategoria_sugerida_nome: {
-                      type: "string",
-                      description:
-                        "Nome da subcategoria sugerida para exibição",
-                    },
-                    centro_custo_sugerido_id: {
-                      type: "string",
-                      description:
-                        "ID do centro de custo mais adequado baseado no contexto",
-                    },
-                    centro_custo_sugerido_nome: {
-                      type: "string",
-                      description:
-                        "Nome do centro de custo sugerido para exibição",
-                    },
+                    categoria_sugerida_id: { type: "string" },
+                    categoria_sugerida_nome: { type: "string" },
+                    subcategoria_sugerida_id: { type: "string" },
+                    subcategoria_sugerida_nome: { type: "string" },
+                    centro_custo_sugerido_id: { type: "string" },
+                    centro_custo_sugerido_nome: { type: "string" },
                   },
                   required: [
                     "fornecedor_nome",
@@ -464,54 +506,257 @@ serve(async (req) => {
             function: { name: "extrair_nota_fiscal" },
           },
         }),
+      });
+
+      if (!oaResp.ok) {
+        const errorText = await oaResp.text();
+        console.error("OpenAI erro:", oaResp.status, errorText);
+        throw new Error("Erro ao processar imagem");
       }
+      const oaData = await oaResp.json();
+      const toolCall = oaData.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall || toolCall.function?.name !== "extrair_nota_fiscal") {
+        throw new Error("Resposta da IA não contém dados estruturados");
+      }
+      notaFiscalData = JSON.parse(toolCall.function.arguments);
+    } else {
+      // Gemini
+      const geminiModelId = model?.startsWith("google/")
+        ? model.split("/")[1]
+        : model || "gemini-2.0-pro";
+      const promptText =
+        (isPdf
+          ? "Extraia as informações deste documento PDF de nota fiscal e sugira a categorização financeira mais adequada:"
+          : "Extraia as informações desta imagem de nota fiscal e sugira a categorização financeira mais adequada:") +
+        "\nRetorne um JSON exatamente com as chaves: fornecedor_cnpj_cpf, fornecedor_nome, data_emissao, valor_total, data_vencimento, descricao, numero_nota, tipo_documento, categoria_sugerida_id, categoria_sugerida_nome, subcategoria_sugerida_id, subcategoria_sugerida_nome, centro_custo_sugerido_id, centro_custo_sugerido_nome. Use null quando não houver.";
+
+      const gmResp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: enhancedPrompt + "\n\n" + promptText },
+                  {
+                    inline_data: {
+                      mime_type: effectiveMimeType,
+                      data: imageBase64,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: { response_mime_type: "application/json" },
+          }),
+        }
+      );
+
+      if (!gmResp.ok) {
+        const errorText = await gmResp.text();
+        console.error("Gemini erro:", gmResp.status, errorText);
+        throw new Error("Erro ao processar imagem");
+      }
+      const gmData = await gmResp.json();
+      const text = gmData?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("Resposta vazia do provedor");
+      try {
+        notaFiscalData = JSON.parse(text);
+      } catch (e) {
+        console.error("Falha ao parsear JSON do Gemini:", text);
+        throw new Error("Resposta não estruturada do provedor");
+      }
+    }
+    console.log(
+      "[processar-nota-fiscal] Dados extraídos da IA (antes sugestões por histórico):",
+      JSON.stringify({
+        fornecedor_nome: notaFiscalData?.fornecedor_nome,
+        fornecedor_cnpj_cpf: notaFiscalData?.fornecedor_cnpj_cpf,
+        valor_total: notaFiscalData?.valor_total,
+        data_emissao: notaFiscalData?.data_emissao,
+        categoria_sugerida_id: notaFiscalData?.categoria_sugerida_id,
+        subcategoria_sugerida_id: notaFiscalData?.subcategoria_sugerida_id,
+        centro_custo_sugerido_id: notaFiscalData?.centro_custo_sugerido_id,
+      })
     );
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        console.error("Rate limit atingido");
-        return new Response(
-          JSON.stringify({
-            error:
-              "Limite de requisições excedido. Tente novamente em alguns instantes.",
-          }),
-          {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      if (response.status === 402) {
-        console.error("Pagamento necessário");
-        return new Response(
-          JSON.stringify({
-            error:
-              "Créditos insuficientes no Lovable AI. Adicione créditos em Settings → Workspace → Usage.",
-          }),
-          {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      const errorText = await response.text();
-      console.error("Erro na API:", response.status, errorText);
-      throw new Error("Erro ao processar imagem");
-    }
-
-    const data = await response.json();
-    console.log("[processar-nota-fiscal] Resposta da IA recebida");
-
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall || toolCall.function?.name !== "extrair_nota_fiscal") {
-      throw new Error("Resposta da IA não contém dados estruturados");
-    }
-
-    const notaFiscalData = JSON.parse(toolCall.function.arguments);
     console.log(
-      "[processar-nota-fiscal] Dados extraídos:",
+      "[processar-nota-fiscal] Dados finais (após sugestões):",
       JSON.stringify(notaFiscalData)
     );
+
+    // Vincular/criar fornecedor por CPF/CNPJ e aplicar sugestões por histórico
+    try {
+      const rawDoc = (notaFiscalData?.fornecedor_cnpj_cpf || "").toString();
+      const normalizedDoc = rawDoc.replace(/\D/g, "");
+      const fornecedorNome = (notaFiscalData?.fornecedor_nome || "")
+        .toString()
+        .trim();
+      let fornecedorId: string | null = null;
+
+      console.log(
+        `[processar-nota-fiscal] Iniciando vinculação de fornecedor - CNPJ/CPF: ${
+          normalizedDoc || "vazio"
+        }, Nome: ${fornecedorNome || "vazio"}`
+      );
+
+      if (normalizedDoc || fornecedorNome) {
+        // Lookup: global por igreja (filial_id = null)
+        const { data: found, error: findErr } = await supabaseService
+          .from("fornecedores")
+          .select("id")
+          .eq("igreja_id", igrejaId)
+          .eq("filial_id", null)
+          .eq("cpf_cnpj", normalizedDoc)
+          .limit(1);
+        if (findErr) {
+          console.error("Erro ao buscar fornecedor por cpf_cnpj:", findErr);
+        }
+
+        if (found && found.length > 0) {
+          fornecedorId = (found[0] as any).id as string;
+          console.log(
+            `[processar-nota-fiscal] Fornecedor encontrado: ${fornecedorId}`
+          );
+        } else {
+          const tipoPessoa =
+            normalizedDoc && normalizedDoc.length === 11
+              ? "fisica"
+              : "juridica";
+          const insertPayload: Record<string, unknown> = {
+            nome: fornecedorNome || "Fornecedor",
+            cpf_cnpj: normalizedDoc || null,
+            tipo_pessoa: tipoPessoa,
+            ativo: true,
+            igreja_id: igrejaId,
+            filial_id: null,
+          };
+          console.log(
+            `[processar-nota-fiscal] Criando novo fornecedor:`,
+            insertPayload
+          );
+          const { data: inserted, error: insErr } = await supabaseService
+            .from("fornecedores")
+            .insert(insertPayload)
+            .select("id")
+            .limit(1);
+          if (insErr) {
+            console.error("Erro ao criar fornecedor:", insErr);
+          } else if (inserted && inserted.length > 0) {
+            fornecedorId = (inserted[0] as any).id as string;
+            console.log(
+              `[processar-nota-fiscal] Fornecedor criado: ${fornecedorId}`
+            );
+          }
+        }
+
+        if (fornecedorId) {
+          // anexar ao payload de saída
+          (notaFiscalData as any).fornecedor_id = fornecedorId;
+
+          // Sugestões por histórico
+          try {
+            let histQuery = supabaseService
+              .from("transacoes_financeiras")
+              .select(
+                "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento"
+              )
+              .eq("igreja_id", igrejaId)
+              .eq("fornecedor_id", fornecedorId)
+              .order("created_at", { ascending: false })
+              .limit(50);
+
+            if (filialId) {
+              // @ts-ignore: se coluna não existir, a consulta pode falhar e caímos no catch
+              histQuery = (histQuery as any).or(
+                `filial_id.is.null,filial_id.eq.${filialId}`
+              );
+            }
+
+            const { data: transacoesHist, error: histErr } =
+              (await histQuery) as any;
+            if (histErr) throw histErr;
+
+            if (transacoesHist && transacoesHist.length > 0) {
+              console.log(
+                `[processar-nota-fiscal] Encontradas ${transacoesHist.length} transações do fornecedor ${fornecedorId}`
+              );
+              const freq = (arr: any[], key: string) => {
+                const map: Record<string, number> = {};
+                for (const t of arr) {
+                  const v = (t[key] as string | null) || "";
+                  if (!v) continue;
+                  map[v] = (map[v] || 0) + 1;
+                }
+                return (
+                  Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+                  null
+                );
+              };
+
+              const cat = freq(transacoesHist, "categoria_id");
+              const sub = freq(transacoesHist, "subcategoria_id");
+              const cc = freq(transacoesHist, "centro_custo_id");
+              const contaHist = freq(transacoesHist, "conta_id");
+              const formaHist = freq(transacoesHist, "forma_pagamento");
+
+              console.log(
+                `[processar-nota-fiscal] Histórico - categoria mais frequente: ${
+                  cat || "nenhuma"
+                }, subcategoria: ${sub || "nenhuma"}, centro_custo: ${
+                  cc || "nenhum"
+                }`
+              );
+
+              if (!notaFiscalData.categoria_sugerida_id && cat) {
+                (notaFiscalData as any).categoria_sugerida_id = cat;
+                console.log(
+                  `[processar-nota-fiscal] Categoria preenchida do histórico: ${cat}`
+                );
+              }
+              if (!notaFiscalData.subcategoria_sugerida_id && sub) {
+                (notaFiscalData as any).subcategoria_sugerida_id = sub;
+                console.log(
+                  `[processar-nota-fiscal] Subcategoria preenchida do histórico: ${sub}`
+                );
+              }
+              if (!notaFiscalData.centro_custo_sugerido_id && cc) {
+                (notaFiscalData as any).centro_custo_sugerido_id = cc;
+                console.log(
+                  `[processar-nota-fiscal] Centro de custo preenchido do histórico: ${cc}`
+                );
+              }
+              if (!(notaFiscalData as any).conta_sugerida_id && contaHist) {
+                (notaFiscalData as any).conta_sugerida_id = contaHist;
+                console.log(
+                  `[processar-nota-fiscal] Conta sugerida do histórico: ${contaHist}`
+                );
+              }
+              if (
+                !(notaFiscalData as any).forma_pagamento_sugerida &&
+                formaHist
+              ) {
+                (notaFiscalData as any).forma_pagamento_sugerida = formaHist;
+                console.log(
+                  `[processar-nota-fiscal] Forma de pagamento sugerida do histórico: ${formaHist}`
+                );
+              }
+            } else {
+              console.log(
+                `[processar-nota-fiscal] Nenhuma transação anterior encontrada para fornecedor ${fornecedorId}`
+              );
+            }
+          } catch (e) {
+            console.warn("Falha ao aplicar sugestões por histórico:", e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Falha na vinculação/criação de fornecedor:", e);
+    }
 
     return new Response(
       JSON.stringify({

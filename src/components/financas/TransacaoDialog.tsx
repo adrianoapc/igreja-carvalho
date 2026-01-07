@@ -611,6 +611,12 @@ export function TransacaoDialog({
     anexo_url?: string;
     fornecedor_nome?: string;
     fornecedor_cnpj_cpf?: string;
+    fornecedor_id?: string | null;
+    categoria_sugerida_id?: string | null;
+    subcategoria_sugerida_id?: string | null;
+    centro_custo_sugerido_id?: string | null;
+    conta_sugerida_id?: string | null;
+    forma_pagamento_sugerida?: string | null;
   }) => {
     try {
       console.log("Processando dados da nota fiscal:", dados);
@@ -662,8 +668,27 @@ export function TransacaoDialog({
         }
       }
 
-      // Buscar fornecedor existente - priorizar CNPJ/CPF
-      if (dados.fornecedor_nome || dados.fornecedor_cnpj_cpf) {
+      // Aplicar fornecedor_id retornado pelo Edge, se existir
+      if (dados.fornecedor_id) {
+        setFornecedorId(dados.fornecedor_id);
+      }
+
+      // Preencher sugestões diretas da IA/histórico antes de buscar mais
+      if (dados.categoria_sugerida_id)
+        setCategoriaId(dados.categoria_sugerida_id);
+      if (dados.subcategoria_sugerida_id)
+        setSubcategoriaId(dados.subcategoria_sugerida_id);
+      if (dados.centro_custo_sugerido_id)
+        setCentroCustoId(dados.centro_custo_sugerido_id);
+      if (dados.conta_sugerida_id) setContaId(dados.conta_sugerida_id);
+      if (dados.forma_pagamento_sugerida)
+        setFormaPagamento(dados.forma_pagamento_sugerida);
+
+      // Se não veio fornecedor_id, buscar fornecedor existente - priorizar CNPJ/CPF
+      if (
+        !dados.fornecedor_id &&
+        (dados.fornecedor_nome || dados.fornecedor_cnpj_cpf)
+      ) {
         const cnpjCpfLimpo =
           dados.fornecedor_cnpj_cpf?.replace(/\D/g, "") || null;
         let fornecedorEncontrado: { id: string } | null = null;
@@ -698,9 +723,20 @@ export function TransacaoDialog({
             fornecedorEncontrado.id
           );
           setFornecedorId(fornecedorEncontrado.id);
-          // Chamar sugestões com forceApply para garantir aplicação
+          // Só buscar sugestões históricas se algum campo-chave estiver vazio
           setTimeout(async () => {
-            await buscarSugestoesFornecedor(fornecedorEncontrado.id, true);
+            const needsMoreSuggestions =
+              categoriaId === "none" ||
+              !categoriaId ||
+              subcategoriaId === "none" ||
+              !subcategoriaId ||
+              centroCustoId === "none" ||
+              !centroCustoId ||
+              !contaId ||
+              !formaPagamento;
+            if (needsMoreSuggestions) {
+              await buscarSugestoesFornecedor(fornecedorEncontrado.id, true);
+            }
           }, 100);
         } else if (dados.fornecedor_nome) {
           // Criar novo fornecedor

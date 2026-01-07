@@ -1,12 +1,21 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { motion } from "framer-motion";
-import { MetricCard, InsightCard } from "@/components/voluntario/MetricsComponents";
+import {
+  MetricCard,
+  InsightCard,
+} from "@/components/voluntario/MetricsComponents";
 import { useFilialId } from "@/hooks/useFilialId";
 import {
   Users,
@@ -21,7 +30,20 @@ import {
   Filter,
   Download,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+} from "recharts";
 
 interface CandidatoStats {
   total: number;
@@ -73,14 +95,14 @@ export default function Candidatos() {
     setLoading(true);
     try {
       // Buscar todos os candidatos
-      let query = supabase
-        .from("candidatos_voluntario")
-        .select("*");
-      
+      let query = supabase.from("candidatos_voluntario").select("*");
+
       if (igrejaId) query = query.eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
-      
-      const { data: candidatosData, error } = await query.order("created_at", { ascending: false });
+
+      const { data: candidatosData, error } = await query.order("created_at", {
+        ascending: false,
+      });
 
       if (error) throw error;
 
@@ -88,10 +110,14 @@ export default function Candidatos() {
 
       // Calcular estatísticas
       const total = candidatosData?.length || 0;
-      const pendentes = candidatosData?.filter(c => c.status === "pendente").length || 0;
-      const em_analise = candidatosData?.filter(c => c.status === "em_analise").length || 0;
-      const aprovados = candidatosData?.filter(c => c.status === "aprovado").length || 0;
-      const rejeitados = candidatosData?.filter(c => c.status === "rejeitado").length || 0;
+      const pendentes =
+        candidatosData?.filter((c) => c.status === "pendente").length || 0;
+      const em_analise =
+        candidatosData?.filter((c) => c.status === "em_analise").length || 0;
+      const aprovados =
+        candidatosData?.filter((c) => c.status === "aprovado").length || 0;
+      const rejeitados =
+        candidatosData?.filter((c) => c.status === "rejeitado").length || 0;
 
       // Por ministério
       const ministeriosCount = candidatosData?.reduce((acc, c) => {
@@ -99,14 +125,19 @@ export default function Candidatos() {
         return acc;
       }, {} as Record<string, number>);
 
-      const por_ministerio = Object.entries(ministeriosCount || {}).map(([ministerio, total]) => ({
-        ministerio,
-        total,
-      }));
+      const por_ministerio = Object.entries(ministeriosCount || {}).map(
+        ([ministerio, total]) => ({
+          ministerio,
+          total,
+        })
+      );
 
       // Por mês (últimos 6 meses)
       const mesesData = candidatosData?.reduce((acc, c) => {
-        const mes = new Date(c.created_at).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+        const mes = new Date(c.created_at).toLocaleDateString("pt-BR", {
+          month: "short",
+          year: "2-digit",
+        });
         acc[mes] = (acc[mes] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -119,28 +150,39 @@ export default function Candidatos() {
       const hoje = new Date();
       const ultimos3meses = Array.from({ length: 3 }, (_, i) => {
         const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-        return { mes: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }), data: d };
+        return {
+          mes: d.toLocaleDateString("pt-BR", {
+            month: "short",
+            year: "2-digit",
+          }),
+          data: d,
+        };
       }).reverse();
 
       const aprovacoes_mes = ultimos3meses.map(({ mes, data }) => {
         const inicioMes = new Date(data.getFullYear(), data.getMonth(), 1);
         const fimMes = new Date(data.getFullYear(), data.getMonth() + 1, 0);
-        
-        const totalMes = candidatosData?.filter(c => {
-          const datac = new Date(c.created_at);
-          return datac >= inicioMes && datac <= fimMes;
-        }).length || 0;
 
-        const aprovadosMes = candidatosData?.filter(c => {
-          const datac = new Date(c.created_at);
-          return c.status === "aprovado" && datac >= inicioMes && datac <= fimMes;
-        }).length || 0;
+        const totalMes =
+          candidatosData?.filter((c) => {
+            const datac = new Date(c.created_at);
+            return datac >= inicioMes && datac <= fimMes;
+          }).length || 0;
+
+        const aprovadosMes =
+          candidatosData?.filter((c) => {
+            const datac = new Date(c.created_at);
+            return (
+              c.status === "aprovado" && datac >= inicioMes && datac <= fimMes
+            );
+          }).length || 0;
 
         return { mes, candidatos: totalMes, aprovacoes: aprovadosMes };
       });
 
       // Tempo médio de análise
-      const candidatosAnalisados = candidatosData?.filter(c => c.status !== "pendente") || [];
+      const candidatosAnalisados =
+        candidatosData?.filter((c) => c.status !== "pendente") || [];
       let tempoMedioDias = 0;
       if (candidatosAnalisados.length > 0) {
         const totalDias = candidatosAnalisados.reduce((acc, c) => {
@@ -148,40 +190,80 @@ export default function Candidatos() {
           const fim = new Date(c.data_avaliacao || new Date()).getTime();
           return acc + (fim - inicio) / (1000 * 60 * 60 * 24);
         }, 0);
-        tempoMedioDias = Math.round((totalDias / candidatosAnalisados.length) * 10) / 10;
+        tempoMedioDias =
+          Math.round((totalDias / candidatosAnalisados.length) * 10) / 10;
       }
 
       // Calcular maior crescimento por ministério (comparar últimos 2 meses)
-      let maiorCrescimento: { ministerio: string; percentual: number } | null = null;
+      let maiorCrescimento: { ministerio: string; percentual: number } | null =
+        null;
       const mesAtual = new Date();
-      const mesAnterior = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
-      const inicioMesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
-      const fimMesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0);
-      const inicioMesAnterior = new Date(mesAnterior.getFullYear(), mesAnterior.getMonth(), 1);
-      const fimMesAnterior = new Date(mesAnterior.getFullYear(), mesAnterior.getMonth() + 1, 0);
+      const mesAnterior = new Date(
+        mesAtual.getFullYear(),
+        mesAtual.getMonth() - 1,
+        1
+      );
+      const inicioMesAtual = new Date(
+        mesAtual.getFullYear(),
+        mesAtual.getMonth(),
+        1
+      );
+      const fimMesAtual = new Date(
+        mesAtual.getFullYear(),
+        mesAtual.getMonth() + 1,
+        0
+      );
+      const inicioMesAnterior = new Date(
+        mesAnterior.getFullYear(),
+        mesAnterior.getMonth(),
+        1
+      );
+      const fimMesAnterior = new Date(
+        mesAnterior.getFullYear(),
+        mesAnterior.getMonth() + 1,
+        0
+      );
 
-      const ministerios = [...new Set(candidatosData?.map(c => c.ministerio) || [])];
-      const crescimentos = ministerios.map(ministerio => {
-        const candidatosMesAtual = candidatosData?.filter(c => {
-          const data = new Date(c.created_at);
-          return c.ministerio === ministerio && data >= inicioMesAtual && data <= fimMesAtual;
-        }).length || 0;
+      const ministerios = [
+        ...new Set(candidatosData?.map((c) => c.ministerio) || []),
+      ];
+      const crescimentos = ministerios
+        .map((ministerio) => {
+          const candidatosMesAtual =
+            candidatosData?.filter((c) => {
+              const data = new Date(c.created_at);
+              return (
+                c.ministerio === ministerio &&
+                data >= inicioMesAtual &&
+                data <= fimMesAtual
+              );
+            }).length || 0;
 
-        const candidatosMesAnterior = candidatosData?.filter(c => {
-          const data = new Date(c.created_at);
-          return c.ministerio === ministerio && data >= inicioMesAnterior && data <= fimMesAnterior;
-        }).length || 0;
+          const candidatosMesAnterior =
+            candidatosData?.filter((c) => {
+              const data = new Date(c.created_at);
+              return (
+                c.ministerio === ministerio &&
+                data >= inicioMesAnterior &&
+                data <= fimMesAnterior
+              );
+            }).length || 0;
 
-        if (candidatosMesAnterior === 0) {
-          return { ministerio, percentual: candidatosMesAtual > 0 ? 100 : 0 };
-        }
-        
-        const percentual = Math.round(((candidatosMesAtual - candidatosMesAnterior) / candidatosMesAnterior) * 100);
-        return { ministerio, percentual };
-      }).filter(c => c.percentual > 0);
+          if (candidatosMesAnterior === 0) {
+            return { ministerio, percentual: candidatosMesAtual > 0 ? 100 : 0 };
+          }
+
+          const percentual = Math.round(
+            ((candidatosMesAtual - candidatosMesAnterior) /
+              candidatosMesAnterior) *
+              100
+          );
+          return { ministerio, percentual };
+        })
+        .filter((c) => c.percentual > 0);
 
       if (crescimentos.length > 0) {
-        maiorCrescimento = crescimentos.reduce((max, curr) => 
+        maiorCrescimento = crescimentos.reduce((max, curr) =>
           curr.percentual > max.percentual ? curr : max
         );
       }
@@ -215,8 +297,10 @@ export default function Candidatos() {
       if (error) throw error;
 
       // Atualizar estado local
-      setCandidatos(prev =>
-        prev.map(c => (c.id === candidatoId ? { ...c, status: novoStatus } : c))
+      setCandidatos((prev) =>
+        prev.map((c) =>
+          c.id === candidatoId ? { ...c, status: novoStatus } : c
+        )
       );
 
       // Recalcular stats
@@ -226,15 +310,24 @@ export default function Candidatos() {
     }
   };
 
-  const candidatosFiltrados = candidatos.filter(c => {
+  const candidatosFiltrados = candidatos.filter((c) => {
     if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
-    if (filtroMinisterio !== "todos" && c.ministerio !== filtroMinisterio) return false;
+    if (filtroMinisterio !== "todos" && c.ministerio !== filtroMinisterio)
+      return false;
     return true;
   });
 
-  const ministerios = Array.from(new Set(candidatos.map(c => c.ministerio)));
+  const ministerios = Array.from(new Set(candidatos.map((c) => c.ministerio)));
 
-  const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#f97316"];
+  const COLORS = [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#8b5cf6",
+    "#ef4444",
+    "#06b6d4",
+    "#f97316",
+  ];
 
   if (loading) {
     return (
@@ -321,10 +414,20 @@ export default function Candidatos() {
         <InsightCard
           tipo="meta"
           titulo="Aprovações neste mês"
-          descricao={`${stats?.aprovacoes_mes?.[2]?.candidatos || 0} candidatos inscritos, ${stats?.aprovacoes_mes?.[2]?.aprovacoes || 0} aprovados`}
-          valor={stats?.aprovacoes_mes?.[2]?.aprovacoes || 0 > 0 
-            ? `${Math.round(((stats?.aprovacoes_mes?.[2]?.aprovacoes || 0) / (stats?.aprovacoes_mes?.[2]?.candidatos || 1)) * 100)}%` 
-            : "0%"}
+          descricao={`${
+            stats?.aprovacoes_mes?.[2]?.candidatos || 0
+          } candidatos inscritos, ${
+            stats?.aprovacoes_mes?.[2]?.aprovacoes || 0
+          } aprovados`}
+          valor={
+            stats?.aprovacoes_mes?.[2]?.aprovacoes || 0 > 0
+              ? `${Math.round(
+                  ((stats?.aprovacoes_mes?.[2]?.aprovacoes || 0) /
+                    (stats?.aprovacoes_mes?.[2]?.candidatos || 1)) *
+                    100
+                )}%`
+              : "0%"
+          }
         />
         <InsightCard
           tipo="tempo"
@@ -335,12 +438,16 @@ export default function Candidatos() {
         <InsightCard
           tipo="conquista"
           titulo="Maior crescimento"
-          descricao={stats?.maior_crescimento 
-            ? `O ministério ${stats.maior_crescimento.ministerio} teve o maior crescimento em candidaturas.`
-            : "Nenhum crescimento registrado este mês."}
-          valor={stats?.maior_crescimento 
-            ? `+${stats.maior_crescimento.percentual}% este mês`
-            : "0%"}
+          descricao={
+            stats?.maior_crescimento
+              ? `O ministério ${stats.maior_crescimento.ministerio} teve o maior crescimento em candidaturas.`
+              : "Nenhum crescimento registrado este mês."
+          }
+          valor={
+            stats?.maior_crescimento
+              ? `+${stats.maior_crescimento.percentual}% este mês`
+              : "0%"
+          }
         />
       </div>
 
@@ -368,7 +475,11 @@ export default function Candidatos() {
                     borderRadius: "8px",
                   }}
                 />
-                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                <Bar
+                  dataKey="total"
+                  fill="hsl(var(--primary))"
+                  radius={[8, 8, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -399,7 +510,10 @@ export default function Candidatos() {
                   dataKey="total"
                 >
                   {(stats?.por_ministerio || []).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -455,7 +569,8 @@ export default function Candidatos() {
               </p>
             ) : (
               candidatosFiltrados.map((candidato) => {
-                const config = STATUS_CONFIG[candidato.status as keyof typeof STATUS_CONFIG];
+                const config =
+                  STATUS_CONFIG[candidato.status as keyof typeof STATUS_CONFIG];
                 const Icon = config.icon;
 
                 return (
@@ -468,11 +583,16 @@ export default function Candidatos() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-3">
-                          <h3 className="font-semibold">{candidato.nome_contato}</h3>
+                          <h3 className="font-semibold">
+                            {candidato.nome_contato}
+                          </h3>
                           <Badge
                             variant="outline"
                             className="text-xs"
-                            style={{ borderColor: config.color, color: config.color }}
+                            style={{
+                              borderColor: config.color,
+                              color: config.color,
+                            }}
                           >
                             <Icon className="w-3 h-3 mr-1" />
                             {config.label}
@@ -480,26 +600,37 @@ export default function Candidatos() {
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-muted-foreground">
                           <div>
-                            <span className="font-medium">Ministério:</span> {candidato.ministerio}
+                            <span className="font-medium">Ministério:</span>{" "}
+                            {candidato.ministerio}
                           </div>
                           <div>
-                            <span className="font-medium">Disponibilidade:</span>{" "}
+                            <span className="font-medium">
+                              Disponibilidade:
+                            </span>{" "}
                             {candidato.disponibilidade}
                           </div>
                           <div>
-                            <span className="font-medium">Experiência:</span> {candidato.experiencia}
+                            <span className="font-medium">Experiência:</span>{" "}
+                            {candidato.experiencia}
                           </div>
                           <div>
                             <span className="font-medium">Data:</span>{" "}
-                            {new Date(candidato.created_at).toLocaleDateString("pt-BR")}
+                            {new Date(candidato.created_at).toLocaleDateString(
+                              "pt-BR"
+                            )}
                           </div>
                         </div>
-                        {(candidato.telefone_contato || candidato.email_contato) && (
+                        {(candidato.telefone_contato ||
+                          candidato.email_contato) && (
                           <div className="text-sm text-muted-foreground">
                             {candidato.telefone_contato && (
-                              <span className="mr-4">📱 {candidato.telefone_contato}</span>
+                              <span className="mr-4">
+                                📱 {candidato.telefone_contato}
+                              </span>
                             )}
-                            {candidato.email_contato && <span>✉️ {candidato.email_contato}</span>}
+                            {candidato.email_contato && (
+                              <span>✉️ {candidato.email_contato}</span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -509,13 +640,17 @@ export default function Candidatos() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleMudarStatus(candidato.id, "em_analise")}
+                              onClick={() =>
+                                handleMudarStatus(candidato.id, "em_analise")
+                              }
                             >
                               Analisar
                             </Button>
                             <Button
                               size="sm"
-                              onClick={() => handleMudarStatus(candidato.id, "aprovado")}
+                              onClick={() =>
+                                handleMudarStatus(candidato.id, "aprovado")
+                              }
                             >
                               Aprovar
                             </Button>
@@ -525,14 +660,18 @@ export default function Candidatos() {
                           <>
                             <Button
                               size="sm"
-                              onClick={() => handleMudarStatus(candidato.id, "aprovado")}
+                              onClick={() =>
+                                handleMudarStatus(candidato.id, "aprovado")
+                              }
                             >
                               Aprovar
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleMudarStatus(candidato.id, "rejeitado")}
+                              onClick={() =>
+                                handleMudarStatus(candidato.id, "rejeitado")
+                              }
                             >
                               Rejeitar
                             </Button>
@@ -542,7 +681,9 @@ export default function Candidatos() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleMudarStatus(candidato.id, "em_trilha")}
+                            onClick={() =>
+                              handleMudarStatus(candidato.id, "em_trilha")
+                            }
                           >
                             Iniciar Trilha
                           </Button>

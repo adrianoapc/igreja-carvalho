@@ -18,7 +18,16 @@ import {
   DrawerFooter,
   DrawerClose,
 } from "@/components/ui/drawer";
-import { Calendar, MapPin, Video, Church, BookOpen, User, Clock, Link } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  Video,
+  Church,
+  BookOpen,
+  User,
+  Clock,
+  Link,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useFilialId } from "@/hooks/useFilialId";
@@ -51,11 +60,15 @@ interface Profile {
   nome: string;
 }
 
-export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAulaDrawerProps) {
+export default function NovaAulaDrawer({
+  open,
+  onOpenChange,
+  onSuccess,
+}: NovaAulaDrawerProps) {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  
+
   // Form state
   const [jornadaId, setJornadaId] = useState("");
   const [tema, setTema] = useState("");
@@ -63,11 +76,13 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
   const [dataInicio, setDataInicio] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [duracao, setDuracao] = useState("60");
-  
-  const [modalidade, setModalidade] = useState<"presencial" | "online" | "hibrido">("presencial");
+
+  const [modalidade, setModalidade] = useState<
+    "presencial" | "online" | "hibrido"
+  >("presencial");
   const [salaId, setSalaId] = useState("");
   const [linkReuniao, setLinkReuniao] = useState("");
-  
+
   const [vinculadoCulto, setVinculadoCulto] = useState(false);
   const [cultoId, setCultoId] = useState("");
 
@@ -113,10 +128,11 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
       .from("salas")
       .select("id, nome")
       .eq("ativo", true);
-    
+
     if (igrejaId) salasQuery = salasQuery.eq("igreja_id", igrejaId);
-    if (!isAllFiliais && filialId) salasQuery = salasQuery.eq("filial_id", filialId);
-    
+    if (!isAllFiliais && filialId)
+      salasQuery = salasQuery.eq("filial_id", filialId);
+
     const { data: salasData } = await salasQuery.order("nome");
     setSalas(salasData || []);
 
@@ -164,8 +180,12 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
       data_inicio: dataHoraInicio.toISOString(),
       duracao_minutos: parseInt(duracao),
       modalidade,
-      sala_id: (modalidade === "presencial" || modalidade === "hibrido") ? salaId : null,
-      link_reuniao: (modalidade === "online" || modalidade === "hibrido") ? linkReuniao : null,
+      sala_id:
+        modalidade === "presencial" || modalidade === "hibrido" ? salaId : null,
+      link_reuniao:
+        modalidade === "online" || modalidade === "hibrido"
+          ? linkReuniao
+          : null,
       evento_id: vinculadoCulto ? cultoId : null,
       status: "agendada",
     });
@@ -187,7 +207,8 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
     if (step === 2) {
       if (modalidade === "presencial") return salaId.length > 0;
       if (modalidade === "online") return linkReuniao.length > 0;
-      if (modalidade === "hibrido") return salaId.length > 0 && linkReuniao.length > 0;
+      if (modalidade === "hibrido")
+        return salaId.length > 0 && linkReuniao.length > 0;
     }
     return true;
   };
@@ -315,7 +336,12 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
 
               <div className="space-y-2">
                 <Label>Modalidade *</Label>
-                <Select value={modalidade} onValueChange={(v) => setModalidade(v as "presencial" | "online" | "hibrido")}>
+                <Select
+                  value={modalidade}
+                  onValueChange={(v) =>
+                    setModalidade(v as "presencial" | "online" | "hibrido")
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -395,7 +421,11 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
 
               <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
                 <div className="flex items-center gap-3">
-                  <Church className={`w-5 h-5 ${vinculadoCulto ? "text-primary" : "text-muted-foreground"}`} />
+                  <Church
+                    className={`w-5 h-5 ${
+                      vinculadoCulto ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  />
                   <div>
                     <p className="font-medium">Acontece durante um Evento?</p>
                     <p className="text-xs text-muted-foreground">
@@ -419,7 +449,8 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
                     <SelectContent>
                       {cultos.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.titulo} - {format(new Date(c.data_evento), "dd/MM HH:mm")}
+                          {c.titulo} -{" "}
+                          {format(new Date(c.data_evento), "dd/MM HH:mm")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -431,21 +462,47 @@ export default function NovaAulaDrawer({ open, onOpenChange, onSuccess }: NovaAu
               <div className="p-4 rounded-lg border bg-muted/50 space-y-2">
                 <h4 className="font-medium text-sm">Resumo da Aula</h4>
                 <div className="text-sm space-y-1">
-                  <p><strong>Tema:</strong> {tema}</p>
+                  <p>
+                    <strong>Tema:</strong> {tema}
+                  </p>
                   {jornadaId && (
-                    <p><strong>Jornada:</strong> {jornadas.find(j => j.id === jornadaId)?.titulo}</p>
+                    <p>
+                      <strong>Jornada:</strong>{" "}
+                      {jornadas.find((j) => j.id === jornadaId)?.titulo}
+                    </p>
                   )}
-                  <p><strong>Data:</strong> {dataInicio} às {horaInicio}</p>
-                  <p><strong>Duração:</strong> {duracao} minutos</p>
-                  <p><strong>Modalidade:</strong> {modalidade === "presencial" ? "Presencial" : modalidade === "online" ? "Online" : "Híbrido"}</p>
-                  {(modalidade === "presencial" || modalidade === "hibrido") && salaId && (
-                    <p><strong>Sala:</strong> {salas.find(s => s.id === salaId)?.nome}</p>
-                  )}
-                  {(modalidade === "online" || modalidade === "hibrido") && linkReuniao && (
-                    <p><strong>Link:</strong> {linkReuniao}</p>
-                  )}
+                  <p>
+                    <strong>Data:</strong> {dataInicio} às {horaInicio}
+                  </p>
+                  <p>
+                    <strong>Duração:</strong> {duracao} minutos
+                  </p>
+                  <p>
+                    <strong>Modalidade:</strong>{" "}
+                    {modalidade === "presencial"
+                      ? "Presencial"
+                      : modalidade === "online"
+                      ? "Online"
+                      : "Híbrido"}
+                  </p>
+                  {(modalidade === "presencial" || modalidade === "hibrido") &&
+                    salaId && (
+                      <p>
+                        <strong>Sala:</strong>{" "}
+                        {salas.find((s) => s.id === salaId)?.nome}
+                      </p>
+                    )}
+                  {(modalidade === "online" || modalidade === "hibrido") &&
+                    linkReuniao && (
+                      <p>
+                        <strong>Link:</strong> {linkReuniao}
+                      </p>
+                    )}
                   {vinculadoCulto && cultoId && (
-                    <p><strong>Evento:</strong> {cultos.find(c => c.id === cultoId)?.titulo}</p>
+                    <p>
+                      <strong>Evento:</strong>{" "}
+                      {cultos.find((c) => c.id === cultoId)?.titulo}
+                    </p>
                   )}
                 </div>
               </div>

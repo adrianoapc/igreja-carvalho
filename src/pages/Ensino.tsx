@@ -117,15 +117,15 @@ export default function Ensino() {
   };
 
   const fetchSalas = async () => {
-    let salasQuery = supabase
-      .from("salas")
-      .select("*")
-      .eq("ativo", true);
-    
+    let salasQuery = supabase.from("salas").select("*").eq("ativo", true);
+
     if (igrejaId) salasQuery = salasQuery.eq("igreja_id", igrejaId);
-    if (!isAllFiliais && filialId) salasQuery = salasQuery.eq("filial_id", filialId);
-    
-    const { data: salasData, error: salasError } = await salasQuery.order("nome");
+    if (!isAllFiliais && filialId)
+      salasQuery = salasQuery.eq("filial_id", filialId);
+
+    const { data: salasData, error: salasError } = await salasQuery.order(
+      "nome"
+    );
 
     if (salasError) {
       console.error("Erro ao carregar salas:", salasError);
