@@ -176,34 +176,47 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // For internal calls, skip user auth but still use service role
+    let userId: string | null = null;
+    
     if (!isInternalCall) {
-      if (!authHeader) {
-        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        console.error("Auth header missing or invalid format");
+        return new Response(JSON.stringify({ error: "Token de autenticação ausente" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Use service role to verify the JWT and check user without triggering session errors
-      const token = authHeader?.replace("Bearer ", "");
+      const token = authHeader.slice("Bearer ".length).trim();
+      if (!token) {
+        console.error("Empty token after extraction");
+        return new Response(JSON.stringify({ error: "Token de autenticação vazio" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      console.log(`[${FUNCTION_NAME}] Token length: ${token.length}`);
+
+      // Use service role to validate JWT via getUser(token)
       const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
-      const {
-        data: { user },
-        error: authError,
-      } = await supabaseService.auth.getUser(token);
-      if (authError || !user) {
-        console.error("Auth error:", authError);
-        return new Response(JSON.stringify({ error: "Sessão inválida" }), {
+      const { data: userData, error: authError } = await supabaseService.auth.getUser(token);
+      if (authError || !userData?.user) {
+        console.error("JWT validation error:", authError?.message || "No user found");
+        return new Response(JSON.stringify({ error: "Sessão inválida ou expirada" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      userId = userData.user.id;
+      console.log(`[${FUNCTION_NAME}] Authenticated user: ${userId}`);
 
       const { data: userRoles, error: rolesError } = await supabaseService
         .from("user_app_roles")
         .select("role:app_roles(name)")
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (rolesError) {
         console.error("Roles error:", rolesError);
