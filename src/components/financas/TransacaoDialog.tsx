@@ -7,11 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   CalendarIcon,
   X,
@@ -33,7 +43,10 @@ import { generatePdfThumbnail } from "@/lib/pdfUtils";
 import { TransacaoUploadSection } from "./TransacaoUploadSection";
 import { TransacaoDocumentViewer } from "./TransacaoDocumentViewer";
 import { useFilialId } from "@/hooks/useFilialId";
-import { AIProcessingOverlay, type AIProcessingStep } from "./AIProcessingOverlay";
+import {
+  AIProcessingOverlay,
+  type AIProcessingStep,
+} from "./AIProcessingOverlay";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface TransacaoDialogProps {
@@ -63,25 +76,38 @@ interface TransacaoDialogProps {
     desconto?: number | null;
     taxas_administrativas?: number | null;
     total_parcelas?: number | null;
-    recorrencia?: "diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral" | null;
+    recorrencia?:
+      | "diaria"
+      | "semanal"
+      | "quinzenal"
+      | "mensal"
+      | "bimestral"
+      | null;
     data_fim_recorrencia?: string | null;
   };
 }
 
-export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: TransacaoDialogProps) {
+export function TransacaoDialog({
+  open,
+  onOpenChange,
+  tipo,
+  transacao,
+}: TransacaoDialogProps) {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
 
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
-  const [aiStep, setAiStep] = useState<AIProcessingStep>('idle');
+  const [aiStep, setAiStep] = useState<AIProcessingStep>("idle");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
 
   // Estados do formulário
-  const [tipoLancamento, setTipoLancamento] = useState<"unico" | "recorrente" | "parcelado">("unico");
+  const [tipoLancamento, setTipoLancamento] = useState<
+    "unico" | "recorrente" | "parcelado"
+  >("unico");
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [dataVencimento, setDataVencimento] = useState<Date>(new Date());
@@ -94,8 +120,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const [fornecedorId, setFornecedorId] = useState("none");
   const [formaPagamento, setFormaPagamento] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("1");
-  const [recorrencia, setRecorrencia] = useState<"diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral">("mensal");
-  const [dataFimRecorrencia, setDataFimRecorrencia] = useState<Date | undefined>();
+  const [recorrencia, setRecorrencia] = useState<
+    "diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral"
+  >("mensal");
+  const [dataFimRecorrencia, setDataFimRecorrencia] = useState<
+    Date | undefined
+  >();
   const [observacoes, setObservacoes] = useState("");
   const [anexoFile, setAnexoFile] = useState<File | null>(null);
   const [anexoUrl, setAnexoUrl] = useState<string>("");
@@ -115,8 +145,16 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     if (transacao && open) {
       setDescricao(transacao.descricao || "");
       setValor(String(transacao.valor || ""));
-      setDataVencimento(transacao.data_vencimento ? new Date(transacao.data_vencimento) : new Date());
-      setDataCompetencia(transacao.data_competencia ? new Date(transacao.data_competencia) : new Date());
+      setDataVencimento(
+        transacao.data_vencimento
+          ? new Date(transacao.data_vencimento)
+          : new Date()
+      );
+      setDataCompetencia(
+        transacao.data_competencia
+          ? new Date(transacao.data_competencia)
+          : new Date()
+      );
       setContaId(transacao.conta_id || "");
       setCategoriaId(transacao.categoria_id || "none");
       setSubcategoriaId(transacao.subcategoria_id || "none");
@@ -128,7 +166,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setTipoLancamento(transacao.tipo_lancamento || "unico");
       setAnexoUrl(transacao.anexo_url || "");
 
-      const isPdf = transacao.anexo_url?.toLowerCase().endsWith(".pdf") || false;
+      const isPdf =
+        transacao.anexo_url?.toLowerCase().endsWith(".pdf") || false;
       setAnexoIsPdf(isPdf);
 
       // Gerar thumbnail se for PDF existente
@@ -144,14 +183,24 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       }
 
       setFoiPago(transacao.status === "pago");
-      setDataPagamento(transacao.data_pagamento ? new Date(transacao.data_pagamento) : undefined);
+      setDataPagamento(
+        transacao.data_pagamento
+          ? new Date(transacao.data_pagamento)
+          : undefined
+      );
       setJuros(transacao.juros ? String(transacao.juros) : "");
       setMultas(transacao.multas ? String(transacao.multas) : "");
       setDesconto(transacao.desconto ? String(transacao.desconto) : "");
-      setTaxasAdministrativas(transacao.taxas_administrativas ? String(transacao.taxas_administrativas) : "");
-      if (transacao.total_parcelas) setTotalParcelas(String(transacao.total_parcelas));
+      setTaxasAdministrativas(
+        transacao.taxas_administrativas
+          ? String(transacao.taxas_administrativas)
+          : ""
+      );
+      if (transacao.total_parcelas)
+        setTotalParcelas(String(transacao.total_parcelas));
       if (transacao.recorrencia) setRecorrencia(transacao.recorrencia);
-      if (transacao.data_fim_recorrencia) setDataFimRecorrencia(new Date(transacao.data_fim_recorrencia));
+      if (transacao.data_fim_recorrencia)
+        setDataFimRecorrencia(new Date(transacao.data_fim_recorrencia));
     } else if (!open) {
       resetForm();
     }
@@ -191,7 +240,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const { data: contas } = useQuery({
     queryKey: ["contas-select"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("contas").select("id, nome").eq("ativo", true).order("nome");
+      const { data, error } = await supabase
+        .from("contas")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
       if (error) throw error;
       return data;
     },
@@ -230,7 +283,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const { data: centros } = useQuery({
     queryKey: ["centros-select"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome");
+      const { data, error } = await supabase
+        .from("centros_custo")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
       if (error) throw error;
       return data;
     },
@@ -252,7 +309,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const { data: fornecedores } = useQuery({
     queryKey: ["fornecedores-select"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("fornecedores").select("id, nome").eq("ativo", true).order("nome");
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
       if (error) throw error;
       return data;
     },
@@ -272,15 +333,25 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   });
 
   // Buscar sugestões baseadas em transações anteriores do fornecedor
-  const buscarSugestoesFornecedor = async (fornecedorIdParam: string, forceApply: boolean = false) => {
+  const buscarSugestoesFornecedor = async (
+    fornecedorIdParam: string,
+    forceApply: boolean = false
+  ) => {
     if (!fornecedorIdParam || fornecedorIdParam === "none") return;
 
     try {
-      console.log("Buscando sugestões para fornecedor:", fornecedorIdParam, "forceApply:", forceApply);
+      console.log(
+        "Buscando sugestões para fornecedor:",
+        fornecedorIdParam,
+        "forceApply:",
+        forceApply
+      );
 
       const { data: transacoes, error } = await supabase
         .from("transacoes_financeiras")
-        .select("categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento")
+        .select(
+          "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento"
+        )
         .eq("fornecedor_id", fornecedorIdParam)
         .not("categoria_id", "is", null)
         .order("created_at", { ascending: false })
@@ -303,13 +374,23 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const formaPagamentoFreq: Record<string, number> = {};
 
       transacoes.forEach((t) => {
-        if (t.categoria_id) categoriaFreq[t.categoria_id] = (categoriaFreq[t.categoria_id] || 0) + 1;
-        if (t.subcategoria_id) subcategoriaFreq[t.subcategoria_id] = (subcategoriaFreq[t.subcategoria_id] || 0) + 1;
-        if (t.centro_custo_id) centroCustoFreq[t.centro_custo_id] = (centroCustoFreq[t.centro_custo_id] || 0) + 1;
+        if (t.categoria_id)
+          categoriaFreq[t.categoria_id] =
+            (categoriaFreq[t.categoria_id] || 0) + 1;
+        if (t.subcategoria_id)
+          subcategoriaFreq[t.subcategoria_id] =
+            (subcategoriaFreq[t.subcategoria_id] || 0) + 1;
+        if (t.centro_custo_id)
+          centroCustoFreq[t.centro_custo_id] =
+            (centroCustoFreq[t.centro_custo_id] || 0) + 1;
         if (t.base_ministerial_id)
-          baseMinisterialFreq[t.base_ministerial_id] = (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
-        if (t.conta_id) contaFreq[t.conta_id] = (contaFreq[t.conta_id] || 0) + 1;
-        if (t.forma_pagamento) formaPagamentoFreq[t.forma_pagamento] = (formaPagamentoFreq[t.forma_pagamento] || 0) + 1;
+          baseMinisterialFreq[t.base_ministerial_id] =
+            (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
+        if (t.conta_id)
+          contaFreq[t.conta_id] = (contaFreq[t.conta_id] || 0) + 1;
+        if (t.forma_pagamento)
+          formaPagamentoFreq[t.forma_pagamento] =
+            (formaPagamentoFreq[t.forma_pagamento] || 0) + 1;
       });
 
       const getMaisFrequente = (freq: Record<string, number>) => {
@@ -337,19 +418,31 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       const sugestoesAplicadas: string[] = [];
 
       // Quando forceApply é true (chamado do processamento de nota), sempre aplicar
-      if (categoriaSugerida && (forceApply || categoriaId === "none" || categoriaId === "")) {
+      if (
+        categoriaSugerida &&
+        (forceApply || categoriaId === "none" || categoriaId === "")
+      ) {
         setCategoriaId(categoriaSugerida);
         sugestoesAplicadas.push("categoria");
       }
-      if (subcategoriaSugerida && (forceApply || subcategoriaId === "none" || subcategoriaId === "")) {
+      if (
+        subcategoriaSugerida &&
+        (forceApply || subcategoriaId === "none" || subcategoriaId === "")
+      ) {
         setSubcategoriaId(subcategoriaSugerida);
         sugestoesAplicadas.push("subcategoria");
       }
-      if (centroCustoSugerido && (forceApply || centroCustoId === "none" || centroCustoId === "")) {
+      if (
+        centroCustoSugerido &&
+        (forceApply || centroCustoId === "none" || centroCustoId === "")
+      ) {
         setCentroCustoId(centroCustoSugerido);
         sugestoesAplicadas.push("centro de custo");
       }
-      if (baseMinisterialSugerida && (forceApply || baseMinisterialId === "none" || baseMinisterialId === "")) {
+      if (
+        baseMinisterialSugerida &&
+        (forceApply || baseMinisterialId === "none" || baseMinisterialId === "")
+      ) {
         setBaseMinisterialId(baseMinisterialSugerida);
         sugestoesAplicadas.push("base ministerial");
       }
@@ -357,14 +450,19 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         setContaId(contaSugerida);
         sugestoesAplicadas.push("conta");
       }
-      if (formaPagamentoSugerida && (forceApply || formaPagamento === "" || !formaPagamento)) {
+      if (
+        formaPagamentoSugerida &&
+        (forceApply || formaPagamento === "" || !formaPagamento)
+      ) {
         setFormaPagamento(formaPagamentoSugerida);
         sugestoesAplicadas.push("forma de pagamento");
       }
 
       if (sugestoesAplicadas.length > 0) {
         toast.success("💡 Sugestões aplicadas", {
-          description: `Baseado em transações anteriores: ${sugestoesAplicadas.join(", ")}`,
+          description: `Baseado em transações anteriores: ${sugestoesAplicadas.join(
+            ", "
+          )}`,
         });
       }
     } catch (error) {
@@ -382,7 +480,9 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   const handleFileSelected = async (file: File) => {
     setAnexoFile(file);
 
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    const isPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
     setAnexoIsPdf(isPdf);
 
     // Criar preview
@@ -413,48 +513,58 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   const processarComIA = async (file: File) => {
     setAiProcessing(true);
-    setAiStep('uploading');
+    setAiStep("uploading");
 
     try {
       // Garantir sessão e contexto antes de invocar a função
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
-        throw new Error('Sessão inválida. Refaça login antes de processar a nota.');
+        throw new Error(
+          "Sessão inválida. Refaça login antes de processar a nota."
+        );
       }
       if (!igrejaId) {
-        throw new Error('Contexto da igreja não identificado. Recarregue a página e tente novamente.');
+        throw new Error(
+          "Contexto da igreja não identificado. Recarregue a página e tente novamente."
+        );
       }
 
       // Converter para base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
+        reader.onload = (e) =>
+          resolve((e.target?.result as string).split(",")[1]);
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
 
-      setAiStep('analyzing');
+      setAiStep("analyzing");
 
-      const { data, error } = await supabase.functions.invoke("processar-nota-fiscal", {
-        body: { 
-          imageBase64: base64, 
-          mimeType: file.type,
-          igreja_id: igrejaId,
-          filial_id: isAllFiliais ? null : filialId || null
-        },
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-          apikey: supabaseAnonKey,
-        },
-      });
+      const { data, error } = await supabase.functions.invoke(
+        "processar-nota-fiscal",
+        {
+          body: {
+            imageBase64: base64,
+            mimeType: file.type,
+            igreja_id: igrejaId,
+            filial_id: isAllFiliais ? null : filialId || null,
+          },
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+            apikey: supabaseAnonKey,
+          },
+        }
+      );
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      setAiStep('extracting');
+      setAiStep("extracting");
 
       const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(7)}.${fileExt}`;
       const filePath = `notas-fiscais/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -474,7 +584,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         setAnexoPreview(publicUrl);
       }
 
-      setAiStep('filling');
+      setAiStep("filling");
 
       // Preencher campos
       await handleDadosNotaFiscal({ ...data.dados, anexo_url: publicUrl });
@@ -482,10 +592,12 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       toast.success("Nota fiscal processada com sucesso!");
     } catch (error: unknown) {
       console.error("Erro ao processar nota fiscal:", error);
-      toast.error("Erro ao processar", { description: error instanceof Error ? error.message : String(error) });
+      toast.error("Erro ao processar", {
+        description: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setAiProcessing(false);
-      setAiStep('idle');
+      setAiStep("idle");
     }
   };
 
@@ -504,7 +616,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       console.log("Processando dados da nota fiscal:", dados);
 
       if (dados.descricao) setDescricao(dados.descricao);
-      if (dados.valor_total) setValor(String(dados.valor_total).replace(".", ","));
+      if (dados.valor_total)
+        setValor(String(dados.valor_total).replace(".", ","));
 
       if (dados.data_emissao) {
         try {
@@ -525,7 +638,9 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       }
 
       if (dados.numero_nota) {
-        const novaObs = `Nota Fiscal: ${dados.numero_nota}${dados.tipo_documento ? `\nTipo: ${dados.tipo_documento}` : ""}`;
+        const novaObs = `Nota Fiscal: ${dados.numero_nota}${
+          dados.tipo_documento ? `\nTipo: ${dados.tipo_documento}` : ""
+        }`;
         setObservacoes((prev) => (prev ? `${novaObs}\n${prev}` : novaObs));
       }
 
@@ -549,7 +664,8 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       // Buscar fornecedor existente - priorizar CNPJ/CPF
       if (dados.fornecedor_nome || dados.fornecedor_cnpj_cpf) {
-        const cnpjCpfLimpo = dados.fornecedor_cnpj_cpf?.replace(/\D/g, "") || null;
+        const cnpjCpfLimpo =
+          dados.fornecedor_cnpj_cpf?.replace(/\D/g, "") || null;
         let fornecedorEncontrado: { id: string } | null = null;
 
         // Primeiro: tentar encontrar por CNPJ/CPF (mais preciso)
@@ -577,7 +693,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         }
 
         if (fornecedorEncontrado) {
-          console.log("Fornecedor encontrado, buscando sugestões:", fornecedorEncontrado.id);
+          console.log(
+            "Fornecedor encontrado, buscando sugestões:",
+            fornecedorEncontrado.id
+          );
           setFornecedorId(fornecedorEncontrado.id);
           // Chamar sugestões com forceApply para garantir aplicação
           setTimeout(async () => {
@@ -585,23 +704,30 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           }, 100);
         } else if (dados.fornecedor_nome) {
           // Criar novo fornecedor
-          const { data: novoFornecedor, error: fornecedorError } = await supabase
-            .from("fornecedores")
-            .insert({
-              nome: dados.fornecedor_nome,
-              cpf_cnpj: cnpjCpfLimpo,
-              tipo_pessoa:
-                cnpjCpfLimpo?.length === 14 ? "juridica" : cnpjCpfLimpo?.length === 11 ? "fisica" : "juridica",
-              ativo: true,
-            })
-            .select("id")
-            .single();
+          const { data: novoFornecedor, error: fornecedorError } =
+            await supabase
+              .from("fornecedores")
+              .insert({
+                nome: dados.fornecedor_nome,
+                cpf_cnpj: cnpjCpfLimpo,
+                tipo_pessoa:
+                  cnpjCpfLimpo?.length === 14
+                    ? "juridica"
+                    : cnpjCpfLimpo?.length === 11
+                    ? "fisica"
+                    : "juridica",
+                ativo: true,
+              })
+              .select("id")
+              .single();
 
           if (fornecedorError) {
             console.error("Erro ao criar fornecedor:", fornecedorError);
           } else if (novoFornecedor) {
             setFornecedorId(novoFornecedor.id);
-            queryClient.invalidateQueries({ queryKey: ["fornecedores-select"] });
+            queryClient.invalidateQueries({
+              queryKey: ["fornecedores-select"],
+            });
           }
         }
       }
@@ -637,7 +763,9 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     }
 
     if (!igrejaId) {
-      toast.error("Contexto da igreja não identificado. Recarregue e tente novamente.");
+      toast.error(
+        "Contexto da igreja não identificado. Recarregue e tente novamente."
+      );
       return;
     }
 
@@ -650,10 +778,14 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       let anexoPath = anexoUrl;
       if (anexoFile && !anexoUrl) {
         const fileExt = anexoFile.name.split(".").pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const fileName = `${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(7)}.${fileExt}`;
         const filePath = `${tipo}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage.from("transaction-attachments").upload(filePath, anexoFile);
+        const { error: uploadError } = await supabase.storage
+          .from("transaction-attachments")
+          .upload(filePath, anexoFile);
 
         if (uploadError) throw uploadError;
 
@@ -676,56 +808,80 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         valor: valorNumerico,
         data_vencimento: format(dataVencimento, "yyyy-MM-dd"),
         data_competencia: format(dataCompetencia, "yyyy-MM-dd"),
-        data_pagamento: foiPago && dataPagamento ? format(dataPagamento, "yyyy-MM-dd") : null,
+        data_pagamento:
+          foiPago && dataPagamento ? format(dataPagamento, "yyyy-MM-dd") : null,
         conta_id: contaId,
-        categoria_id: categoriaId && categoriaId !== "none" ? categoriaId : null,
-        subcategoria_id: subcategoriaId && subcategoriaId !== "none" ? subcategoriaId : null,
-        centro_custo_id: centroCustoId && centroCustoId !== "none" ? centroCustoId : null,
-        base_ministerial_id: baseMinisterialId && baseMinisterialId !== "none" ? baseMinisterialId : null,
-        fornecedor_id: fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
-        forma_pagamento: formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
-        total_parcelas: tipoLancamento === "parcelado" ? parseInt(totalParcelas) : null,
+        categoria_id:
+          categoriaId && categoriaId !== "none" ? categoriaId : null,
+        subcategoria_id:
+          subcategoriaId && subcategoriaId !== "none" ? subcategoriaId : null,
+        centro_custo_id:
+          centroCustoId && centroCustoId !== "none" ? centroCustoId : null,
+        base_ministerial_id:
+          baseMinisterialId && baseMinisterialId !== "none"
+            ? baseMinisterialId
+            : null,
+        fornecedor_id:
+          fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
+        forma_pagamento:
+          formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
+        total_parcelas:
+          tipoLancamento === "parcelado" ? parseInt(totalParcelas) : null,
         numero_parcela: tipoLancamento === "parcelado" ? 1 : null,
         recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
         data_fim_recorrencia:
-          tipoLancamento === "recorrente" && dataFimRecorrencia ? format(dataFimRecorrencia, "yyyy-MM-dd") : null,
+          tipoLancamento === "recorrente" && dataFimRecorrencia
+            ? format(dataFimRecorrencia, "yyyy-MM-dd")
+            : null,
         observacoes: observacoes || null,
         anexo_url: anexoPath || null,
         lancado_por: userData.user?.id,
         status: foiPago ? "pago" : "pendente",
         juros: foiPago && juros ? parseFloat(juros.replace(",", ".")) : 0,
         multas: foiPago && multas ? parseFloat(multas.replace(",", ".")) : 0,
-        desconto: foiPago && desconto ? parseFloat(desconto.replace(",", ".")) : 0,
-        taxas_administrativas: foiPago && taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(",", ".")) : 0,
+        desconto:
+          foiPago && desconto ? parseFloat(desconto.replace(",", ".")) : 0,
+        taxas_administrativas:
+          foiPago && taxasAdministrativas
+            ? parseFloat(taxasAdministrativas.replace(",", "."))
+            : 0,
         igreja_id: igrejaId,
         filial_id: isAllFiliais ? null : filialId,
       };
 
       let error;
       if (transacao) {
-        const result = await supabase.from("transacoes_financeiras").update(transacaoData).eq("id", String(transacao.id));
+        const result = await supabase
+          .from("transacoes_financeiras")
+          .update(transacaoData)
+          .eq("id", String(transacao.id));
         error = result.error;
       } else {
-        const result = await supabase.from("transacoes_financeiras").insert(transacaoData);
+        const result = await supabase
+          .from("transacoes_financeiras")
+          .insert(transacaoData);
         error = result.error;
       }
 
       if (error) throw error;
 
       // Apenas notificar se for uma NOVA transação (não na edição) e se for uma SAÍDA (Conta a Pagar)
-      if (!transacao && tipo === 'saida') {
+      if (!transacao && tipo === "saida") {
         try {
-          await supabase.functions.invoke('disparar-alerta', {
+          await supabase.functions.invoke("disparar-alerta", {
             body: {
-              evento: 'financeiro_conta_vencer',
+              evento: "financeiro_conta_vencer",
               dados: {
                 descricao,
                 valor: valorNumerico,
                 data_vencimento: format(dataVencimento, "yyyy-MM-dd"),
                 // Formata o valor para BRL para ficar bonito na mensagem
-                valor_formatado: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorNumerico)
-              }
-            }
+                valor_formatado: new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(valorNumerico),
+              },
+            },
           });
           console.log("🔔 Alerta de nova conta a pagar disparado");
         } catch (err) {
@@ -733,13 +889,22 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         }
       }
 
-      toast.success(`${tipo === "entrada" ? "Entrada" : "Saída"} ${transacao ? "atualizada" : "cadastrada"}!`);
+      toast.success(
+        `${tipo === "entrada" ? "Entrada" : "Saída"} ${
+          transacao ? "atualizada" : "cadastrada"
+        }!`
+      );
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
       onOpenChange(false);
       resetForm();
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : String(error) || `Erro ao ${transacao ? "atualizar" : "cadastrar"} transação`);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : String(error) ||
+              `Erro ao ${transacao ? "atualizar" : "cadastrar"} transação`
+      );
     } finally {
       setLoading(false);
     }
@@ -754,49 +919,62 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
   };
 
   // Handler para formatar valor monetário (aceita apenas números e vírgula)
-  const handleValorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    let inputValue = e.target.value;
-    
-    // Remove tudo que não é número ou vírgula
-    inputValue = inputValue.replace(/[^\d,]/g, "");
-    
-    // Permite apenas uma vírgula
-    const parts = inputValue.split(",");
-    if (parts.length > 2) {
-      inputValue = parts[0] + "," + parts.slice(1).join("");
-    }
-    
-    // Limita casas decimais a 2
-    if (parts.length === 2 && parts[1].length > 2) {
-      inputValue = parts[0] + "," + parts[1].substring(0, 2);
-    }
-    
-    setValor(inputValue);
-  }, []);
-
-  // Handler para formatar valores de juros/multas/desconto/taxas
-  const handleDecimalChange = useCallback((setter: React.Dispatch<React.SetStateAction<string>>) => {
-    return (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleValorChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       let inputValue = e.target.value;
+
+      // Remove tudo que não é número ou vírgula
       inputValue = inputValue.replace(/[^\d,]/g, "");
+
+      // Permite apenas uma vírgula
       const parts = inputValue.split(",");
       if (parts.length > 2) {
         inputValue = parts[0] + "," + parts.slice(1).join("");
       }
+
+      // Limita casas decimais a 2
       if (parts.length === 2 && parts[1].length > 2) {
         inputValue = parts[0] + "," + parts[1].substring(0, 2);
       }
-      setter(inputValue);
-    };
-  }, []);
+
+      setValor(inputValue);
+    },
+    []
+  );
+
+  // Handler para formatar valores de juros/multas/desconto/taxas
+  const handleDecimalChange = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<string>>) => {
+      return (e: React.ChangeEvent<HTMLInputElement>) => {
+        let inputValue = e.target.value;
+        inputValue = inputValue.replace(/[^\d,]/g, "");
+        const parts = inputValue.split(",");
+        if (parts.length > 2) {
+          inputValue = parts[0] + "," + parts.slice(1).join("");
+        }
+        if (parts.length === 2 && parts[1].length > 2) {
+          inputValue = parts[0] + "," + parts[1].substring(0, 2);
+        }
+        setter(inputValue);
+      };
+    },
+    []
+  );
 
   // Formulário principal - JSX inline para evitar re-render
   const formContent = (
     <div className="space-y-4">
       {/* Tipo de lançamento */}
       <div>
-        <Label className="text-sm font-medium mb-2 block">Tipo de {tipo === "entrada" ? "entrada" : "saída"} *</Label>
-        <RadioGroup value={tipoLancamento} onValueChange={(value: "unico" | "recorrente" | "parcelado") => setTipoLancamento(value)}>
+        <Label className="text-sm font-medium mb-2 block">
+          Tipo de {tipo === "entrada" ? "entrada" : "saída"} *
+        </Label>
+        <RadioGroup
+          value={tipoLancamento}
+          onValueChange={(value: "unico" | "recorrente" | "parcelado") =>
+            setTipoLancamento(value)
+          }
+        >
           <div className="flex flex-col gap-2">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="unico" id="unico" />
@@ -841,7 +1019,17 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         <div className="border-t pt-3 space-y-3">
           <div>
             <Label>Frequência *</Label>
-            <Select value={recorrencia} onValueChange={(value: "diaria" | "semanal" | "quinzenal" | "mensal" | "bimestral") => setRecorrencia(value)}>
+            <Select
+              value={recorrencia}
+              onValueChange={(
+                value:
+                  | "diaria"
+                  | "semanal"
+                  | "quinzenal"
+                  | "mensal"
+                  | "bimestral"
+              ) => setRecorrencia(value)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -863,15 +1051,22 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal",
-                    !dataFimRecorrencia && "text-muted-foreground",
+                    !dataFimRecorrencia && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dataFimRecorrencia ? format(dataFimRecorrencia, "dd/MM/yyyy", { locale: ptBR }) : "Opcional"}
+                  {dataFimRecorrencia
+                    ? format(dataFimRecorrencia, "dd/MM/yyyy", { locale: ptBR })
+                    : "Opcional"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={dataFimRecorrencia} onSelect={setDataFimRecorrencia} locale={ptBR} />
+                <Calendar
+                  mode="single"
+                  selected={dataFimRecorrencia}
+                  onSelect={setDataFimRecorrencia}
+                  locale={ptBR}
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -998,7 +1193,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             <Label>Vencimento *</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {format(dataVencimento, "dd/MM/yy", { locale: ptBR })}
                 </Button>
@@ -1018,7 +1216,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
             <Label>Competência *</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {format(dataCompetencia, "dd/MM/yy", { locale: ptBR })}
                 </Button>
@@ -1093,7 +1294,10 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label>Base Ministerial</Label>
-            <Select value={baseMinisterialId} onValueChange={setBaseMinisterialId}>
+            <Select
+              value={baseMinisterialId}
+              onValueChange={setBaseMinisterialId}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
@@ -1139,28 +1343,41 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               Já foi {tipo === "entrada" ? "recebido" : "pago"}?
             </Label>
           </div>
-          <Switch id="foi-pago" checked={foiPago} onCheckedChange={setFoiPago} />
+          <Switch
+            id="foi-pago"
+            checked={foiPago}
+            onCheckedChange={setFoiPago}
+          />
         </div>
 
         {foiPago && (
           <div className="space-y-3 pt-2 border-t">
             <div>
-              <Label>Data do {tipo === "entrada" ? "recebimento" : "pagamento"} *</Label>
+              <Label>
+                Data do {tipo === "entrada" ? "recebimento" : "pagamento"} *
+              </Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dataPagamento && "text-muted-foreground",
+                      !dataPagamento && "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataPagamento ? format(dataPagamento, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                    {dataPagamento
+                      ? format(dataPagamento, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={dataPagamento} onSelect={setDataPagamento} locale={ptBR} />
+                  <Calendar
+                    mode="single"
+                    selected={dataPagamento}
+                    onSelect={setDataPagamento}
+                    locale={ptBR}
+                  />
                 </PopoverContent>
               </Popover>
             </div>
@@ -1229,7 +1446,11 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setImagePreviewOpen(true);
   };
 
-  const title = transacao ? "Editar" : tipo === "entrada" ? "Nova Entrada" : "Nova Saída";
+  const title = transacao
+    ? "Editar"
+    : tipo === "entrada"
+    ? "Nova Entrada"
+    : "Nova Saída";
 
   return (
     <>
@@ -1247,12 +1468,19 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           {/* Overlay de processamento IA */}
           <AIProcessingOverlay currentStep={aiStep} />
           <DialogTitle className="sr-only">{title}</DialogTitle>
-          <DialogDescription className="sr-only">Formulário de {tipo === "entrada" ? "entrada" : "saída"} financeira</DialogDescription>
+          <DialogDescription className="sr-only">
+            Formulário de {tipo === "entrada" ? "entrada" : "saída"} financeira
+          </DialogDescription>
           <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
+            <h2 className="text-lg font-semibold leading-none tracking-tight">
+              {title}
+            </h2>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
-            <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-col h-full min-h-0"
+            >
               {/* Desktop: Split View */}
               <div className="hidden md:flex md:gap-6 flex-1 min-h-0">
                 {/* Coluna esquerda: Imagem */}
@@ -1284,9 +1512,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
                 {/* Coluna direita: Formulário com scroll */}
                 <ScrollArea className="flex-1 min-w-0 pl-4 border-l h-[calc(90vh-180px)]">
-                  <div className="pr-4">
-                    {formContent}
-                  </div>
+                  <div className="pr-4">{formContent}</div>
                 </ScrollArea>
               </div>
 
@@ -1314,13 +1540,22 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
               <div
                 className={cn(
                   "flex gap-2 pt-4 border-t bg-background shrink-0",
-                  isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg",
+                  isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg"
                 )}
               >
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  className="flex-1"
+                >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={loading || aiProcessing} className="flex-1">
+                <Button
+                  type="submit"
+                  disabled={loading || aiProcessing}
+                  className="flex-1"
+                >
                   {loading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />

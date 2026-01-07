@@ -10,6 +10,7 @@
 ## 🎯 Visão Geral do Modelo
 
 ### Conceito Central
+
 Sistema multi-tenant onde a **Matriz governa estrutura e conteúdo**, enquanto **Filiais executam operação local** usando recursos globais + específicos.
 
 ```
@@ -35,6 +36,7 @@ Sistema multi-tenant onde a **Matriz governa estrutura e conteúdo**, enquanto *
 ### Camadas de Dados
 
 #### 🌐 **TIER 1: GLOBAIS** (Matriz define, Filiais herdam)
+
 - Estrutura de times/ministérios
 - Jornadas de discipulado
 - Cursos e treinamentos
@@ -46,6 +48,7 @@ Sistema multi-tenant onde a **Matriz governa estrutura e conteúdo**, enquanto *
 - Políticas e workflows
 
 #### 🏢 **TIER 2: LOCAIS** (Cada filial gerencia)
+
 - Infraestrutura física (salas)
 - Cadastro de membros/famílias
 - Voluntários e escalas
@@ -55,6 +58,7 @@ Sistema multi-tenant onde a **Matriz governa estrutura e conteúdo**, enquanto *
 - Atendimentos e intercessões
 
 #### 🔄 **TIER 3: HÍBRIDOS** (Global + Instância Local)
+
 - **Eventos:** Matriz cria "Congresso Nacional" → Cada filial tem inscrições próprias
 - **Cursos:** Matriz define conteúdo → Cada filial tem turmas e matrículas
 - **Jornadas:** Matriz cria trilha → Cada filial acompanha progresso dos membros
@@ -71,25 +75,26 @@ Sistema multi-tenant onde a **Matriz governa estrutura e conteúdo**, enquanto *
 
 ```yaml
 Global (Organization Level):
-  Service Types:        # "Domingo 10h", "Quarta 20h" (herdados)
-  Check-in Labels:      # "Primeira Vez", "Alérgico" (herdados)
-  Position Types:       # "Vocal", "Baixo", "Bateria" (globais)
-  Workflow Templates:   # Processos padronizados
-  Form Templates:       # Formulários reutilizáveis
-  
+  Service Types: # "Domingo 10h", "Quarta 20h" (herdados)
+  Check-in Labels: # "Primeira Vez", "Alérgico" (herdados)
+  Position Types: # "Vocal", "Baixo", "Bateria" (globais)
+  Workflow Templates: # Processos padronizados
+  Form Templates: # Formulários reutilizáveis
+
 Per Campus (Local):
-  Actual Services:      # Instâncias dos cultos
-  Check-ins:            # Registros de presença
-  Team Members:         # Voluntários locais
-  Rooms:                # Salas físicas
-  
+  Actual Services: # Instâncias dos cultos
+  Check-ins: # Registros de presença
+  Team Members: # Voluntários locais
+  Rooms: # Salas físicas
+
 Hybrid:
-  Songs:                # Banco global, setlists locais
-  People:               # Podem estar em múltiplos campus
-  Groups:               # Podem ser cross-campus
+  Songs: # Banco global, setlists locais
+  People: # Podem estar em múltiplos campus
+  Groups: # Podem ser cross-campus
 ```
 
 **Funcionalidades chave:**
+
 - ✅ Campus pode "override" configurações globais
 - ✅ Relatórios consolidados automáticos
 - ✅ Permissões granulares por campus
@@ -103,26 +108,27 @@ Hybrid:
 
 ```yaml
 Nível Igreja (Global):
-  Estrutura Ministerial:  # Departamentos padronizados
-  Cursos EBD:             # Conteúdo compartilhado
+  Estrutura Ministerial: # Departamentos padronizados
+  Cursos EBD: # Conteúdo compartilhado
   Categorias Financeiras: # Plano de contas unificado
-  Templates:              # Comunicados, relatórios
-  Campanhas:              # Arrecadações nacionais
-  
+  Templates: # Comunicados, relatórios
+  Campanhas: # Arrecadações nacionais
+
 Nível Congregação (Local):
-  Membros:                # Cadastro local
-  Células:                # Grupos pequenos
-  Dizimistas:             # Contribuições locais
-  Eventos:                # Agenda local
-  Patrimônio:             # Bens da sede
-  
+  Membros: # Cadastro local
+  Células: # Grupos pequenos
+  Dizimistas: # Contribuições locais
+  Eventos: # Agenda local
+  Patrimônio: # Bens da sede
+
 Dashboard:
-  Visão Consolidada:      # Matriz vê todas as sedes
-  Comparativos:           # Benchmarks entre sedes
-  Metas:                  # Global com breakdown local
+  Visão Consolidada: # Matriz vê todas as sedes
+  Comparativos: # Benchmarks entre sedes
+  Metas: # Global com breakdown local
 ```
 
 **Diferenciais:**
+
 - ✅ **Financeiro consolidado** com drill-down
 - ✅ **Transferência de membros** entre sedes
 - ✅ **Relatórios comparativos** automáticos
@@ -136,26 +142,27 @@ Dashboard:
 
 ```yaml
 Rede (Matriz):
-  Estatuto:               # Documentos institucionais
-  Organograma:            # Estrutura hierárquica
-  Currículo Teológico:    # Conteúdo de ensino
-  Regimento Interno:      # Normas e políticas
-  Sistema de Dízimos:     # Regras de repartição
-  
+  Estatuto: # Documentos institucionais
+  Organograma: # Estrutura hierárquica
+  Currículo Teológico: # Conteúdo de ensino
+  Regimento Interno: # Normas e políticas
+  Sistema de Dízimos: # Regras de repartição
+
 Igreja Local:
-  Membros Ativos:         # Rol de membros
-  Departamentos Locais:   # Adaptações locais
-  Agenda:                 # Eventos e cultos
-  Tesouraria:             # Caixa local
-  Patrimônio:             # Bens e imóveis
-  
+  Membros Ativos: # Rol de membros
+  Departamentos Locais: # Adaptações locais
+  Agenda: # Eventos e cultos
+  Tesouraria: # Caixa local
+  Patrimônio: # Bens e imóveis
+
 Integrações:
-  Contabilidade:          # Exportação para contador
-  Financeiro Rede:        # Remessas para sede
-  BI/Analytics:           # Dashboards executivos
+  Contabilidade: # Exportação para contador
+  Financeiro Rede: # Remessas para sede
+  BI/Analytics: # Dashboards executivos
 ```
 
 **Pontos fortes:**
+
 - ✅ **Gestão financeira robusta** (compliance contábil)
 - ✅ **Workflow de aprovações** (hierárquico)
 - ✅ **Auditoria completa** (rastreabilidade)
@@ -169,24 +176,25 @@ Integrações:
 
 ```yaml
 Church Settings (Global):
-  Custom Fields:          # Campos personalizados
-  Tags & Categories:      # Taxonomia global
-  Email Templates:        # Comunicações
-  Giving Categories:      # Categorias de doações
-  
+  Custom Fields: # Campos personalizados
+  Tags & Categories: # Taxonomia global
+  Email Templates: # Comunicações
+  Giving Categories: # Categorias de doações
+
 Campus Level (se habilitado):
-  Events & Attendance:    # Específicos da unidade
-  Small Groups:           # Grupos locais
-  Contributions:          # Doações por campus
-  Volunteers:             # Serviço local
-  
+  Events & Attendance: # Específicos da unidade
+  Small Groups: # Grupos locais
+  Contributions: # Doações por campus
+  Volunteers: # Serviço local
+
 Filosofia:
-  "Simple by Design":     # Não overengineer
-  Opt-in Complexity:      # Campus é opcional
-  Mobile-first:           # App nativo robusto
+  "Simple by Design": # Não overengineer
+  Opt-in Complexity: # Campus é opcional
+  Mobile-first: # App nativo robusto
 ```
 
 **Lições:**
+
 - ✅ **Multi-campus é opcional** (nem todas igrejas precisam)
 - ✅ **Interface única** com toggle de campus
 - ✅ **Relatórios simples mas eficazes**
@@ -202,12 +210,12 @@ Organisation:
   Service Types:          # Tipos de culto
   Volunteer Positions:    # Posições de serviço
   Rosters Templates:      # Templates de escalas
-  
+
 Venues (Locais):
   Specific Services:      # Cultos agendados
   Room Bookings:          # Reservas de espaços
   Local Teams:            # Times da unidade
-  
+
 Recurso Killer:
   "Roster" (Escalas):     # Sistema de revezamento
   Auto-fill:              # IA sugere voluntários
@@ -223,53 +231,56 @@ Recurso Killer:
 
 ```yaml
 Church-Wide:
-  Member Database:        # Banco central
-  Giving Setup:           # Configurações de doações
-  Communication:          # Templates e envios
-  
+  Member Database: # Banco central
+  Giving Setup: # Configurações de doações
+  Communication: # Templates e envios
+
 Locations:
-  Attendance Tracking:    # Por unidade
-  Check-In Kiosks:        # Kids específico
-  Event Calendar:         # Agenda local
-  
+  Attendance Tracking: # Por unidade
+  Check-In Kiosks: # Kids específico
+  Event Calendar: # Agenda local
+
 Destaque:
-  Preço Acessível:        # Modelo freemium
-  Mobile Check-In:        # App dedicado Kids
-  Text-to-Give:           # Doações por SMS
+  Preço Acessível: # Modelo freemium
+  Mobile Check-In: # App dedicado Kids
+  Text-to-Give: # Doações por SMS
 ```
 
 ---
 
 ## 🎯 Padrões Comuns Identificados
 
-| Aspecto | Como mercado resolve |
-|---------|---------------------|
-| **Hierarquia** | 2-3 níveis (Org → Region → Campus/Venue) |
-| **Configurações** | Globais por padrão, override local **permitido** |
-| **Dados transacionais** | **Sempre locais**, agregação no superior |
-| **Conteúdo/Assets** | Biblioteca compartilhada com **permissões** |
-| **Relatórios** | Drill-down: consolidado → regional → unidade |
-| **Permissões** | Role-based **+** Location-based |
-| **UI/UX** | Toggle "Ver tudo" vs "Apenas minha unidade" |
-| **Propagação** | **Push** (matriz envia) ou **Pull** (filial escolhe) |
-| **Mobile** | Seletor de campus/sede persistente |
-| **Financeiro** | Consolidação com **drill-down** |
-| **Transferências** | Membros podem migrar entre unidades |
-| **Check-in** | Labels/tags globais, registros locais |
-| **Voluntários** | Posições globais, pessoas locais |
+| Aspecto                 | Como mercado resolve                                 |
+| ----------------------- | ---------------------------------------------------- |
+| **Hierarquia**          | 2-3 níveis (Org → Region → Campus/Venue)             |
+| **Configurações**       | Globais por padrão, override local **permitido**     |
+| **Dados transacionais** | **Sempre locais**, agregação no superior             |
+| **Conteúdo/Assets**     | Biblioteca compartilhada com **permissões**          |
+| **Relatórios**          | Drill-down: consolidado → regional → unidade         |
+| **Permissões**          | Role-based **+** Location-based                      |
+| **UI/UX**               | Toggle "Ver tudo" vs "Apenas minha unidade"          |
+| **Propagação**          | **Push** (matriz envia) ou **Pull** (filial escolhe) |
+| **Mobile**              | Seletor de campus/sede persistente                   |
+| **Financeiro**          | Consolidação com **drill-down**                      |
+| **Transferências**      | Membros podem migrar entre unidades                  |
+| **Check-in**            | Labels/tags globais, registros locais                |
+| **Voluntários**         | Posições globais, pessoas locais                     |
 
 ---
 
 ## Pendências Identificadas
 
 ### 1. Jornadas (Prioridade: Média)
+
 **Status:** Pendente de análise e implementação
 
 **Contexto:**
+
 - Atualmente a tela de Jornadas não possui filtros de filial implementados
 - Precisa definir estratégia: compartilhar jornadas entre filiais ou ter jornadas específicas por filial?
 
 **Tarefas:**
+
 - [ ] Analisar modelo de negócio: jornadas são compartilhadas ou específicas por filial?
 - [ ] Adicionar `filial_id` à tabela `jornadas` (se necessário)
 - [ ] Implementar filtros em `src/pages/Jornadas.tsx`
@@ -278,6 +289,7 @@ Destaque:
 - [ ] Testar comportamento "Todas as Filiais" vs filial específica
 
 **Arquivos afetados:**
+
 - `src/pages/Jornadas.tsx`
 - `src/pages/JornadaBoard.tsx`
 - `supabase/migrations/` (nova migration se necessário)
@@ -290,32 +302,32 @@ Destaque:
 
 #### 📊 Matriz de Decisão
 
-| Módulo/Dado | Camada | Justificativa | Ação Necessária |
-|-------------|--------|---------------|-----------------|
-| **Salas** | 🏢 Local | Infraestrutura física varia | ✅ Já implementado |
-| **Times/Ministérios** | 🌐 Global | Estrutura ministerial padronizada | 🔴 Mudar para global |
-| **Membros/Famílias** | 🏢 Local | Cadastro específico da unidade | ✅ Correto |
-| **Check-ins Kids** | 🏢 Local | Presença em sala física local | ✅ Correto |
-| **Voluntários (pessoas)** | 🏢 Local | Serviço na própria filial | ✅ Correto |
-| **Escalas** | 🏢 Local | Voluntários locais em times locais | ✅ Correto |
-| **Jornadas (trilha)** | 🌐 Global | Conteúdo de discipulado padrão | 🔴 Tornar global |
-| **Jornadas (progresso)** | 🏢 Local | Acompanhamento individual | 🟡 Criar tabela N:N |
-| **Cursos (conteúdo)** | 🌐 Global | Material educacional padrão | 🔴 Tornar global |
-| **Cursos (matrículas)** | 🏢 Local | Alunos e turmas locais | 🟡 Criar tabela N:N |
-| **Eventos (congresso)** | 🔄 Híbrido | Evento global, inscrições locais | 🟡 Criar tabela N:N |
-| **Eventos (culto)** | 🏢 Local | Específico da unidade | ✅ Correto |
-| **Comunicados (template)** | 🌐 Global | Mensagem institucional | 🔴 Tornar global |
-| **Comunicados (leitura)** | 🏢 Local | Rastrear visualizações | 🟡 Criar tabela N:N |
-| **Notificações (template/canais)** | 🌐 Global | Canais e padrões definidos pela Matriz | 🟡 Adicionar `eh_global`, `visivel_para_filiais` |
-| **Notificações (disparos/logs)** | 🔄 Híbrido | Disparos herdam igreja_id e filial_id; alcance global/local | 🟡 Campos `alcance`, `filiais_destino[]`, filtro `.or(filial_id.eq,filial_id.is.null)` |
-| **Mídia/Imagens** | 🌐 Global | Biblioteca compartilhada | 🔴 Adicionar flag `compartilhada` |
-| **Banners** | 🌐 Global | Comunicação institucional | 🔴 Adicionar `visivel_para_filiais` |
-| **Categorias Financeiras** | 🌐 Global | Plano de contas unificado | ✅ Implementado (com `origem_matriz_id`) |
-| **Transações Financeiras** | 🏢 Local | Receitas/despesas da unidade | ✅ Correto |
-| **Fornecedores** | 🔄 Híbrido | Nacionais (global) + Locais | 🟡 Adicionar flag `eh_nacional` |
-| **Testemunhos** | 🏢 Local | Histórias da comunidade local | ✅ Correto (ou global se quiser compartilhar) |
-| **Intercessões** | 🏢 Local | Pedidos específicos da unidade | ✅ Correto |
-| **Planos Leitura** | 🌐 Global | Desafios bíblicos institucionais | 🔴 Tornar global |
+| Módulo/Dado                        | Camada     | Justificativa                                               | Ação Necessária                                                                        |
+| ---------------------------------- | ---------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Salas**                          | 🏢 Local   | Infraestrutura física varia                                 | ✅ Já implementado                                                                     |
+| **Times/Ministérios**              | 🌐 Global  | Estrutura ministerial padronizada                           | 🔴 Mudar para global                                                                   |
+| **Membros/Famílias**               | 🏢 Local   | Cadastro específico da unidade                              | ✅ Correto                                                                             |
+| **Check-ins Kids**                 | 🏢 Local   | Presença em sala física local                               | ✅ Correto                                                                             |
+| **Voluntários (pessoas)**          | 🏢 Local   | Serviço na própria filial                                   | ✅ Correto                                                                             |
+| **Escalas**                        | 🏢 Local   | Voluntários locais em times locais                          | ✅ Correto                                                                             |
+| **Jornadas (trilha)**              | 🌐 Global  | Conteúdo de discipulado padrão                              | 🔴 Tornar global                                                                       |
+| **Jornadas (progresso)**           | 🏢 Local   | Acompanhamento individual                                   | 🟡 Criar tabela N:N                                                                    |
+| **Cursos (conteúdo)**              | 🌐 Global  | Material educacional padrão                                 | 🔴 Tornar global                                                                       |
+| **Cursos (matrículas)**            | 🏢 Local   | Alunos e turmas locais                                      | 🟡 Criar tabela N:N                                                                    |
+| **Eventos (congresso)**            | 🔄 Híbrido | Evento global, inscrições locais                            | 🟡 Criar tabela N:N                                                                    |
+| **Eventos (culto)**                | 🏢 Local   | Específico da unidade                                       | ✅ Correto                                                                             |
+| **Comunicados (template)**         | 🌐 Global  | Mensagem institucional                                      | 🔴 Tornar global                                                                       |
+| **Comunicados (leitura)**          | 🏢 Local   | Rastrear visualizações                                      | 🟡 Criar tabela N:N                                                                    |
+| **Notificações (template/canais)** | 🌐 Global  | Canais e padrões definidos pela Matriz                      | 🟡 Adicionar `eh_global`, `visivel_para_filiais`                                       |
+| **Notificações (disparos/logs)**   | 🔄 Híbrido | Disparos herdam igreja_id e filial_id; alcance global/local | 🟡 Campos `alcance`, `filiais_destino[]`, filtro `.or(filial_id.eq,filial_id.is.null)` |
+| **Mídia/Imagens**                  | 🌐 Global  | Biblioteca compartilhada                                    | 🔴 Adicionar flag `compartilhada`                                                      |
+| **Banners**                        | 🌐 Global  | Comunicação institucional                                   | 🔴 Adicionar `visivel_para_filiais`                                                    |
+| **Categorias Financeiras**         | 🌐 Global  | Plano de contas unificado                                   | ✅ Implementado (com `origem_matriz_id`)                                               |
+| **Transações Financeiras**         | 🏢 Local   | Receitas/despesas da unidade                                | ✅ Correto                                                                             |
+| **Fornecedores**                   | 🔄 Híbrido | Nacionais (global) + Locais                                 | 🟡 Adicionar flag `eh_nacional`                                                        |
+| **Testemunhos**                    | 🏢 Local   | Histórias da comunidade local                               | ✅ Correto (ou global se quiser compartilhar)                                          |
+| **Intercessões**                   | 🏢 Local   | Pedidos específicos da unidade                              | ✅ Correto                                                                             |
+| **Planos Leitura**                 | 🌐 Global  | Desafios bíblicos institucionais                            | 🔴 Tornar global                                                                       |
 
 ---
 
@@ -324,6 +336,7 @@ Destaque:
 **Objetivo:** Garantir que todas as telas respeitam o contexto e camada corretos
 
 **Telas já implementadas:** ✅
+
 - [x] Kids Dashboard (✅ filtros aplicados, ⚠️ precisa revisar eventos)
 - [x] Kids Config/Salas (✅ correto - sempre local)
 - [x] Voluntariado (⚠️ filtrado local, **deveria ser global**)
@@ -335,6 +348,7 @@ Destaque:
 **Telas que precisam revisão:** 🔍
 
 #### 2.1. Financeiro ✅ **Estrutura OK, Falta Consolidação**
+
 - [x] Estrutura de cadastros replicável (IMPLEMENTADO)
 - [x] Receitas/Despesas sempre locais (correto)
 - [ ] Dashboard consolidado (visualização Matriz de todas filiais)
@@ -343,7 +357,9 @@ Destaque:
 - [ ] Metas financeiras por filial
 
 **Modelo atual:** ✅ Correto
+
 #### 2.3. Agenda/Eventos 🔴 **ALTA PRIORIDADE - HÍBRIDO**
+
 **Modelo recomendado:** Evento global com inscrições/participações locais
 
 - [ ] Adicionar `eh_global` à tabela `eventos`
@@ -355,15 +371,18 @@ Destaque:
 - [ ] Cultos regulares: sempre locais (específicos de cada unidade)
 
 **Casos de uso:**
+
 - ✅ **Congresso/Retiro Nacional:** Evento global, cada filial gerencia inscrições
 - ✅ **Culto Regular:** Sempre local (cada filial tem horário próprio)
 - ✅ **Campanha de Jejum:** Global (todos participam), acompanhamento local
 
 #### 2.2. Intercessão ⚠️ **PRECISA ANÁLISE**
+
 - [ ] Pedidos de oração são por filial ou globais?
 - [ ] Sala de Guerra compartilhada ou separada?
 
 #### 2.3. Agenda/Eventos ⚠️ **PRIORIDADE**
+
 - [ ] Eventos globais vs eventos por filial
 - [ ] Escalas por filial
 - [ ] Cultos/Eventos vinculados a filial?
@@ -372,6 +391,7 @@ Destaque:
 - [ ] Sincronização de alterações: mudanças na Matriz refletem nas filiais?
 
 #### 2.4. Pessoas/Membros
+
 - [ ] Perfis vinculados a filial específica?
 - [ ] Transferência entre filiais
 - [ ] Visitantes por filial
@@ -383,6 +403,7 @@ Destaque:
 **Contexto:** Sistema SaaS com integrações Make, ChatGPT, Gemini, WABA gerenciadas centralmente.
 
 **Problema identificado:**
+
 - Edge function `processar-nota-fiscal` tenta filtrar `chatbot_configs` por `igreja_id`, mas tabela é **global** (coluna não existe)
 - Query falha silenciosamente e usa defaults
 - Arquitetura inconsistente: intenção multi-tenant vs implementação global
@@ -390,6 +411,7 @@ Destaque:
 **Modelo Recomendado: HÍBRIDO com 3 Camadas**
 
 ##### 🌐 **Camada 1: GLOBAL (Matriz/SaaS)**
+
 Gerenciamento centralizado das credenciais e infraestrutura:
 
 - [ ] Criar tabela `saas_api_configs`:
@@ -409,12 +431,14 @@ Gerenciamento centralizado das credenciais e infraestrutura:
 - [ ] Webhooks de infraestrutura
 
 **Benefícios:**
+
 - ✅ Segurança centralizada (não expõe keys sensíveis)
 - ✅ Faturamento simplificado (controle de consumo)
 - ✅ Economia de escala (pool de recursos)
 - ✅ Manutenção única (atualiza 1 vez, propaga pra todos)
 
 ##### 🏢 **Camada 2: POR IGREJA (Opcional - Flexibilização)**
+
 Personalização sem comprometer segurança:
 
 - [ ] Criar tabela `igreja_api_preferences`:
@@ -439,11 +463,13 @@ Personalização sem comprometer segurança:
 - [ ] BYOK (Bring Your Own Key) para igrejas enterprise
 
 **Benefícios:**
+
 - ✅ Personalização sem comprometer segurança
 - ✅ A/B testing por igreja
 - ✅ Upsell: "Quer usar GPT-4? Plano Premium"
 
 ##### 🏬 **Camada 3: POR FILIAL (Operacional - Logs)**
+
 Rastreabilidade e chargeback:
 
 - [ ] Criar tabela `api_usage_logs`:
@@ -459,7 +485,7 @@ Rastreabilidade e chargeback:
     metadata JSONB,
     created_at TIMESTAMP DEFAULT NOW()
   );
-  CREATE INDEX idx_usage_logs_igreja_filial 
+  CREATE INDEX idx_usage_logs_igreja_filial
   ON api_usage_logs(igreja_id, filial_id, created_at DESC);
   ```
 - [ ] Logs de uso (rastreabilidade)
@@ -467,6 +493,7 @@ Rastreabilidade e chargeback:
 - [ ] Estatísticas de consumo
 
 **Benefícios:**
+
 - ✅ Chargeback interno (igreja cobra filiais)
 - ✅ Relatórios de uso por unidade
 - ✅ Identificação de anomalias
@@ -474,17 +501,19 @@ Rastreabilidade e chargeback:
 ##### 🛠️ **Correção Imediata (Bug Atual)**
 
 **Solução Curto Prazo:**
+
 - [ ] Atualizar `processar-nota-fiscal/index.ts`:
   - Remover `.eq('igreja_id', igrejaId)` de `getChatbotConfig()`
   - Função deve buscar config global até migração
 
 **Solução Definitivo (Após Decisão Estratégica):**
+
 - [ ] Migração `chatbot_configs`:
   ```sql
   ALTER TABLE chatbot_configs ADD COLUMN igreja_id UUID REFERENCES igrejas(id);
   ALTER TABLE chatbot_configs ADD COLUMN eh_global BOOLEAN DEFAULT true;
   UPDATE chatbot_configs SET eh_global = true WHERE igreja_id IS NULL;
-  CREATE INDEX idx_chatbot_configs_lookup 
+  CREATE INDEX idx_chatbot_configs_lookup
   ON chatbot_configs(edge_function_name, igreja_id, ativo) WHERE ativo = true;
   ```
 - [ ] Atualizar edge functions para buscar config hierárquica:
@@ -496,39 +525,44 @@ Rastreabilidade e chargeback:
 
 ##### 💰 **Modelo de Negócio Sugerido**
 
-| Plano | Config | Features | Preço |
-|-------|--------|----------|-------|
-| **Básico** | 🌐 Global | Credenciais SaaS, modelos básicos (gpt-4o-mini, gemini-flash), quotas compartilhadas | R$ X/mês |
-| **Personalizado** | 🔄 Híbrido | System prompts customizados, escolha de modelo (gpt-4o, gemini-pro), webhooks personalizados | R$ X + Y/mês |
-| **Enterprise** | 🏢 BYOK | Usa credenciais próprias, sem limite de quota, suporte dedicado | R$ Z/mês (menor) |
+| Plano             | Config     | Features                                                                                     | Preço            |
+| ----------------- | ---------- | -------------------------------------------------------------------------------------------- | ---------------- |
+| **Básico**        | 🌐 Global  | Credenciais SaaS, modelos básicos (gpt-4o-mini, gemini-flash), quotas compartilhadas         | R$ X/mês         |
+| **Personalizado** | 🔄 Híbrido | System prompts customizados, escolha de modelo (gpt-4o, gemini-pro), webhooks personalizados | R$ X + Y/mês     |
+| **Enterprise**    | 🏢 BYOK    | Usa credenciais próprias, sem limite de quota, suporte dedicado                              | R$ Z/mês (menor) |
 
 ##### 📋 **Fluxo de Decisão Implementado**
+
 ```typescript
 async function getApiConfig(servico, igrejaId) {
   // 1. Busca preferência da igreja
   const preference = await getIgrejaPreference(servico, igrejaId);
-  
+
   // 2. Se igreja tem credenciais próprias (BYOK)
   if (preference?.usar_credenciais_proprias && preference.api_key_propria) {
-    return { apiKey: decrypt(preference.api_key_propria), source: 'igreja_byok' };
+    return {
+      apiKey: decrypt(preference.api_key_propria),
+      source: "igreja_byok",
+    };
   }
-  
+
   // 3. Se igreja tem preferências mas usa pool SaaS
   if (preference) {
     const globalConfig = await getGlobalConfig(servico);
-    return { 
-      apiKey: globalConfig.api_key, 
+    return {
+      apiKey: globalConfig.api_key,
       model: preference.modelo_preferido || globalConfig.modelo_default,
-      source: 'saas_customizado' 
+      source: "saas_customizado",
     };
   }
-  
+
   // 4. Fallback: config global pura
   return await getGlobalConfig(servico);
 }
 ```
 
 **Arquivos afetados:**
+
 - `supabase/functions/processar-nota-fiscal/index.ts` (correção imediata)
 - `supabase/functions/*/` (todas edge functions que usam APIs externas)
 - Migrations: `saas_api_configs`, `igreja_api_preferences`, `api_usage_logs`
@@ -541,6 +575,7 @@ async function getApiConfig(servico, igrejaId) {
 **Objetivo:** Verificar autenticação, provedor de IA, origem das chaves e escopo Igreja/Filial em ambos os fluxos (tela e chatbot-financeiro), e apontar ajustes necessários.
 
 **Evidências (código atual):**
+
 - Autenticação:
   - Externa (tela): exige `Authorization` (JWT) e validação de cargos em `user_app_roles` (`admin`, `tesoureiro`, `pastor`).
   - Interna (chatbot): cabeçalho `X-Internal-Call: true` → pula auth de usuário e usa `SERVICE ROLE`.
@@ -557,27 +592,33 @@ async function getApiConfig(servico, igrejaId) {
   - `supabase/functions/chatbot-financeiro/index.ts` chama com `X-Internal-Call: true`, `Authorization: Bearer SERVICE_KEY` e envia `igreja_id` (ok).
 
 **Gaps Identificados:**
+
 - `TransacaoDialog.tsx` não envia `igreja_id` para a função (inconsistência com `Reembolsos.tsx`).
 - A função não recebe/usa `filial_id`; sugestões de categoria/centro podem ignorar segregação por filial caso exista em `categorias_financeiras`/`centros_custo`. (a confirmar)
 - `getFinancialOptions()` filtra apenas por `igreja_id` — não replica o comportamento de telas que aplicam `filial_id` quando não é "Todas as Filiais".
 
 **Ações Imediatas (sem implementar agora):**
+
 - [ ] `TransacaoDialog.tsx`: incluir `igreja_id` no `invoke('processar-nota-fiscal', { body })` para alinhar com a função.
 - [ ] Avaliar passagem opcional de `filial_id` no body da função e refletir nos filtros de `getFinancialOptions()`.
 - [ ] Confirmar no schema se `categorias_financeiras`, `subcategorias_financeiras` e `centros_custo` possuem `filial_id` e como o RLS lida com isso. (a confirmar)
 
 **Evolução Planejada (IA Global/Filial e Cobrança):**
+
 - Config IA: manter `chatbot_configs` global (curto prazo); migrar para modelo híbrido (`igreja_id`, `eh_global`) para permitir override por igreja (opcional) alinhado à seção 2.8.
 - Escopo por filial: permitir filtro opcional por `filial_id` quando a igreja opera plano de contas segregado por filial (híbrido). (a confirmar)
 - Medição/Chargeback: registrar uso por `igreja_id`/`filial_id` em `api_usage_logs` para billing/quotas (ver 2.8).
 
 **Aceite desta aferição:**
+
 - Documentado provedor, autenticação e origem de chaves.
 - Mapeados dois fluxos (tela e chatbot) com diferenças de payload.
 - Listadas ações mínimas para consistência e aderência multi-tenant.
 
 ---
+
 ### Fase 1: Definir Arquitetura de Dados (2-3 dias)
+
 **Objetivo:** Classificar todos os módulos em Global/Local/Híbrido
 
 - [ ] Revisar matriz de decisão acima
@@ -590,9 +631,11 @@ async function getApiConfig(servico, igrejaId) {
 ---
 
 ### Fase 2: Database Schema Refactoring (3-5 dias)
+
 **Objetivo:** Adicionar campos de herança e criar tabelas híbridas
 
 #### 2.1 Migrations para Dados Globais
+
 ```sql
 -- Campos padrão para todos os globais
 ALTER TABLE times
@@ -602,11 +645,12 @@ ALTER TABLE times
   ADD COLUMN customizado_localmente BOOLEAN DEFAULT false,
   ADD COLUMN visivel_para_filiais BOOLEAN DEFAULT false;
 
--- Repetir para: jornadas, cursos, comunicados_templates, 
+-- Repetir para: jornadas, cursos, comunicados_templates,
 -- midias, banners, planos_leitura
 ```
 
 #### 2.2 Tabelas de Relacionamento (Híbridos)
+
 ```sql
 -- Jornadas (trilha global, progresso local)
 CREATE TABLE jornadas_participantes (
@@ -670,12 +714,13 @@ CREATE TABLE comunicados_leituras (
 ```
 
 #### 2.3 Constraints e Índices
+
 ```sql
 -- Garantir mesma igreja
 ALTER TABLE times
   ADD CONSTRAINT chk_origem_mesma_igreja
   CHECK (
-    origem_matriz_id IS NULL 
+    origem_matriz_id IS NULL
     OR EXISTS (
       SELECT 1 FROM times origem
       WHERE origem.id = origem_matriz_id
@@ -696,9 +741,11 @@ CREATE INDEX idx_eventos_participantes ON eventos_participantes(evento_id, filia
 ---
 
 ### Fase 3: Helpers e Utilitários (1-2 dias)
+
 **Objetivo:** Criar funções reutilizáveis para queries
 
 #### 3.1 Query Helper
+
 ```typescript
 // src/lib/queryHelpers.ts
 export function applyGlobalOrLocalFilter(
@@ -711,16 +758,16 @@ export function applyGlobalOrLocalFilter(
     campoGlobal?: string;
   }
 ) {
-  const { 
-    incluirGlobais = true, 
-    campoFilial = 'filial_id',
-    campoGlobal = 'eh_global'
+  const {
+    incluirGlobais = true,
+    campoFilial = "filial_id",
+    campoGlobal = "eh_global",
   } = opcoes || {};
-  
+
   if (isAllFiliais) {
     return query; // Admin vê tudo
   }
-  
+
   if (!filialId) {
     // Usuário da Matriz
     if (incluirGlobais) {
@@ -728,19 +775,20 @@ export function applyGlobalOrLocalFilter(
     }
     return query.is(campoFilial, null);
   }
-  
+
   if (incluirGlobais) {
     // Filial vê: próprios + globais + Matriz
     return query.or(
       `${campoFilial}.eq.${filialId},${campoGlobal}.eq.true,${campoFilial}.is.null`
     );
   }
-  
+
   return query.eq(campoFilial, filialId);
 }
 ```
 
 #### 3.2 Hook Customizado
+
 ```typescript
 // src/hooks/useGlobalData.ts
 export function useGlobalData<T>(
@@ -748,35 +796,29 @@ export function useGlobalData<T>(
   opcoes?: { incluirLocais?: boolean }
 ) {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
-  
+
   const query = useQuery({
-    queryKey: [tabela, 'global', igrejaId, filialId],
+    queryKey: [tabela, "global", igrejaId, filialId],
     queryFn: async () => {
-      let query = supabase
-        .from(tabela)
-        .select('*')
-        .eq('ativo', true);
-      
-      if (igrejaId) query = query.eq('igreja_id', igrejaId);
-      
-      query = applyGlobalOrLocalFilter(
-        query, 
-        filialId, 
-        isAllFiliais,
-        { incluirGlobais: true }
-      );
-      
+      let query = supabase.from(tabela).select("*").eq("ativo", true);
+
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+
+      query = applyGlobalOrLocalFilter(query, filialId, isAllFiliais, {
+        incluirGlobais: true,
+      });
+
       const { data, error } = await query;
       if (error) throw error;
       return data as T[];
-    }
+    },
   });
-  
+
   return query;
 }
 
 // Uso:
-const { data: jornadas } = useGlobalData<Jornada>('jornadas');
+const { data: jornadas } = useGlobalData<Jornada>("jornadas");
 ```
 
 **Entregável:** Biblioteca de helpers documentada
@@ -786,13 +828,16 @@ const { data: jornadas } = useGlobalData<Jornada>('jornadas');
 ### Fase 4: Implementação por Módulo (2-3 semanas)
 
 #### Sprint 1: Dados Globais Básicos (1 semana)
+
 - [ ] **Times/Ministérios:** Tornar global
+
   - Migração: Marcar times da Matriz como `eh_global = true`
   - UI: Badge "🌐 Global" nos cards
   - Query: Usar `applyGlobalOrLocalFilter`
   - Testes: Filial vê times da Matriz + próprios
 
 - [ ] **Jornadas:** Conteúdo global + progresso local
+
   - Migração: Marcar jornadas como globais
   - Criar tabela `jornadas_participantes`
   - UI: Listagem mostra globais + locais, progresso é individual
@@ -804,9 +849,11 @@ const { data: jornadas } = useGlobalData<Jornada>('jornadas');
   - Sync: Atualização em batch das filiais
 
 #### Sprint 2: Dados Híbridos (1 semana)
+
 - [ ] **Eventos:** Global com participações locais
   - Migração: Adicionar `eh_global` à eventos
   - Criar tabela `eventos_participantes`
+
 ---
 
 ## 🚨 Correções Urgentes Identificadas
@@ -817,14 +864,15 @@ Durante a implementação de hoje (06/01/2026), aplicamos filtros que **isolam c
 
 #### Arquivos que precisam correção:
 
-| Arquivo | Problema | Correção | Prioridade |
-|---------|----------|----------|-----------|
-| `src/pages/Kids.tsx` | Filiais não veem salas da Matriz | Usar `.or()` incluindo `NULL` | 🔴 Alta |
-| `src/pages/Ensino.tsx` | Filiais não veem salas da Matriz | Usar `.or()` incluindo `NULL` | 🔴 Alta |
-| `src/components/ensino/NovaAulaDrawer.tsx` | Não lista salas globais | Usar `.or()` incluindo `NULL` | 🔴 Alta |
-| `src/pages/Voluntariado.tsx` | Times filtrados local (deveria ser global) | Remover filtro ou marcar como global | 🔴 Alta |
+| Arquivo                                    | Problema                                   | Correção                             | Prioridade |
+| ------------------------------------------ | ------------------------------------------ | ------------------------------------ | ---------- |
+| `src/pages/Kids.tsx`                       | Filiais não veem salas da Matriz           | Usar `.or()` incluindo `NULL`        | 🔴 Alta    |
+| `src/pages/Ensino.tsx`                     | Filiais não veem salas da Matriz           | Usar `.or()` incluindo `NULL`        | 🔴 Alta    |
+| `src/components/ensino/NovaAulaDrawer.tsx` | Não lista salas globais                    | Usar `.or()` incluindo `NULL`        | 🔴 Alta    |
+| `src/pages/Voluntariado.tsx`               | Times filtrados local (deveria ser global) | Remover filtro ou marcar como global | 🔴 Alta    |
 
 #### Correção padrão:
+
 ```typescript
 // ANTES (implementado hoje - INCORRETO):
 if (!isAllFiliais && filialId) {
@@ -838,7 +886,8 @@ if (!isAllFiliais && filialId) {
 }
 ```
 
-**Impacto:** 
+**Impacto:**
+
 - ⚠️ Filiais não conseguem usar recursos da Matriz
 - ⚠️ Usuários reportarão "salas/times sumiram"
 - ⚠️ Precisa correção antes de produção
@@ -850,12 +899,14 @@ if (!isAllFiliais && filialId) {
 ## 📊 Resumo Executivo
 
 ### O que temos hoje:
+
 - ✅ Base multi-tenant sólida (`igreja_id` + `filial_id`)
 - ✅ Hook `useFilialId` funcionando
 - ✅ Filtros aplicados (mas precisam ajustes)
 - ✅ Financeiro com replicação estrutural implementado
 
 ### O que falta:
+
 - 🔴 **Flags de herança** (`eh_global`, `origem_matriz_id`, etc)
 - 🔴 **Tabelas híbridas** (N:N para jornadas, cursos, eventos)
 - 🔴 **Helpers para queries globais**
@@ -865,6 +916,7 @@ if (!isAllFiliais && filialId) {
 - 🟡 **Componentes de UX** (badges, seletores)
 
 ### Estimativa total:
+
 - **Planejamento:** 2-3 dias
 - **Database:** 3-5 dias
 - **Helpers:** 1-2 dias
@@ -876,6 +928,7 @@ if (!isAllFiliais && filialId) {
 **Total:** ~8-10 semanas (2-2.5 meses) para implementação completa
 
 ### Modelo de referência:
+
 Seguir padrões de **Planning Center** (service types globais) + **InChurch** (consolidação financeira) + **Breeze** (simplicidade opt-in).
 
 ---
@@ -884,10 +937,11 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 **Revisão de mercado:** InChurch, Ecclesia, Planning Center, Breeze, Elvanto, ChurchTrac  
 **Responsável:** Equipe de Desenvolvimento  
 **Status:** 🟡 Em planejamentolocais
-  - Migração: Marcar cursos como globais
-  - Criar tabela `cursos_matriculas`
-  - UI: Filial vê catálogo global, cria turma local
-  - Relatório: "30 alunos no curso X nesta filial"
+
+- Migração: Marcar cursos como globais
+- Criar tabela `cursos_matriculas`
+- UI: Filial vê catálogo global, cria turma local
+- Relatório: "30 alunos no curso X nesta filial"
 
 - [ ] **Projetos:** Meta global, execução local
   - Migração: Adicionar `eh_global`
@@ -896,19 +950,23 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
   - Drill-down: Clicar na barra → ver por filial
 
 #### Sprint 3: Comunicação e Mídia (3-5 dias)
+
 - [ ] **Comunicados:** Template global, leituras locais
+
   - Migração: Flag `visivel_para_filiais`
   - Tabela `comunicados_leituras`
   - UI: Matriz envia → filiais veem e confirmam
   - Dashboard: Taxa de leitura por filial
 
 - [ ] **Notificações:** Canais globais, disparos locais/global
+
   - Campos: `alcance` (`local`, `global`, `filiais_especificas`), `filiais_destino` (array)
   - Filtro padrão: `.or('filial_id.eq.${filialId},filial_id.is.null')` para herdar da Matriz
   - UI: Selector de alcance + multi-select de filiais
   - Logs: Guardar `igreja_id`, `filial_id`, `alcance`, `canal`
 
 - [ ] **Mídia/Biblioteca:** Compartilhamento
+
   - Campo `compartilhada_matriz`
   - UI: Toggle "Compartilhar com filiais"
   - Interface: Aba "Da Matriz" + "Locais"
@@ -920,7 +978,9 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
   - Exibição: Filial vê apenas banners direcionados + globais
 
 #### Sprint 4: Correções de Filtros (2-3 dias)
+
 - [ ] **Salas:** Incluir salas da Matriz nas queries de filiais
+
   - Ajustar `Kids.tsx`, `Ensino.tsx`, `NovaAulaDrawer.tsx`
   - Query: `.or('filial_id.eq.${filialId},filial_id.is.null')`
   - UI: Badge indicando "Da Matriz" vs "Local"
@@ -937,6 +997,7 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 ### Fase 5: Interfaces e UX (1 semana)
 
 #### 5.1 Componentes Reutilizáveis
+
 ```tsx
 // AlcanceSelector
 <AlcanceSelector
@@ -947,7 +1008,7 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 />
 
 // OrigemBadge
-<OrigemBadge 
+<OrigemBadge
   tipo={item.eh_global ? 'global' : 'local'}
   customizado={item.customizado_localmente}
 />
@@ -962,6 +1023,7 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 ```
 
 #### 5.2 Dashboards Consolidados
+
 - [ ] **Financeiro:** Drill-down de receitas/despesas
 - [ ] **Eventos:** Mapa de calor de participação
 - [ ] **Jornadas:** Funil de conversão por filial
@@ -972,9 +1034,10 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 ---
 
 ### Fase 6: Testes e Validação (1 semana)
+
 1. **Testes Unitários:** Helpers e funções
 2. **Testes de Integração:** Fluxos completos
-3. **Testes de Permissão:** 
+3. **Testes de Permissão:**
    - ✅ Matriz cria global → Filiais veem
    - ✅ Filial cria local → Só ela vê
    - ✅ Admin "Todas Filiais" → Vê tudo
@@ -987,6 +1050,7 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 ---
 
 ### Fase 7: Documentação e Treinamento (3 dias)
+
 1. **Documentação Técnica:** Arquitetura, helpers, padrões
 2. **Manual do Usuário:** Como usar recursos multi-filial
 3. **Vídeos Tutorial:** Workflows principais
@@ -996,8 +1060,9 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 ├─ Filial 01: Meta R$ 300.000 → Arrecadado R$ 250.000 (83%)
 ├─ Filial 02: Meta R$ 200.000 → Arrecadado R$ 200.000 (100%)
 └─ Filial 03: Meta R$ 500.000 → Arrecadado R$ 400.000 (80%)
-    Total: R$ 850.000 de R$ 1.000.000 (85%)
-```
+Total: R$ 850.000 de R$ 1.000.000 (85%)
+
+````
 - [ ] Públicos (global) ou por filial?
 
 #### 2.7. Projetos ⚠️ **PRIORIDADE**
@@ -1053,13 +1118,12 @@ Seguir padrões de **Planning Center** (service types globais) + **InChurch** (c
 import { useFilialId } from "@/hooks/useFilialId";
 
 const { igrejaId, filialId, isAllFiliais } = useFilialId();
-```
+````
 
 ### Padrão de Query
+
 ```tsx
-let query = supabase
-  .from("tabela")
-  .select("*");
+let query = supabase.from("tabela").select("*");
 
 if (igrejaId) query = query.eq("igreja_id", igrejaId);
 if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
@@ -1068,6 +1132,7 @@ const { data } = await query;
 ```
 
 ### Padrão de Insert/Update
+
 ```tsx
 const data = {
   // ... outros campos
@@ -1081,12 +1146,15 @@ const data = {
 ## Funcionalidade: Replicação Matriz → Filiais
 
 ### Conceito
+
 Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente replicado para as filiais.
 
 ### Módulos Prioritários para Replicação
 
 #### 1. **Eventos** 🎯
+
 **Caso de uso:** Evento nacional/regional que todas as filiais participarão
+
 - Criar evento na Matriz
 - Opção: "Replicar para filiais"
 - Selecionar: Todas ou específicas
@@ -1094,41 +1162,51 @@ Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente re
 - Alterações na Matriz podem ou não propagar (configurável)
 
 **Implementação:**
+
 - Campo `origem_matriz_id` na tabela `eventos`
 - Campo `escopo` (enum: 'matriz', 'filial', 'replicado')
 - Trigger ou função para replicação automática
 - Interface de seleção de filiais
 
 #### 2. **Comunicados** 📢
+
 **Caso de uso:** Anúncio importante que precisa chegar a todas as unidades
+
 - Criar comunicado na Matriz
 - Opção: "Enviar para todas as filiais"
 - Cada filial visualiza o comunicado como se fosse local
 - Histórico de entrega/visualização por filial
 
 **Implementação:**
+
 - Tabela `comunicados_filiais` (relação N:N)
 - Campo `criado_por_matriz` (boolean)
 - Dashboard de alcance: quantas filiais visualizaram
 
 #### 3. **Projetos Sociais** 🤝
+
 **Caso de uso:** Campanha de arrecadação nacional com metas por filial
+
 - Projeto criado na Matriz define meta global
 - Cada filial tem submeta e gestão própria
 - Relatório consolidado mostra progresso geral
 
 **Implementação:**
+
 - Campo `projeto_matriz_id` na tabela `projetos`
 - Tabela `projetos_metas_filiais` (metas individuais)
 - Agregação de resultados para dashboard consolidado
 
 #### 4. **Mídia/Biblioteca** 🎬
+
 **Caso de uso:** Material institucional, sermões, estudos disponíveis para todas
+
 - Mídia marcada como "Compartilhada"
 - Filiais têm acesso read-only ou download
 - Catálogo unificado com filtro de origem
 
 **Implementação:**
+
 - Campo `compartilhada_matriz` (boolean)
 - Campo `permissoes_filiais` (enum: 'visualizar', 'baixar', 'editar')
 - Interface de biblioteca com aba "Da Matriz" e "Local"
@@ -1138,9 +1216,11 @@ Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente re
 ## Decisões de Design Pendentes
 
 ### 1. Dados Compartilhados
+
 **Questão:** Quais dados devem ser compartilhados entre todas as filiais?
 
 **Candidatos para compartilhamento:**
+
 - Jornadas de discipulado (conteúdo padrão)
 - Cursos/Material de ensino
 - Templates de comunicados
@@ -1149,18 +1229,22 @@ Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente re
 **Estratégia:** Usar `filial_id = null` para dados globais
 
 ### 2. Dados Específicos
+
 **Questão:** Quais dados são sempre específicos de uma filial?
 
 **Candidatos para separação:**
+
 - Check-ins Kids
 - Presenças em aulas
 - Escalas de voluntários
 - Financeiro local
 
 ### 3. Dados Híbridos
+
 **Questão:** Quais dados podem ser tanto globais quanto específicos?
 
 **Candidatos:**
+
 - Eventos (alguns são da igreja toda, outros por filial)
 - Comunicados (alguns gerais, outros segmentados)
 - Projetos sociais
@@ -1169,22 +1253,23 @@ Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente re
 **Estratégia:** Permitir `filial_id` opcional + filtro "Todas as Filiais" + **campo `origem_matriz_id` para rastreabilidade**
 
 ### 4. Replicação e Sincronização ⚠️ **NOVO**
+
 **Questão:** Como gerenciar conteúdo que parte da Matriz e vai para filiais?
 
 **Opções de implementação:**
+
 1. **Replicação por cópia:** Criar registros duplicados em cada filial
    - ✅ Cada filial tem autonomia para customizar
    - ❌ Mudanças na Matriz não refletem automaticamente
-   
 2. **Referência compartilhada:** Um registro com flag de compartilhamento
    - ✅ Economiza espaço, mudanças propagam automaticamente
    - ❌ Menos flexibilidade para customização local
-   
 3. **Modelo híbrido:** Referência + override local
    - ✅ Melhor dos dois mundos
    - ❌ Mais complexo de implementar
 
 **Recomendação:** Modelo híbrido com campos:
+
 - `origem_matriz_id` (UUID, nullable) - referência ao registro original da Matriz
 - `customizado_localmente` (boolean) - indica se filial fez alterações
 - `sincronizar_com_matriz` (boolean) - se deve receber atualizações da Matriz
@@ -1194,6 +1279,7 @@ Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente re
 ## Notas de Implementação
 
 ### Observações Importantes
+
 1. Sempre validar se `igrejaId` existe antes de fazer queries
 2. Nunca assumir `filialId` - sempre verificar `isAllFiliais`
 3. Em queries de agregação, considerar ambos os cenários
@@ -1201,6 +1287,7 @@ Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente re
 5. RLS policies devem respeitar o contexto de filial
 
 ### Migrations Futuras
+
 - Avaliar necessidade de `filial_id` em cada tabela
 - Criar índices compostos para performance
 - Adicionar constraints de integridade
@@ -1213,7 +1300,9 @@ Permitir que conteúdo criado na Matriz seja automaticamente ou seletivamente re
 ## Componentes de Interface Necessários
 
 ### Seletor de Alcance (Scope Selector)
+
 Componente reutilizável para escolher onde o conteúdo será aplicado:
+
 ```tsx
 <AlcanceSelector
   options={['apenas_matriz', 'todas_filiais', 'filiais_especificas']}
@@ -1222,7 +1311,9 @@ Componente reutilizável para escolher onde o conteúdo será aplicado:
 ```
 
 ### Indicador de Origem
+
 Badge/Tag mostrando origem do conteúdo:
+
 ```tsx
 <OrigemBadge tipo="matriz" /> // 🏢 Da Matriz
 <OrigemBadge tipo="filial" /> // 📍 Local
@@ -1230,7 +1321,9 @@ Badge/Tag mostrando origem do conteúdo:
 ```
 
 ### Dashboard de Propagação
+
 Interface para acompanhar replicação:
+
 - Quantas filiais receberam
 - Quantas visualizaram/confirmaram
 - Quais customizaram localmente

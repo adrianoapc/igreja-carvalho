@@ -1,5 +1,5 @@
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
+import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 // Configure worker to use a bundled, same-origin asset to avoid CDN fetch failures
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
@@ -16,7 +16,7 @@ export async function generatePdfThumbnail(
 ): Promise<string> {
   try {
     let pdfData: ArrayBuffer | string;
-    
+
     if (pdfSource instanceof File) {
       pdfData = await pdfSource.arrayBuffer();
     } else {
@@ -24,46 +24,47 @@ export async function generatePdfThumbnail(
       const response = await fetch(pdfSource);
       pdfData = await response.arrayBuffer();
     }
-    
+
     // Load the PDF document
     const loadingTask = getDocument({ data: pdfData });
     const pdf = await loadingTask.promise;
-    
+
     // Get the first page
     const page = await pdf.getPage(1);
-    
+
     // Get viewport at desired scale
     const viewport = page.getViewport({ scale });
-    
+
     // Create canvas
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
     if (!context) {
-      throw new Error('Could not get canvas context');
+      throw new Error("Could not get canvas context");
     }
-    
+
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    
+
     // Render the page to canvas
     await page.render({
       canvasContext: context,
       viewport: viewport,
     }).promise;
-    
+
     // Convert canvas to data URL
-    const dataUrl = canvas.toDataURL('image/png');
-    
+    const dataUrl = canvas.toDataURL("image/png");
+
     // Clean up
     pdf.destroy();
-    
+
     return dataUrl;
   } catch (error) {
-    const isPasswordError = error instanceof Error && error.name === 'PasswordException';
-    console.error('Error generating PDF thumbnail:', error);
+    const isPasswordError =
+      error instanceof Error && error.name === "PasswordException";
+    console.error("Error generating PDF thumbnail:", error);
     if (isPasswordError) {
-      throw new Error('PDF protegido por senha; preview indisponivel.');
+      throw new Error("PDF protegido por senha; preview indisponivel.");
     }
     throw error;
   }

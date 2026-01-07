@@ -51,7 +51,10 @@ import {
   Upload,
   FileText,
 } from "lucide-react";
-import { AIProcessingOverlay, type AIProcessingStep } from "@/components/financas/AIProcessingOverlay";
+import {
+  AIProcessingOverlay,
+  type AIProcessingStep,
+} from "@/components/financas/AIProcessingOverlay";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -135,8 +138,8 @@ export default function Reembolsos() {
     data_item: "",
     anexo_url: "",
   });
-  const [aiStep, setAiStep] = useState<AIProcessingStep>('idle');
-  const processandoIA = aiStep !== 'idle';
+  const [aiStep, setAiStep] = useState<AIProcessingStep>("idle");
+  const processandoIA = aiStep !== "idle";
 
   // Estado do pagamento
   const [contaSaida, setContaSaida] = useState("");
@@ -502,7 +505,7 @@ export default function Reembolsos() {
   });
 
   const processarNotaFiscalComIA = async (file: File) => {
-    setAiStep('uploading');
+    setAiStep("uploading");
     try {
       if (!igrejaId) {
         throw new Error("Igreja não identificada.");
@@ -530,7 +533,7 @@ export default function Reembolsos() {
         throw new Error("Erro ao gerar URL de acesso ao arquivo");
       }
 
-      setAiStep('analyzing');
+      setAiStep("analyzing");
 
       // 2. Converter arquivo para base64
       const reader = new FileReader();
@@ -571,7 +574,7 @@ export default function Reembolsos() {
 
       if (error) throw error;
 
-      setAiStep('extracting');
+      setAiStep("extracting");
 
       if (data?.success && data?.dados) {
         const {
@@ -598,7 +601,7 @@ export default function Reembolsos() {
               : primeiraLinha;
         }
 
-        setAiStep('filling');
+        setAiStep("filling");
 
         // Auto-preencher campos
         setItemAtual((prev) => ({
@@ -621,7 +624,7 @@ export default function Reembolsos() {
           : String(error) || "Erro ao processar nota fiscal com IA"
       );
     } finally {
-      setAiStep('idle');
+      setAiStep("idle");
     }
   };
 
