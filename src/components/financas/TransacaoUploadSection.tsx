@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Camera, Eye, FileText, Loader2, X } from "lucide-react";
+import { Camera, Eye, FileText, Loader2, Paperclip, X } from "lucide-react";
 
 interface TransacaoUploadSectionProps {
   anexoPreview: string;
@@ -27,6 +27,7 @@ export function TransacaoUploadSection({
   onViewDocument,
 }: TransacaoUploadSectionProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   return (
     <div className="space-y-3">
@@ -39,26 +40,64 @@ export function TransacaoUploadSection({
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="default"
-                  size="lg"
-                  className="w-full gap-2"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Camera className="w-5 h-5" />
-                  {isMobile ? "Tirar Foto da Nota" : "Fotografar ou Enviar Nota"}
-                </Button>
+              <div className="flex flex-col gap-3">
+                {isMobile ? (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="lg"
+                      className="flex-1 gap-2"
+                      onClick={() => cameraInputRef.current?.click()}
+                    >
+                      <Camera className="w-5 h-5" />
+                      Tirar Foto
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="flex-1 gap-2"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="w-5 h-5" />
+                      Anexar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="lg"
+                    className="w-full gap-2"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip className="w-5 h-5" />
+                    Anexar Nota ou PDF
+                  </Button>
+                )}
                 <p className="text-xs text-center text-muted-foreground">A IA irá extrair os dados automaticamente</p>
               </div>
 
+              {/* Input para câmera (mobile) */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                className="hidden"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onFileSelected(file);
+                }}
+              />
+              
+              {/* Input para arquivos (galeria/PDFs) */}
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
                 accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
-                capture="environment"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) onFileSelected(file);
