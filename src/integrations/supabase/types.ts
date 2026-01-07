@@ -2678,6 +2678,7 @@ export type Database = {
           igreja_id: string | null
           juros: number | null
           multas: number | null
+          numero_documento: string | null
           processado: boolean | null
           rede: string | null
           regional: string | null
@@ -2711,6 +2712,7 @@ export type Database = {
           igreja_id?: string | null
           juros?: number | null
           multas?: number | null
+          numero_documento?: string | null
           processado?: boolean | null
           rede?: string | null
           regional?: string | null
@@ -2744,6 +2746,7 @@ export type Database = {
           igreja_id?: string | null
           juros?: number | null
           multas?: number | null
+          numero_documento?: string | null
           processado?: boolean | null
           rede?: string | null
           regional?: string | null
