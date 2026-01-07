@@ -2657,6 +2657,7 @@ export type Database = {
       }
       importacao_transacoes_temp: {
         Row: {
+          base_ministerial: string | null
           categoria: string | null
           celula: string | null
           centro_custo: string | null
@@ -2689,6 +2690,7 @@ export type Database = {
           valor_pago: number | null
         }
         Insert: {
+          base_ministerial?: string | null
           categoria?: string | null
           celula?: string | null
           centro_custo?: string | null
@@ -2721,6 +2723,7 @@ export type Database = {
           valor_pago?: number | null
         }
         Update: {
+          base_ministerial?: string | null
           categoria?: string | null
           celula?: string | null
           centro_custo?: string | null
