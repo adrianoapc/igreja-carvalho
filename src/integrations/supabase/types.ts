@@ -2668,6 +2668,7 @@ export type Database = {
           desconto: number | null
           descricao: string | null
           filial_id: string | null
+          forma_pagamento: string | null
           fornecedor_pagador: string | null
           id: string
           id_ecommerce: string | null
@@ -2699,6 +2700,7 @@ export type Database = {
           desconto?: number | null
           descricao?: string | null
           filial_id?: string | null
+          forma_pagamento?: string | null
           fornecedor_pagador?: string | null
           id?: string
           id_ecommerce?: string | null
@@ -2730,6 +2732,7 @@ export type Database = {
           desconto?: number | null
           descricao?: string | null
           filial_id?: string | null
+          forma_pagamento?: string | null
           fornecedor_pagador?: string | null
           id?: string
           id_ecommerce?: string | null
