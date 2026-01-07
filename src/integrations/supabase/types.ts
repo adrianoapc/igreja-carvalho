@@ -2655,6 +2655,102 @@ export type Database = {
         }
         Relationships: []
       }
+      importacao_transacoes_temp: {
+        Row: {
+          categoria: string | null
+          celula: string | null
+          centro_custo: string | null
+          conta: string | null
+          created_at: string | null
+          data_competencia: string | null
+          data_pagamento_recebimento: string | null
+          data_vencimento: string | null
+          desconto: number | null
+          descricao: string | null
+          filial_id: string | null
+          fornecedor_pagador: string | null
+          id: string
+          id_ecommerce: string | null
+          id_transacao: string | null
+          igreja: string | null
+          igreja_id: string | null
+          juros: number | null
+          multas: number | null
+          processado: boolean | null
+          rede: string | null
+          regional: string | null
+          subcategoria: string | null
+          taxas_administrativas: number | null
+          tipo: string
+          unidade_negocio: string | null
+          updated_at: string | null
+          valor_base: number | null
+          valor_pago: number | null
+        }
+        Insert: {
+          categoria?: string | null
+          celula?: string | null
+          centro_custo?: string | null
+          conta?: string | null
+          created_at?: string | null
+          data_competencia?: string | null
+          data_pagamento_recebimento?: string | null
+          data_vencimento?: string | null
+          desconto?: number | null
+          descricao?: string | null
+          filial_id?: string | null
+          fornecedor_pagador?: string | null
+          id?: string
+          id_ecommerce?: string | null
+          id_transacao?: string | null
+          igreja?: string | null
+          igreja_id?: string | null
+          juros?: number | null
+          multas?: number | null
+          processado?: boolean | null
+          rede?: string | null
+          regional?: string | null
+          subcategoria?: string | null
+          taxas_administrativas?: number | null
+          tipo: string
+          unidade_negocio?: string | null
+          updated_at?: string | null
+          valor_base?: number | null
+          valor_pago?: number | null
+        }
+        Update: {
+          categoria?: string | null
+          celula?: string | null
+          centro_custo?: string | null
+          conta?: string | null
+          created_at?: string | null
+          data_competencia?: string | null
+          data_pagamento_recebimento?: string | null
+          data_vencimento?: string | null
+          desconto?: number | null
+          descricao?: string | null
+          filial_id?: string | null
+          fornecedor_pagador?: string | null
+          id?: string
+          id_ecommerce?: string | null
+          id_transacao?: string | null
+          igreja?: string | null
+          igreja_id?: string | null
+          juros?: number | null
+          multas?: number | null
+          processado?: boolean | null
+          rede?: string | null
+          regional?: string | null
+          subcategoria?: string | null
+          taxas_administrativas?: number | null
+          tipo?: string
+          unidade_negocio?: string | null
+          updated_at?: string | null
+          valor_base?: number | null
+          valor_pago?: number | null
+        }
+        Relationships: []
+      }
       inscricoes_eventos: {
         Row: {
           created_at: string | null
