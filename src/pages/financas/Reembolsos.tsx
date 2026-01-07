@@ -546,6 +546,13 @@ export default function Reembolsos() {
 
       const imageBase64 = await base64Promise;
 
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        throw new Error("Sessão inválida. Faça login novamente.");
+      }
+
       // 3. Chamar edge function para processar (suporta imagens e PDFs)
       const { data, error } = await supabase.functions.invoke(
         "processar-nota-fiscal",
@@ -554,6 +561,10 @@ export default function Reembolsos() {
             imageBase64,
             mimeType: file.type,
             igreja_id: igrejaId,
+          },
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+            apikey: supabaseAnonKey,
           },
         }
       );

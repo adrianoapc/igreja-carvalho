@@ -375,6 +375,208 @@ Destaque:
 - [ ] Perfis vinculados a filial específica?
 - [ ] Transferência entre filiais
 - [ ] Visitantes por filial
+
+---
+
+#### 2.8. APIs Externas e Edge Functions 🔴 **CRÍTICO - ARQUITETURA SAAS**
+
+**Contexto:** Sistema SaaS com integrações Make, ChatGPT, Gemini, WABA gerenciadas centralmente.
+
+**Problema identificado:**
+- Edge function `processar-nota-fiscal` tenta filtrar `chatbot_configs` por `igreja_id`, mas tabela é **global** (coluna não existe)
+- Query falha silenciosamente e usa defaults
+- Arquitetura inconsistente: intenção multi-tenant vs implementação global
+
+**Modelo Recomendado: HÍBRIDO com 3 Camadas**
+
+##### 🌐 **Camada 1: GLOBAL (Matriz/SaaS)**
+Gerenciamento centralizado das credenciais e infraestrutura:
+
+- [ ] Criar tabela `saas_api_configs`:
+  ```sql
+  CREATE TABLE saas_api_configs (
+    id UUID PRIMARY KEY,
+    servico TEXT NOT NULL, -- 'make', 'openai', 'gemini', 'waba'
+    api_key TEXT NOT NULL, -- Criptografado
+    quota_mensal INTEGER,
+    ativo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+  ```
+- [ ] Credenciais master (API keys, tokens)
+- [ ] Limites de uso agregados
+- [ ] Monitoramento e health checks
+- [ ] Webhooks de infraestrutura
+
+**Benefícios:**
+- ✅ Segurança centralizada (não expõe keys sensíveis)
+- ✅ Faturamento simplificado (controle de consumo)
+- ✅ Economia de escala (pool de recursos)
+- ✅ Manutenção única (atualiza 1 vez, propaga pra todos)
+
+##### 🏢 **Camada 2: POR IGREJA (Opcional - Flexibilização)**
+Personalização sem comprometer segurança:
+
+- [ ] Criar tabela `igreja_api_preferences`:
+  ```sql
+  CREATE TABLE igreja_api_preferences (
+    id UUID PRIMARY KEY,
+    igreja_id UUID REFERENCES igrejas(id),
+    servico TEXT NOT NULL,
+    modelo_preferido TEXT, -- 'gpt-4o-mini', 'gemini-2.0-flash'
+    system_prompt TEXT,
+    usar_credenciais_proprias BOOLEAN DEFAULT false,
+    api_key_propria TEXT, -- Opcional, criptografado (BYOK)
+    webhook_url TEXT,
+    ativo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(igreja_id, servico)
+  );
+  ```
+- [ ] Prompts customizados (system prompts do chatbot)
+- [ ] Modelos específicos (gpt-4o vs gemini-pro)
+- [ ] Webhooks personalizados (Make scenarios)
+- [ ] BYOK (Bring Your Own Key) para igrejas enterprise
+
+**Benefícios:**
+- ✅ Personalização sem comprometer segurança
+- ✅ A/B testing por igreja
+- ✅ Upsell: "Quer usar GPT-4? Plano Premium"
+
+##### 🏬 **Camada 3: POR FILIAL (Operacional - Logs)**
+Rastreabilidade e chargeback:
+
+- [ ] Criar tabela `api_usage_logs`:
+  ```sql
+  CREATE TABLE api_usage_logs (
+    id UUID PRIMARY KEY,
+    igreja_id UUID REFERENCES igrejas(id),
+    filial_id UUID REFERENCES filiais(id),
+    servico TEXT NOT NULL,
+    edge_function TEXT,
+    tokens_usados INTEGER,
+    custo_estimado DECIMAL(10,4),
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+  CREATE INDEX idx_usage_logs_igreja_filial 
+  ON api_usage_logs(igreja_id, filial_id, created_at DESC);
+  ```
+- [ ] Logs de uso (rastreabilidade)
+- [ ] Quotas por filial (soft limits)
+- [ ] Estatísticas de consumo
+
+**Benefícios:**
+- ✅ Chargeback interno (igreja cobra filiais)
+- ✅ Relatórios de uso por unidade
+- ✅ Identificação de anomalias
+
+##### 🛠️ **Correção Imediata (Bug Atual)**
+
+**Solução Curto Prazo:**
+- [ ] Atualizar `processar-nota-fiscal/index.ts`:
+  - Remover `.eq('igreja_id', igrejaId)` de `getChatbotConfig()`
+  - Função deve buscar config global até migração
+
+**Solução Definitivo (Após Decisão Estratégica):**
+- [ ] Migração `chatbot_configs`:
+  ```sql
+  ALTER TABLE chatbot_configs ADD COLUMN igreja_id UUID REFERENCES igrejas(id);
+  ALTER TABLE chatbot_configs ADD COLUMN eh_global BOOLEAN DEFAULT true;
+  UPDATE chatbot_configs SET eh_global = true WHERE igreja_id IS NULL;
+  CREATE INDEX idx_chatbot_configs_lookup 
+  ON chatbot_configs(edge_function_name, igreja_id, ativo) WHERE ativo = true;
+  ```
+- [ ] Atualizar edge functions para buscar config hierárquica:
+  ```typescript
+  // Busca config específica da igreja OU global
+  .or(`igreja_id.eq.${igrejaId},eh_global.eq.true`)
+  .order('igreja_id', { ascending: false, nullsFirst: false }) // Prioriza específico
+  ```
+
+##### 💰 **Modelo de Negócio Sugerido**
+
+| Plano | Config | Features | Preço |
+|-------|--------|----------|-------|
+| **Básico** | 🌐 Global | Credenciais SaaS, modelos básicos (gpt-4o-mini, gemini-flash), quotas compartilhadas | R$ X/mês |
+| **Personalizado** | 🔄 Híbrido | System prompts customizados, escolha de modelo (gpt-4o, gemini-pro), webhooks personalizados | R$ X + Y/mês |
+| **Enterprise** | 🏢 BYOK | Usa credenciais próprias, sem limite de quota, suporte dedicado | R$ Z/mês (menor) |
+
+##### 📋 **Fluxo de Decisão Implementado**
+```typescript
+async function getApiConfig(servico, igrejaId) {
+  // 1. Busca preferência da igreja
+  const preference = await getIgrejaPreference(servico, igrejaId);
+  
+  // 2. Se igreja tem credenciais próprias (BYOK)
+  if (preference?.usar_credenciais_proprias && preference.api_key_propria) {
+    return { apiKey: decrypt(preference.api_key_propria), source: 'igreja_byok' };
+  }
+  
+  // 3. Se igreja tem preferências mas usa pool SaaS
+  if (preference) {
+    const globalConfig = await getGlobalConfig(servico);
+    return { 
+      apiKey: globalConfig.api_key, 
+      model: preference.modelo_preferido || globalConfig.modelo_default,
+      source: 'saas_customizado' 
+    };
+  }
+  
+  // 4. Fallback: config global pura
+  return await getGlobalConfig(servico);
+}
+```
+
+**Arquivos afetados:**
+- `supabase/functions/processar-nota-fiscal/index.ts` (correção imediata)
+- `supabase/functions/*/` (todas edge functions que usam APIs externas)
+- Migrations: `saas_api_configs`, `igreja_api_preferences`, `api_usage_logs`
+- `chatbot_configs` (adicionar `igreja_id`, `eh_global`)
+
+---
+
+#### 2.9. Aferição — OCR Financeiro `processar-nota-fiscal` (07/01/2026)
+
+**Objetivo:** Verificar autenticação, provedor de IA, origem das chaves e escopo Igreja/Filial em ambos os fluxos (tela e chatbot-financeiro), e apontar ajustes necessários.
+
+**Evidências (código atual):**
+- Autenticação:
+  - Externa (tela): exige `Authorization` (JWT) e validação de cargos em `user_app_roles` (`admin`, `tesoureiro`, `pastor`).
+  - Interna (chatbot): cabeçalho `X-Internal-Call: true` → pula auth de usuário e usa `SERVICE ROLE`.
+- Provedor IA: requisição para `https://ai.gateway.lovable.dev/v1/chat/completions` (Lovable Gateway) com modelo default `google/gemini-2.5-pro` ou definido em `chatbot_configs` (global).
+- Origem da chave: `Deno.env.get('LOVABLE_API_KEY')` (secreto nas Edge Functions).
+- Config de prompt/modelo: `chatbot_configs` (lookup global por `edge_function_name` + `ativo`).
+- Contexto financeiro: `getFinancialOptions()` filtra por `igreja_id` (não considera `filial_id`).
+- Fluxo via Tela:
+  - `TransacaoDialog.tsx` invoca a função sem enviar `igreja_id` (risco 400 "igreja_id é obrigatório"). (a confirmar)
+  - Upload de anexo para `transaction-attachments` e gravação de transação com `igreja_id` e `filial_id` ok.
+- Fluxo via Reembolsos:
+  - `Reembolsos.tsx` invoca a função com `igreja_id` (ok), preenche item, e UI filtra seleções por `igreja_id`/`filial_id` quando aplicável.
+- Fluxo via Chatbot-Financeiro:
+  - `supabase/functions/chatbot-financeiro/index.ts` chama com `X-Internal-Call: true`, `Authorization: Bearer SERVICE_KEY` e envia `igreja_id` (ok).
+
+**Gaps Identificados:**
+- `TransacaoDialog.tsx` não envia `igreja_id` para a função (inconsistência com `Reembolsos.tsx`).
+- A função não recebe/usa `filial_id`; sugestões de categoria/centro podem ignorar segregação por filial caso exista em `categorias_financeiras`/`centros_custo`. (a confirmar)
+- `getFinancialOptions()` filtra apenas por `igreja_id` — não replica o comportamento de telas que aplicam `filial_id` quando não é "Todas as Filiais".
+
+**Ações Imediatas (sem implementar agora):**
+- [ ] `TransacaoDialog.tsx`: incluir `igreja_id` no `invoke('processar-nota-fiscal', { body })` para alinhar com a função.
+- [ ] Avaliar passagem opcional de `filial_id` no body da função e refletir nos filtros de `getFinancialOptions()`.
+- [ ] Confirmar no schema se `categorias_financeiras`, `subcategorias_financeiras` e `centros_custo` possuem `filial_id` e como o RLS lida com isso. (a confirmar)
+
+**Evolução Planejada (IA Global/Filial e Cobrança):**
+- Config IA: manter `chatbot_configs` global (curto prazo); migrar para modelo híbrido (`igreja_id`, `eh_global`) para permitir override por igreja (opcional) alinhado à seção 2.8.
+- Escopo por filial: permitir filtro opcional por `filial_id` quando a igreja opera plano de contas segregado por filial (híbrido). (a confirmar)
+- Medição/Chargeback: registrar uso por `igreja_id`/`filial_id` em `api_usage_logs` para billing/quotas (ver 2.8).
+
+**Aceite desta aferição:**
+- Documentado provedor, autenticação e origem de chaves.
+- Mapeados dois fluxos (tela e chatbot) com diferenças de payload.
+- Listadas ações mínimas para consistência e aderência multi-tenant.
+
+---
 ### Fase 1: Definir Arquitetura de Dados (2-3 dias)
 **Objetivo:** Classificar todos os módulos em Global/Local/Híbrido
 

@@ -8,6 +8,7 @@ import { Loader2, Upload, FileText, Image as ImageIcon, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageCaptureInput } from "@/components/ui/image-capture-input";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface NotaFiscalData {
   fornecedor_cnpj_cpf?: string;
@@ -63,6 +64,11 @@ export default function ProcessarNotaFiscalDialog({
         toast.error("Igreja não identificada.");
         return;
       }
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error("Sessão inválida. Faça login novamente.");
+        return;
+      }
       // Converter para base64
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -76,6 +82,10 @@ export default function ProcessarNotaFiscalDialog({
             imageBase64: base64,
             mimeType: file.type,
             igreja_id: igrejaId,
+          },
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+            apikey: supabaseAnonKey,
           }
         });
 

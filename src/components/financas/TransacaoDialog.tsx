@@ -34,6 +34,7 @@ import { TransacaoUploadSection } from "./TransacaoUploadSection";
 import { TransacaoDocumentViewer } from "./TransacaoDocumentViewer";
 import { useFilialId } from "@/hooks/useFilialId";
 import { AIProcessingOverlay, type AIProcessingStep } from "./AIProcessingOverlay";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface TransacaoDialogProps {
   open: boolean;
@@ -415,6 +416,15 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
     setAiStep('uploading');
 
     try {
+      // Garantir sessão e contexto antes de invocar a função
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        throw new Error('Sessão inválida. Refaça login antes de processar a nota.');
+      }
+      if (!igrejaId) {
+        throw new Error('Contexto da igreja não identificado. Recarregue a página e tente novamente.');
+      }
+
       // Converter para base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -426,7 +436,16 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       setAiStep('analyzing');
 
       const { data, error } = await supabase.functions.invoke("processar-nota-fiscal", {
-        body: { imageBase64: base64, mimeType: file.type },
+        body: { 
+          imageBase64: base64, 
+          mimeType: file.type,
+          igreja_id: igrejaId,
+          filial_id: isAllFiliais ? null : filialId || null
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          apikey: supabaseAnonKey,
+        },
       });
 
       if (error) throw error;

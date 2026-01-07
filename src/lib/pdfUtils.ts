@@ -1,7 +1,8 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure worker to use a bundled, same-origin asset to avoid CDN fetch failures
+GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 /**
  * Generate a thumbnail from the first page of a PDF
@@ -25,7 +26,7 @@ export async function generatePdfThumbnail(
     }
     
     // Load the PDF document
-    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+    const loadingTask = getDocument({ data: pdfData });
     const pdf = await loadingTask.promise;
     
     // Get the first page
@@ -59,7 +60,11 @@ export async function generatePdfThumbnail(
     
     return dataUrl;
   } catch (error) {
+    const isPasswordError = error instanceof Error && error.name === 'PasswordException';
     console.error('Error generating PDF thumbnail:', error);
+    if (isPasswordError) {
+      throw new Error('PDF protegido por senha; preview indisponivel.');
+    }
     throw error;
   }
 }

@@ -159,11 +159,11 @@ serve(async (req) => {
         );
       }
 
-      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } }
-      });
-
-      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+      // Use service role to verify the JWT and check user without triggering session errors
+      const token = authHeader?.replace('Bearer ', '');
+      const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+      
+      const { data: { user }, error: authError } = await supabaseService.auth.getUser(token);
       if (authError || !user) {
         console.error('Auth error:', authError);
         return new Response(
@@ -172,7 +172,7 @@ serve(async (req) => {
         );
       }
 
-      const { data: userRoles, error: rolesError } = await supabaseAuth
+      const { data: userRoles, error: rolesError } = await supabaseService
         .from('user_app_roles')
         .select('role:app_roles(name)')
         .eq('user_id', user.id);
