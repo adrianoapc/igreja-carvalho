@@ -115,7 +115,7 @@ export function TransacaoUploadSection({
             )}
             onClick={onViewDocument}
           >
-            {anexoPreview ? (
+            {anexoPreview && anexoPreview.startsWith("data:") ? (
               <>
                 <img
                   src={anexoPreview}
@@ -131,6 +131,17 @@ export function TransacaoUploadSection({
                     PDF
                   </div>
                 )}
+              </>
+            ) : anexoPreview && !anexoIsPdf ? (
+              <>
+                <img
+                  src={anexoPreview}
+                  alt="Nota fiscal"
+                  className="w-full h-full object-contain"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Eye className="w-8 h-8 text-white" />
+                </div>
               </>
             ) : anexoUrl && !anexoIsPdf ? (
               <>
