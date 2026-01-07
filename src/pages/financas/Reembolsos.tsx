@@ -51,6 +51,7 @@ import {
   Upload,
   FileText,
 } from "lucide-react";
+import { AIProcessingOverlay, type AIProcessingStep } from "@/components/financas/AIProcessingOverlay";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -134,7 +135,8 @@ export default function Reembolsos() {
     data_item: "",
     anexo_url: "",
   });
-  const [processandoIA, setProcessandoIA] = useState(false);
+  const [aiStep, setAiStep] = useState<AIProcessingStep>('idle');
+  const processandoIA = aiStep !== 'idle';
 
   // Estado do pagamento
   const [contaSaida, setContaSaida] = useState("");
@@ -500,7 +502,7 @@ export default function Reembolsos() {
   });
 
   const processarNotaFiscalComIA = async (file: File) => {
-    setProcessandoIA(true);
+    setAiStep('uploading');
     try {
       if (!igrejaId) {
         throw new Error("Igreja não identificada.");
@@ -527,6 +529,8 @@ export default function Reembolsos() {
       if (signedError || !signedData?.signedUrl) {
         throw new Error("Erro ao gerar URL de acesso ao arquivo");
       }
+
+      setAiStep('analyzing');
 
       // 2. Converter arquivo para base64
       const reader = new FileReader();
@@ -556,6 +560,8 @@ export default function Reembolsos() {
 
       if (error) throw error;
 
+      setAiStep('extracting');
+
       if (data?.success && data?.dados) {
         const {
           valor_total,
@@ -581,6 +587,8 @@ export default function Reembolsos() {
               : primeiraLinha;
         }
 
+        setAiStep('filling');
+
         // Auto-preencher campos
         setItemAtual((prev) => ({
           ...prev,
@@ -602,7 +610,7 @@ export default function Reembolsos() {
           : String(error) || "Erro ao processar nota fiscal com IA"
       );
     } finally {
-      setProcessandoIA(false);
+      setAiStep('idle');
     }
   };
 
@@ -928,7 +936,8 @@ export default function Reembolsos() {
 
       {/* DIALOG: Novo Reembolso (Wizard) */}
       <Dialog open={novoReembolsoOpen} onOpenChange={setNovoReembolsoOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto relative">
+          <AIProcessingOverlay currentStep={aiStep} />
           <DialogHeader>
             <DialogTitle>
               Nova Solicitação de Reembolso - Etapa {etapaWizard} de 3
