@@ -271,7 +271,13 @@ export default function Dashboard() {
 
   // Reembolsos em aberto (pendente/aprovado)
   const { data: reembolsosAbertos = [] } = useQuery({
-    queryKey: ["reembolsos-abertos", igrejaId, filialId, isAllFiliais, dateRange],
+    queryKey: [
+      "reembolsos-abertos",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      dateRange,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = (supabase as any)
@@ -294,7 +300,13 @@ export default function Dashboard() {
 
   // Relatórios de oferta (solicitações de conferência no período)
   const { data: relatoriosOferta = [] } = useQuery({
-    queryKey: ["relatorios-oferta", igrejaId, filialId, isAllFiliais, dateRange],
+    queryKey: [
+      "relatorios-oferta",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      dateRange,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
@@ -592,8 +604,12 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-muted-foreground">Reembolsos</p>
-                    <p className="text-lg font-bold">{reembolsosAbertos.length} em aberto</p>
-                    <p className="text-xs text-muted-foreground">Acesse e gerencie solicitações</p>
+                    <p className="text-lg font-bold">
+                      {reembolsosAbertos.length} em aberto
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Acesse e gerencie solicitações
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -609,9 +625,15 @@ export default function Dashboard() {
                     <FileText className="w-5 h-5 text-violet-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Relatório de Ofertas</p>
-                    <p className="text-lg font-bold">{relatoriosOferta.length} no período</p>
-                    <p className="text-xs text-muted-foreground">Conferir e exportar valores</p>
+                    <p className="text-xs text-muted-foreground">
+                      Relatório de Ofertas
+                    </p>
+                    <p className="text-lg font-bold">
+                      {relatoriosOferta.length} no período
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Conferir e exportar valores
+                    </p>
                   </div>
                 </div>
               </CardContent>
