@@ -33,6 +33,7 @@ import { generatePdfThumbnail } from "@/lib/pdfUtils";
 import { TransacaoUploadSection } from "./TransacaoUploadSection";
 import { TransacaoDocumentViewer } from "./TransacaoDocumentViewer";
 import { useFilialId } from "@/hooks/useFilialId";
+import { AIProcessingOverlay, type AIProcessingStep } from "./AIProcessingOverlay";
 
 interface TransacaoDialogProps {
   open: boolean;
@@ -73,6 +74,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiStep, setAiStep] = useState<AIProcessingStep>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
@@ -410,6 +412,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
   const processarComIA = async (file: File) => {
     setAiProcessing(true);
+    setAiStep('uploading');
 
     try {
       // Converter para base64
@@ -420,7 +423,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
         reader.readAsDataURL(file);
       });
 
-      toast.loading("Processando nota fiscal com IA...", { id: "processing" });
+      setAiStep('analyzing');
 
       const { data, error } = await supabase.functions.invoke("processar-nota-fiscal", {
         body: { imageBase64: base64, mimeType: file.type },
@@ -429,8 +432,7 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      // Upload do arquivo
-      toast.loading("Salvando arquivo...", { id: "processing" });
+      setAiStep('extracting');
 
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -444,25 +446,27 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
 
       const { data: signedData } = await supabase.storage
         .from("transaction-attachments")
-        .createSignedUrl(filePath, 31536000); // URL válida por 1 ano
+        .createSignedUrl(filePath, 31536000);
 
       const publicUrl = signedData?.signedUrl;
 
       setAnexoUrl(publicUrl);
-      // Também atualizar preview para garantir que a imagem seja exibida
       if (file.type.startsWith("image/")) {
         setAnexoPreview(publicUrl);
       }
 
+      setAiStep('filling');
+
       // Preencher campos
       await handleDadosNotaFiscal({ ...data.dados, anexo_url: publicUrl });
 
-      toast.success("Nota fiscal processada!", { id: "processing" });
+      toast.success("Nota fiscal processada com sucesso!");
     } catch (error: unknown) {
       console.error("Erro ao processar nota fiscal:", error);
-      toast.error("Erro ao processar", { description: error instanceof Error ? error.message : String(error), id: "processing" });
+      toast.error("Erro ao processar", { description: error instanceof Error ? error.message : String(error) });
     } finally {
       setAiProcessing(false);
+      setAiStep('idle');
     }
   };
 
@@ -1220,7 +1224,9 @@ export function TransacaoDialog({ open, onOpenChange, tipo, transacao }: Transac
           className: "max-h-[95vh]",
         }}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full relative">
+          {/* Overlay de processamento IA */}
+          <AIProcessingOverlay currentStep={aiStep} />
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <DialogDescription className="sr-only">Formulário de {tipo === "entrada" ? "entrada" : "saída"} financeira</DialogDescription>
           <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
