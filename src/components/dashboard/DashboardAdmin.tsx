@@ -626,7 +626,7 @@ export default function DashboardAdmin() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate("/financas/relatorio-oferta")}
+          onClick={() => navigate("/financas/relatorios/ofertas")}
           className="gap-2"
         >
           <DollarSign className="w-4 h-4" />

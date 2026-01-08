@@ -27,5 +27,7 @@
     }
   },
   "include": ["src"],
-  "exclude": ["supabase/functions/**/*"]
+  "exclude": [
+    "supabase/functions/**/*"
+  ]
 }

@@ -102,7 +102,31 @@ export default function DashboardOfertas() {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data || [];
+      
+      // Buscar formas e contas separadamente
+      if (!data || data.length === 0) return [];
+      
+      const formaIds = [...new Set(data.map(t => t.forma_pagamento).filter(Boolean))];
+      const contaIds = [...new Set(data.map(t => t.conta_id).filter(Boolean))];
+      
+      const [formasRes, contasRes] = await Promise.all([
+        formaIds.length > 0 
+          ? supabase.from("formas_pagamento").select("id, nome").in("id", formaIds)
+          : { data: [], error: null },
+        contaIds.length > 0
+          ? supabase.from("contas").select("id, nome").in("id", contaIds)
+          : { data: [], error: null }
+      ]);
+      
+      const formasMap = new Map((formasRes.data || []).map(f => [f.id, f]));
+      const contasMap = new Map((contasRes.data || []).map(c => [c.id, c]));
+      
+      // Enriquecer os dados
+      return data.map(t => ({
+        ...t,
+        formas_pagamento: t.forma_pagamento ? formasMap.get(t.forma_pagamento) : null,
+        contas: t.conta_id ? contasMap.get(t.conta_id) : null,
+      }));
     },
     enabled: !!igrejaId && !filialLoading,
   });
@@ -135,6 +159,7 @@ export default function DashboardOfertas() {
       return {
         totalGeral: 0,
         porFormaPagamento: [],
+        porConta: [],
         evolucaoMensal: [],
         comparativoMensal: [],
         tendencia: { valor: 0, percentual: 0 },
@@ -147,11 +172,23 @@ export default function DashboardOfertas() {
     // Por forma de pagamento
     const porForma: Record<string, number> = {};
     transacoes.forEach((t) => {
-      const forma = t.forma_pagamento || "Não especificado";
+      const forma = t.formas_pagamento?.nome || "Não especificado";
       porForma[forma] = (porForma[forma] || 0) + Number(t.valor);
     });
 
     const porFormaPagamento = Object.entries(porForma).map(([name, value]) => ({
+      name,
+      value,
+    }));
+
+    // Por conta
+    const porContaMap: Record<string, number> = {};
+    transacoes.forEach((t) => {
+      const conta = t.contas?.nome || "Sem conta";
+      porContaMap[conta] = (porContaMap[conta] || 0) + Number(t.valor);
+    });
+
+    const porConta = Object.entries(porContaMap).map(([name, value]) => ({
       name,
       value,
     }));
@@ -167,7 +204,7 @@ export default function DashboardOfertas() {
         evolucaoMap[chave] = {};
       }
 
-      const forma = t.forma_pagamento || "Não especificado";
+      const forma = t.formas_pagamento?.nome || "Não especificado";
       evolucaoMap[chave][forma] =
         (evolucaoMap[chave][forma] || 0) + Number(t.valor);
     });
@@ -200,6 +237,7 @@ export default function DashboardOfertas() {
       return {
         totalGeral,
         porFormaPagamento,
+        porConta,
         evolucaoMensal,
         comparativoMensal,
         tendencia: { valor: diferenca, percentual },
@@ -209,6 +247,7 @@ export default function DashboardOfertas() {
     return {
       totalGeral,
       porFormaPagamento,
+      porConta,
       evolucaoMensal,
       comparativoMensal,
       tendencia: { valor: 0, percentual: 0 },
@@ -233,7 +272,7 @@ export default function DashboardOfertas() {
 
   const formasPagamento = Array.from(
     new Set(
-      transacoes?.map((t) => t.forma_pagamento || "Não especificado") || []
+      transacoes?.map((t) => t.formas_pagamento?.nome || "Não especificado") || []
     )
   );
 
@@ -280,7 +319,7 @@ export default function DashboardOfertas() {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -335,6 +374,22 @@ export default function DashboardOfertas() {
             </div>
             <p className="text-xs text-muted-foreground">
               Métodos utilizados nas ofertas
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Contas Utilizadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {dados.porConta.length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Contas que receberam ofertas
             </p>
           </CardContent>
         </Card>
@@ -490,6 +545,44 @@ export default function DashboardOfertas() {
               ))}
             </BarChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Resumo por Conta */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Resumo por Conta Financeira</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {dados.porConta.map((conta, index) => {
+              const percentual = (conta.value / dados.totalGeral) * 100;
+              return (
+                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium">{conta.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="h-2 flex-1 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full transition-all"
+                          style={{
+                            width: `${percentual}%`,
+                            backgroundColor: Object.values(COLORS)[index % Object.values(COLORS).length],
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground w-12 text-right">
+                        {percentual.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="ml-4 text-right">
+                    <p className="text-lg font-bold">{formatValue(conta.value)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
     </div>

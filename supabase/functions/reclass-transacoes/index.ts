@@ -5,6 +5,12 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info, x-client-application",
+};
+
 type ReclassPayload = {
   tipo: "entrada" | "saida";
   filtros: Record<string, unknown>;
@@ -35,64 +41,55 @@ type JobResult = {
 Deno.serve(async (req) => {
   // Suporte a CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
   }
 
   try {
     const body = (await req.json()) as ReclassPayload & Contexto;
+        // Extrai usuário do token (se enviado) para registrar ownership do job
+        let userId: string | null = null;
+        const authHeader = req.headers.get("Authorization");
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+          const token = authHeader.slice(7);
+          const { data: userData, error: authError } = await supabase.auth.getUser(token);
+          if (!authError && userData?.user) {
+            userId = userData.user.id;
+          }
+        }
     const { tipo, filtros, ids, novos_valores, limite = 5000, igreja_id, filial_id } = body;
 
     if (!tipo || (tipo !== "entrada" && tipo !== "saida")) {
       return new Response(JSON.stringify({ error: "tipo é obrigatório (entrada|saida)" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
     if (!igreja_id) {
       return new Response(JSON.stringify({ error: "igreja_id é obrigatório" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
     if (!novos_valores || Object.keys(novos_valores).length === 0) {
       return new Response(JSON.stringify({ error: "novos_valores não pode ser vazio" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
     if (limite > 5000) {
       return new Response(JSON.stringify({ error: "limite máximo por operação é 5000" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
@@ -104,10 +101,7 @@ Deno.serve(async (req) => {
     if (Object.keys(updateFields).length === 0) {
       return new Response(JSON.stringify({ error: "nenhum campo para atualizar" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
@@ -123,19 +117,13 @@ Deno.serve(async (req) => {
       if (error || !data) {
         return new Response(JSON.stringify({ error: "Categoria inválida ou inativa" }), {
           status: 400,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
       if (data.tipo !== tipo) {
         return new Response(JSON.stringify({ error: "Categoria incompatível com o tipo" }), {
           status: 400,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
     }
@@ -151,10 +139,7 @@ Deno.serve(async (req) => {
       if (error || !data) {
         return new Response(JSON.stringify({ error: "Subcategoria inválida ou inativa" }), {
           status: 400,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
     }
@@ -170,10 +155,7 @@ Deno.serve(async (req) => {
       if (error || !data) {
         return new Response(JSON.stringify({ error: "Conta inválida ou inativa" }), {
           status: 400,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
     }
@@ -188,10 +170,7 @@ Deno.serve(async (req) => {
       if (error || !data) {
         return new Response(JSON.stringify({ error: "Centro de custo inválido" }), {
           status: 400,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
     }
@@ -207,10 +186,7 @@ Deno.serve(async (req) => {
       if (error || !data) {
         return new Response(JSON.stringify({ error: "Fornecedor inválido ou inativo" }), {
           status: 400,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
     }
@@ -244,10 +220,7 @@ Deno.serve(async (req) => {
     if (!transacoes || transacoes.length === 0) {
       return new Response(JSON.stringify({ error: "Nenhuma transacao encontrada" }), {
         status: 404,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
@@ -261,7 +234,7 @@ Deno.serve(async (req) => {
       .insert({
         igreja_id,
         filial_id,
-        user_id: crypto.randomUUID(), // Sem autenticação, usar ID genérico
+        user_id: userId, // associa ao usuário autenticado quando disponível
         tipo,
         filtros_aplicados: filtros,
         campos_alterados: updateFields,
@@ -321,10 +294,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, job: result }), {
       status: 200,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
   } catch (error) {
     console.error("Erro reclass-transacoes:", error);
@@ -334,10 +304,7 @@ Deno.serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       }
     );
   }

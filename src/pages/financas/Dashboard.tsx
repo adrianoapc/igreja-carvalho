@@ -274,6 +274,7 @@ export default function Dashboard() {
     created_at: string;
     filial_id?: string | null;
     igreja_id: string;
+    valor_total?: number;
   };
 
   // Reembolsos em aberto (pendente/aprovado)
@@ -290,7 +291,7 @@ export default function Dashboard() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = (supabase as any)
         .from("view_solicitacoes_reembolso")
-        .select("id, status, created_at, filial_id, igreja_id")
+        .select("id, status, created_at, filial_id, igreja_id, valor_total")
         .in("status", ["pendente", "aprovado"]) // aguardando pagamento
         .eq("igreja_id", igrejaId)
         .gte("created_at", dateRange.inicio)
@@ -468,7 +469,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
-        <div className="space-y-3 lg:col-span-2">
+        <div className="space-y-3 lg:col-span-3">
           {mostrarAlertaSemana && (
             <Card
               className={`shadow-soft ${
@@ -609,8 +610,20 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-muted-foreground">Reembolsos</p>
-                    <p className="text-lg font-bold">{reembolsosAbertos.length} em aberto</p>
-                    <p className="text-xs text-muted-foreground">Pendentes/aprovados no período</p>
+                    <p className="text-lg font-bold">
+                      {reembolsosAbertos.length} solicitações
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Montante: {new Intl.NumberFormat("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      }).format(
+                        reembolsosAbertos.reduce(
+                          (sum, r) => sum + (r.valor_total || 0),
+                          0
+                        )
+                      )}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -632,7 +645,10 @@ export default function Dashboard() {
             </Card>
           </div>
         </div>
+      </div>
 
+      {/* Card de Contas a Pagar - Centralizado */}
+      <div className="w-full">
         <ContasAPagarWidget />
       </div>
 

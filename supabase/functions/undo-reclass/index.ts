@@ -4,23 +4,22 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info, x-client-application",
+};
+
 Deno.serve(async (req) => {
   // Suporte a CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
   }
 
@@ -29,10 +28,7 @@ Deno.serve(async (req) => {
     if (!job_id) {
       return new Response(JSON.stringify({ error: "job_id é obrigatório" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
@@ -45,17 +41,13 @@ Deno.serve(async (req) => {
     if (jobError || !job) {
       return new Response(JSON.stringify({ error: "Job não encontrado" }), {
         status: 404,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
     // Extrair usuário do token JWT para validação de ownership
     const authHeader = req.headers.get("Authorization");
     let userId: string | null = null;
-
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.slice(7);
       const { data: userData, error: authError } = await supabase.auth.getUser(token);
@@ -64,7 +56,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!userId || job.user_id !== userId) {
+    // Permite undo quando:
+    // - job.user_id é nulo (jobs antigos ou criados sem auth)
+    // - OU quando job.user_id === usuário autenticado
+    if (job.user_id && job.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), {
         status: 403,
         headers: { 
@@ -77,10 +72,7 @@ Deno.serve(async (req) => {
     if (job.status !== "completed") {
       return new Response(JSON.stringify({ error: "Apenas jobs concluídos podem ser desfeitos" }), {
         status: 400,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
@@ -96,10 +88,7 @@ Deno.serve(async (req) => {
     if (!itens || !itens.length) {
       return new Response(JSON.stringify({ error: "Nenhum item para reverter" }), {
         status: 404,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
 
@@ -127,10 +116,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ success: true, reverted: beforeUpdates.length }),
       {
         status: 200,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       }
     );
   } catch (error) {
@@ -139,10 +125,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }),
       {
         status: 500,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       }
     );
   }
