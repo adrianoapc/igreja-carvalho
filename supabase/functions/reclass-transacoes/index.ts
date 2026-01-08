@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
       .in("id", alvoIds)
       .eq("igreja_id", igreja_id)
       .eq("tipo", tipo)
-      .select("id", { count: "exact" });
+      .select("id");
 
     if (updateError) throw updateError;
 
