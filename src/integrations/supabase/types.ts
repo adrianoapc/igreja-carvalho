@@ -5121,6 +5121,121 @@ export type Database = {
           },
         ]
       }
+      reclass_job_items: {
+        Row: {
+          antes: Json | null
+          created_at: string
+          depois: Json | null
+          error_reason: string | null
+          id: string
+          job_id: string
+          status: string
+          transacao_id: string | null
+        }
+        Insert: {
+          antes?: Json | null
+          created_at?: string
+          depois?: Json | null
+          error_reason?: string | null
+          id?: string
+          job_id: string
+          status?: string
+          transacao_id?: string | null
+        }
+        Update: {
+          antes?: Json | null
+          created_at?: string
+          depois?: Json | null
+          error_reason?: string | null
+          id?: string
+          job_id?: string
+          status?: string
+          transacao_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclass_job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "reclass_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclass_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclass_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
+      }
+      reclass_jobs: {
+        Row: {
+          campos_alterados: Json | null
+          completed_at: string | null
+          created_at: string
+          error_reason: string | null
+          filial_id: string | null
+          filtros_aplicados: Json | null
+          id: string
+          igreja_id: string
+          status: string
+          tipo: string
+          total_linhas: number
+          user_id: string
+        }
+        Insert: {
+          campos_alterados?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          error_reason?: string | null
+          filial_id?: string | null
+          filtros_aplicados?: Json | null
+          id?: string
+          igreja_id: string
+          status?: string
+          tipo: string
+          total_linhas?: number
+          user_id: string
+        }
+        Update: {
+          campos_alterados?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          error_reason?: string | null
+          filial_id?: string | null
+          filtros_aplicados?: Json | null
+          id?: string
+          igreja_id?: string
+          status?: string
+          tipo?: string
+          total_linhas?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclass_jobs_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclass_jobs_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       respostas_quiz: {
         Row: {
           aprovado: boolean | null
