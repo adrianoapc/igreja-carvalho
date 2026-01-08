@@ -52,7 +52,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (job.user_id !== user.id) {
+    // Extrair usuário do token JWT para validação de ownership
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const { data: userData, error: authError } = await supabase.auth.getUser(token);
+      if (!authError && userData?.user) {
+        userId = userData.user.id;
+      }
+    }
+
+    if (!userId || job.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), {
         status: 403,
         headers: { 
