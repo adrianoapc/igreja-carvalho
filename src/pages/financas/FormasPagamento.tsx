@@ -136,11 +136,13 @@ export default function FormasPagamento({ onBack }: Props) {
       if (!igrejaId) return [];
       let query = supabase
         .from("forma_pagamento_contas")
-        .select(`
+        .select(
+          `
           id, forma_pagamento_id, conta_id, prioridade,
           contas(id, nome),
           formas_pagamento(id, nome, taxa_administrativa, taxa_administrativa_fixa, gera_pago)
-        `)
+        `
+        )
         .eq("igreja_id", igrejaId)
         .order("prioridade", { ascending: true });
       if (!isAllFiliais && filialId) {
@@ -166,17 +168,15 @@ export default function FormasPagamento({ onBack }: Props) {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       if (!igrejaId) throw new Error("Igreja não identificada.");
-      const { error } = await supabase
-        .from("formas_pagamento")
-        .insert({
-          nome: data.nome,
-          ativo: data.ativo,
-          taxa_administrativa: data.taxa_administrativa ?? 0,
-          taxa_administrativa_fixa: data.taxa_administrativa_fixa,
-          gera_pago: data.gera_pago ?? false,
-          igreja_id: igrejaId,
-          filial_id: !isAllFiliais ? filialId : null,
-        });
+      const { error } = await supabase.from("formas_pagamento").insert({
+        nome: data.nome,
+        ativo: data.ativo,
+        taxa_administrativa: data.taxa_administrativa ?? 0,
+        taxa_administrativa_fixa: data.taxa_administrativa_fixa,
+        gera_pago: data.gera_pago ?? false,
+        igreja_id: igrejaId,
+        filial_id: !isAllFiliais ? filialId : null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -291,15 +291,13 @@ export default function FormasPagamento({ onBack }: Props) {
 
   const handleAddMapeamento = async () => {
     if (!selectedFormaId || !selectedContaId || !igrejaId) return;
-    const { error } = await supabase
-      .from("forma_pagamento_contas")
-      .insert({
-        forma_pagamento_id: selectedFormaId,
-        conta_id: selectedContaId,
-        igreja_id: igrejaId,
-        filial_id: !isAllFiliais ? filialId : null,
-        prioridade: 1,
-      });
+    const { error } = await supabase.from("forma_pagamento_contas").insert({
+      forma_pagamento_id: selectedFormaId,
+      conta_id: selectedContaId,
+      igreja_id: igrejaId,
+      filial_id: !isAllFiliais ? filialId : null,
+      prioridade: 1,
+    });
     if (error) {
       if (String(error.message).includes("duplicate key")) {
         toast.error("Esta forma já está mapeada para esta conta.");
@@ -411,13 +409,19 @@ export default function FormasPagamento({ onBack }: Props) {
                         {forma.ativo ? "Ativo" : "Inativo"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{(forma.taxa_administrativa ?? 0).toFixed(2)} %</TableCell>
+                    <TableCell>
+                      {(forma.taxa_administrativa ?? 0).toFixed(2)} %
+                    </TableCell>
                     <TableCell>
                       {forma.taxa_administrativa_fixa != null
-                        ? `R$ ${Number(forma.taxa_administrativa_fixa).toFixed(2)}`
+                        ? `R$ ${Number(forma.taxa_administrativa_fixa).toFixed(
+                            2
+                          )}`
                         : "-"}
                     </TableCell>
-                    <TableCell>{forma.gera_pago ? "✅ Sim" : "⏳ Não"}</TableCell>
+                    <TableCell>
+                      {forma.gera_pago ? "✅ Sim" : "⏳ Não"}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
@@ -564,7 +568,8 @@ export default function FormasPagamento({ onBack }: Props) {
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    taxa_administrativa_fixa: e.target.value === "" ? null : parseFloat(e.target.value),
+                    taxa_administrativa_fixa:
+                      e.target.value === "" ? null : parseFloat(e.target.value),
                   })
                 }
               />
@@ -619,22 +624,34 @@ export default function FormasPagamento({ onBack }: Props) {
               <TableBody>
                 {mapeamentos.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">{m.formas_pagamento.nome}</TableCell>
+                    <TableCell className="font-medium">
+                      {m.formas_pagamento.nome}
+                    </TableCell>
                     <TableCell>{m.contas.nome}</TableCell>
                     <TableCell>
                       {(m.formas_pagamento.taxa_administrativa ?? 0) > 0 && (
                         <>
                           {m.formas_pagamento.taxa_administrativa}%
-                          {m.formas_pagamento.taxa_administrativa_fixa ? " + " : ""}
+                          {m.formas_pagamento.taxa_administrativa_fixa
+                            ? " + "
+                            : ""}
                         </>
                       )}
                       {m.formas_pagamento.taxa_administrativa_fixa != null ? (
-                        <>R$ {Number(m.formas_pagamento.taxa_administrativa_fixa).toFixed(2)}</>
+                        <>
+                          R${" "}
+                          {Number(
+                            m.formas_pagamento.taxa_administrativa_fixa
+                          ).toFixed(2)}
+                        </>
                       ) : (
-                        (m.formas_pagamento.taxa_administrativa ?? 0) === 0 && "-"
+                        (m.formas_pagamento.taxa_administrativa ?? 0) === 0 &&
+                        "-"
                       )}
                     </TableCell>
-                    <TableCell>{m.formas_pagamento.gera_pago ? "✅ Pago" : "⏳ Pendente"}</TableCell>
+                    <TableCell>
+                      {m.formas_pagamento.gera_pago ? "✅ Pago" : "⏳ Pendente"}
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -661,10 +678,7 @@ export default function FormasPagamento({ onBack }: Props) {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="select-forma">Forma de Pagamento</Label>
-            <Select
-              value={selectedFormaId}
-              onValueChange={setSelectedFormaId}
-            >
+            <Select value={selectedFormaId} onValueChange={setSelectedFormaId}>
               <SelectTrigger id="select-forma">
                 <SelectValue placeholder="Selecione uma forma..." />
               </SelectTrigger>
@@ -692,7 +706,10 @@ export default function FormasPagamento({ onBack }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleAddMapeamento} disabled={!selectedFormaId || !selectedContaId}>
+          <Button
+            onClick={handleAddMapeamento}
+            disabled={!selectedFormaId || !selectedContaId}
+          >
             Criar Mapeamento
           </Button>
         </div>

@@ -102,29 +102,38 @@ export default function DashboardOfertas() {
       const { data, error } = await query;
 
       if (error) throw error;
-      
+
       // Buscar formas e contas separadamente
       if (!data || data.length === 0) return [];
-      
-      const formaIds = [...new Set(data.map(t => t.forma_pagamento).filter(Boolean))];
-      const contaIds = [...new Set(data.map(t => t.conta_id).filter(Boolean))];
-      
+
+      const formaIds = [
+        ...new Set(data.map((t) => t.forma_pagamento).filter(Boolean)),
+      ];
+      const contaIds = [
+        ...new Set(data.map((t) => t.conta_id).filter(Boolean)),
+      ];
+
       const [formasRes, contasRes] = await Promise.all([
-        formaIds.length > 0 
-          ? supabase.from("formas_pagamento").select("id, nome").in("id", formaIds)
+        formaIds.length > 0
+          ? supabase
+              .from("formas_pagamento")
+              .select("id, nome")
+              .in("id", formaIds)
           : { data: [], error: null },
         contaIds.length > 0
           ? supabase.from("contas").select("id, nome").in("id", contaIds)
-          : { data: [], error: null }
+          : { data: [], error: null },
       ]);
-      
-      const formasMap = new Map((formasRes.data || []).map(f => [f.id, f]));
-      const contasMap = new Map((contasRes.data || []).map(c => [c.id, c]));
-      
+
+      const formasMap = new Map((formasRes.data || []).map((f) => [f.id, f]));
+      const contasMap = new Map((contasRes.data || []).map((c) => [c.id, c]));
+
       // Enriquecer os dados
-      return data.map(t => ({
+      return data.map((t) => ({
         ...t,
-        formas_pagamento: t.forma_pagamento ? formasMap.get(t.forma_pagamento) : null,
+        formas_pagamento: t.forma_pagamento
+          ? formasMap.get(t.forma_pagamento)
+          : null,
         contas: t.conta_id ? contasMap.get(t.conta_id) : null,
       }));
     },
@@ -272,7 +281,8 @@ export default function DashboardOfertas() {
 
   const formasPagamento = Array.from(
     new Set(
-      transacoes?.map((t) => t.formas_pagamento?.nome || "Não especificado") || []
+      transacoes?.map((t) => t.formas_pagamento?.nome || "Não especificado") ||
+        []
     )
   );
 
@@ -385,9 +395,7 @@ export default function DashboardOfertas() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {dados.porConta.length}
-            </div>
+            <div className="text-2xl font-bold">{dados.porConta.length}</div>
             <p className="text-xs text-muted-foreground">
               Contas que receberam ofertas
             </p>
@@ -558,7 +566,10 @@ export default function DashboardOfertas() {
             {dados.porConta.map((conta, index) => {
               const percentual = (conta.value / dados.totalGeral) * 100;
               return (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
                   <div className="flex-1">
                     <p className="font-medium">{conta.name}</p>
                     <div className="flex items-center gap-2 mt-1">
@@ -567,7 +578,10 @@ export default function DashboardOfertas() {
                           className="h-full transition-all"
                           style={{
                             width: `${percentual}%`,
-                            backgroundColor: Object.values(COLORS)[index % Object.values(COLORS).length],
+                            backgroundColor:
+                              Object.values(COLORS)[
+                                index % Object.values(COLORS).length
+                              ],
                           }}
                         />
                       </div>
@@ -577,7 +591,9 @@ export default function DashboardOfertas() {
                     </div>
                   </div>
                   <div className="ml-4 text-right">
-                    <p className="text-lg font-bold">{formatValue(conta.value)}</p>
+                    <p className="text-lg font-bold">
+                      {formatValue(conta.value)}
+                    </p>
                   </div>
                 </div>
               );

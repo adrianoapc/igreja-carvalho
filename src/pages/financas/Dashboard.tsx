@@ -614,7 +614,8 @@ export default function Dashboard() {
                       {reembolsosAbertos.length} solicitações
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Montante: {new Intl.NumberFormat("pt-BR", {
+                      Montante:{" "}
+                      {new Intl.NumberFormat("pt-BR", {
                         style: "currency",
                         currency: "BRL",
                       }).format(
@@ -636,9 +637,15 @@ export default function Dashboard() {
                     <FileText className="w-5 h-5 text-violet-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Relatório de Ofertas</p>
-                    <p className="text-lg font-bold">{relatoriosOferta.length} no período</p>
-                    <p className="text-xs text-muted-foreground">Envios e conferências recentes</p>
+                    <p className="text-xs text-muted-foreground">
+                      Relatório de Ofertas
+                    </p>
+                    <p className="text-lg font-bold">
+                      {relatoriosOferta.length} no período
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Envios e conferências recentes
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -750,7 +757,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
-
     </div>
   );
 }

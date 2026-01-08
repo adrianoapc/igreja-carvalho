@@ -8,7 +8,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info, x-client-application",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, apikey, x-client-info, x-client-application",
 };
 
 type ReclassPayload = {
@@ -53,44 +54,66 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as ReclassPayload & Contexto;
-        // Extrai usuário do token (se enviado) para registrar ownership do job
-        let userId: string | null = null;
-        const authHeader = req.headers.get("Authorization");
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-          const token = authHeader.slice(7);
-          const { data: userData, error: authError } = await supabase.auth.getUser(token);
-          if (!authError && userData?.user) {
-            userId = userData.user.id;
-          }
-        }
-    const { tipo, filtros, ids, novos_valores, limite = 5000, igreja_id, filial_id } = body;
+    // Extrai usuário do token (se enviado) para registrar ownership do job
+    let userId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const { data: userData, error: authError } = await supabase.auth.getUser(
+        token
+      );
+      if (!authError && userData?.user) {
+        userId = userData.user.id;
+      }
+    }
+    const {
+      tipo,
+      filtros,
+      ids,
+      novos_valores,
+      limite = 5000,
+      igreja_id,
+      filial_id,
+    } = body;
 
     if (!tipo || (tipo !== "entrada" && tipo !== "saida")) {
-      return new Response(JSON.stringify({ error: "tipo é obrigatório (entrada|saida)" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "tipo é obrigatório (entrada|saida)" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     if (!igreja_id) {
-      return new Response(JSON.stringify({ error: "igreja_id é obrigatório" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "igreja_id é obrigatório" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     if (!novos_valores || Object.keys(novos_valores).length === 0) {
-      return new Response(JSON.stringify({ error: "novos_valores não pode ser vazio" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "novos_valores não pode ser vazio" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     if (limite > 5000) {
-      return new Response(JSON.stringify({ error: "limite máximo por operação é 5000" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "limite máximo por operação é 5000" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     // Normaliza novos valores (remove undefined)
@@ -99,10 +122,13 @@ Deno.serve(async (req) => {
     );
 
     if (Object.keys(updateFields).length === 0) {
-      return new Response(JSON.stringify({ error: "nenhum campo para atualizar" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "nenhum campo para atualizar" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     // Valida novos valores (categoria/tipo, subcategoria, conta ativa, centro, fornecedor)
@@ -115,16 +141,22 @@ Deno.serve(async (req) => {
         .eq("ativo", true)
         .single();
       if (error || !data) {
-        return new Response(JSON.stringify({ error: "Categoria inválida ou inativa" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return new Response(
+          JSON.stringify({ error: "Categoria inválida ou inativa" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          }
+        );
       }
       if (data.tipo !== tipo) {
-        return new Response(JSON.stringify({ error: "Categoria incompatível com o tipo" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return new Response(
+          JSON.stringify({ error: "Categoria incompatível com o tipo" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          }
+        );
       }
     }
 
@@ -137,10 +169,13 @@ Deno.serve(async (req) => {
         .eq("ativo", true)
         .single();
       if (error || !data) {
-        return new Response(JSON.stringify({ error: "Subcategoria inválida ou inativa" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return new Response(
+          JSON.stringify({ error: "Subcategoria inválida ou inativa" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          }
+        );
       }
     }
 
@@ -153,10 +188,13 @@ Deno.serve(async (req) => {
         .eq("ativo", true)
         .single();
       if (error || !data) {
-        return new Response(JSON.stringify({ error: "Conta inválida ou inativa" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return new Response(
+          JSON.stringify({ error: "Conta inválida ou inativa" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          }
+        );
       }
     }
 
@@ -168,10 +206,13 @@ Deno.serve(async (req) => {
         .eq("igreja_id", igreja_id)
         .single();
       if (error || !data) {
-        return new Response(JSON.stringify({ error: "Centro de custo inválido" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return new Response(
+          JSON.stringify({ error: "Centro de custo inválido" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          }
+        );
       }
     }
 
@@ -184,10 +225,13 @@ Deno.serve(async (req) => {
         .eq("ativo", true)
         .single();
       if (error || !data) {
-        return new Response(JSON.stringify({ error: "Fornecedor inválido ou inativo" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return new Response(
+          JSON.stringify({ error: "Fornecedor inválido ou inativo" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          }
+        );
       }
     }
 
@@ -203,25 +247,40 @@ Deno.serve(async (req) => {
     if (ids && ids.length) query = query.in("id", ids);
 
     // Filtros simples (IDs/nome direto)
-    if (filtros.descricao) query = query.ilike("descricao", `%${filtros.descricao}%` as string);
+    if (filtros.descricao)
+      query = query.ilike("descricao", `%${filtros.descricao}%` as string);
     if (filtros.status) query = query.eq("status", filtros.status as string);
-    if (filtros.categoria) query = query.eq("categoria_id", filtros.categoria as string);
-    if (filtros.subcategoria) query = query.eq("subcategoria_id", filtros.subcategoria as string);
-    if (filtros.centro) query = query.eq("centro_custo_id", filtros.centro as string);
-    if (filtros.fornecedor) query = query.eq("fornecedor_id", filtros.fornecedor as string);
+    if (filtros.categoria)
+      query = query.eq("categoria_id", filtros.categoria as string);
+    if (filtros.subcategoria)
+      query = query.eq("subcategoria_id", filtros.subcategoria as string);
+    if (filtros.centro)
+      query = query.eq("centro_custo_id", filtros.centro as string);
+    if (filtros.fornecedor)
+      query = query.eq("fornecedor_id", filtros.fornecedor as string);
     if (filtros.conta) query = query.eq("conta_id", filtros.conta as string);
-    if (filtros.dataInicio) query = query.gte("data_vencimento", filtros.dataInicio as string);
-    if (filtros.dataFim) query = query.lte("data_vencimento", filtros.dataFim as string);
-    if (filtros.competenciaInicio) query = query.gte("data_competencia", filtros.competenciaInicio as string);
-    if (filtros.competenciaFim) query = query.lte("data_competencia", filtros.competenciaFim as string);
+    if (filtros.dataInicio)
+      query = query.gte("data_vencimento", filtros.dataInicio as string);
+    if (filtros.dataFim)
+      query = query.lte("data_vencimento", filtros.dataFim as string);
+    if (filtros.competenciaInicio)
+      query = query.gte(
+        "data_competencia",
+        filtros.competenciaInicio as string
+      );
+    if (filtros.competenciaFim)
+      query = query.lte("data_competencia", filtros.competenciaFim as string);
 
     const { data: transacoes, error: fetchError } = await query;
     if (fetchError) throw fetchError;
     if (!transacoes || transacoes.length === 0) {
-      return new Response(JSON.stringify({ error: "Nenhuma transacao encontrada" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "Nenhuma transacao encontrada" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     // TODO: se houver campo de conciliacao, bloquear aqui (não presente no schema atual)
@@ -244,7 +303,8 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    if (jobError || !jobInsert) throw jobError || new Error("Falha ao criar job");
+    if (jobError || !jobInsert)
+      throw jobError || new Error("Falha ao criar job");
 
     // Atualizar em lote
     const { error: updateError, count } = await supabase
@@ -278,7 +338,9 @@ Deno.serve(async (req) => {
       };
     });
 
-    const { error: itemsError } = await supabase.from("reclass_job_items").insert(itens);
+    const { error: itemsError } = await supabase
+      .from("reclass_job_items")
+      .insert(itens);
     if (itemsError) throw itemsError;
 
     await supabase

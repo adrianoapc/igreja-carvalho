@@ -24,14 +24,14 @@
              │
              ▼
     HANDLESUBMIT() executa:
-    
+
     1. Validações:
        ✓ Igreja identificada?
        ✓ Conferente selecionado?
        ✓ Há valores preenchidos?
-    
+
     2. Busca "conferente" na lista pessoas
-    
+
     3. Cria NOTIFICAÇÃO:
        INSERT INTO notifications {
          user_id: conferente.user_id  ← Vai pra inbox dele
@@ -49,10 +49,10 @@
            taxa_cartao_debito: "2.0"
          }
        }
-    
+
     4. Toast de sucesso ✅
     5. Limpa form
-    
+
     ⏸️ AQUI PARA! Nenhum lançamento criado ainda.
 ```
 
@@ -88,7 +88,7 @@
                  ▼
     CONFERIRDIALOG se abre:
     (Componente: ConferirOfertaDialog)
-    
+
     Exibe:
     • Data: 08/01/2026
     • Valores por forma:
@@ -97,40 +97,40 @@
     • Total: R$ 350,50
     • Taxa crédito: 3.5%
     • Taxa débito: 2.0%
-    
+
     Botões:
     [Rejeitar] [Confirmar]
                  │
                  ▼ (se confirmar)
     HANDLECONFIRAROFERTA() executa:
-    
+
     1. Busca contas por NOME:
        • contaOfertas = contains("oferta")
        • contaSantander = contains("santander")
        ❌ PROBLEMA: Se conta não tiver
           essas palavras = erro
-    
+
     2. Para CADA valor de forma:
-       
+
        • Busca form no array
        • Checa nome forma:
          - isDinheiro = includes("dinheiro")
          - isPix = includes("pix")
          - isCartaoCredito = includes("crédito"|"credito")
          - isCartaoDebito = includes("débito"|"debito")
-       
+
        • Define CONTA:
          if (isDinheiro) → contaOfertas
          else → contaSantander
-       
+
        • Define STATUS e DATA_PAGAMENTO:
          if (isDinheiro || isPix) → status="pago", data_pgto=hoje
          else → status="pendente", data_pgto=null
-       
+
        • Calcula TAXA:
          if (isCartaoCredito) → taxa = valor * 3.5%
          if (isCartaoDebito) → taxa = valor * 2.0%
-       
+
        • Cria transação:
          {
            tipo: "entrada"
@@ -150,16 +150,16 @@
            igreja_id: igreja_id
            filial_id: filial_id
          }
-    
+
     3. INSERT MÚLTIPLOS em transacoes_financeiras
        (uma linha por forma com valor > 0)
-    
+
     4. Atualiza notification:
        UPDATE notifications SET read=true WHERE id=...
-    
+
     5. Toast sucesso ✅ "2 lançamentos criados"
     6. Invalida query de "notifications"
-    
+
     ⏸️ DADOS PERSISTEM NO BANCO
 ```
 
@@ -175,7 +175,7 @@ HANDLEREJEITAROFERTA() executa:
   UPDATE notifications SET
     read = true
   WHERE id = notif_id
-  
+
   Toast: "Conferência rejeitada"
 
 ❌ PROBLEMA:
@@ -226,15 +226,15 @@ SE REJEITADO:
 
 ## 🚨 Resumo dos Problemas
 
-| Item | Problema | Impacto |
-|------|----------|---------|
-| **Mapeamento Forma→Conta** | Hardcoded por nome | Se renomear conta = quebra |
-| **Taxas** | Hardcoded 3.5% e 2.0% | Não reflete sistema dinâmico |
-| **Validação** | Nenhuma em valores | Pode lançar R$ 9999999 |
-| **Rejeição** | Sem razão/auditoria | Perda de informação |
-| **Roles** | Apenas admin/tesoureiro | Sem flexibilidade |
-| **UI Formas** | Grid 2 colunas fixo | Fica ruim com 10+ formas |
-| **Preview** | Sem pré-visualização | User B não vê o que vai criar |
+| Item                       | Problema                | Impacto                       |
+| -------------------------- | ----------------------- | ----------------------------- |
+| **Mapeamento Forma→Conta** | Hardcoded por nome      | Se renomear conta = quebra    |
+| **Taxas**                  | Hardcoded 3.5% e 2.0%   | Não reflete sistema dinâmico  |
+| **Validação**              | Nenhuma em valores      | Pode lançar R$ 9999999        |
+| **Rejeição**               | Sem razão/auditoria     | Perda de informação           |
+| **Roles**                  | Apenas admin/tesoureiro | Sem flexibilidade             |
+| **UI Formas**              | Grid 2 colunas fixo     | Fica ruim com 10+ formas      |
+| **Preview**                | Sem pré-visualização    | User B não vê o que vai criar |
 
 ---
 

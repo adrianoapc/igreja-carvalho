@@ -7,7 +7,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info, x-client-application",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, apikey, x-client-info, x-client-application",
 };
 
 Deno.serve(async (req) => {
@@ -50,7 +51,9 @@ Deno.serve(async (req) => {
     let userId: string | null = null;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.slice(7);
-      const { data: userData, error: authError } = await supabase.auth.getUser(token);
+      const { data: userData, error: authError } = await supabase.auth.getUser(
+        token
+      );
       if (!authError && userData?.user) {
         userId = userData.user.id;
       }
@@ -62,7 +65,7 @@ Deno.serve(async (req) => {
     if (job.user_id && job.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), {
         status: 403,
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
         },
@@ -70,10 +73,13 @@ Deno.serve(async (req) => {
     }
 
     if (job.status !== "completed") {
-      return new Response(JSON.stringify({ error: "Apenas jobs concluídos podem ser desfeitos" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "Apenas jobs concluídos podem ser desfeitos" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     // Janela de undo: opcional (24h). Não implementado check de tempo aqui.
@@ -86,10 +92,13 @@ Deno.serve(async (req) => {
 
     if (itensError) throw itensError;
     if (!itens || !itens.length) {
-      return new Response(JSON.stringify({ error: "Nenhum item para reverter" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
+      return new Response(
+        JSON.stringify({ error: "Nenhum item para reverter" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        }
+      );
     }
 
     // Reverte campos alterados
@@ -105,7 +114,10 @@ Deno.serve(async (req) => {
 
     if (updateError) throw updateError;
 
-    await supabase.from("reclass_jobs").update({ status: "undone" }).eq("id", job_id);
+    await supabase
+      .from("reclass_jobs")
+      .update({ status: "undone" })
+      .eq("id", job_id);
     await supabase
       .from("reclass_job_items")
       .update({ status: "reverted" })
@@ -122,7 +134,9 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Erro undo-reclass:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }),
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Internal server error",
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },

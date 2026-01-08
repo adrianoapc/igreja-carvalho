@@ -16,7 +16,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
-import { ArrowLeft, CalendarIcon, Save, DollarSign, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarIcon,
+  Save,
+  DollarSign,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -61,7 +68,9 @@ export default function RelatorioOferta() {
       if (!igrejaId) return [];
       let query = supabase
         .from("formas_pagamento")
-        .select("id, nome, taxa_administrativa, taxa_administrativa_fixa, gera_pago")
+        .select(
+          "id, nome, taxa_administrativa, taxa_administrativa_fixa, gera_pago"
+        )
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("nome");
@@ -81,27 +90,27 @@ export default function RelatorioOferta() {
     queryKey: ["forma-conta-mapa", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      
+
       let query = supabase
         .from("forma_pagamento_contas")
-        .select(`
+        .select(
+          `
           forma_pagamento_id,
           conta_id,
           prioridade,
           contas(id, nome)
-        `)
+        `
+        )
         .eq("igreja_id", igrejaId)
         .order("prioridade", { ascending: true });
-      
+
       // Se não é all filiais, preferir mapeamento específico da filial
       if (!isAllFiliais && filialId) {
-        query = query.or(
-          `filial_id.eq.${filialId},filial_id.is.null`
-        );
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       } else {
         query = query.is("filial_id", null);
       }
-      
+
       const { data, error } = await query;
 
       if (error) throw error;
@@ -112,7 +121,10 @@ export default function RelatorioOferta() {
 
   // Índice rápido de mapeamentos por forma, já respeitando prioridade
   const mapeamentosPorForma = useMemo(() => {
-    const map: Record<string, { contaId: string; contaNome: string; prioridade: number | null }[]> = {};
+    const map: Record<
+      string,
+      { contaId: string; contaNome: string; prioridade: number | null }[]
+    > = {};
     (formaContaMapa || []).forEach((m) => {
       if (!m.forma_pagamento_id || !m.contas) return;
       const lista = map[m.forma_pagamento_id] || [];
@@ -232,7 +244,9 @@ export default function RelatorioOferta() {
   const adicionarLinha = () => {
     const primeiraForma = formasPagamento?.[0];
     const formaId = primeiraForma?.id || "";
-    const contaDefault = formaId ? mapeamentosPorForma[formaId]?.[0]?.contaId : undefined;
+    const contaDefault = formaId
+      ? mapeamentosPorForma[formaId]?.[0]?.contaId
+      : undefined;
     setLinhas((prev) => [
       ...prev,
       {
@@ -245,7 +259,9 @@ export default function RelatorioOferta() {
   };
 
   const removerLinha = (id: string) => {
-    setLinhas((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
+    setLinhas((prev) =>
+      prev.length > 1 ? prev.filter((l) => l.id !== id) : prev
+    );
   };
 
   const formatCurrency = (value: number) => {
@@ -303,7 +319,9 @@ export default function RelatorioOferta() {
       }
       const listaMap = mapeamentosPorForma[linha.formaId];
       if (!listaMap || listaMap.length === 0) {
-        toast.error("Forma sem mapeamento de conta. Configure antes de lançar.");
+        toast.error(
+          "Forma sem mapeamento de conta. Configure antes de lançar."
+        );
         return;
       }
       if (!linha.contaId) {
@@ -331,11 +349,13 @@ export default function RelatorioOferta() {
       const linhasEnriquecidas = linhasValidas.map((linha) => {
         const forma = formasPagamento?.find((f) => f.id === linha.formaId);
         const contaNome =
-          mapeamentosPorForma[linha.formaId]?.find((m) => m.contaId === linha.contaId)?.contaNome ||
-          "Conta não mapeada";
+          mapeamentosPorForma[linha.formaId]?.find(
+            (m) => m.contaId === linha.contaId
+          )?.contaNome || "Conta não mapeada";
         const valorNum = parseFloat(linha.valor.replace(",", ".")) || 0;
         if (forma) {
-          valoresAgrupados[linha.formaId] = (valoresAgrupados[linha.formaId] || 0) + valorNum;
+          valoresAgrupados[linha.formaId] =
+            (valoresAgrupados[linha.formaId] || 0) + valorNum;
         }
         return {
           formaId: linha.formaId,
@@ -347,7 +367,12 @@ export default function RelatorioOferta() {
       });
 
       const valoresFormatados = linhasEnriquecidas
-        .map((l) => `${l.formaNome || "Forma"} → ${l.contaNome}: R$ ${l.valor.toFixed(2)}`)
+        .map(
+          (l) =>
+            `${l.formaNome || "Forma"} → ${l.contaNome}: R$ ${l.valor.toFixed(
+              2
+            )}`
+        )
         .join(", ");
 
       // Criar notificação para o conferente com dados completos no metadata
@@ -375,7 +400,10 @@ export default function RelatorioOferta() {
             valores_formatados: valoresFormatados,
             // Para compatibilidade com lógica antiga
             valores: Object.fromEntries(
-              Object.entries(valoresAgrupados).map(([k, v]) => [k, v.toFixed(2)])
+              Object.entries(valoresAgrupados).map(([k, v]) => [
+                k,
+                v.toFixed(2),
+              ])
             ),
           },
         });
@@ -433,12 +461,15 @@ export default function RelatorioOferta() {
       const valoresMetadata = metadata.valores || {};
       const contaPorFormaSelecionada = metadata.conta_por_forma || {};
       const linhasMetadata =
-        (metadata.linhas && metadata.linhas.length > 0)
+        metadata.linhas && metadata.linhas.length > 0
           ? metadata.linhas
           : Object.entries(valoresMetadata).map(([formaId, valorStr]) => {
-              const valorNumerico = parseFloat(String(valorStr).replace(",", "."));
+              const valorNumerico = parseFloat(
+                String(valorStr).replace(",", ".")
+              );
               const contaFallback =
-                contaPorFormaSelecionada[formaId] || mapeamentosPorForma[formaId]?.[0]?.contaId;
+                contaPorFormaSelecionada[formaId] ||
+                mapeamentosPorForma[formaId]?.[0]?.contaId;
               return {
                 formaId,
                 contaId: contaFallback,
@@ -462,7 +493,8 @@ export default function RelatorioOferta() {
       // Criar transações para cada forma de pagamento com valor
       const transacoes = [];
       for (const linha of linhasMetadata) {
-        const valorNumerico = parseFloat(String(linha.valor).replace(",", ".")) || 0;
+        const valorNumerico =
+          parseFloat(String(linha.valor).replace(",", ".")) || 0;
         if (valorNumerico <= 0) continue;
 
         const forma = formasPagamento?.find((f) => f.id === linha.formaId);
@@ -474,16 +506,16 @@ export default function RelatorioOferta() {
         if (!contaId) {
           toast.error(
             `Forma "${forma.nome}" não está mapeada para uma conta. ` +
-            `Configure em Financas → Formas de Pagamento`
+              `Configure em Financas → Formas de Pagamento`
           );
           setLoading(false);
           return;
         }
-        
+
         // 🎯 NOVO: Taxa vem da forma, não do form
         const taxaAdministrativa = forma.taxa_administrativa || 0;
         const taxaAdministrativaFixa = forma.taxa_administrativa_fixa;
-        
+
         // 🎯 NOVO: Status vem da forma, não de parsing de nome
         const status = forma.gera_pago ? "pago" : "pendente";
         const dataPagamento = forma.gera_pago ? dataFormatada : null;
@@ -494,7 +526,8 @@ export default function RelatorioOferta() {
           taxasAdministrativas = valorNumerico * (taxaAdministrativa / 100);
         }
         if (taxaAdministrativaFixa && taxaAdministrativaFixa > 0) {
-          taxasAdministrativas = (taxasAdministrativas || 0) + taxaAdministrativaFixa;
+          taxasAdministrativas =
+            (taxasAdministrativas || 0) + taxaAdministrativaFixa;
         }
 
         const transacao = {
@@ -508,11 +541,11 @@ export default function RelatorioOferta() {
           data_vencimento: dataFormatada,
           data_competencia: dataFormatada,
           data_pagamento: dataPagamento,
-          conta_id: contaId,  // ✅ Agora dinâmico
+          conta_id: contaId, // ✅ Agora dinâmico
           categoria_id: categoriaOferta?.id || null,
           forma_pagamento: linha.formaId,
-          status: status,  // ✅ Agora dinâmico
-          taxas_administrativas: taxasAdministrativas,  // ✅ Agora dinâmico
+          status: status, // ✅ Agora dinâmico
+          taxas_administrativas: taxasAdministrativas, // ✅ Agora dinâmico
           observacoes: `Lançado por: ${metadata.lancado_por}\nConferido por: ${profile?.nome}`,
           lancado_por: userData.user?.id,
           igreja_id: igrejaId,
@@ -683,9 +716,23 @@ export default function RelatorioOferta() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <div className={cn("flex items-center gap-2", step === 1 ? "font-semibold text-foreground" : "")}>1. Dados do culto</div>
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              step === 1 ? "font-semibold text-foreground" : ""
+            )}
+          >
+            1. Dados do culto
+          </div>
           <span>→</span>
-          <div className={cn("flex items-center gap-2", step === 2 ? "font-semibold text-foreground" : "")}>2. Valores e contas</div>
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              step === 2 ? "font-semibold text-foreground" : ""
+            )}
+          >
+            2. Valores e contas
+          </div>
         </div>
       </div>
 
@@ -758,7 +805,11 @@ export default function RelatorioOferta() {
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit" className="bg-gradient-primary" disabled={loading}>
+                <Button
+                  type="submit"
+                  className="bg-gradient-primary"
+                  disabled={loading}
+                >
                   Próximo
                 </Button>
               </div>
@@ -783,15 +834,22 @@ export default function RelatorioOferta() {
                 </div>
                 <div className="space-y-3">
                   {linhas.map((linha) => {
-                    const formaSelecionada = formasPagamento?.find((f) => f.id === linha.formaId);
+                    const formaSelecionada = formasPagamento?.find(
+                      (f) => f.id === linha.formaId
+                    );
                     const mapeamentos = linha.formaId
                       ? mapeamentosPorForma[linha.formaId] || []
                       : [];
                     const temTaxa =
-                      (Number(formaSelecionada?.taxa_administrativa ?? 0) > 0) ||
-                      (Number(formaSelecionada?.taxa_administrativa_fixa ?? 0) > 0);
-                    const taxaPercentual = Number(formaSelecionada?.taxa_administrativa ?? 0);
-                    const taxaFixa = Number(formaSelecionada?.taxa_administrativa_fixa ?? 0);
+                      Number(formaSelecionada?.taxa_administrativa ?? 0) > 0 ||
+                      Number(formaSelecionada?.taxa_administrativa_fixa ?? 0) >
+                        0;
+                    const taxaPercentual = Number(
+                      formaSelecionada?.taxa_administrativa ?? 0
+                    );
+                    const taxaFixa = Number(
+                      formaSelecionada?.taxa_administrativa_fixa ?? 0
+                    );
 
                     return (
                       <div
@@ -801,7 +859,9 @@ export default function RelatorioOferta() {
                         <div className="space-y-1">
                           <Select
                             value={linha.formaId}
-                            onValueChange={(v) => handleFormaChange(linha.id, v)}
+                            onValueChange={(v) =>
+                              handleFormaChange(linha.id, v)
+                            }
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione a forma" />
@@ -816,7 +876,8 @@ export default function RelatorioOferta() {
                           </Select>
                           {temTaxa && (
                             <p className="text-[11px] text-muted-foreground">
-                              Taxa: {taxaPercentual > 0 ? `${taxaPercentual}%` : ""}
+                              Taxa:{" "}
+                              {taxaPercentual > 0 ? `${taxaPercentual}%` : ""}
                               {taxaPercentual > 0 && taxaFixa > 0 ? " + " : ""}
                               {taxaFixa > 0 ? `R$ ${taxaFixa.toFixed(2)}` : ""}
                             </p>
@@ -825,11 +886,15 @@ export default function RelatorioOferta() {
 
                         <div>
                           {mapeamentos.length === 0 ? (
-                            <p className="text-xs text-destructive">Sem conta mapeada</p>
+                            <p className="text-xs text-destructive">
+                              Sem conta mapeada
+                            </p>
                           ) : (
                             <Select
                               value={linha.contaId || mapeamentos[0].contaId}
-                              onValueChange={(v) => handleContaChange(linha.id, v)}
+                              onValueChange={(v) =>
+                                handleContaChange(linha.id, v)
+                              }
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione a conta" />
@@ -850,7 +915,9 @@ export default function RelatorioOferta() {
                           type="text"
                           placeholder="0,00"
                           value={linha.valor}
-                          onChange={(e) => handleValorChange(linha.id, e.target.value)}
+                          onChange={(e) =>
+                            handleValorChange(linha.id, e.target.value)
+                          }
                         />
 
                         <div className="flex md:justify-end">
@@ -869,7 +936,12 @@ export default function RelatorioOferta() {
                   })}
                 </div>
 
-                <Button type="button" variant="outline" size="sm" onClick={adicionarLinha}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={adicionarLinha}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Adicionar linha
                 </Button>
@@ -915,16 +987,24 @@ export default function RelatorioOferta() {
       <ResponsiveDialog open={showPreview} onOpenChange={setShowPreview}>
         <div className="flex flex-col h-full">
           <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">Revisar e Enviar</h2>
-            <p className="text-sm text-muted-foreground">Confirme os lançamentos antes de enviar para conferência</p>
+            <h2 className="text-lg font-semibold leading-none tracking-tight">
+              Revisar e Enviar
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Confirme os lançamentos antes de enviar para conferência
+            </p>
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5 space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="text-muted-foreground">Data do culto</div>
-              <div className="font-medium">{format(dataCulto, "dd/MM/yyyy")}</div>
+              <div className="font-medium">
+                {format(dataCulto, "dd/MM/yyyy")}
+              </div>
               <div className="text-muted-foreground">Conferente</div>
-              <div className="font-medium">{pessoas?.find((p) => p.id === conferenteId)?.nome || ""}</div>
+              <div className="font-medium">
+                {pessoas?.find((p) => p.id === conferenteId)?.nome || ""}
+              </div>
             </div>
 
             <div className="border rounded-lg">
@@ -935,25 +1015,40 @@ export default function RelatorioOferta() {
               </div>
               <div className="divide-y">
                 {linhas
-                  .filter((linha) => parseFloat(linha.valor.replace(",", ".")) > 0)
+                  .filter(
+                    (linha) => parseFloat(linha.valor.replace(",", ".")) > 0
+                  )
                   .map((linha) => {
                     const formaNome =
-                      formasPagamento?.find((f) => f.id === linha.formaId)?.nome || "Forma";
+                      formasPagamento?.find((f) => f.id === linha.formaId)
+                        ?.nome || "Forma";
                     const contaNome =
-                      mapeamentosPorForma[linha.formaId]?.find((m) => m.contaId === linha.contaId)?.contaNome ||
-                      "Conta";
+                      mapeamentosPorForma[linha.formaId]?.find(
+                        (m) => m.contaId === linha.contaId
+                      )?.contaNome || "Conta";
                     return (
-                      <div key={linha.id} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm items-center">
+                      <div
+                        key={linha.id}
+                        className="grid grid-cols-3 gap-2 px-3 py-2 text-sm items-center"
+                      >
                         <span>{formaNome}</span>
-                        <span className="truncate" title={contaNome}>{contaNome}</span>
-                        <span className="text-right font-medium">{formatCurrency(parseFloat(linha.valor.replace(",", ".")) || 0)}</span>
+                        <span className="truncate" title={contaNome}>
+                          {contaNome}
+                        </span>
+                        <span className="text-right font-medium">
+                          {formatCurrency(
+                            parseFloat(linha.valor.replace(",", ".")) || 0
+                          )}
+                        </span>
                       </div>
                     );
                   })}
               </div>
               <div className="flex justify-between items-center px-3 py-3 bg-muted/50">
                 <span className="text-sm font-semibold">Total</span>
-                <span className="text-xl font-bold text-primary">{formatCurrency(calcularTotal())}</span>
+                <span className="text-xl font-bold text-primary">
+                  {formatCurrency(calcularTotal())}
+                </span>
               </div>
             </div>
           </div>
@@ -995,39 +1090,56 @@ export default function RelatorioOferta() {
               const valoresObj = metadata.valores || {};
               const total = metadata.total || 0;
 
-              const valoresAgrupados = (metadata.linhas && metadata.linhas.length > 0)
-                ? metadata.linhas.reduce((acc, linha) => {
-                    const valorNum = Number(linha.valor) || 0;
-                    if (valorNum <= 0) return acc;
-                    const formaNome =
-                      linha.formaNome || formasPagamento?.find((f) => f.id === linha.formaId)?.nome || "Forma";
-                    const atual = acc[linha.formaId] || { nome: formaNome, valor: 0 };
-                    acc[linha.formaId] = { nome: atual.nome, valor: atual.valor + valorNum };
-                    return acc;
-                  }, {} as Record<string, { nome: string; valor: number }>)
-                : Object.entries(valoresObj).reduce(
-                    (acc, [id, valorStr]: [string, string]) => {
-                      const valorNumerico = parseFloat(
-                        String(valorStr).replace(",", ".")
-                      );
-                      if (valorNumerico > 0) {
-                        const forma = formasPagamento?.find((f) => f.id === id);
-                        if (forma) {
-                          acc[id] = {
-                            nome: forma.nome,
-                            valor: valorNumerico,
-                          };
-                        }
-                      }
+              const valoresAgrupados =
+                metadata.linhas && metadata.linhas.length > 0
+                  ? metadata.linhas.reduce((acc, linha) => {
+                      const valorNum = Number(linha.valor) || 0;
+                      if (valorNum <= 0) return acc;
+                      const formaNome =
+                        linha.formaNome ||
+                        formasPagamento?.find((f) => f.id === linha.formaId)
+                          ?.nome ||
+                        "Forma";
+                      const atual = acc[linha.formaId] || {
+                        nome: formaNome,
+                        valor: 0,
+                      };
+                      acc[linha.formaId] = {
+                        nome: atual.nome,
+                        valor: atual.valor + valorNum,
+                      };
                       return acc;
-                    },
-                    {} as Record<string, { nome: string; valor: number }>
-                  );
+                    }, {} as Record<string, { nome: string; valor: number }>)
+                  : Object.entries(valoresObj).reduce(
+                      (acc, [id, valorStr]: [string, string]) => {
+                        const valorNumerico = parseFloat(
+                          String(valorStr).replace(",", ".")
+                        );
+                        if (valorNumerico > 0) {
+                          const forma = formasPagamento?.find(
+                            (f) => f.id === id
+                          );
+                          if (forma) {
+                            acc[id] = {
+                              nome: forma.nome,
+                              valor: valorNumerico,
+                            };
+                          }
+                        }
+                        return acc;
+                      },
+                      {} as Record<string, { nome: string; valor: number }>
+                    );
 
               const dadosConferencia = {
                 dataCulto: new Date(metadata.data_evento),
                 valores: valoresAgrupados,
-                total: total || Object.values(valoresAgrupados).reduce((s, v) => s + v.valor, 0),
+                total:
+                  total ||
+                  Object.values(valoresAgrupados).reduce(
+                    (s, v) => s + v.valor,
+                    0
+                  ),
                 lancadoPor: metadata.lancado_por || "Não identificado",
                 conferente: profile?.nome || "Você",
               };

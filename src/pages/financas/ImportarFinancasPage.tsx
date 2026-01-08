@@ -79,21 +79,37 @@ export default function ImportarFinancasPage() {
   const [columns, setColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
-  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>(
+    []
+  );
   const [excluded, setExcluded] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
-  const [chunkProgress, setChunkProgress] = useState<{ processed: number; total: number }>({ processed: 0, total: 0 });
-  const [rejected, setRejected] = useState<Array<{ index: number; reason: string }>>([]);
+  const [chunkProgress, setChunkProgress] = useState<{
+    processed: number;
+    total: number;
+  }>({ processed: 0, total: 0 });
+  const [rejected, setRejected] = useState<
+    Array<{ index: number; reason: string }>
+  >([]);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
-  const requiredKeys = new Set(["descricao", "valor", "data_vencimento", "data_competencia", "conta", "categoria"]);
+  const requiredKeys = new Set([
+    "descricao",
+    "valor",
+    "data_vencimento",
+    "data_competencia",
+    "conta",
+    "categoria",
+  ]);
 
   const mappingErrors = useMemo(() => {
     const errors: string[] = [];
     if (!mapping.descricao) errors.push("Campo 'Descrição' não mapeado");
     if (!mapping.valor) errors.push("Campo 'Valor' não mapeado");
-    if (!mapping.data_vencimento) errors.push("Campo 'Data Vencimento' não mapeado");
-    if (!mapping.data_competencia) errors.push("Campo 'Data Competência' não mapeado");
+    if (!mapping.data_vencimento)
+      errors.push("Campo 'Data Vencimento' não mapeado");
+    if (!mapping.data_competencia)
+      errors.push("Campo 'Data Competência' não mapeado");
     if (!mapping.conta) errors.push("Campo 'Conta' não mapeado");
     if (!mapping.categoria) errors.push("Campo 'Categoria' não mapeado");
     return errors;
@@ -147,7 +163,9 @@ export default function ImportarFinancasPage() {
     try {
       const worksheet = wb.Sheets[sheetName];
       // Obter cabeçalhos diretamente da primeira linha para garantir todas as colunas
-      const aoa = utils.sheet_to_json(worksheet, { header: 1 }) as Array<Array<unknown>>;
+      const aoa = utils.sheet_to_json(worksheet, { header: 1 }) as Array<
+        Array<unknown>
+      >;
       const headerRow = (aoa[0] || []) as Array<unknown>;
       let columnNames = headerRow
         .map((h) => String(h || "").trim())
@@ -174,28 +192,49 @@ export default function ImportarFinancasPage() {
       const k = col.toLowerCase().trim();
       if (k.includes("descri")) auto.descricao = col;
       if (k.includes("valor") && !k.includes("liquido")) auto.valor = col;
-      if (k.includes("vencimento") || k.includes("data_venc")) auto.data_vencimento = col;
-      if (k.includes("competenc") || k.includes("competência") || k.includes("data_compet")) auto.data_competencia = col;
-      if (k.includes("pagamento") || k.includes("data_pag")) auto.data_pagamento = col;
+      if (k.includes("vencimento") || k.includes("data_venc"))
+        auto.data_vencimento = col;
+      if (
+        k.includes("competenc") ||
+        k.includes("competência") ||
+        k.includes("data_compet")
+      )
+        auto.data_competencia = col;
+      if (k.includes("pagamento") || k.includes("data_pag"))
+        auto.data_pagamento = col;
       if (k.includes("status") || k.includes("situacao")) auto.status = col;
       if (k.includes("conta")) auto.conta = col;
       if (k.includes("categoria")) auto.categoria = col;
-      if (k.includes("subcat") || k.includes("sub-categ") || k.includes("subcategoria")) auto.subcategoria = col;
+      if (
+        k.includes("subcat") ||
+        k.includes("sub-categ") ||
+        k.includes("subcategoria")
+      )
+        auto.subcategoria = col;
       if (k.includes("centro") || k.includes("custo")) auto.centro_custo = col;
-      if (k.includes("fornecedor") || k.includes("beneficiario")) auto.fornecedor = col;
+      if (k.includes("fornecedor") || k.includes("beneficiario"))
+        auto.fornecedor = col;
       if (k.includes("observ") || k.includes("obs")) auto.observacoes = col;
-      if (k.includes("base") && k.includes("minister")) auto.base_ministerial = col;
+      if (k.includes("base") && k.includes("minister"))
+        auto.base_ministerial = col;
       if (k.includes("multa") || k.includes("multas")) auto.multas = col;
       if (k.includes("juros")) auto.juros = col;
       if (k.includes("desconto")) auto.desconto = col;
-      if (k.includes("taxa") && (k.includes("admin") || k.includes("administrativa"))) auto.taxas_administrativas = col;
+      if (
+        k.includes("taxa") &&
+        (k.includes("admin") || k.includes("administrativa"))
+      )
+        auto.taxas_administrativas = col;
     });
     setMapping(auto);
   };
 
   const parseValor = (valor: unknown): number => {
     if (valor === undefined || valor === null) return 0;
-    const valorStr = String(valor).replace(/[\sR$€£%]/g, "").replace(/\./g, "").replace(/,/g, ".");
+    const valorStr = String(valor)
+      .replace(/[\sR$€£%]/g, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".");
     const n = parseFloat(valorStr);
     return isNaN(n) ? 0 : n;
   };
@@ -216,8 +255,10 @@ export default function ImportarFinancasPage() {
     const errors: string[] = [];
     if (!mapping.descricao) errors.push("Campo 'Descrição' não mapeado");
     if (!mapping.valor) errors.push("Campo 'Valor' não mapeado");
-    if (!mapping.data_vencimento) errors.push("Campo 'Data Vencimento' não mapeado");
-    if (!mapping.data_competencia) errors.push("Campo 'Data Competência' não mapeado");
+    if (!mapping.data_vencimento)
+      errors.push("Campo 'Data Vencimento' não mapeado");
+    if (!mapping.data_competencia)
+      errors.push("Campo 'Data Competência' não mapeado");
     if (!mapping.conta) errors.push("Campo 'Conta' não mapeado");
     if (!mapping.categoria) errors.push("Campo 'Categoria' não mapeado");
     return errors;
@@ -231,15 +272,26 @@ export default function ImportarFinancasPage() {
       return;
     }
 
-    const { data: contas } = await supabase.from("contas").select("id, nome").eq("ativo", true);
-    const { data: categorias } = await supabase.from("categorias_financeiras").select("id, nome, tipo").eq("ativo", true);
+    const { data: contas } = await supabase
+      .from("contas")
+      .select("id, nome")
+      .eq("ativo", true);
+    const { data: categorias } = await supabase
+      .from("categorias_financeiras")
+      .select("id, nome, tipo")
+      .eq("ativo", true);
     const { data: fornecedores } = await supabase
       .from("fornecedores")
       .select("id, nome")
       .eq("ativo", true)
       .eq("igreja_id", igrejaId);
-    const { data: subcategorias } = await supabase.from("subcategorias_financeiras").select("id, nome").eq("ativo", true);
-    const { data: basesMinisteriais } = await supabase.from("bases_ministeriais").select("id, titulo");
+    const { data: subcategorias } = await supabase
+      .from("subcategorias_financeiras")
+      .select("id, nome")
+      .eq("ativo", true);
+    const { data: basesMinisteriais } = await supabase
+      .from("bases_ministeriais")
+      .select("id, titulo");
     const { data: centrosCusto } = await supabase
       .from("centros_custo")
       .select("id, nome")
@@ -252,18 +304,20 @@ export default function ImportarFinancasPage() {
       const row = rows[i];
       const msgs: string[] = [];
       const fieldValues: Record<string, unknown> = {};
-      
+
       const descricao = mapping.descricao ? row[mapping.descricao] : null;
       const valor = mapping.valor ? parseValor(row[mapping.valor]) : 0;
-      const dataVenc = mapping.data_vencimento ? parseData(row[mapping.data_vencimento]) : null;
+      const dataVenc = mapping.data_vencimento
+        ? parseData(row[mapping.data_vencimento])
+        : null;
       const dataComp = parseData(row[mapping.data_competencia!]);
-      
+
       if (!descricao) msgs.push("Descrição ausente");
       else fieldValues.descricao = descricao;
-      
+
       if (!valor || valor <= 0) msgs.push("Valor inválido");
       else fieldValues.valor = row[mapping.valor!];
-      
+
       if (!dataVenc) msgs.push("Data de vencimento inválida");
       else fieldValues.data_vencimento = row[mapping.data_vencimento!];
 
@@ -273,41 +327,78 @@ export default function ImportarFinancasPage() {
       if (mapping.conta && contas) {
         const nomeConta = row[mapping.conta];
         fieldValues.conta = nomeConta;
-        const contaOk = contas.find((c) => c.nome.toLowerCase() === String(nomeConta || "").toLowerCase().trim());
+        const contaOk = contas.find(
+          (c) =>
+            c.nome.toLowerCase() ===
+            String(nomeConta || "")
+              .toLowerCase()
+              .trim()
+        );
         if (!contaOk) msgs.push("Conta não encontrada");
       }
       if (mapping.categoria && categorias) {
         const nomeCategoria = row[mapping.categoria];
         fieldValues.categoria = nomeCategoria;
-        const categoriaOk = categorias.find((c) => c.nome.toLowerCase() === String(nomeCategoria || "").toLowerCase().trim());
+        const categoriaOk = categorias.find(
+          (c) =>
+            c.nome.toLowerCase() ===
+            String(nomeCategoria || "")
+              .toLowerCase()
+              .trim()
+        );
         if (!categoriaOk) msgs.push("Categoria não encontrada");
-        else if (categoriaOk.tipo !== tipo) msgs.push("Categoria incompatível com tipo");
+        else if (categoriaOk.tipo !== tipo)
+          msgs.push("Categoria incompatível com tipo");
       }
       if (mapping.subcategoria && subcategorias) {
         const nomeSub = row[mapping.subcategoria];
         fieldValues.subcategoria = nomeSub;
-        const subOk = subcategorias.find((s) => s.nome.toLowerCase() === String(nomeSub || "").toLowerCase().trim());
+        const subOk = subcategorias.find(
+          (s) =>
+            s.nome.toLowerCase() ===
+            String(nomeSub || "")
+              .toLowerCase()
+              .trim()
+        );
         if (!subOk) msgs.push("Subcategoria não encontrada");
       }
 
       if (mapping.base_ministerial && basesMinisteriais) {
         const nomeBase = row[mapping.base_ministerial];
         fieldValues.base_ministerial = nomeBase;
-        const baseOk = basesMinisteriais.find((b) => b.titulo.toLowerCase() === String(nomeBase || "").toLowerCase().trim());
+        const baseOk = basesMinisteriais.find(
+          (b) =>
+            b.titulo.toLowerCase() ===
+            String(nomeBase || "")
+              .toLowerCase()
+              .trim()
+        );
         if (!baseOk) msgs.push("Base ministerial não encontrada");
       }
 
       if (mapping.centro_custo && centrosCusto) {
         const nomeCC = row[mapping.centro_custo];
         fieldValues.centro_custo = nomeCC;
-        const ccOk = centrosCusto.find((c) => c.nome.toLowerCase() === String(nomeCC || "").toLowerCase().trim());
+        const ccOk = centrosCusto.find(
+          (c) =>
+            c.nome.toLowerCase() ===
+            String(nomeCC || "")
+              .toLowerCase()
+              .trim()
+        );
         if (!ccOk) msgs.push("Centro de custo não encontrado");
       }
 
       if (mapping.fornecedor && fornecedores) {
         const nomeFornecedor = row[mapping.fornecedor];
         fieldValues.fornecedor = nomeFornecedor;
-        const fornOk = fornecedores.find((f) => f.nome.toLowerCase() === String(nomeFornecedor || "").toLowerCase().trim());
+        const fornOk = fornecedores.find(
+          (f) =>
+            f.nome.toLowerCase() ===
+            String(nomeFornecedor || "")
+              .toLowerCase()
+              .trim()
+        );
         if (!fornOk) msgs.push("Fornecedor não encontrado");
       }
 
@@ -315,7 +406,8 @@ export default function ImportarFinancasPage() {
       if (mapping.multas) fieldValues.multas = row[mapping.multas];
       if (mapping.juros) fieldValues.juros = row[mapping.juros];
       if (mapping.desconto) fieldValues.desconto = row[mapping.desconto];
-      if (mapping.taxas_administrativas) fieldValues.taxas_administrativas = row[mapping.taxas_administrativas];
+      if (mapping.taxas_administrativas)
+        fieldValues.taxas_administrativas = row[mapping.taxas_administrativas];
 
       if (msgs.length) {
         issues.push({ index: i, messages: msgs, fieldValues });
@@ -327,7 +419,9 @@ export default function ImportarFinancasPage() {
     setExcluded(newExcluded);
     setStep(2);
     toast[issues.length ? "warning" : "success"](
-      issues.length ? `${issues.length} linhas com problemas` : "Validação concluída sem erros"
+      issues.length
+        ? `${issues.length} linhas com problemas`
+        : "Validação concluída sem erros"
     );
   };
 
@@ -346,43 +440,85 @@ export default function ImportarFinancasPage() {
     const multas = mapping.multas ? parseValor(row[mapping.multas]) : 0;
     const juros = mapping.juros ? parseValor(row[mapping.juros]) : 0;
     const desconto = mapping.desconto ? parseValor(row[mapping.desconto]) : 0;
-    const taxasAdm = mapping.taxas_administrativas ? parseValor(row[mapping.taxas_administrativas]) : 0;
-    const dataVencimento = mapping.data_vencimento ? parseData(row[mapping.data_vencimento]) : null;
-    const dataCompetencia = mapping.data_competencia ? parseData(row[mapping.data_competencia]) : null;
+    const taxasAdm = mapping.taxas_administrativas
+      ? parseValor(row[mapping.taxas_administrativas])
+      : 0;
+    const dataVencimento = mapping.data_vencimento
+      ? parseData(row[mapping.data_vencimento])
+      : null;
+    const dataCompetencia = mapping.data_competencia
+      ? parseData(row[mapping.data_competencia])
+      : null;
     let contaId = contas[0]?.id;
     if (mapping.conta) {
       const nomeConta = row[mapping.conta];
-      const contaEncontrada = contas.find((c) => c.nome.toLowerCase() === String(nomeConta || "").toLowerCase().trim());
+      const contaEncontrada = contas.find(
+        (c) =>
+          c.nome.toLowerCase() ===
+          String(nomeConta || "")
+            .toLowerCase()
+            .trim()
+      );
       if (contaEncontrada) contaId = contaEncontrada.id;
     }
     let categoriaId: string | null = null;
     if (mapping.categoria) {
       const nomeCategoria = row[mapping.categoria];
-      const categoriaEncontrada = categorias.find((c) => c.nome.toLowerCase() === String(nomeCategoria || "").toLowerCase().trim());
+      const categoriaEncontrada = categorias.find(
+        (c) =>
+          c.nome.toLowerCase() ===
+          String(nomeCategoria || "")
+            .toLowerCase()
+            .trim()
+      );
       if (categoriaEncontrada) categoriaId = categoriaEncontrada.id;
     }
     let fornecedorId: string | null = null;
     if (mapping.fornecedor && fornecedores) {
       const nomeFornecedor = row[mapping.fornecedor];
-      const fornecedorEncontrado = fornecedores.find((f) => f.nome.toLowerCase() === String(nomeFornecedor || "").toLowerCase().trim());
+      const fornecedorEncontrado = fornecedores.find(
+        (f) =>
+          f.nome.toLowerCase() ===
+          String(nomeFornecedor || "")
+            .toLowerCase()
+            .trim()
+      );
       if (fornecedorEncontrado) fornecedorId = fornecedorEncontrado.id;
     }
     let subcategoriaId: string | null = null;
     if (mapping.subcategoria && subcategorias) {
       const nomeSub = row[mapping.subcategoria];
-      const subEncontrada = subcategorias.find((s) => s.nome.toLowerCase() === String(nomeSub || "").toLowerCase().trim());
+      const subEncontrada = subcategorias.find(
+        (s) =>
+          s.nome.toLowerCase() ===
+          String(nomeSub || "")
+            .toLowerCase()
+            .trim()
+      );
       if (subEncontrada) subcategoriaId = subEncontrada.id;
     }
     let baseMinisterialId: string | null = null;
     if (mapping.base_ministerial && basesMinisteriais) {
       const nomeBase = row[mapping.base_ministerial];
-      const baseEncontrada = basesMinisteriais.find((b) => b.titulo.toLowerCase() === String(nomeBase || "").toLowerCase().trim());
+      const baseEncontrada = basesMinisteriais.find(
+        (b) =>
+          b.titulo.toLowerCase() ===
+          String(nomeBase || "")
+            .toLowerCase()
+            .trim()
+      );
       if (baseEncontrada) baseMinisterialId = baseEncontrada.id;
     }
     let centroCustoId: string | null = null;
     if (mapping.centro_custo && centrosCusto) {
       const nomeCC = row[mapping.centro_custo];
-      const ccEncontrado = centrosCusto.find((c) => c.nome.toLowerCase() === String(nomeCC || "").toLowerCase().trim());
+      const ccEncontrado = centrosCusto.find(
+        (c) =>
+          c.nome.toLowerCase() ===
+          String(nomeCC || "")
+            .toLowerCase()
+            .trim()
+      );
       if (ccEncontrado) centroCustoId = ccEncontrado.id;
     }
     let status = "pendente";
@@ -390,8 +526,12 @@ export default function ImportarFinancasPage() {
       const s = String(row[mapping.status] || "").toLowerCase();
       if (s.includes("pago") || s.includes("recebido")) status = "pago";
     }
-    const dataPagamento = mapping.data_pagamento ? parseData(row[mapping.data_pagamento]) : null;
-    const observacoes = mapping.observacoes ? String(row[mapping.observacoes] ?? "") : null;
+    const dataPagamento = mapping.data_pagamento
+      ? parseData(row[mapping.data_pagamento])
+      : null;
+    const observacoes = mapping.observacoes
+      ? String(row[mapping.observacoes] ?? "")
+      : null;
     return {
       tipo,
       descricao,
@@ -425,7 +565,9 @@ export default function ImportarFinancasPage() {
     setLoading(true);
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
       // Create import job
@@ -444,12 +586,16 @@ export default function ImportarFinancasPage() {
         .select("id")
         .single();
 
-      if (jobError || !jobData) throw jobError || new Error("Erro ao criar job");
-      
+      if (jobError || !jobData)
+        throw jobError || new Error("Erro ao criar job");
+
       const jobId = jobData.id;
       setCurrentJobId(jobId);
 
-      const { data: contas } = await supabase.from("contas").select("id, nome").eq("ativo", true);
+      const { data: contas } = await supabase
+        .from("contas")
+        .select("id, nome")
+        .eq("ativo", true);
       const { data: categorias } = await supabase
         .from("categorias_financeiras")
         .select("id, nome, tipo")
@@ -460,14 +606,20 @@ export default function ImportarFinancasPage() {
         .select("id, nome")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId);
-      const { data: subcategorias } = await supabase.from("subcategorias_financeiras").select("id, nome").eq("ativo", true);
-      const { data: basesMinisteriais } = await supabase.from("bases_ministeriais").select("id, titulo");
+      const { data: subcategorias } = await supabase
+        .from("subcategorias_financeiras")
+        .select("id, nome")
+        .eq("ativo", true);
+      const { data: basesMinisteriais } = await supabase
+        .from("bases_ministeriais")
+        .select("id, titulo");
       const { data: centrosCusto } = await supabase
         .from("centros_custo")
         .select("id, nome")
         .eq("igreja_id", igrejaId);
 
-      if (!contas || !contas.length) throw new Error("Nenhuma conta ativa encontrada");
+      if (!contas || !contas.length)
+        throw new Error("Nenhuma conta ativa encontrada");
 
       const validRowsIdx = rows.map((_, i) => i).filter((i) => !excluded[i]);
       const transacoes = validRowsIdx.map((i) =>
@@ -498,7 +650,10 @@ export default function ImportarFinancasPage() {
 
         if (error) {
           chunk.forEach((_, idx) => {
-            errs.push({ index: start + idx, reason: String(error.message || error) });
+            errs.push({
+              index: start + idx,
+              reason: String(error.message || error),
+            });
           });
           // Create job items for failed insertions
           const failedItems = chunk.map((_, idx) => ({
@@ -520,7 +675,10 @@ export default function ImportarFinancasPage() {
           await supabase.from("import_job_items").insert(successItems);
         }
 
-        setChunkProgress((p) => ({ processed: Math.min(p.processed + chunk.length, total), total }));
+        setChunkProgress((p) => ({
+          processed: Math.min(p.processed + chunk.length, total),
+          total,
+        }));
       }
 
       // Update job status
@@ -537,7 +695,8 @@ export default function ImportarFinancasPage() {
         .eq("id", jobId);
 
       setRejected(errs);
-      if (failureCount) toast.warning(`${successCount} importadas, ${failureCount} rejeitadas`);
+      if (failureCount)
+        toast.warning(`${successCount} importadas, ${failureCount} rejeitadas`);
       else toast.success(`${total} transações importadas`);
 
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
@@ -558,13 +717,19 @@ export default function ImportarFinancasPage() {
       return;
     }
 
-    if (!confirm("Tem certeza? Isso deletará todas as transações importadas neste lote.")) {
+    if (
+      !confirm(
+        "Tem certeza? Isso deletará todas as transações importadas neste lote."
+      )
+    ) {
       return;
     }
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error("Sessão expirada");
 
       const response = await fetch(
@@ -573,7 +738,7 @@ export default function ImportarFinancasPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ job_id: currentJobId }),
         }
@@ -585,7 +750,9 @@ export default function ImportarFinancasPage() {
       }
 
       const result = await response.json();
-      toast.success(`Importação desfeita. ${result.deleted_count} transações deletadas.`);
+      toast.success(
+        `Importação desfeita. ${result.deleted_count} transações deletadas.`
+      );
 
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
@@ -607,7 +774,9 @@ export default function ImportarFinancasPage() {
       setChunkProgress({ processed: 0, total: 0 });
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Erro ao desfazer importação");
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao desfazer importação"
+      );
     } finally {
       setLoading(false);
     }
@@ -633,7 +802,9 @@ export default function ImportarFinancasPage() {
       "observacoes",
     ];
     if (format === "csv") {
-      const blob = new Blob([headers.join(",") + "\n"], { type: "text/csv;charset=utf-8;" });
+      const blob = new Blob([headers.join(",") + "\n"], {
+        type: "text/csv;charset=utf-8;",
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -656,11 +827,14 @@ export default function ImportarFinancasPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
         </Button>
-        <h1 className="text-2xl font-bold">Importar {tipo === "entrada" ? "Entradas" : "Saídas"}</h1>
+        <h1 className="text-2xl font-bold">
+          Importar {tipo === "entrada" ? "Entradas" : "Saídas"}
+        </h1>
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="text-sm">
-            Importação disponível apenas no desktop. Acesse em um dispositivo maior.
+            Importação disponível apenas no desktop. Acesse em um dispositivo
+            maior.
           </AlertDescription>
         </Alert>
       </div>
@@ -677,8 +851,12 @@ export default function ImportarFinancasPage() {
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Importar {tipo === "entrada" ? "Entradas" : "Saídas"}</h1>
-          <p className="text-sm text-muted-foreground">Wizard de importação com validação</p>
+          <h1 className="text-2xl font-bold">
+            Importar {tipo === "entrada" ? "Entradas" : "Saídas"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Wizard de importação com validação
+          </p>
         </div>
       </div>
 
@@ -689,7 +867,9 @@ export default function ImportarFinancasPage() {
             <div key={idx} className="flex items-center gap-3 flex-1">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors flex-shrink-0 ${
-                  idx <= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                  idx <= step
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 {idx + 1}
@@ -702,7 +882,11 @@ export default function ImportarFinancasPage() {
                 {title}
               </p>
               {idx < stepTitles.length - 1 && (
-                <ChevronRight className={`w-4 h-4 flex-1 ${idx < step ? "text-primary" : "text-muted-foreground"}`} />
+                <ChevronRight
+                  className={`w-4 h-4 flex-1 ${
+                    idx < step ? "text-primary" : "text-muted-foreground"
+                  }`}
+                />
               )}
             </div>
           ))}
@@ -724,7 +908,8 @@ export default function ImportarFinancasPage() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                Faça upload de um arquivo Excel (.xlsx, .xls) ou CSV com os dados das transações.
+                Faça upload de um arquivo Excel (.xlsx, .xls) ou CSV com os
+                dados das transações.
               </AlertDescription>
             </Alert>
 
@@ -746,12 +931,19 @@ export default function ImportarFinancasPage() {
                 <label htmlFor="excel-upload" className="cursor-pointer">
                   <Button type="button" variant="outline" asChild>
                     <span>
-                      <Upload className="w-4 h-4 mr-2" /> Selecionar arquivo Excel/CSV
+                      <Upload className="w-4 h-4 mr-2" /> Selecionar arquivo
+                      Excel/CSV
                     </span>
                   </Button>
                 </label>
               )}
-              <input id="excel-upload" type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+              <input
+                id="excel-upload"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
             </div>
 
             {sheetNames.length > 1 && (
@@ -780,17 +972,33 @@ export default function ImportarFinancasPage() {
 
             {columns.length > 0 && (
               <div className="space-y-2">
-                <h3 className="font-semibold text-sm">Prévia ({rows.length} linhas)</h3>
+                <h3 className="font-semibold text-sm">
+                  Prévia ({rows.length} linhas)
+                </h3>
                 <div className="border rounded-lg overflow-x-auto">
-                  <div className="bg-muted text-xs grid" style={{ gridTemplateColumns: gridTemplate }}>
+                  <div
+                    className="bg-muted text-xs grid"
+                    style={{ gridTemplateColumns: gridTemplate }}
+                  >
                     {columns.map((col) => (
-                      <div key={col} className="px-3 py-2 font-medium whitespace-nowrap">
+                      <div
+                        key={col}
+                        className="px-3 py-2 font-medium whitespace-nowrap"
+                      >
                         {col}
                       </div>
                     ))}
                   </div>
-                  <div ref={previewParentRef} className="max-h-60 overflow-y-auto">
-                    <div style={{ height: previewVirtualizer.getTotalSize(), position: "relative" }}>
+                  <div
+                    ref={previewParentRef}
+                    className="max-h-60 overflow-y-auto"
+                  >
+                    <div
+                      style={{
+                        height: previewVirtualizer.getTotalSize(),
+                        position: "relative",
+                      }}
+                    >
                       {previewVirtualizer.getVirtualItems().map((vi) => {
                         const row = rows[vi.index] as Record<string, unknown>;
                         return (
@@ -805,9 +1013,15 @@ export default function ImportarFinancasPage() {
                             }}
                             className="border-t"
                           >
-                            <div className="text-xs grid" style={{ gridTemplateColumns: gridTemplate }}>
+                            <div
+                              className="text-xs grid"
+                              style={{ gridTemplateColumns: gridTemplate }}
+                            >
                               {columns.map((col) => (
-                                <div key={col} className="px-3 py-2 whitespace-nowrap">
+                                <div
+                                  key={col}
+                                  className="px-3 py-2 whitespace-nowrap"
+                                >
                                   {String(row[col] || "")}
                                 </div>
                               ))}
@@ -851,7 +1065,9 @@ export default function ImportarFinancasPage() {
                   ).map((key) => (
                     <div className="space-y-1.5" key={key}>
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs">{key.replace(/_/g, " ")}</Label>
+                        <Label className="text-xs">
+                          {key.replace(/_/g, " ")}
+                        </Label>
                         {requiredKeys.has(key) && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
                             Obrigatório
@@ -860,12 +1076,16 @@ export default function ImportarFinancasPage() {
                       </div>
                       <Select
                         value={mapping[key as keyof ColumnMapping] || ""}
-                        onValueChange={(v) => setMapping({ ...mapping, [key]: v })}
+                        onValueChange={(v) =>
+                          setMapping({ ...mapping, [key]: v })
+                        }
                       >
                         <SelectTrigger className="h-9">
                           <SelectValue
                             placeholder={
-                              requiredKeys.has(key) ? "Selecione (Obrigatório)" : "Selecione a coluna"
+                              requiredKeys.has(key)
+                                ? "Selecione (Obrigatório)"
+                                : "Selecione a coluna"
                             }
                           />
                         </SelectTrigger>
@@ -893,9 +1113,15 @@ export default function ImportarFinancasPage() {
                   <div className="space-y-2">
                     <h4 className="font-medium text-xs">Prévia rápida</h4>
                     <div className="border rounded-lg overflow-x-auto">
-                      <div className="bg-muted text-xs grid" style={{ gridTemplateColumns: gridTemplate }}>
+                      <div
+                        className="bg-muted text-xs grid"
+                        style={{ gridTemplateColumns: gridTemplate }}
+                      >
                         {columns.map((col) => (
-                          <div key={col} className="px-3 py-2 font-medium whitespace-nowrap">
+                          <div
+                            key={col}
+                            className="px-3 py-2 font-medium whitespace-nowrap"
+                          >
                             {col}
                           </div>
                         ))}
@@ -908,8 +1134,13 @@ export default function ImportarFinancasPage() {
                             style={{ gridTemplateColumns: gridTemplate }}
                           >
                             {columns.map((col) => (
-                              <div key={col} className="px-3 py-2 whitespace-nowrap">
-                                {String((row as Record<string, unknown>)[col] || "")}
+                              <div
+                                key={col}
+                                className="px-3 py-2 whitespace-nowrap"
+                              >
+                                {String(
+                                  (row as Record<string, unknown>)[col] || ""
+                                )}
                               </div>
                             ))}
                           </div>
@@ -924,7 +1155,9 @@ export default function ImportarFinancasPage() {
             {mappingErrors.length ? (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-xs">{mappingErrors.join("; ")}</AlertDescription>
+                <AlertDescription className="text-xs">
+                  {mappingErrors.join("; ")}
+                </AlertDescription>
               </Alert>
             ) : (
               <Alert>
@@ -993,8 +1226,16 @@ export default function ImportarFinancasPage() {
                       </thead>
                     </table>
                   </div>
-                  <div ref={validationParentRef} className="overflow-auto max-h-48">
-                    <div style={{ height: validationVirtualizer.getTotalSize(), position: "relative" }}>
+                  <div
+                    ref={validationParentRef}
+                    className="overflow-auto max-h-48"
+                  >
+                    <div
+                      style={{
+                        height: validationVirtualizer.getTotalSize(),
+                        position: "relative",
+                      }}
+                    >
                       {validationVirtualizer.getVirtualItems().map((vi) => {
                         const issue = validationIssues[vi.index];
                         return (
@@ -1011,14 +1252,21 @@ export default function ImportarFinancasPage() {
                             <table className="min-w-full text-xs border-t">
                               <tbody>
                                 <tr className="hover:bg-muted/50">
-                                  <td className="px-3 py-2">{issue.index + 1}</td>
-                                  <td className="px-3 py-2">{issue.messages.join("; ")}</td>
+                                  <td className="px-3 py-2">
+                                    {issue.index + 1}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {issue.messages.join("; ")}
+                                  </td>
                                   <td className="px-3 py-2 text-center">
                                     <input
                                       type="checkbox"
                                       checked={!!excluded[issue.index]}
                                       onChange={(e) =>
-                                        setExcluded({ ...excluded, [issue.index]: e.target.checked })
+                                        setExcluded({
+                                          ...excluded,
+                                          [issue.index]: e.target.checked,
+                                        })
                                       }
                                     />
                                   </td>
@@ -1034,7 +1282,9 @@ export default function ImportarFinancasPage() {
 
                 {/* Grid com Detalhes dos Problemas */}
                 <div className="space-y-2 mt-4">
-                  <h4 className="font-medium text-sm">Detalhes dos Problemas Encontrados</h4>
+                  <h4 className="font-medium text-sm">
+                    Detalhes dos Problemas Encontrados
+                  </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                     {validationIssues.map((issue) => (
                       <div
@@ -1042,40 +1292,60 @@ export default function ImportarFinancasPage() {
                         className="p-3 border rounded-lg bg-destructive/5 text-xs space-y-2"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-destructive">Linha {issue.index + 1}</span>
+                          <span className="font-semibold text-destructive">
+                            Linha {issue.index + 1}
+                          </span>
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-destructive/10 text-destructive font-medium">
                             <span className="inline-block w-2 h-2 rounded-full bg-destructive"></span>
                             Não encontrado
                           </span>
                         </div>
-                        
+
                         {rows[issue.index] && (
                           <div className="text-muted-foreground space-y-1">
                             <div>
                               <span className="font-medium">Descrição:</span>{" "}
-                              {String(rows[issue.index][mapping.descricao || ""] || "—")}
+                              {String(
+                                rows[issue.index][mapping.descricao || ""] ||
+                                  "—"
+                              )}
                             </div>
                           </div>
                         )}
-                        
-                        {issue.fieldValues && Object.keys(issue.fieldValues).length > 0 && (
-                          <div className="border-t pt-2 space-y-1">
-                            <div className="font-medium text-foreground mb-1">Valores encontrados no arquivo:</div>
-                            {Object.entries(issue.fieldValues).map(([key, value]) => (
-                              <div key={key} className="text-muted-foreground flex justify-between">
-                                <span className="font-medium capitalize">{key.replace(/_/g, " ")}:</span>
-                                <span className="text-right ml-2 font-mono text-foreground break-all max-w-[120px]">
-                                  {String(value || "—")}
-                                </span>
+
+                        {issue.fieldValues &&
+                          Object.keys(issue.fieldValues).length > 0 && (
+                            <div className="border-t pt-2 space-y-1">
+                              <div className="font-medium text-foreground mb-1">
+                                Valores encontrados no arquivo:
                               </div>
-                            ))}
-                          </div>
-                        )}
-                        
+                              {Object.entries(issue.fieldValues).map(
+                                ([key, value]) => (
+                                  <div
+                                    key={key}
+                                    className="text-muted-foreground flex justify-between"
+                                  >
+                                    <span className="font-medium capitalize">
+                                      {key.replace(/_/g, " ")}:
+                                    </span>
+                                    <span className="text-right ml-2 font-mono text-foreground break-all max-w-[120px]">
+                                      {String(value || "—")}
+                                    </span>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          )}
+
                         <div className="border-t pt-2 space-y-1">
-                          <div className="font-medium text-foreground mb-1">Problemas:</div>
+                          <div className="font-medium text-foreground mb-1">
+                            Problemas:
+                          </div>
                           {issue.messages.map((msg, idx) => (
-                            <div key={idx} className="text-destructive flex gap-2">
+                            <div
+                              key={idx}
+                              className="text-destructive flex gap-2"
+                            >
                               <span>•</span>
                               <span>{msg}</span>
                             </div>
@@ -1099,17 +1369,24 @@ export default function ImportarFinancasPage() {
                   className="h-3 bg-primary rounded-full transition-all"
                   style={{
                     width: chunkProgress.total
-                      ? `${Math.round((chunkProgress.processed / chunkProgress.total) * 100)}%`
+                      ? `${Math.round(
+                          (chunkProgress.processed / chunkProgress.total) * 100
+                        )}%`
                       : "0%",
                   }}
                 />
               </div>
               <div className="flex items-center justify-between text-xs">
                 <p className="text-muted-foreground">
-                  {chunkProgress.processed} / {chunkProgress.total} linhas processadas
+                  {chunkProgress.processed} / {chunkProgress.total} linhas
+                  processadas
                 </p>
                 <p className="font-semibold">
-                  {chunkProgress.total ? `${Math.round((chunkProgress.processed / chunkProgress.total) * 100)}%` : "0%"}
+                  {chunkProgress.total
+                    ? `${Math.round(
+                        (chunkProgress.processed / chunkProgress.total) * 100
+                      )}%`
+                    : "0%"}
                 </p>
               </div>
             </div>
@@ -1117,31 +1394,35 @@ export default function ImportarFinancasPage() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  {rejected.length} linha(s) rejeitada(s). Verifique os erros antes de retentar.
+                  {rejected.length} linha(s) rejeitada(s). Verifique os erros
+                  antes de retentar.
                 </AlertDescription>
               </Alert>
             )}
-            {chunkProgress.processed === chunkProgress.total && chunkProgress.total > 0 && (
-              <div className="space-y-2">
-                <Alert>
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-xs">
-                    Importação concluída! {chunkProgress.total - rejected.length} transações importadas com sucesso.
-                  </AlertDescription>
-                </Alert>
-                {currentJobId && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={undoImport}
-                    disabled={loading}
-                    className="w-full"
-                  >
-                    ↶ Desfazer Importação
-                  </Button>
-                )}
-              </div>
-            )}
+            {chunkProgress.processed === chunkProgress.total &&
+              chunkProgress.total > 0 && (
+                <div className="space-y-2">
+                  <Alert>
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-xs">
+                      Importação concluída!{" "}
+                      {chunkProgress.total - rejected.length} transações
+                      importadas com sucesso.
+                    </AlertDescription>
+                  </Alert>
+                  {currentJobId && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={undoImport}
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      ↶ Desfazer Importação
+                    </Button>
+                  )}
+                </div>
+              )}
           </div>
         )}
       </div>
@@ -1193,7 +1474,9 @@ export default function ImportarFinancasPage() {
           {step === 1 && (
             <Button
               onClick={runValidation}
-              disabled={columns.length === 0 || mappingErrors.length > 0 || loading}
+              disabled={
+                columns.length === 0 || mappingErrors.length > 0 || loading
+              }
             >
               Validar
             </Button>
@@ -1206,7 +1489,9 @@ export default function ImportarFinancasPage() {
           {step === 3 && (
             <Button
               onClick={() =>
-                navigate("/financas/" + (tipo === "entrada" ? "entradas" : "saidas"))
+                navigate(
+                  "/financas/" + (tipo === "entrada" ? "entradas" : "saidas")
+                )
               }
             >
               Ir para {tipo === "entrada" ? "Entradas" : "Saídas"}

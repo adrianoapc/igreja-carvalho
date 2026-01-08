@@ -4,29 +4,30 @@
 
 Temos **DUAS telas praticamente idênticas** gerenciando os mesmos dados:
 
-| Aspecto | FormasPagamento.tsx | ConfiguracaoFormasPagamento.tsx |
-|---------|-------------------|-------------------------------|
-| **Rota** | `/financas/formas-pagamento` | `/financas/config-formas-pagamento` |
-| **Tabela** | `formas_pagamento` | `formas_pagamento` |
-| **Dados Mostrados** | nome, ativo | nome, taxa, gera_pago |
-| **Funcionalidade** | CRUD básico | CRUD + Mapeamento forma→conta |
-| **Campos** | 2 (nome, ativo) | 3+ (taxa, taxa_fixa, gera_pago) |
-| **Deduplicação** | ❌ | ❌ |
+| Aspecto             | FormasPagamento.tsx          | ConfiguracaoFormasPagamento.tsx     |
+| ------------------- | ---------------------------- | ----------------------------------- |
+| **Rota**            | `/financas/formas-pagamento` | `/financas/config-formas-pagamento` |
+| **Tabela**          | `formas_pagamento`           | `formas_pagamento`                  |
+| **Dados Mostrados** | nome, ativo                  | nome, taxa, gera_pago               |
+| **Funcionalidade**  | CRUD básico                  | CRUD + Mapeamento forma→conta       |
+| **Campos**          | 2 (nome, ativo)              | 3+ (taxa, taxa_fixa, gera_pago)     |
+| **Deduplicação**    | ❌                           | ❌                                  |
 
 ---
 
 ## 📊 Comparação Detalhada
 
 ### FormasPagamento.tsx (EXISTENTE)
+
 ```typescript
 // ❌ Limitado
 interface FormaPagamento {
   id: string;
   nome: string;
-  ativo: boolean;      // ← Só isto
+  ativo: boolean; // ← Só isto
 }
 
-// UI: 
+// UI:
 // ┌──────────────────────┐
 // │ Nome      │ Status   │ Ações
 // │ Dinheiro  │ Ativo    │ [Edit] [Del]
@@ -41,15 +42,16 @@ interface FormaPagamento {
 ```
 
 ### ConfiguracaoFormasPagamento.tsx (NOVO - DUPLICADO)
+
 ```typescript
 // ✅ Completo
 type FormaPagamento = {
   id: string;
   nome: string;
-  taxa_administrativa: number | null;       // ← Novo
-  taxa_administrativa_fixa: number | null;  // ← Novo
-  gera_pago: boolean;                       // ← Novo
-}
+  taxa_administrativa: number | null; // ← Novo
+  taxa_administrativa_fixa: number | null; // ← Novo
+  gera_pago: boolean; // ← Novo
+};
 
 // UI Seção 1: Formas (mesma tela)
 // ┌──────────────────────────────────────┐
@@ -71,11 +73,13 @@ type FormaPagamento = {
 ## ⚠️ Problemas da Duplicação
 
 ### 1. **Confusão de Usuário**
+
 - Admin vê **2 links** em Financas
 - Qual clico para editar taxa?
 - Qual para criar forma?
 
 ### 2. **Inconsistência de Dados**
+
 ```
 Cenário:
 1. Admin em /formas-pagamento: vê "Dinheiro"
@@ -85,6 +89,7 @@ Cenário:
 ```
 
 ### 3. **Manutenção Duplicada**
+
 - Se mudar `formas_pagamento` table:
   - Atualizar 2 queries
   - Atualizar 2 validações
@@ -92,15 +97,19 @@ Cenário:
   - 🐛 Risco de desincronizar
 
 ### 4. **RLS Igreja/Filial**
+
 Ambas fazem assim:
+
 ```typescript
 if (!isAllFiliais && filialId) {
-  query = query.eq("filial_id", filialId);  // ← Correto
+  query = query.eq("filial_id", filialId); // ← Correto
 }
 ```
+
 ✅ Ambas respeitam filial, mas...
 
 **Problema**: Se usuario muda filial:
+
 - Em FormasPagamento: vê formas da filial X
 - Em ConfiguracaoFormasPagamento: vê mapeamentos da filial X
 - Mas **mapeamentos podem estar na filial Y!**
@@ -134,6 +143,7 @@ if (!isAllFiliais && filialId) {
 ```
 
 **Benefícios:**
+
 - ✅ Uma única URL
 - ✅ Uma única tela
 - ✅ Um único lugar para admin gerenciar
@@ -145,6 +155,7 @@ if (!isAllFiliais && filialId) {
 ## 📋 Impacto por Opção
 
 ### Opção A: Unificar em FormasPagamento.tsx
+
 ```
 Ações necessárias:
 1. Expandir FormasPagamento.tsx:
@@ -163,6 +174,7 @@ Benefício: ALTO (sem duplicação)
 ```
 
 ### Opção B: Manter Ambas
+
 ```
 Ações: Nenhuma
 ↓
@@ -176,6 +188,7 @@ Risco: MÉDIO (desincronizar)
 ## 🔍 Verificação: Comportamento Igreja/Filial
 
 ### FormasPagamento.tsx
+
 ```typescript
 // ✅ Query respeita filial
 let query = supabase
@@ -204,6 +217,7 @@ Status: ✅ CORRETO
 ```
 
 ### ConfiguracaoFormasPagamento.tsx
+
 ```typescript
 // ✅ Query formas respeita filial
 const { data: formas } = useQuery({
@@ -228,7 +242,7 @@ const { data: mapeamentos } = useQuery({
       .select("*")
       .eq("igreja_id", igrejaId)
       .order("prioridade");
-    
+
     if (!isAllFiliais && filialId) {
       query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       // ← BOM: Pega mapeamentos específicos da filial OU genéricos (null)
@@ -253,6 +267,7 @@ Status: ✅ CORRETO (mas com lógica OR mais complexa)
 ## ✅ Ambos Respeitam Igreja/Filial Corretamente!
 
 ### Verificação:
+
 - ✅ Filtram por `igreja_id` (multi-tenant)
 - ✅ Filtram por `filial_id` quando aplicável
 - ✅ Setam `filial_id: null` quando "todas as filiais"
@@ -267,6 +282,7 @@ Status: ✅ CORRETO (mas com lógica OR mais complexa)
 ### **UNIFICAR EM FormasPagamento.tsx**
 
 **Razão:**
+
 1. **Dados são os mesmos** (`formas_pagamento` table)
 2. **Complementam-se** (config básica + mapeamentos)
 3. **Um único lugar** (melhor UX)
@@ -276,6 +292,7 @@ Status: ✅ CORRETO (mas com lógica OR mais complexa)
 ### **Plano:**
 
 #### 1. Expandir FormasPagamento.tsx
+
 ```diff
 + Campos: taxa_administrativa, taxa_administrativa_fixa, gera_pago
 + Dialog: Editar estas colunas
@@ -284,17 +301,20 @@ Status: ✅ CORRETO (mas com lógica OR mais complexa)
 ```
 
 #### 2. Deletar ConfiguracaoFormasPagamento.tsx
+
 ```
 src/pages/financas/ConfiguracaoFormasPagamento.tsx ❌ DELETE
 ```
 
 #### 3. Em App.tsx
+
 ```
 Path: /financas/config-formas-pagamento ❌ DELETE
 Path: /financas/formas-pagamento ✅ MANTER (agora com tudo)
 ```
 
 #### 4. Custo
+
 - Implementação: 1-2 horas
 - Testes: 30 minutos
 - Risco: BAIXO (ambas já existem, é só mesclar)

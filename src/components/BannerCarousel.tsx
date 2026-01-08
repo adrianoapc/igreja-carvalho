@@ -27,7 +27,9 @@ interface BannerCarouselProps {
   compact?: boolean; // Nova prop para forçar modo compacto em dashboards se necessário
 }
 
-export default function BannerCarousel({ compact = false }: BannerCarouselProps) {
+export default function BannerCarousel({
+  compact = false,
+}: BannerCarouselProps) {
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,7 +42,9 @@ export default function BannerCarousel({ compact = false }: BannerCarouselProps)
       const now = new Date().toISOString();
       const { data, error } = await supabase
         .from("comunicados")
-        .select("id, titulo, descricao, tipo, nivel_urgencia, imagem_url, created_at")
+        .select(
+          "id, titulo, descricao, tipo, nivel_urgencia, imagem_url, created_at"
+        )
         .eq("ativo", true)
         .eq("exibir_site", true)
         .eq("tipo", "banner")
@@ -60,19 +64,27 @@ export default function BannerCarousel({ compact = false }: BannerCarouselProps)
 
   const getUrgenciaColor = (nivel: string | null) => {
     switch (nivel) {
-      case "info": return "bg-blue-500/10 text-blue-600 border-blue-200";
-      case "warning": return "bg-amber-500/10 text-amber-600 border-amber-200";
-      case "urgent": return "bg-red-500/10 text-red-600 border-red-200";
-      default: return "bg-primary/10 text-primary border-primary/20";
+      case "info":
+        return "bg-blue-500/10 text-blue-600 border-blue-200";
+      case "warning":
+        return "bg-amber-500/10 text-amber-600 border-amber-200";
+      case "urgent":
+        return "bg-red-500/10 text-red-600 border-red-200";
+      default:
+        return "bg-primary/10 text-primary border-primary/20";
     }
   };
 
   const getUrgenciaLabel = (nivel: string | null) => {
     switch (nivel) {
-      case "info": return "Informação";
-      case "warning": return "Atenção";
-      case "urgent": return "Urgente";
-      default: return "Aviso";
+      case "info":
+        return "Informação";
+      case "warning":
+        return "Atenção";
+      case "urgent":
+        return "Urgente";
+      default:
+        return "Aviso";
     }
   };
 
@@ -99,9 +111,15 @@ export default function BannerCarousel({ compact = false }: BannerCarouselProps)
               <Card className="border-0 shadow-lg overflow-hidden bg-black md:rounded-xl rounded-none">
                 <CardContent className="p-0 relative">
                   {comunicado.imagem_url ? (
-                    <div className={`relative w-full bg-black/90 flex items-center justify-center 
-                      ${compact ? 'h-[200px] md:h-[300px]' : 'aspect-video md:aspect-auto md:h-[450px]'} 
-                    `}>
+                    <div
+                      className={`relative w-full bg-black/90 flex items-center justify-center 
+                      ${
+                        compact
+                          ? "h-[200px] md:h-[300px]"
+                          : "aspect-video md:aspect-auto md:h-[450px]"
+                      } 
+                    `}
+                    >
                       {/* LÓGICA CORRIGIDA:
                          - Mobile: aspect-video (16:9)
                          - Desktop: Altura fixa (450px) para não ficar gigante, 
@@ -113,17 +131,21 @@ export default function BannerCarousel({ compact = false }: BannerCarouselProps)
                         priority={index === 0}
                         className="w-full h-full object-contain"
                       />
-                      
+
                       {/* Gradiente para leitura do texto */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent pointer-events-none" />
-                      
+
                       <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 text-white z-10">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                           <h3 className="text-lg md:text-2xl font-bold leading-tight drop-shadow-md line-clamp-1">
                             {comunicado.titulo}
                           </h3>
                           {comunicado.nivel_urgencia && (
-                            <Badge className={`${getUrgenciaColor(comunicado.nivel_urgencia)} border-0 bg-white/95 backdrop-blur-sm self-start shadow-sm`}>
+                            <Badge
+                              className={`${getUrgenciaColor(
+                                comunicado.nivel_urgencia
+                              )} border-0 bg-white/95 backdrop-blur-sm self-start shadow-sm`}
+                            >
                               {getUrgenciaLabel(comunicado.nivel_urgencia)}
                             </Badge>
                           )}
@@ -137,7 +159,11 @@ export default function BannerCarousel({ compact = false }: BannerCarouselProps)
                     </div>
                   ) : (
                     /* Fallback sem imagem */
-                    <div className={`${compact ? 'h-[200px]' : 'h-[250px] md:h-[400px]'} flex flex-col justify-center p-8 bg-gradient-to-br from-slate-900 to-slate-800 text-white`}>
+                    <div
+                      className={`${
+                        compact ? "h-[200px]" : "h-[250px] md:h-[400px]"
+                      } flex flex-col justify-center p-8 bg-gradient-to-br from-slate-900 to-slate-800 text-white`}
+                    >
                       <div className="flex flex-col gap-3 max-w-2xl mx-auto text-center items-center">
                         <Badge className="bg-white/20 text-white hover:bg-white/30 border-0 mb-2">
                           {getUrgenciaLabel(comunicado.nivel_urgencia)}
