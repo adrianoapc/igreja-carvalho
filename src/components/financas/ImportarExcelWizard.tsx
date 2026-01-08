@@ -440,7 +440,7 @@ export function ImportarExcelWizard({
     const observacoes = mapping.observacoes ? row[mapping.observacoes] : null;
     return {
       tipo,
-      descricao,
+      descricao: descricao ? String(descricao) : null,
       valor,
       data_vencimento: dataVencimento,
       data_pagamento: dataPagamento,
@@ -450,7 +450,7 @@ export function ImportarExcelWizard({
       categoria_id: categoriaId,
       subcategoria_id: subcategoriaId,
       fornecedor_id: fornecedorId,
-      observacoes,
+      observacoes: observacoes ? String(observacoes) : null,
       igreja_id: igrejaId,
       filial_id: isAllFiliais ? null : filialId,
     };
