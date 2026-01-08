@@ -28,7 +28,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
-import { ImportarExcelDialog } from "@/components/financas/ImportarExcelDialog";
+// import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { useQuery } from "@tanstack/react-query";
@@ -52,7 +52,7 @@ export default function Saidas() {
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  // const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<{
     id: string;
     descricao: string;
@@ -402,11 +402,12 @@ export default function Saidas() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => setImportDialogOpen(true)}
+            onClick={() => navigate("/financas/importar?tipo=saida")}
             size="sm"
+            className="hidden md:inline-flex"
           >
             <Upload className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline text-xs">Importar</span>
+            <span className="text-xs">Importar</span>
           </Button>
           <Button
             className="bg-gradient-primary shadow-soft whitespace-nowrap"
@@ -697,11 +698,7 @@ export default function Saidas() {
         transacao={editingTransacao}
       />
 
-      <ImportarExcelDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        tipo="saida"
-      />
+      {/** Import via página dedicada; wizard modal desativado */}
     </div>
   );
 }
