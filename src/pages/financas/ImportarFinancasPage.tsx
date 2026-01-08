@@ -31,13 +31,20 @@ type ColumnMapping = {
   descricao?: string;
   valor?: string;
   data_vencimento?: string;
+  data_competencia?: string;
   data_pagamento?: string;
   status?: string;
   conta?: string;
   categoria?: string;
   subcategoria?: string;
+  centro_custo?: string;
   fornecedor?: string;
   observacoes?: string;
+  base_ministerial?: string;
+  multas?: string;
+  juros?: string;
+  desconto?: string;
+  taxas_administrativas?: string;
 };
 type ValidationIssue = {
   index: number;
@@ -63,7 +70,6 @@ export default function ImportarFinancasPage() {
 
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const queryClient = useQueryClient();
-
   // Wizard state
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [fileName, setFileName] = useState<string>("");
@@ -80,13 +86,14 @@ export default function ImportarFinancasPage() {
   const [rejected, setRejected] = useState<Array<{ index: number; reason: string }>>([]);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
-  const requiredKeys = new Set(["descricao", "valor", "data_vencimento", "conta", "categoria"]);
+  const requiredKeys = new Set(["descricao", "valor", "data_vencimento", "data_competencia", "conta", "categoria"]);
 
   const mappingErrors = useMemo(() => {
     const errors: string[] = [];
     if (!mapping.descricao) errors.push("Campo 'Descrição' não mapeado");
     if (!mapping.valor) errors.push("Campo 'Valor' não mapeado");
     if (!mapping.data_vencimento) errors.push("Campo 'Data Vencimento' não mapeado");
+    if (!mapping.data_competencia) errors.push("Campo 'Data Competência' não mapeado");
     if (!mapping.conta) errors.push("Campo 'Conta' não mapeado");
     if (!mapping.categoria) errors.push("Campo 'Categoria' não mapeado");
     return errors;
@@ -139,9 +146,18 @@ export default function ImportarFinancasPage() {
   const parseSheet = (wb: WorkBook, sheetName: string) => {
     try {
       const worksheet = wb.Sheets[sheetName];
-      const jsonData = utils.sheet_to_json(worksheet);
-      const firstRow = (jsonData[0] || {}) as Record<string, unknown>;
-      const columnNames = Object.keys(firstRow);
+      // Obter cabeçalhos diretamente da primeira linha para garantir todas as colunas
+      const aoa = utils.sheet_to_json(worksheet, { header: 1 }) as Array<Array<unknown>>;
+      const headerRow = (aoa[0] || []) as Array<unknown>;
+      let columnNames = headerRow
+        .map((h) => String(h || "").trim())
+        .filter((h) => h.length > 0);
+      // Fallback: se não houver cabeçalhos válidos, derive de keys da primeira linha dos dados
+      const jsonData = utils.sheet_to_json(worksheet, { defval: "" });
+      if (!columnNames.length) {
+        const firstRow = (jsonData[0] || {}) as Record<string, unknown>;
+        columnNames = Object.keys(firstRow);
+      }
       setColumns(columnNames);
       setRows(jsonData as Record<string, unknown>[]);
       autoDetectMapping(columnNames);
@@ -159,13 +175,20 @@ export default function ImportarFinancasPage() {
       if (k.includes("descri")) auto.descricao = col;
       if (k.includes("valor") && !k.includes("liquido")) auto.valor = col;
       if (k.includes("vencimento") || k.includes("data_venc")) auto.data_vencimento = col;
+      if (k.includes("competenc") || k.includes("competência") || k.includes("data_compet")) auto.data_competencia = col;
       if (k.includes("pagamento") || k.includes("data_pag")) auto.data_pagamento = col;
       if (k.includes("status") || k.includes("situacao")) auto.status = col;
       if (k.includes("conta")) auto.conta = col;
       if (k.includes("categoria")) auto.categoria = col;
       if (k.includes("subcat") || k.includes("sub-categ") || k.includes("subcategoria")) auto.subcategoria = col;
+      if (k.includes("centro") || k.includes("custo")) auto.centro_custo = col;
       if (k.includes("fornecedor") || k.includes("beneficiario")) auto.fornecedor = col;
       if (k.includes("observ") || k.includes("obs")) auto.observacoes = col;
+      if (k.includes("base") && k.includes("minister")) auto.base_ministerial = col;
+      if (k.includes("multa") || k.includes("multas")) auto.multas = col;
+      if (k.includes("juros")) auto.juros = col;
+      if (k.includes("desconto")) auto.desconto = col;
+      if (k.includes("taxa") && (k.includes("admin") || k.includes("administrativa"))) auto.taxas_administrativas = col;
     });
     setMapping(auto);
   };
@@ -194,6 +217,7 @@ export default function ImportarFinancasPage() {
     if (!mapping.descricao) errors.push("Campo 'Descrição' não mapeado");
     if (!mapping.valor) errors.push("Campo 'Valor' não mapeado");
     if (!mapping.data_vencimento) errors.push("Campo 'Data Vencimento' não mapeado");
+    if (!mapping.data_competencia) errors.push("Campo 'Data Competência' não mapeado");
     if (!mapping.conta) errors.push("Campo 'Conta' não mapeado");
     if (!mapping.categoria) errors.push("Campo 'Categoria' não mapeado");
     return errors;
@@ -209,8 +233,17 @@ export default function ImportarFinancasPage() {
 
     const { data: contas } = await supabase.from("contas").select("id, nome").eq("ativo", true);
     const { data: categorias } = await supabase.from("categorias_financeiras").select("id, nome, tipo").eq("ativo", true);
-    const { data: fornecedores } = await supabase.from("fornecedores").select("id, nome, cnpj").eq("ativo", true);
+    const { data: fornecedores } = await supabase
+      .from("fornecedores")
+      .select("id, nome")
+      .eq("ativo", true)
+      .eq("igreja_id", igrejaId);
     const { data: subcategorias } = await supabase.from("subcategorias_financeiras").select("id, nome").eq("ativo", true);
+    const { data: basesMinisteriais } = await supabase.from("bases_ministeriais").select("id, titulo");
+    const { data: centrosCusto } = await supabase
+      .from("centros_custo")
+      .select("id, nome")
+      .eq("igreja_id", igrejaId);
 
     const issues: ValidationIssue[] = [];
     const newExcluded: Record<number, boolean> = { ...excluded };
@@ -223,6 +256,7 @@ export default function ImportarFinancasPage() {
       const descricao = mapping.descricao ? row[mapping.descricao] : null;
       const valor = mapping.valor ? parseValor(row[mapping.valor]) : 0;
       const dataVenc = mapping.data_vencimento ? parseData(row[mapping.data_vencimento]) : null;
+      const dataComp = parseData(row[mapping.data_competencia!]);
       
       if (!descricao) msgs.push("Descrição ausente");
       else fieldValues.descricao = descricao;
@@ -232,6 +266,9 @@ export default function ImportarFinancasPage() {
       
       if (!dataVenc) msgs.push("Data de vencimento inválida");
       else fieldValues.data_vencimento = row[mapping.data_vencimento!];
+
+      if (!dataComp) msgs.push("Data de competência inválida");
+      else fieldValues.data_competencia = row[mapping.data_competencia!];
 
       if (mapping.conta && contas) {
         const nomeConta = row[mapping.conta];
@@ -253,6 +290,33 @@ export default function ImportarFinancasPage() {
         if (!subOk) msgs.push("Subcategoria não encontrada");
       }
 
+      if (mapping.base_ministerial && basesMinisteriais) {
+        const nomeBase = row[mapping.base_ministerial];
+        fieldValues.base_ministerial = nomeBase;
+        const baseOk = basesMinisteriais.find((b) => b.titulo.toLowerCase() === String(nomeBase || "").toLowerCase().trim());
+        if (!baseOk) msgs.push("Base ministerial não encontrada");
+      }
+
+      if (mapping.centro_custo && centrosCusto) {
+        const nomeCC = row[mapping.centro_custo];
+        fieldValues.centro_custo = nomeCC;
+        const ccOk = centrosCusto.find((c) => c.nome.toLowerCase() === String(nomeCC || "").toLowerCase().trim());
+        if (!ccOk) msgs.push("Centro de custo não encontrado");
+      }
+
+      if (mapping.fornecedor && fornecedores) {
+        const nomeFornecedor = row[mapping.fornecedor];
+        fieldValues.fornecedor = nomeFornecedor;
+        const fornOk = fornecedores.find((f) => f.nome.toLowerCase() === String(nomeFornecedor || "").toLowerCase().trim());
+        if (!fornOk) msgs.push("Fornecedor não encontrado");
+      }
+
+      // Capturar valores opcionais numéricos (não geram erro se ausentes)
+      if (mapping.multas) fieldValues.multas = row[mapping.multas];
+      if (mapping.juros) fieldValues.juros = row[mapping.juros];
+      if (mapping.desconto) fieldValues.desconto = row[mapping.desconto];
+      if (mapping.taxas_administrativas) fieldValues.taxas_administrativas = row[mapping.taxas_administrativas];
+
       if (msgs.length) {
         issues.push({ index: i, messages: msgs, fieldValues });
         newExcluded[i] = true;
@@ -272,12 +336,19 @@ export default function ImportarFinancasPage() {
     contas: Array<{ id: string; nome: string }>,
     categorias: Array<{ id: string; nome: string; tipo: string }>,
     fornecedores?: Array<{ id: string; nome: string }>,
-    subcategorias?: Array<{ id: string; nome: string }>
+    subcategorias?: Array<{ id: string; nome: string }>,
+    basesMinisteriais?: Array<{ id: string; titulo: string }>,
+    centrosCusto?: Array<{ id: string; nome: string }>
   ) => {
     const rawDescricao = mapping.descricao ? row[mapping.descricao] : null;
     const descricao = rawDescricao != null ? String(rawDescricao) : "";
     const valor = mapping.valor ? parseValor(row[mapping.valor]) : 0;
+    const multas = mapping.multas ? parseValor(row[mapping.multas]) : 0;
+    const juros = mapping.juros ? parseValor(row[mapping.juros]) : 0;
+    const desconto = mapping.desconto ? parseValor(row[mapping.desconto]) : 0;
+    const taxasAdm = mapping.taxas_administrativas ? parseValor(row[mapping.taxas_administrativas]) : 0;
     const dataVencimento = mapping.data_vencimento ? parseData(row[mapping.data_vencimento]) : null;
+    const dataCompetencia = mapping.data_competencia ? parseData(row[mapping.data_competencia]) : null;
     let contaId = contas[0]?.id;
     if (mapping.conta) {
       const nomeConta = row[mapping.conta];
@@ -302,6 +373,18 @@ export default function ImportarFinancasPage() {
       const subEncontrada = subcategorias.find((s) => s.nome.toLowerCase() === String(nomeSub || "").toLowerCase().trim());
       if (subEncontrada) subcategoriaId = subEncontrada.id;
     }
+    let baseMinisterialId: string | null = null;
+    if (mapping.base_ministerial && basesMinisteriais) {
+      const nomeBase = row[mapping.base_ministerial];
+      const baseEncontrada = basesMinisteriais.find((b) => b.titulo.toLowerCase() === String(nomeBase || "").toLowerCase().trim());
+      if (baseEncontrada) baseMinisterialId = baseEncontrada.id;
+    }
+    let centroCustoId: string | null = null;
+    if (mapping.centro_custo && centrosCusto) {
+      const nomeCC = row[mapping.centro_custo];
+      const ccEncontrado = centrosCusto.find((c) => c.nome.toLowerCase() === String(nomeCC || "").toLowerCase().trim());
+      if (ccEncontrado) centroCustoId = ccEncontrado.id;
+    }
     let status = "pendente";
     if (mapping.status) {
       const s = String(row[mapping.status] || "").toLowerCase();
@@ -315,12 +398,19 @@ export default function ImportarFinancasPage() {
       valor,
       data_vencimento: dataVencimento ?? "",
       data_pagamento: dataPagamento,
+      data_competencia: dataCompetencia,
       status,
       tipo_lancamento: "unico",
       conta_id: contaId,
       categoria_id: categoriaId,
       subcategoria_id: subcategoriaId,
       fornecedor_id: fornecedorId,
+      base_ministerial_id: baseMinisterialId,
+      centro_custo_id: centroCustoId,
+      desconto,
+      juros,
+      multas,
+      taxas_administrativas: taxasAdm,
       observacoes,
       igreja_id: igrejaId,
       filial_id: isAllFiliais ? null : filialId,
@@ -365,14 +455,31 @@ export default function ImportarFinancasPage() {
         .select("id, nome, tipo")
         .eq("ativo", true)
         .eq("tipo", tipo);
-      const { data: fornecedores } = await supabase.from("fornecedores").select("id, nome").eq("ativo", true);
+      const { data: fornecedores } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
       const { data: subcategorias } = await supabase.from("subcategorias_financeiras").select("id, nome").eq("ativo", true);
+      const { data: basesMinisteriais } = await supabase.from("bases_ministeriais").select("id, titulo");
+      const { data: centrosCusto } = await supabase
+        .from("centros_custo")
+        .select("id, nome")
+        .eq("igreja_id", igrejaId);
 
       if (!contas || !contas.length) throw new Error("Nenhuma conta ativa encontrada");
 
       const validRowsIdx = rows.map((_, i) => i).filter((i) => !excluded[i]);
       const transacoes = validRowsIdx.map((i) =>
-        buildTransacao(rows[i], contas!, categorias || [], fornecedores || [], subcategorias || [])
+        buildTransacao(
+          rows[i],
+          contas!,
+          categorias || [],
+          fornecedores || [],
+          subcategorias || [],
+          basesMinisteriais || [],
+          centrosCusto || []
+        )
       );
 
       const total = transacoes.length;
@@ -511,8 +618,16 @@ export default function ImportarFinancasPage() {
       "descricao",
       "valor",
       "data_vencimento",
+      "data_competencia",
       "conta",
       "categoria",
+      "subcategoria",
+      "centro_custo",
+      "base_ministerial",
+      "multas",
+      "juros",
+      "desconto",
+      "taxas_administrativas",
       "fornecedor",
       "status",
       "observacoes",
@@ -718,13 +833,20 @@ export default function ImportarFinancasPage() {
                       "descricao",
                       "valor",
                       "data_vencimento",
+                      "data_competencia",
                       "conta",
                       "categoria",
                       "subcategoria",
+                      "centro_custo",
                       "data_pagamento",
                       "status",
                       "fornecedor",
                       "observacoes",
+                      "base_ministerial",
+                      "multas",
+                      "juros",
+                      "desconto",
+                      "taxas_administrativas",
                     ] as const
                   ).map((key) => (
                     <div className="space-y-1.5" key={key}>

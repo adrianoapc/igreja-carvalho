@@ -148,6 +148,9 @@ const FinancasRelatorioOferta = lazy(
 const FinancasImportar = lazy(
   () => import("./pages/financas/ImportarFinancasPage")
 );
+const FinancasReclassificacao = lazy(
+  () => import("./pages/financas/Reclassificacao")
+);
 const FinancasDashboardOfertas = lazy(
   () => import("./pages/financas/DashboardOfertas")
 );
@@ -943,6 +946,14 @@ const App = () => (
                   element={
                     <AuthGate>
                       <FinancasImportar />
+                    </AuthGate>
+                  }
+                />
+                <Route
+                  path="/financas/reclassificacao"
+                  element={
+                    <AuthGate>
+                      <FinancasReclassificacao />
                     </AuthGate>
                   }
                 />

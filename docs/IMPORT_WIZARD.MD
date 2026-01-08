@@ -20,11 +20,12 @@
 
 **Mapeamento de Campos**
 
-- **Obrigatórios:** `descricao`, `valor`, `data_vencimento`, `conta`, `categoria`.
+- **Obrigatórios:** `descricao`, `valor`, `data_vencimento`, `data_competencia`, `conta`, `categoria`.
 - **Sugeridos:** `forma_pagamento`, `fornecedor` (nome/CNPJ), `centro_custo`, `subcategoria`, `base_ministerial`, `status`, `observacoes`, `data_pagamento`.
+- **Ajustes financeiros opcionais:** `multas`, `juros`, `desconto`, `taxas_administrativas` (valores numéricos; não bloqueiam validação se ausentes).
 - **Presets:** salvar “modelo de mapeamento” por `igreja/filial` para reuso (armazenar em tabela `import_presets` com RLS por contexto).
 - **Auto-sugestões:** inferir `valor` por padrão monetário; `data` por formatos comuns; normalizar decimais pt-BR; aceitar combinações (`yyyy-MM-dd`, `dd/MM/yyyy`, etc.).
-- **Template:** botão “Baixar modelo” (`.xlsx/.csv`) com cabeçalhos esperados, gerado no cliente via `xlsx` (ou CSV simples) para uso imediato.
+- **Template:** botão “Baixar modelo” (`.xlsx/.csv`) com cabeçalhos esperados, gerado no cliente via `xlsx` (ou CSV simples) para uso imediato. Inclui: `descricao, valor, data_vencimento, conta, categoria, subcategoria, base_ministerial, multas, juros, desconto, taxas_administrativas, fornecedor, status, observacoes`.
 
 **Validação e Correções**
 
@@ -66,7 +67,7 @@
 **Esquema de Payload (front → edge)**
 
 - `job_meta`: `{ tipo: "entrada"|"saida", igreja_id, filial_id, usuario_id }`
-- `mapping`: `{ descricao, valor, data_vencimento, data_pagamento?, status?, conta?, categoria?, fornecedor?, observacoes? }`
+- `mapping`: `{ descricao, valor, data_vencimento, data_pagamento?, status?, conta?, categoria?, fornecedor?, subcategoria?, base_ministerial?, observacoes?, multas?, juros?, desconto?, taxas_administrativas? }`
 - `rows`: `Array<{ [col:string]: string|number|Date }>` já normalizados (datas `yyyy-MM-dd`, decimais `.`).
 - `options`: `{ chunkSize: number, dryRun?: boolean }`
 
