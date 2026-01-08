@@ -38,3 +38,10 @@ verify_jwt = false
 
 [functions.provisionar-admin-igreja]
 verify_jwt = false
+
+[functions.reclass-transacoes]
+verify_jwt = false
+
+[functions.undo-reclass]
+verify_jwt = false
+

@@ -38,7 +38,6 @@ import {
   Cell,
 } from "recharts";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
-import { ReconciliacaoBancaria } from "@/components/financas/ReconciliacaoBancaria";
 import { ContasAPagarWidget } from "@/components/financas/ContasAPagarWidget";
 import { useState } from "react";
 import { useHideValues } from "@/hooks/useHideValues";
@@ -269,6 +268,14 @@ export default function Dashboard() {
     return formatValue(value);
   };
 
+  type ReembolsoView = {
+    id: string;
+    status: string;
+    created_at: string;
+    filial_id?: string | null;
+    igreja_id: string;
+  };
+
   // Reembolsos em aberto (pendente/aprovado)
   const { data: reembolsosAbertos = [] } = useQuery({
     queryKey: [
@@ -280,9 +287,10 @@ export default function Dashboard() {
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = (supabase as any)
         .from("view_solicitacoes_reembolso")
-        .select("id, status, created_at")
+        .select("id, status, created_at, filial_id, igreja_id")
         .in("status", ["pendente", "aprovado"]) // aguardando pagamento
         .eq("igreja_id", igrejaId)
         .gte("created_at", dateRange.inicio)
@@ -591,12 +599,9 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Atalhos Rápidos */}
+          {/* Indicadores Operacionais */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-2">
-            <Card
-              className="shadow-soft hover:shadow-md transition-all cursor-pointer"
-              onClick={() => navigate("/financas/reembolsos")}
-            >
+            <Card className="shadow-soft">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center">
@@ -604,36 +609,23 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-muted-foreground">Reembolsos</p>
-                    <p className="text-lg font-bold">
-                      {reembolsosAbertos.length} em aberto
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Acesse e gerencie solicitações
-                    </p>
+                    <p className="text-lg font-bold">{reembolsosAbertos.length} em aberto</p>
+                    <p className="text-xs text-muted-foreground">Pendentes/aprovados no período</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card
-              className="shadow-soft hover:shadow-md transition-all cursor-pointer"
-              onClick={() => navigate("/financas/relatorio-oferta")}
-            >
+            <Card className="shadow-soft">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/20 flex items-center justify-center">
                     <FileText className="w-5 h-5 text-violet-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">
-                      Relatório de Ofertas
-                    </p>
-                    <p className="text-lg font-bold">
-                      {relatoriosOferta.length} no período
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Conferir e exportar valores
-                    </p>
+                    <p className="text-xs text-muted-foreground">Relatório de Ofertas</p>
+                    <p className="text-lg font-bold">{relatoriosOferta.length} no período</p>
+                    <p className="text-xs text-muted-foreground">Envios e conferências recentes</p>
                   </div>
                 </div>
               </CardContent>
@@ -743,8 +735,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Reconciliação Bancária */}
-      <ReconciliacaoBancaria />
     </div>
   );
 }

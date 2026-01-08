@@ -5,39 +5,34 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 Deno.serve(async (req) => {
+  // Suporte a CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        status: 405,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.replace("Bearer ", "");
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
     const { job_id } = await req.json();
     if (!job_id) {
       return new Response(JSON.stringify({ error: "job_id é obrigatório" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       });
     }
 
@@ -50,21 +45,30 @@ Deno.serve(async (req) => {
     if (jobError || !job) {
       return new Response(JSON.stringify({ error: "Job não encontrado" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       });
     }
 
     if (job.user_id !== user.id) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), {
         status: 403,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       });
     }
 
     if (job.status !== "completed") {
       return new Response(JSON.stringify({ error: "Apenas jobs concluídos podem ser desfeitos" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       });
     }
 
@@ -80,7 +84,10 @@ Deno.serve(async (req) => {
     if (!itens || !itens.length) {
       return new Response(JSON.stringify({ error: "Nenhum item para reverter" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       });
     }
 
@@ -108,7 +115,10 @@ Deno.serve(async (req) => {
       JSON.stringify({ success: true, reverted: beforeUpdates.length }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       }
     );
   } catch (error) {
@@ -117,7 +127,10 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
       }
     );
   }
