@@ -2655,6 +2655,181 @@ export type Database = {
         }
         Relationships: []
       }
+      import_job_items: {
+        Row: {
+          created_at: string
+          error_reason: string | null
+          id: string
+          job_id: string
+          row_index: number
+          status: string
+          transacao_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          job_id: string
+          row_index: number
+          status?: string
+          transacao_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          job_id?: string
+          row_index?: number
+          status?: string
+          transacao_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          file_name: string
+          filial_id: string
+          id: string
+          igreja_id: string
+          imported_rows: number
+          rejected_rows: number
+          started_at: string | null
+          status: string
+          tipo: string
+          total_rows: number
+          undone_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_name: string
+          filial_id: string
+          id?: string
+          igreja_id: string
+          imported_rows?: number
+          rejected_rows?: number
+          started_at?: string | null
+          status?: string
+          tipo: string
+          total_rows?: number
+          undone_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_name?: string
+          filial_id?: string
+          id?: string
+          igreja_id?: string
+          imported_rows?: number
+          rejected_rows?: number
+          started_at?: string | null
+          status?: string
+          tipo?: string
+          total_rows?: number
+          undone_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_presets: {
+        Row: {
+          created_at: string
+          description: string | null
+          filial_id: string
+          id: string
+          igreja_id: string
+          mapping: Json
+          name: string
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          filial_id: string
+          id?: string
+          igreja_id: string
+          mapping: Json
+          name: string
+          tipo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          filial_id?: string
+          id?: string
+          igreja_id?: string
+          mapping?: Json
+          name?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_presets_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_presets_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inscricoes_eventos: {
         Row: {
           created_at: string | null
