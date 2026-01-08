@@ -2430,32 +2430,100 @@ export type Database = {
           },
         ]
       }
+      forma_pagamento_contas: {
+        Row: {
+          conta_id: string
+          criado_em: string | null
+          filial_id: string | null
+          forma_pagamento_id: string
+          id: string
+          igreja_id: string
+          prioridade: number | null
+        }
+        Insert: {
+          conta_id: string
+          criado_em?: string | null
+          filial_id?: string | null
+          forma_pagamento_id: string
+          id?: string
+          igreja_id: string
+          prioridade?: number | null
+        }
+        Update: {
+          conta_id?: string
+          criado_em?: string | null
+          filial_id?: string | null
+          forma_pagamento_id?: string
+          id?: string
+          igreja_id?: string
+          prioridade?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forma_pagamento_contas_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forma_pagamento_contas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forma_pagamento_contas_forma_pagamento_id_fkey"
+            columns: ["forma_pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forma_pagamento_contas_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formas_pagamento: {
         Row: {
           ativo: boolean
           created_at: string
           filial_id: string | null
+          gera_pago: boolean | null
           id: string
           igreja_id: string | null
           nome: string
+          taxa_administrativa: number | null
+          taxa_administrativa_fixa: number | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
           created_at?: string
           filial_id?: string | null
+          gera_pago?: boolean | null
           id?: string
           igreja_id?: string | null
           nome: string
+          taxa_administrativa?: number | null
+          taxa_administrativa_fixa?: number | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
           created_at?: string
           filial_id?: string | null
+          gera_pago?: boolean | null
           id?: string
           igreja_id?: string | null
           nome?: string
+          taxa_administrativa?: number | null
+          taxa_administrativa_fixa?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -4419,6 +4487,9 @@ export type Database = {
           message: string
           metadata: Json | null
           read: boolean | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
           related_user_id: string | null
           title: string
           type: string
@@ -4432,6 +4503,9 @@ export type Database = {
           message: string
           metadata?: Json | null
           read?: boolean | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           related_user_id?: string | null
           title: string
           type: string
@@ -4445,6 +4519,9 @@ export type Database = {
           message?: string
           metadata?: Json | null
           read?: boolean | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           related_user_id?: string | null
           title?: string
           type?: string
@@ -4464,6 +4541,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "igrejas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "notifications_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
         ]
       }
