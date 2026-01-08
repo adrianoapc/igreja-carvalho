@@ -396,13 +396,17 @@ export default function Saidas() {
             }}
             onAplicar={() => refetch()}
           />
-          <Button variant="outline" onClick={handleExportar} size="sm">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/financas/gerenciar-dados?tab=exportar&tipo=saidas")}
+            size="sm"
+          >
             <Download className="w-4 h-4 mr-1" />
             <span className="hidden sm:inline text-xs">Exportar</span>
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate("/financas/importar?tipo=saida")}
+            onClick={() => navigate("/financas/gerenciar-dados?tab=importar&tipo=saida")}
             size="sm"
             className="hidden md:inline-flex"
           >
