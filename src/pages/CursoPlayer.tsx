@@ -126,7 +126,7 @@ export default function CursoPlayer() {
     if (id && profile?.id && igrejaId) {
       fetchDados();
     }
-  }, [id, profile?.id, igrejaId, filialId, isAllFiliais]);
+  }, [id, profile?.id, igrejaId]);
 
   useEffect(() => {
     if (etapaSelecionada?.aula_vinculada_id) {
@@ -140,18 +140,13 @@ export default function CursoPlayer() {
     if (!id || !profile?.id || !igrejaId) return;
 
     try {
-      // Buscar jornada com filtros multi-tenant
-      let queryJornada = supabase
+      // Buscar jornada - apenas validar que pertence à igreja (cross-filial)
+      const { data: jornadaData, error: jornadaError } = await supabase
         .from("jornadas")
         .select("id, titulo, descricao, cor_tema, valor, requer_pagamento")
         .eq("id", id)
-        .eq("igreja_id", igrejaId);
-      
-      if (!isAllFiliais && filialId) {
-        queryJornada = queryJornada.eq("filial_id", filialId);
-      }
-      
-      const { data: jornadaData, error: jornadaError } = await queryJornada.single();
+        .eq("igreja_id", igrejaId)
+        .single();
 
       if (jornadaError) {
         if (jornadaError.code === 'PGRST116') {

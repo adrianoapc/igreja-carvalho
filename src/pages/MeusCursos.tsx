@@ -64,7 +64,8 @@ export default function MeusCursos() {
     if (!profile?.id || !igrejaId) return;
 
     try {
-      let query = supabase
+      // Buscar TODAS as inscrições do usuário (cross-filial) apenas filtrando por igreja
+      const { data: inscricoesData, error } = await supabase
         .from("inscricoes_jornada")
         .select(`
           id,
@@ -78,12 +79,6 @@ export default function MeusCursos() {
         .eq("concluido", false)
         .eq("jornada.exibir_portal", true)
         .eq("jornada.igreja_id", igrejaId);
-      
-      if (!isAllFiliais && filialId) {
-        query = query.eq("jornada.filial_id", filialId);
-      }
-      
-      const { data: inscricoesData, error } = await query;
 
       if (error) throw error;
 
@@ -131,7 +126,7 @@ export default function MeusCursos() {
     } finally {
       setLoading(false);
     }
-  }, [profile?.id, igrejaId, filialId, isAllFiliais]);
+  }, [profile?.id, igrejaId]);
 
   const fetchDisponiveis = useCallback(async () => {
     if (!profile?.id || !igrejaId) return;
@@ -148,19 +143,14 @@ export default function MeusCursos() {
 
       const idsInscritos = new Set((inscricoesUsuario || []).map((i) => i.jornada_id));
 
-      let queryJornadas = supabase
+      // Buscar TODAS as jornadas disponíveis da igreja (cross-filial)
+      const { data: jornadas, error } = await supabase
         .from("jornadas")
-        .select("id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal")
+        .select("id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal, filial_id")
         .eq("ativo", true)
         .eq("exibir_portal", true)
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
-      
-      if (!isAllFiliais && filialId) {
-        queryJornadas = queryJornadas.eq("filial_id", filialId);
-      }
-      
-      const { data: jornadas, error } = await queryJornadas;
 
       if (error) throw error;
 
@@ -172,14 +162,14 @@ export default function MeusCursos() {
     } finally {
       setLoadingDisponiveis(false);
     }
-  }, [profile?.id, igrejaId, filialId, isAllFiliais]);
+  }, [profile?.id, igrejaId]);
 
   useEffect(() => {
     if (profile?.id && igrejaId) {
       fetchInscricoes();
       fetchDisponiveis();
     }
-  }, [profile?.id, igrejaId, filialId, isAllFiliais, fetchInscricoes, fetchDisponiveis]);
+  }, [profile?.id, igrejaId, fetchInscricoes, fetchDisponiveis]);
 
   const calcularProgresso = (inscricao: InscricaoComProgresso) => {
     if (inscricao.totalEtapas === 0) return 0;
