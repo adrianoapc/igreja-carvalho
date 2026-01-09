@@ -268,7 +268,7 @@ export default function DashboardMember() {
         <Button
           variant="outline"
           className="h-24 flex flex-col gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-800 dark:hover:bg-blue-950/30"
-          onClick={() => navigate("/intercessao/pedidos?novo=true")}
+          onClick={() => navigate("/intercessao")}
         >
           <HeartHandshake className="w-6 h-6 text-blue-600" />
           <span className="text-xs">Pedido de Oração</span>

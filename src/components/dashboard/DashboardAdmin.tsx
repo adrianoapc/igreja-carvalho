@@ -626,7 +626,7 @@ export default function DashboardAdmin() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate("/financas/relatorios/ofertas")}
+          onClick={() => navigate("/financas/entradas")}
           className="gap-2"
         >
           <DollarSign className="w-4 h-4" />
@@ -653,11 +653,11 @@ export default function DashboardAdmin() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate("/intercessao/pedidos?novo=true")}
+          onClick={() => navigate("/intercessao")}
           className="gap-2"
         >
           <HeartHandshake className="w-4 h-4" />
-          <span className="hidden sm:inline">Novo Pedido</span>
+          <span className="hidden sm:inline">Intercessão</span>
         </Button>
       </div>
 
@@ -919,7 +919,7 @@ export default function DashboardAdmin() {
                 variant="ghost"
                 size="sm"
                 className="w-full text-xs"
-                onClick={() => navigate("/intercessao/pedidos")}
+                onClick={() => navigate("/intercessao")}
               >
                 Ver todos
               </Button>
@@ -974,7 +974,7 @@ export default function DashboardAdmin() {
                 variant="ghost"
                 size="sm"
                 className="w-full text-xs"
-                onClick={() => navigate("/intercessao/testemunhos")}
+                onClick={() => navigate("/intercessao")}
               >
                 Ver todos
               </Button>

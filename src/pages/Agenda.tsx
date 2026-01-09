@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { EventoDetailsDialog } from "@/components/agenda/EventoDetailsDialog";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface Evento {
   id: string;
@@ -125,22 +126,33 @@ export default function Agenda() {
   const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);
 
   useEffect(() => {
-    fetchCultos();
-  }, []);
+    if (igrejaId) {
+      fetchCultos();
+    }
+  }, [igrejaId, filialId, isAllFiliais]);
 
   const fetchCultos = async () => {
+    if (!igrejaId) return;
+    
     setLoading(true);
     try {
       const today = startOfToday();
       const threeMonthsLater = endOfMonth(addMonths(today, 3));
       
-      const { data, error } = await supabase
+      let query = supabase
         .from("eventos")
         .select("id, titulo, tipo, data_evento, local, endereco, tema, descricao, pregador, exibir_preletor")
+        .eq("igreja_id", igrejaId)
         .gte("data_evento", today.toISOString())
         .lte("data_evento", threeMonthsLater.toISOString())
         .eq("status", "confirmado")
         .order("data_evento", { ascending: true });
+      
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
       setCultos((data || []) as Evento[]);

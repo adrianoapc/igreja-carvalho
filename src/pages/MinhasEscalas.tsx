@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useFilialId } from "@/hooks/useFilialId";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ interface Escala {
 
 export default function MinhasEscalas() {
   const { profile } = useAuth();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEscala, setSelectedEscala] = useState<Escala | null>(null);
@@ -48,17 +50,17 @@ export default function MinhasEscalas() {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    if (profile?.id) {
+    if (profile?.id && igrejaId) {
       loadEscalas();
     }
-  }, [profile?.id]);
+  }, [profile?.id, igrejaId, filialId, isAllFiliais]);
 
   const loadEscalas = async () => {
-    if (!profile?.id) return;
+    if (!profile?.id || !igrejaId) return;
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("escalas")
         .select(`
           id,
@@ -72,7 +74,9 @@ export default function MinhasEscalas() {
             data_evento,
             tipo,
             tema,
-            local
+            local,
+            igreja_id,
+            filial_id
           ),
           time:times!escalas_time_id_fkey (
             id,
@@ -87,12 +91,22 @@ export default function MinhasEscalas() {
         `)
         .eq("pessoa_id", profile.id);
 
+      const { data, error } = await query;
+
       if (error) throw error;
       
-      // Filtrar e ordenar manualmente no frontend (Supabase não suporta filtro/order em relacionamentos aliasados)
+      // Filtrar por igreja/filial e ordenar manualmente no frontend
       const validEscalas = (data || [])
         .filter(e => e.culto !== null)
-        .filter(e => new Date(e.culto.data_evento) >= new Date())
+        .filter(e => {
+          const culto = e.culto as any;
+          // Filtrar por igreja_id
+          if (culto.igreja_id !== igrejaId) return false;
+          // Filtrar por filial_id se não for "Todas as Filiais"
+          if (!isAllFiliais && filialId && culto.filial_id !== filialId) return false;
+          // Filtrar por data futura
+          return new Date(culto.data_evento) >= new Date();
+        })
         .sort((a, b) => new Date(a.culto.data_evento).getTime() - new Date(b.culto.data_evento).getTime()) as Escala[];
       setEscalas(validEscalas);
     } catch (error) {

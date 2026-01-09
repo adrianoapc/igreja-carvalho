@@ -8,6 +8,7 @@ import { ptBR } from "date-fns/locale";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 
 interface Comunicado {
   id: string;
@@ -23,25 +24,37 @@ interface Comunicado {
 }
 
 const Announcements = () => {
+  const { igrejaId, filialId, isAllFiliais } = useAuthContext();
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchComunicados();
-  }, []);
+    if (igrejaId) {
+      fetchComunicados();
+    }
+  }, [igrejaId, filialId, isAllFiliais]);
 
   const fetchComunicados = async () => {
+    if (!igrejaId) return;
+    
     try {
       const now = new Date().toISOString();
       
-      const { data, error } = await supabase
+      let query = supabase
         .from("comunicados")
         .select("*")
+        .eq("igreja_id", igrejaId)
         .eq("ativo", true)
         .eq("exibir_site", true)
         .or(`data_inicio.is.null,data_inicio.lte.${now}`)
         .or(`data_fim.is.null,data_fim.gte.${now}`)
         .order("created_at", { ascending: false });
+      
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
       setComunicados(data || []);
