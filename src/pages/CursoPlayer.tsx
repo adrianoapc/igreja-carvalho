@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useFilialId } from "@/hooks/useFilialId";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -102,6 +103,7 @@ export default function CursoPlayer() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
 
   const [jornada, setJornada] = useState<Jornada | null>(null);
   const [etapas, setEtapas] = useState<Etapa[]>([]);
@@ -121,10 +123,10 @@ export default function CursoPlayer() {
     etapas.length > 0 && etapas.every((e) => e.concluida);
 
   useEffect(() => {
-    if (id && profile?.id) {
+    if (id && profile?.id && igrejaId) {
       fetchDados();
     }
-  }, [id, profile?.id]);
+  }, [id, profile?.id, igrejaId, filialId, isAllFiliais]);
 
   useEffect(() => {
     if (etapaSelecionada?.aula_vinculada_id) {
@@ -135,17 +137,30 @@ export default function CursoPlayer() {
   }, [etapaSelecionada]);
 
   const fetchDados = async () => {
-    if (!id || !profile?.id) return;
+    if (!id || !profile?.id || !igrejaId) return;
 
     try {
-      // Buscar jornada
-      const { data: jornadaData, error: jornadaError } = await supabase
+      // Buscar jornada com filtros multi-tenant
+      let queryJornada = supabase
         .from("jornadas")
         .select("id, titulo, descricao, cor_tema, valor, requer_pagamento")
         .eq("id", id)
-        .single();
+        .eq("igreja_id", igrejaId);
+      
+      if (!isAllFiliais && filialId) {
+        queryJornada = queryJornada.eq("filial_id", filialId);
+      }
+      
+      const { data: jornadaData, error: jornadaError } = await queryJornada.single();
 
-      if (jornadaError) throw jornadaError;
+      if (jornadaError) {
+        if (jornadaError.code === 'PGRST116') {
+          toast.error("Curso não encontrado ou você não tem acesso a ele");
+          navigate("/cursos");
+          return;
+        }
+        throw jornadaError;
+      }
       setJornada(jornadaData);
 
       // Verificar inscrição e pagamento

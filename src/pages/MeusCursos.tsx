@@ -61,10 +61,10 @@ export default function MeusCursos() {
   const [pagamentoMensagem, setPagamentoMensagem] = useState("");
 
   const fetchInscricoes = useCallback(async () => {
-    if (!profile?.id) return;
+    if (!profile?.id || !igrejaId) return;
 
     try {
-      const { data: inscricoesData, error } = await supabase
+      let query = supabase
         .from("inscricoes_jornada")
         .select(`
           id,
@@ -72,11 +72,18 @@ export default function MeusCursos() {
           etapa_atual_id,
           concluido,
           status_pagamento,
-          jornada:jornadas!inner(id, titulo, descricao, cor_tema, exibir_portal, requer_pagamento, valor)
+          jornada:jornadas!inner(id, titulo, descricao, cor_tema, exibir_portal, requer_pagamento, valor, igreja_id, filial_id)
         `)
         .eq("pessoa_id", profile.id)
         .eq("concluido", false)
-        .eq("jornada.exibir_portal", true);
+        .eq("jornada.exibir_portal", true)
+        .eq("jornada.igreja_id", igrejaId);
+      
+      if (!isAllFiliais && filialId) {
+        query = query.eq("jornada.filial_id", filialId);
+      }
+      
+      const { data: inscricoesData, error } = await query;
 
       if (error) throw error;
 
@@ -124,10 +131,10 @@ export default function MeusCursos() {
     } finally {
       setLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile?.id, igrejaId, filialId, isAllFiliais]);
 
   const fetchDisponiveis = useCallback(async () => {
-    if (!profile?.id) return;
+    if (!profile?.id || !igrejaId) return;
 
     try {
       setLoadingDisponiveis(true);
@@ -141,12 +148,19 @@ export default function MeusCursos() {
 
       const idsInscritos = new Set((inscricoesUsuario || []).map((i) => i.jornada_id));
 
-      const { data: jornadas, error } = await supabase
+      let queryJornadas = supabase
         .from("jornadas")
         .select("id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal")
         .eq("ativo", true)
         .eq("exibir_portal", true)
+        .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      
+      if (!isAllFiliais && filialId) {
+        queryJornadas = queryJornadas.eq("filial_id", filialId);
+      }
+      
+      const { data: jornadas, error } = await queryJornadas;
 
       if (error) throw error;
 
@@ -158,14 +172,14 @@ export default function MeusCursos() {
     } finally {
       setLoadingDisponiveis(false);
     }
-  }, [profile?.id]);
+  }, [profile?.id, igrejaId, filialId, isAllFiliais]);
 
   useEffect(() => {
-    if (profile?.id) {
+    if (profile?.id && igrejaId) {
       fetchInscricoes();
       fetchDisponiveis();
     }
-  }, [profile?.id, fetchInscricoes, fetchDisponiveis]);
+  }, [profile?.id, igrejaId, filialId, isAllFiliais, fetchInscricoes, fetchDisponiveis]);
 
   const calcularProgresso = (inscricao: InscricaoComProgresso) => {
     if (inscricao.totalEtapas === 0) return 0;
