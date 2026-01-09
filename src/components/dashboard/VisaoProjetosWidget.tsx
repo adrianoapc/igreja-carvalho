@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FolderKanban, AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface ProjetoComProgresso {
   id: string;
@@ -17,30 +18,48 @@ interface ProjetoComProgresso {
 
 export default function VisaoProjetosWidget() {
   const navigate = useNavigate();
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["projetos-stats"],
+    queryKey: ["projetos-stats", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
+      if (!igrejaId) return { tarefasAtrasadas: 0, projetosAtivos: 0, topProjetos: [] };
+      
       // Buscar tarefas atrasadas (não concluídas e vencidas)
       const hoje = new Date().toISOString().split("T")[0];
-      const { count: atrasadas } = await supabase
+      let tarefasQuery = supabase
         .from("tarefas")
         .select("*", { count: "exact", head: true })
+        .eq("igreja_id", igrejaId)
         .neq("status", "done")
         .lt("data_vencimento", hoje);
+      if (!isAllFiliais && filialId) {
+        tarefasQuery = tarefasQuery.eq("filial_id", filialId);
+      }
+      const { count: atrasadas } = await tarefasQuery;
 
       // Buscar projetos ativos
-      const { count: projetosAtivos } = await supabase
+      let projetosCountQuery = supabase
         .from("projetos")
         .select("*", { count: "exact", head: true })
+        .eq("igreja_id", igrejaId)
         .eq("status", "ativo");
+      if (!isAllFiliais && filialId) {
+        projetosCountQuery = projetosCountQuery.eq("filial_id", filialId);
+      }
+      const { count: projetosAtivos } = await projetosCountQuery;
 
       // Buscar top 3 projetos com progresso
-      const { data: projetos } = await supabase
+      let projetosQuery = supabase
         .from("projetos")
         .select(`id, titulo, tarefas(status)`)
+        .eq("igreja_id", igrejaId)
         .eq("status", "ativo")
         .limit(5);
+      if (!isAllFiliais && filialId) {
+        projetosQuery = projetosQuery.eq("filial_id", filialId);
+      }
+      const { data: projetos } = await projetosQuery;
 
       const projetosComProgresso: ProjetoComProgresso[] = (projetos || [])
         .map(p => {
@@ -64,6 +83,7 @@ export default function VisaoProjetosWidget() {
         topProjetos: projetosComProgresso,
       };
     },
+    enabled: !filialLoading && !!igrejaId,
   });
 
   if (isLoading) {
