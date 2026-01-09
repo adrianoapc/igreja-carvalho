@@ -9,10 +9,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, X, Image as ImageIcon, Megaphone, AlertCircle, AlertTriangle, Info, Link as LinkIcon } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Megaphone, AlertCircle, AlertTriangle, Info, Link as LinkIcon, Eye, Settings } from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
 import { useFilialId } from "@/hooks/useFilialId";
 
@@ -221,257 +222,270 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-      <div className="flex flex-col h-full">
-        <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
-          <h2 className="text-lg font-semibold leading-none tracking-tight">{comunicado ? "Editar Comunicado" : "Novo Comunicado"}</h2>
+      <div className="flex flex-col h-full max-h-[90vh]">
+        <div className="border-b pb-3 px-4 pt-4 md:px-6">
+          <h2 className="text-lg font-semibold">{comunicado ? "Editar Comunicado" : "Novo Comunicado"}</h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
-          <div className="grid md:grid-cols-2 gap-6">
-          {/* Formulário */}
-          <div className="space-y-4">
-            {/* Tipo */}
-            <div className="space-y-2">
-              <Label>Tipo de Comunicado</Label>
-              <RadioGroup
-                value={formData.tipo}
-                onValueChange={(value: TipoComunicado) => setFormData({ ...formData, tipo: value })}
-                className="grid grid-cols-2 gap-4"
-              >
-                <Label
-                  htmlFor="alerta"
-                  className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all ${
-                    formData.tipo === "alerta" ? "border-primary bg-primary/5 ring-2 ring-primary" : "border-input hover:border-primary/50"
-                  }`}
-                >
-                  <RadioGroupItem value="alerta" id="alerta" className="sr-only" />
-                  <Megaphone className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <p className="font-medium">📢 Alerta</p>
-                    <p className="text-xs text-muted-foreground">Mensagem de texto</p>
-                  </div>
-                </Label>
-                <Label
-                  htmlFor="banner"
-                  className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all ${
-                    formData.tipo === "banner" ? "border-primary bg-primary/5 ring-2 ring-primary" : "border-input hover:border-primary/50"
-                  }`}
-                >
-                  <RadioGroupItem value="banner" id="banner" className="sr-only" />
-                  <ImageIcon className="h-5 w-5 text-purple-500" />
-                  <div>
-                    <p className="font-medium">🖼️ Banner</p>
-                    <p className="text-xs text-muted-foreground">Com imagem</p>
-                  </div>
-                </Label>
-              </RadioGroup>
-            </div>
-
-            {/* Campos Comuns */}
-            <div className="space-y-2">
-              <Label htmlFor="titulo">Título *</Label>
-              <Input
-                id="titulo"
-                value={formData.titulo}
-                onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                placeholder="Ex: Culto Especial de Domingo"
-                maxLength={100}
-              />
-            </div>
-
-            {/* Campos condicionais - Alerta */}
-            {formData.tipo === "alerta" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="descricao">Mensagem do Alerta *</Label>
-                  <Textarea
-                    id="descricao"
-                    value={formData.descricao}
-                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                    placeholder="Digite a mensagem do alerta..."
-                    className="min-h-[100px]"
-                    maxLength={500}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nivel">Nível de Urgência</Label>
-                  <Select
-                    value={formData.nivel_urgencia}
-                    onValueChange={(value) => setFormData({ ...formData, nivel_urgencia: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="info">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-blue-500" /> Info (Azul)
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="warning">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-yellow-500" /> Atenção (Amarelo)
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="destructive">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-red-500" /> Crítico (Vermelho)
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            {/* Campos condicionais - Banner */}
-            {formData.tipo === "banner" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Imagem do Banner *</Label>
-                  {imagePreview ? (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-32 object-cover rounded-lg border"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 h-7 w-7"
-                        onClick={removeImage}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                        id="banner-image"
-                      />
-                      <label htmlFor="banner-image" className="cursor-pointer">
-                        <Upload className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                        <p className="text-sm text-primary font-medium">Clique para upload</p>
-                        <p className="text-xs text-muted-foreground">PNG, JPG até 2MB</p>
-                      </label>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="descricao">Descrição (opcional)</Label>
-                  <Input
-                    id="descricao"
-                    value={formData.descricao}
-                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                    placeholder="Texto curto sobre o banner"
-                    maxLength={200}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="link_acao">
-                    <LinkIcon className="h-3 w-3 inline mr-1" />
-                    Link de Ação (opcional)
-                  </Label>
-                  <Input
-                    id="link_acao"
-                    value={formData.link_acao}
-                    onChange={(e) => setFormData({ ...formData, link_acao: e.target.value })}
-                    placeholder="https://..."
-                    type="url"
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Datas e Status */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data de Início</Label>
-                <DateTimePicker
-                  value={formData.data_inicio}
-                  onChange={(date) => setFormData({ ...formData, data_inicio: date })}
-                  placeholder="Agora"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Data de Fim (opcional)</Label>
-                <DateTimePicker
-                  value={formData.data_fim}
-                  onChange={(date) => setFormData({ ...formData, data_fim: date })}
-                  placeholder="Sem expiração"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="ativo"
-                checked={formData.ativo}
-                onCheckedChange={(checked) => setFormData({ ...formData, ativo: !!checked })}
-              />
-              <Label htmlFor="ativo" className="text-sm cursor-pointer">
-                Comunicado ativo
-              </Label>
-            </div>
+        <Tabs defaultValue="config" className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-4 md:px-6 pt-4 border-b">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="config" className="text-xs md:text-sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Configuração
+              </TabsTrigger>
+              <TabsTrigger value="preview" className="text-xs md:text-sm">
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </TabsTrigger>
+            </TabsList>
           </div>
 
-          {/* Preview */}
-          <div className="space-y-4">
-            <Label className="text-muted-foreground">Preview em Tempo Real</Label>
-            <div className="border rounded-lg p-4 bg-muted/30 min-h-[200px]">
-              {formData.tipo === "alerta" ? (
-                <Alert className={getAlertStyle()}>
-                  {getAlertIcon()}
-                  <AlertTitle>{formData.titulo || "Título do Alerta"}</AlertTitle>
-                  <AlertDescription>
-                    {formData.descricao || "A mensagem do alerta aparecerá aqui..."}
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Card className="overflow-hidden">
-                  <div className="relative h-40 bg-gradient-to-br from-purple-500/20 to-purple-600/30">
+          <div className="flex-1 overflow-y-auto">
+            <TabsContent value="config" className="px-4 py-4 md:px-6 space-y-4 mt-0">
+              {/* Tipo */}
+              <div className="space-y-2">
+                <Label>Tipo de Comunicado</Label>
+                <RadioGroup
+                  value={formData.tipo}
+                  onValueChange={(value: TipoComunicado) => setFormData({ ...formData, tipo: value })}
+                  className="grid grid-cols-2 gap-3"
+                >
+                  <Label
+                    htmlFor="alerta"
+                    className={`flex flex-col items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                      formData.tipo === "alerta" ? "border-primary bg-primary/5 ring-2 ring-primary" : "border-input hover:border-primary/50"
+                    }`}
+                  >
+                    <RadioGroupItem value="alerta" id="alerta" className="sr-only" />
+                    <Megaphone className="h-5 w-5 text-orange-500" />
+                    <div className="text-center">
+                      <p className="font-medium text-sm">Alerta</p>
+                      <p className="text-xs text-muted-foreground">Mensagem de texto</p>
+                    </div>
+                  </Label>
+                  <Label
+                    htmlFor="banner"
+                    className={`flex flex-col items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                      formData.tipo === "banner" ? "border-primary bg-primary/5 ring-2 ring-primary" : "border-input hover:border-primary/50"
+                    }`}
+                  >
+                    <RadioGroupItem value="banner" id="banner" className="sr-only" />
+                    <ImageIcon className="h-5 w-5 text-purple-500" />
+                    <div className="text-center">
+                      <p className="font-medium text-sm">Banner</p>
+                      <p className="text-xs text-muted-foreground">Com imagem</p>
+                    </div>
+                  </Label>
+                </RadioGroup>
+              </div>
+
+              {/* Título */}
+              <div className="space-y-2">
+                <Label htmlFor="titulo">Título *</Label>
+                <Input
+                  id="titulo"
+                  value={formData.titulo}
+                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  placeholder="Ex: Culto Especial de Domingo"
+                  maxLength={100}
+                />
+              </div>
+
+              {/* Campos Alerta */}
+              {formData.tipo === "alerta" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="descricao">Mensagem do Alerta *</Label>
+                    <Textarea
+                      id="descricao"
+                      value={formData.descricao}
+                      onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                      placeholder="Digite a mensagem do alerta..."
+                      className="min-h-[100px] resize-none"
+                      maxLength={500}
+                    />
+                    <p className="text-xs text-muted-foreground text-right">
+                      {formData.descricao.length}/500
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nivel">Nível de Urgência</Label>
+                    <Select
+                      value={formData.nivel_urgencia}
+                      onValueChange={(value) => setFormData({ ...formData, nivel_urgencia: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="info">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-blue-500" /> Info (Azul)
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="warning">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-yellow-500" /> Atenção (Amarelo)
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="destructive">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-red-500" /> Crítico (Vermelho)
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+
+              {/* Campos Banner */}
+              {formData.tipo === "banner" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Imagem do Banner *</Label>
                     {imagePreview ? (
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
+                      <div className="relative">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-40 object-cover rounded-lg border"
+                        />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={removeImage}
+                          type="button"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                          id="banner-image"
+                        />
+                        <label htmlFor="banner-image" className="cursor-pointer block">
+                          <Upload className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
+                          <p className="text-sm text-primary font-medium">Clique para upload</p>
+                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG até 2MB</p>
+                        </label>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                      <h3 className="font-semibold text-lg">
-                        {formData.titulo || "Título do Banner"}
-                      </h3>
-                      {formData.descricao && (
-                        <p className="text-sm text-white/80">{formData.descricao}</p>
-                      )}
-                    </div>
                   </div>
-                  {formData.link_acao && (
-                    <CardContent className="p-3">
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <LinkIcon className="h-3 w-3" />
-                        {formData.link_acao}
-                      </p>
-                    </CardContent>
-                  )}
-                </Card>
+                  <div className="space-y-2">
+                    <Label htmlFor="descricao">Descrição (opcional)</Label>
+                    <Input
+                      id="descricao"
+                      value={formData.descricao}
+                      onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                      placeholder="Texto curto sobre o banner"
+                      maxLength={200}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="link_acao">Link de Ação (opcional)</Label>
+                    <Input
+                      id="link_acao"
+                      value={formData.link_acao}
+                      onChange={(e) => setFormData({ ...formData, link_acao: e.target.value })}
+                      placeholder="https://exemplo.com"
+                      type="url"
+                    />
+                  </div>
+                </>
               )}
-            </div>
-          </div>
-          </div>
-        </div>
 
-        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2">
+              {/* Datas */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Data de Início</Label>
+                  <DateTimePicker
+                    value={formData.data_inicio}
+                    onChange={(date) => setFormData({ ...formData, data_inicio: date })}
+                    placeholder="Agora"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data de Fim (opcional)</Label>
+                  <DateTimePicker
+                    value={formData.data_fim}
+                    onChange={(date) => setFormData({ ...formData, data_fim: date })}
+                    placeholder="Sem expiração"
+                  />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center gap-2 pt-2">
+                <Checkbox
+                  id="ativo"
+                  checked={formData.ativo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: !!checked })}
+                />
+                <Label htmlFor="ativo" className="text-sm cursor-pointer">
+                  Comunicado ativo
+                </Label>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="preview" className="px-4 py-4 md:px-6 mt-0">
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Pré-visualização</p>
+                {formData.tipo === "alerta" ? (
+                  <Alert className={getAlertStyle()}>
+                    {getAlertIcon()}
+                    <AlertTitle>{formData.titulo || "Título do Alerta"}</AlertTitle>
+                    <AlertDescription>
+                      {formData.descricao || "A mensagem do alerta aparecerá aqui..."}
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Card className="overflow-hidden">
+                    <div className="relative h-48 bg-gradient-to-br from-purple-500/20 to-purple-600/30">
+                      {imagePreview ? (
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <ImageIcon className="h-16 w-16 text-muted-foreground/30" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                        <h3 className="font-semibold text-lg">
+                          {formData.titulo || "Título do Banner"}
+                        </h3>
+                        {formData.descricao && (
+                          <p className="text-sm text-white/90 mt-1">{formData.descricao}</p>
+                        )}
+                      </div>
+                    </div>
+                    {formData.link_acao && (
+                      <CardContent className="p-3 bg-muted/30">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                          <LinkIcon className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{formData.link_acao}</span>
+                        </p>
+                      </CardContent>
+                    )}
+                  </Card>
+                )}
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
+
+        <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2 shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancelar
           </Button>

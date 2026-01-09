@@ -27,6 +27,8 @@ interface InscricaoComProgresso {
     exibir_portal: boolean | null;
     requer_pagamento?: boolean | null;
     valor?: number | null;
+    filial_id?: string | null;
+    igreja_id?: string | null;
   };
   status_pagamento?: "isento" | "pendente" | "pago" | null;
   totalEtapas: number;
@@ -44,6 +46,7 @@ interface JornadaDisponivel {
   cor_tema: string | null;
   requer_pagamento?: boolean | null;
   valor?: number | null;
+  filial_id?: string | null;
 }
 
 export default function MeusCursos() {
@@ -52,6 +55,7 @@ export default function MeusCursos() {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [inscricoes, setInscricoes] = useState<InscricaoComProgresso[]>([]);
   const [jornadasDisponiveis, setJornadasDisponiveis] = useState<JornadaDisponivel[]>([]);
+  const [filiaisMap, setFiliaisMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadingDisponiveis, setLoadingDisponiveis] = useState(true);
   const [activeTab, setActiveTab] = useState("inscritos");
@@ -59,6 +63,28 @@ export default function MeusCursos() {
   const { categoriaId, baseMinisterialId, contaId } = useConfiguracaoFinanceiraEnsino();
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [pagamentoMensagem, setPagamentoMensagem] = useState("");
+
+  // Buscar nomes das filiais
+  const fetchFiliais = useCallback(async () => {
+    if (!igrejaId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("filiais")
+        .select("id, nome")
+        .eq("igreja_id", igrejaId);
+      
+      if (error) throw error;
+      
+      const map: Record<string, string> = {};
+      data?.forEach(f => {
+        map[f.id] = f.nome;
+      });
+      setFiliaisMap(map);
+    } catch (error) {
+      console.error("Erro ao buscar filiais:", error);
+    }
+  }, [igrejaId]);
 
   const fetchInscricoes = useCallback(async () => {
     if (!profile?.id || !igrejaId) return;
@@ -166,10 +192,11 @@ export default function MeusCursos() {
 
   useEffect(() => {
     if (profile?.id && igrejaId) {
+      fetchFiliais();
       fetchInscricoes();
       fetchDisponiveis();
     }
-  }, [profile?.id, igrejaId, fetchInscricoes, fetchDisponiveis]);
+  }, [profile?.id, igrejaId, fetchFiliais, fetchInscricoes, fetchDisponiveis]);
 
   const calcularProgresso = (inscricao: InscricaoComProgresso) => {
     if (inscricao.totalEtapas === 0) return 0;
@@ -308,10 +335,15 @@ export default function MeusCursos() {
                       
                       <div className="flex-1 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
                               {inscricao.jornada?.titulo}
                             </h3>
+                            {inscricao.jornada?.filial_id && filiaisMap[inscricao.jornada.filial_id] && (
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {filiaisMap[inscricao.jornada.filial_id]}
+                              </Badge>
+                            )}
                             {bloqueado && <Badge variant="secondary">Aguardando Pagamento</Badge>}
                           </div>
                           {inscricao.jornada?.descricao && (
@@ -389,8 +421,15 @@ export default function MeusCursos() {
                         className="w-2 h-10 rounded-full"
                         style={{ backgroundColor: jornada.cor_tema || "hsl(var(--primary))" }}
                       />
-                      <div className="space-y-1">
-                        <h3 className="font-semibold leading-tight">{jornada.titulo}</h3>
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold leading-tight">{jornada.titulo}</h3>
+                          {jornada.filial_id && filiaisMap[jornada.filial_id] && (
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {filiaisMap[jornada.filial_id]}
+                            </Badge>
+                          )}
+                        </div>
                         {jornada.descricao && (
                           <p className="text-sm text-muted-foreground line-clamp-2">
                             {jornada.descricao}

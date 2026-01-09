@@ -5,9 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { List, LayoutGrid, CalendarDays } from "lucide-react";
+import { List, LayoutGrid, CalendarDays, Plus } from "lucide-react";
 import { useFilialId } from "@/hooks/useFilialId";
 
+import { Button } from "@/components/ui/button";
 import { PastoralKPIs } from "@/components/gabinete/PastoralKPIs";
 import { PastoralFilters } from "@/components/gabinete/PastoralFilters";
 import { PastoralInboxTable } from "@/components/gabinete/PastoralInboxTable";
@@ -175,9 +176,19 @@ export default function GabinetePastoral() {
   return (
     <div className="p-4 space-y-4 max-w-7xl mx-auto">
       {/* Header Compacto */}
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Painel Pastoral</h1>
-        <p className="text-sm text-muted-foreground">Gestão de atendimentos</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Painel Pastoral</h1>
+          <p className="text-sm text-muted-foreground">Gestão de atendimentos</p>
+        </div>
+        <Button
+          onClick={() => handleAgendar(null as any)}
+          size="sm"
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Nova Agenda
+        </Button>
       </div>
 
       {/* KPIs */}

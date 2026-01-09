@@ -7,9 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, X, Loader2, Calendar as CalendarIcon, Clock, Tag, Plus } from "lucide-react";
+import { Upload, X, Loader2, Calendar as CalendarIcon, Clock, Tag, Plus, Eye, Settings } from "lucide-react";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -430,13 +431,27 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
   return (
     <>
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-        <div className="flex flex-col h-full">
-          <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">{midia ? "Editar" : "Nova"} Mídia</h2>
+        <div className="flex flex-col h-full max-h-[90vh]">
+          <div className="border-b pb-3 px-4 pt-4 md:px-6">
+            <h2 className="text-lg font-semibold">{midia ? "Editar" : "Nova"} Mídia</h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
-            <div className="space-y-4">
+          <Tabs defaultValue="config" className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-4 md:px-6 pt-4 border-b">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="config" className="text-xs md:text-sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configuração
+                </TabsTrigger>
+                <TabsTrigger value="preview" className="text-xs md:text-sm">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              <TabsContent value="config" className="px-4 py-4 md:px-6 space-y-4 mt-0">
           {/* Upload de Arquivo */}
           <div>
             <Label>Arquivo</Label>
@@ -557,7 +572,7 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
           </div>
 
           {/* Data de Publicação e Expiração */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
               <Label htmlFor="scheduledAt">
                 <CalendarIcon className="w-4 h-4 inline mr-1" />
@@ -587,6 +602,16 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
                 placeholder="Sem expiração"
               />
             </div>
+          </div>
+
+          {/* Ativo */}
+          <div className="flex items-center justify-between pt-2">
+            <Label htmlFor="ativo">Mídia Ativa</Label>
+            <Switch
+              id="ativo"
+              checked={ativo}
+              onCheckedChange={setAtivo}
+            />
           </div>
 
           {/* Tags */}
@@ -637,26 +662,37 @@ export function MidiaDialog({ open, onOpenChange, midia, onSuccess }: MidiaDialo
             </div>
           </div>
 
-          {/* Ativo */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="ativo">Mídia Ativa</Label>
-            <Switch
-              id="ativo"
-              checked={ativo}
-              onCheckedChange={setAtivo}
-            />
-          </div>
-        </div>
+              </TabsContent>
 
-        <div className="flex gap-2 justify-end mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving || uploading}>
-            {(saving || uploading) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {uploading ? "Enviando..." : saving ? "Salvando..." : "Salvar"}
-          </Button>
+              <TabsContent value="preview" className="px-4 py-4 md:px-6 mt-0">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Pré-visualização</p>
+                  {tipo === 'imagem' && previewUrl ? (
+                    <img src={previewUrl} alt="Preview" className="w-full h-48 object-cover rounded-lg border" />
+                  ) : tipo === 'video' && previewUrl ? (
+                    <video src={previewUrl} controls className="w-full h-48 rounded-lg border" />
+                  ) : tipo === 'documento' ? (
+                    <div className="h-48 flex items-center justify-center bg-muted rounded-lg border">
+                      <p className="text-sm text-muted-foreground">Documento PDF</p>
+                    </div>
+                  ) : (
+                    <div className="h-48 flex items-center justify-center bg-muted rounded-lg border">
+                      <p className="text-sm text-muted-foreground">Nenhuma mídia selecionada</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
             </div>
+          </Tabs>
+
+          <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2 shrink-0">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving || uploading}>
+              {(saving || uploading) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {uploading ? "Enviando..." : saving ? "Salvando..." : "Salvar"}
+            </Button>
           </div>
         </div>
       </ResponsiveDialog>

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFilialId } from "@/hooks/useFilialId";
+import { motion } from "framer-motion";
 
 export default function Midias() {
   const navigate = useNavigate();
@@ -114,28 +115,23 @@ export default function Midias() {
     },
   ];
 
-  const quickActions = [
-    {
-      title: "Nova Mídia",
-      description: "Adicionar imagem, vídeo ou documento",
-      icon: Plus,
-      action: () => navigate("/midias/geral?novo=true"),
-    },
-    {
-      title: "Gerenciar Telão",
-      description: "Organizar avisos para projeção",
-      icon: MonitorPlay,
-      action: () => navigate("/midias/geral?canal=telao"),
-    },
-  ];
-
   return (
-    <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Mídias</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Gestão completa de conteúdo visual e comunicação
-        </p>
+    <div className="space-y-4 md:space-y-6 p-2 sm:p-0 relative pb-20">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Mídias</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Gestão completa de conteúdo visual e comunicação
+          </p>
+        </div>
+        <Button 
+          onClick={() => navigate("/midias/geral?novo=true")}
+          className="hidden md:flex"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Nova Mídia
+        </Button>
       </div>
 
       {/* Módulos principais */}
@@ -175,38 +171,6 @@ export default function Midias() {
         })}
       </div>
 
-      {/* Ações Rápidas */}
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-base md:text-lg">Ações Rápidas</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 md:p-6 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Button
-                  key={action.title}
-                  variant="outline"
-                  className="h-auto p-4 flex items-start gap-3 text-left"
-                  onClick={action.action}
-                >
-                  <div className="p-2 rounded bg-primary/10 flex-shrink-0">
-                    <Icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{action.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {action.description}
-                    </p>
-                  </div>
-                </Button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Tipos de Mídia */}
       <Card>
         <CardHeader className="p-4 md:p-6">
@@ -244,6 +208,22 @@ export default function Midias() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Botão Flutuante Mobile */}
+      <motion.div
+        className="fixed bottom-20 right-4 md:hidden z-50"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
+      >
+        <Button 
+          onClick={() => navigate("/midias/geral?novo=true")}
+          size="lg"
+          className="h-14 w-14 rounded-full shadow-lg"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
+      </motion.div>
     </div>
   );
 }

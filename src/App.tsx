@@ -630,6 +630,14 @@ const App = () => (
                     }
                   />
                   <Route
+                    path="/cursos/:id"
+                    element={
+                      <AuthGate>
+                        <CursoPlayer />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
                     path="/cursos/:id/aula/:aulaId"
                     element={
                       <AuthGate>
@@ -809,7 +817,7 @@ const App = () => (
                     path="/midias/geral"
                     element={
                       <AuthGate>
-                        <Midias />
+                        <EventosMidias />
                       </AuthGate>
                     }
                   />
