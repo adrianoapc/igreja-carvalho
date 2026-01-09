@@ -598,6 +598,287 @@ Para entender a composição do DRE em detalhes, consulte: [Diagrama DRE](diagra
 **O que acontece:**
 
 - ✅ Transações conciliadas recebem status "Conciliado"
+
+---
+
+### 4.12 Gerenciar Dados (Importação/Exportação)
+
+A tela **Gerenciar Dados** centraliza todas as operações de importação e exportação de dados financeiros, facilitando o fluxo de trabalho da tesouraria.
+
+#### Acessando Gerenciar Dados
+
+**Opção 1 - Via menu Finanças:**
+
+1. Acesse **Finanças > Gerenciar Dados**
+
+**Opção 2 - Via Entradas ou Saídas:**
+
+1. Na tela de **Entradas** ou **Saídas**, clique no botão **"Importar"** ou **"Exportar"**
+2. O sistema abre automaticamente a tab correspondente
+
+![Gerenciar Dados](./screenshots/placeholder-gerenciar-dados.png)
+
+> _Screenshot: Tela Gerenciar Dados com 3 tabs_
+
+---
+
+#### Tab 1: Importar (Transações Financeiras)
+
+Use esta funcionalidade para importar lançamentos em lote a partir de planilhas.
+
+**Passo 1: Upload do Arquivo**
+
+1. Clique na tab **"Importar"**
+2. Arraste o arquivo ou clique em **"Selecionar arquivo"**
+3. Formatos aceitos: **CSV** ou **XLSX** (até 10MB)
+4. Se a planilha tiver múltiplas abas, selecione a aba desejada
+
+![Upload Importação](./screenshots/placeholder-upload-import.png)
+
+> _Screenshot: Upload de arquivo para importação_
+
+**Passo 2: Mapeamento de Colunas**
+
+1. O sistema detecta automaticamente as colunas:
+   - **Data**: Colunas com "data" no nome
+   - **Descrição**: Colunas com "descri" no nome
+   - **Valor**: Colunas com "valor" no nome
+   - **Categoria, Fornecedor, Conta, etc.**
+2. Ajuste o mapeamento manualmente se necessário
+3. Clique em **"Próximo"**
+
+![Mapeamento Colunas](./screenshots/placeholder-mapeamento.png)
+
+> _Screenshot: Mapeamento de colunas_
+
+**Passo 3: Validação**
+
+1. O sistema valida os dados:
+   - ✅ **Data válida**: Formato DD/MM/YYYY ou YYYY-MM-DD
+   - ✅ **Descrição preenchida**: Não pode estar vazia
+   - ✅ **Valor válido**: Maior que zero
+2. Linhas com erro são destacadas em vermelho
+3. Use os checkboxes para **excluir** linhas problemáticas
+4. Clique em **"Validar"** para reprocessar
+
+![Validação](./screenshots/placeholder-validacao-import.png)
+
+> _Screenshot: Preview com validação_
+
+**Passo 4: Confirmação e Importação**
+
+1. Revise o resumo:
+   - Total de registros válidos
+   - Total de registros excluídos
+   - Valor total a importar
+2. Clique em **"Importar"**
+3. Aguarde o processamento (chunks de 200 registros)
+4. Ao finalizar, você verá uma mensagem de sucesso
+
+![Confirmação Import](./screenshots/placeholder-confirmacao-import.png)
+
+> _Screenshot: Confirmação de importação_
+
+**O que acontece:**
+
+- ✅ Transações são criadas em lote
+- ✅ Registro de tracking em `import_jobs` (histórico de importações)
+- ✅ Saldo das contas é atualizado
+- ✅ DRE e Fluxo de Caixa refletem os lançamentos
+
+---
+
+#### Tab 2: Exportar (Transações Financeiras)
+
+Use para gerar relatórios customizados em Excel.
+
+**Passo 1: Aplicar Filtros**
+
+1. Clique na tab **"Exportar"**
+2. Configure os filtros:
+   - **Tipo**: Entrada ou Saída
+   - **Status**: Pago, Pendente ou Ambos
+   - **Período**: Data início e data fim
+   - **Conta**: Filtre por conta específica (opcional)
+   - **Categoria**: Filtre por categoria (opcional)
+
+![Filtros Exportar](./screenshots/placeholder-filtros-export.png)
+
+> _Screenshot: Filtros de exportação_
+
+**Passo 2: Selecionar Colunas**
+
+1. Marque as colunas que deseja exportar:
+   - Data, Descrição, Tipo, Valor
+   - Categoria, Conta, Fornecedor
+   - Status, Forma de Pagamento, Observações
+2. O preview mostra os dados filtrados
+
+![Seleção Colunas](./screenshots/placeholder-selecao-colunas.png)
+
+> _Screenshot: Seleção de colunas para export_
+
+**Passo 3: Exportar**
+
+1. Clique em **"Exportar para Excel"**
+2. O arquivo é gerado automaticamente
+3. Salve em seu computador
+
+**O que acontece:**
+
+- ✅ Dados são formatados automaticamente:
+  - Valores monetários: **R$ 1.234,56**
+  - Datas: **DD/MM/YYYY**
+- ✅ Arquivo Excel (.xlsx) pronto para uso
+
+---
+
+#### Tab 3: Extratos (Importação para Conciliação Bancária)
+
+Use para importar extratos bancários e preparar a conciliação.
+
+**Passo 1: Selecionar Conta**
+
+1. Clique na tab **"Extratos"**
+2. Selecione a **conta bancária** destino
+3. Esta seleção vincula todas as transações do extrato à conta
+
+![Selecionar Conta](./screenshots/placeholder-selecao-conta.png)
+
+> _Screenshot: Seleção de conta bancária_
+
+**Passo 2: Upload do Extrato**
+
+1. Clique em **"Selecionar arquivo"** ou arraste o arquivo
+2. Formatos aceitos:
+   - **CSV/XLSX**: Extratos genéricos exportados do banco
+   - **OFX**: Formato padrão brasileiro (Open Financial Exchange)
+3. Tamanho máximo: **10MB**
+
+![Upload Extrato](./screenshots/placeholder-upload-extrato.png)
+
+> _Screenshot: Upload de extrato bancário_
+
+**Passo 3: Mapeamento (CSV/XLSX) ou Auto-detecção (OFX)**
+
+**Para arquivos CSV/XLSX:**
+
+1. O sistema detecta colunas automaticamente:
+   - **Data**: "data", "dt", "date"
+   - **Descrição**: "descri", "historico", "memo"
+   - **Valor**: "valor", "value", "amount"
+   - **Saldo**: "saldo", "balance"
+   - **Documento**: "doc", "numero", "ref"
+   - **Tipo**: "tipo", "debito", "credito"
+2. Ajuste manualmente se necessário
+3. Clique em **"Próximo"**
+
+**Para arquivos OFX:**
+
+1. O sistema parseia automaticamente os campos:
+   - `DTPOSTED` → Data da transação
+   - `TRNAMT` → Valor
+   - `MEMO` ou `NAME` → Descrição
+   - `FITID` ou `CHECKNUM` → Número do documento
+   - `TRNTYPE` → Tipo (crédito/débito)
+2. **Não requer ajuste manual** de mapeamento
+
+![Mapeamento Extrato](./screenshots/placeholder-mapeamento-extrato.png)
+
+> _Screenshot: Mapeamento de colunas do extrato_
+
+**Passo 4: Validação**
+
+1. O sistema valida os campos obrigatórios:
+   - ✅ **Data válida**: Formato reconhecido
+   - ✅ **Descrição preenchida**: Não vazia
+   - ✅ **Valor válido**: Diferente de zero
+2. Linhas com erro são destacadas
+3. Use checkboxes para excluir linhas problemáticas
+4. O sistema **infere automaticamente o tipo** (crédito/débito):
+   - Por sinal do valor (negativo = débito)
+   - Por texto da coluna tipo ("d", "deb", "c", "cred")
+
+![Validação Extrato](./screenshots/placeholder-validacao-extrato.png)
+
+> _Screenshot: Validação do extrato com preview_
+
+**Passo 5: Importação**
+
+1. Clique em **"Importar extrato"**
+2. O sistema processa em chunks de 200 registros
+3. Ao finalizar, exibe contagem de registros importados
+
+**O que acontece:**
+
+- ✅ Transações são gravadas na tabela `extratos_bancarios`
+- ✅ Campo `reconciliado` é marcado como **FALSE** (pendente)
+- ✅ Dados ficam disponíveis para **conciliação automática** (próxima feature)
+- ✅ Você pode visualizar os extratos importados na tela de Conciliação
+
+**Formato OFX - Detalhes Técnicos:**
+
+O parser OFX extrai os seguintes campos do arquivo:
+
+| Campo OFX    | Campo Sistema     | Descrição                |
+| ------------ | ----------------- | ------------------------ |
+| `DTPOSTED`   | data_transacao    | Data (YYYYMMDD → DD/MM)  |
+| `TRNAMT`     | valor             | Valor da transação       |
+| `MEMO/NAME`  | descricao         | Descrição/Histórico      |
+| `FITID`      | numero_documento  | ID único da transação    |
+| `CHECKNUM`   | numero_documento  | Número do cheque/doc     |
+| `TRNTYPE`    | tipo              | DEBIT/CREDIT → deb/cred  |
+
+**Próximos Passos (Conciliação):**
+
+Após importar extratos, você poderá:
+
+1. Acessar **Finanças > Conciliação Bancária** (a implementar)
+2. O sistema sugerirá **matches automáticos** entre:
+   - Transações registradas (`transacoes_financeiras`)
+   - Transações do extrato (`extratos_bancarios`)
+3. Critérios de match:
+   - Mesmo valor (± R$ 0,50 tolerância)
+   - Data próxima (± 3 dias úteis)
+   - Mesma conta bancária
+   - Descrição similar (scoring de similaridade)
+4. Ações disponíveis:
+   - **Aprovar match**: Vincula e marca como reconciliado
+   - **Rejeitar**: Mantém separado
+   - **Criar transação**: Lançamento estava no extrato mas não no sistema
+
+> **Dica**: Importe extratos mensalmente para manter a conciliação em dia e identificar rapidamente divergências (taxas bancárias, juros, erros de lançamento).
+
+---
+
+### 4.13 Fluxo de Trabalho Recomendado
+
+**Diário:**
+
+1. Lance transações conforme ocorrem (Entradas/Saídas)
+2. Anexe comprovantes sempre que possível
+3. Confirme pagamentos ao final do dia
+
+**Semanal:**
+
+1. Revise transações pendentes
+2. Reconcilie extrato bancário (importação via Gerenciar Dados)
+3. Confira saldo das contas
+
+**Mensal:**
+
+1. Gere relatório de ofertas
+2. Exporte DRE para análise
+3. Archive comprovantes físicos
+4. Execute conciliação completa (extrato vs lançamentos)
+
+**Trimestral/Anual:**
+
+1. Revise categorias e plano de contas
+2. Analise tendências no dashboard
+3. Gere relatórios para prestação de contas
+
+---
 - ⚠️ Divergências são destacadas para ajuste manual
 - ✅ Saldo final é validado contra o extrato
 

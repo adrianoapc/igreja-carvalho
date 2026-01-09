@@ -160,6 +160,8 @@ export type Database = {
           observacoes?: string | null
           profile_id?: string
           status?: string
+                filial_id: string | null
+                igreja_id: string | null
           updated_at?: string | null
         }
         Relationships: [

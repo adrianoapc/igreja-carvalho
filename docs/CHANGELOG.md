@@ -10,6 +10,108 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Alterado
 
+#### 💰 Gestão Unificada de Dados Financeiros + Importação de Extratos Bancários (9 Jan/2026)
+
+- **Tipo**: feature + database
+- **Resumo**: Nova tela **Gerenciar Dados** consolidando importação/exportação de transações financeiras e importação de extratos bancários para conciliação. Suporte a formatos CSV, XLSX e OFX com parser automático e validação.
+- **Módulos afetados**: Finanças > Importação/Exportação, Conciliação Bancária
+- **Impacto no usuário**:
+  - **Centralização**: Acesso unificado a todas operações de importação/exportação via tabs
+  - **OFX Support**: Importação direta de arquivos OFX bancários (formato padrão brasileiro)
+  - **Auto-detecção**: Mapeamento automático de colunas em CSV/XLSX por keywords
+  - **Validação**: Preview com destacamento de erros antes da importação
+  - **Performance**: Importação em chunks de 200 registros por lote
+
+**Detalhamento técnico:**
+
+- **Tela `GerenciarDados.tsx`** (`src/pages/financas/GerenciarDados.tsx`):
+  - Layout com 3 tabs: **Importar** (transações), **Exportar** (transações), **Extratos** (conciliação)
+  - Navegação via query params: `?tab=importar&tipo=entrada`
+  - Acesso via botões em Entradas/Saídas substituindo links antigos
+
+- **Componente `ImportarTab.tsx`** (`src/components/financas/ImportarTab.tsx`):
+  - Extraído de `ImportarFinancasPage` (mantém wizard 4 etapas)
+  - Upload → Mapeamento → Validação → Confirmação
+  - Suporta CSV/XLSX com auto-detecção de colunas
+  - Virtualização de preview com `@tanstack/react-virtual`
+
+- **Componente `ExportarTab.tsx`** (`src/components/financas/ExportarTab.tsx`):
+  - Filtros avançados: tipo, status, período, conta, categoria
+  - Seleção de colunas para exportação customizada
+  - Preview virtualizado antes do export
+  - Exportação para Excel via `xlsx` library
+
+- **Componente `ImportarExtratosTab.tsx`** (`src/components/financas/ImportarExtratosTab.tsx`):
+  - **Upload**: Aceita CSV, XLSX e **OFX** (até 10MB)
+  - **Parser OFX**: Biblioteca `ofx-js` extrai `STMTTRN` (transações bancárias)
+    - Campos: `DTPOSTED` (data), `TRNAMT` (valor), `MEMO/NAME` (descrição), `FITID/CHECKNUM` (documento)
+    - Conversão de data OFX: `YYYYMMDD` → `DD/MM/YYYY`
+  - **Auto-detecção CSV/XLSX**: Mapeia colunas por keywords (data, descricao, valor, saldo, documento, tipo)
+  - **Inferência de tipo**: Analisa sinal do valor (negativo = débito) ou texto da coluna tipo
+  - **Validação**: Marca linhas com problemas (data inválida, descrição ausente, valor zero)
+  - **Exclusão seletiva**: Checkbox para excluir linhas com erro antes de importar
+  - **Importação chunk**: Insere em lotes de 200 registros na tabela `extratos_bancarios`
+
+- **Tabela `extratos_bancarios`** (Migration `20260109_extratos_bancarios.sql`):
+  - Campos: `conta_id` (FK), `igreja_id`, `filial_id`, `data_transacao`, `descricao`, `valor`, `saldo`, `numero_documento`, `tipo` (credito/debito), `reconciliado` (boolean)
+  - Índices: `conta_id`, `data_transacao`, `igreja_id`, `filial_id`
+  - RLS policies: Multi-tenant por `igreja_id`
+  - Constraint CHECK: `tipo IN ('credito', 'debito')`
+
+- **Dependências**:
+  - `ofx-js` v0.2.0: Parser de arquivos OFX
+  - `xlsx` v0.18.5: Parse e export de Excel/CSV
+  - `@tanstack/react-virtual` v3.13.10: Virtualização de grids grandes
+
+**Fluxo de importação de extratos:**
+
+1. **Upload**: Usuário seleciona conta e faz upload de arquivo CSV/XLSX/OFX
+2. **Parsing**: 
+   - OFX: Extrai transações via parser, mapeia campos automaticamente
+   - CSV/XLSX: Extrai colunas e rows, aplica auto-detecção de mapeamento
+3. **Mapeamento**: Usuário ajusta mapeamento de colunas (se necessário)
+4. **Validação**: Sistema valida campos obrigatórios (data, descrição, valor)
+5. **Preview**: Grid virtualizado exibe até 10k+ linhas com scroll infinito
+6. **Exclusão**: Usuário marca/desmarca linhas com erro para exclusão
+7. **Importação**: Insere em chunks de 200 registros com feedback de progresso
+8. **Confirmação**: Toast de sucesso com contagem de registros importados
+
+**Roteamento atualizado:**
+
+- Botões "Importar" e "Exportar" em `Entradas.tsx` e `Saidas.tsx` agora navegam para:
+  - `/financas/gerenciar-dados?tab=importar&tipo=entrada`
+  - `/financas/gerenciar-dados?tab=exportar&tipo=saida`
+
+**Arquivos criados:**
+
+- `src/pages/financas/GerenciarDados.tsx`
+- `src/components/financas/ImportarTab.tsx`
+- `src/components/financas/ExportarTab.tsx`
+- `src/components/financas/ImportarExtratosTab.tsx`
+- `supabase/migrations/20260109_extratos_bancarios.sql`
+
+**Arquivos modificados:**
+
+- `src/pages/financas/Entradas.tsx` (navegação)
+- `src/pages/financas/Saidas.tsx` (navegação)
+- `src/App.tsx` (rota `/financas/gerenciar-dados`)
+- `package.json` (dependência `ofx-js`)
+
+**Próximos passos:**
+
+- Implementar reconciliação automática entre `extratos_bancarios` e `transacoes_financeiras`
+- Sugestões de match por valor/data/conta com scoring de similaridade
+- Interface para aprovar/rejeitar sugestões de conciliação
+- Relatório de itens não reconciliados
+
+**Commits relacionados:** 999effd, bed2cb3, 2b48ab7
+
+**Documentação atualizada:**
+
+- Guia operacional de importação de extratos (arquivo/API): `docs/operacoes/importacao-extratos.md`
+
+---
+
 #### 🏗️ AuthContext Centralizado + Paginação Otimizada (6 Jan/2026)
 
 - **Tipo**: refactor + performance

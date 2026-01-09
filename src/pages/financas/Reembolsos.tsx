@@ -162,9 +162,6 @@ export default function Reembolsos() {
         .select("role")
         .eq("user_id", user?.id)
         .eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
       const { data, error } = await query;
 
       if (error) throw error;

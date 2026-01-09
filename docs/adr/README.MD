@@ -79,6 +79,13 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Link:** [ADR-021](ADR-021-multi-tenant-arquitetura.md)
 - **Resumo:** Implementação de isolamento completo por igreja com coluna `igreja_id` em 30+ tabelas, RLS policies, super admin dashboard e suporte a filiais hierárquicas.
 
+### ADR-022
+
+- **Titulo:** Estrategia de Importacao de Extratos via API (Santander e Getnet)
+- **Status:** Proposto
+- **Link:** [ADR-022](ADR-022-importacao-extratos-api.md)
+- **Resumo:** Conectores por provedor usando polling inicial com backoff, dedupe/idempotencia antes de persistir em `extratos_bancarios`, armazenamento seguro de credenciais e observabilidade basica.
+
 ---
 
 ## 📐 Relacao com Diagramas

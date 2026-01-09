@@ -19,6 +19,8 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
   - Hook de paginação: [`PAGINATED_QUERY_HOOK.md`](PAGINATED_QUERY_HOOK.md)
   - Multi-tenancy (Backlog): [`BACKLOG_MULTI_TENANCY.md`](BACKLOG_MULTI_TENANCY.md)
   - Controle Multi-Tenant: [`controle-multi-tenant.md`](controle-multi-tenant.md)
+  - Guia de importação de extratos (arquivo/API): [`operacoes/importacao-extratos.md`](operacoes/importacao-extratos.md)
+  - Replicação de cadastros entre filiais: [`operacoes/replicacao-cadastros-filiais.md`](operacoes/replicacao-cadastros-filiais.md)
 - Arquitetura
   - Visão geral: [`01-Arquitetura/01-arquitetura-geral.MD`](01-Arquitetura/01-arquitetura-geral.MD)
   - Autenticação Supabase: [`01-Arquitetura/02-autenticacao-supabase.MD`](01-Arquitetura/02-autenticacao-supabase.MD)

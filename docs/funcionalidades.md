@@ -1308,6 +1308,245 @@ A aba "Histórico" em AdminPermissions implementa auditoria completa com capacid
 
 ---
 
+## 16.1 Gestão Unificada de Dados Financeiros
+
+### Objetivo do Módulo
+
+Centralizar operações de importação e exportação de transações financeiras e extratos bancários em uma interface unificada com tabs, facilitando o fluxo de trabalho da tesouraria e preparando dados para conciliação bancária.
+
+### Rota e Navegação
+
+- **Rota**: `/financas/gerenciar-dados`
+- **Acesso**: Via botões "Importar" e "Exportar" nas páginas `Entradas.tsx` e `Saidas.tsx`
+- **Query params**: `?tab=importar&tipo=entrada` | `?tab=exportar&tipo=saida` | `?tab=extratos`
+
+### Estrutura (3 Tabs)
+
+#### Tab 1: Importar (Transações Financeiras)
+
+**Componente**: `ImportarTab.tsx` (extraído de `ImportarFinancasPage`)
+
+**Funcionalidades**:
+
+- Wizard 4 etapas: Upload → Mapeamento → Validação → Confirmação
+- Formatos suportados: CSV, XLSX
+- Auto-detecção de colunas (data, descrição, valor, categoria, fornecedor, conta)
+- Validação de campos obrigatórios antes da importação
+- Preview virtualizado com `@tanstack/react-virtual` (suporta 10k+ linhas)
+- Importação em chunks de 200 registros por lote
+- Tracking via `import_jobs` table (histórico de importações)
+
+**Campos mapeáveis**:
+
+- Data (obrigatório)
+- Descrição (obrigatório)
+- Valor (obrigatório)
+- Tipo (entrada/saída)
+- Categoria
+- Fornecedor/Beneficiário
+- Conta
+- Forma de Pagamento
+- Status (pago/pendente)
+- Observações
+
+#### Tab 2: Exportar (Transações Financeiras)
+
+**Componente**: `ExportarTab.tsx`
+
+**Funcionalidades**:
+
+- Filtros avançados: tipo (entrada/saída), status (pago/pendente), período (data início/fim), conta, categoria
+- Seleção customizada de colunas para export
+- Preview virtualizado dos dados antes da exportação
+- Exportação para Excel via biblioteca `xlsx`
+- Formatação automática de valores monetários (R$ 1.234,56)
+- Formatação de datas (DD/MM/YYYY)
+
+**Colunas exportáveis**:
+
+- Data, Descrição, Tipo, Valor, Categoria, Conta, Fornecedor, Status, Forma de Pagamento, Observações
+
+#### Tab 3: Extratos (Importação para Conciliação Bancária)
+
+**Componente**: `ImportarExtratosTab.tsx`
+
+**Objetivo**: Importar transações de extratos bancários para posterior conciliação com transações financeiras registradas
+
+**Formatos suportados**:
+
+- **CSV/XLSX**: Extratos genéricos exportados de sistemas bancários
+- **OFX** (Open Financial Exchange): Formato padrão brasileiro para dados bancários
+
+**Fluxo de Importação**:
+
+1. **Seleção de conta**: Escolher conta bancária destino
+2. **Upload de arquivo**: Arrasto ou seleção (até 10MB)
+3. **Parsing automático**:
+   - **CSV/XLSX**: Extração de colunas e rows via `xlsx` library
+   - **OFX**: Parse via `ofx-js` library, extração de nós `STMTTRN` (Statement Transactions)
+4. **Mapeamento de colunas**:
+   - **Auto-detecção**: Sistema identifica colunas por keywords (data, descricao, valor, saldo, documento, tipo)
+   - **Manual**: Usuário ajusta mapeamento se necessário
+5. **Validação**:
+   - Verifica campos obrigatórios: data, descrição, valor
+   - Marca linhas com problemas (data inválida, descrição vazia, valor zero)
+   - Exibe preview com destaque visual de erros
+6. **Exclusão seletiva**: Checkbox para marcar/desmarcar linhas com erro
+7. **Importação**: Insere em chunks de 200 registros na tabela `extratos_bancarios`
+8. **Confirmação**: Toast com contagem de registros importados
+
+**Parser OFX (Detalhes Técnicos)**:
+
+- Biblioteca: `ofx-js` v0.2.0
+- Extração de campos do nó `STMTTRN`:
+  - `DTPOSTED` → `data_transacao` (converte YYYYMMDD para DD/MM/YYYY)
+  - `TRNAMT` → `valor` (valor da transação)
+  - `MEMO` ou `NAME` → `descricao`
+  - `FITID` ou `CHECKNUM` → `numero_documento`
+  - `TRNTYPE` → inferência de tipo (crédito/débito)
+- Conversão automática de data: `formatOFXDate(YYYYMMDD)` → `DD/MM/YYYY`
+- Mapeamento pré-definido (não requer ajuste manual)
+
+**Auto-detecção CSV/XLSX**:
+
+- Analisa nomes de colunas com keywords:
+  - `data` → data_transacao
+  - `descri` → descricao
+  - `valor` → valor
+  - `saldo` → saldo
+  - `doc`, `numero` → numero_documento
+  - `tipo`, `deb`, `cred` → tipo
+
+**Inferência de Tipo (Crédito/Débito)**:
+
+1. **Por texto da coluna tipo**: Analisa texto (debito/credito, d/c, dr/cr)
+2. **Por sinal do valor**: Negativo = débito, positivo = crédito
+3. **Fallback**: Crédito (padrão)
+
+**Virtualização de Preview**:
+
+- `@tanstack/react-virtual`: Suporta visualização de 10k+ linhas sem lag
+- Grid responsivo com scroll horizontal para muitas colunas
+- Estimativa de altura: 32px por row
+
+**Validação de Campos**:
+
+- **Data inválida**: Formato não reconhecido (DD/MM/YYYY ou YYYY-MM-DD)
+- **Descrição ausente**: Campo vazio ou apenas espaços
+- **Valor inválido**: Zero, nulo ou não numérico
+
+### Tabela: `extratos_bancarios`
+
+**Schema** (Migration `20260109_extratos_bancarios.sql`):
+
+```sql
+CREATE TABLE extratos_bancarios (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conta_id UUID NOT NULL REFERENCES contas(id),
+  igreja_id UUID NOT NULL REFERENCES igrejas(id),
+  filial_id UUID REFERENCES filiais(id),
+  data_transacao DATE NOT NULL,
+  descricao TEXT NOT NULL,
+  valor NUMERIC(15,2) NOT NULL,
+  saldo NUMERIC(15,2),
+  numero_documento TEXT,
+  tipo TEXT NOT NULL CHECK (tipo IN ('credito', 'debito')),
+  reconciliado BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Índices**:
+
+- `conta_id` (FK, acesso por conta)
+- `data_transacao` (filtro por período)
+- `igreja_id` (multi-tenant)
+- `filial_id` (multi-tenant opcional)
+
+**RLS Policies**: Isolamento por `igreja_id` (a confirmar implementação exata)
+
+**Campo `reconciliado`**:
+
+- `FALSE` (padrão): Extrato não reconciliado
+- `TRUE`: Transação do extrato já vinculada a uma `transacao_financeira`
+- Uso futuro: Interface de conciliação automática/manual
+
+### Integração com Conciliação Bancária (Próximos Passos)
+
+**Objetivo**: Matching automático entre `extratos_bancarios` e `transacoes_financeiras`
+
+**Critérios de Match**:
+
+- Conta bancária (`conta_id`)
+- Valor próximo (± R$ 0,50 tolerância)
+- Data próxima (± 3 dias úteis)
+- Descrição similar (Levenshtein distance ou keywords)
+
+**Scoring de Similaridade**:
+
+- 100%: Match exato (valor + data + conta)
+- 80-99%: Alta probabilidade (valor + data próxima)
+- 60-79%: Média probabilidade (valor + descrição similar)
+- <60%: Baixa probabilidade (requer revisão manual)
+
+**Interface (a implementar)**:
+
+- `ReconciliacaoBancaria.tsx`: Tela de sugestões de match
+- Grid lado-a-lado: Extrato | Transação Sugerida | Score
+- Ações: Aprovar match, Rejeitar, Criar transação nova
+- Bulk actions: Aprovar todos >90%, Rejeitar todos <60%
+- Relatório de não reconciliados por conta/período
+
+### Dependências Técnicas
+
+**Bibliotecas**:
+
+- `xlsx` v0.18.5: Parse/export de Excel e CSV
+- `ofx-js` v0.2.0: Parser de arquivos OFX
+- `@tanstack/react-virtual` v3.13.10: Virtualização de grids grandes
+- `@tanstack/react-query` v5.83.0: Cache e gerenciamento de estado
+
+**Hooks**:
+
+- `useFilialId`: Contexto de igreja/filial para queries
+- `useQuery`: Fetch de contas bancárias disponíveis
+
+**Utilities**:
+
+- `parseValor(valor)`: Converte string para número (lida com R$, vírgulas, pontos)
+- `parseData(data)`: Converte DD/MM/YYYY ou YYYY-MM-DD para ISO
+- `inferirTipo(valor, tipoTexto)`: Determina crédito/débito
+
+### Permissões
+
+- **Admin/Tesoureiro**: Acesso completo (importar, exportar, visualizar extratos)
+- **Secretário**: Apenas visualização (a confirmar)
+- **Outros**: Sem acesso
+
+### Arquivos Criados
+
+- `src/pages/financas/GerenciarDados.tsx`
+- `src/components/financas/ImportarTab.tsx`
+- `src/components/financas/ExportarTab.tsx`
+- `src/components/financas/ImportarExtratosTab.tsx`
+- `supabase/migrations/20260109_extratos_bancarios.sql`
+
+### Arquivos Modificados
+
+- `src/pages/financas/Entradas.tsx` (navegação para Gerenciar Dados)
+- `src/pages/financas/Saidas.tsx` (navegação para Gerenciar Dados)
+- `src/App.tsx` (rota `/financas/gerenciar-dados`)
+- `package.json` (dependência `ofx-js`)
+
+### Referências
+
+- ADR: (a criar) `docs/adr/ADR-XXX-gerenciar-dados-financeiros.md`
+- Manual: `docs/manual-usuario.md#4-finanças` (seção Gerenciar Dados)
+- Fluxo: `docs/diagramas/fluxo-financas.md` (atualizar com nova tela)
+- Tabela: `extratos_bancarios` em `docs/database-schema.sql`
+
+---
+
 ## 17. Bíblia
 
 - Acesso integrado à Bíblia
