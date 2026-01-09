@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
+import { OFXParser } from "ofx-js";
 
 const MAX_FILE_SIZE_MB = 10;
 const COL_MIN_WIDTH_PX = 140;
@@ -160,6 +161,75 @@ export function ImportarExtratosTab() {
       return;
     }
     setFileName(file.name);
+    
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    
+    if (fileExtension === 'ofx') {
+      await handleOFXFile(file);
+    } else {
+      await handleSpreadsheetFile(file);
+    }
+  };
+
+  const handleOFXFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parser = new OFXParser();
+      const ofxData = parser.parse(text);
+      
+      // Extrair transações do OFX
+      const transactions = ofxData?.body?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS?.BANKTRANLIST?.STMTTRN || [];
+      
+      if (!Array.isArray(transactions) || transactions.length === 0) {
+        toast.error("Nenhuma transação encontrada no arquivo OFX");
+        return;
+      }
+
+      // Converter transações OFX para formato padrão
+      const rows = transactions.map((trn: any) => ({
+        data: trn.DTPOSTED ? formatOFXDate(trn.DTPOSTED) : "",
+        descricao: trn.MEMO || trn.NAME || "",
+        valor: parseFloat(trn.TRNAMT || "0"),
+        documento: trn.FITID || trn.CHECKNUM || "",
+        tipo: parseFloat(trn.TRNAMT || "0") < 0 ? "debito" : "credito",
+      }));
+
+      // Definir colunas fixas para OFX
+      const columnNames = ["data", "descricao", "valor", "documento", "tipo"];
+      setColumns(columnNames);
+      setRows(rows);
+      
+      // Mapeamento automático para OFX
+      setMapping({
+        data: "data",
+        descricao: "descricao",
+        valor: "valor",
+        documento: "documento",
+        tipo: "tipo",
+      });
+
+      // Limpar estados de planilha
+      setWorkbook(null);
+      setSheetNames([]);
+      setSelectedSheet("");
+      
+      toast.success(`${rows.length} transações carregadas do arquivo OFX`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao ler arquivo OFX. Verifique o formato.");
+    }
+  };
+
+  const formatOFXDate = (dateStr: string): string => {
+    // OFX dates: YYYYMMDD ou YYYYMMDDHHMMSS
+    if (!dateStr) return "";
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleSpreadsheetFile = async (file: File) => {
     try {
       const data = await file.arrayBuffer();
       const wb = read(data);
@@ -370,7 +440,7 @@ export function ImportarExtratosTab() {
           </div>
 
           <div className="space-y-2">
-            <Label>Upload de extrato (CSV/XLSX)</Label>
+            <Label>Upload de extrato (CSV/XLSX/OFX)</Label>
             <div className="border-2 border-dashed border-border rounded-lg p-4 text-center bg-background">
               <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
               {fileName ? (
@@ -397,7 +467,7 @@ export function ImportarExtratosTab() {
               <input
                 id="extrato-upload"
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.csv,.ofx"
                 className="hidden"
                 onChange={handleFileUpload}
               />
