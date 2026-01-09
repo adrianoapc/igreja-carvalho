@@ -355,7 +355,9 @@ export default function Entradas() {
           />
           <Button
             variant="outline"
-            onClick={() => navigate("/financas/gerenciar-dados?tab=exportar&tipo=entradas")}
+            onClick={() =>
+              navigate("/financas/gerenciar-dados?tab=exportar&tipo=entradas")
+            }
             size="sm"
           >
             <Download className="w-4 h-4 mr-1" />
@@ -363,7 +365,9 @@ export default function Entradas() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate("/financas/gerenciar-dados?tab=importar&tipo=entrada")}
+            onClick={() =>
+              navigate("/financas/gerenciar-dados?tab=importar&tipo=entrada")
+            }
             size="sm"
             className="hidden md:inline-flex"
           >

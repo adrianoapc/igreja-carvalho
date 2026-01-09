@@ -398,7 +398,9 @@ export default function Saidas() {
           />
           <Button
             variant="outline"
-            onClick={() => navigate("/financas/gerenciar-dados?tab=exportar&tipo=saidas")}
+            onClick={() =>
+              navigate("/financas/gerenciar-dados?tab=exportar&tipo=saidas")
+            }
             size="sm"
           >
             <Download className="w-4 h-4 mr-1" />
@@ -406,7 +408,9 @@ export default function Saidas() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate("/financas/gerenciar-dados?tab=importar&tipo=saida")}
+            onClick={() =>
+              navigate("/financas/gerenciar-dados?tab=importar&tipo=saida")
+            }
             size="sm"
             className="hidden md:inline-flex"
           >

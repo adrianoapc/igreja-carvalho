@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Upload, Download } from "lucide-react";
+import { ArrowLeft, Upload, Download, FileText } from "lucide-react";
 import { ImportarTab } from "@/components/financas/ImportarTab";
 import { ExportarTab } from "@/components/financas/ExportarTab";
+import { ImportarExtratosTab } from "@/components/financas/ImportarExtratosTab";
 
 export default function GerenciarDados() {
   const navigate = useNavigate();
@@ -34,8 +35,12 @@ export default function GerenciarDados() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="w-full"
+      >
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="importar" className="flex items-center gap-2">
             <Upload className="w-4 h-4" />
             <span>Importar</span>
@@ -43,6 +48,10 @@ export default function GerenciarDados() {
           <TabsTrigger value="exportar" className="flex items-center gap-2">
             <Download className="w-4 h-4" />
             <span>Exportar</span>
+          </TabsTrigger>
+          <TabsTrigger value="extratos" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            <span>Extratos</span>
           </TabsTrigger>
         </TabsList>
 
@@ -52,6 +61,10 @@ export default function GerenciarDados() {
 
         <TabsContent value="exportar" className="mt-6">
           <ExportarTab />
+        </TabsContent>
+
+        <TabsContent value="extratos" className="mt-6">
+          <ImportarExtratosTab />
         </TabsContent>
       </Tabs>
     </div>

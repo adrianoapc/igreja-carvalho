@@ -397,7 +397,7 @@ export default function Financas() {
               <p className="text-xs text-muted-foreground">Este mês</p>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="outline"
                 onClick={() => navigate("/financas/entradas")}
               >
                 Ver entradas
@@ -421,7 +421,7 @@ export default function Financas() {
               <p className="text-xs text-muted-foreground">Este mês</p>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="outline"
                 onClick={() => navigate("/financas/saidas")}
               >
                 Ver saídas
@@ -482,7 +482,7 @@ export default function Financas() {
 
           <Card
             className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 border-purple-200 dark:border-purple-800"
-            onClick={() => navigate("/financas/importar")}
+            onClick={() => navigate("/financas/gerenciar-dados")}
           >
             <CardContent className="p-5">
               <div className="flex items-start justify-between gap-3 mb-3">
@@ -491,11 +491,9 @@ export default function Financas() {
                 </div>
                 <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
               </div>
-              <h3 className="font-semibold text-base mb-1">
-                Importar Transações
-              </h3>
+              <h3 className="font-semibold text-base mb-1">Gerenciar Dados</h3>
               <p className="text-xs text-muted-foreground">
-                Importe entradas e saídas via planilha
+                Importe e exporte entradas e saídas via planilha
               </p>
             </CardContent>
           </Card>

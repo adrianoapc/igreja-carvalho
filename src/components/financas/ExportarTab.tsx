@@ -38,7 +38,13 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-type TipoExportacao = "entradas" | "saidas" | "dre" | "contas" | "categorias" | "fornecedores";
+type TipoExportacao =
+  | "entradas"
+  | "saidas"
+  | "dre"
+  | "contas"
+  | "categorias"
+  | "fornecedores";
 type StatusFiltro = "todos" | "pago" | "pendente" | "atrasado";
 
 type TransacaoExportacao = {
@@ -92,7 +98,12 @@ export function ExportarTab() {
     COLUNAS_DISPONIVEIS.map((c) => c.id)
   );
 
-  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: filialLoading,
+  } = useFilialId();
 
   // Query para contas
   const { data: contas = [] } = useQuery({
@@ -126,7 +137,9 @@ export function ExportarTab() {
       if (error) throw error;
       return data;
     },
-    enabled: !!igrejaId && (tipoExportacao === "entradas" || tipoExportacao === "saidas"),
+    enabled:
+      !!igrejaId &&
+      (tipoExportacao === "entradas" || tipoExportacao === "saidas"),
   });
 
   // Query para dados de exportação
@@ -144,12 +157,20 @@ export function ExportarTab() {
       categoriaFiltro,
     ],
     queryFn: async () => {
-      if (!igrejaId || tipoExportacao === "dre" || tipoExportacao === "contas" || tipoExportacao === "categorias" || tipoExportacao === "fornecedores") return [];
+      if (
+        !igrejaId ||
+        tipoExportacao === "dre" ||
+        tipoExportacao === "contas" ||
+        tipoExportacao === "categorias" ||
+        tipoExportacao === "fornecedores"
+      )
+        return [];
 
       const tipo = tipoExportacao === "entradas" ? "entrada" : "saida";
       let query = supabase
         .from("transacoes_financeiras")
-        .select(`
+        .select(
+          `
           id,
           descricao,
           valor,
@@ -165,7 +186,8 @@ export function ExportarTab() {
           fornecedor:fornecedor_id(nome),
           base_ministerial:base_ministerial_id(titulo),
           centro_custo:centro_custo_id(nome)
-        `)
+        `
+        )
         .eq("tipo", tipo)
         .eq("igreja_id", igrejaId);
 
@@ -186,7 +208,9 @@ export function ExportarTab() {
         } else if (statusFiltro === "pendente") {
           query = query.eq("status", "pendente");
         } else if (statusFiltro === "atrasado") {
-          query = query.eq("status", "pendente").lt("data_vencimento", new Date().toISOString().split("T")[0]);
+          query = query
+            .eq("status", "pendente")
+            .lt("data_vencimento", new Date().toISOString().split("T")[0]);
         }
       }
 
@@ -204,7 +228,10 @@ export function ExportarTab() {
       if (error) throw error;
       return data;
     },
-    enabled: !!igrejaId && !filialLoading && (tipoExportacao === "entradas" || tipoExportacao === "saidas"),
+    enabled:
+      !!igrejaId &&
+      !filialLoading &&
+      (tipoExportacao === "entradas" || tipoExportacao === "saidas"),
   });
 
   const dadosPreview = useMemo(() => {
@@ -220,26 +247,45 @@ export function ExportarTab() {
 
       const dadosExportacao = transacoes.map((t) => {
         const row: Record<string, string | number> = {};
-        
-        if (colunasSelecionadas.includes("descricao")) row.Descrição = t.descricao;
-        if (colunasSelecionadas.includes("valor")) row.Valor = formatCurrencyForExport(t.valor);
+
+        if (colunasSelecionadas.includes("descricao"))
+          row.Descrição = t.descricao;
+        if (colunasSelecionadas.includes("valor"))
+          row.Valor = formatCurrencyForExport(t.valor);
         if (colunasSelecionadas.includes("status")) row.Status = t.status;
-        if (colunasSelecionadas.includes("data_vencimento")) row["Data Vencimento"] = formatDateForExport(t.data_vencimento);
-        if (colunasSelecionadas.includes("data_pagamento")) row["Data Pagamento"] = formatDateForExport(t.data_pagamento);
-        if (colunasSelecionadas.includes("conta")) row.Conta = t.conta?.nome || "";
-        if (colunasSelecionadas.includes("categoria")) row.Categoria = t.categoria?.nome || "";
-        if (colunasSelecionadas.includes("subcategoria")) row.Subcategoria = t.subcategoria?.nome || "";
-        if (colunasSelecionadas.includes("fornecedor")) row.Fornecedor = t.fornecedor?.nome || "";
-        if (colunasSelecionadas.includes("base_ministerial")) row["Base Ministerial"] = t.base_ministerial?.titulo || "";
-        if (colunasSelecionadas.includes("centro_custo")) row["Centro de Custo"] = t.centro_custo?.nome || "";
-        if (colunasSelecionadas.includes("forma_pagamento")) row["Forma Pagamento"] = t.forma_pagamento || "";
-        if (colunasSelecionadas.includes("observacoes")) row.Observações = t.observacoes || "";
+        if (colunasSelecionadas.includes("data_vencimento"))
+          row["Data Vencimento"] = formatDateForExport(t.data_vencimento);
+        if (colunasSelecionadas.includes("data_pagamento"))
+          row["Data Pagamento"] = formatDateForExport(t.data_pagamento);
+        if (colunasSelecionadas.includes("conta"))
+          row.Conta = t.conta?.nome || "";
+        if (colunasSelecionadas.includes("categoria"))
+          row.Categoria = t.categoria?.nome || "";
+        if (colunasSelecionadas.includes("subcategoria"))
+          row.Subcategoria = t.subcategoria?.nome || "";
+        if (colunasSelecionadas.includes("fornecedor"))
+          row.Fornecedor = t.fornecedor?.nome || "";
+        if (colunasSelecionadas.includes("base_ministerial"))
+          row["Base Ministerial"] = t.base_ministerial?.titulo || "";
+        if (colunasSelecionadas.includes("centro_custo"))
+          row["Centro de Custo"] = t.centro_custo?.nome || "";
+        if (colunasSelecionadas.includes("forma_pagamento"))
+          row["Forma Pagamento"] = t.forma_pagamento || "";
+        if (colunasSelecionadas.includes("observacoes"))
+          row.Observações = t.observacoes || "";
 
         return row;
       });
 
-      const nomeArquivo = `${tipoExportacao}_${format(new Date(), "yyyyMMdd_HHmmss")}`;
-      exportToExcel(dadosExportacao, nomeArquivo, tipoExportacao === "entradas" ? "Entradas" : "Saídas");
+      const nomeArquivo = `${tipoExportacao}_${format(
+        new Date(),
+        "yyyyMMdd_HHmmss"
+      )}`;
+      exportToExcel(
+        dadosExportacao,
+        nomeArquivo,
+        tipoExportacao === "entradas" ? "Entradas" : "Saídas"
+      );
       toast.success(`${transacoes.length} registros exportados com sucesso!`);
     } catch (error) {
       console.error("Erro ao exportar:", error);
@@ -277,24 +323,38 @@ export function ExportarTab() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tipo de Dados</Label>
-              <Select value={tipoExportacao} onValueChange={(v) => setTipoExportacao(v as TipoExportacao)}>
+              <Select
+                value={tipoExportacao}
+                onValueChange={(v) => setTipoExportacao(v as TipoExportacao)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="entradas">Entradas</SelectItem>
                   <SelectItem value="saidas">Saídas</SelectItem>
-                  <SelectItem value="dre" disabled>DRE (em breve)</SelectItem>
-                  <SelectItem value="contas" disabled>Contas (em breve)</SelectItem>
-                  <SelectItem value="categorias" disabled>Categorias (em breve)</SelectItem>
-                  <SelectItem value="fornecedores" disabled>Fornecedores (em breve)</SelectItem>
+                  <SelectItem value="dre" disabled>
+                    DRE (em breve)
+                  </SelectItem>
+                  <SelectItem value="contas" disabled>
+                    Contas (em breve)
+                  </SelectItem>
+                  <SelectItem value="categorias" disabled>
+                    Categorias (em breve)
+                  </SelectItem>
+                  <SelectItem value="fornecedores" disabled>
+                    Fornecedores (em breve)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={statusFiltro} onValueChange={(v) => setStatusFiltro(v as StatusFiltro)}>
+              <Select
+                value={statusFiltro}
+                onValueChange={(v) => setStatusFiltro(v as StatusFiltro)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -321,7 +381,9 @@ export function ExportarTab() {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataInicio ? format(dataInicio, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                    {dataInicio
+                      ? format(dataInicio, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -348,7 +410,9 @@ export function ExportarTab() {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataFim ? format(dataFim, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                    {dataFim
+                      ? format(dataFim, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -384,7 +448,10 @@ export function ExportarTab() {
 
             <div className="space-y-2">
               <Label>Categoria</Label>
-              <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+              <Select
+                value={categoriaFiltro}
+                onValueChange={setCategoriaFiltro}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -411,10 +478,18 @@ export function ExportarTab() {
               Colunas para Exportar
             </CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={selecionarTodasColunas}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={selecionarTodasColunas}
+              >
                 Todas
               </Button>
-              <Button variant="outline" size="sm" onClick={desmarcarTodasColunas}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={desmarcarTodasColunas}
+              >
                 Nenhuma
               </Button>
             </div>
@@ -466,22 +541,32 @@ export function ExportarTab() {
                 <thead className="bg-muted">
                   <tr>
                     {colunasSelecionadas.includes("descricao") && (
-                      <th className="px-3 py-2 text-left font-medium">Descrição</th>
+                      <th className="px-3 py-2 text-left font-medium">
+                        Descrição
+                      </th>
                     )}
                     {colunasSelecionadas.includes("valor") && (
-                      <th className="px-3 py-2 text-right font-medium">Valor</th>
+                      <th className="px-3 py-2 text-right font-medium">
+                        Valor
+                      </th>
                     )}
                     {colunasSelecionadas.includes("status") && (
-                      <th className="px-3 py-2 text-left font-medium">Status</th>
+                      <th className="px-3 py-2 text-left font-medium">
+                        Status
+                      </th>
                     )}
                     {colunasSelecionadas.includes("data_vencimento") && (
-                      <th className="px-3 py-2 text-left font-medium">Vencimento</th>
+                      <th className="px-3 py-2 text-left font-medium">
+                        Vencimento
+                      </th>
                     )}
                     {colunasSelecionadas.includes("conta") && (
                       <th className="px-3 py-2 text-left font-medium">Conta</th>
                     )}
                     {colunasSelecionadas.includes("categoria") && (
-                      <th className="px-3 py-2 text-left font-medium">Categoria</th>
+                      <th className="px-3 py-2 text-left font-medium">
+                        Categoria
+                      </th>
                     )}
                   </tr>
                 </thead>
@@ -513,7 +598,9 @@ export function ExportarTab() {
                         <td className="px-3 py-2">{t.conta?.nome || "—"}</td>
                       )}
                       {colunasSelecionadas.includes("categoria") && (
-                        <td className="px-3 py-2">{t.categoria?.nome || "—"}</td>
+                        <td className="px-3 py-2">
+                          {t.categoria?.nome || "—"}
+                        </td>
                       )}
                     </tr>
                   ))}
@@ -533,7 +620,11 @@ export function ExportarTab() {
       <div className="flex justify-end">
         <Button
           onClick={handleExportar}
-          disabled={!transacoes || transacoes.length === 0 || colunasSelecionadas.length === 0}
+          disabled={
+            !transacoes ||
+            transacoes.length === 0 ||
+            colunasSelecionadas.length === 0
+          }
           size="lg"
           className="bg-gradient-primary"
         >
