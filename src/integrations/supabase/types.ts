@@ -7199,8 +7199,10 @@ export type Database = {
           data_pagamento: string | null
           data_solicitacao: string | null
           data_vencimento: string | null
+          filial_id: string | null
           forma_pagamento_preferida: string | null
           id: string | null
+          igreja_id: string | null
           observacoes: string | null
           quantidade_itens: number | null
           solicitante_avatar: string | null
@@ -7213,6 +7215,20 @@ export type Database = {
           valor_total: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "solicitacoes_reembolso_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_reembolso_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
             columns: ["solicitante_id"]
