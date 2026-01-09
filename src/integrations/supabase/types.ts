@@ -2299,6 +2299,73 @@ export type Database = {
           },
         ]
       }
+      extratos_bancarios: {
+        Row: {
+          conta_id: string
+          created_at: string | null
+          data_transacao: string
+          descricao: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          numero_documento: string | null
+          reconciliado: boolean | null
+          saldo: number | null
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          conta_id: string
+          created_at?: string | null
+          data_transacao: string
+          descricao: string
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          numero_documento?: string | null
+          reconciliado?: boolean | null
+          saldo?: number | null
+          tipo: string
+          valor: number
+        }
+        Update: {
+          conta_id?: string
+          created_at?: string | null
+          data_transacao?: string
+          descricao?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          numero_documento?: string | null
+          reconciliado?: boolean | null
+          saldo?: number | null
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extratos_bancarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       familias: {
         Row: {
           created_at: string
