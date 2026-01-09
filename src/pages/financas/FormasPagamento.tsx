@@ -282,7 +282,7 @@ export default function FormasPagamento({ onBack }: Props) {
 
   const resetForm = () => {
     setEditingForma(null);
-    setFormData({ nome: "", ativo: true });
+    setFormData({ nome: "", ativo: true, taxa_administrativa: 0, taxa_administrativa_fixa: 0, gera_pago: false });
   };
 
   const filteredFormas = formas.filter((f) =>
