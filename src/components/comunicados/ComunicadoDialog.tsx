@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, X, Image as ImageIcon, Megaphone, AlertCircle, AlertTriangle, Info, Link as LinkIcon } from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
+import { useFilialId } from "@/hooks/useFilialId";
 
 type TipoComunicado = Database["public"]["Enums"]["tipo_comunicado"];
 
@@ -39,6 +40,7 @@ interface ComunicadoDialogProps {
 
 export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: ComunicadoDialogProps) {
   const { toast } = useToast();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [isLoading, setIsLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -169,6 +171,8 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
         ativo: formData.ativo,
         data_inicio: formData.data_inicio?.toISOString() || new Date().toISOString(),
         data_fim: formData.data_fim?.toISOString() || null,
+        igreja_id: igrejaId,
+        filial_id: isAllFiliais ? null : filialId,
       };
 
       if (comunicado) {

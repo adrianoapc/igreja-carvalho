@@ -5,9 +5,11 @@ import { Image, Video, FileText, ArrowRight, Plus, MonitorPlay } from "lucide-re
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useFilialId } from "@/hooks/useFilialId";
 
 export default function Midias() {
   const navigate = useNavigate();
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [stats, setStats] = useState({
     totalMidias: 0,
     midiasApp: 0,
@@ -17,32 +19,42 @@ export default function Midias() {
   });
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const { data: midias } = await supabase
-          .from("midias")
-          .select("canal, ativo");
+    if (!filialLoading && igrejaId) {
+      fetchStats();
+    }
+  }, [igrejaId, filialId, isAllFiliais, filialLoading]);
 
-        const total = midias?.length || 0;
-        const app = midias?.filter(m => m.canal === "app" && m.ativo).length || 0;
-        const redes = midias?.filter(m => m.canal === "redes_sociais" && m.ativo).length || 0;
-        const telao = midias?.filter(m => m.canal === "telao" && m.ativo).length || 0;
-        const site = midias?.filter(m => m.canal === "site" && m.ativo).length || 0;
-
-        setStats({
-          totalMidias: total,
-          midiasApp: app,
-          midiasRedesSociais: redes,
-          midiasTelao: telao,
-          midiasSite: site,
-        });
-      } catch (error) {
-        console.error("Erro ao buscar estatísticas:", error);
+  const fetchStats = async () => {
+    try {
+      if (!igrejaId) return;
+      let query = supabase
+        .from("midias")
+        .select("canal, ativo")
+        .eq("igreja_id", igrejaId);
+      
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
       }
-    };
 
-    fetchStats();
-  }, []);
+      const { data: midias } = await query;
+
+      const total = midias?.length || 0;
+      const app = midias?.filter(m => m.canal === "app" && m.ativo).length || 0;
+      const redes = midias?.filter(m => m.canal === "redes_sociais" && m.ativo).length || 0;
+      const telao = midias?.filter(m => m.canal === "telao" && m.ativo).length || 0;
+      const site = midias?.filter(m => m.canal === "site" && m.ativo).length || 0;
+
+      setStats({
+        totalMidias: total,
+        midiasApp: app,
+        midiasRedesSociais: redes,
+        midiasTelao: telao,
+        midiasSite: site,
+      });
+    } catch (error) {
+      console.error("Erro ao buscar estatísticas:", error);
+    }
+  };
 
   const modules = [
     {

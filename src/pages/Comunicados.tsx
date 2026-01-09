@@ -12,6 +12,7 @@ import { ptBR } from "date-fns/locale";
 import { ComunicadoDialog } from "@/components/comunicados/ComunicadoDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Database } from "@/integrations/supabase/types";
+import { useFilialId } from "@/hooks/useFilialId";
 
 type TipoComunicado = Database["public"]["Enums"]["tipo_comunicado"];
 
@@ -32,6 +33,7 @@ interface Comunicado {
 export default function Comunicados() {
   const { toast } = useToast();
   const { hasAccess } = useAuth();
+  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -40,15 +42,25 @@ export default function Comunicados() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadComunicados();
-  }, []);
+    if (!filialLoading && igrejaId) {
+      loadComunicados();
+    }
+  }, [igrejaId, filialId, isAllFiliais, filialLoading]);
 
   const loadComunicados = async () => {
     try {
-      const { data, error } = await supabase
+      if (!igrejaId) return;
+      let query = supabase
         .from("comunicados")
         .select("*")
+        .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setComunicados(data || []);

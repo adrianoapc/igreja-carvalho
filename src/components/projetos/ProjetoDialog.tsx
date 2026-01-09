@@ -13,6 +13,7 @@ import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { useFilialId } from "@/hooks/useFilialId";
 
 interface ProjetoDialogProps {
   open: boolean;
@@ -30,6 +31,7 @@ interface ProjetoDialogProps {
 }
 
 export default function ProjetoDialog({ open, onOpenChange, projeto, onSuccess }: ProjetoDialogProps) {
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [loading, setLoading] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -84,6 +86,8 @@ export default function ProjetoDialog({ open, onOpenChange, projeto, onSuccess }
         lider_id: liderId || null,
         data_inicio: dataInicio ? dataInicio.toISOString().split("T")[0] : null,
         data_fim: dataFim ? dataFim.toISOString().split("T")[0] : null,
+        igreja_id: igrejaId,
+        filial_id: isAllFiliais ? null : filialId,
       };
 
       if (projeto) {
