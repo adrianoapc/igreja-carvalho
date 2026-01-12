@@ -1607,6 +1607,65 @@ export type Database = {
           },
         ]
       }
+      contagens: {
+        Row: {
+          contador_id: string
+          id: string
+          ordem: number
+          sessao_id: string
+          submitted_at: string
+          totais_por_tipo: Json
+          total: number
+        }
+        Insert: {
+          contador_id: string
+          id?: string
+          ordem: number
+          sessao_id: string
+          submitted_at?: string
+          totais_por_tipo?: Json
+          total?: number
+        }
+        Update: {
+          contador_id?: string
+          id?: string
+          ordem?: number
+          sessao_id?: string
+          submitted_at?: string
+          totais_por_tipo?: Json
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contagens_contador_id_fkey"
+            columns: ["contador_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contagens_contador_id_fkey"
+            columns: ["contador_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "contagens_contador_id_fkey"
+            columns: ["contador_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "contagens_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "sessoes_contagem"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contas: {
         Row: {
           agencia: string | null
@@ -5745,6 +5804,174 @@ export type Database = {
           {
             foreignKeyName: "sentimentos_membros_pessoa_id_fkey"
             columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
+      sessoes_contagem: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          blind_compare_level: string
+          blind_count_mode: string
+          blind_lock_totals: boolean
+          blind_min_counters: number
+          blind_tolerance_value: number
+          conferentes: Json
+          created_at: string
+          created_by: string | null
+          data_culto: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          periodo: string
+          provider_tipo: string | null
+          rejection_at: string | null
+          rejection_by: string | null
+          rejection_reason_code: string | null
+          rejection_reason_note: string | null
+          secret_hint: string | null
+          status: string
+          sync_strategy: string | null
+          updated_at: string
+          variance_by_tipo: Json | null
+          variance_value: number | null
+          webhook_url: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          blind_compare_level: string
+          blind_count_mode: string
+          blind_lock_totals: boolean
+          blind_min_counters: number
+          blind_tolerance_value: number
+          conferentes?: Json
+          created_at?: string
+          created_by?: string | null
+          data_culto: string
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          periodo: string
+          provider_tipo?: string | null
+          rejection_at?: string | null
+          rejection_by?: string | null
+          rejection_reason_code?: string | null
+          rejection_reason_note?: string | null
+          secret_hint?: string | null
+          status?: string
+          sync_strategy?: string | null
+          updated_at?: string
+          variance_by_tipo?: Json | null
+          variance_value?: number | null
+          webhook_url?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          blind_compare_level?: string
+          blind_count_mode?: string
+          blind_lock_totals?: boolean
+          blind_min_counters?: number
+          blind_tolerance_value?: number
+          conferentes?: Json
+          created_at?: string
+          created_by?: string | null
+          data_culto?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          periodo?: string
+          provider_tipo?: string | null
+          rejection_at?: string | null
+          rejection_by?: string | null
+          rejection_reason_code?: string | null
+          rejection_reason_note?: string | null
+          secret_hint?: string | null
+          status?: string
+          sync_strategy?: string | null
+          updated_at?: string
+          variance_by_tipo?: Json | null
+          variance_value?: number | null
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessoes_contagem_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_rejection_by_fkey"
+            columns: ["rejection_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_rejection_by_fkey"
+            columns: ["rejection_by"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_rejection_by_fkey"
+            columns: ["rejection_by"]
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
