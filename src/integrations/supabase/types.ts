@@ -7673,6 +7673,14 @@ export type Database = {
         Args: { p_lat: number; p_long: number; p_telefone: string }
         Returns: Json
       }
+      confrontar_contagens: {
+        Args: { p_sessao_id: string }
+        Returns: {
+          status: string
+          variance_by_tipo: Json
+          variance_value: number
+        }[]
+      }
       create_filial_short_links: {
         Args: {
           p_filial_id: string
@@ -7813,6 +7821,49 @@ export type Database = {
           p_type: string
         }
         Returns: undefined
+      }
+      open_sessao_contagem: {
+        Args: {
+          p_data_culto: string
+          p_filial_id: string
+          p_igreja_id: string
+          p_periodo: string
+        }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          blind_compare_level: string
+          blind_count_mode: string
+          blind_lock_totals: boolean
+          blind_min_counters: number
+          blind_tolerance_value: number
+          conferentes: Json
+          created_at: string
+          created_by: string | null
+          data_culto: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          periodo: string
+          provider_tipo: string | null
+          rejection_at: string | null
+          rejection_by: string | null
+          rejection_reason_code: string | null
+          rejection_reason_note: string | null
+          secret_hint: string | null
+          status: string
+          sync_strategy: string | null
+          updated_at: string
+          variance_by_tipo: Json | null
+          variance_value: number | null
+          webhook_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sessoes_contagem"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       rollback_audit_batch: {
         Args: { target_request_id: string }
