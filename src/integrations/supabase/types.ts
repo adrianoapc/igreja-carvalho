@@ -6723,6 +6723,8 @@ export type Database = {
           multas: number | null
           numero_parcela: number | null
           observacoes: string | null
+          origem_registro: string
+          pessoa_id: string | null
           recorrencia: string | null
           solicitacao_reembolso_id: string | null
           status: string
@@ -6758,6 +6760,8 @@ export type Database = {
           multas?: number | null
           numero_parcela?: number | null
           observacoes?: string | null
+          origem_registro?: string
+          pessoa_id?: string | null
           recorrencia?: string | null
           solicitacao_reembolso_id?: string | null
           status?: string
@@ -6793,6 +6797,8 @@ export type Database = {
           multas?: number | null
           numero_parcela?: number | null
           observacoes?: string | null
+          origem_registro?: string
+          pessoa_id?: string | null
           recorrencia?: string | null
           solicitacao_reembolso_id?: string | null
           status?: string
@@ -6861,6 +6867,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
           {
             foreignKeyName: "transacoes_financeiras_solicitacao_reembolso_id_fkey"
