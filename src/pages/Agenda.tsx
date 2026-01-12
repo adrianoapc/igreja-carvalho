@@ -121,6 +121,7 @@ const timelineVariants = {
 
 export default function Agenda() {
   const navigate = useNavigate();
+  const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [cultos, setCultos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);

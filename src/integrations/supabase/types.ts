@@ -160,8 +160,6 @@ export type Database = {
           observacoes?: string | null
           profile_id?: string
           status?: string
-                filial_id: string | null
-                igreja_id: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2492,6 +2490,75 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "filiais_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financeiro_config: {
+        Row: {
+          blind_compare_level: string
+          blind_count_mode: string
+          blind_lock_totals: boolean
+          blind_min_counters: number
+          blind_tolerance_value: number
+          conciliacao_janela_horas: number
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          integracao_banco_enabled: boolean
+          integracao_gateway_enabled: boolean
+          integracao_pix_enabled: boolean
+          mapping_default_conta_por_forma: Json
+          sync_strategy: string
+          updated_at: string
+        }
+        Insert: {
+          blind_compare_level?: string
+          blind_count_mode?: string
+          blind_lock_totals?: boolean
+          blind_min_counters?: number
+          blind_tolerance_value?: number
+          conciliacao_janela_horas?: number
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          integracao_banco_enabled?: boolean
+          integracao_gateway_enabled?: boolean
+          integracao_pix_enabled?: boolean
+          mapping_default_conta_por_forma?: Json
+          sync_strategy?: string
+          updated_at?: string
+        }
+        Update: {
+          blind_compare_level?: string
+          blind_count_mode?: string
+          blind_lock_totals?: boolean
+          blind_min_counters?: number
+          blind_tolerance_value?: number
+          conciliacao_janela_horas?: number
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          integracao_banco_enabled?: boolean
+          integracao_gateway_enabled?: boolean
+          integracao_pix_enabled?: boolean
+          mapping_default_conta_por_forma?: Json
+          sync_strategy?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_config_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_config_igreja_id_fkey"
             columns: ["igreja_id"]
             isOneToOne: false
             referencedRelation: "igrejas"
