@@ -2565,14 +2565,20 @@ export type Database = {
           blind_tolerance_value: number
           conciliacao_janela_horas: number
           filial_id: string | null
+          formas_digitais_ids: string[] | null
+          formas_fisicas_ids: string[] | null
           id: string
           igreja_id: string
           integracao_banco_enabled: boolean
           integracao_gateway_enabled: boolean
           integracao_pix_enabled: boolean
           mapping_default_conta_por_forma: Json
+          periodos: string[] | null
           sync_strategy: string
+          tipos_permitidos_digital: string[] | null
+          tipos_permitidos_fisico: string[] | null
           updated_at: string
+          valor_zero_policy: string | null
         }
         Insert: {
           blind_compare_level?: string
@@ -2582,14 +2588,20 @@ export type Database = {
           blind_tolerance_value?: number
           conciliacao_janela_horas?: number
           filial_id?: string | null
+          formas_digitais_ids?: string[] | null
+          formas_fisicas_ids?: string[] | null
           id?: string
           igreja_id: string
           integracao_banco_enabled?: boolean
           integracao_gateway_enabled?: boolean
           integracao_pix_enabled?: boolean
           mapping_default_conta_por_forma?: Json
+          periodos?: string[] | null
           sync_strategy?: string
+          tipos_permitidos_digital?: string[] | null
+          tipos_permitidos_fisico?: string[] | null
           updated_at?: string
+          valor_zero_policy?: string | null
         }
         Update: {
           blind_compare_level?: string
@@ -2599,14 +2611,20 @@ export type Database = {
           blind_tolerance_value?: number
           conciliacao_janela_horas?: number
           filial_id?: string | null
+          formas_digitais_ids?: string[] | null
+          formas_fisicas_ids?: string[] | null
           id?: string
           igreja_id?: string
           integracao_banco_enabled?: boolean
           integracao_gateway_enabled?: boolean
           integracao_pix_enabled?: boolean
           mapping_default_conta_por_forma?: Json
+          periodos?: string[] | null
           sync_strategy?: string
+          tipos_permitidos_digital?: string[] | null
+          tipos_permitidos_fisico?: string[] | null
           updated_at?: string
+          valor_zero_policy?: string | null
         }
         Relationships: [
           {
