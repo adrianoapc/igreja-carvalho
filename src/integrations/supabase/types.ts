@@ -2710,6 +2710,7 @@ export type Database = {
           gera_pago: boolean | null
           id: string
           igreja_id: string | null
+          is_digital: boolean
           nome: string
           taxa_administrativa: number | null
           taxa_administrativa_fixa: number | null
@@ -2722,6 +2723,7 @@ export type Database = {
           gera_pago?: boolean | null
           id?: string
           igreja_id?: string | null
+          is_digital?: boolean
           nome: string
           taxa_administrativa?: number | null
           taxa_administrativa_fixa?: number | null
@@ -2734,6 +2736,7 @@ export type Database = {
           gera_pago?: boolean | null
           id?: string
           igreja_id?: string | null
+          is_digital?: boolean
           nome?: string
           taxa_administrativa?: number | null
           taxa_administrativa_fixa?: number | null
