@@ -5999,6 +5999,148 @@ export type Database = {
           },
         ]
       }
+      sessoes_itens_draft: {
+        Row: {
+          categoria_id: string | null
+          conta_id: string | null
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          filial_id: string | null
+          forma_pagamento_id: string | null
+          id: string
+          igreja_id: string
+          is_digital: boolean
+          origem_registro: string
+          pessoa_id: string | null
+          read_only: boolean
+          sessao_id: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          categoria_id?: string | null
+          conta_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          filial_id?: string | null
+          forma_pagamento_id?: string | null
+          id?: string
+          igreja_id: string
+          is_digital?: boolean
+          origem_registro?: string
+          pessoa_id?: string | null
+          read_only?: boolean
+          sessao_id: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          categoria_id?: string | null
+          conta_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          filial_id?: string | null
+          forma_pagamento_id?: string | null
+          id?: string
+          igreja_id?: string
+          is_digital?: boolean
+          origem_registro?: string
+          pessoa_id?: string | null
+          read_only?: boolean
+          sessao_id?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessoes_itens_draft_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_forma_pagamento_id_fkey"
+            columns: ["forma_pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "sessoes_contagem"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       short_links: {
         Row: {
           created_at: string
@@ -6747,6 +6889,7 @@ export type Database = {
           origem_registro: string
           pessoa_id: string | null
           recorrencia: string | null
+          sessao_id: string | null
           solicitacao_reembolso_id: string | null
           status: string
           subcategoria_id: string | null
@@ -6784,6 +6927,7 @@ export type Database = {
           origem_registro?: string
           pessoa_id?: string | null
           recorrencia?: string | null
+          sessao_id?: string | null
           solicitacao_reembolso_id?: string | null
           status?: string
           subcategoria_id?: string | null
@@ -6821,6 +6965,7 @@ export type Database = {
           origem_registro?: string
           pessoa_id?: string | null
           recorrencia?: string | null
+          sessao_id?: string | null
           solicitacao_reembolso_id?: string | null
           status?: string
           subcategoria_id?: string | null
@@ -6909,6 +7054,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "sessoes_contagem"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "transacoes_financeiras_solicitacao_reembolso_id_fkey"
