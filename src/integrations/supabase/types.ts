@@ -5946,21 +5946,7 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessoes_contagem_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "view_absent_kids"
-            referencedColumns: ["child_id"]
-          },
-          {
-            foreignKeyName: "sessoes_contagem_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "view_health_score"
-            referencedColumns: ["pessoa_id"]
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "sessoes_contagem_filial_id_fkey"
