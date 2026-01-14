@@ -45,3 +45,5 @@ verify_jwt = false
 [functions.undo-reclass]
 verify_jwt = false
 
+[functions.manage-users]
+verify_jwt = false
