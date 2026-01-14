@@ -1641,21 +1641,7 @@ export type Database = {
             columns: ["contador_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contagens_contador_id_fkey"
-            columns: ["contador_id"]
-            isOneToOne: false
-            referencedRelation: "view_absent_kids"
-            referencedColumns: ["child_id"]
-          },
-          {
-            foreignKeyName: "contagens_contador_id_fkey"
-            columns: ["contador_id"]
-            isOneToOne: false
-            referencedRelation: "view_health_score"
-            referencedColumns: ["pessoa_id"]
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "contagens_sessao_id_fkey"
@@ -5925,21 +5911,7 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessoes_contagem_approved_by_fkey"
-            columns: ["approved_by"]
-            isOneToOne: false
-            referencedRelation: "view_absent_kids"
-            referencedColumns: ["child_id"]
-          },
-          {
-            foreignKeyName: "sessoes_contagem_approved_by_fkey"
-            columns: ["approved_by"]
-            isOneToOne: false
-            referencedRelation: "view_health_score"
-            referencedColumns: ["pessoa_id"]
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "sessoes_contagem_created_by_fkey"
@@ -5967,21 +5939,7 @@ export type Database = {
             columns: ["rejection_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessoes_contagem_rejection_by_fkey"
-            columns: ["rejection_by"]
-            isOneToOne: false
-            referencedRelation: "view_absent_kids"
-            referencedColumns: ["child_id"]
-          },
-          {
-            foreignKeyName: "sessoes_contagem_rejection_by_fkey"
-            columns: ["rejection_by"]
-            isOneToOne: false
-            referencedRelation: "view_health_score"
-            referencedColumns: ["pessoa_id"]
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -6060,21 +6018,7 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessoes_itens_draft_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "view_absent_kids"
-            referencedColumns: ["child_id"]
-          },
-          {
-            foreignKeyName: "sessoes_itens_draft_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "view_health_score"
-            referencedColumns: ["pessoa_id"]
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "sessoes_itens_draft_filial_id_fkey"
