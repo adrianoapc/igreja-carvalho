@@ -7862,6 +7862,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      criar_usuario_membro: {
+        Args: {
+          p_email: string
+          p_profile_id: string
+          p_senha_temporaria: string
+        }
+        Returns: {
+          message: string
+          success: boolean
+          user_id: string
+        }[]
+      }
       generate_filial_slug: {
         Args: { p_igreja_id: string; p_nome: string }
         Returns: string
@@ -8037,6 +8049,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      resetar_senha_usuario_membro: {
+        Args: { p_profile_id: string; p_senha_temporaria: string }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
       }
       rollback_audit_batch: {
         Args: { target_request_id: string }
