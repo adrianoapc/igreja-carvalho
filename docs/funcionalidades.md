@@ -29,7 +29,7 @@ O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas i
 #### Tela de Seleção de Contexto
 
 - **Rota**: `/context-select` (apenas para super admins após login)
-- **Opções**: 
+- **Opções**:
   - **Painel SaaS** → navega para `/superadmin`
   - **Aplicativo Igreja** → navega para `/`
 - **Preferência**: Checkbox "Lembrar minha escolha" salva em `localStorage`
@@ -60,14 +60,14 @@ O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas i
 
 #### Componentes
 
-| Componente | Descrição |
-|------------|-----------|
-| `SuperAdminLayout` | Layout com header e navegação do portal SaaS |
-| `SuperAdminGate` | Gate de proteção que verifica role `super_admin` |
-| `ContextSelect` | Tela de seleção de contexto pós-login |
-| `SuperAdminIndicator` | Ícone Shield no MainLayout para acesso rápido |
-| `FilialManager` | CRUD reutilizável de filiais |
-| `IgrejaRowExpandable` | Row expansível com detalhes da igreja |
+| Componente            | Descrição                                        |
+| --------------------- | ------------------------------------------------ |
+| `SuperAdminLayout`    | Layout com header e navegação do portal SaaS     |
+| `SuperAdminGate`      | Gate de proteção que verifica role `super_admin` |
+| `ContextSelect`       | Tela de seleção de contexto pós-login            |
+| `SuperAdminIndicator` | Ícone Shield no MainLayout para acesso rápido    |
+| `FilialManager`       | CRUD reutilizável de filiais                     |
+| `IgrejaRowExpandable` | Row expansível com detalhes da igreja            |
 
 #### Hooks e Utilitários
 

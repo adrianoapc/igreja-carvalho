@@ -820,14 +820,14 @@ Use para importar extratos bancários e preparar a conciliação.
 
 O parser OFX extrai os seguintes campos do arquivo:
 
-| Campo OFX    | Campo Sistema     | Descrição                |
-| ------------ | ----------------- | ------------------------ |
-| `DTPOSTED`   | data_transacao    | Data (YYYYMMDD → DD/MM)  |
-| `TRNAMT`     | valor             | Valor da transação       |
-| `MEMO/NAME`  | descricao         | Descrição/Histórico      |
-| `FITID`      | numero_documento  | ID único da transação    |
-| `CHECKNUM`   | numero_documento  | Número do cheque/doc     |
-| `TRNTYPE`    | tipo              | DEBIT/CREDIT → deb/cred  |
+| Campo OFX   | Campo Sistema    | Descrição               |
+| ----------- | ---------------- | ----------------------- |
+| `DTPOSTED`  | data_transacao   | Data (YYYYMMDD → DD/MM) |
+| `TRNAMT`    | valor            | Valor da transação      |
+| `MEMO/NAME` | descricao        | Descrição/Histórico     |
+| `FITID`     | numero_documento | ID único da transação   |
+| `CHECKNUM`  | numero_documento | Número do cheque/doc    |
+| `TRNTYPE`   | tipo             | DEBIT/CREDIT → deb/cred |
 
 **Próximos Passos (Conciliação):**
 
@@ -879,6 +879,7 @@ Após importar extratos, você poderá:
 3. Gere relatórios para prestação de contas
 
 ---
+
 - ⚠️ Divergências são destacadas para ajuste manual
 - ✅ Saldo final é validado contra o extrato
 

@@ -35,7 +35,15 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -56,12 +64,13 @@ interface Pessoa {
 }
 const ITEMS_PER_PAGE = 10;
 export default function TodosPessoas() {
-  const [displayedPessoas, setDisplayedPessoas] = useState<Pessoa[]>([]);
   const [allPessoas, setAllPessoas] = useState<Pessoa[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     "todos" | "visitante" | "frequentador" | "membro"
   >("todos");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [filterHasEmail, setFilterHasEmail] = useState(false);
@@ -94,7 +103,7 @@ export default function TodosPessoas() {
 
       if (error) throw error;
       setAllPessoas(data || []);
-      setDisplayedPessoas((data || []).slice(0, ITEMS_PER_PAGE));
+      setCurrentPage(1);
     } catch (error) {
       console.error("Erro ao buscar pessoas:", error);
       toast({
@@ -111,41 +120,8 @@ export default function TodosPessoas() {
     }
   }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
-  const {
-    loadMoreRef,
-    isLoading,
-    hasMore,
-    page,
-    setIsLoading,
-    setHasMore,
-    setPage,
-  } = useInfiniteScroll();
-
-  // Load more when page changes and it's not the initial page
-  useEffect(() => {
-    if (page === 1 || allPessoas.length === 0) return;
-
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    const newItems = allPessoas.slice(start, end);
-
-    if (newItems.length > 0) {
-      setDisplayedPessoas((prev) => {
-        const existingIds = new Set(prev.map((p) => p.id));
-        const uniqueNewItems = newItems.filter(
-          (item) => !existingIds.has(item.id)
-        );
-        return [...prev, ...uniqueNewItems];
-      });
-    }
-
-    if (end >= allPessoas.length) {
-      setHasMore(false);
-    }
-    setIsLoading(false);
-  }, [page, allPessoas, setHasMore, setIsLoading]);
-
-  const filteredPessoas = displayedPessoas
+  // Apply filters to all pessoas for pagination
+  const filteredPessoas = allPessoas
     .filter((p) => {
       const matchesSearch =
         p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -157,6 +133,12 @@ export default function TodosPessoas() {
     })
     .filter((p) => (filterHasPhone ? !!p.telefone : true))
     .filter((p) => (filterHasEmail ? !!p.email : true));
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredPessoas.length / ITEMS_PER_PAGE);
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const paginatedPessoas = filteredPessoas.slice(start, end);
   const countByStatus = {
     todos: allPessoas.length,
     visitante: allPessoas.filter((p) => p.status === "visitante").length,
@@ -307,13 +289,8 @@ export default function TodosPessoas() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPessoas.map((pessoa, index) => (
-                  <TableRow
-                    key={pessoa.id}
-                    ref={
-                      index === filteredPessoas.length - 1 ? loadMoreRef : null
-                    }
-                  >
+                {paginatedPessoas.map((pessoa) => (
+                  <TableRow key={pessoa.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
@@ -427,10 +404,9 @@ export default function TodosPessoas() {
           </div>
 
           <div className="block md:hidden space-y-4">
-            {filteredPessoas.map((pessoa, index) => (
+            {paginatedPessoas.map((pessoa) => (
               <div
                 key={pessoa.id}
-                ref={index === filteredPessoas.length - 1 ? loadMoreRef : null}
                 className="flex flex-col gap-3 p-3 rounded-lg bg-[#eff0cf]"
               >
                 <div className="flex items-start gap-3">
@@ -533,10 +509,39 @@ export default function TodosPessoas() {
             )}
           </div>
 
-          {!hasMore && filteredPessoas.length > 0 && (
-            <div className="text-center py-4 text-sm text-muted-foreground">
-              Todas as pessoas foram carregadas
-            </div>
+          {filteredPessoas.length > 0 && (
+            <Pagination className="mt-6">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           )}
         </CardContent>
       </Card>

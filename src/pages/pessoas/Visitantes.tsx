@@ -36,7 +36,15 @@ import {
   ArrowLeft,
   Filter,
 } from "lucide-react";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { RegistrarVisitanteDialog } from "@/components/visitantes/RegistrarVisitanteDialog";
@@ -67,14 +75,12 @@ interface Visitante {
 const ITEMS_PER_PAGE = 10;
 
 export default function Visitantes() {
-  const [displayedVisitantes, setDisplayedVisitantes] = useState<Visitante[]>(
-    []
-  );
   const [allVisitantes, setAllVisitantes] = useState<Visitante[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     "todos" | "visitante" | "frequentador"
   >("todos");
+  const [currentPage, setCurrentPage] = useState(1);
   const [registrarOpen, setRegistrarOpen] = useState(false);
   const [agendarContatoOpen, setAgendarContatoOpen] = useState(false);
   const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(
@@ -83,6 +89,7 @@ export default function Visitantes() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [filterHasEmail, setFilterHasEmail] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const {
@@ -101,7 +108,7 @@ export default function Visitantes() {
         .select("*")
         .in("status", ["visitante", "frequentador"])
         .eq("igreja_id", igrejaId)
-        .order("data_primeira_visita", { ascending: false });
+        .order("nome", { ascending: true });
 
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
@@ -111,7 +118,7 @@ export default function Visitantes() {
 
       if (error) throw error;
       setAllVisitantes(data || []);
-      setDisplayedVisitantes((data || []).slice(0, ITEMS_PER_PAGE));
+      setCurrentPage(1);
     } catch (error) {
       console.error("Erro ao buscar visitantes:", error);
       toast({
@@ -123,45 +130,13 @@ export default function Visitantes() {
   };
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && igrejaId) {
       fetchVisitantes();
     }
   }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
-  const {
-    loadMoreRef,
-    isLoading,
-    hasMore,
-    page,
-    setIsLoading,
-    setHasMore,
-    setPage,
-  } = useInfiniteScroll();
-
-  useEffect(() => {
-    if (page === 1 || allVisitantes.length === 0) return;
-
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    const newItems = allVisitantes.slice(start, end);
-
-    if (newItems.length > 0) {
-      setDisplayedVisitantes((prev) => {
-        const existingIds = new Set(prev.map((v) => v.id));
-        const uniqueNewItems = newItems.filter(
-          (item) => !existingIds.has(item.id)
-        );
-        return [...prev, ...uniqueNewItems];
-      });
-    }
-
-    if (end >= allVisitantes.length) {
-      setHasMore(false);
-    }
-    setIsLoading(false);
-  }, [page, allVisitantes, setHasMore, setIsLoading]);
-
-  const filteredVisitantes = displayedVisitantes
+  // Apply filters to all visitantes for pagination
+  const allFiltered = allVisitantes
     .filter((v) => {
       const matchesSearch =
         v.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -173,6 +148,12 @@ export default function Visitantes() {
     })
     .filter((v) => (filterHasPhone ? !!v.telefone : true))
     .filter((v) => (filterHasEmail ? !!v.email : true));
+
+  // Pagination logic
+  const totalPages = Math.ceil(allFiltered.length / ITEMS_PER_PAGE);
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const paginatedVisitantes = allFiltered.slice(start, end);
 
   const countByStatus = {
     todos: allVisitantes.length,
@@ -319,15 +300,8 @@ export default function Visitantes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVisitantes.map((visitante, index) => (
-                  <TableRow
-                    key={visitante.id}
-                    ref={
-                      index === filteredVisitantes.length - 1
-                        ? loadMoreRef
-                        : null
-                    }
-                  >
+                {paginatedVisitantes.map((visitante) => (
+                  <TableRow key={visitante.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
@@ -435,7 +409,7 @@ export default function Visitantes() {
                   </TableRow>
                 )}
 
-                {!isLoading && filteredVisitantes.length === 0 && (
+                {!isLoading && paginatedVisitantes.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -452,12 +426,9 @@ export default function Visitantes() {
           </div>
 
           <div className="block md:hidden space-y-4">
-            {filteredVisitantes.map((visitante, index) => (
+            {paginatedVisitantes.map((visitante) => (
               <div
                 key={visitante.id}
-                ref={
-                  index === filteredVisitantes.length - 1 ? loadMoreRef : null
-                }
                 className="flex flex-col gap-3 p-3 rounded-lg bg-[#eff0cf]"
               >
                 <div className="flex items-start gap-3">
@@ -550,7 +521,7 @@ export default function Visitantes() {
               </div>
             )}
 
-            {filteredVisitantes.length === 0 && !isLoading && (
+            {paginatedVisitantes.length === 0 && !isLoading && (
               <div className="text-center py-8 text-sm text-muted-foreground">
                 {searchTerm
                   ? "Nenhum visitante encontrado"
@@ -559,10 +530,39 @@ export default function Visitantes() {
             )}
           </div>
 
-          {!hasMore && filteredVisitantes.length > 0 && (
-            <div className="text-center py-4 text-sm text-muted-foreground">
-              Todos os visitantes foram carregados
-            </div>
+          {allFiltered.length > 0 && (
+            <Pagination className="mt-6">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           )}
         </CardContent>
       </Card>

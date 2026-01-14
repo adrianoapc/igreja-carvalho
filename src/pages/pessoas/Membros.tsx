@@ -25,7 +25,15 @@ import {
   UserPlus,
   ArrowLeft,
 } from "lucide-react";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -53,9 +61,10 @@ interface Membro {
 }
 const ITEMS_PER_PAGE = 10;
 export default function Membros() {
-  const [displayedMembros, setDisplayedMembros] = useState<Membro[]>([]);
   const [allMembros, setAllMembros] = useState<Membro[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
   const [atribuirFuncaoOpen, setAtribuirFuncaoOpen] = useState(false);
   const [gerenciarFuncoesOpen, setGerenciarFuncoesOpen] = useState(false);
   const [selectedMembro, setSelectedMembro] = useState<Membro | null>(null);
@@ -153,7 +162,7 @@ export default function Membros() {
         })
       );
       setAllMembros(membrosComFuncoes);
-      setDisplayedMembros(membrosComFuncoes.slice(0, ITEMS_PER_PAGE));
+      setCurrentPage(1);
     } catch (error) {
       console.error("Erro ao buscar membros:", error);
       toast({
@@ -163,50 +172,15 @@ export default function Membros() {
       });
     }
   };
-  useEffect(() => {
-    fetchMembros();
-  }, []);
-  const {
-    loadMoreRef,
-    isLoading,
-    hasMore,
-    page,
-    setIsLoading,
-    setHasMore,
-    setPage,
-  } = useInfiniteScroll();
-
-  // Load more when page changes and it's not the initial page
-  useEffect(() => {
-    if (page === 1 || allMembros.length === 0) return;
-
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    const newItems = allMembros.slice(start, end);
-
-    if (newItems.length > 0) {
-      setDisplayedMembros((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id));
-        const uniqueNewItems = newItems.filter(
-          (item) => !existingIds.has(item.id)
-        );
-        return [...prev, ...uniqueNewItems];
-      });
-    }
-
-    if (end >= allMembros.length) {
-      setHasMore(false);
-    }
-    setIsLoading(false);
-  }, [page, allMembros, setHasMore, setIsLoading]);
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && igrejaId) {
       fetchMembros();
     }
   }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
-  const filteredMembros = displayedMembros
+  // Apply filters to all membros for pagination
+  const filteredMembros = allMembros
     .filter(
       (m) =>
         m.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -215,6 +189,12 @@ export default function Membros() {
     )
     .filter((m) => (filterHasPhone ? !!m.telefone : true))
     .filter((m) => (filterHasEmail ? !!m.email : true));
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredMembros.length / ITEMS_PER_PAGE);
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const paginatedMembros = filteredMembros.slice(start, end);
 
   const handleAtribuirFuncao = (membro: Membro) => {
     setSelectedMembro(membro);
@@ -285,233 +265,234 @@ export default function Membros() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMembros.map((membro, index) => {
-                  const isLast = index === filteredMembros.length - 1;
-                  return (
-                    <TableRow key={membro.id} ref={isLast ? loadMoreRef : null}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage
-                              src={membro.avatar_url || undefined}
-                              alt={membro.nome}
-                            />
-                            <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
-                              {membro.nome.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="space-y-1">
-                            <p className="font-medium text-foreground">
-                              {membro.nome}
-                            </p>
-                            {(membro.funcoes.length > 0 ||
-                              membro.times.length > 0) && (
-                              <div className="flex flex-wrap gap-2">
-                                {membro.funcoes.map((funcao) => (
-                                  <Badge
-                                    key={`funcao-${funcao.id}`}
-                                    variant="secondary"
-                                    className="bg-primary/10 text-primary hover:bg-primary/20"
-                                  >
-                                    {funcao.nome}
-                                  </Badge>
-                                ))}
-                                {membro.times.map((time) => (
-                                  <Badge
-                                    key={`time-${time.id}`}
-                                    variant="outline"
-                                    style={{
-                                      borderColor: time.cor || undefined,
-                                    }}
-                                  >
-                                    {time.nome}
-                                    {time.posicao && (
-                                      <span className="ml-1 text-muted-foreground">
-                                        • {time.posicao}
-                                      </span>
-                                    )}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        <div className="flex flex-col gap-1">
-                          {membro.telefone && (
-                            <span className="flex items-center gap-2">
-                              <Phone className="w-4 h-4" />
-                              {formatarTelefone(membro.telefone)}
-                            </span>
-                          )}
-                          {membro.email && (
-                            <span className="flex items-center gap-2 truncate">
-                              <Mail className="w-4 h-4" />
-                              <span className="truncate">{membro.email}</span>
-                            </span>
+                {paginatedMembros.map((membro) => (
+                  <TableRow key={membro.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage
+                            src={membro.avatar_url || undefined}
+                            alt={membro.nome}
+                          />
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
+                            {membro.nome.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">
+                            {membro.nome}
+                          </p>
+                          {(membro.funcoes.length > 0 ||
+                            membro.times.length > 0) && (
+                            <div className="flex flex-wrap gap-2">
+                              {membro.funcoes.map((funcao) => (
+                                <Badge
+                                  key={`funcao-${funcao.id}`}
+                                  variant="secondary"
+                                  className="bg-primary/10 text-primary hover:bg-primary/20"
+                                >
+                                  {funcao.nome}
+                                </Badge>
+                              ))}
+                              {membro.times.map((time) => (
+                                <Badge
+                                  key={`time-${time.id}`}
+                                  variant="outline"
+                                  style={{
+                                    borderColor: time.cor || undefined,
+                                  }}
+                                >
+                                  {time.nome}
+                                  {time.posicao && (
+                                    <span className="ml-1 text-muted-foreground">
+                                      • {time.posicao}
+                                    </span>
+                                  )}
+                                </Badge>
+                              ))}
+                            </div>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {membro.status || "ativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAtribuirFuncao(membro)}
-                          >
-                            <UserPlus className="w-4 h-4 mr-1" />
-                            Atribuir
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/pessoas/${membro.id}`)}
-                          >
-                            Ver Perfil
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            {/* Mobile Cards */}
-            <div className="block md:hidden space-y-4">
-              {filteredMembros.map((membro, index) => {
-                const isLast = index === filteredMembros.length - 1;
-                return (
-                  <Card
-                    key={membro.id}
-                    ref={isLast ? loadMoreRef : null}
-                    className="shadow-sm"
-                  >
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Avatar className="w-10 h-10 flex-shrink-0">
-                            <AvatarImage
-                              src={membro.avatar_url || undefined}
-                              alt={membro.nome}
-                            />
-                            <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
-                              {membro.nome.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-base text-foreground truncate">
-                              {membro.nome}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="capitalize">
-                          {membro.status || "ativo"}
-                        </Badge>
                       </div>
-
-                      <div className="space-y-2 text-sm text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <div className="flex flex-col gap-1">
                         {membro.telefone && (
-                          <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-2">
                             <Phone className="w-4 h-4" />
-                            <span>{formatarTelefone(membro.telefone)}</span>
-                          </div>
+                            {formatarTelefone(membro.telefone)}
+                          </span>
                         )}
                         {membro.email && (
-                          <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-2 truncate">
                             <Mail className="w-4 h-4" />
                             <span className="truncate">{membro.email}</span>
-                          </div>
+                          </span>
                         )}
                       </div>
-
-                      {(membro.funcoes.length > 0 ||
-                        membro.times.length > 0) && (
-                        <div className="flex flex-wrap gap-2">
-                          {membro.funcoes.map((funcao) => (
-                            <Badge
-                              key={`funcao-${funcao.id}`}
-                              variant="secondary"
-                              className="bg-primary/10 text-primary hover:bg-primary/20"
-                            >
-                              {funcao.nome}
-                            </Badge>
-                          ))}
-                          {membro.times.map((time) => (
-                            <Badge
-                              key={`time-${time.id}`}
-                              variant="outline"
-                              style={{ borderColor: time.cor || undefined }}
-                            >
-                              {time.nome}
-                              {time.posicao && (
-                                <span className="ml-1 text-muted-foreground">
-                                  • {time.posicao}
-                                </span>
-                              )}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-1">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => navigate(`/pessoas/${membro.id}`)}
-                        >
-                          Ver Perfil
-                        </Button>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {membro.status || "ativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1"
                           onClick={() => handleAtribuirFuncao(membro)}
                         >
                           <UserPlus className="w-4 h-4 mr-1" />
                           Atribuir
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/pessoas/${membro.id}`)}
+                        >
+                          Ver Perfil
+                        </Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Mobile Cards */}
+            <div className="block md:hidden space-y-4">
+              {paginatedMembros.map((membro) => (
+                <Card key={membro.id} className="shadow-sm">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Avatar className="w-10 h-10 flex-shrink-0">
+                          <AvatarImage
+                            src={membro.avatar_url || undefined}
+                            alt={membro.nome}
+                          />
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
+                            {membro.nome.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-base text-foreground truncate">
+                            {membro.nome}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="capitalize">
+                        {membro.status || "ativo"}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      {membro.telefone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4" />
+                          <span>{formatarTelefone(membro.telefone)}</span>
+                        </div>
+                      )}
+                      {membro.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4" />
+                          <span className="truncate">{membro.email}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {(membro.funcoes.length > 0 || membro.times.length > 0) && (
+                      <div className="flex flex-wrap gap-2">
+                        {membro.funcoes.map((funcao) => (
+                          <Badge
+                            key={`funcao-${funcao.id}`}
+                            variant="secondary"
+                            className="bg-primary/10 text-primary hover:bg-primary/20"
+                          >
+                            {funcao.nome}
+                          </Badge>
+                        ))}
+                        {membro.times.map((time) => (
+                          <Badge
+                            key={`time-${time.id}`}
+                            variant="outline"
+                            style={{ borderColor: time.cor || undefined }}
+                          >
+                            {time.nome}
+                            {time.posicao && (
+                              <span className="ml-1 text-muted-foreground">
+                                • {time.posicao}
+                              </span>
+                            )}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => navigate(`/pessoas/${membro.id}`)}
+                      >
+                        Ver Perfil
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleAtribuirFuncao(membro)}
+                      >
+                        <UserPlus className="w-4 h-4 mr-1" />
+                        Atribuir
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            {isLoading && (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 p-3 md:p-4 rounded-lg bg-secondary"
-                  >
-                    <Skeleton className="w-10 h-10 md:w-12 md:h-12 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-48" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!hasMore && displayedMembros.length > 0 && (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                Todos os membros foram carregados
-              </div>
-            )}
-
-            {filteredMembros.length === 0 && !isLoading && (
+            {!isLoading && paginatedMembros.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <p>Nenhum membro encontrado</p>
               </div>
+            )}
+
+            {paginatedMembros.length > 0 && (
+              <Pagination className="mt-6">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  )}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             )}
           </div>
         </CardContent>

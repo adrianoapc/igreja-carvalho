@@ -4,6 +4,9 @@
     "esbenp.prettier-vscode",
     "bradlc.vscode-tailwindcss",
     "github.copilot",
-    "denoland.vscode-deno"
+    "denoland.vscode-deno",
+    "supabase.supabase-vscode",
+    "csstools.postcss",
+    "EditorConfig.EditorConfig"
   ]
 }

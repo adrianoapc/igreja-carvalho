@@ -1,16 +1,47 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Eye, EyeOff, Megaphone, ImageIcon, Calendar } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff,
+  Megaphone,
+  ImageIcon,
+  Calendar,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ComunicadoDialog } from "@/components/comunicados/ComunicadoDialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Database } from "@/integrations/supabase/types";
 import { useFilialId } from "@/hooks/useFilialId";
 
@@ -33,11 +64,18 @@ interface Comunicado {
 export default function Comunicados() {
   const { toast } = useToast();
   const { hasAccess } = useAuth();
-  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: filialLoading,
+  } = useFilialId();
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingComunicado, setEditingComunicado] = useState<Comunicado | null>(null);
+  const [editingComunicado, setEditingComunicado] = useState<Comunicado | null>(
+    null
+  );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -55,7 +93,7 @@ export default function Comunicados() {
         .select("*")
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
-      
+
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -97,7 +135,11 @@ export default function Comunicados() {
       toast({ title: "Status atualizado!" });
       loadComunicados();
     } catch (error: unknown) {
-      toast({ title: "Erro", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     }
   };
 
@@ -111,7 +153,7 @@ export default function Comunicados() {
 
     try {
       const comunicado = comunicados.find((c) => c.id === deletingId);
-      
+
       // Deletar imagem do storage se existir
       if (comunicado?.imagem_url) {
         const path = comunicado.imagem_url.split("/").pop();
@@ -120,14 +162,21 @@ export default function Comunicados() {
         }
       }
 
-      const { error } = await supabase.from("comunicados").delete().eq("id", deletingId);
+      const { error } = await supabase
+        .from("comunicados")
+        .delete()
+        .eq("id", deletingId);
 
       if (error) throw error;
 
       toast({ title: "Comunicado removido!" });
       loadComunicados();
     } catch (error: unknown) {
-      toast({ title: "Erro", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     } finally {
       setDeleteDialogOpen(false);
       setDeletingId(null);
@@ -136,7 +185,9 @@ export default function Comunicados() {
 
   const getStatusInfo = (comunicado: Comunicado) => {
     const now = new Date();
-    const dataInicio = comunicado.data_inicio ? new Date(comunicado.data_inicio) : null;
+    const dataInicio = comunicado.data_inicio
+      ? new Date(comunicado.data_inicio)
+      : null;
     const dataFim = comunicado.data_fim ? new Date(comunicado.data_fim) : null;
 
     if (!comunicado.ativo) {
@@ -152,10 +203,10 @@ export default function Comunicados() {
   };
 
   const formatValidity = (comunicado: Comunicado) => {
-    const dataInicio = comunicado.data_inicio 
+    const dataInicio = comunicado.data_inicio
       ? format(new Date(comunicado.data_inicio), "dd/MM/yy", { locale: ptBR })
       : "Imediato";
-    const dataFim = comunicado.data_fim 
+    const dataFim = comunicado.data_fim
       ? format(new Date(comunicado.data_fim), "dd/MM/yy", { locale: ptBR })
       : "Sem fim";
     return `${dataInicio} → ${dataFim}`;
@@ -194,16 +245,21 @@ export default function Comunicados() {
         <CardHeader>
           <CardTitle className="text-lg">Lista de Comunicados</CardTitle>
           <CardDescription>
-            {comunicados.length} comunicado{comunicados.length !== 1 ? "s" : ""} cadastrado{comunicados.length !== 1 ? "s" : ""}
+            {comunicados.length} comunicado{comunicados.length !== 1 ? "s" : ""}{" "}
+            cadastrado{comunicados.length !== 1 ? "s" : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+            <div className="text-center py-8 text-muted-foreground">
+              Carregando...
+            </div>
           ) : comunicados.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Megaphone className="w-16 h-16 text-muted-foreground/20 mb-4" />
-              <p className="text-muted-foreground">Nenhum comunicado criado ainda</p>
+              <p className="text-muted-foreground">
+                Nenhum comunicado criado ainda
+              </p>
               <Button onClick={handleNew} variant="outline" className="mt-4">
                 Criar primeiro comunicado
               </Button>
@@ -255,7 +311,9 @@ export default function Comunicados() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => toggleActive(comunicado.id, comunicado.ativo)}
+                              onClick={() =>
+                                toggleActive(comunicado.id, comunicado.ativo)
+                              }
                               title={comunicado.ativo ? "Desativar" : "Ativar"}
                             >
                               {comunicado.ativo ? (
@@ -303,12 +361,16 @@ export default function Comunicados() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este comunicado? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir este comunicado? Esta ação não pode
+              ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>

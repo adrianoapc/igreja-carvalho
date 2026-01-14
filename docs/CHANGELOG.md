@@ -8,6 +8,51 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+#### 🔒 Conferência Cega: RPCs oficiais + integração (12 Jan/2026)
+
+- **Tipo**: backend + frontend
+- **Resumo**: Uso dos RPCs oficiais `open_sessao_contagem` e `confrontar_contagens` (migrations em `supabase/migrations/20260112183749_*.sql`), criação do hook `useFinanceiroSessao` e integração em `RelatorioOferta.tsx` para abrir sessão com snapshot após envio de notificação. Adicionado skeleton da Edge Function `finance-sync` para futura sincronização com provedores.
+- **Módulos afetados**: Finanças
+- **Impacto no usuário**: Sessão de contagem aberta automaticamente; base pronta para confronto de contagens com tolerância parametrizada.
+
+**Arquivos criados/modificados:**
+
+- `src/hooks/useFinanceiroSessao.ts` (RPC wrappers)
+- `src/pages/financas/RelatorioOferta.tsx` (integração `openSessaoContagem`)
+- `supabase/functions/finance-sync/index.ts` (skeleton)
+- `supabase/migrations/20260112183749_28424ab5-...sql` (RPCs oficiais)
+
+**Próximos passos:**
+
+- Refatorar `RelatorioOferta` para wizard de 4 etapas
+- Implementar UI de “Minha Contagem” e fluxo de confronto
+- Criar tela admin para `financeiro_config` e segredos/webhooks
+- Integrar `finance-sync` com provedores e materialização
+
+#### 🧾 Classificação Digital/Física + Correções de Configuração (13 Jan/2026)
+
+- **Tipo**: frontend + database
+- **Resumo**: Adoção oficial de `is_digital` em `formas_pagamento` para classificar meios digitais vs. físicos. UI de `FormasPagamento` atualizada com coluna/controle “Digital?”. `RelatorioOferta` passa a separar por `is_digital` e respeitar filtros de `financeiro_config`. Correção de `blind_count_mode` para opções válidas (`off`, `optional`, `required`) e remoção de campos inexistentes no payload de `ConfigFinanceiro`, eliminando erros 400 e violações de CHECK.
+- **Módulos afetados**: Finanças
+- **Impacto no usuário**: Configuração financeira salva corretamente; relatório exibe separação adequada; evita falhas de salvamento e classificação incorreta.
+
+**Arquivos modificados:**
+
+- `src/pages/financas/FormasPagamento.tsx` (inclusão/edição de `is_digital`)
+- `src/pages/financas/RelatorioOferta.tsx` (separação por `is_digital`, respeito aos filtros da config)
+- `src/pages/financas/ConfigFinanceiro.tsx` (corrigido `blind_count_mode` e payload sem colunas inexistentes)
+- `supabase/migrations/20260113134425_*.sql` (coluna `is_digital` em `formas_pagamento`)
+
+**Notas de migração/validação:**
+
+- Certifique-se de definir `is_digital=true` para PIX, cartões e apps; `false` para dinheiro/cheque.
+- `blind_count_mode` aceita apenas: `off`, `optional`, `required`.
+
+**Próximos passos:**
+
+- Validar salvamento em ambiente e revisar UX de confirmação zero físico.
+- Prosseguir com telas de reconciliação e supervisão de contagens.
+
 ### Alterado
 
 #### 💰 Gestão Unificada de Dados Financeiros + Importação de Extratos Bancários (9 Jan/2026)
@@ -25,23 +70,27 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **Tela `GerenciarDados.tsx`** (`src/pages/financas/GerenciarDados.tsx`):
+
   - Layout com 3 tabs: **Importar** (transações), **Exportar** (transações), **Extratos** (conciliação)
   - Navegação via query params: `?tab=importar&tipo=entrada`
   - Acesso via botões em Entradas/Saídas substituindo links antigos
 
 - **Componente `ImportarTab.tsx`** (`src/components/financas/ImportarTab.tsx`):
+
   - Extraído de `ImportarFinancasPage` (mantém wizard 4 etapas)
   - Upload → Mapeamento → Validação → Confirmação
   - Suporta CSV/XLSX com auto-detecção de colunas
   - Virtualização de preview com `@tanstack/react-virtual`
 
 - **Componente `ExportarTab.tsx`** (`src/components/financas/ExportarTab.tsx`):
+
   - Filtros avançados: tipo, status, período, conta, categoria
   - Seleção de colunas para exportação customizada
   - Preview virtualizado antes do export
   - Exportação para Excel via `xlsx` library
 
 - **Componente `ImportarExtratosTab.tsx`** (`src/components/financas/ImportarExtratosTab.tsx`):
+
   - **Upload**: Aceita CSV, XLSX e **OFX** (até 10MB)
   - **Parser OFX**: Biblioteca `ofx-js` extrai `STMTTRN` (transações bancárias)
     - Campos: `DTPOSTED` (data), `TRNAMT` (valor), `MEMO/NAME` (descrição), `FITID/CHECKNUM` (documento)
@@ -53,6 +102,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
   - **Importação chunk**: Insere em lotes de 200 registros na tabela `extratos_bancarios`
 
 - **Tabela `extratos_bancarios`** (Migration `20260109_extratos_bancarios.sql`):
+
   - Campos: `conta_id` (FK), `igreja_id`, `filial_id`, `data_transacao`, `descricao`, `valor`, `saldo`, `numero_documento`, `tipo` (credito/debito), `reconciliado` (boolean)
   - Índices: `conta_id`, `data_transacao`, `igreja_id`, `filial_id`
   - RLS policies: Multi-tenant por `igreja_id`
@@ -66,7 +116,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Fluxo de importação de extratos:**
 
 1. **Upload**: Usuário seleciona conta e faz upload de arquivo CSV/XLSX/OFX
-2. **Parsing**: 
+2. **Parsing**:
    - OFX: Extrai transações via parser, mapeia campos automaticamente
    - CSV/XLSX: Extrai colunas e rows, aplica auto-detecção de mapeamento
 3. **Mapeamento**: Usuário ajusta mapeamento de colunas (se necessário)

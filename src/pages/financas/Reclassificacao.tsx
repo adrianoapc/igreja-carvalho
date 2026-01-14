@@ -203,8 +203,28 @@ const ReclassificacaoPage = () => {
           )
           .map((r) => ({ id: String(r.id), nome: r.nome ?? "" }));
 
+      const mapCategorias = (
+        rows: Array<{
+          id?: string | number | null;
+          nome?: string | null;
+          tipo?: string | null;
+        }> | null
+      ) =>
+        (rows || [])
+          .filter(
+            (r) =>
+              r.id !== null &&
+              r.id !== undefined &&
+              String(r.id).trim().length > 0
+          )
+          .map((r) => ({
+            id: String(r.id),
+            nome: r.nome ?? "",
+            tipo: String(r.tipo ?? ""),
+          }));
+
       setOptions({
-        categorias: safe(cat.data) as Array<{
+        categorias: mapCategorias(cat.data) as Array<{
           id: string;
           nome: string;
           tipo: string;

@@ -10,7 +10,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, Clock, CheckCircle, XCircle, Music, Users, Baby, Megaphone } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Music,
+  Users,
+  Baby,
+  Megaphone,
+} from "lucide-react";
 import { RecusarEscalaDialog } from "@/components/voluntario/RecusarEscalaDialog";
 import { EscalaDetailsSheet } from "@/components/voluntario/EscalaDetailsSheet";
 
@@ -57,12 +66,13 @@ export default function MinhasEscalas() {
 
   const loadEscalas = async () => {
     if (!profile?.id || !igrejaId) return;
-    
+
     setLoading(true);
     try {
       let query = supabase
         .from("escalas")
-        .select(`
+        .select(
+          `
           id,
           confirmado,
           status_confirmacao,
@@ -88,26 +98,32 @@ export default function MinhasEscalas() {
             id,
             nome
           )
-        `)
+        `
+        )
         .eq("pessoa_id", profile.id);
 
       const { data, error } = await query;
 
       if (error) throw error;
-      
+
       // Filtrar por igreja/filial e ordenar manualmente no frontend
       const validEscalas = (data || [])
-        .filter(e => e.culto !== null)
-        .filter(e => {
+        .filter((e) => e.culto !== null)
+        .filter((e) => {
           const culto = e.culto as any;
           // Filtrar por igreja_id
           if (culto.igreja_id !== igrejaId) return false;
           // Filtrar por filial_id se não for "Todas as Filiais"
-          if (!isAllFiliais && filialId && culto.filial_id !== filialId) return false;
+          if (!isAllFiliais && filialId && culto.filial_id !== filialId)
+            return false;
           // Filtrar por data futura
           return new Date(culto.data_evento) >= new Date();
         })
-        .sort((a, b) => new Date(a.culto.data_evento).getTime() - new Date(b.culto.data_evento).getTime()) as Escala[];
+        .sort(
+          (a, b) =>
+            new Date(a.culto.data_evento).getTime() -
+            new Date(b.culto.data_evento).getTime()
+        ) as Escala[];
       setEscalas(validEscalas);
     } catch (error) {
       console.error("Erro ao carregar escalas:", error);
@@ -124,12 +140,12 @@ export default function MinhasEscalas() {
         .update({
           confirmado: true,
           status_confirmacao: "aceito",
-          motivo_recusa: null
+          motivo_recusa: null,
         })
         .eq("id", escala.id);
 
       if (error) throw error;
-      
+
       toast.success("Escala confirmada!");
       loadEscalas();
     } catch (error) {
@@ -145,12 +161,12 @@ export default function MinhasEscalas() {
         .update({
           confirmado: false,
           status_confirmacao: "recusado",
-          motivo_recusa: motivo
+          motivo_recusa: motivo,
         })
         .eq("id", escalaId);
 
       if (error) throw error;
-      
+
       toast.success("Escala recusada");
       setRecusarEscala(null);
       loadEscalas();
@@ -162,9 +178,12 @@ export default function MinhasEscalas() {
 
   const getTeamIcon = (categoria: string | null | undefined) => {
     const nome = categoria?.toLowerCase() || "";
-    if (nome.includes("louvor") || nome.includes("música")) return <Music className="h-5 w-5" />;
-    if (nome.includes("kids") || nome.includes("infantil")) return <Baby className="h-5 w-5" />;
-    if (nome.includes("mídia") || nome.includes("comunicação")) return <Megaphone className="h-5 w-5" />;
+    if (nome.includes("louvor") || nome.includes("música"))
+      return <Music className="h-5 w-5" />;
+    if (nome.includes("kids") || nome.includes("infantil"))
+      return <Baby className="h-5 w-5" />;
+    if (nome.includes("mídia") || nome.includes("comunicação"))
+      return <Megaphone className="h-5 w-5" />;
     return <Users className="h-5 w-5" />;
   };
 
@@ -173,193 +192,236 @@ export default function MinhasEscalas() {
     switch (status) {
       case "aceito":
       case "confirmado":
-        return <Badge className="bg-green-500/20 text-green-600 border-green-500/30">Confirmado</Badge>;
+        return (
+          <Badge className="bg-green-500/20 text-green-600 border-green-500/30">
+            Confirmado
+          </Badge>
+        );
       case "recusado":
         return <Badge variant="destructive">Recusado</Badge>;
       default:
-        return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">Pendente</Badge>;
+        return (
+          <Badge
+            variant="secondary"
+            className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30"
+          >
+            Pendente
+          </Badge>
+        );
     }
   };
 
-  const pendentes = escalas.filter(e => !e.status_confirmacao || e.status_confirmacao === "pendente");
-  const confirmadas = escalas.filter(e => e.status_confirmacao === "aceito" || e.status_confirmacao === "confirmado");
-  const recusadas = escalas.filter(e => e.status_confirmacao === "recusado");
+  const pendentes = escalas.filter(
+    (e) => !e.status_confirmacao || e.status_confirmacao === "pendente"
+  );
+  const confirmadas = escalas.filter(
+    (e) =>
+      e.status_confirmacao === "aceito" || e.status_confirmacao === "confirmado"
+  );
+  const recusadas = escalas.filter((e) => e.status_confirmacao === "recusado");
 
   return (
     <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Minhas Escalas</h1>
-          <p className="text-muted-foreground">Gerencie suas próximas escalas e compromissos</p>
+      <div>
+        <h1 className="text-2xl font-bold">Minhas Escalas</h1>
+        <p className="text-muted-foreground">
+          Gerencie suas próximas escalas e compromissos
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48" />
+          ))}
         </div>
-
-        {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-48" />
-            ))}
-          </div>
-        ) : escalas.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">Nenhuma escala encontrada</h3>
-              <p className="text-muted-foreground">Você não possui escalas futuras no momento.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            {/* Pendentes de Confirmação */}
-            {pendentes.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-yellow-500" />
-                  Aguardando sua confirmação ({pendentes.length})
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {pendentes.map(escala => (
-                    <Card key={escala.id} className="border-yellow-500/30 bg-yellow-500/5">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            {getTeamIcon(escala.time.categoria)}
-                            <CardTitle className="text-base">{escala.time.nome}</CardTitle>
-                          </div>
-                          {getStatusBadge(escala)}
+      ) : escalas.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium">Nenhuma escala encontrada</h3>
+            <p className="text-muted-foreground">
+              Você não possui escalas futuras no momento.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {/* Pendentes de Confirmação */}
+          {pendentes.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Clock className="h-5 w-5 text-yellow-500" />
+                Aguardando sua confirmação ({pendentes.length})
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {pendentes.map((escala) => (
+                  <Card
+                    key={escala.id}
+                    className="border-yellow-500/30 bg-yellow-500/5"
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {getTeamIcon(escala.time.categoria)}
+                          <CardTitle className="text-base">
+                            {escala.time.nome}
+                          </CardTitle>
                         </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div>
-                          <p className="font-medium">{escala.culto.titulo}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_evento), "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_evento), "HH:mm")}
-                            {escala.culto.local && ` • ${escala.culto.local}`}
-                          </p>
-                        </div>
-                        {escala.posicao && (
-                          <Badge variant="outline">{escala.posicao.nome}</Badge>
-                        )}
-                        <div className="flex gap-2 pt-2">
-                          <Button 
-                            size="sm" 
-                            className="flex-1"
-                            onClick={() => handleConfirmar(escala)}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Confirmar
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => setRecusarEscala(escala)}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Recusar
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Confirmadas */}
-            {confirmadas.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  Escalas Confirmadas ({confirmadas.length})
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {confirmadas.map(escala => (
-                    <Card 
-                      key={escala.id} 
-                      className="cursor-pointer hover:border-primary/50 transition-colors"
-                      onClick={() => {
-                        setSelectedEscala(escala);
-                        setDetailsOpen(true);
-                      }}
-                    >
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            {getTeamIcon(escala.time.categoria)}
-                            <CardTitle className="text-base">{escala.time.nome}</CardTitle>
-                          </div>
-                          {getStatusBadge(escala)}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div>
-                          <p className="font-medium">{escala.culto.titulo}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_evento), "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_evento), "HH:mm")}
-                            {escala.culto.local && ` • ${escala.culto.local}`}
-                          </p>
-                        </div>
-                        {escala.posicao && (
-                          <Badge variant="outline">{escala.posicao.nome}</Badge>
-                        )}
-                        <p className="text-xs text-muted-foreground pt-2">
-                          Clique para ver detalhes e briefing
+                        {getStatusBadge(escala)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="font-medium">{escala.culto.titulo}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(
+                            new Date(escala.culto.data_evento),
+                            "EEEE, dd 'de' MMMM",
+                            { locale: ptBR }
+                          )}
                         </p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(escala.culto.data_evento), "HH:mm")}
+                          {escala.culto.local && ` • ${escala.culto.local}`}
+                        </p>
+                      </div>
+                      {escala.posicao && (
+                        <Badge variant="outline">{escala.posicao.nome}</Badge>
+                      )}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleConfirmar(escala)}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Confirmar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setRecusarEscala(escala)}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Recusar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Recusadas */}
-            {recusadas.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2 text-muted-foreground">
-                  <XCircle className="h-5 w-5" />
-                  Escalas Recusadas ({recusadas.length})
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {recusadas.map(escala => (
-                    <Card key={escala.id} className="opacity-60">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            {getTeamIcon(escala.time.categoria)}
-                            <CardTitle className="text-base">{escala.time.nome}</CardTitle>
-                          </div>
-                          {getStatusBadge(escala)}
+          {/* Confirmadas */}
+          {confirmadas.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                Escalas Confirmadas ({confirmadas.length})
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {confirmadas.map((escala) => (
+                  <Card
+                    key={escala.id}
+                    className="cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => {
+                      setSelectedEscala(escala);
+                      setDetailsOpen(true);
+                    }}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {getTeamIcon(escala.time.categoria)}
+                          <CardTitle className="text-base">
+                            {escala.time.nome}
+                          </CardTitle>
                         </div>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div>
-                          <p className="font-medium">{escala.culto.titulo}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(escala.culto.data_evento), "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                          </p>
-                        </div>
-                        {escala.motivo_recusa && (
-                          <p className="text-sm text-muted-foreground italic">
-                            Motivo: {escala.motivo_recusa}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        {getStatusBadge(escala)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div>
+                        <p className="font-medium">{escala.culto.titulo}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(
+                            new Date(escala.culto.data_evento),
+                            "EEEE, dd 'de' MMMM",
+                            { locale: ptBR }
+                          )}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(escala.culto.data_evento), "HH:mm")}
+                          {escala.culto.local && ` • ${escala.culto.local}`}
+                        </p>
+                      </div>
+                      {escala.posicao && (
+                        <Badge variant="outline">{escala.posicao.nome}</Badge>
+                      )}
+                      <p className="text-xs text-muted-foreground pt-2">
+                        Clique para ver detalhes e briefing
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+
+          {/* Recusadas */}
+          {recusadas.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-muted-foreground">
+                <XCircle className="h-5 w-5" />
+                Escalas Recusadas ({recusadas.length})
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {recusadas.map((escala) => (
+                  <Card key={escala.id} className="opacity-60">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {getTeamIcon(escala.time.categoria)}
+                          <CardTitle className="text-base">
+                            {escala.time.nome}
+                          </CardTitle>
+                        </div>
+                        {getStatusBadge(escala)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div>
+                        <p className="font-medium">{escala.culto.titulo}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(
+                            new Date(escala.culto.data_evento),
+                            "EEEE, dd 'de' MMMM",
+                            { locale: ptBR }
+                          )}
+                        </p>
+                      </div>
+                      {escala.motivo_recusa && (
+                        <p className="text-sm text-muted-foreground italic">
+                          Motivo: {escala.motivo_recusa}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <RecusarEscalaDialog
         open={!!recusarEscala}
         onOpenChange={(open) => !open && setRecusarEscala(null)}
-        onConfirm={(motivo) => recusarEscala && handleRecusar(recusarEscala.id, motivo)}
+        onConfirm={(motivo) =>
+          recusarEscala && handleRecusar(recusarEscala.id, motivo)
+        }
         escala={recusarEscala}
       />
 

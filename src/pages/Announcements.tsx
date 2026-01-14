@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Calendar, Clock, AlertTriangle, Info, AlertCircle, Megaphone } from "lucide-react";
+import {
+  Bell,
+  Calendar,
+  Clock,
+  AlertTriangle,
+  Info,
+  AlertCircle,
+  Megaphone,
+} from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PublicHeader } from "@/components/layout/PublicHeader";
@@ -36,10 +44,10 @@ const Announcements = () => {
 
   const fetchComunicados = async () => {
     if (!igrejaId) return;
-    
+
     try {
       const now = new Date().toISOString();
-      
+
       let query = supabase
         .from("comunicados")
         .select("*")
@@ -49,11 +57,11 @@ const Announcements = () => {
         .or(`data_inicio.is.null,data_inicio.lte.${now}`)
         .or(`data_fim.is.null,data_fim.gte.${now}`)
         .order("created_at", { ascending: false });
-      
+
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
-      
+
       const { data, error } = await query;
 
       if (error) throw error;
@@ -69,42 +77,47 @@ const Announcements = () => {
     switch (nivel) {
       case "info":
         return {
-          color: "bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400",
+          color:
+            "bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400",
           icon: Info,
           label: "Informação",
-          accent: "border-l-blue-500"
+          accent: "border-l-blue-500",
         };
       case "warning":
         return {
-          color: "bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400",
+          color:
+            "bg-amber-500/10 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400",
           icon: AlertTriangle,
           label: "Atenção",
-          accent: "border-l-amber-500"
+          accent: "border-l-amber-500",
         };
       case "urgent":
         return {
-          color: "bg-red-500/10 text-red-600 border-red-200 dark:bg-red-500/20 dark:text-red-400",
+          color:
+            "bg-red-500/10 text-red-600 border-red-200 dark:bg-red-500/20 dark:text-red-400",
           icon: AlertCircle,
           label: "Urgente",
-          accent: "border-l-red-500"
+          accent: "border-l-red-500",
         };
       default:
         return {
           color: "bg-primary/10 text-primary border-primary/20",
           icon: Bell,
           label: "Aviso",
-          accent: "border-l-primary"
+          accent: "border-l-primary",
         };
     }
   };
 
   const getTimeAgo = (date: string) => {
-    return formatDistanceToNow(new Date(date), { addSuffix: true, locale: ptBR });
+    return formatDistanceToNow(new Date(date), {
+      addSuffix: true,
+      locale: ptBR,
+    });
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-    
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         {/* Header com contador */}
         {!loading && comunicados.length > 0 && (
@@ -113,7 +126,10 @@ const Announcements = () => {
               <Megaphone className="w-5 h-5 text-primary" />
             </div>
             <span className="text-sm text-muted-foreground">
-              {comunicados.length} {comunicados.length === 1 ? 'comunicado ativo' : 'comunicados ativos'}
+              {comunicados.length}{" "}
+              {comunicados.length === 1
+                ? "comunicado ativo"
+                : "comunicados ativos"}
             </span>
           </div>
         )}
@@ -142,9 +158,12 @@ const Announcements = () => {
                 <Bell className="h-10 w-10 text-muted-foreground/50" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg text-foreground mb-1">Nenhum comunicado</h3>
+                <h3 className="font-semibold text-lg text-foreground mb-1">
+                  Nenhum comunicado
+                </h3>
                 <p className="text-muted-foreground text-sm">
-                  Não há comunicados ativos no momento.<br />
+                  Não há comunicados ativos no momento.
+                  <br />
                   Volte mais tarde para novidades!
                 </p>
               </div>
@@ -155,10 +174,10 @@ const Announcements = () => {
             {comunicados.map((comunicado, index) => {
               const config = getUrgenciaConfig(comunicado.nivel_urgencia);
               const TypeIcon = config.icon;
-              
+
               return (
-                <Card 
-                  key={comunicado.id} 
+                <Card
+                  key={comunicado.id}
                   className={`overflow-hidden border-l-4 ${config.accent} hover:shadow-lg transition-all duration-300 animate-fade-in bg-card/80 backdrop-blur-sm`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
@@ -178,7 +197,9 @@ const Announcements = () => {
                     {/* Header do card */}
                     <div className="flex items-start gap-3 mb-3">
                       {!comunicado.imagem_url && (
-                        <div className={`p-2.5 rounded-full ${config.color} flex-shrink-0`}>
+                        <div
+                          className={`p-2.5 rounded-full ${config.color} flex-shrink-0`}
+                        >
                           <TypeIcon className="w-5 h-5" />
                         </div>
                       )}
@@ -188,7 +209,10 @@ const Announcements = () => {
                             {comunicado.titulo}
                           </h3>
                           {!comunicado.imagem_url && (
-                            <Badge variant="outline" className={`${config.color} flex-shrink-0 text-xs`}>
+                            <Badge
+                              variant="outline"
+                              className={`${config.color} flex-shrink-0 text-xs`}
+                            >
                               {config.label}
                             </Badge>
                           )}
@@ -214,7 +238,12 @@ const Announcements = () => {
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50 text-xs text-muted-foreground">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>
-                          Válido até {format(new Date(comunicado.data_fim), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                          Válido até{" "}
+                          {format(
+                            new Date(comunicado.data_fim),
+                            "dd 'de' MMMM 'às' HH:mm",
+                            { locale: ptBR }
+                          )}
                         </span>
                       </div>
                     )}

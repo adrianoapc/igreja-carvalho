@@ -145,6 +145,12 @@ const FinancasDRE = lazy(() => import("./pages/financas/DRE"));
 const FinancasRelatorioOferta = lazy(
   () => import("./pages/financas/RelatorioOferta")
 );
+const FinancasSessoesContagem = lazy(
+  () => import("./pages/financas/SessoesContagem")
+);
+const FinancasSessaoLancamentos = lazy(
+  () => import("./pages/financas/SessaoLancamentos")
+);
 const FinancasImportar = lazy(
   () => import("./pages/financas/ImportarFinancasPage")
 );
@@ -156,6 +162,9 @@ const FinancasReclassificacao = lazy(
 );
 const FinancasReconciliacao = lazy(
   () => import("./pages/financas/Reconciliacao")
+);
+const FinancasConfigFinanceiro = lazy(
+  () => import("./pages/financas/ConfigFinanceiro")
 );
 const FinancasDashboardOfertas = lazy(
   () => import("./pages/financas/DashboardOfertas")
@@ -954,6 +963,22 @@ const App = () => (
                     }
                   />
                   <Route
+                    path="/financas/sessoes-contagem"
+                    element={
+                      <AuthGate>
+                        <FinancasSessoesContagem />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/financas/sessoes-contagem/:id"
+                    element={
+                      <AuthGate>
+                        <FinancasSessaoLancamentos />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
                     path="/financas/importar"
                     element={
                       <AuthGate>
@@ -982,6 +1007,14 @@ const App = () => (
                     element={
                       <AuthGate>
                         <FinancasReconciliacao />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/financas/config-financeiro"
+                    element={
+                      <AuthGate requiredPermission="financeiro.admin">
+                        <FinancasConfigFinanceiro />
                       </AuthGate>
                     }
                   />

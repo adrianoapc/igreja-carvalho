@@ -149,7 +149,7 @@ export default function CursoPlayer() {
         .single();
 
       if (jornadaError) {
-        if (jornadaError.code === 'PGRST116') {
+        if (jornadaError.code === "PGRST116") {
           toast.error("Curso não encontrado ou você não tem acesso a ele");
           navigate("/cursos");
           return;
@@ -201,21 +201,19 @@ export default function CursoPlayer() {
         presencasData?.map((p) => [p.etapa_id, p.created_at]) || []
       );
 
-      const etapasComStatus: Etapa[] = (etapasData || []).map(
-        (etapa) => ({
-          id: String(etapa.id),
-          titulo: String(etapa.titulo || ''),
-          ordem: Number(etapa.ordem || 0),
-          tipo_conteudo: etapa.tipo_conteudo as string | null,
-          conteudo_url: etapa.conteudo_url as string | null,
-          conteudo_texto: etapa.conteudo_texto as string | null,
-          aula_vinculada_id: (etapa.aula_vinculada_id as string | null) ?? null,
-          check_automatico: etapa.check_automatico as boolean | null,
-          quiz_config: normalizeQuizConfig(etapa.quiz_config),
-          concluida: conclusoesMap.has(String(etapa.id)),
-          data_conclusao: conclusoesMap.get(String(etapa.id)),
-        })
-      );
+      const etapasComStatus: Etapa[] = (etapasData || []).map((etapa) => ({
+        id: String(etapa.id),
+        titulo: String(etapa.titulo || ""),
+        ordem: Number(etapa.ordem || 0),
+        tipo_conteudo: etapa.tipo_conteudo as string | null,
+        conteudo_url: etapa.conteudo_url as string | null,
+        conteudo_texto: etapa.conteudo_texto as string | null,
+        aula_vinculada_id: (etapa.aula_vinculada_id as string | null) ?? null,
+        check_automatico: etapa.check_automatico as boolean | null,
+        quiz_config: normalizeQuizConfig(etapa.quiz_config),
+        concluida: conclusoesMap.has(String(etapa.id)),
+        data_conclusao: conclusoesMap.get(String(etapa.id)),
+      }));
 
       setEtapas(etapasComStatus);
 
