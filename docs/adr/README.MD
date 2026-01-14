@@ -86,6 +86,13 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Link:** [ADR-022](ADR-022-importacao-extratos-api.md)
 - **Resumo:** Conectores por provedor usando polling inicial com backoff, dedupe/idempotencia antes de persistir em `extratos_bancarios`, armazenamento seguro de credenciais e observabilidade basica.
 
+### ADR-023
+
+- **Titulo:** Conferência Cega com Contagem Dupla e Tolerância Parametrizada
+- **Status:** Aceito
+- **Link:** [ADR-023](ADR-023-conferencia-cega-contagem-dupla.md)
+- **Resumo:** Modelo de contagem dupla independente com snapshot imutável, tolerância configurável (% e R$), blind count (opcional/obrigatório), e base para sincronização com provedores externos via `finance-sync`.
+
 ---
 
 ## 📐 Relacao com Diagramas

@@ -8,6 +8,22 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+#### 👤 Acesso de Membros via Edge Function (14 Jan/2026)
+
+- **Tipo**: feature + automação
+- **Resumo**: Provisionamento e reset de contas via Edge Function `criar-usuario` usando Admin API do Supabase, com botões de "Criar Acesso" / "Resetar Senha" exibidos apenas para admins na tela de pessoa (status membro). Atualiza `profiles.user_id` e força troca de senha no primeiro login.
+- **Módulos afetados**: Pessoas, Auth
+- **Impacto no usuário**: Evita erros 409/23503 e permite conceder ou redefinir acesso direto pelo detalhe da pessoa.
+- **Referência ADR**: [ADR-023](docs/adr/ADR-023-conferencia-cega-contagem-dupla.md) (contexto: segurança de acesso para conferência cega)
+
+#### 💰 Conferência Cega — Sessões e Configuração (14 Jan/2026)
+
+- **Tipo**: feature
+- **Resumo**: Novas rotas `/financas/sessoes-contagem` e `/financas/sessoes-contagem/:id` para abrir/acompanhar sessões de contagem, além de `/financas/config-financeiro` para ajustar parâmetros (blind count, tolerância, provedores). `RelatorioOferta` integra os RPCs oficiais (`open_sessao_contagem`, `confrontar_contagens`) e usa o hook `useFinanceiroSessao`.
+- **Módulos afetados**: Finanças
+- **Impacto no usuário**: Fluxo de conferência cega habilitado com abertura de sessão, parametrização de contagem e confronto via UI.
+- **Referência ADR**: [ADR-023](docs/adr/ADR-023-conferencia-cega-contagem-dupla.md) (decisão arquitetural de contagem dupla, snapshot e tolerância)
+
 #### 🔒 Conferência Cega: RPCs oficiais + integração (12 Jan/2026)
 
 - **Tipo**: backend + frontend

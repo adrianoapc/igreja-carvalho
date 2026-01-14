@@ -130,6 +130,14 @@ O sino no canto superior direito mostra suas notificações:
 - **Campos obrigatórios e validações**: Nome é obrigatório; status deve ser um dos valores válidos (Visitante/Frequentador/Membro); contatos ajudam na busca e no follow-up. Em mobile, priorize inserir contato para facilitar ações posteriores.
 - **Vincular funções/roles ministeriais**: No perfil, acesse a área de status/igreja e atribua funções (quando disponível) conforme a liderança definir.
 
+**Gerenciamento de acesso (somente admins)**
+
+- No detalhe de um **membro** aparece o card “Gerenciamento de Acesso” apenas para admins.
+- Botões disponíveis:
+   - **Criar Acesso**: cria usuário no Supabase com senha temporária e vincula `profiles.user_id`.
+   - **Resetar Senha**: gera nova senha temporária e marca troca no próximo login.
+- Se o usuário já existe, o botão exibido é apenas **Resetar Senha**.
+
 **Exemplos práticos**
 
 - Cadastro de novo membro: Pessoas → Membros → **+ Novo** → Nome obrigatório, telefone/email recomendado, status **membro** → Salvar → aparece na lista com badge.
