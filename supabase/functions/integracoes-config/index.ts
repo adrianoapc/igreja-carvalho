@@ -1,9 +1,9 @@
 // supabase/functions/integracoes-config/index.ts
-// Edge Function para criar integrações financeiras + secrets (acesso somente via service role)
+// Edge Function para criar integrações financeiras + secrets com criptografia XSalsa20-Poly1305
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import * as nacl from 'npm:tweetnacl@1.0.3'
-import { encodeBase64, decodeBase64 } from 'npm:tweetnacl-util@0.5.2'
+import nacl from 'npm:tweetnacl@1.0.3'
+import { encodeBase64, decodeBase64 } from 'npm:tweetnacl-util@0.15.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,8 +35,57 @@ function json(status: number, payload: unknown) {
   })
 }
 
+// ==================== ENCRYPTION UTILITIES ====================
+
+/**
+ * Deriva uma chave de 32 bytes a partir da ENCRYPTION_KEY.
+ * Suporta hex (64 chars) ou base64 (44 chars).
+ */
+function deriveKey(masterKey: string): Uint8Array {
+  const trimmed = masterKey.trim()
+  
+  // Se for hex (64 caracteres = 32 bytes em hex)
+  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+    const bytes = new Uint8Array(32)
+    for (let i = 0; i < 32; i++) {
+      bytes[i] = parseInt(trimmed.substring(i * 2, i * 2 + 2), 16)
+    }
+    return bytes
+  }
+  
+  // Se for base64 (44 chars = 32 bytes em base64)
+  if (/^[A-Za-z0-9+/]{43}=?$/.test(trimmed) || /^[A-Za-z0-9+/]{44}$/.test(trimmed)) {
+    return decodeBase64(trimmed)
+  }
+  
+  // Fallback: usar os primeiros 32 bytes do UTF-8 (padded com zeros)
+  const encoder = new TextEncoder()
+  const encoded = encoder.encode(trimmed)
+  const key = new Uint8Array(32)
+  key.set(encoded.slice(0, 32))
+  return key
+}
+
+/**
+ * Criptografa dados usando XSalsa20-Poly1305 (secretbox).
+ * Retorna base64(nonce || ciphertext).
+ */
+function encryptData(plaintext: string, key: Uint8Array): string {
+  const nonce = nacl.randomBytes(nacl.secretbox.nonceLength) // 24 bytes
+  const messageBytes = new TextEncoder().encode(plaintext)
+  const ciphertext = nacl.secretbox(messageBytes, nonce, key)
+  
+  // Concatena nonce + ciphertext
+  const combined = new Uint8Array(nonce.length + ciphertext.length)
+  combined.set(nonce, 0)
+  combined.set(ciphertext, nonce.length)
+  
+  return encodeBase64(combined)
+}
+
+// ==================== PERMISSION VALIDATION ====================
+
 async function validatePermissions(supabaseAdmin: any, userId: string, igrejaId: string) {
-  // Mantém compatibilidade com o projeto atual (tabela user_roles)
   const { data, error } = await supabaseAdmin
     .from('user_roles')
     .select('role')
@@ -48,56 +97,7 @@ async function validatePermissions(supabaseAdmin: any, userId: string, igrejaId:
   return !error && !!data
 }
 
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
-  return bytes
-}
-
-/**
- * Encriptar dados usando XSalsa20-Poly1305 (tweetnacl)
- * Retorna: base64(nonce || ciphertext)
- */
-function encryptData(data: string, key: Uint8Array): string {
-  if (data.length === 0) return ''
-
-  const nonce = nacl.randomBytes(nacl.secretbox.nonceLength)
-  const message = new TextEncoder().encode(data)
-
-  const encrypted = nacl.secretbox(message, nonce, key)
-  if (!encrypted) throw new Error('Encryption failed')
-
-  // Concatenar nonce + ciphertext
-  const combined = new Uint8Array(nonce.length + encrypted.length)
-  combined.set(nonce)
-  combined.set(encrypted, nonce.length)
-
-  return encodeBase64(combined)
-}
-
-/**
- * Derivar chave a partir de ENCRYPTION_KEY env var
- * Retorna 32 bytes (256 bits)
- */
-function deriveKey(masterKeyHex: string): Uint8Array {
-  // Se a chave é em hex, converter para bytes
-  if (masterKeyHex.length === 64) {
-    const key = new Uint8Array(32)
-    for (let i = 0; i < 32; i++) {
-      key[i] = parseInt(masterKeyHex.substr(i * 2, 2), 16)
-    }
-    return key
-  }
-
-  // Fallback: usar a string como base64
-  try {
-    return decodeBase64(masterKeyHex)
-  } catch {
-    // Último fallback: usar SHA256 da string (simples, não ideal)
-    throw new Error('ENCRYPTION_KEY deve ser 64 chars em hex ou 44 chars em base64')
-  }
-}
+// ==================== MAIN HANDLER ====================
 
 Deno.serve(async (req) => {
   // CORS preflight
@@ -112,19 +112,24 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY')
 
     if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
-      console.error('[integracoes-config] Missing env vars', {
-        hasUrl: !!supabaseUrl,
-        hasAnon: !!supabaseAnonKey,
-        hasService: !!serviceKey,
-      })
+      console.error('[integracoes-config] Missing Supabase env vars')
       return json(500, { error: 'Server misconfigured' })
     }
 
+    if (!encryptionKey) {
+      console.error('[integracoes-config] ENCRYPTION_KEY not configured')
+      return json(500, { error: 'Encryption not configured' })
+    }
+
+    const derivedKey = deriveKey(encryptionKey)
+    console.log('[integracoes-config] Encryption key derived successfully')
+
     const token = authHeader.replace('Bearer ', '')
 
-    // 1) Validar JWT e obter userId (não depende de sessão)
+    // 1) Validar JWT e obter userId
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     })
@@ -185,7 +190,7 @@ Deno.serve(async (req) => {
       return json(500, { error: 'Failed to create integration' })
     }
 
-    // 5) Persistir secrets (service role). Nunca retornar secrets.
+    // 5) Persistir secrets CRIPTOGRAFADOS (service role). Nunca retornar secrets.
     const hasSecrets =
       payload.client_id ||
       payload.client_secret ||
@@ -194,52 +199,47 @@ Deno.serve(async (req) => {
       payload.pfx_password
 
     if (hasSecrets) {
-      const encryptionKeyHex = Deno.env.get('ENCRYPTION_KEY')
-      if (!encryptionKeyHex) {
-        console.error('[integracoes-config] ENCRYPTION_KEY not configured')
+      console.log('[integracoes-config] Encrypting sensitive credentials...')
+
+      // Criptografar cada campo sensível
+      const encryptedClientId = payload.client_id 
+        ? encryptData(payload.client_id, derivedKey) 
+        : null
+      
+      const encryptedClientSecret = payload.client_secret 
+        ? encryptData(payload.client_secret, derivedKey) 
+        : null
+      
+      const encryptedApplicationKey = payload.application_key 
+        ? encryptData(payload.application_key, derivedKey) 
+        : null
+      
+      const encryptedPfxPassword = payload.pfx_password 
+        ? encryptData(payload.pfx_password, derivedKey) 
+        : null
+      
+      // PFX blob já vem como base64, criptografamos a string base64
+      const encryptedPfxBlob = payload.pfx_blob 
+        ? encryptData(payload.pfx_blob, derivedKey) 
+        : null
+
+      const { error: secretsError } = await supabaseAdmin.from('integracoes_financeiras_secrets').insert({
+        integracao_id: integracao.id,
+        pfx_blob: encryptedPfxBlob,
+        pfx_password: encryptedPfxPassword,
+        client_id: encryptedClientId,
+        client_secret: encryptedClientSecret,
+        application_key: encryptedApplicationKey,
+      })
+
+      if (secretsError) {
+        console.error('[integracoes-config] Error storing encrypted secrets', secretsError)
+        // rollback best-effort
         await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
-        return json(500, { error: 'Encryption not configured on server' })
+        return json(500, { error: 'Failed to store credentials securely' })
       }
 
-      try {
-        const encryptionKey = deriveKey(encryptionKeyHex)
-
-        // Criptografar cada campo sensível
-        const encryptedClientId = payload.client_id ? encryptData(payload.client_id, encryptionKey) : null
-        const encryptedClientSecret = payload.client_secret
-          ? encryptData(payload.client_secret, encryptionKey)
-          : null
-        const encryptedApplicationKey = payload.application_key
-          ? encryptData(payload.application_key, encryptionKey)
-          : null
-        const encryptedPfxPassword = payload.pfx_password
-          ? encryptData(payload.pfx_password, encryptionKey)
-          : null
-        const encryptedPfxBlob = payload.pfx_blob
-          ? encryptData(payload.pfx_blob, encryptionKey)
-          : null
-
-        const { error: secretsError } = await supabaseAdmin
-          .from('integracoes_financeiras_secrets')
-          .insert({
-            integracao_id: integracao.id,
-            pfx_blob: encryptedPfxBlob,
-            pfx_password: encryptedPfxPassword,
-            client_id: encryptedClientId,
-            client_secret: encryptedClientSecret,
-            application_key: encryptedApplicationKey,
-          })
-
-        if (secretsError) {
-          console.error('[integracoes-config] Error storing secrets', secretsError)
-          await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
-          return json(500, { error: 'Failed to store credentials securely' })
-        }
-      } catch (encryptError) {
-        console.error('[integracoes-config] Encryption error', encryptError)
-        await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
-        return json(500, { error: 'Encryption failed' })
-      }
+      console.log('[integracoes-config] Secrets encrypted and stored successfully')
     }
 
     return json(201, { success: true, integracao })
