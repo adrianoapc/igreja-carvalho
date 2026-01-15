@@ -18,6 +18,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import nacl from 'npm:tweetnacl@1.0.3'
+import forge from 'npm:node-forge@1.3.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -101,6 +102,38 @@ function decryptData(encrypted: string, key: Uint8Array): string {
     // Se falhar na decodificação base64, retorna o valor original
     console.warn('[test-santander] Base64 decode failed, returning original:', error)
     return encrypted
+  }
+}
+
+/**
+ * Converte certificado PFX (PKCS#12) para PEM
+ * Retorna certificado + chave privada em formato PEM
+ */
+function pfxToPem(pfxBase64: string, password?: string): { cert: string; key: string } {
+  try {
+    const pfxDer = forge.util.decode64(pfxBase64)
+    const pfxAsn1 = forge.asn1.fromDer(pfxDer)
+    const p12 = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, password || '')
+
+    // Extrair certificado
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })
+    const certBag = certBags[forge.pki.oids.certBag]?.[0]
+    if (!certBag?.cert) {
+      throw new Error('Certificate not found in PFX')
+    }
+    const cert = forge.pki.certificateToPem(certBag.cert)
+
+    // Extrair chave privada
+    const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })
+    const keyBag = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0]
+    if (!keyBag?.key) {
+      throw new Error('Private key not found in PFX')
+    }
+    const key = forge.pki.privateKeyToPem(keyBag.key)
+
+    return { cert, key }
+  } catch (error) {
+    throw new Error(`PFX conversion failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -238,8 +271,36 @@ Deno.serve(async (req) => {
 
     console.log('[test-santander] Credentials decrypted successfully')
 
+    // Create mTLS HttpClient if PFX certificate is available
+    let httpClient: Deno.HttpClient | null = null
+
+    if (pfxBlob && pfxPassword) {
+      try {
+        console.log('[test-santander] Converting PFX to PEM for mTLS...')
+        const { cert, key } = pfxToPem(pfxBlob, pfxPassword)
+
+        httpClient = Deno.createHttpClient({
+          cert,
+          key,
+        })
+        console.log('[test-santander] mTLS HttpClient created successfully')
+      } catch (pfxError) {
+        console.error('[test-santander] PFX conversion failed:', pfxError)
+        return jsonResponse(
+          {
+            error: 'Failed to parse certificate',
+            detail: pfxError instanceof Error ? pfxError.message : String(pfxError),
+          },
+          500,
+        )
+      }
+    } else {
+      console.warn('[test-santander] No PFX certificate found - will attempt standard TLS only')
+    }
+
     // Get OAuth2 token
     console.log('[test-santander] Requesting OAuth2 token...')
+    console.log(`[test-santander] Using mTLS: ${httpClient ? 'Yes' : 'No'}`)
 
     const tokenBody = new URLSearchParams({
       client_id: clientId,
@@ -253,6 +314,7 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: tokenBody,
+      ...(httpClient && { client: httpClient }),
     })
 
     if (!tokenResponse.ok) {
@@ -288,6 +350,7 @@ Deno.serve(async (req) => {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      ...(httpClient && { client: httpClient }),
     })
 
     let balance = null
@@ -328,6 +391,7 @@ Deno.serve(async (req) => {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      ...(httpClient && { client: httpClient }),
     })
 
     let statement = null
@@ -382,5 +446,9 @@ Deno.serve(async (req) => {
       },
       500,
     )
+  } finally {
+    if (httpClient) {
+      httpClient.close()
+    }
   }
 })
