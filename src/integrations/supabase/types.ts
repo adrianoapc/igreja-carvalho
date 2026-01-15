@@ -3356,6 +3356,98 @@ export type Database = {
           },
         ]
       }
+      integracoes_financeiras: {
+        Row: {
+          cnpj: string
+          config: Json
+          created_at: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          provedor: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cnpj: string
+          config?: Json
+          created_at?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          provedor: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string
+          config?: Json
+          created_at?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          provedor?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracoes_financeiras_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracoes_financeiras_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integracoes_financeiras_secrets: {
+        Row: {
+          application_key: string | null
+          client_id: string | null
+          client_secret: string | null
+          created_at: string
+          id: string
+          integracao_id: string
+          pfx_blob: string | null
+          pfx_password: string | null
+        }
+        Insert: {
+          application_key?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          id?: string
+          integracao_id: string
+          pfx_blob?: string | null
+          pfx_password?: string | null
+        }
+        Update: {
+          application_key?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          id?: string
+          integracao_id?: string
+          pfx_blob?: string | null
+          pfx_password?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracoes_financeiras_secrets_integracao_id_fkey"
+            columns: ["integracao_id"]
+            isOneToOne: false
+            referencedRelation: "integracoes_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intercessores: {
         Row: {
           ativo: boolean | null
