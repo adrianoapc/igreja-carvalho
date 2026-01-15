@@ -172,6 +172,9 @@ const FinancasDashboardOfertas = lazy(
 const FinancasProjecao = lazy(() => import("./pages/financas/Projecao"));
 const FinancasInsights = lazy(() => import("./pages/financas/Insights"));
 const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
+const FinancasIntegracoes = lazy(
+  () => import("./pages/financas/Integracoes")
+);
 
 // Projetos
 const Projetos = lazy(() => import("./pages/Projetos"));
@@ -1015,6 +1018,14 @@ const App = () => (
                     element={
                       <AuthGate requiredPermission="financeiro.admin">
                         <FinancasConfigFinanceiro />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/financas/integracoes"
+                    element={
+                      <AuthGate requiredPermission="financeiro.admin">
+                        <FinancasIntegracoes />
                       </AuthGate>
                     }
                   />
