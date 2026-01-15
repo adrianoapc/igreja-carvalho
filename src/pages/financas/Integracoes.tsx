@@ -11,7 +11,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
-import { useFilialId } from "@/hooks/useFilialId";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit2, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -33,39 +32,24 @@ type Integracao = Database["public"]["Tables"]["integracoes_financeiras"]["Row"]
 
 export default function Integracoes() {
   const { igrejaId } = useIgrejaId();
-  const { filialId, isAllFiliais } = useFilialId();
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  console.log('[Integracoes] Component mounted/updated', {
-    igrejaId,
-    filialId,
-    isAllFiliais,
-  });
-
   // Buscar integrações
   const { data: integracoes, isLoading, error } = useQuery({
-    queryKey: ["integracoes_financeiras", igrejaId, filialId],
+    queryKey: ["integracoes_financeiras", igrejaId],
     queryFn: async () => {
-      console.log('[Integracoes] Fetching data...', { igrejaId, filialId, isAllFiliais });
-      
-      let query = supabase
+      // Buscar TODAS as integrações da igreja (não filtrar por filial)
+      // Integrações são configurações de infraestrutura, não dependem de filial selecionada
+      const { data, error } = await supabase
         .from("integracoes_financeiras")
         .select("*")
-        .eq("igreja_id", igrejaId!);
-
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
-
-      const { data, error } = await query.order("created_at", { ascending: false });
-
-      console.log('[Integracoes] Query result:', { data, error, count: data?.length });
+        .eq("igreja_id", igrejaId!)
+        .order("created_at", { ascending: false });
 
       if (error) {
-        console.error('[Integracoes] Query error:', error);
         throw error;
       }
       return data || [];
@@ -89,7 +73,7 @@ export default function Integracoes() {
       toast.success("Integração deletada com sucesso");
       setDeleteId(null);
       await queryClient.invalidateQueries({
-        queryKey: ["integracoes_financeiras", igrejaId, filialId],
+        queryKey: ["integracoes_financeiras", igrejaId],
       });
     } catch (error) {
       console.error("Error deleting integration:", error);
@@ -145,7 +129,7 @@ export default function Integracoes() {
         <Button
           onClick={() =>
             queryClient.invalidateQueries({
-              queryKey: ["integracoes_financeiras", igrejaId, filialId],
+              queryKey: ["integracoes_financeiras", igrejaId],
             })
           }
         >
@@ -154,14 +138,6 @@ export default function Integracoes() {
       </div>
     );
   }
-
-  console.log('[Integracoes] Render state:', {
-    igrejaId,
-    filialId,
-    isAllFiliais,
-    integracoesCount: integracoes?.length,
-    integracoes,
-  });
 
   return (
     <div className="space-y-4 p-4">
@@ -178,7 +154,7 @@ export default function Integracoes() {
             size="sm"
             onClick={() =>
               queryClient.invalidateQueries({
-                queryKey: ["integracoes_financeiras", igrejaId, filialId],
+                queryKey: ["integracoes_financeiras", igrejaId],
               })
             }
           >
@@ -262,7 +238,7 @@ export default function Integracoes() {
         onOpenChange={setOpenDialog}
         onSuccess={() => {
           queryClient.invalidateQueries({
-            queryKey: ["integracoes_financeiras", igrejaId, filialId],
+            queryKey: ["integracoes_financeiras", igrejaId],
           });
         }}
       />
