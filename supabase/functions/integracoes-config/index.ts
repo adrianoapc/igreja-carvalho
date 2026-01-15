@@ -2,6 +2,8 @@
 // Edge Function para criar integrações financeiras + secrets (acesso somente via service role)
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import * as nacl from 'npm:tweetnacl@1.0.3'
+import { encodeBase64, decodeBase64 } from 'npm:tweetnacl-util@0.5.2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,6 +53,50 @@ function base64ToUint8Array(base64: string): Uint8Array {
   const bytes = new Uint8Array(binaryString.length)
   for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
   return bytes
+}
+
+/**
+ * Encriptar dados usando XSalsa20-Poly1305 (tweetnacl)
+ * Retorna: base64(nonce || ciphertext)
+ */
+function encryptData(data: string, key: Uint8Array): string {
+  if (data.length === 0) return ''
+
+  const nonce = nacl.randomBytes(nacl.secretbox.nonceLength)
+  const message = new TextEncoder().encode(data)
+
+  const encrypted = nacl.secretbox(message, nonce, key)
+  if (!encrypted) throw new Error('Encryption failed')
+
+  // Concatenar nonce + ciphertext
+  const combined = new Uint8Array(nonce.length + encrypted.length)
+  combined.set(nonce)
+  combined.set(encrypted, nonce.length)
+
+  return encodeBase64(combined)
+}
+
+/**
+ * Derivar chave a partir de ENCRYPTION_KEY env var
+ * Retorna 32 bytes (256 bits)
+ */
+function deriveKey(masterKeyHex: string): Uint8Array {
+  // Se a chave é em hex, converter para bytes
+  if (masterKeyHex.length === 64) {
+    const key = new Uint8Array(32)
+    for (let i = 0; i < 32; i++) {
+      key[i] = parseInt(masterKeyHex.substr(i * 2, 2), 16)
+    }
+    return key
+  }
+
+  // Fallback: usar a string como base64
+  try {
+    return decodeBase64(masterKeyHex)
+  } catch {
+    // Último fallback: usar SHA256 da string (simples, não ideal)
+    throw new Error('ENCRYPTION_KEY deve ser 64 chars em hex ou 44 chars em base64')
+  }
 }
 
 Deno.serve(async (req) => {
@@ -148,22 +194,51 @@ Deno.serve(async (req) => {
       payload.pfx_password
 
     if (hasSecrets) {
-      const pfxBytes = payload.pfx_blob ? base64ToUint8Array(payload.pfx_blob) : null
-
-      const { error: secretsError } = await supabaseAdmin.from('integracoes_financeiras_secrets').insert({
-        integracao_id: integracao.id,
-        pfx_blob: pfxBytes,
-        pfx_password: payload.pfx_password ?? null,
-        client_id: payload.client_id ?? null,
-        client_secret: payload.client_secret ?? null,
-        application_key: payload.application_key ?? null,
-      })
-
-      if (secretsError) {
-        console.error('[integracoes-config] Error storing secrets', secretsError)
-        // rollback best-effort
+      const encryptionKeyHex = Deno.env.get('ENCRYPTION_KEY')
+      if (!encryptionKeyHex) {
+        console.error('[integracoes-config] ENCRYPTION_KEY not configured')
         await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
-        return json(500, { error: 'Failed to store credentials securely' })
+        return json(500, { error: 'Encryption not configured on server' })
+      }
+
+      try {
+        const encryptionKey = deriveKey(encryptionKeyHex)
+
+        // Criptografar cada campo sensível
+        const encryptedClientId = payload.client_id ? encryptData(payload.client_id, encryptionKey) : null
+        const encryptedClientSecret = payload.client_secret
+          ? encryptData(payload.client_secret, encryptionKey)
+          : null
+        const encryptedApplicationKey = payload.application_key
+          ? encryptData(payload.application_key, encryptionKey)
+          : null
+        const encryptedPfxPassword = payload.pfx_password
+          ? encryptData(payload.pfx_password, encryptionKey)
+          : null
+        const encryptedPfxBlob = payload.pfx_blob
+          ? encryptData(payload.pfx_blob, encryptionKey)
+          : null
+
+        const { error: secretsError } = await supabaseAdmin
+          .from('integracoes_financeiras_secrets')
+          .insert({
+            integracao_id: integracao.id,
+            pfx_blob: encryptedPfxBlob,
+            pfx_password: encryptedPfxPassword,
+            client_id: encryptedClientId,
+            client_secret: encryptedClientSecret,
+            application_key: encryptedApplicationKey,
+          })
+
+        if (secretsError) {
+          console.error('[integracoes-config] Error storing secrets', secretsError)
+          await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
+          return json(500, { error: 'Failed to store credentials securely' })
+        }
+      } catch (encryptError) {
+        console.error('[integracoes-config] Encryption error', encryptError)
+        await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
+        return json(500, { error: 'Encryption failed' })
       }
     }
 

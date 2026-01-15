@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +34,7 @@ type Integracao = Database["public"]["Tables"]["integracoes_financeiras"]["Row"]
 export default function Integracoes() {
   const { igrejaId } = useIgrejaId();
   const { filialId, isAllFiliais } = useFilialId();
+  const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -74,7 +75,9 @@ export default function Integracoes() {
 
       toast.success("Integração deletada com sucesso");
       setDeleteId(null);
-      await refetch();
+      await queryClient.invalidateQueries({
+        queryKey: ["integracoes_financeiras", igrejaId, filialId],
+      });
     } catch (error) {
       console.error("Error deleting integration:", error);
       toast.error("Erro ao deletar integração");
@@ -131,7 +134,11 @@ export default function Integracoes() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetch()}
+            onClick={() =>
+              queryClient.invalidateQueries({
+                queryKey: ["integracoes_financeiras", igrejaId, filialId],
+              })
+            }
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Atualizar
@@ -211,7 +218,11 @@ export default function Integracoes() {
       <IntegracaoCriarDialog
         open={openDialog}
         onOpenChange={setOpenDialog}
-        onSuccess={() => refetch()}
+        onSuccess={() => {
+          queryClient.invalidateQueries({
+            queryKey: ["integracoes_financeiras", igrejaId, filialId],
+          });
+        }}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
