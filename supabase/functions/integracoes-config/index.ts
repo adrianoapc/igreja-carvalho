@@ -3,7 +3,6 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import nacl from 'npm:tweetnacl@1.0.3'
-import { encodeBase64, decodeBase64 } from 'npm:tweetnacl-util@0.15.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,9 +40,27 @@ function json(status: number, payload: unknown) {
  * Deriva uma chave de 32 bytes a partir da ENCRYPTION_KEY.
  * Suporta hex (64 chars) ou base64 (44 chars).
  */
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
+  return bytes
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  // btoa aceita string binária; usamos chunking para evitar "Maximum call stack size" em arrays grandes
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize)
+    binary += String.fromCharCode(...chunk)
+  }
+  return btoa(binary)
+}
+
 function deriveKey(masterKey: string): Uint8Array {
   const trimmed = masterKey.trim()
-  
+
   // Se for hex (64 caracteres = 32 bytes em hex)
   if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
     const bytes = new Uint8Array(32)
@@ -52,15 +69,18 @@ function deriveKey(masterKey: string): Uint8Array {
     }
     return bytes
   }
-  
-  // Se for base64 (44 chars = 32 bytes em base64)
+
+  // Se for base64 (idealmente 32 bytes)
   if (/^[A-Za-z0-9+/]{43}=?$/.test(trimmed) || /^[A-Za-z0-9+/]{44}$/.test(trimmed)) {
-    return decodeBase64(trimmed)
+    const decoded = base64ToUint8Array(trimmed)
+    if (decoded.length === 32) return decoded
+    const key = new Uint8Array(32)
+    key.set(decoded.slice(0, 32))
+    return key
   }
-  
+
   // Fallback: usar os primeiros 32 bytes do UTF-8 (padded com zeros)
-  const encoder = new TextEncoder()
-  const encoded = encoder.encode(trimmed)
+  const encoded = new TextEncoder().encode(trimmed)
   const key = new Uint8Array(32)
   key.set(encoded.slice(0, 32))
   return key
@@ -74,13 +94,13 @@ function encryptData(plaintext: string, key: Uint8Array): string {
   const nonce = nacl.randomBytes(nacl.secretbox.nonceLength) // 24 bytes
   const messageBytes = new TextEncoder().encode(plaintext)
   const ciphertext = nacl.secretbox(messageBytes, nonce, key)
-  
+
   // Concatena nonce + ciphertext
   const combined = new Uint8Array(nonce.length + ciphertext.length)
   combined.set(nonce, 0)
   combined.set(ciphertext, nonce.length)
-  
-  return encodeBase64(combined)
+
+  return uint8ArrayToBase64(combined)
 }
 
 // ==================== PERMISSION VALIDATION ====================
