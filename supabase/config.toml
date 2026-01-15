@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.criar-usuario]
 verify_jwt = false
+
+[functions.integracoes-config]
+verify_jwt = false
