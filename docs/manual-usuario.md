@@ -130,6 +130,14 @@ O sino no canto superior direito mostra suas notificações:
 - **Campos obrigatórios e validações**: Nome é obrigatório; status deve ser um dos valores válidos (Visitante/Frequentador/Membro); contatos ajudam na busca e no follow-up. Em mobile, priorize inserir contato para facilitar ações posteriores.
 - **Vincular funções/roles ministeriais**: No perfil, acesse a área de status/igreja e atribua funções (quando disponível) conforme a liderança definir.
 
+**Gerenciamento de acesso (somente admins)**
+
+- No detalhe de um **membro** aparece o card “Gerenciamento de Acesso” apenas para admins.
+- Botões disponíveis:
+   - **Criar Acesso**: cria usuário no Supabase com senha temporária e vincula `profiles.user_id`.
+   - **Resetar Senha**: gera nova senha temporária e marca troca no próximo login.
+- Se o usuário já existe, o botão exibido é apenas **Resetar Senha**.
+
 **Exemplos práticos**
 
 - Cadastro de novo membro: Pessoas → Membros → **+ Novo** → Nome obrigatório, telefone/email recomendado, status **membro** → Salvar → aparece na lista com badge.
@@ -820,14 +828,14 @@ Use para importar extratos bancários e preparar a conciliação.
 
 O parser OFX extrai os seguintes campos do arquivo:
 
-| Campo OFX    | Campo Sistema     | Descrição                |
-| ------------ | ----------------- | ------------------------ |
-| `DTPOSTED`   | data_transacao    | Data (YYYYMMDD → DD/MM)  |
-| `TRNAMT`     | valor             | Valor da transação       |
-| `MEMO/NAME`  | descricao         | Descrição/Histórico      |
-| `FITID`      | numero_documento  | ID único da transação    |
-| `CHECKNUM`   | numero_documento  | Número do cheque/doc     |
-| `TRNTYPE`    | tipo              | DEBIT/CREDIT → deb/cred  |
+| Campo OFX   | Campo Sistema    | Descrição               |
+| ----------- | ---------------- | ----------------------- |
+| `DTPOSTED`  | data_transacao   | Data (YYYYMMDD → DD/MM) |
+| `TRNAMT`    | valor            | Valor da transação      |
+| `MEMO/NAME` | descricao        | Descrição/Histórico     |
+| `FITID`     | numero_documento | ID único da transação   |
+| `CHECKNUM`  | numero_documento | Número do cheque/doc    |
+| `TRNTYPE`   | tipo             | DEBIT/CREDIT → deb/cred |
 
 **Próximos Passos (Conciliação):**
 
@@ -879,6 +887,7 @@ Após importar extratos, você poderá:
 3. Gere relatórios para prestação de contas
 
 ---
+
 - ⚠️ Divergências são destacadas para ajuste manual
 - ✅ Saldo final é validado contra o extrato
 

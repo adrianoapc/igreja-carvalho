@@ -25,7 +25,15 @@ import {
   ArrowLeft,
   Filter,
 } from "lucide-react";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -49,13 +57,12 @@ interface Frequentador {
 const ITEMS_PER_PAGE = 10;
 
 export default function Frequentadores() {
-  const [displayedFrequentadores, setDisplayedFrequentadores] = useState<
-    Frequentador[]
-  >([]);
   const [allFrequentadores, setAllFrequentadores] = useState<Frequentador[]>(
     []
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [filterHasEmail, setFilterHasEmail] = useState(false);
@@ -90,7 +97,7 @@ export default function Frequentadores() {
       if (error) throw error;
 
       setAllFrequentadores(data || []);
-      setDisplayedFrequentadores((data || []).slice(0, ITEMS_PER_PAGE));
+      setCurrentPage(1);
     } catch (error) {
       console.error("Erro ao buscar frequentadores:", error);
       toast({
@@ -107,40 +114,7 @@ export default function Frequentadores() {
     }
   }, [igrejaId, filialId, isAllFiliais, authLoading]);
 
-  const {
-    loadMoreRef,
-    isLoading,
-    hasMore,
-    page,
-    setIsLoading,
-    setHasMore,
-    setPage,
-  } = useInfiniteScroll();
-
-  useEffect(() => {
-    if (page === 1 || allFrequentadores.length === 0) return;
-
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    const newItems = allFrequentadores.slice(start, end);
-
-    if (newItems.length > 0) {
-      setDisplayedFrequentadores((prev) => {
-        const existingIds = new Set(prev.map((f) => f.id));
-        const uniqueNewItems = newItems.filter(
-          (item) => !existingIds.has(item.id)
-        );
-        return [...prev, ...uniqueNewItems];
-      });
-    }
-
-    if (end >= allFrequentadores.length) {
-      setHasMore(false);
-    }
-    setIsLoading(false);
-  }, [page, allFrequentadores, setHasMore, setIsLoading]);
-
-  const filteredFrequentadores = displayedFrequentadores
+  const filteredFrequentadores = allFrequentadores
     .filter(
       (f) =>
         f.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -149,6 +123,12 @@ export default function Frequentadores() {
     )
     .filter((f) => (filterHasPhone ? !!f.telefone : true))
     .filter((f) => (filterHasEmail ? !!f.email : true));
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredFrequentadores.length / ITEMS_PER_PAGE);
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const paginatedFrequentadores = filteredFrequentadores.slice(start, end);
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
@@ -205,15 +185,8 @@ export default function Frequentadores() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredFrequentadores.map((freq, index) => (
-                  <TableRow
-                    key={freq.id}
-                    ref={
-                      index === filteredFrequentadores.length - 1
-                        ? loadMoreRef
-                        : null
-                    }
-                  >
+                {paginatedFrequentadores.map((freq) => (
+                  <TableRow key={freq.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
@@ -331,16 +304,8 @@ export default function Frequentadores() {
           </div>
 
           <div className="block md:hidden space-y-4">
-            {filteredFrequentadores.map((freq, index) => (
-              <Card
-                key={freq.id}
-                ref={
-                  index === filteredFrequentadores.length - 1
-                    ? loadMoreRef
-                    : null
-                }
-                className="shadow-sm"
-              >
+            {paginatedFrequentadores.map((freq) => (
+              <Card key={freq.id} className="shadow-sm">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -447,7 +412,7 @@ export default function Frequentadores() {
               </div>
             )}
 
-            {filteredFrequentadores.length === 0 && !isLoading && (
+            {paginatedFrequentadores.length === 0 && !isLoading && (
               <div className="text-center py-8 text-sm text-muted-foreground">
                 {searchTerm
                   ? "Nenhum frequentador encontrado"
@@ -456,10 +421,39 @@ export default function Frequentadores() {
             )}
           </div>
 
-          {!hasMore && filteredFrequentadores.length > 0 && (
-            <div className="text-center py-4 text-sm text-muted-foreground">
-              Todos os frequentadores foram carregados
-            </div>
+          {filteredFrequentadores.length > 0 && (
+            <Pagination className="mt-6">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           )}
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@ import {
   Dialog,
   DialogTrigger,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Drawer,
@@ -66,7 +67,11 @@ export function ResponsiveDialog({
   return (
     <Dialog open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange} {...dialogProps}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent {...dialogContentProps}>{children}</DialogContent>
+      <DialogContent {...dialogContentProps}>
+        {/* Título invisível para acessibilidade (exigência do Radix Dialog) */}
+        <DialogTitle className="sr-only">Diálogo</DialogTitle>
+        {children}
+      </DialogContent>
     </Dialog>
   );
 }

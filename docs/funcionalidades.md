@@ -29,7 +29,7 @@ O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas i
 #### Tela de Seleção de Contexto
 
 - **Rota**: `/context-select` (apenas para super admins após login)
-- **Opções**: 
+- **Opções**:
   - **Painel SaaS** → navega para `/superadmin`
   - **Aplicativo Igreja** → navega para `/`
 - **Preferência**: Checkbox "Lembrar minha escolha" salva em `localStorage`
@@ -60,14 +60,14 @@ O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas i
 
 #### Componentes
 
-| Componente | Descrição |
-|------------|-----------|
-| `SuperAdminLayout` | Layout com header e navegação do portal SaaS |
-| `SuperAdminGate` | Gate de proteção que verifica role `super_admin` |
-| `ContextSelect` | Tela de seleção de contexto pós-login |
-| `SuperAdminIndicator` | Ícone Shield no MainLayout para acesso rápido |
-| `FilialManager` | CRUD reutilizável de filiais |
-| `IgrejaRowExpandable` | Row expansível com detalhes da igreja |
+| Componente            | Descrição                                        |
+| --------------------- | ------------------------------------------------ |
+| `SuperAdminLayout`    | Layout com header e navegação do portal SaaS     |
+| `SuperAdminGate`      | Gate de proteção que verifica role `super_admin` |
+| `ContextSelect`       | Tela de seleção de contexto pós-login            |
+| `SuperAdminIndicator` | Ícone Shield no MainLayout para acesso rápido    |
+| `FilialManager`       | CRUD reutilizável de filiais                     |
+| `IgrejaRowExpandable` | Row expansível com detalhes da igreja            |
 
 #### Hooks e Utilitários
 
@@ -147,6 +147,7 @@ O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas i
 #### Módulo Pessoas / Membros — visão funcional
 
 - **Funcionalidades disponíveis**: dashboard com estatísticas por status; busca rápida por nome/email/telefone; listagem com ordenação por nome e avatars (quando cadastrados); criação/edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem; cards de acesso rápido (visitantes, membros, frequentadores, contatos agendados); painel de alterações pendentes; lista das últimas conversões (aceitaram Jesus).
+- **Provisionamento de acesso**: admins podem criar usuário Supabase (senha temporária) ou resetar senha direto no detalhe do membro; operação vincula `profiles.user_id` e marca troca de senha no próximo login.
 - **Ações permitidas**: criar pessoa (nome obrigatório, contato recomendado), editar dados pessoais/contatos/status/funções, navegar para detalhes, aplicar busca/filtros, carregar mais itens via scroll, acionar atalhos rápidos para segmentos e contatos agendados, revisar alterações pendentes e acessar lista de conversões recentes.
 - **Regras funcionais**: status restrito a `visitante`/`frequentador`/`membro`; sem deduplicação automática (verificar duplicidade de nome/telefone/email antes de salvar); campos mínimos para cadastro exigem nome; contatos incompletos reduzem eficácia da busca e follow-up; vínculos familiares exibem ambos os lados com inversão de papel; avatars não são obrigatórios e podem exibir fallback.
 - **Links relacionados**: [Manual do Usuário — Pessoas](manual-usuario.md#3-gestão-de-pessoas) · [Produto — Pessoas/Membros](produto/README_PRODUTO.MD#pessoas--membros-visão-de-produto)

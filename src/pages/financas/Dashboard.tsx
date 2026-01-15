@@ -336,6 +336,42 @@ export default function Dashboard() {
     enabled: !loading && !!igrejaId,
   });
 
+  // Sessões de contagem recentes (últimos 60 dias)
+  type Sessao = {
+    id: string;
+    status: string;
+    created_at: string;
+    filial_id?: string | null;
+    igreja_id: string;
+  };
+  const { data: sessoesRecentes = [] } = useQuery<Sessao[]>({
+    queryKey: ["sessoes-contagem-resumo", igrejaId, filialId, isAllFiliais],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+      let query = supabase
+        .from("sessoes_contagem")
+        .select("id, status, created_at, filial_id, igreja_id")
+        .eq("igreja_id", igrejaId)
+        .gte("created_at", format(addDays(new Date(), -60), "yyyy-MM-dd"))
+        .order("created_at", { ascending: false });
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Sessao[];
+    },
+    enabled: !loading && !!igrejaId,
+  });
+
+  const totalAbertas = sessoesRecentes.filter((s) =>
+    ["aberta", "em_contagem"].includes(s.status)
+  ).length;
+  const totalDivergentes = sessoesRecentes.filter(
+    (s) => s.status === "divergente"
+  ).length;
+  const totalValidadas = sessoesRecentes.filter(
+    (s) => s.status === "validada"
+  ).length;
+
   // Cálculos do mês atual
   const receitasMesAtual =
     transacoesMesAtual
@@ -601,7 +637,51 @@ export default function Dashboard() {
           </div>
 
           {/* Indicadores Operacionais */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mt-2">
+            <Card className="shadow-soft">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Sessões de Contagem
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Últimos 60 dias
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate("/financas/sessoes-contagem")}
+                  >
+                    Ver sessões
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Abertas</p>
+                    <p className="text-lg font-bold">{totalAbertas}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Divergentes</p>
+                    <p className="text-lg font-bold text-destructive">
+                      {totalDivergentes}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Validadas</p>
+                    <p className="text-lg font-bold text-green-600">
+                      {totalValidadas}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             <Card className="shadow-soft">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">

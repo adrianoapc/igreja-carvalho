@@ -42,6 +42,7 @@ interface FormaPagamento {
   taxa_administrativa?: number | null;
   taxa_administrativa_fixa?: number | null;
   gera_pago?: boolean;
+  is_digital?: boolean;
 }
 
 interface Props {
@@ -63,6 +64,7 @@ export default function FormasPagamento({ onBack }: Props) {
     taxa_administrativa: 0 as number | null,
     taxa_administrativa_fixa: null as number | null,
     gera_pago: false,
+    is_digital: false,
   });
 
   // Estado para mapeamentos forma → conta
@@ -174,6 +176,7 @@ export default function FormasPagamento({ onBack }: Props) {
         taxa_administrativa: data.taxa_administrativa ?? 0,
         taxa_administrativa_fixa: data.taxa_administrativa_fixa,
         gera_pago: data.gera_pago ?? false,
+        is_digital: data.is_digital ?? false,
         igreja_id: igrejaId,
         filial_id: !isAllFiliais ? filialId : null,
       });
@@ -203,6 +206,7 @@ export default function FormasPagamento({ onBack }: Props) {
           taxa_administrativa: data.taxa_administrativa ?? 0,
           taxa_administrativa_fixa: data.taxa_administrativa_fixa,
           gera_pago: data.gera_pago ?? false,
+          is_digital: data.is_digital ?? false,
         })
         .eq("id", id)
         .eq("igreja_id", igrejaId);
@@ -276,13 +280,14 @@ export default function FormasPagamento({ onBack }: Props) {
       taxa_administrativa: forma.taxa_administrativa ?? 0,
       taxa_administrativa_fixa: forma.taxa_administrativa_fixa ?? null,
       gera_pago: !!forma.gera_pago,
+      is_digital: !!forma.is_digital,
     });
     setDialogOpen(true);
   };
 
   const resetForm = () => {
     setEditingForma(null);
-    setFormData({ nome: "", ativo: true, taxa_administrativa: 0, taxa_administrativa_fixa: 0, gera_pago: false });
+    setFormData({ nome: "", ativo: true, taxa_administrativa: 0, taxa_administrativa_fixa: 0, gera_pago: false, is_digital: false });
   };
 
   const filteredFormas = formas.filter((f) =>
@@ -397,6 +402,7 @@ export default function FormasPagamento({ onBack }: Props) {
                   <TableHead>Taxa (%)</TableHead>
                   <TableHead>Taxa Fixa (R$)</TableHead>
                   <TableHead>Gera Pago?</TableHead>
+                  <TableHead>Digital?</TableHead>
                   <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -421,6 +427,9 @@ export default function FormasPagamento({ onBack }: Props) {
                     </TableCell>
                     <TableCell>
                       {forma.gera_pago ? "✅ Sim" : "⏳ Não"}
+                    </TableCell>
+                    <TableCell>
+                      {forma.is_digital ? "Sim" : "Não"}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -581,6 +590,16 @@ export default function FormasPagamento({ onBack }: Props) {
                 checked={!!formData.gera_pago}
                 onCheckedChange={(checked) =>
                   setFormData({ ...formData, gera_pago: checked })
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="is-digital">Digital?</Label>
+              <Switch
+                id="is-digital"
+                checked={!!formData.is_digital}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, is_digital: checked })
                 }
               />
             </div>

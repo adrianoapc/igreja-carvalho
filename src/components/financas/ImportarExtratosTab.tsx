@@ -161,10 +161,10 @@ export function ImportarExtratosTab() {
       return;
     }
     setFileName(file.name);
-    
-    const fileExtension = file.name.toLowerCase().split('.').pop();
-    
-    if (fileExtension === 'ofx') {
+
+    const fileExtension = file.name.toLowerCase().split(".").pop();
+
+    if (fileExtension === "ofx") {
       await handleOFXFile(file);
     } else {
       await handleSpreadsheetFile(file);
@@ -176,10 +176,12 @@ export function ImportarExtratosTab() {
       const text = await file.text();
       const parser = new OFXParser();
       const ofxData = parser.parse(text);
-      
+
       // Extrair transações do OFX
-      const transactions = ofxData?.body?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS?.BANKTRANLIST?.STMTTRN || [];
-      
+      const transactions =
+        ofxData?.body?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS?.BANKTRANLIST
+          ?.STMTTRN || [];
+
       if (!Array.isArray(transactions) || transactions.length === 0) {
         toast.error("Nenhuma transação encontrada no arquivo OFX");
         return;
@@ -198,7 +200,7 @@ export function ImportarExtratosTab() {
       const columnNames = ["data", "descricao", "valor", "documento", "tipo"];
       setColumns(columnNames);
       setRows(rows);
-      
+
       // Mapeamento automático para OFX
       setMapping({
         data: "data",
@@ -212,7 +214,7 @@ export function ImportarExtratosTab() {
       setWorkbook(null);
       setSheetNames([]);
       setSelectedSheet("");
-      
+
       toast.success(`${rows.length} transações carregadas do arquivo OFX`);
     } catch (err) {
       console.error(err);

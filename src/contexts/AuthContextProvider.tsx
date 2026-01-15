@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
+import { useNavigate } from "react-router-dom";
 
 const AUTH_CACHE_KEY = "auth_context_cache_v1";
 const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
@@ -169,6 +170,7 @@ function applyCacheToState(
 }
 
 export function AuthContextProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -447,6 +449,17 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error("[AUTH] Error initializing auth:", err);
+        // Se o refresh token for inválido/stale, força signOut + redirect
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.toLowerCase().includes("invalid refresh token")) {
+          try {
+            await supabase.auth.signOut();
+          } catch {}
+          // Evita loops: se já está na página de auth, não redireciona novamente
+          if (window.location.pathname !== "/auth") {
+            navigate("/auth", { replace: true });
+          }
+        }
       } finally {
         if (isMounted) {
           console.log("[AUTH] initializeAuth complete, setLoading(false)");
@@ -480,6 +493,10 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
         setFilialOverrideState(null);
         localStorage.removeItem(AUTH_CACHE_KEY);
         localStorage.removeItem(FILIAL_OVERRIDE_KEY);
+        // Redireciona para login se sair (inclui casos de refresh inválido)
+        if (window.location.pathname !== "/auth") {
+          navigate("/auth", { replace: true });
+        }
       }
 
       setLoading(false);

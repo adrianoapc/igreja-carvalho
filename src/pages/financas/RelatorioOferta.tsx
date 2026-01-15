@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import {
   ArrowLeft,
@@ -32,15 +33,25 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  openSessaoContagem,
+  confrontarContagens,
+  SessaoContagem,
+} from "@/hooks/useFinanceiroSessao";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { ConferirOfertaDialog } from "@/components/financas/ConferirOfertaDialog";
+import { PessoaCombobox } from "@/components/pessoas/PessoaCombobox";
+import { MinhaContagemDialog } from "@/components/financas/MinhaContagemDialog";
 
 type LinhaLancamento = {
   id: string;
   formaId: string;
   contaId?: string;
   valor: string;
+  pessoaId?: string | null;
+  tipo?: "oferta" | "dizimo" | "missoes";
+  categoriaId?: string | null;
 };
 
 export default function RelatorioOferta() {
@@ -56,10 +67,73 @@ export default function RelatorioOferta() {
 
   const [loading, setLoading] = useState(false);
   const [dataCulto, setDataCulto] = useState<Date>(new Date());
+  const [periodo, setPeriodo] = useState<"manha" | "noite">("manha");
+  const [periodosDisponiveis, setPeriodosDisponiveis] = useState<string[]>([
+    "manhã",
+    "noite",
+  ]);
   const [conferenteId, setConferenteId] = useState("");
   const [linhas, setLinhas] = useState<LinhaLancamento[]>([]);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [showPreview, setShowPreview] = useState(false);
+  const [showMinhaContagem, setShowMinhaContagem] = useState(false);
+  const [minhaContagemLoading, setMinhaContagemLoading] = useState(false);
+  const [sessaoAtual, setSessaoAtual] = useState<SessaoContagem | null>(null);
+  // Extensão para suportar conta em linhas digitais
+  type LinhaDigital = {
+    id: string;
+    pessoaId?: string | null;
+    formaId?: string;
+    contaId?: string;
+    categoriaId?: string | null;
+    valor: string;
+    origem: "manual" | "api";
+    readOnly?: boolean;
+  };
+  const [linhasDigitaisEx, setLinhasDigitaisEx] = useState<LinhaDigital[]>([]);
+  const [confrontoLoading, setConfrontoLoading] = useState(false);
+  const [confrontoStatus, setConfrontoStatus] = useState<string | null>(null);
+  const [confrontoVariance, setConfrontoVariance] = useState<number | null>(
+    null
+  );
+  const [confrontoPorTipo, setConfrontoPorTipo] = useState<Record<
+    string,
+    number
+  > | null>(null);
+  const [blindTolerance, setBlindTolerance] = useState<number | null>(null);
+  const [blindCompareLevel, setBlindCompareLevel] = useState<
+    "total" | "tipo" | null
+  >(null);
+  const [confirmZeroFisico, setConfirmZeroFisico] = useState(false);
+  const [financeiroConfig, setFinanceiroConfig] = useState<any | null>(null);
+  const { data: categoriasEntrada } = useQuery({
+    queryKey: ["categorias-entrada", igrejaId, filialId, isAllFiliais],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+      let q = supabase
+        .from("categorias_financeiras")
+        .select("id, nome, tipo")
+        .eq("tipo", "entrada")
+        .eq("igreja_id", igrejaId)
+        .order("nome");
+      if (!isAllFiliais && filialId) q = q.eq("filial_id", filialId);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!igrejaId,
+  });
+
+  // CTA para listagem de sessões de contagem
+  const HeaderActions = () => (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="secondary"
+        onClick={() => navigate("/financas/sessoes-contagem")}
+      >
+        Sessões de Contagem
+      </Button>
+    </div>
+  );
 
   // Buscar formas de pagamento com info de taxa e status
   const { data: formasPagamento } = useQuery({
@@ -69,7 +143,7 @@ export default function RelatorioOferta() {
       let query = supabase
         .from("formas_pagamento")
         .select(
-          "id, nome, taxa_administrativa, taxa_administrativa_fixa, gera_pago"
+          "id, nome, taxa_administrativa, taxa_administrativa_fixa, gera_pago, is_digital"
         )
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
@@ -84,6 +158,24 @@ export default function RelatorioOferta() {
     },
     enabled: !authLoading && !!igrejaId,
   });
+
+  // Derivar listas de formas por canal, aplicando restrições de config se existirem
+  const formasFisicas = useMemo(() => {
+    let base = (formasPagamento || []).filter((f: any) => !f.is_digital);
+    const ids = financeiroConfig?.formas_fisicas_ids as string[] | undefined;
+    if (Array.isArray(ids) && ids.length > 0) {
+      base = base.filter((f: any) => ids.includes(f.id));
+    }
+    return base;
+  }, [formasPagamento, financeiroConfig?.formas_fisicas_ids]);
+  const formasDigitais = useMemo(() => {
+    let base = (formasPagamento || []).filter((f: any) => !!f.is_digital);
+    const ids = financeiroConfig?.formas_digitais_ids as string[] | undefined;
+    if (Array.isArray(ids) && ids.length > 0) {
+      base = base.filter((f: any) => ids.includes(f.id));
+    }
+    return base;
+  }, [formasPagamento, financeiroConfig?.formas_digitais_ids]);
 
   // Buscar mapeamento dinâmico: forma → conta
   const { data: formaContaMapa } = useQuery({
@@ -147,13 +239,79 @@ export default function RelatorioOferta() {
     return map;
   }, [formaContaMapa]);
 
+  // Tipos permitidos (físico) derivados de config ou por fallback de nomes
+  const tiposFisicosPermitidos = useMemo(() => {
+    const ids = financeiroConfig?.tipos_permitidos_fisico as
+      | string[]
+      | undefined;
+    const todas = (categoriasEntrada || []) as any[];
+    if (Array.isArray(ids) && ids.length > 0) {
+      return todas.filter((c) => ids.includes(c.id));
+    }
+    const nomes = ["oferta", "dizimo", "miss" /* cobre missões */];
+    return todas.filter((c) =>
+      nomes.some((n) => (c.nome || "").toLowerCase().includes(n))
+    );
+  }, [financeiroConfig?.tipos_permitidos_fisico, categoriasEntrada]);
+
+  // Helper para mapear uma categoria ao tipo base (dizimo/missoes/oferta)
+  const categoriaToTipo = (nome: string) => {
+    const n = nome.toLowerCase();
+    return n.includes("diz")
+      ? "dizimo"
+      : n.includes("miss")
+      ? "missoes"
+      : "oferta";
+  };
+
+  // Categorias permitidas (digital) derivadas de config ou fallback de nomes
+  const categoriasDigitaisPermitidas = useMemo(() => {
+    const ids = financeiroConfig?.tipos_permitidos_digital as
+      | string[]
+      | undefined;
+    const todas = (categoriasEntrada || []) as any[];
+    if (Array.isArray(ids) && ids.length > 0) {
+      return todas.filter((c) => ids.includes(c.id));
+    }
+    const nomes = ["oferta", "dizimo", "miss"]; // fallback por nome
+    return todas.filter((c) =>
+      nomes.some((n) => (c.nome || "").toLowerCase().includes(n))
+    );
+  }, [financeiroConfig?.tipos_permitidos_digital, categoriasEntrada]);
+
   // Cria uma linha inicial e garante conta padrão por forma quando mapeamentos chegarem
+  useEffect(() => {
+    // Carregar períodos configurados de financeiro_config (fallback para padrão)
+    const carregarPeriodos = async () => {
+      try {
+        if (!igrejaId) return;
+        let q = supabase
+          .from("financeiro_config")
+          .select(
+            "periodos, formas_fisicas_ids, formas_digitais_ids, tipos_permitidos_fisico, tipos_permitidos_digital"
+          )
+          .eq("igreja_id", igrejaId)
+          .limit(1);
+        if (!isAllFiliais && filialId) q = q.eq("filial_id", filialId);
+        const { data } = await q.maybeSingle();
+        setFinanceiroConfig(data || null);
+        const arr = (data?.periodos as any) || null;
+        if (Array.isArray(arr) && arr.length > 0) {
+          setPeriodosDisponiveis(arr);
+        }
+      } catch (e) {
+        // silencia erros e mantém defaults
+      }
+    };
+    carregarPeriodos();
+  }, [igrejaId, filialId, isAllFiliais]);
+
   useEffect(() => {
     if (!formasPagamento || formasPagamento.length === 0) return;
 
     // Se não existir nenhuma linha, cria a primeira usando a primeira forma disponível
     if (linhas.length === 0) {
-      const primeiraForma = formasPagamento[0];
+      const primeiraForma = formasFisicas[0] || formasPagamento[0];
       const contaDefault = mapeamentosPorForma[primeiraForma.id]?.[0]?.contaId;
       setLinhas([
         {
@@ -161,6 +319,15 @@ export default function RelatorioOferta() {
           formaId: primeiraForma.id,
           contaId: contaDefault,
           valor: "",
+          tipo: (tiposFisicosPermitidos[0]?.nome || "oferta")
+            .toLowerCase()
+            .includes("diz")
+            ? "dizimo"
+            : (tiposFisicosPermitidos[0]?.nome || "")
+                .toLowerCase()
+                .includes("miss")
+            ? "missoes"
+            : "oferta",
         },
       ]);
       return;
@@ -227,6 +394,36 @@ export default function RelatorioOferta() {
     );
   };
 
+  useEffect(() => {
+    const carregarConfronto = async () => {
+      if (step !== 4 || !sessaoAtual?.id || !igrejaId) return;
+      setConfrontoLoading(true);
+      try {
+        const { data: sessao } = await supabase
+          .from("sessoes_contagem")
+          .select("blind_tolerance_value, blind_compare_level")
+          .eq("id", sessaoAtual.id)
+          .maybeSingle();
+        if (sessao) {
+          setBlindTolerance(Number(sessao.blind_tolerance_value ?? 0));
+          setBlindCompareLevel((sessao.blind_compare_level as any) || "total");
+        }
+
+        const confronto = await confrontarContagens(sessaoAtual.id);
+        if (confronto) {
+          setConfrontoStatus(confronto.status || null);
+          setConfrontoVariance(confronto.variance_value ?? null);
+          setConfrontoPorTipo((confronto.variance_by_tipo as any) || null);
+        }
+      } catch (e) {
+        console.warn("Falha ao carregar confronto", e);
+      } finally {
+        setConfrontoLoading(false);
+      }
+    };
+    carregarConfronto();
+  }, [step, sessaoAtual?.id, igrejaId]);
+
   const handleFormaChange = (id: string, formaId: string) => {
     const lista = mapeamentosPorForma[formaId] || [];
     const contaDefault = lista[0]?.contaId;
@@ -237,12 +434,23 @@ export default function RelatorioOferta() {
     atualizarLinha(id, { contaId });
   };
 
+  // Sanitiza entrada monetária: apenas dígitos e formata como 0,00
+  const sanitizeMoneyInput = (raw: string) => {
+    const digits = (raw || "").replace(/\D+/g, "");
+    const trimmed = digits.replace(/^0+(?=\d)/, "");
+    const safe = trimmed === "" ? "0" : trimmed;
+    const len = safe.length;
+    const intPart = safe.slice(0, Math.max(0, len - 2)) || "0";
+    const decPart = safe.slice(Math.max(0, len - 2)).padStart(2, "0");
+    return `${intPart},${decPart}`;
+  };
+
   const handleValorChange = (id: string, valor: string) => {
-    atualizarLinha(id, { valor });
+    atualizarLinha(id, { valor: sanitizeMoneyInput(valor) });
   };
 
   const adicionarLinha = () => {
-    const primeiraForma = formasPagamento?.[0];
+    const primeiraForma = formasFisicas?.[0] || formasPagamento?.[0];
     const formaId = primeiraForma?.id || "";
     const contaDefault = formaId
       ? mapeamentosPorForma[formaId]?.[0]?.contaId
@@ -254,6 +462,16 @@ export default function RelatorioOferta() {
         formaId,
         contaId: contaDefault,
         valor: "",
+        pessoaId: null,
+        tipo: (tiposFisicosPermitidos[0]?.nome || "oferta")
+          .toLowerCase()
+          .includes("diz")
+          ? "dizimo"
+          : (tiposFisicosPermitidos[0]?.nome || "")
+              .toLowerCase()
+              .includes("miss")
+          ? "missoes"
+          : "oferta",
       },
     ]);
   };
@@ -277,6 +495,12 @@ export default function RelatorioOferta() {
       return sum + num;
     }, 0);
   };
+  const calcularTotalDigital = () => {
+    return linhasDigitaisEx.reduce((sum, l: any) => {
+      const num = parseFloat(String(l.valor || "").replace(",", ".")) || 0;
+      return sum + num;
+    }, 0);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,8 +515,15 @@ export default function RelatorioOferta() {
       return;
     }
 
-    // Se ainda estiver no passo 1, apenas avança para passo 2
+    // Passo 1: abrir sessão e só avançar se existir
     if (step === 1) {
+      const dataISO = format(dataCulto, "yyyy-MM-dd");
+      const sessao = await findOrOpenSessao(dataISO, periodo);
+      if (!sessao) {
+        toast.error("Falha ao abrir sessão de contagem.");
+        return;
+      }
+      setSessaoAtual(sessao);
       setStep(2);
       return;
     }
@@ -301,9 +532,15 @@ export default function RelatorioOferta() {
     const linhasValidas = linhas.filter(
       (linha) => parseFloat(linha.valor.replace(",", ".")) > 0
     );
+    const totalFisico = calcularTotal();
 
     if (linhasValidas.length === 0) {
-      toast.error("Preencha ao menos um valor");
+      // Permite avançar se total físico for zero e houver confirmação explícita
+      if (totalFisico <= 0 && confirmZeroFisico) {
+        setStep(3);
+        return;
+      }
+      toast.error("Preencha ao menos um valor ou confirme valor zero");
       return;
     }
 
@@ -330,9 +567,137 @@ export default function RelatorioOferta() {
       }
     }
 
-    // Abre pré-visualização (confirmação antes de enviar)
-    setShowPreview(true);
+    // Avança para Digital
+    setStep(3);
   };
+
+  // Salvar rascunho (substitui os itens atuais de rascunho da sessão)
+  const salvarRascunho = async () => {
+    try {
+      if (!igrejaId) throw new Error("Igreja não identificada");
+      const dataISO = format(dataCulto, "yyyy-MM-dd");
+      // Garante sessão aberta (usa a sessão atual se existir)
+      const sessao = sessaoAtual || (await findOrOpenSessao(dataISO, periodo));
+      if (!sessao) throw new Error("Sessão não encontrada/aberta");
+
+      // Limpa rascunhos anteriores da sessão
+      await supabase
+        .from("sessoes_itens_draft")
+        .delete()
+        .eq("sessao_id", sessao.id);
+
+      // Mapeia linhas físicas
+      const fisicos = linhas
+        .map((l) => ({
+          igreja_id: igrejaId,
+          filial_id: !isAllFiliais ? filialId : null,
+          sessao_id: sessao.id,
+          is_digital: false,
+          origem_registro: "manual",
+          pessoa_id: l.pessoaId || null,
+          forma_pagamento_id: l.formaId || null,
+          conta_id: l.contaId || null,
+          categoria_id: l.categoriaId || null,
+          valor: parseFloat((l.valor || "0").replace(",", ".")) || 0,
+          descricao: `${(l.tipo || "oferta").replace(/^./, (c) =>
+            c.toUpperCase()
+          )} - Culto ${format(dataCulto, "dd/MM/yyyy")}`,
+          read_only: false,
+          created_by: profile?.id || null,
+        }))
+        .filter((x) => x.valor > 0);
+
+      // Mapeia linhas digitais
+      const digitais = linhasDigitaisEx
+        .map((d) => ({
+          igreja_id: igrejaId,
+          filial_id: !isAllFiliais ? filialId : null,
+          sessao_id: sessao.id,
+          is_digital: true,
+          origem_registro: d.origem,
+          pessoa_id: d.pessoaId || null,
+          forma_pagamento_id: d.formaId || null,
+          conta_id: d.contaId || null,
+          categoria_id: d.categoriaId || null,
+          valor: parseFloat((d.valor || "0").replace(",", ".")) || 0,
+          descricao: `Digital (${d.origem}) - Culto ${format(
+            dataCulto,
+            "dd/MM/yyyy"
+          )}`,
+          read_only: !!d.readOnly,
+          created_by: profile?.id || null,
+        }))
+        .filter((x) => x.valor > 0);
+
+      const payload = [...fisicos, ...digitais];
+      if (payload.length === 0) {
+        toast.info("Nada para salvar como rascunho.");
+        return;
+      }
+      const { error } = await supabase
+        .from("sessoes_itens_draft")
+        .insert(payload);
+      if (error) throw error;
+      setSessaoAtual(sessao);
+      toast.success("Rascunho salvo com sucesso.");
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error("Falha ao salvar rascunho", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  // Carregar rascunho da sessão (se existir)
+  const carregarRascunho = async (sessaoId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("sessoes_itens_draft")
+        .select("*, formas_pagamento:forma_pagamento_id(id, is_digital)")
+        .eq("sessao_id", sessaoId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      const fisicos = (data || []).filter((x: any) => !x.is_digital);
+      const digitais = (data || []).filter((x: any) => !!x.is_digital);
+
+      setLinhas(
+        fisicos.map((x: any) => ({
+          id: crypto.randomUUID(),
+          formaId: x.forma_pagamento_id || "",
+          contaId: x.conta_id || undefined,
+          valor: Number(x.valor || 0)
+            .toFixed(2)
+            .replace(".", ","),
+          pessoaId: x.pessoa_id || null,
+          tipo: undefined,
+          categoriaId: x.categoria_id || null,
+        }))
+      );
+      setLinhasDigitaisEx(
+        digitais.map((x: any) => ({
+          id: crypto.randomUUID(),
+          pessoaId: x.pessoa_id || null,
+          formaId: x.forma_pagamento_id || undefined,
+          contaId: x.conta_id || undefined,
+          categoriaId: x.categoria_id || null,
+          valor: Number(x.valor || 0)
+            .toFixed(2)
+            .replace(".", ","),
+          origem: x.origem_registro || "manual",
+          readOnly: !!x.read_only,
+        }))
+      );
+    } catch (e) {
+      console.warn("Falha ao carregar rascunho da sessão", e);
+    }
+  };
+
+  // Quando abrirmos/definirmos a sessão, tenta carregar rascunho
+  useEffect(() => {
+    if (sessaoAtual?.id) {
+      carregarRascunho(sessaoAtual.id);
+    }
+  }, [sessaoAtual?.id]);
 
   const enviarRelatorio = async () => {
     const linhasValidas = linhas.filter(
@@ -409,14 +774,20 @@ export default function RelatorioOferta() {
         });
       }
 
-      toast.success("Relatório enviado para conferência!");
+      // Garantir sessão de contagem disponível para este culto/período
+      try {
+        const dataISO = format(dataCulto, "yyyy-MM-dd");
+        const sessao = await findOrOpenSessao(dataISO, periodo);
+        if (sessao) setSessaoAtual(sessao);
+      } catch (e) {
+        console.warn("Falha ao abrir/obter sessão de contagem", e);
+      }
 
-      // Resetar form
-      setLinhas([]);
-      setDataCulto(new Date());
-      setConferenteId("");
-      setStep(1);
+      toast.success("Relatório enviado! Sessão de contagem aberta.");
+
+      // Avançar para passo 3 (envio & sessão)
       setShowPreview(false);
+      setStep(3);
     } catch (error: unknown) {
       console.error("Erro ao enviar relatório:", error);
       toast.error("Erro ao enviar relatório", {
@@ -589,6 +960,141 @@ export default function RelatorioOferta() {
     }
   };
 
+  const findOrOpenSessao = async (
+    dataEventoISO: string,
+    periodoSessao: string = periodo
+  ): Promise<SessaoContagem | null> => {
+    if (!igrejaId) return null;
+    // 1) Tenta localizar sessão existente (igreja/data/periodo) ignorando filial
+    // para evitar 409 quando a sessão existir em outra filial ou global.
+    let base = supabase
+      .from("sessoes_contagem")
+      .select("*")
+      .eq("igreja_id", igrejaId)
+      .eq("data_culto", dataEventoISO)
+      .eq("periodo", periodoSessao)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const { data: byPeriodo } = await base;
+    if (byPeriodo && byPeriodo.length > 0) {
+      return byPeriodo[0] as unknown as SessaoContagem;
+    }
+
+    // 2) Fallback: buscar por data sem filtrar periodo (caso antigas sessões usem outro valor, ex.: 'oferta'), ignorando filial
+    let anyPeriodo = supabase
+      .from("sessoes_contagem")
+      .select("*")
+      .eq("igreja_id", igrejaId)
+      .eq("data_culto", dataEventoISO)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const { data: existentes } = await anyPeriodo;
+    if (existentes && existentes.length > 0) {
+      return existentes[0] as unknown as SessaoContagem;
+    }
+
+    // 3) Se ainda não existir, tenta abrir; em caso de conflito (409), reconsulta e retorna
+    try {
+      const criada = await openSessaoContagem(
+        igrejaId,
+        !isAllFiliais ? filialId || null : null,
+        new Date(dataEventoISO),
+        periodoSessao
+      );
+      return criada;
+    } catch (e: any) {
+      // Log completo do erro para debug
+      console.error("Erro ao abrir sessão:", e);
+      console.error("Detalhes do erro:", {
+        message: e?.message,
+        details: e?.details,
+        hint: e?.hint,
+        code: e?.code,
+      });
+
+      // Em cenários de corrida/duplicidade (409), reconsultar sem filtrar período e ignorando filial
+      let retry = supabase
+        .from("sessoes_contagem")
+        .select("*")
+        .eq("igreja_id", igrejaId)
+        .eq("data_culto", dataEventoISO)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const { data: aposErro } = await retry;
+      if (aposErro && aposErro.length > 0) {
+        return aposErro[0] as unknown as SessaoContagem;
+      }
+
+      // Se não conseguiu abrir a sessão, mostrar erro para o usuário
+      toast.error("Erro ao abrir sessão", {
+        description:
+          e?.message || "Não foi possível abrir a sessão de contagem",
+      });
+      return null;
+    }
+  };
+
+  const handleSalvarMinhaContagem = async (
+    valores: { oferta: number; dizimo: number; missoes: number },
+    metadata?: OfertaMetadata
+  ) => {
+    if (!igrejaId || !profile?.id) return;
+    setMinhaContagemLoading(true);
+    try {
+      const dataISO = metadata?.data_evento || format(dataCulto, "yyyy-MM-dd");
+      const sessao = await findOrOpenSessao(dataISO);
+      if (!sessao) throw new Error("Sessão não encontrada/aberta");
+
+      const { count } = await supabase
+        .from("contagens")
+        .select("id", { count: "exact", head: true })
+        .eq("sessao_id", sessao.id);
+
+      const ordem = (count || 0) + 1;
+      const total =
+        (valores.oferta || 0) + (valores.dizimo || 0) + (valores.missoes || 0);
+
+      const { error: insertError } = await supabase.from("contagens").insert({
+        sessao_id: sessao.id,
+        contador_id: profile.id,
+        ordem,
+        total,
+        totais_por_tipo: valores,
+      });
+      if (insertError) throw insertError;
+
+      const confronto = await confrontarContagens(sessao.id);
+      if (confronto) {
+        const status = confronto.status;
+        const variance = confronto.variance_value ?? 0;
+        if (status === "validado") {
+          toast.success("Contagem validada sem divergências.");
+        } else if (status === "divergente") {
+          toast.warning(
+            `Divergência de ${new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            }).format(variance)}`
+          );
+        } else {
+          toast.info(`Status da sessão: ${status}`);
+        }
+      } else {
+        toast.info("Confronto realizado.");
+      }
+
+      setShowMinhaContagem(false);
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error("Falha ao salvar contagem", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setMinhaContagemLoading(false);
+    }
+  };
+
   const handleRejeitarOferta = async (
     notificationId: string,
     metadata: OfertaMetadata
@@ -722,7 +1228,7 @@ export default function RelatorioOferta() {
               step === 1 ? "font-semibold text-foreground" : ""
             )}
           >
-            1. Dados do culto
+            1. Abertura
           </div>
           <span>→</span>
           <div
@@ -731,7 +1237,25 @@ export default function RelatorioOferta() {
               step === 2 ? "font-semibold text-foreground" : ""
             )}
           >
-            2. Valores e contas
+            2. Cofre (Físico)
+          </div>
+          <span>→</span>
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              step === 3 ? "font-semibold text-foreground" : ""
+            )}
+          >
+            3. Digital (Pix/Cartão)
+          </div>
+          <span>→</span>
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              step === 4 ? "font-semibold text-foreground" : ""
+            )}
+          >
+            4. Fechamento
           </div>
         </div>
       </div>
@@ -771,6 +1295,25 @@ export default function RelatorioOferta() {
                       />
                     </PopoverContent>
                   </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="periodo">Período *</Label>
+                  <Select
+                    value={periodo}
+                    onValueChange={(v) => setPeriodo(v as any)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periodosDisponiveis.map((p) => (
+                        <SelectItem key={p} value={p.toLowerCase()}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -826,11 +1369,12 @@ export default function RelatorioOferta() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0 space-y-4">
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-3 text-xs font-semibold text-muted-foreground px-1">
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3 text-xs font-semibold text-muted-foreground px-1">
+                  <span>Membro</span>
+                  <span>Tipo</span>
                   <span>Forma</span>
                   <span>Conta</span>
                   <span>Valor</span>
-                  <span className="hidden md:block" />
                 </div>
                 <div className="space-y-3">
                   {linhas.map((linha) => {
@@ -854,8 +1398,52 @@ export default function RelatorioOferta() {
                     return (
                       <div
                         key={linha.id}
-                        className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center p-3 border rounded-lg"
+                        className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center p-3 border rounded-lg"
                       >
+                        <div>
+                          <PessoaCombobox
+                            value={linha.pessoaId || null}
+                            onChange={(v) =>
+                              atualizarLinha(linha.id, { pessoaId: v })
+                            }
+                            placeholder="Membro (opcional)"
+                          />
+                        </div>
+
+                        <div>
+                          <Select
+                            value={
+                              linha.categoriaId
+                                ? `${linha.tipo || "oferta"}:${
+                                    linha.categoriaId
+                                  }`
+                                : undefined
+                            }
+                            onValueChange={(v) => {
+                              const [tipoSel, catId] = v.split(":");
+                              atualizarLinha(linha.id, {
+                                tipo: tipoSel as any,
+                                categoriaId: catId,
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecionar tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {tiposFisicosPermitidos.map((c: any) => {
+                                const key = categoriaToTipo(c.nome || "");
+                                const label = c.nome as string;
+                                const value = `${key}:${c.id}`;
+                                return (
+                                  <SelectItem key={c.id} value={value}>
+                                    {label}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="space-y-1">
                           <Select
                             value={linha.formaId}
@@ -867,7 +1455,7 @@ export default function RelatorioOferta() {
                               <SelectValue placeholder="Selecione a forma" />
                             </SelectTrigger>
                             <SelectContent>
-                              {formasPagamento?.map((f) => (
+                              {(formasFisicas || formasPagamento)?.map((f) => (
                                 <SelectItem key={f.id} value={f.id}>
                                   {f.nome}
                                 </SelectItem>
@@ -913,6 +1501,7 @@ export default function RelatorioOferta() {
                         <Input
                           id={`valor-${linha.id}`}
                           type="text"
+                          inputMode="numeric"
                           placeholder="0,00"
                           value={linha.valor}
                           onChange={(e) =>
@@ -953,13 +1542,20 @@ export default function RelatorioOferta() {
                 <div className="flex items-center justify-between flex-col sm:flex-row gap-3">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">
-                      Total do Relatório
+                      Total Físico
                     </p>
                     <p className="text-3xl font-bold text-foreground">
                       {formatCurrency(calcularTotal())}
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={salvarRascunho}
+                    >
+                      <Save className="w-4 h-4 mr-2" /> Salvar rascunho
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"
@@ -974,13 +1570,638 @@ export default function RelatorioOferta() {
                       className="bg-gradient-primary shadow-soft"
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {loading ? "Enviando..." : "Pré-visualizar"}
+                      {loading ? "Salvando..." : "Avançar para Digital"}
                     </Button>
                   </div>
                 </div>
+
+                {calcularTotal() <= 0 && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <Checkbox
+                      id="confirm-zero-fisico"
+                      checked={confirmZeroFisico}
+                      onCheckedChange={(v) => setConfirmZeroFisico(!!v)}
+                    />
+                    <Label
+                      htmlFor="confirm-zero-fisico"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Confirmo que não houve entradas físicas (valor zerado)
+                    </Label>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </>
+        )}
+
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate("/financas/sessoes-contagem")}
+        >
+          Sessões de Contagem
+        </Button>
+        {step === 3 && (
+          <Card className="shadow-soft">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="text-lg">Digital (Pix/Cartão)</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 space-y-4">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const url = `${
+                        import.meta.env.VITE_SUPABASE_URL
+                      }/functions/v1/finance-sync?provider=pix&op=pull`;
+                      const resp = await fetch(url, { method: "GET" });
+                      const data = await resp.json();
+                      toast.info(`Sync: ${data.ok ? "ok" : "falhou"}`);
+                      if (data.ok && Array.isArray(data.items)) {
+                        const novos: LinhaDigital[] = data.items.map(
+                          (it: any) => {
+                            const formaId =
+                              it.forma_pagamento_id ||
+                              formasDigitais?.[0]?.id ||
+                              formasPagamento?.[0]?.id;
+                            const contaDefault = formaId
+                              ? mapeamentosPorForma[formaId]?.[0]?.contaId
+                              : undefined;
+                            return {
+                              id: `api-${it.id || crypto.randomUUID()}`,
+                              pessoaId: it.pessoa_id || null,
+                              formaId,
+                              contaId: contaDefault,
+                              valor: String(it.valor ?? ""),
+                              origem: "api",
+                              readOnly: true,
+                            };
+                          }
+                        );
+                        setLinhasDigitaisEx((prev) => {
+                          const filtrados = prev.filter(
+                            (p) => p.origem !== "api"
+                          );
+                          return [...novos, ...filtrados];
+                        });
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      toast.error("Erro ao sincronizar API");
+                    }
+                  }}
+                >
+                  🔄 Sincronizar API
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const formaId =
+                      formasDigitais?.[0]?.id || formasPagamento?.[0]?.id;
+                    const contaDefault = formaId
+                      ? mapeamentosPorForma[formaId]?.[0]?.contaId
+                      : undefined;
+                    const categoriaDefault =
+                      categoriasDigitaisPermitidas?.[0]?.id || null;
+                    setLinhasDigitaisEx((prev) => [
+                      ...prev,
+                      {
+                        id: `${Date.now()}-${Math.random()}`,
+                        pessoaId: null,
+                        formaId,
+                        contaId: contaDefault,
+                        categoriaId: categoriaDefault,
+                        valor: "",
+                        origem: "manual",
+                      },
+                    ]);
+                  }}
+                >
+                  ➕ Adicionar Manual
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-6 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2">
+                <span>Pessoa</span>
+                <span>Forma</span>
+                <span>Categoria</span>
+                <span>Conta</span>
+                <span>Origem</span>
+                <span>Valor</span>
+              </div>
+              <div className="space-y-3">
+                {linhasDigitaisEx.map((l) => (
+                  <div
+                    key={l.id}
+                    className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center p-3 border rounded-lg"
+                  >
+                    <div>
+                      <PessoaCombobox
+                        value={l.pessoaId || null}
+                        onChange={(v) =>
+                          setLinhasDigitaisEx((prev) =>
+                            prev.map((it) =>
+                              it.id === l.id ? { ...it, pessoaId: v } : it
+                            )
+                          )
+                        }
+                        placeholder="Pessoa (opcional)"
+                      />
+                    </div>
+                    <div>
+                      <Select
+                        value={l.formaId || ""}
+                        disabled={!!l.readOnly}
+                        onValueChange={(v) => {
+                          const contaDefault = v
+                            ? mapeamentosPorForma[v]?.[0]?.contaId
+                            : undefined;
+                          setLinhasDigitaisEx((prev) =>
+                            prev.map((it) =>
+                              it.id === l.id
+                                ? { ...it, formaId: v, contaId: contaDefault }
+                                : it
+                            )
+                          );
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a forma" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(formasDigitais || formasPagamento)?.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Select
+                        value={
+                          l.categoriaId || categoriasDigitaisPermitidas?.[0]?.id
+                        }
+                        disabled={!!l.readOnly}
+                        onValueChange={(v) =>
+                          setLinhasDigitaisEx((prev) =>
+                            prev.map((it) =>
+                              it.id === l.id ? { ...it, categoriaId: v } : it
+                            )
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categoriasDigitaisPermitidas.map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      {(() => {
+                        const mapeamentos = l.formaId
+                          ? mapeamentosPorForma[l.formaId] || []
+                          : [];
+                        if (mapeamentos.length === 0) {
+                          return (
+                            <p className="text-xs text-destructive">
+                              Sem conta mapeada
+                            </p>
+                          );
+                        }
+                        return (
+                          <Select
+                            value={l.contaId || mapeamentos[0].contaId}
+                            disabled={!!l.readOnly}
+                            onValueChange={(v) =>
+                              setLinhasDigitaisEx((prev) =>
+                                prev.map((it) =>
+                                  it.id === l.id ? { ...it, contaId: v } : it
+                                )
+                              )
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a conta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {mapeamentos.map((m) => (
+                                <SelectItem key={m.contaId} value={m.contaId}>
+                                  {m.contaNome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <span className="text-xs">{l.origem.toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0,00"
+                        value={l.valor}
+                        disabled={l.readOnly}
+                        onChange={(e) =>
+                          setLinhasDigitaisEx((prev) =>
+                            prev.map((it) =>
+                              it.id === l.id
+                                ? {
+                                    ...it,
+                                    valor: sanitizeMoneyInput(e.target.value),
+                                  }
+                                : it
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between flex-col sm:flex-row gap-3 mt-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Total Digital
+                  </p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {formatCurrency(
+                      linhasDigitaisEx.reduce(
+                        (sum, l) =>
+                          sum +
+                          (parseFloat((l.valor || "0").replace(",", ".")) || 0),
+                        0
+                      )
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={salvarRascunho}
+                  >
+                    <Save className="w-4 h-4 mr-2" /> Salvar rascunho
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep(2)}
+                  >
+                    Voltar
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-gradient-primary"
+                    onClick={() => setStep(4)}
+                  >
+                    Avançar para Fechamento
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {step === 4 && (
+          <Card className="shadow-soft">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="text-lg">Fechamento & Resumo</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="text-muted-foreground">Data do culto</div>
+                <div className="font-medium">
+                  {format(dataCulto, "dd/MM/yyyy")}
+                </div>
+                <div className="text-muted-foreground">Período</div>
+                <div className="font-medium">
+                  {periodo?.charAt(0).toUpperCase() + periodo?.slice(1)}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="p-3 border rounded">
+                  <p className="text-sm text-muted-foreground">Físico</p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(calcularTotal())}
+                  </p>
+                </div>
+                <div className="p-3 border rounded">
+                  <p className="text-sm text-muted-foreground">Digital</p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(calcularTotalDigital())}
+                  </p>
+                </div>
+                <div className="p-3 border rounded">
+                  <p className="text-sm text-muted-foreground">Total Geral</p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(calcularTotal() + calcularTotalDigital())}
+                  </p>
+                </div>
+              </div>
+
+              {sessaoAtual && (
+                <div className="p-3 border rounded space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">Conferência Cega</p>
+                    <span className="text-xs text-muted-foreground">
+                      {confrontoLoading
+                        ? "Carregando..."
+                        : confrontoStatus
+                        ? `Status: ${confrontoStatus}`
+                        : "-"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="p-2 rounded bg-muted/50">
+                      <p className="text-xs text-muted-foreground">
+                        Tolerância
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatCurrency(Number(blindTolerance ?? 0))}
+                      </p>
+                    </div>
+                    <div className="p-2 rounded bg-muted/50">
+                      <p className="text-xs text-muted-foreground">
+                        Comparação
+                      </p>
+                      <p className="text-sm font-medium">
+                        {blindCompareLevel === "tipo" ? "Por Tipo" : "Total"}
+                      </p>
+                    </div>
+                    <div className="p-2 rounded bg-muted/50">
+                      <p className="text-xs text-muted-foreground">
+                        Desvio Total
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatCurrency(Number(confrontoVariance ?? 0))}
+                      </p>
+                    </div>
+                  </div>
+                  {blindCompareLevel === "tipo" && confrontoPorTipo && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {(["oferta", "dizimo", "missoes"] as const).map((k) => {
+                        const v = Number((confrontoPorTipo as any)[k] ?? 0);
+                        const ok =
+                          blindTolerance != null
+                            ? Math.abs(v) <= Number(blindTolerance)
+                            : undefined;
+                        return (
+                          <div
+                            key={k}
+                            className={`p-2 rounded border ${
+                              ok === undefined
+                                ? ""
+                                : ok
+                                ? "border-green-300 bg-green-50"
+                                : "border-amber-300 bg-amber-50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">
+                                {k.charAt(0).toUpperCase() + k.slice(1)}
+                              </span>
+                              {ok !== undefined && (
+                                <span
+                                  className={`font-medium ${
+                                    ok ? "text-green-600" : "text-amber-600"
+                                  }`}
+                                >
+                                  {ok ? "OK" : "Divergente"}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm font-medium">
+                              {formatCurrency(v)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(3)}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-gradient-primary"
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      if (!igrejaId) throw new Error("Igreja não identificada");
+                      const dataISO = format(dataCulto, "yyyy-MM-dd");
+                      const sessao =
+                        sessaoAtual || (await findOrOpenSessao(dataISO));
+                      // Categorias por tipo
+                      const getCategoriaId = async (tipoNome: string) => {
+                        let q = supabase
+                          .from("categorias_financeiras")
+                          .select("id")
+                          .eq("tipo", "entrada")
+                          .ilike("nome", `%${tipoNome}%`)
+                          .eq("igreja_id", igrejaId)
+                          .limit(1);
+                        if (!isAllFiliais && filialId)
+                          q = q.eq("filial_id", filialId);
+                        const { data } = await q.maybeSingle();
+                        return data?.id || null;
+                      };
+                      const catOferta = await getCategoriaId("oferta");
+                      const catDizimo = await getCategoriaId("dizimo");
+                      const catMissoes = await getCategoriaId("missoes");
+                      // Prefere IDs das categorias carregadas (permitidas), se disponíveis
+                      const idOfertaCfg =
+                        tiposFisicosPermitidos.find((c: any) =>
+                          (c.nome || "").toLowerCase().includes("oferta")
+                        )?.id || catOferta;
+                      const idDizimoCfg =
+                        tiposFisicosPermitidos.find((c: any) =>
+                          (c.nome || "").toLowerCase().includes("diz")
+                        )?.id || catDizimo;
+                      const idMissoesCfg =
+                        tiposFisicosPermitidos.find((c: any) =>
+                          (c.nome || "").toLowerCase().includes("miss")
+                        )?.id || catMissoes;
+
+                      const fisicoTransacoes: any[] = [];
+                      for (const l of linhas) {
+                        const valorNumerico =
+                          parseFloat(l.valor.replace(",", ".")) || 0;
+                        if (valorNumerico <= 0) continue;
+                        const forma = formasPagamento?.find(
+                          (f) => f.id === l.formaId
+                        );
+                        if (!forma) continue;
+                        const contaMap = mapeamentosPorForma[l.formaId];
+                        const contaId =
+                          l.contaId || contaMap?.[0]?.contaId || null;
+                        const categoriaId =
+                          l.categoriaId ||
+                          (l.tipo === "dizimo"
+                            ? idDizimoCfg
+                            : l.tipo === "missoes"
+                            ? idMissoesCfg
+                            : idOfertaCfg);
+                        const taxaPercent = Number(
+                          forma.taxa_administrativa || 0
+                        );
+                        const taxaFixa = Number(
+                          forma.taxa_administrativa_fixa || 0
+                        );
+                        let taxasAdministrativas: number | null = null;
+                        if (taxaPercent > 0)
+                          taxasAdministrativas =
+                            valorNumerico * (taxaPercent / 100);
+                        if (taxaFixa > 0)
+                          taxasAdministrativas =
+                            (taxasAdministrativas || 0) + taxaFixa;
+                        fisicoTransacoes.push({
+                          tipo: "entrada",
+                          tipo_lancamento: "unico",
+                          descricao: `${
+                            (l.tipo || "oferta").charAt(0).toUpperCase() +
+                            (l.tipo || "oferta").slice(1)
+                          } - Culto ${format(dataCulto, "dd/MM/yyyy")}`,
+                          valor: valorNumerico,
+                          data_vencimento: format(dataCulto, "yyyy-MM-dd"),
+                          data_competencia: format(dataCulto, "yyyy-MM-dd"),
+                          data_pagamento: null,
+                          conta_id: contaId,
+                          categoria_id: categoriaId,
+                          forma_pagamento: l.formaId,
+                          status: "pendente",
+                          taxas_administrativas: taxasAdministrativas,
+                          observacoes: `Lançado por: ${profile?.nome}`,
+                          lancado_por: profile?.user_id,
+                          igreja_id: igrejaId,
+                          filial_id: !isAllFiliais ? filialId : null,
+                          pessoa_id: l.pessoaId || null,
+                          origem_registro: "manual",
+                        });
+                      }
+
+                      // Categoria digital preferida via config (tipos_permitidos_digital)
+                      const idDigitalCfg =
+                        Array.isArray(
+                          (financeiroConfig as any)?.tipos_permitidos_digital
+                        ) &&
+                        (financeiroConfig as any).tipos_permitidos_digital
+                          .length > 0
+                          ? (financeiroConfig as any)
+                              .tipos_permitidos_digital[0]
+                          : catOferta;
+
+                      const digitaisTransacoes: any[] = [];
+                      for (const d of linhasDigitaisEx) {
+                        const valorNumerico =
+                          parseFloat(d.valor.replace(",", ".")) || 0;
+                        if (valorNumerico <= 0) continue;
+                        const forma = formasPagamento?.find(
+                          (f) => f.id === d.formaId
+                        );
+                        const contaMap = d.formaId
+                          ? mapeamentosPorForma[d.formaId]
+                          : [];
+                        const contaId =
+                          d.contaId || contaMap?.[0]?.contaId || null;
+                        digitaisTransacoes.push({
+                          tipo: "entrada",
+                          tipo_lancamento: "unico",
+                          descricao: `Digital - Culto ${format(
+                            dataCulto,
+                            "dd/MM/yyyy"
+                          )}`,
+                          valor: valorNumerico,
+                          data_vencimento: format(dataCulto, "yyyy-MM-dd"),
+                          data_competencia: format(dataCulto, "yyyy-MM-dd"),
+                          data_pagamento: format(dataCulto, "yyyy-MM-dd"),
+                          conta_id: contaId,
+                          categoria_id: d.categoriaId || idDigitalCfg,
+                          forma_pagamento: d.formaId,
+                          status: "pago",
+                          taxas_administrativas: forma
+                            ? Number(forma.taxa_administrativa || 0) > 0
+                              ? valorNumerico *
+                                (Number(forma.taxa_administrativa) / 100)
+                              : null
+                            : null,
+                          observacoes: `Digital (${d.origem})`,
+                          lancado_por: profile?.user_id,
+                          igreja_id: igrejaId,
+                          filial_id: !isAllFiliais ? filialId : null,
+                          pessoa_id: d.pessoaId || null,
+                          origem_registro: d.origem,
+                        });
+                      }
+
+                      const todas = [
+                        ...fisicoTransacoes,
+                        ...digitaisTransacoes,
+                      ];
+                      if (todas.length === 0) {
+                        toast.error("Nada a lançar");
+                        setLoading(false);
+                        return;
+                      }
+
+                      // Anexa sessão ao lançamento para consulta posterior
+                      const payload = todas.map((t) => ({
+                        ...t,
+                        sessao_id: sessao?.id || null,
+                      }));
+
+                      const { error } = await supabase
+                        .from("transacoes_financeiras")
+                        .insert(payload);
+                      if (error) throw error;
+
+                      // Limpa rascunho ao encerrar
+                      if (sessao?.id) {
+                        await supabase
+                          .from("sessoes_itens_draft")
+                          .delete()
+                          .eq("sessao_id", sessao.id);
+                      }
+                      toast.success(`${todas.length} lançamento(s) criado(s)!`);
+                      setStep(1);
+                      setLinhas([]);
+                      setLinhasDigitaisEx([]);
+                    } catch (err: any) {
+                      console.error(err);
+                      toast.error("Erro ao encerrar e lançar", {
+                        description: err?.message || String(err),
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  Encerrar e Lançar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </form>
 
@@ -991,7 +2212,7 @@ export default function RelatorioOferta() {
               Revisar e Enviar
             </h2>
             <p className="text-sm text-muted-foreground">
-              Confirme os lançamentos antes de enviar para conferência
+              Confirme os lançamentos físicos antes de avançar
             </p>
           </div>
 
@@ -1008,9 +2229,10 @@ export default function RelatorioOferta() {
             </div>
 
             <div className="border rounded-lg">
-              <div className="grid grid-cols-3 gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <div className="grid grid-cols-4 gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground">
                 <span>Forma</span>
                 <span>Conta</span>
+                <span>Membro</span>
                 <span className="text-right">Valor</span>
               </div>
               <div className="divide-y">
@@ -1026,14 +2248,20 @@ export default function RelatorioOferta() {
                       mapeamentosPorForma[linha.formaId]?.find(
                         (m) => m.contaId === linha.contaId
                       )?.contaNome || "Conta";
+                    const pessoaNome =
+                      (pessoas || []).find((p) => p.id === linha.pessoaId)
+                        ?.nome || "-";
                     return (
                       <div
                         key={linha.id}
-                        className="grid grid-cols-3 gap-2 px-3 py-2 text-sm items-center"
+                        className="grid grid-cols-4 gap-2 px-3 py-2 text-sm items-center"
                       >
                         <span>{formaNome}</span>
                         <span className="truncate" title={contaNome}>
                           {contaNome}
+                        </span>
+                        <span className="truncate" title={pessoaNome}>
+                          {pessoaNome}
                         </span>
                         <span className="text-right font-medium">
                           {formatCurrency(
@@ -1070,7 +2298,7 @@ export default function RelatorioOferta() {
               className="w-full sm:w-auto bg-gradient-primary"
             >
               <Save className="w-4 h-4 mr-2" />
-              {loading ? "Enviando..." : "Confirmar e Enviar"}
+              {loading ? "Salvando..." : "Confirmar Físico"}
             </Button>
           </div>
         </div>
@@ -1175,6 +2403,13 @@ export default function RelatorioOferta() {
                     >
                       Rejeitar
                     </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowMinhaContagem(true)}
+                    >
+                      Minha Contagem
+                    </Button>
                     <ConferirOfertaDialog
                       dados={dadosConferencia}
                       onConfirmar={() =>
@@ -1184,6 +2419,15 @@ export default function RelatorioOferta() {
                         handleRejeitarOferta(notif.id, metadata)
                       }
                       loading={loading}
+                    />
+                    <MinhaContagemDialog
+                      open={showMinhaContagem}
+                      onOpenChange={setShowMinhaContagem}
+                      defaultValores={{ oferta: metadata.total || 0 }}
+                      onSubmit={(vals) =>
+                        handleSalvarMinhaContagem(vals, metadata)
+                      }
+                      loading={minhaContagemLoading}
                     />
                   </div>
                 </div>

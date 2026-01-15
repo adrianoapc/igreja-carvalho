@@ -179,7 +179,9 @@ export default function GabinetePastoral() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">Painel Pastoral</h1>
-          <p className="text-sm text-muted-foreground">Gestão de atendimentos</p>
+          <p className="text-sm text-muted-foreground">
+            Gestão de atendimentos
+          </p>
         </div>
         <Button
           onClick={() => handleAgendar(null as any)}

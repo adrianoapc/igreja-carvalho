@@ -36,6 +36,19 @@ npm i
 npm run dev
 ```
 
+## Development
+
+- Dev server: roda em `http://localhost:8080` (ver `vite.config.ts`).
+- VS Code Task: use a tarefa `Dev: Vite` para iniciar o servidor de desenvolvimento.
+- Build: `npm run build` gera arquivos em `dist/` e registra o service worker PWA.
+
+## Extensões Recomendadas
+
+- ESLint (`dbaeumer.vscode-eslint`): lint e qualidade de código.
+- Prettier (`esbenp.prettier-vscode`): formatação consistente.
+- Tailwind CSS (`bradlc.vscode-tailwindcss`): auto-complete/utilitários.
+- Supabase (`supabase.supabase-vscode`): integração com banco e policies.
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).

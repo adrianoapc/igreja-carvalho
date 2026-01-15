@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { BookOpen, Play, ChevronRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +41,11 @@ interface InscricaoComProgresso {
   etapasConcluidas: number;
 }
 
-interface SupabaseInscricao extends Omit<InscricaoComProgresso, "totalEtapas" | "etapasConcluidas" | "id"> {
+interface SupabaseInscricao
+  extends Omit<
+    InscricaoComProgresso,
+    "totalEtapas" | "etapasConcluidas" | "id"
+  > {
   id: string;
 }
 
@@ -54,30 +64,33 @@ export default function MeusCursos() {
   const { profile } = useAuth();
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [inscricoes, setInscricoes] = useState<InscricaoComProgresso[]>([]);
-  const [jornadasDisponiveis, setJornadasDisponiveis] = useState<JornadaDisponivel[]>([]);
+  const [jornadasDisponiveis, setJornadasDisponiveis] = useState<
+    JornadaDisponivel[]
+  >([]);
   const [filiaisMap, setFiliaisMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadingDisponiveis, setLoadingDisponiveis] = useState(true);
   const [activeTab, setActiveTab] = useState("inscritos");
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
-  const { categoriaId, baseMinisterialId, contaId } = useConfiguracaoFinanceiraEnsino();
+  const { categoriaId, baseMinisterialId, contaId } =
+    useConfiguracaoFinanceiraEnsino();
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [pagamentoMensagem, setPagamentoMensagem] = useState("");
 
   // Buscar nomes das filiais
   const fetchFiliais = useCallback(async () => {
     if (!igrejaId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from("filiais")
         .select("id, nome")
         .eq("igreja_id", igrejaId);
-      
+
       if (error) throw error;
-      
+
       const map: Record<string, string> = {};
-      data?.forEach(f => {
+      data?.forEach((f) => {
         map[f.id] = f.nome;
       });
       setFiliaisMap(map);
@@ -93,14 +106,16 @@ export default function MeusCursos() {
       // Buscar TODAS as inscrições do usuário (cross-filial) apenas filtrando por igreja
       const { data: inscricoesData, error } = await supabase
         .from("inscricoes_jornada")
-        .select(`
+        .select(
+          `
           id,
           jornada_id,
           etapa_atual_id,
           concluido,
           status_pagamento,
           jornada:jornadas!inner(id, titulo, descricao, cor_tema, exibir_portal, requer_pagamento, valor, igreja_id, filial_id)
-        `)
+        `
+        )
         .eq("pessoa_id", profile.id)
         .eq("concluido", false)
         .eq("jornada.exibir_portal", true)
@@ -167,12 +182,16 @@ export default function MeusCursos() {
 
       if (inscricoesError) throw inscricoesError;
 
-      const idsInscritos = new Set((inscricoesUsuario || []).map((i) => i.jornada_id));
+      const idsInscritos = new Set(
+        (inscricoesUsuario || []).map((i) => i.jornada_id)
+      );
 
       // Buscar TODAS as jornadas disponíveis da igreja (cross-filial)
       const { data: jornadas, error } = await supabase
         .from("jornadas")
-        .select("id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal, filial_id")
+        .select(
+          "id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal, filial_id"
+        )
         .eq("ativo", true)
         .eq("exibir_portal", true)
         .eq("igreja_id", igrejaId)
@@ -200,7 +219,9 @@ export default function MeusCursos() {
 
   const calcularProgresso = (inscricao: InscricaoComProgresso) => {
     if (inscricao.totalEtapas === 0) return 0;
-    return Math.round((inscricao.etapasConcluidas / inscricao.totalEtapas) * 100);
+    return Math.round(
+      (inscricao.etapasConcluidas / inscricao.totalEtapas) * 100
+    );
   };
 
   const handleInscrever = async (jornada: JornadaDisponivel) => {
@@ -224,11 +245,15 @@ export default function MeusCursos() {
 
       // Curso pago
       if (!contaId) {
-        toast.error("Configuração financeira ausente (conta padrão). Configure em Financeiro.");
+        toast.error(
+          "Configuração financeira ausente (conta padrão). Configure em Financeiro."
+        );
         return;
       }
       const hoje = new Date();
-      const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+      const data = `${hoje.getFullYear()}-${String(
+        hoje.getMonth() + 1
+      ).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
 
       const { data: transacaoCriada, error: txError } = await supabase
         .from("transacoes_financeiras")
@@ -261,7 +286,11 @@ export default function MeusCursos() {
         });
       if (inscError) throw inscError;
 
-      setPagamentoMensagem(`Inscrição realizada! Para liberar o acesso, realize o pagamento de R$ ${Number(jornada.valor || 0).toFixed(2)}.`);
+      setPagamentoMensagem(
+        `Inscrição realizada! Para liberar o acesso, realize o pagamento de R$ ${Number(
+          jornada.valor || 0
+        ).toFixed(2)}.`
+      );
       setPagamentoDialogOpen(true);
       await Promise.all([fetchInscricoes(), fetchDisponiveis()]);
     } catch (error) {
@@ -297,7 +326,11 @@ export default function MeusCursos() {
         <h1 className="text-2xl font-bold">Meus Cursos</h1>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="inscritos">Meus cursos</TabsTrigger>
           <TabsTrigger value="disponiveis">Disponíveis</TabsTrigger>
@@ -308,7 +341,9 @@ export default function MeusCursos() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Nenhum curso encontrado</h3>
+                <h3 className="text-lg font-medium mb-2">
+                  Nenhum curso encontrado
+                </h3>
                 <p className="text-muted-foreground text-sm">
                   Você ainda não está inscrito em nenhuma jornada de ensino.
                 </p>
@@ -318,33 +353,46 @@ export default function MeusCursos() {
             <div className="flex flex-col gap-3">
               {inscricoes.map((inscricao) => {
                 const progresso = calcularProgresso(inscricao);
-                const corTema = inscricao.jornada?.cor_tema || "hsl(var(--primary))";
-                
+                const corTema =
+                  inscricao.jornada?.cor_tema || "hsl(var(--primary))";
+
                 const bloqueado = inscricao.status_pagamento === "pendente";
                 return (
-                  <Card 
-                    key={inscricao.id} 
-                    className={`overflow-hidden hover:shadow-md transition-all ${bloqueado ? "opacity-90" : "cursor-pointer group"}`}
-                    onClick={() => !bloqueado && navigate(`/cursos/${inscricao.jornada_id}`)}
+                  <Card
+                    key={inscricao.id}
+                    className={`overflow-hidden hover:shadow-md transition-all ${
+                      bloqueado ? "opacity-90" : "cursor-pointer group"
+                    }`}
+                    onClick={() =>
+                      !bloqueado && navigate(`/cursos/${inscricao.jornada_id}`)
+                    }
                   >
                     <div className="flex items-stretch">
-                      <div 
-                        className="w-1.5 shrink-0" 
+                      <div
+                        className="w-1.5 shrink-0"
                         style={{ backgroundColor: corTema }}
                       />
-                      
+
                       <div className="flex-1 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
                               {inscricao.jornada?.titulo}
                             </h3>
-                            {inscricao.jornada?.filial_id && filiaisMap[inscricao.jornada.filial_id] && (
-                              <Badge variant="outline" className="text-xs shrink-0">
-                                {filiaisMap[inscricao.jornada.filial_id]}
+                            {inscricao.jornada?.filial_id &&
+                              filiaisMap[inscricao.jornada.filial_id] && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs shrink-0"
+                                >
+                                  {filiaisMap[inscricao.jornada.filial_id]}
+                                </Badge>
+                              )}
+                            {bloqueado && (
+                              <Badge variant="secondary">
+                                Aguardando Pagamento
                               </Badge>
                             )}
-                            {bloqueado && <Badge variant="secondary">Aguardando Pagamento</Badge>}
                           </div>
                           {inscricao.jornada?.descricao && (
                             <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
@@ -352,24 +400,27 @@ export default function MeusCursos() {
                             </p>
                           )}
                         </div>
-                        
+
                         <div className="flex items-center gap-4 sm:gap-6">
                           <div className="flex-1 sm:w-40 space-y-1">
                             <div className="flex justify-between text-xs">
                               <span className="text-muted-foreground">
-                                {inscricao.etapasConcluidas}/{inscricao.totalEtapas} etapas
+                                {inscricao.etapasConcluidas}/
+                                {inscricao.totalEtapas} etapas
                               </span>
                               <span className="font-medium">{progresso}%</span>
                             </div>
                             <Progress value={progresso} className="h-1.5" />
                           </div>
-                          
+
                           {!bloqueado && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               variant={progresso === 0 ? "default" : "outline"}
                               className="shrink-0 hidden sm:flex"
-                              onClick={() => navigate(`/cursos/${inscricao.jornada_id}`)}
+                              onClick={() =>
+                                navigate(`/cursos/${inscricao.jornada_id}`)
+                              }
                             >
                               {progresso === 0 ? (
                                 <>
@@ -405,30 +456,45 @@ export default function MeusCursos() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <Sparkles className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Nada disponível no momento</h3>
+                <h3 className="text-lg font-medium mb-2">
+                  Nada disponível no momento
+                </h3>
                 <p className="text-muted-foreground text-sm">
-                  Assim que novas jornadas forem liberadas, elas aparecerão aqui.
+                  Assim que novas jornadas forem liberadas, elas aparecerão
+                  aqui.
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {jornadasDisponiveis.map((jornada) => (
-                <Card key={jornada.id} className="h-full flex flex-col border hover:shadow-md transition-all">
+                <Card
+                  key={jornada.id}
+                  className="h-full flex flex-col border hover:shadow-md transition-all"
+                >
                   <CardContent className="p-5 flex flex-col gap-3 flex-1">
                     <div className="flex items-start gap-3">
-                      <div 
+                      <div
                         className="w-2 h-10 rounded-full"
-                        style={{ backgroundColor: jornada.cor_tema || "hsl(var(--primary))" }}
+                        style={{
+                          backgroundColor:
+                            jornada.cor_tema || "hsl(var(--primary))",
+                        }}
                       />
                       <div className="space-y-1 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold leading-tight">{jornada.titulo}</h3>
-                          {jornada.filial_id && filiaisMap[jornada.filial_id] && (
-                            <Badge variant="outline" className="text-xs shrink-0">
-                              {filiaisMap[jornada.filial_id]}
-                            </Badge>
-                          )}
+                          <h3 className="font-semibold leading-tight">
+                            {jornada.titulo}
+                          </h3>
+                          {jornada.filial_id &&
+                            filiaisMap[jornada.filial_id] && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs shrink-0"
+                              >
+                                {filiaisMap[jornada.filial_id]}
+                              </Badge>
+                            )}
                         </div>
                         {jornada.descricao && (
                           <p className="text-sm text-muted-foreground line-clamp-2">
@@ -440,14 +506,18 @@ export default function MeusCursos() {
 
                     <div className="mt-auto flex justify-between items-center">
                       {jornada.requer_pagamento && (
-                        <span className="text-sm font-medium">Valor: R$ {(jornada.valor || 0).toFixed(2)}</span>
+                        <span className="text-sm font-medium">
+                          Valor: R$ {(jornada.valor || 0).toFixed(2)}
+                        </span>
                       )}
-                      <Button 
+                      <Button
                         size="sm"
                         onClick={() => handleInscrever(jornada)}
                         disabled={enrollingId === jornada.id}
                       >
-                        {enrollingId === jornada.id ? "Inscrevendo..." : "Inscrever-se"}
+                        {enrollingId === jornada.id
+                          ? "Inscrevendo..."
+                          : "Inscrever-se"}
                       </Button>
                     </div>
                   </CardContent>
@@ -465,7 +535,12 @@ export default function MeusCursos() {
             <DialogDescription>{pagamentoMensagem}</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setPagamentoDialogOpen(false)}>Entendi</Button>
+            <Button
+              variant="outline"
+              onClick={() => setPagamentoDialogOpen(false)}
+            >
+              Entendi
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

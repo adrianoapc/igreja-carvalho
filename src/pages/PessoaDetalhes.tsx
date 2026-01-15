@@ -56,11 +56,14 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPessoaisDialog";
 import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
+import { CriarUsuarioDialog } from "@/components/pessoas/CriarUsuarioDialog";
+import { ResetarSenhaDialog } from "@/components/pessoas/ResetarSenhaDialog";
 import { AtribuirFuncaoDialog } from "@/components/membros/AtribuirFuncaoDialog";
 import { AvatarUpload } from "@/components/perfil/AvatarUpload";
 import { FamiliaresSection } from "@/components/pessoas/FamiliaresSection";
@@ -113,6 +116,7 @@ interface PessoaDetalhesData {
   tipo_sanguineo: string | null;
   observacoes: string | null;
   autorizado_bot_financeiro: boolean | null;
+  is_admin?: boolean;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -128,6 +132,7 @@ export default function PessoaDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin } = useAuthContext();
   const [pessoa, setPessoa] = useState<PessoaDetalhesData | null>(null);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,6 +143,8 @@ export default function PessoaDetalhes() {
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
   const [editarStatusOpen, setEditarStatusOpen] = useState(false);
   const [atribuirFuncaoOpen, setAtribuirFuncaoOpen] = useState(false);
+  const [criarUsuarioOpen, setCriarUsuarioOpen] = useState(false);
+  const [resetarSenhaOpen, setResetarSenhaOpen] = useState(false);
   const [dadosCivisOpen, setDadosCivisOpen] = useState(true);
   const [dadosEclesiasticosOpen, setDadosEclesiasticosOpen] = useState(true);
   const [dadosContatosOpen, setDadosContatosOpen] = useState(true);
@@ -423,6 +430,49 @@ export default function PessoaDetalhes() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Gerenciamento de Acesso ao Sistema */}
+      {pessoa.status === "membro" && isAdmin && (
+        <Card className="shadow-soft border-l-4 border-l-purple-500">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-start justify-between">
+              <div>
+                <h3 className="font-semibold flex items-center gap-2 mb-1">
+                  <Shield className="w-4 h-4 text-purple-600" />
+                  Gerenciamento de Acesso
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {pessoa.user_id
+                    ? "Usuário possui acesso ao sistema. Você pode resetar a senha se necessário."
+                    : "Crie uma conta para este membro acessar o sistema"}
+                </p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                {!pessoa.user_id ? (
+                  <Button
+                    size="sm"
+                    className="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-700"
+                    onClick={() => setCriarUsuarioOpen(true)}
+                  >
+                    <UserCheck className="w-4 h-4 mr-1" />
+                    Criar Acesso
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 sm:flex-none"
+                    onClick={() => setResetarSenhaOpen(true)}
+                  >
+                    <Shield className="w-4 h-4 mr-1" />
+                    Resetar Senha
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -1085,6 +1135,24 @@ export default function PessoaDetalhes() {
             pessoaId={pessoa.id}
             statusAtual={pessoa.status}
             nome={pessoa.nome}
+            onSuccess={fetchPessoa}
+          />
+
+          <CriarUsuarioDialog
+            isOpen={criarUsuarioOpen}
+            onOpenChange={setCriarUsuarioOpen}
+            pessoaId={pessoa.id}
+            pessoaNome={pessoa.nome}
+            pessoaEmail={pessoa.email}
+            onSuccess={fetchPessoa}
+          />
+
+          <ResetarSenhaDialog
+            isOpen={resetarSenhaOpen}
+            onOpenChange={setResetarSenhaOpen}
+            pessoaId={pessoa.id}
+            pessoaNome={pessoa.nome}
+            pessoaEmail={pessoa.email}
             onSuccess={fetchPessoa}
           />
         </>

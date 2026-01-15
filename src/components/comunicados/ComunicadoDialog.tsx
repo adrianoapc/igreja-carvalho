@@ -6,14 +6,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, X, Image as ImageIcon, Megaphone, AlertCircle, AlertTriangle, Info, Link as LinkIcon, Eye, Settings } from "lucide-react";
+import {
+  Upload,
+  X,
+  Image as ImageIcon,
+  Megaphone,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  Link as LinkIcon,
+  Eye,
+  Settings,
+} from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
 import { useFilialId } from "@/hooks/useFilialId";
 
@@ -39,7 +56,12 @@ interface ComunicadoDialogProps {
   onSuccess: () => void;
 }
 
-export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: ComunicadoDialogProps) {
+export function ComunicadoDialog({
+  open,
+  onOpenChange,
+  comunicado,
+  onSuccess,
+}: ComunicadoDialogProps) {
   const { toast } = useToast();
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [isLoading, setIsLoading] = useState(false);
@@ -66,8 +88,12 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
         nivel_urgencia: comunicado.nivel_urgencia || "info",
         link_acao: comunicado.link_acao || "",
         ativo: comunicado.ativo ?? true,
-        data_inicio: comunicado.data_inicio ? new Date(comunicado.data_inicio) : undefined,
-        data_fim: comunicado.data_fim ? new Date(comunicado.data_fim) : undefined,
+        data_inicio: comunicado.data_inicio
+          ? new Date(comunicado.data_inicio)
+          : undefined,
+        data_fim: comunicado.data_fim
+          ? new Date(comunicado.data_fim)
+          : undefined,
       });
       setImagePreview(comunicado.imagem_url || null);
     } else {
@@ -113,7 +139,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2)}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("comunicados")
@@ -134,17 +162,29 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
 
   const handleSubmit = async () => {
     if (!formData.titulo.trim()) {
-      toast({ title: "Erro", description: "Título é obrigatório", variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: "Título é obrigatório",
+        variant: "destructive",
+      });
       return;
     }
 
     if (formData.tipo === "banner" && !imagePreview) {
-      toast({ title: "Erro", description: "Banner requer uma imagem", variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: "Banner requer uma imagem",
+        variant: "destructive",
+      });
       return;
     }
 
     if (formData.tipo === "alerta" && !formData.descricao.trim()) {
-      toast({ title: "Erro", description: "Mensagem do alerta é obrigatória", variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: "Mensagem do alerta é obrigatória",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -156,7 +196,11 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
       if (imageFile) {
         imageUrl = await uploadImage(imageFile);
         if (!imageUrl) {
-          toast({ title: "Erro no upload", description: "Falha ao enviar imagem", variant: "destructive" });
+          toast({
+            title: "Erro no upload",
+            description: "Falha ao enviar imagem",
+            variant: "destructive",
+          });
           setIsLoading(false);
           return;
         }
@@ -166,11 +210,14 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
         titulo: formData.titulo,
         descricao: formData.descricao || null,
         tipo: formData.tipo,
-        nivel_urgencia: formData.tipo === "alerta" ? formData.nivel_urgencia : null,
-        link_acao: formData.tipo === "banner" ? formData.link_acao || null : null,
+        nivel_urgencia:
+          formData.tipo === "alerta" ? formData.nivel_urgencia : null,
+        link_acao:
+          formData.tipo === "banner" ? formData.link_acao || null : null,
         imagem_url: formData.tipo === "banner" ? imageUrl : null,
         ativo: formData.ativo,
-        data_inicio: formData.data_inicio?.toISOString() || new Date().toISOString(),
+        data_inicio:
+          formData.data_inicio?.toISOString() || new Date().toISOString(),
         data_fim: formData.data_fim?.toISOString() || null,
         igreja_id: igrejaId,
         filial_id: isAllFiliais ? null : filialId,
@@ -186,7 +233,10 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
       } else {
         const { error } = await supabase.from("comunicados").insert(payload);
         if (error) throw error;
-        toast({ title: "Comunicado criado!", description: "O comunicado está ativo e visível." });
+        toast({
+          title: "Comunicado criado!",
+          description: "O comunicado está ativo e visível.",
+        });
       }
 
       onSuccess();
@@ -206,17 +256,23 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
 
   const getAlertIcon = () => {
     switch (formData.nivel_urgencia) {
-      case "destructive": return <AlertCircle className="h-4 w-4" />;
-      case "warning": return <AlertTriangle className="h-4 w-4" />;
-      default: return <Info className="h-4 w-4" />;
+      case "destructive":
+        return <AlertCircle className="h-4 w-4" />;
+      case "warning":
+        return <AlertTriangle className="h-4 w-4" />;
+      default:
+        return <Info className="h-4 w-4" />;
     }
   };
 
   const getAlertStyle = () => {
     switch (formData.nivel_urgencia) {
-      case "destructive": return "border-destructive/50 text-destructive bg-destructive/5";
-      case "warning": return "border-yellow-500/50 text-yellow-700 bg-yellow-50 dark:bg-yellow-950/20 dark:text-yellow-400";
-      default: return "border-blue-500/50 text-blue-700 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400";
+      case "destructive":
+        return "border-destructive/50 text-destructive bg-destructive/5";
+      case "warning":
+        return "border-yellow-500/50 text-yellow-700 bg-yellow-50 dark:bg-yellow-950/20 dark:text-yellow-400";
+      default:
+        return "border-blue-500/50 text-blue-700 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400";
     }
   };
 
@@ -224,10 +280,15 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <div className="flex flex-col h-full max-h-[90vh]">
         <div className="border-b pb-3 px-4 pt-4 md:px-6">
-          <h2 className="text-lg font-semibold">{comunicado ? "Editar Comunicado" : "Novo Comunicado"}</h2>
+          <h2 className="text-lg font-semibold">
+            {comunicado ? "Editar Comunicado" : "Novo Comunicado"}
+          </h2>
         </div>
 
-        <Tabs defaultValue="config" className="flex-1 flex flex-col overflow-hidden">
+        <Tabs
+          defaultValue="config"
+          className="flex-1 flex flex-col overflow-hidden"
+        >
           <div className="px-4 md:px-6 pt-4 border-b">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="config" className="text-xs md:text-sm">
@@ -242,39 +303,60 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            <TabsContent value="config" className="px-4 py-4 md:px-6 space-y-4 mt-0">
+            <TabsContent
+              value="config"
+              className="px-4 py-4 md:px-6 space-y-4 mt-0"
+            >
               {/* Tipo */}
               <div className="space-y-2">
                 <Label>Tipo de Comunicado</Label>
                 <RadioGroup
                   value={formData.tipo}
-                  onValueChange={(value: TipoComunicado) => setFormData({ ...formData, tipo: value })}
+                  onValueChange={(value: TipoComunicado) =>
+                    setFormData({ ...formData, tipo: value })
+                  }
                   className="grid grid-cols-2 gap-3"
                 >
                   <Label
                     htmlFor="alerta"
                     className={`flex flex-col items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
-                      formData.tipo === "alerta" ? "border-primary bg-primary/5 ring-2 ring-primary" : "border-input hover:border-primary/50"
+                      formData.tipo === "alerta"
+                        ? "border-primary bg-primary/5 ring-2 ring-primary"
+                        : "border-input hover:border-primary/50"
                     }`}
                   >
-                    <RadioGroupItem value="alerta" id="alerta" className="sr-only" />
+                    <RadioGroupItem
+                      value="alerta"
+                      id="alerta"
+                      className="sr-only"
+                    />
                     <Megaphone className="h-5 w-5 text-orange-500" />
                     <div className="text-center">
                       <p className="font-medium text-sm">Alerta</p>
-                      <p className="text-xs text-muted-foreground">Mensagem de texto</p>
+                      <p className="text-xs text-muted-foreground">
+                        Mensagem de texto
+                      </p>
                     </div>
                   </Label>
                   <Label
                     htmlFor="banner"
                     className={`flex flex-col items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
-                      formData.tipo === "banner" ? "border-primary bg-primary/5 ring-2 ring-primary" : "border-input hover:border-primary/50"
+                      formData.tipo === "banner"
+                        ? "border-primary bg-primary/5 ring-2 ring-primary"
+                        : "border-input hover:border-primary/50"
                     }`}
                   >
-                    <RadioGroupItem value="banner" id="banner" className="sr-only" />
+                    <RadioGroupItem
+                      value="banner"
+                      id="banner"
+                      className="sr-only"
+                    />
                     <ImageIcon className="h-5 w-5 text-purple-500" />
                     <div className="text-center">
                       <p className="font-medium text-sm">Banner</p>
-                      <p className="text-xs text-muted-foreground">Com imagem</p>
+                      <p className="text-xs text-muted-foreground">
+                        Com imagem
+                      </p>
                     </div>
                   </Label>
                 </RadioGroup>
@@ -286,7 +368,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                 <Input
                   id="titulo"
                   value={formData.titulo}
-                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, titulo: e.target.value })
+                  }
                   placeholder="Ex: Culto Especial de Domingo"
                   maxLength={100}
                 />
@@ -300,7 +384,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                     <Textarea
                       id="descricao"
                       value={formData.descricao}
-                      onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao: e.target.value })
+                      }
                       placeholder="Digite a mensagem do alerta..."
                       className="min-h-[100px] resize-none"
                       maxLength={500}
@@ -313,7 +399,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                     <Label htmlFor="nivel">Nível de Urgência</Label>
                     <Select
                       value={formData.nivel_urgencia}
-                      onValueChange={(value) => setFormData({ ...formData, nivel_urgencia: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, nivel_urgencia: value })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -321,17 +409,20 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                       <SelectContent>
                         <SelectItem value="info">
                           <span className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-blue-500" /> Info (Azul)
+                            <span className="h-2 w-2 rounded-full bg-blue-500" />{" "}
+                            Info (Azul)
                           </span>
                         </SelectItem>
                         <SelectItem value="warning">
                           <span className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-yellow-500" /> Atenção (Amarelo)
+                            <span className="h-2 w-2 rounded-full bg-yellow-500" />{" "}
+                            Atenção (Amarelo)
                           </span>
                         </SelectItem>
                         <SelectItem value="destructive">
                           <span className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-red-500" /> Crítico (Vermelho)
+                            <span className="h-2 w-2 rounded-full bg-red-500" />{" "}
+                            Crítico (Vermelho)
                           </span>
                         </SelectItem>
                       </SelectContent>
@@ -371,10 +462,17 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                           className="hidden"
                           id="banner-image"
                         />
-                        <label htmlFor="banner-image" className="cursor-pointer block">
+                        <label
+                          htmlFor="banner-image"
+                          className="cursor-pointer block"
+                        >
                           <Upload className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
-                          <p className="text-sm text-primary font-medium">Clique para upload</p>
-                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG até 2MB</p>
+                          <p className="text-sm text-primary font-medium">
+                            Clique para upload
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            PNG, JPG até 2MB
+                          </p>
                         </label>
                       </div>
                     )}
@@ -384,7 +482,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                     <Input
                       id="descricao"
                       value={formData.descricao}
-                      onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao: e.target.value })
+                      }
                       placeholder="Texto curto sobre o banner"
                       maxLength={200}
                     />
@@ -394,7 +494,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                     <Input
                       id="link_acao"
                       value={formData.link_acao}
-                      onChange={(e) => setFormData({ ...formData, link_acao: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, link_acao: e.target.value })
+                      }
                       placeholder="https://exemplo.com"
                       type="url"
                     />
@@ -408,7 +510,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                   <Label>Data de Início</Label>
                   <DateTimePicker
                     value={formData.data_inicio}
-                    onChange={(date) => setFormData({ ...formData, data_inicio: date })}
+                    onChange={(date) =>
+                      setFormData({ ...formData, data_inicio: date })
+                    }
                     placeholder="Agora"
                   />
                 </div>
@@ -416,7 +520,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                   <Label>Data de Fim (opcional)</Label>
                   <DateTimePicker
                     value={formData.data_fim}
-                    onChange={(date) => setFormData({ ...formData, data_fim: date })}
+                    onChange={(date) =>
+                      setFormData({ ...formData, data_fim: date })
+                    }
                     placeholder="Sem expiração"
                   />
                 </div>
@@ -427,7 +533,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                 <Checkbox
                   id="ativo"
                   checked={formData.ativo}
-                  onCheckedChange={(checked) => setFormData({ ...formData, ativo: !!checked })}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, ativo: !!checked })
+                  }
                 />
                 <Label htmlFor="ativo" className="text-sm cursor-pointer">
                   Comunicado ativo
@@ -437,13 +545,18 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
 
             <TabsContent value="preview" className="px-4 py-4 md:px-6 mt-0">
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Pré-visualização</p>
+                <p className="text-sm text-muted-foreground">
+                  Pré-visualização
+                </p>
                 {formData.tipo === "alerta" ? (
                   <Alert className={getAlertStyle()}>
                     {getAlertIcon()}
-                    <AlertTitle>{formData.titulo || "Título do Alerta"}</AlertTitle>
+                    <AlertTitle>
+                      {formData.titulo || "Título do Alerta"}
+                    </AlertTitle>
                     <AlertDescription>
-                      {formData.descricao || "A mensagem do alerta aparecerá aqui..."}
+                      {formData.descricao ||
+                        "A mensagem do alerta aparecerá aqui..."}
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -466,7 +579,9 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
                           {formData.titulo || "Título do Banner"}
                         </h3>
                         {formData.descricao && (
-                          <p className="text-sm text-white/90 mt-1">{formData.descricao}</p>
+                          <p className="text-sm text-white/90 mt-1">
+                            {formData.descricao}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -486,11 +601,19 @@ export function ComunicadoDialog({ open, onOpenChange, comunicado, onSuccess }: 
         </Tabs>
 
         <div className="border-t bg-muted/50 px-4 py-3 md:px-6 flex justify-end gap-2 shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? "Salvando..." : comunicado ? "Atualizar" : "Criar Comunicado"}
+            {isLoading
+              ? "Salvando..."
+              : comunicado
+              ? "Atualizar"
+              : "Criar Comunicado"}
           </Button>
         </div>
       </div>
