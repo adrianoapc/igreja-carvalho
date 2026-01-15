@@ -39,10 +39,18 @@ export default function Integracoes() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  console.log('[Integracoes] Component mounted/updated', {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+  });
+
   // Buscar integrações
-  const { data: integracoes, isLoading, refetch } = useQuery({
+  const { data: integracoes, isLoading, error } = useQuery({
     queryKey: ["integracoes_financeiras", igrejaId, filialId],
     queryFn: async () => {
+      console.log('[Integracoes] Fetching data...', { igrejaId, filialId, isAllFiliais });
+      
       let query = supabase
         .from("integracoes_financeiras")
         .select("*")
@@ -54,7 +62,12 @@ export default function Integracoes() {
 
       const { data, error } = await query.order("created_at", { ascending: false });
 
-      if (error) throw error;
+      console.log('[Integracoes] Query result:', { data, error, count: data?.length });
+
+      if (error) {
+        console.error('[Integracoes] Query error:', error);
+        throw error;
+      }
       return data || [];
     },
     enabled: !!igrejaId,
@@ -120,6 +133,35 @@ export default function Integracoes() {
       </div>
     );
   }
+
+  if (error) {
+    console.error('[Integracoes] Query error:', error);
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <p className="text-destructive font-semibold">Erro ao carregar integrações</p>
+        <p className="text-sm text-muted-foreground">
+          {error instanceof Error ? error.message : 'Erro desconhecido'}
+        </p>
+        <Button
+          onClick={() =>
+            queryClient.invalidateQueries({
+              queryKey: ["integracoes_financeiras", igrejaId, filialId],
+            })
+          }
+        >
+          Tentar Novamente
+        </Button>
+      </div>
+    );
+  }
+
+  console.log('[Integracoes] Render state:', {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    integracoesCount: integracoes?.length,
+    integracoes,
+  });
 
   return (
     <div className="space-y-4 p-4">
