@@ -36,6 +36,7 @@ export default function Integracoes() {
   const [openDialog, setOpenDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Buscar integrações
   const { data: integracoes, isLoading, error } = useQuery({
@@ -81,6 +82,11 @@ export default function Integracoes() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleEdit = (integracaoId: string) => {
+    setEditingId(integracaoId);
+    setOpenDialog(true);
   };
 
   const getProviderLabel = (provedor: string) => {
@@ -202,8 +208,7 @@ export default function Integracoes() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        disabled
-                        title="Edição em desenvolvimento"
+                        onClick={() => handleEdit(integracao.id)}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
@@ -235,7 +240,11 @@ export default function Integracoes() {
 
       <IntegracaoCriarDialog
         open={openDialog}
-        onOpenChange={setOpenDialog}
+        onOpenChange={(open) => {
+          setOpenDialog(open);
+          if (!open) setEditingId(null);
+        }}
+        integracaoId={editingId}
         onSuccess={() => {
           queryClient.invalidateQueries({
             queryKey: ["integracoes_financeiras", igrejaId],
