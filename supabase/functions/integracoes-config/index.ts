@@ -1,5 +1,5 @@
 // supabase/functions/integracoes-config/index.ts
-// Edge Function para criar integrações financeiras + secrets com criptografia XSalsa20-Poly1305
+// Edge Function para criar/atualizar integrações financeiras + secrets com criptografia XSalsa20-Poly1305
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import nacl from 'npm:tweetnacl@1.0.3'
@@ -26,6 +26,25 @@ type CreateIntegracaoPayload = {
   pfx_blob?: string | null
   pfx_password?: string | null
 }
+
+type UpdateIntegracaoPayload = {
+  action: 'update_integracao'
+  id: string
+  igreja_id: string
+  cnpj: string
+  ativo?: boolean
+
+  // credenciais (opcionais - se fornecido um, todos os outros devem ser fornecidos)
+  client_id?: string | null
+  client_secret?: string | null
+  application_key?: string | null
+
+  // PFX (base64)
+  pfx_blob?: string | null
+  pfx_password?: string | null
+}
+
+type IntegracaoPayload = CreateIntegracaoPayload | UpdateIntegracaoPayload
 
 function json(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), {
@@ -106,15 +125,226 @@ function encryptData(plaintext: string, key: Uint8Array): string {
 // ==================== PERMISSION VALIDATION ====================
 
 async function validatePermissions(supabaseAdmin: any, userId: string, igrejaId: string) {
+  // Verificar roles: admin, admin_igreja, tesoureiro ou super_admin (global)
   const { data, error } = await supabaseAdmin
     .from('user_roles')
-    .select('role')
+    .select('role, igreja_id')
     .eq('user_id', userId)
-    .eq('igreja_id', igrejaId)
-    .in('role', ['admin', 'tesoureiro'])
-    .maybeSingle()
+    .in('role', ['super_admin', 'admin', 'admin_igreja', 'tesoureiro'])
 
-  return !error && !!data
+  if (error) {
+    console.error('[integracoes-config] Error checking permissions', error)
+    return false
+  }
+
+  if (!data || data.length === 0) return false
+
+  // super_admin tem acesso global
+  if (data.some((r: any) => r.role === 'super_admin')) return true
+
+  // admin/admin_igreja/tesoureiro precisam estar vinculados à igreja específica
+  return data.some(
+    (r: any) =>
+      r.igreja_id === igrejaId &&
+      ['admin', 'admin_igreja', 'tesoureiro'].includes(r.role)
+  )
+}
+
+// ==================== HANDLERS ====================
+
+async function handleCreateIntegracao(
+  payload: CreateIntegracaoPayload,
+  userId: string,
+  derivedKey: Uint8Array,
+  supabaseAdmin: any
+) {
+  const igreja_id = payload.igreja_id
+  const filial_id = payload.filial_id ?? null
+  const provedor = (payload.provedor ?? '').trim()
+  const cnpj = (payload.cnpj ?? '').trim()
+
+  if (!igreja_id || !provedor || !cnpj) {
+    return json(400, { error: 'Missing required fields: igreja_id, provedor, cnpj' })
+  }
+
+  // Validação básica CNPJ (com ou sem máscara)
+  if (!/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/.test(cnpj)) {
+    return json(400, { error: 'Invalid CNPJ format' })
+  }
+
+  // Autorização (admin/tesoureiro)
+  const hasPermission = await validatePermissions(supabaseAdmin, userId, igreja_id)
+  if (!hasPermission) return json(403, { error: 'Insufficient permissions' })
+
+  // Criar integração (service role)
+  const status = payload.ativo === false ? 'inativo' : 'ativo'
+
+  const { data: integracao, error: integracaoError } = await supabaseAdmin
+    .from('integracoes_financeiras')
+    .insert({
+      igreja_id,
+      filial_id,
+      cnpj: cnpj.replace(/\D/g, ''),
+      provedor,
+      status,
+      config: {
+        created_by: userId,
+      },
+    })
+    .select('id, igreja_id, filial_id, cnpj, provedor, status, config, created_at, updated_at')
+    .single()
+
+  if (integracaoError || !integracao) {
+    console.error('[integracoes-config] Error creating integration', integracaoError)
+    return json(500, { error: 'Failed to create integration' })
+  }
+
+  // Persistir secrets CRIPTOGRAFADOS (service role)
+  const hasSecrets =
+    payload.client_id ||
+    payload.client_secret ||
+    payload.application_key ||
+    payload.pfx_blob ||
+    payload.pfx_password
+
+  if (hasSecrets) {
+    console.log('[integracoes-config] Encrypting sensitive credentials...')
+
+    const encryptedClientId = payload.client_id 
+      ? encryptData(payload.client_id, derivedKey) 
+      : null
+    
+    const encryptedClientSecret = payload.client_secret 
+      ? encryptData(payload.client_secret, derivedKey) 
+      : null
+    
+    const encryptedApplicationKey = payload.application_key 
+      ? encryptData(payload.application_key, derivedKey) 
+      : null
+    
+    const encryptedPfxPassword = payload.pfx_password 
+      ? encryptData(payload.pfx_password, derivedKey) 
+      : null
+    
+    const encryptedPfxBlob = payload.pfx_blob 
+      ? encryptData(payload.pfx_blob, derivedKey) 
+      : null
+
+    const { error: secretsError } = await supabaseAdmin.from('integracoes_financeiras_secrets').insert({
+      integracao_id: integracao.id,
+      pfx_blob: encryptedPfxBlob,
+      pfx_password: encryptedPfxPassword,
+      client_id: encryptedClientId,
+      client_secret: encryptedClientSecret,
+      application_key: encryptedApplicationKey,
+    })
+
+    if (secretsError) {
+      console.error('[integracoes-config] Error storing encrypted secrets', secretsError)
+      // rollback best-effort
+      await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
+      return json(500, { error: 'Failed to store credentials securely' })
+    }
+
+    console.log('[integracoes-config] Secrets encrypted and stored successfully')
+  }
+
+  return json(201, { success: true, integracao })
+}
+
+async function handleUpdateIntegracao(
+  payload: UpdateIntegracaoPayload,
+  userId: string,
+  derivedKey: Uint8Array,
+  supabaseAdmin: any
+) {
+  const { id, igreja_id, cnpj, ativo } = payload
+
+  if (!id || !igreja_id || !cnpj) {
+    return json(400, { error: 'Missing required fields: id, igreja_id, cnpj' })
+  }
+
+  // Validação básica CNPJ
+  if (!/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/.test(cnpj)) {
+    return json(400, { error: 'Invalid CNPJ format' })
+  }
+
+  // Autorização
+  const hasPermission = await validatePermissions(supabaseAdmin, userId, igreja_id)
+  if (!hasPermission) return json(403, { error: 'Insufficient permissions' })
+
+  // Atualizar metadados (cnpj, status)
+  const status = ativo === false ? 'inativo' : 'ativo'
+
+  const { error: updateError } = await supabaseAdmin
+    .from('integracoes_financeiras')
+    .update({
+      cnpj: cnpj.replace(/\D/g, ''),
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('igreja_id', igreja_id)
+
+  if (updateError) {
+    console.error('[integracoes-config] Error updating integration', updateError)
+    return json(500, { error: 'Failed to update integration' })
+  }
+
+  // Se fornecidas novas credenciais, atualizar secrets
+  const hasSecrets =
+    payload.client_id ||
+    payload.client_secret ||
+    payload.application_key ||
+    payload.pfx_blob ||
+    payload.pfx_password
+
+  if (hasSecrets) {
+    console.log('[integracoes-config] Encrypting updated credentials...')
+
+    const encryptedClientId = payload.client_id 
+      ? encryptData(payload.client_id, derivedKey) 
+      : null
+    
+    const encryptedClientSecret = payload.client_secret 
+      ? encryptData(payload.client_secret, derivedKey) 
+      : null
+    
+    const encryptedApplicationKey = payload.application_key 
+      ? encryptData(payload.application_key, derivedKey) 
+      : null
+    
+    const encryptedPfxPassword = payload.pfx_password 
+      ? encryptData(payload.pfx_password, derivedKey) 
+      : null
+    
+    const encryptedPfxBlob = payload.pfx_blob 
+      ? encryptData(payload.pfx_blob, derivedKey) 
+      : null
+
+    // Deletar secrets antigos e inserir novos
+    await supabaseAdmin.from('integracoes_financeiras_secrets').delete().eq('integracao_id', id)
+
+    const { error: secretsError } = await supabaseAdmin
+      .from('integracoes_financeiras_secrets')
+      .insert({
+        integracao_id: id,
+        pfx_blob: encryptedPfxBlob,
+        pfx_password: encryptedPfxPassword,
+        client_id: encryptedClientId,
+        client_secret: encryptedClientSecret,
+        application_key: encryptedApplicationKey,
+      })
+
+    if (secretsError) {
+      console.error('[integracoes-config] Error storing updated secrets', secretsError)
+      return json(500, { error: 'Failed to store credentials securely' })
+    }
+
+    console.log('[integracoes-config] Secrets updated and encrypted successfully')
+  }
+
+  return json(200, { success: true })
 }
 
 // ==================== MAIN HANDLER ====================
@@ -163,106 +393,23 @@ Deno.serve(async (req) => {
     const userId = claimsData.claims.sub
 
     // 2) Parse payload
-    const payload = (await req.json().catch(() => null)) as CreateIntegracaoPayload | null
+    const payload = (await req.json().catch(() => null)) as IntegracaoPayload | null
     if (!payload) return json(400, { error: 'Invalid JSON body' })
-    if (payload.action !== 'create_integracao') return json(400, { error: 'Invalid action' })
-
-    const igreja_id = payload.igreja_id
-    const filial_id = payload.filial_id ?? null
-    const provedor = (payload.provedor ?? '').trim()
-    const cnpj = (payload.cnpj ?? '').trim()
-
-    if (!igreja_id || !provedor || !cnpj) {
-      return json(400, { error: 'Missing required fields: igreja_id, provedor, cnpj' })
+    if (!['create_integracao', 'update_integracao'].includes(payload.action)) {
+      return json(400, { error: 'Invalid action' })
     }
 
-    // Validação básica CNPJ (com ou sem máscara)
-    if (!/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/.test(cnpj)) {
-      return json(400, { error: 'Invalid CNPJ format' })
-    }
-
+    // Criar cliente admin
     const supabaseAdmin = createClient(supabaseUrl, serviceKey)
 
-    // 3) Autorização (admin/tesoureiro)
-    const hasPermission = await validatePermissions(supabaseAdmin, userId, igreja_id)
-    if (!hasPermission) return json(403, { error: 'Insufficient permissions' })
-
-    // 4) Criar integração (service role)
-    const status = payload.ativo === false ? 'inativo' : 'ativo'
-
-    const { data: integracao, error: integracaoError } = await supabaseAdmin
-      .from('integracoes_financeiras')
-      .insert({
-        igreja_id,
-        filial_id,
-        cnpj: cnpj.replace(/\D/g, ''),
-        provedor,
-        status,
-        config: {
-          created_by: userId,
-        },
-      })
-      .select('id, igreja_id, filial_id, cnpj, provedor, status, config, created_at, updated_at')
-      .single()
-
-    if (integracaoError || !integracao) {
-      console.error('[integracoes-config] Error creating integration', integracaoError)
-      return json(500, { error: 'Failed to create integration' })
+    // Distribuir para o handler apropriado
+    if (payload.action === 'create_integracao') {
+      return await handleCreateIntegracao(payload as CreateIntegracaoPayload, userId, derivedKey, supabaseAdmin)
+    } else if (payload.action === 'update_integracao') {
+      return await handleUpdateIntegracao(payload as UpdateIntegracaoPayload, userId, derivedKey, supabaseAdmin)
     }
 
-    // 5) Persistir secrets CRIPTOGRAFADOS (service role). Nunca retornar secrets.
-    const hasSecrets =
-      payload.client_id ||
-      payload.client_secret ||
-      payload.application_key ||
-      payload.pfx_blob ||
-      payload.pfx_password
-
-    if (hasSecrets) {
-      console.log('[integracoes-config] Encrypting sensitive credentials...')
-
-      // Criptografar cada campo sensível
-      const encryptedClientId = payload.client_id 
-        ? encryptData(payload.client_id, derivedKey) 
-        : null
-      
-      const encryptedClientSecret = payload.client_secret 
-        ? encryptData(payload.client_secret, derivedKey) 
-        : null
-      
-      const encryptedApplicationKey = payload.application_key 
-        ? encryptData(payload.application_key, derivedKey) 
-        : null
-      
-      const encryptedPfxPassword = payload.pfx_password 
-        ? encryptData(payload.pfx_password, derivedKey) 
-        : null
-      
-      // PFX blob já vem como base64, criptografamos a string base64
-      const encryptedPfxBlob = payload.pfx_blob 
-        ? encryptData(payload.pfx_blob, derivedKey) 
-        : null
-
-      const { error: secretsError } = await supabaseAdmin.from('integracoes_financeiras_secrets').insert({
-        integracao_id: integracao.id,
-        pfx_blob: encryptedPfxBlob,
-        pfx_password: encryptedPfxPassword,
-        client_id: encryptedClientId,
-        client_secret: encryptedClientSecret,
-        application_key: encryptedApplicationKey,
-      })
-
-      if (secretsError) {
-        console.error('[integracoes-config] Error storing encrypted secrets', secretsError)
-        // rollback best-effort
-        await supabaseAdmin.from('integracoes_financeiras').delete().eq('id', integracao.id)
-        return json(500, { error: 'Failed to store credentials securely' })
-      }
-
-      console.log('[integracoes-config] Secrets encrypted and stored successfully')
-    }
-
-    return json(201, { success: true, integracao })
+    return json(400, { error: 'Invalid action' })
   } catch (e: unknown) {
     console.error('[integracoes-config] Unhandled error', e)
     return json(500, { error: 'Internal server error' })
