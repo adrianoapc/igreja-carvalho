@@ -76,9 +76,24 @@ function deriveKey(masterKey: string): Uint8Array {
  * Descriptografa dados usando XSalsa20-Poly1305.
  * Esperado: base64(nonce || ciphertext)
  * Se falhar, retorna o valor original (dados não criptografados legados)
+ * Se for JSON com campo "data" (array de bytes), converte para string
  */
 function decryptData(encrypted: string, key: Uint8Array): string {
   try {
+    // Verifica se é JSON com formato de array de bytes
+    if (encrypted.startsWith('{') && encrypted.includes('"data":[')) {
+      try {
+        const parsed = JSON.parse(encrypted)
+        if (Array.isArray(parsed.data)) {
+          // Converte array de bytes para string UTF-8
+          const bytes = new Uint8Array(parsed.data)
+          return new TextDecoder().decode(bytes)
+        }
+      } catch {
+        // Não é JSON válido, continua com decryption
+      }
+    }
+
     const combined = base64ToUint8Array(encrypted)
     
     // Verifica se tem tamanho mínimo para ser criptografado (nonce 24 + pelo menos 1 byte)
@@ -109,9 +124,23 @@ function decryptData(encrypted: string, key: Uint8Array): string {
  * Converte certificado PFX (PKCS#12) para PEM
  * Retorna certificado + chave privada em formato PEM
  */
-function pfxToPem(pfxBase64: string, password?: string): { cert: string; key: string } {
+function pfxToPem(pfxData: string, password?: string): { cert: string; key: string } {
   try {
-    const pfxDer = forge.util.decode64(pfxBase64)
+    let pfxDer: string
+    
+    // Se for base64 padrão, decodifica
+    if (/^[A-Za-z0-9+/]*={0,2}$/.test(pfxData)) {
+      pfxDer = forge.util.decode64(pfxData)
+    } else {
+      // Caso contrário, assume que é UTF-8 e tenta converter para base64 primeiro
+      try {
+        pfxDer = forge.util.decode64(btoa(unescape(encodeURIComponent(pfxData))))
+      } catch {
+        // Se ainda assim falhar, tenta usar diretamente
+        pfxDer = pfxData
+      }
+    }
+    
     const pfxAsn1 = forge.asn1.fromDer(pfxDer)
     const p12 = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, password || '')
 
