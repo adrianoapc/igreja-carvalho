@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Edit2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
 import {
@@ -154,24 +154,10 @@ export default function Integracoes() {
             Gerencie as conexões com provedores de serviços financeiros
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              queryClient.invalidateQueries({
-                queryKey: ["integracoes_financeiras", igrejaId],
-              })
-            }
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
-          <Button onClick={() => setOpenDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Integração
-          </Button>
-        </div>
+        <Button onClick={() => setOpenDialog(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nova Integração
+        </Button>
       </div>
 
       {integracoes && integracoes.length > 0 ? (
