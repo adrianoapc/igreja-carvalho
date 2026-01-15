@@ -306,6 +306,11 @@ Deno.serve(async (req) => {
     if (pfxBlob && pfxPassword) {
       try {
         console.log('[test-santander] Converting PFX to PEM for mTLS...')
+        console.log(`[test-santander] PFX blob type: ${typeof pfxBlob}`)
+        console.log(`[test-santander] PFX blob size: ${pfxBlob.length} chars`)
+        console.log(`[test-santander] PFX blob preview: ${pfxBlob.substring(0, 100)}`)
+        console.log(`[test-santander] PFX password: ${pfxPassword?.substring(0, 50)}...`)
+        
         const { cert, key } = pfxToPem(pfxBlob, pfxPassword)
 
         httpClient = Deno.createHttpClient({
@@ -325,6 +330,7 @@ Deno.serve(async (req) => {
       }
     } else {
       console.warn('[test-santander] No PFX certificate found - will attempt standard TLS only')
+      console.warn(`[test-santander] pfxBlob: ${pfxBlob ? 'present' : 'null'}, pfxPassword: ${pfxPassword ? 'present' : 'null'}`)
     }
 
     // Get OAuth2 token
