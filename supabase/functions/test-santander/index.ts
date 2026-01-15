@@ -106,9 +106,16 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // DEBUG MODE: permite testes sem autenticação
+    const debugMode = Deno.env.get('TEST_SANTANDER_DEBUG') === 'true'
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
+    
+    if (!debugMode && !authHeader?.startsWith('Bearer ')) {
       return jsonResponse({ error: 'Unauthorized' }, 401)
+    }
+
+    if (debugMode) {
+      console.log('[test-santander] Running in DEBUG MODE - auth bypassed')
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
