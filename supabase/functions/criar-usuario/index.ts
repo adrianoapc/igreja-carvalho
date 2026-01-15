@@ -127,11 +127,12 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Exceção ao criar usuário:", error);
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
         return new Response(
           JSON.stringify({
-            error: `Erro ao criar usuário: ${error.message}`,
+            error: `Erro ao criar usuário: ${errorMessage}`,
             success: false,
           }),
           {
@@ -213,11 +214,12 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Exceção ao resetar senha:", error);
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
         return new Response(
           JSON.stringify({
-            error: `Erro ao resetar senha: ${error.message}`,
+            error: `Erro ao resetar senha: ${errorMessage}`,
             success: false,
           }),
           {
