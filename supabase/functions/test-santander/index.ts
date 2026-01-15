@@ -30,10 +30,20 @@ const SANTANDER_BASE_URL = 'https://trust-open.api.santander.com.br/bank_account
 // ==================== ENCRYPTION UTILITIES ====================
 
 function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
-  return bytes
+  try {
+    // Normaliza base64 URL-safe para standard
+    let normalized = base64.replace(/-/g, '+').replace(/_/g, '/')
+    // Adiciona padding se necessário
+    while (normalized.length % 4) {
+      normalized += '='
+    }
+    const binaryString = atob(normalized)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
+    return bytes
+  } catch (error) {
+    throw new Error(`Failed to decode base64: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 function deriveKey(masterKey: string): Uint8Array {
@@ -64,21 +74,33 @@ function deriveKey(masterKey: string): Uint8Array {
 /**
  * Descriptografa dados usando XSalsa20-Poly1305.
  * Esperado: base64(nonce || ciphertext)
+ * Se falhar, retorna o valor original (dados não criptografados legados)
  */
 function decryptData(encrypted: string, key: Uint8Array): string {
   try {
     const combined = base64ToUint8Array(encrypted)
+    
+    // Verifica se tem tamanho mínimo para ser criptografado (nonce 24 + pelo menos 1 byte)
+    if (combined.length < 25) {
+      console.log('[test-santander] Data too short to be encrypted, returning as-is')
+      return encrypted
+    }
+    
     const nonce = combined.slice(0, 24)
     const ciphertext = combined.slice(24)
 
     const decrypted = nacl.secretbox.open(ciphertext, nonce, key)
     if (!decrypted) {
-      throw new Error('Decryption failed')
+      // Se falhar na descriptografia, pode ser dado legado não criptografado
+      console.warn('[test-santander] Decryption failed, trying as plain text')
+      return encrypted
     }
 
     return new TextDecoder().decode(decrypted)
   } catch (error) {
-    throw new Error(`Decryption error: ${error instanceof Error ? error.message : String(error)}`)
+    // Se falhar na decodificação base64, retorna o valor original
+    console.warn('[test-santander] Base64 decode failed, returning original:', error)
+    return encrypted
   }
 }
 
@@ -179,9 +201,12 @@ Deno.serve(async (req) => {
     }
 
     console.log('[test-santander] Found secrets for integração')
+    console.log('[test-santander] client_id preview:', secrets.client_id?.substring(0, 30))
+    console.log('[test-santander] client_id length:', secrets.client_id?.length)
 
     // Decrypt credentials
     const derivedKey = deriveKey(encryptionKey)
+    console.log('[test-santander] Derived key length:', derivedKey.length)
 
     let clientId: string | null = null
     let clientSecret: string | null = null
@@ -190,6 +215,7 @@ Deno.serve(async (req) => {
 
     try {
       if (secrets.client_id) {
+        console.log('[test-santander] Attempting to decrypt client_id...')
         clientId = decryptData(secrets.client_id, derivedKey)
       }
       if (secrets.client_secret) {
