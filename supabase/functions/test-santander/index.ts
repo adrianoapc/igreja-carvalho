@@ -73,17 +73,72 @@ function deriveKey(masterKey: string): Uint8Array {
 }
 
 /**
+ * Converte bytea do Supabase para string.
+ * Supabase pode retornar bytea como:
+ * 1. String hex com prefixo \x (formato Postgres bytea)
+ * 2. String normal (já é texto)
+ * 3. Uint8Array/ArrayBuffer (bytes raw)
+ * 4. Objeto com formato especial
+ */
+function byteaToString(value: unknown): string {
+  if (typeof value === 'string') {
+    // Check for Postgres bytea hex format: \x followed by hex chars
+    if (value.startsWith('\\x')) {
+      try {
+        const hexStr = value.slice(2) // Remove \x prefix
+        const bytes = new Uint8Array(hexStr.length / 2)
+        for (let i = 0; i < bytes.length; i++) {
+          bytes[i] = parseInt(hexStr.substring(i * 2, i * 2 + 2), 16)
+        }
+        return new TextDecoder().decode(bytes)
+      } catch (err) {
+        console.warn('[test-santander] Failed to decode hex bytea:', err)
+        return value
+      }
+    }
+    return value
+  }
+  
+  if (value instanceof Uint8Array) {
+    return new TextDecoder().decode(value)
+  }
+  
+  if (value instanceof ArrayBuffer) {
+    return new TextDecoder().decode(new Uint8Array(value))
+  }
+  
+  // Supabase pode retornar objeto com data como array de números
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    if (Array.isArray(obj.data)) {
+      const bytes = new Uint8Array(obj.data as number[])
+      return new TextDecoder().decode(bytes)
+    }
+    // Também pode ter um campo type: 'Buffer'
+    if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
+      const bytes = new Uint8Array(obj.data as number[])
+      return new TextDecoder().decode(bytes)
+    }
+  }
+  
+  // Fallback: converter para string
+  return String(value)
+}
+
+/**
  * Descriptografa dados usando XSalsa20-Poly1305.
  * Esperado: base64(nonce || ciphertext)
  * Se falhar, retorna o valor original (dados não criptografados legados)
- * Se for JSON com campo "data" (array de bytes), converte para string
  */
-function decryptData(encrypted: string, key: Uint8Array): string {
+function decryptData(encrypted: unknown, key: Uint8Array): string {
+  // Primeiro, converter de bytea para string se necessário
+  const encryptedStr = byteaToString(encrypted)
+  
   try {
     // Verifica se é JSON com formato de array de bytes
-    if (encrypted.startsWith('{') && encrypted.includes('"data":[')) {
+    if (encryptedStr.startsWith('{') && encryptedStr.includes('"data":[')) {
       try {
-        const parsed = JSON.parse(encrypted)
+        const parsed = JSON.parse(encryptedStr)
         if (Array.isArray(parsed.data)) {
           // Converte array de bytes para string UTF-8
           const bytes = new Uint8Array(parsed.data)
@@ -94,12 +149,12 @@ function decryptData(encrypted: string, key: Uint8Array): string {
       }
     }
 
-    const combined = base64ToUint8Array(encrypted)
+    const combined = base64ToUint8Array(encryptedStr)
     
     // Verifica se tem tamanho mínimo para ser criptografado (nonce 24 + pelo menos 1 byte)
     if (combined.length < 25) {
       console.log('[test-santander] Data too short to be encrypted, returning as-is')
-      return encrypted
+      return encryptedStr
     }
     
     const nonce = combined.slice(0, 24)
@@ -109,14 +164,14 @@ function decryptData(encrypted: string, key: Uint8Array): string {
     if (!decrypted) {
       // Se falhar na descriptografia, pode ser dado legado não criptografado
       console.warn('[test-santander] Decryption failed, trying as plain text')
-      return encrypted
+      return encryptedStr
     }
 
     return new TextDecoder().decode(decrypted)
   } catch (error) {
     // Se falhar na decodificação base64, retorna o valor original
     console.warn('[test-santander] Base64 decode failed, returning original:', error)
-    return encrypted
+    return encryptedStr
   }
 }
 
@@ -181,6 +236,9 @@ function jsonResponse(body: unknown, status = 200) {
 // ==================== MAIN HANDLER ====================
 
 Deno.serve(async (req) => {
+  // Declare httpClient at function scope for cleanup in finally block
+  let httpClient: Deno.HttpClient | null = null
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -301,7 +359,6 @@ Deno.serve(async (req) => {
     console.log('[test-santander] Credentials decrypted successfully')
 
     // Create mTLS HttpClient if PFX certificate is available
-    let httpClient: Deno.HttpClient | null = null
 
     if (pfxBlob && pfxPassword) {
       try {
