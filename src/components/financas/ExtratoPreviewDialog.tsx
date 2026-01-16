@@ -90,8 +90,8 @@ export function ExtratoPreviewDialog({
         return;
       }
 
-      if (data.success && data.data?.availableAmount !== undefined) {
-        setSaldoAtual(data.data.availableAmount);
+      if (data.success && data.balance?.availableAmount !== undefined) {
+        setSaldoAtual(data.balance.availableAmount);
       }
     } catch (err) {
       console.error("Exceção ao buscar saldo:", err);
@@ -145,21 +145,21 @@ export function ExtratoPreviewDialog({
       }
 
       // Transformar dados do banco para formato interno
-      const transacoes: ExtratoItem[] = (data.data?.transactions || []).map(
+      const transacoes: ExtratoItem[] = (data.transacoes || []).map(
         (t: {
-          transactionId: string;
-          transactionDate: string;
-          description: string;
-          amount: number;
-          creditDebitIndicator: string;
-          transactionBalance?: number;
+          external_id: string;
+          data_transacao: string;
+          descricao: string;
+          valor: number;
+          tipo: string;
+          saldo?: number;
         }) => ({
-          id: t.transactionId || crypto.randomUUID(),
-          data: t.transactionDate,
-          descricao: t.description,
-          valor: Math.abs(t.amount),
-          tipo: t.creditDebitIndicator === "CREDIT" ? "credito" : "debito",
-          saldo_apos: t.transactionBalance,
+          id: t.external_id || crypto.randomUUID(),
+          data: t.data_transacao,
+          descricao: t.descricao,
+          valor: Math.abs(t.valor),
+          tipo: t.tipo === "credito" ? "credito" : "debito",
+          saldo_apos: t.saldo,
         })
       );
 
