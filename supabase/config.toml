@@ -51,8 +51,8 @@ verify_jwt = false
 [functions.criar-usuario]
 verify_jwt = false
 
-[functions.test-santander]
+[functions.integracoes-config]
 verify_jwt = false
 
-[functions.integracoes-config]
+[functions.santander-api]
 verify_jwt = false

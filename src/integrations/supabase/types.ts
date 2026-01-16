@@ -2353,13 +2353,17 @@ export type Database = {
           created_at: string | null
           data_transacao: string
           descricao: string
+          external_id: string | null
           filial_id: string | null
           id: string
           igreja_id: string
+          import_job_id: string | null
           numero_documento: string | null
+          origem: string | null
           reconciliado: boolean | null
           saldo: number | null
           tipo: string
+          transacao_vinculada_id: string | null
           valor: number
         }
         Insert: {
@@ -2367,13 +2371,17 @@ export type Database = {
           created_at?: string | null
           data_transacao: string
           descricao: string
+          external_id?: string | null
           filial_id?: string | null
           id?: string
           igreja_id: string
+          import_job_id?: string | null
           numero_documento?: string | null
+          origem?: string | null
           reconciliado?: boolean | null
           saldo?: number | null
           tipo: string
+          transacao_vinculada_id?: string | null
           valor: number
         }
         Update: {
@@ -2381,13 +2389,17 @@ export type Database = {
           created_at?: string | null
           data_transacao?: string
           descricao?: string
+          external_id?: string | null
           filial_id?: string | null
           id?: string
           igreja_id?: string
+          import_job_id?: string | null
           numero_documento?: string | null
+          origem?: string | null
           reconciliado?: boolean | null
           saldo?: number | null
           tipo?: string
+          transacao_vinculada_id?: string | null
           valor?: number
         }
         Relationships: [
@@ -7833,6 +7845,10 @@ export type Database = {
         Args: { p_pedido_id: string }
         Returns: string
       }
+      aplicar_conciliacao: {
+        Args: { p_extrato_id: string; p_transacao_id: string }
+        Returns: boolean
+      }
       aprovar_onboarding: { Args: { p_request_id: string }; Returns: Json }
       buscar_pessoa_por_contato: {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
@@ -8074,6 +8090,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reconciliar_transacoes: {
+        Args: {
+          p_conta_id: string
+          p_tolerancia_dias?: number
+          p_tolerancia_valor?: number
+        }
+        Returns: {
+          extrato_id: string
+          score: number
+          transacao_id: string
+        }[]
       }
       resetar_senha_usuario_membro: {
         Args: { p_profile_id: string; p_senha_temporaria: string }
