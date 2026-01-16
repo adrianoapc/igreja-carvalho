@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, TestTube2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
 import {
@@ -37,6 +37,7 @@ export default function Integracoes() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
 
   // Buscar integrações
   const { data: integracoes, isLoading, error } = useQuery({
@@ -87,6 +88,53 @@ export default function Integracoes() {
   const handleEdit = (integracaoId: string) => {
     setEditingId(integracaoId);
     setOpenDialog(true);
+  };
+
+  const handleTest = async (integracao: Integracao) => {
+    if (integracao.provedor !== "santander") {
+      toast.info("Teste disponível apenas para Santander no momento");
+      return;
+    }
+
+    setTestingId(integracao.id);
+    try {
+      // Extrair agência e conta do config ou usar valores padrão para teste
+      const config = integracao.config as Record<string, unknown> | null;
+      const agencia = (config?.agencia as string) || "0037";
+      const conta = (config?.conta as string) || "130158884";
+
+      const { data, error } = await supabase.functions.invoke("test-santander", {
+        body: {
+          integracao_id: integracao.id,
+          banco_id: "033",
+          agencia,
+          conta,
+        },
+      });
+
+      if (error) {
+        console.error("Test error:", error);
+        toast.error(`Erro no teste: ${error.message}`);
+        return;
+      }
+
+      console.log("Test result:", data);
+
+      if (data.success) {
+        toast.success("Conexão testada com sucesso!", {
+          description: `Token obtido. Saldo: ${data.balance?.available ?? "N/A"}`,
+        });
+      } else {
+        toast.warning("Teste parcial", {
+          description: data.tokenError || data.balanceError || "Verifique os logs",
+        });
+      }
+    } catch (err) {
+      console.error("Test exception:", err);
+      toast.error("Erro ao testar conexão");
+    } finally {
+      setTestingId(null);
+    }
   };
 
   const getProviderLabel = (provedor: string) => {
@@ -191,6 +239,21 @@ export default function Integracoes() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {integracao.provedor === "santander" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleTest(integracao)}
+                          disabled={testingId === integracao.id}
+                          title="Testar conexão"
+                        >
+                          {testingId === integracao.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <TestTube2 className="w-4 h-4 text-blue-500" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

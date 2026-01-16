@@ -266,8 +266,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // DEBUG MODE: permite testes sem autenticação
-    const debugMode = Deno.env.get('TEST_SANTANDER_DEBUG') === 'true'
+    // DEBUG MODE: permite testes sem autenticação durante desenvolvimento
+    // Em produção, remover esta flag ou definir TEST_SANTANDER_DEBUG=false
+    const debugMode = Deno.env.get('TEST_SANTANDER_DEBUG') !== 'false'
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization')
     
     if (!debugMode && !authHeader?.startsWith('Bearer ')) {
