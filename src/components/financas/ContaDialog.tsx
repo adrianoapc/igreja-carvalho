@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,31 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
   const queryClient = useQueryClient();
   const { igrejaId } = useIgrejaId();
   const { filialId, isAllFiliais } = useFilialId();
+
+  // Mantém o formulário sincronizado quando abrimos para editar ou criar
+  useEffect(() => {
+    if (open && conta) {
+      setNome(conta.nome || "");
+      setTipo(conta.tipo || "bancaria");
+      setSaldoInicial(conta.saldo_inicial?.toString() || "0");
+      setBanco(conta.banco || "");
+      setAgencia(conta.agencia || "");
+      setContaNumero(conta.conta_numero || "");
+      setCnpjBanco(conta.cnpj_banco || "");
+      setObservacoes(conta.observacoes || "");
+    }
+
+    if (open && !conta) {
+      setNome("");
+      setTipo("bancaria");
+      setSaldoInicial("0");
+      setBanco("");
+      setAgencia("");
+      setContaNumero("");
+      setCnpjBanco("");
+      setObservacoes("");
+    }
+  }, [open, conta]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
