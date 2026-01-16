@@ -38,13 +38,19 @@ function base64ToUint8Array(base64: string): Uint8Array {
 
 function pfxToPem(pfxData: string, password?: string): { cert: string; key: string } {
   try {
+    console.log('[pfxToPem] Input type:', typeof pfxData)
+    console.log('[pfxToPem] Input length:', pfxData.length)
+    console.log('[pfxToPem] First 50 chars:', pfxData.substring(0, 50))
+    
     let pfxDer: string
 
     // Caso venha como JSON { data: [ ...bytes ] }
     if (pfxData.trim().startsWith('{')) {
+      console.log('[pfxToPem] Detected JSON format')
       try {
         const parsed = JSON.parse(pfxData)
         if (Array.isArray(parsed.data)) {
+          console.log('[pfxToPem] JSON has data array with', parsed.data.length, 'bytes')
           const uint8 = new Uint8Array(parsed.data)
           // Converte o array de bytes para string binária
           let binary = ''
@@ -52,6 +58,7 @@ function pfxToPem(pfxData: string, password?: string): { cert: string; key: stri
             binary += String.fromCharCode(uint8[i])
           }
           pfxDer = binary
+          console.log('[pfxToPem] Converted to binary string, length:', pfxDer.length)
         } else {
           throw new Error('JSON does not contain data array')
         }
@@ -60,21 +67,27 @@ function pfxToPem(pfxData: string, password?: string): { cert: string; key: stri
       }
     } else if (/^[A-Za-z0-9+/]*={0,2}$/.test(pfxData)) {
       // Base64 padrão
+      console.log('[pfxToPem] Detected base64 format')
       pfxDer = forge.util.decode64(pfxData)
+      console.log('[pfxToPem] Decoded base64, length:', pfxDer.length)
     } else {
       // Tenta converter UTF-8 para base64
+      console.log('[pfxToPem] Trying UTF-8 to base64 conversion')
       try {
         pfxDer = forge.util.decode64(btoa(unescape(encodeURIComponent(pfxData))))
       } catch {
         // Fallback: usa diretamente
+        console.log('[pfxToPem] Using pfxData directly')
         pfxDer = pfxData
       }
     }
-
+    
+    console.log('[pfxToPem] Attempting ASN.1 parsing...')
     const pfxAsn1 = forge.asn1.fromDer(pfxDer)
-    const p12 = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, password || '')
-
-    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })
+    console.log('[pfxToPem] ASN.1 parsed successfully')
+    
+    console.log('[pfxToPem] Attempting PKCS#12 parsing...')
+    const p12 = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, password || '')    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })
     const certBag = certBags[forge.pki.oids.certBag]?.[0]
     if (!certBag?.cert) {
       throw new Error('Certificate not found in PFX')
@@ -133,6 +146,11 @@ Deno.serve(async (req) => {
     if (!pfxBlob) {
       return jsonResponse({ error: 'PFX blob not found' }, 400)
     }
+
+    console.log('[debug-certificate] PFX blob type:', typeof pfxBlob)
+    console.log('[debug-certificate] PFX blob length:', pfxBlob.length)
+    console.log('[debug-certificate] PFX preview:', pfxBlob.substring(0, 100))
+    console.log('[debug-certificate] PFX password exists:', !!pfxPassword)
 
     try {
       const { cert } = pfxToPem(pfxBlob, pfxPassword)
