@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ import {
   ArrowRightLeft,
   AlertCircle,
   CheckCircle2,
+  Wallet,
+  RefreshCw,
 } from "lucide-react";
 
 interface ExtratoItem {
@@ -66,6 +68,43 @@ export function ExtratoPreviewDialog({
     atualizados: number;
     ignorados: number;
   } | null>(null);
+  const [saldoAtual, setSaldoAtual] = useState<number | null>(null);
+  const [loadingSaldo, setLoadingSaldo] = useState(false);
+
+  const buscarSaldo = async () => {
+    setLoadingSaldo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("santander-api", {
+        body: {
+          action: "saldo",
+          integracao_id: integracaoId,
+          conta_id: contaId,
+          banco_id: cnpjBanco,
+          agencia: agencia || "",
+          conta: contaNumero?.replace(/\D/g, "") || "",
+        },
+      });
+
+      if (error) {
+        console.error("Erro ao buscar saldo:", error);
+        return;
+      }
+
+      if (data.success && data.data?.availableAmount !== undefined) {
+        setSaldoAtual(data.data.availableAmount);
+      }
+    } catch (err) {
+      console.error("Exceção ao buscar saldo:", err);
+    } finally {
+      setLoadingSaldo(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && integracaoId) {
+      buscarSaldo();
+    }
+  }, [open, integracaoId]);
 
   const totalCreditos = extrato
     .filter((e) => e.tipo === "credito")
@@ -198,12 +237,40 @@ export function ExtratoPreviewDialog({
       dialogContentProps={{ className: "max-w-2xl" }}
     >
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-primary" />
-          <div>
-            <h2 className="text-lg font-semibold">Extrato Bancário</h2>
-            <p className="text-sm text-muted-foreground">{contaNome}</p>
+        {/* Header com Saldo */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" />
+            <div>
+              <h2 className="text-lg font-semibold">Extrato Bancário</h2>
+              <p className="text-sm text-muted-foreground">{contaNome}</p>
+            </div>
+          </div>
+          
+          {/* Saldo Atual */}
+          <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
+            <Wallet className="w-5 h-5 text-primary" />
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Saldo Atual</p>
+              {loadingSaldo ? (
+                <Loader2 className="w-4 h-4 animate-spin ml-auto" />
+              ) : saldoAtual !== null ? (
+                <p className="text-lg font-bold text-primary">
+                  {formatValue(saldoAtual)}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">--</p>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={buscarSaldo}
+              disabled={loadingSaldo}
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingSaldo ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
