@@ -263,39 +263,51 @@ export function ExtratoPreviewDialog({
       dialogContentProps={{ className: "max-w-2xl" }}
     >
       <div className="space-y-4">
-        {/* Header com Saldo */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            <div>
-              <h2 className="text-lg font-semibold">Extrato Bancário</h2>
-              <p className="text-sm text-muted-foreground">{contaNome}</p>
-            </div>
+        {/* Header com Título */}
+        <div className="flex items-center gap-2 mb-2">
+          <FileText className="w-5 h-5 text-primary" />
+          <div>
+            <h2 className="text-lg font-semibold">Extrato Bancário</h2>
+            <p className="text-sm text-muted-foreground">{contaNome}</p>
           </div>
-          
-          {/* Saldo Atual */}
-          <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
-            <Wallet className="w-5 h-5 text-primary" />
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Saldo Atual</p>
-              {loadingSaldo ? (
-                <Loader2 className="w-4 h-4 animate-spin ml-auto" />
-              ) : saldoAtual !== null ? (
-                <p className="text-lg font-bold text-primary">
-                  {formatValue(saldoAtual)}
+        </div>
+
+        {/* Saldo Atual - Card destacado */}
+        <div className="p-4 bg-gradient-to-br from-primary/15 to-primary/5 rounded-lg border border-primary/20 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-primary/20 rounded-lg">
+                <Wallet className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Saldo Disponível
                 </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">--</p>
-              )}
+                {loadingSaldo ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    <p className="text-sm text-muted-foreground">Atualizando...</p>
+                  </div>
+                ) : saldoAtual !== null ? (
+                  <p className={`text-2xl font-bold ${
+                    saldoAtual >= 0 ? "text-primary" : "text-destructive"
+                  }`}>
+                    {formatValue(saldoAtual)}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">Dados não disponíveis</p>
+                )}
+              </div>
             </div>
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
+              variant="outline"
+              size="sm"
               onClick={buscarSaldo}
               disabled={loadingSaldo}
+              className="h-9 gap-1.5"
             >
               <RefreshCw className={`w-4 h-4 ${loadingSaldo ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline text-xs">Atualizar</span>
             </Button>
           </div>
         </div>
@@ -356,96 +368,108 @@ export function ExtratoPreviewDialog({
 
         {/* Resumo do Período */}
         {fetched && extrato.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <TrendingUp className="w-3 h-3 text-green-600" />
-                <p className="text-xs text-muted-foreground">Créditos</p>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">Resumo do Período</h3>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900/30">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                  <p className="text-xs font-medium text-muted-foreground">Créditos</p>
+                </div>
+                <p className="text-lg font-bold text-green-600">
+                  {formatValue(totalCreditos)}
+                </p>
               </div>
-              <p className="text-sm font-bold text-green-600">
-                {formatValue(totalCreditos)}
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <TrendingDown className="w-3 h-3 text-red-600" />
-                <p className="text-xs text-muted-foreground">Débitos</p>
+              <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900/30">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TrendingDown className="w-4 h-4 text-red-600" />
+                  <p className="text-xs font-medium text-muted-foreground">Débitos</p>
+                </div>
+                <p className="text-lg font-bold text-red-600">
+                  {formatValue(totalDebitos)}
+                </p>
               </div>
-              <p className="text-sm font-bold text-red-600">
-                {formatValue(totalDebitos)}
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <ArrowRightLeft className="w-3 h-3" />
-                <p className="text-xs text-muted-foreground">Saldo</p>
+              <div className={`p-3 rounded-lg border ${
+                saldoPeriodo >= 0
+                  ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
+                  : "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <ArrowRightLeft className={`w-4 h-4 ${saldoPeriodo >= 0 ? "text-blue-600" : "text-orange-600"}`} />
+                  <p className="text-xs font-medium text-muted-foreground">Saldo Período</p>
+                </div>
+                <p className={`text-lg font-bold ${
+                  saldoPeriodo >= 0 ? "text-blue-600" : "text-orange-600"
+                }`}>
+                  {formatValue(saldoPeriodo)}
+                </p>
               </div>
-              <p
-                className={`text-sm font-bold ${
-                  saldoPeriodo >= 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {formatValue(saldoPeriodo)}
-              </p>
             </div>
           </div>
         )}
 
         {/* Lista de Transações */}
         {fetched && (
-          <ScrollArea className="h-[300px] border rounded-lg">
-            {extrato.length > 0 ? (
-              <div className="p-2 space-y-2">
-                {extrato.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`flex items-center justify-between p-3 rounded-lg ${
-                      item.tipo === "credito"
-                        ? "bg-green-50 dark:bg-green-950/20"
-                        : "bg-red-50 dark:bg-red-950/20"
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {item.descricao}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.data && !isNaN(new Date(item.data).getTime())
-                          ? format(new Date(item.data), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })
-                          : item.data || "Data inválida"}
-                      </p>
-                    </div>
-                    <div className="text-right ml-2">
-                      <p
-                        className={`text-sm font-bold ${
-                          item.tipo === "credito"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {item.tipo === "credito" ? "+" : "-"}{" "}
-                        {formatValue(item.valor)}
-                      </p>
-                      {item.saldo_apos !== undefined && (
-                        <p className="text-xs text-muted-foreground">
-                          Saldo: {formatValue(item.saldo_apos)}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              Transações ({extrato.length})
+            </h3>
+            <ScrollArea className="h-[300px] border rounded-lg bg-muted/30">
+              {extrato.length > 0 ? (
+                <div className="p-2 space-y-2">
+                  {extrato.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                        item.tipo === "credito"
+                          ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/30"
+                          : "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/30"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {item.descricao}
                         </p>
-                      )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {item.data && !isNaN(new Date(item.data).getTime())
+                              ? format(new Date(item.data), "dd/MM/yyyy", {
+                                  locale: ptBR,
+                                })
+                              : item.data || "Data inválida"}
+                          </p>
+                          {item.saldo_apos !== undefined && (
+                            <Badge variant="outline" className="text-xs">
+                              Saldo: {formatValue(item.saldo_apos)}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right ml-3 flex-shrink-0">
+                        <p
+                          className={`text-sm font-bold ${
+                            item.tipo === "credito"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {item.tipo === "credito" ? "+" : "-"}
+                          {formatValue(item.valor)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma transação encontrada no período
-                </p>
-              </div>
-            )}
-          </ScrollArea>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                  <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma transação encontrada no período
+                  </p>
+                </div>
+              )}
+            </ScrollArea>
+          </div>
         )}
 
         {/* Instrução inicial */}
