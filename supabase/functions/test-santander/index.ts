@@ -183,8 +183,26 @@ function pfxToPem(pfxData: string, password?: string): { cert: string; key: stri
   try {
     let pfxDer: string
     
-    // Se for base64 padrão, decodifica
-    if (/^[A-Za-z0-9+/]*={0,2}$/.test(pfxData)) {
+    // Caso venha como JSON { data: [ ...bytes ] }
+    if (pfxData.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(pfxData)
+        if (Array.isArray(parsed.data)) {
+          const uint8 = new Uint8Array(parsed.data)
+          // Converte o array de bytes para string binária
+          let binary = ''
+          for (let i = 0; i < uint8.length; i++) {
+            binary += String.fromCharCode(uint8[i])
+          }
+          pfxDer = binary
+        } else {
+          throw new Error('JSON does not contain data array')
+        }
+      } catch (err) {
+        throw new Error(`Invalid JSON PFX: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    } else if (/^[A-Za-z0-9+/]*={0,2}$/.test(pfxData)) {
+      // Base64 padrão
       pfxDer = forge.util.decode64(pfxData)
     } else {
       // Caso contrário, assume que é UTF-8 e tenta converter para base64 primeiro

@@ -39,17 +39,38 @@ function base64ToUint8Array(base64: string): Uint8Array {
 function pfxToPem(pfxData: string, password?: string): { cert: string; key: string } {
   try {
     let pfxDer: string
-    
-    if (/^[A-Za-z0-9+/]*={0,2}$/.test(pfxData)) {
+
+    // Caso venha como JSON { data: [ ...bytes ] }
+    if (pfxData.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(pfxData)
+        if (Array.isArray(parsed.data)) {
+          const uint8 = new Uint8Array(parsed.data)
+          // Converte o array de bytes para string binária
+          let binary = ''
+          for (let i = 0; i < uint8.length; i++) {
+            binary += String.fromCharCode(uint8[i])
+          }
+          pfxDer = binary
+        } else {
+          throw new Error('JSON does not contain data array')
+        }
+      } catch (err) {
+        throw new Error(`Invalid JSON PFX: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    } else if (/^[A-Za-z0-9+/]*={0,2}$/.test(pfxData)) {
+      // Base64 padrão
       pfxDer = forge.util.decode64(pfxData)
     } else {
+      // Tenta converter UTF-8 para base64
       try {
         pfxDer = forge.util.decode64(btoa(unescape(encodeURIComponent(pfxData))))
       } catch {
+        // Fallback: usa diretamente
         pfxDer = pfxData
       }
     }
-    
+
     const pfxAsn1 = forge.asn1.fromDer(pfxDer)
     const p12 = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, password || '')
 
