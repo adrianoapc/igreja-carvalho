@@ -83,7 +83,9 @@ export function ExtratoPreviewDialog({
   const [syncing, setSyncing] = useState(false);
   const [extrato, setExtrato] = useState<ExtratoItem[]>([]);
   const [fetched, setFetched] = useState(false);
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "credito" | "debito">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "credito" | "debito">(
+    "todos"
+  );
   const [syncResult, setSyncResult] = useState<{
     inseridos: number;
     atualizados: number;
@@ -168,57 +170,75 @@ export function ExtratoPreviewDialog({
       // Transformar dados do banco para formato interno
       // Santander retorna: creditDebitType, transactionName, amount (string), transactionDate (DD/MM/YYYY)
       const transacoes: ExtratoItem[] = (data.transacoes || [])
-        .filter((t: { transactionName?: string; descricao?: string; historicComplement?: string }) => {
-          // Filtrar transações CONTAMAX (movimentações internas do banco)
-          const textoCompleto = [t.transactionName, t.descricao, t.historicComplement]
-            .filter(Boolean)
-            .join(" ")
-            .toUpperCase();
-          return !textoCompleto.includes("CONTAMAX");
-        })
-        .map(
-        (t: {
-          creditDebitType?: string;
-          transactionName?: string;
-          historicComplement?: string;
-          amount?: string | number;
-          transactionDate?: string;
-          // Campos alternativos caso já venha transformado
-          external_id?: string;
-          data_transacao?: string;
-          descricao?: string;
-          valor?: number;
-          tipo?: string;
-          saldo?: number;
-        }) => {
-          // Parse da data no formato DD/MM/YYYY para ISO
-          let dataFormatada = t.data_transacao || t.transactionDate || "";
-          if (dataFormatada.includes("/")) {
-            const [dia, mes, ano] = dataFormatada.split("/");
-            dataFormatada = `${ano}-${mes}-${dia}`;
+        .filter(
+          (t: {
+            transactionName?: string;
+            descricao?: string;
+            historicComplement?: string;
+          }) => {
+            // Filtrar transações CONTAMAX (movimentações internas do banco)
+            const textoCompleto = [
+              t.transactionName,
+              t.descricao,
+              t.historicComplement,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toUpperCase();
+            return !textoCompleto.includes("CONTAMAX");
           }
-          
-          const valorNumerico = typeof t.amount === "string" 
-            ? parseFloat(t.amount.replace(",", ".")) 
-            : (t.amount || t.valor || 0);
-          
-          const descricaoOriginal = t.descricao || 
-            [t.transactionName, t.historicComplement].filter(Boolean).join(" - ");
-          const descricaoCompleta = anonymizePixDescription(descricaoOriginal);
-          
-          const tipoTransacao = t.tipo || 
-            (t.creditDebitType?.toUpperCase() === "CREDITO" ? "credito" : "debito");
-          
-          return {
-            id: t.external_id || crypto.randomUUID(),
-            data: dataFormatada,
-            descricao: descricaoCompleta,
-            valor: Math.abs(valorNumerico),
-            tipo: tipoTransacao,
-            saldo_apos: t.saldo,
-          };
-        }
-      );
+        )
+        .map(
+          (t: {
+            creditDebitType?: string;
+            transactionName?: string;
+            historicComplement?: string;
+            amount?: string | number;
+            transactionDate?: string;
+            // Campos alternativos caso já venha transformado
+            external_id?: string;
+            data_transacao?: string;
+            descricao?: string;
+            valor?: number;
+            tipo?: string;
+            saldo?: number;
+          }) => {
+            // Parse da data no formato DD/MM/YYYY para ISO
+            let dataFormatada = t.data_transacao || t.transactionDate || "";
+            if (dataFormatada.includes("/")) {
+              const [dia, mes, ano] = dataFormatada.split("/");
+              dataFormatada = `${ano}-${mes}-${dia}`;
+            }
+
+            const valorNumerico =
+              typeof t.amount === "string"
+                ? parseFloat(t.amount.replace(",", "."))
+                : t.amount || t.valor || 0;
+
+            const descricaoOriginal =
+              t.descricao ||
+              [t.transactionName, t.historicComplement]
+                .filter(Boolean)
+                .join(" - ");
+            const descricaoCompleta =
+              anonymizePixDescription(descricaoOriginal);
+
+            const tipoTransacao =
+              t.tipo ||
+              (t.creditDebitType?.toUpperCase() === "CREDITO"
+                ? "credito"
+                : "debito");
+
+            return {
+              id: t.external_id || crypto.randomUUID(),
+              data: dataFormatada,
+              descricao: descricaoCompleta,
+              valor: Math.abs(valorNumerico),
+              tipo: tipoTransacao,
+              saldo_apos: t.saldo,
+            };
+          }
+        );
 
       setExtrato(transacoes);
       setFetched(true);
@@ -331,16 +351,22 @@ export function ExtratoPreviewDialog({
                 {loadingSaldo ? (
                   <div className="flex items-center gap-2 mt-1">
                     <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                    <p className="text-sm text-muted-foreground">Atualizando...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Atualizando...
+                    </p>
                   </div>
                 ) : saldoAtual !== null ? (
-                  <p className={`text-2xl font-bold ${
-                    saldoAtual >= 0 ? "text-primary" : "text-destructive"
-                  }`}>
+                  <p
+                    className={`text-2xl font-bold ${
+                      saldoAtual >= 0 ? "text-primary" : "text-destructive"
+                    }`}
+                  >
                     {formatValueWithCurrency(saldoAtual)}
                   </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground mt-1">Dados não disponíveis</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Dados não disponíveis
+                  </p>
                 )}
               </div>
             </div>
@@ -351,7 +377,9 @@ export function ExtratoPreviewDialog({
               disabled={loadingSaldo}
               className="h-9 gap-1.5"
             >
-              <RefreshCw className={`w-4 h-4 ${loadingSaldo ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${loadingSaldo ? "animate-spin" : ""}`}
+              />
               <span className="hidden sm:inline text-xs">Atualizar</span>
             </Button>
           </div>
@@ -414,7 +442,9 @@ export function ExtratoPreviewDialog({
         {/* Resumo do Período */}
         {fetched && extrato.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-foreground">Resumo do Período</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Resumo do Período
+            </h3>
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => toggleFiltro("credito")}
@@ -426,13 +456,17 @@ export function ExtratoPreviewDialog({
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   <TrendingUp className="w-4 h-4 text-green-600" />
-                  <p className="text-xs font-medium text-muted-foreground">Créditos</p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Créditos
+                  </p>
                 </div>
                 <p className="text-lg font-bold text-green-600">
                   {formatValueWithCurrency(totalCreditos)}
                 </p>
                 {filtroTipo === "credito" && (
-                  <p className="text-xs text-green-600 mt-1">Clique para limpar</p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Clique para limpar
+                  </p>
                 )}
               </button>
               <button
@@ -445,27 +479,41 @@ export function ExtratoPreviewDialog({
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   <TrendingDown className="w-4 h-4 text-red-600" />
-                  <p className="text-xs font-medium text-muted-foreground">Débitos</p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Débitos
+                  </p>
                 </div>
                 <p className="text-lg font-bold text-red-600">
                   {formatValueWithCurrency(totalDebitos)}
                 </p>
                 {filtroTipo === "debito" && (
-                  <p className="text-xs text-red-600 mt-1">Clique para limpar</p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Clique para limpar
+                  </p>
                 )}
               </button>
-              <div className={`p-3 rounded-lg border ${
-                saldoPeriodo >= 0
-                  ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
-                  : "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
-              }`}>
+              <div
+                className={`p-3 rounded-lg border ${
+                  saldoPeriodo >= 0
+                    ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
+                    : "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
+                }`}
+              >
                 <div className="flex items-center gap-1.5 mb-1">
-                  <ArrowRightLeft className={`w-4 h-4 ${saldoPeriodo >= 0 ? "text-blue-600" : "text-orange-600"}`} />
-                  <p className="text-xs font-medium text-muted-foreground">Saldo Período</p>
+                  <ArrowRightLeft
+                    className={`w-4 h-4 ${
+                      saldoPeriodo >= 0 ? "text-blue-600" : "text-orange-600"
+                    }`}
+                  />
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Saldo Período
+                  </p>
                 </div>
-                <p className={`text-lg font-bold ${
-                  saldoPeriodo >= 0 ? "text-blue-600" : "text-orange-600"
-                }`}>
+                <p
+                  className={`text-lg font-bold ${
+                    saldoPeriodo >= 0 ? "text-blue-600" : "text-orange-600"
+                  }`}
+                >
                   {formatValueWithCurrency(saldoPeriodo)}
                 </p>
               </div>
@@ -478,7 +526,8 @@ export function ExtratoPreviewDialog({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">
-                Transações ({extratoFiltrado.length}{filtroTipo !== "todos" ? ` de ${extrato.length}` : ""})
+                Transações ({extratoFiltrado.length}
+                {filtroTipo !== "todos" ? ` de ${extrato.length}` : ""})
               </h3>
               {filtroTipo !== "todos" && (
                 <Button
