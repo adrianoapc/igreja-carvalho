@@ -98,17 +98,46 @@ export default function Integracoes() {
 
     setTestingId(integracao.id);
     try {
-      // Extrair agência e conta do config ou usar valores padrão para teste
-      const config = integracao.config as Record<string, unknown> | null;
-      const agencia = (config?.agencia as string) || "0037";
-      const conta = (config?.conta as string) || "130158884";
+      // Buscar conta vinculada pelo CNPJ do Santander
+      const { data: contaVinculada, error: contaError } = await supabase
+        .from("contas")
+        .select("id, agencia, conta_numero, cnpj_banco")
+        .eq("igreja_id", igrejaId!)
+        .eq("cnpj_banco", "90400888000142")
+        .eq("ativo", true)
+        .maybeSingle();
+
+      if (contaError) {
+        console.error("Erro ao buscar conta:", contaError);
+        toast.error("Erro ao buscar conta vinculada");
+        setTestingId(null);
+        return;
+      }
+
+      if (!contaVinculada) {
+        toast.error("Nenhuma conta Santander configurada", {
+          description: "Configure uma conta bancária com CNPJ do Santander para testar",
+        });
+        setTestingId(null);
+        return;
+      }
+
+      if (!contaVinculada.agencia || !contaVinculada.conta_numero) {
+        toast.error("Dados da conta incompletos", {
+          description: "Preencha agência e número da conta",
+        });
+        setTestingId(null);
+        return;
+      }
+
+      const contaLimpa = contaVinculada.conta_numero.replace(/\D/g, "");
 
       const { data, error } = await supabase.functions.invoke("test-santander", {
         body: {
           integracao_id: integracao.id,
-          banco_id: "90400888000142",
-          agencia,
-          conta,
+          banco_id: contaVinculada.cnpj_banco,
+          agencia: contaVinculada.agencia,
+          conta: contaLimpa,
         },
       });
 
@@ -122,11 +151,15 @@ export default function Integracoes() {
 
       if (data.success) {
         toast.success("Conexão testada com sucesso!", {
-          description: `Token obtido. Saldo: ${data.balance?.available ?? "N/A"}`,
+          description: `Saldo disponível: ${data.balance?.available ?? "N/A"}`,
+        });
+      } else if (data.tokenSuccess) {
+        toast.warning("Autenticação OK, erro no saldo", {
+          description: data.balanceError || "Verifique os logs",
         });
       } else {
-        toast.warning("Teste parcial", {
-          description: data.tokenError || data.balanceError || "Verifique os logs",
+        toast.error("Falha na conexão", {
+          description: data.tokenError || "Verifique os logs",
         });
       }
     } catch (err) {
