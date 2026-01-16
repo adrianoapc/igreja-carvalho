@@ -145,22 +145,48 @@ export function ExtratoPreviewDialog({
       }
 
       // Transformar dados do banco para formato interno
+      // Santander retorna: creditDebitType, transactionName, amount (string), transactionDate (DD/MM/YYYY)
       const transacoes: ExtratoItem[] = (data.transacoes || []).map(
         (t: {
-          external_id: string;
-          data_transacao: string;
-          descricao: string;
-          valor: number;
-          tipo: string;
+          creditDebitType?: string;
+          transactionName?: string;
+          historicComplement?: string;
+          amount?: string | number;
+          transactionDate?: string;
+          // Campos alternativos caso já venha transformado
+          external_id?: string;
+          data_transacao?: string;
+          descricao?: string;
+          valor?: number;
+          tipo?: string;
           saldo?: number;
-        }) => ({
-          id: t.external_id || crypto.randomUUID(),
-          data: t.data_transacao,
-          descricao: t.descricao,
-          valor: Math.abs(t.valor),
-          tipo: t.tipo === "credito" ? "credito" : "debito",
-          saldo_apos: t.saldo,
-        })
+        }) => {
+          // Parse da data no formato DD/MM/YYYY para ISO
+          let dataFormatada = t.data_transacao || t.transactionDate || "";
+          if (dataFormatada.includes("/")) {
+            const [dia, mes, ano] = dataFormatada.split("/");
+            dataFormatada = `${ano}-${mes}-${dia}`;
+          }
+          
+          const valorNumerico = typeof t.amount === "string" 
+            ? parseFloat(t.amount.replace(",", ".")) 
+            : (t.amount || t.valor || 0);
+          
+          const descricaoCompleta = t.descricao || 
+            [t.transactionName, t.historicComplement].filter(Boolean).join(" - ");
+          
+          const tipoTransacao = t.tipo || 
+            (t.creditDebitType?.toUpperCase() === "CREDITO" ? "credito" : "debito");
+          
+          return {
+            id: t.external_id || crypto.randomUUID(),
+            data: dataFormatada,
+            descricao: descricaoCompleta,
+            valor: Math.abs(valorNumerico),
+            tipo: tipoTransacao,
+            saldo_apos: t.saldo,
+          };
+        }
       );
 
       setExtrato(transacoes);
@@ -384,9 +410,11 @@ export function ExtratoPreviewDialog({
                         {item.descricao}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(item.data), "dd/MM/yyyy", {
-                          locale: ptBR,
-                        })}
+                        {item.data && !isNaN(new Date(item.data).getTime())
+                          ? format(new Date(item.data), "dd/MM/yyyy", {
+                              locale: ptBR,
+                            })
+                          : item.data || "Data inválida"}
                       </p>
                     </div>
                     <div className="text-right ml-2">
