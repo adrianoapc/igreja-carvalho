@@ -387,9 +387,14 @@ export function IntegracaoCriarDialog({
           />
         </div>
 
-        {provedor === "getnet" && (
+        {(provedor === "getnet" || provedor === "santander") && (
           <div className="space-y-2">
-            <Label htmlFor="applicationKey">Application Key (Getnet)</Label>
+            <Label htmlFor="applicationKey">
+              Application Key
+              {provedor === "santander" && (
+                <span className="text-xs text-muted-foreground ml-1">(geralmente igual ao Client ID)</span>
+              )}
+            </Label>
             <Input
               id="applicationKey"
               type="password"
