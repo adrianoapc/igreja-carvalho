@@ -469,10 +469,14 @@ Deno.serve(async (req) => {
 
     const token = tokenData.access_token
 
+    // Formatar conta para 12 dígitos (padrão Santander)
+    const contaFormatada = conta.padStart(12, '0')
+    console.log(`[test-santander] Conta formatada: ${conta} -> ${contaFormatada}`)
+
     // Query balance
     console.log('[test-santander] Querying balance...')
 
-    const balanceUrl = `${SANTANDER_BASE_URL}/banks/${banco_id}/balances/${agencia}.${conta}`
+    const balanceUrl = `${SANTANDER_BASE_URL}/banks/${banco_id}/balances/${agencia}.${contaFormatada}`
     const balanceResponse = await fetch(balanceUrl, {
       method: 'GET',
       headers: {
@@ -502,7 +506,7 @@ Deno.serve(async (req) => {
     console.log('[test-santander] Querying statement...')
 
     const statementUrl = new URL(
-      `${SANTANDER_BASE_URL}/banks/${banco_id}/statements/${agencia}.${conta}`,
+      `${SANTANDER_BASE_URL}/banks/${banco_id}/statements/${agencia}.${contaFormatada}`,
     )
 
     // Date range: default to last 30 days
