@@ -1,7 +1,9 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ReconciliacaoBancaria } from "@/components/financas/ReconciliacaoBancaria";
+import { ConciliacaoManual } from "@/components/financas/ConciliacaoManual";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Reconciliacao() {
   const navigate = useNavigate();
@@ -29,7 +31,18 @@ export default function Reconciliacao() {
         </div>
       </div>
 
-      <ReconciliacaoBancaria />
+      <Tabs defaultValue="saldos" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsTrigger value="saldos">Saldos</TabsTrigger>
+          <TabsTrigger value="extratos">Extratos Bancários</TabsTrigger>
+        </TabsList>
+        <TabsContent value="saldos">
+          <ReconciliacaoBancaria />
+        </TabsContent>
+        <TabsContent value="extratos">
+          <ConciliacaoManual />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
