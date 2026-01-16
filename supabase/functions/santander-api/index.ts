@@ -421,7 +421,11 @@ async function queryStatement(
 
   if (statementResponse.ok) {
     const statement = await statementResponse.json()
-    const records = Array.isArray(statement) ? statement : []
+    console.log('[santander-api] Statement raw response:', JSON.stringify(statement))
+    // Santander returns { _content: [...], _pageable: {...} } or similar structure
+    const records = Array.isArray(statement) 
+      ? statement 
+      : (statement?._content || statement?.content || statement?.transactions || statement?.data || [])
     console.log('[santander-api] Statement query successful, got', records.length, 'records')
     return { data: records, count: records.length }
   } else {
