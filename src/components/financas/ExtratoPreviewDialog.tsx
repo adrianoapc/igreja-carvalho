@@ -57,6 +57,24 @@ export function ExtratoPreviewDialog({
   cnpjBanco,
 }: ExtratoPreviewDialogProps) {
   const { formatValue } = useHideValues();
+
+  // Função para formatar valor como moeda BRL
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  // Função que combina formatação de moeda com ocultação de valores
+  const formatValueWithCurrency = (value: number) => {
+    const formatted = formatCurrency(value);
+    const hidden = formatValue(value);
+    // Se formatValue retorna um símbolo diferente de R$, significa que esconde
+    return hidden.includes("•") ? hidden : formatted;
+  };
   const [dataInicio, setDataInicio] = useState(
     format(subDays(new Date(), 30), "yyyy-MM-dd")
   );
@@ -319,7 +337,7 @@ export function ExtratoPreviewDialog({
                   <p className={`text-2xl font-bold ${
                     saldoAtual >= 0 ? "text-primary" : "text-destructive"
                   }`}>
-                    {formatValue(saldoAtual)}
+                    {formatValueWithCurrency(saldoAtual)}
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground mt-1">Dados não disponíveis</p>
@@ -411,7 +429,7 @@ export function ExtratoPreviewDialog({
                   <p className="text-xs font-medium text-muted-foreground">Créditos</p>
                 </div>
                 <p className="text-lg font-bold text-green-600">
-                  {formatValue(totalCreditos)}
+                  {formatValueWithCurrency(totalCreditos)}
                 </p>
                 {filtroTipo === "credito" && (
                   <p className="text-xs text-green-600 mt-1">Clique para limpar</p>
@@ -430,7 +448,7 @@ export function ExtratoPreviewDialog({
                   <p className="text-xs font-medium text-muted-foreground">Débitos</p>
                 </div>
                 <p className="text-lg font-bold text-red-600">
-                  {formatValue(totalDebitos)}
+                  {formatValueWithCurrency(totalDebitos)}
                 </p>
                 {filtroTipo === "debito" && (
                   <p className="text-xs text-red-600 mt-1">Clique para limpar</p>
@@ -448,7 +466,7 @@ export function ExtratoPreviewDialog({
                 <p className={`text-lg font-bold ${
                   saldoPeriodo >= 0 ? "text-blue-600" : "text-orange-600"
                 }`}>
-                  {formatValue(saldoPeriodo)}
+                  {formatValueWithCurrency(saldoPeriodo)}
                 </p>
               </div>
             </div>
@@ -513,7 +531,7 @@ export function ExtratoPreviewDialog({
                           }`}
                         >
                           {item.tipo === "credito" ? "+" : "-"}
-                          {formatValue(item.valor)}
+                          {formatValueWithCurrency(item.valor)}
                         </p>
                       </div>
                     </div>
