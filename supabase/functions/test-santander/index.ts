@@ -509,16 +509,18 @@ Deno.serve(async (req) => {
       `${SANTANDER_BASE_URL}/banks/${banco_id}/statements/${agencia}.${contaFormatada}`,
     )
 
-    // Date range: default to last 30 days
+    // Date range: default to last 45 days
     const today = new Date()
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const daysAgo = new Date(today.getTime() - 45 * 24 * 60 * 60 * 1000)
 
     const formatDate = (date: Date) => date.toISOString().split('T')[0]
 
-    statementUrl.searchParams.set('initialDate', data_inicio || formatDate(thirtyDaysAgo))
+    statementUrl.searchParams.set('_offset', '1')
+    statementUrl.searchParams.set('_limit', '500')
+    statementUrl.searchParams.set('initialDate', data_inicio || formatDate(daysAgo))
     statementUrl.searchParams.set('finalDate', data_fim || formatDate(today))
-    statementUrl.searchParams.set('_offset', '0')
-    statementUrl.searchParams.set('_limit', '10')
+
+    console.log(`[test-santander] Statement URL: ${statementUrl.toString()}`)
 
     const statementResponse = await fetch(statementUrl.toString(), {
       method: 'GET',
