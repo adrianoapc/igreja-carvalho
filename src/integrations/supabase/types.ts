@@ -1657,6 +1657,7 @@ export type Database = {
           agencia: string | null
           ativo: boolean
           banco: string | null
+          cnpj_banco: string | null
           conta_numero: string | null
           created_at: string
           filial_id: string | null
@@ -1673,6 +1674,7 @@ export type Database = {
           agencia?: string | null
           ativo?: boolean
           banco?: string | null
+          cnpj_banco?: string | null
           conta_numero?: string | null
           created_at?: string
           filial_id?: string | null
@@ -1689,6 +1691,7 @@ export type Database = {
           agencia?: string | null
           ativo?: boolean
           banco?: string | null
+          cnpj_banco?: string | null
           conta_numero?: string | null
           created_at?: string
           filial_id?: string | null

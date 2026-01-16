@@ -13,12 +13,15 @@ import {
   List,
   Check,
   Calendar,
+  TestTube2,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import { ContaDialog } from "@/components/financas/ContaDialog";
 import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -48,6 +51,7 @@ export default function Contas() {
     from: Date;
     to: Date;
   } | null>(null);
+  const [testingContaId, setTestingContaId] = useState<string | null>(null);
 
   const { data: contas, isLoading } = useQuery({
     queryKey: ["contas", igrejaId, filialId, isAllFiliais],
@@ -69,6 +73,93 @@ export default function Contas() {
     },
     enabled: !loading && !!igrejaId,
   });
+
+  // Buscar integrações bancárias ativas
+  const { data: integracoes } = useQuery({
+    queryKey: ["integracoes-financeiras", igrejaId],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+      const { data, error } = await supabase
+        .from("integracoes_financeiras")
+        .select("id, provedor, status")
+        .eq("igreja_id", igrejaId)
+        .eq("status", "ativo");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !loading && !!igrejaId,
+  });
+
+  // Função para testar conexão bancária
+  const handleTestConnection = async (conta: {
+    id: string;
+    cnpj_banco?: string | null;
+    agencia?: string | null;
+    conta_numero?: string | null;
+  }) => {
+    if (!conta.cnpj_banco) {
+      toast.error("CNPJ do banco não configurado", {
+        description: "Edite a conta e preencha o CNPJ do banco para testar a integração.",
+      });
+      return;
+    }
+
+    // Verificar se existe integração Santander ativa
+    const santanderIntegracao = integracoes?.find((i) => i.provedor === "santander" && i.status === "ativo");
+    if (!santanderIntegracao) {
+      toast.error("Nenhuma integração Santander ativa", {
+        description: "Configure uma integração Santander na página de integrações.",
+      });
+      return;
+    }
+
+    setTestingContaId(conta.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("test-santander", {
+        body: {
+          integracao_id: santanderIntegracao.id,
+          banco_id: conta.cnpj_banco,
+          agencia: conta.agencia || "",
+          conta: conta.conta_numero?.replace(/\D/g, "") || "",
+        },
+      });
+
+      if (error) {
+        console.error("Test error:", error);
+        toast.error(`Erro no teste: ${error.message}`);
+        return;
+      }
+
+      console.log("Test result:", data);
+
+      if (data.balance?.obtained) {
+        toast.success("Conexão testada com sucesso!", {
+          description: `Saldo disponível: R$ ${data.balance.data?.availableAmount || "N/A"}`,
+        });
+      } else if (data.token?.obtained) {
+        toast.warning("Token obtido, mas saldo falhou", {
+          description: data.balance?.error?.detail || "Verifique os dados da conta",
+        });
+      } else {
+        toast.error("Falha na conexão", {
+          description: data.tokenError || "Verifique as credenciais da integração",
+        });
+      }
+    } catch (err) {
+      console.error("Test exception:", err);
+      toast.error("Erro ao testar conexão");
+    } finally {
+      setTestingContaId(null);
+    }
+  };
+
+  // Verificar se conta tem integração disponível
+  const hasIntegration = (cnpjBanco?: string | null) => {
+    if (!cnpjBanco || !integracoes) return false;
+    // Por enquanto, só Santander está implementado
+    const santanderCnpj = "90400888000142";
+    return cnpjBanco === santanderCnpj && integracoes.some((i) => i.provedor === "santander" && i.status === "ativo");
+  };
 
   const startDate = customRange
     ? format(customRange.from, "yyyy-MM-dd")
@@ -391,6 +482,31 @@ export default function Contas() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      {/* Botão de teste de conexão - só aparece se tiver integração */}
+                      {hasIntegration((conta as { cnpj_banco?: string | null }).cnpj_banco) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTestConnection(conta as {
+                              id: string;
+                              cnpj_banco?: string | null;
+                              agencia?: string | null;
+                              conta_numero?: string | null;
+                            });
+                          }}
+                          disabled={testingContaId === conta.id}
+                          title="Testar conexão bancária"
+                        >
+                          {testingContaId === conta.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <TestTube2 className="w-3.5 h-3.5 text-blue-500" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

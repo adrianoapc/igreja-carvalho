@@ -22,6 +22,7 @@ interface ContaDialogProps {
     banco?: string | null;
     agencia?: string | null;
     conta_numero?: string | null;
+    cnpj_banco?: string | null;
     observacoes?: string | null;
   };
 }
@@ -33,6 +34,7 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
   const [banco, setBanco] = useState(conta?.banco || "");
   const [agencia, setAgencia] = useState(conta?.agencia || "");
   const [contaNumero, setContaNumero] = useState(conta?.conta_numero || "");
+  const [cnpjBanco, setCnpjBanco] = useState(conta?.cnpj_banco || "");
   const [observacoes, setObservacoes] = useState(conta?.observacoes || "");
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
@@ -59,6 +61,7 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
             banco: tipo === 'bancaria' ? banco : null,
             agencia: tipo === 'bancaria' ? agencia : null,
             conta_numero: tipo === 'bancaria' ? contaNumero : null,
+            cnpj_banco: tipo === 'bancaria' ? cnpjBanco : null,
             observacoes,
           })
           .eq('id', String(conta.id))
@@ -82,6 +85,7 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
             banco: tipo === 'bancaria' ? banco : null,
             agencia: tipo === 'bancaria' ? agencia : null,
             conta_numero: tipo === 'bancaria' ? contaNumero : null,
+            cnpj_banco: tipo === 'bancaria' ? cnpjBanco : null,
             observacoes,
             ativo: true,
             igreja_id: igrejaId,
@@ -178,6 +182,20 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
                     onChange={(e) => setBanco(e.target.value)}
                     placeholder="Ex: Banco do Brasil, Santander"
                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="cnpj-banco">CNPJ do Banco (para integrações)</Label>
+                  <Input
+                    id="cnpj-banco"
+                    value={cnpjBanco}
+                    onChange={(e) => setCnpjBanco(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Ex: 90400888000142 (Santander)"
+                    maxLength={14}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Usado para conectar com APIs bancárias
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
