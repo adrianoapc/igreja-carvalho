@@ -106,7 +106,7 @@ export default function Integracoes() {
       const { data, error } = await supabase.functions.invoke("test-santander", {
         body: {
           integracao_id: integracao.id,
-          banco_id: "033",
+          banco_id: "90400888000142",
           agencia,
           conta,
         },
