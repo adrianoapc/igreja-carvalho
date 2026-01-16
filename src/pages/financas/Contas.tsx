@@ -15,6 +15,7 @@ import {
   Calendar,
   TestTube2,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +25,7 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { ContaDialog } from "@/components/financas/ContaDialog";
 import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
+import { ExtratoPreviewDialog } from "@/components/financas/ExtratoPreviewDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -52,7 +54,15 @@ export default function Contas() {
     to: Date;
   } | null>(null);
   const [testingContaId, setTestingContaId] = useState<string | null>(null);
-
+  const [extratoDialogOpen, setExtratoDialogOpen] = useState(false);
+  const [extratoContaData, setExtratoContaData] = useState<{
+    id: string;
+    nome: string;
+    integracaoId: string;
+    agencia?: string;
+    contaNumero?: string;
+    cnpjBanco?: string;
+  } | null>(null);
   const { data: contas, isLoading } = useQuery({
     queryKey: ["contas", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
@@ -506,8 +516,35 @@ export default function Contas() {
                             <TestTube2 className="w-3.5 h-3.5 text-blue-500" />
                           )}
                         </Button>
-                      )}
-                      <Button
+                        )}
+                        {/* Botão Ver Extrato */}
+                        {hasIntegration((conta as { cnpj_banco?: string | null }).cnpj_banco) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const santanderIntegracao = integracoes?.find(
+                                (i) => i.provedor === "santander" && i.status === "ativo"
+                              );
+                              if (santanderIntegracao) {
+                                setExtratoContaData({
+                                  id: conta.id,
+                                  nome: conta.nome,
+                                  integracaoId: santanderIntegracao.id,
+                                  agencia: (conta as { agencia?: string }).agencia,
+                                  contaNumero: (conta as { conta_numero?: string }).conta_numero,
+                                  cnpjBanco: (conta as { cnpj_banco?: string }).cnpj_banco,
+                                });
+                                setExtratoDialogOpen(true);
+                              }
+                            }}
+                            title="Ver extrato bancário"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-emerald-500" />
+                          </Button>
+                        )}
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0"
@@ -738,6 +775,19 @@ export default function Contas() {
         onOpenChange={setAjusteSaldoDialogOpen}
         conta={selectedConta}
       />
+
+      {extratoContaData && (
+        <ExtratoPreviewDialog
+          open={extratoDialogOpen}
+          onOpenChange={setExtratoDialogOpen}
+          contaId={extratoContaData.id}
+          contaNome={extratoContaData.nome}
+          integracaoId={extratoContaData.integracaoId}
+          agencia={extratoContaData.agencia}
+          contaNumero={extratoContaData.contaNumero}
+          cnpjBanco={extratoContaData.cnpjBanco}
+        />
+      )}
     </div>
   );
 }
