@@ -148,7 +148,16 @@ export function ExtratoPreviewDialog({
 
       // Transformar dados do banco para formato interno
       // Santander retorna: creditDebitType, transactionName, amount (string), transactionDate (DD/MM/YYYY)
-      const transacoes: ExtratoItem[] = (data.transacoes || []).map(
+      const transacoes: ExtratoItem[] = (data.transacoes || [])
+        .filter((t: { transactionName?: string; descricao?: string; historicComplement?: string }) => {
+          // Filtrar transações CONTAMAX (movimentações internas do banco)
+          const textoCompleto = [t.transactionName, t.descricao, t.historicComplement]
+            .filter(Boolean)
+            .join(" ")
+            .toUpperCase();
+          return !textoCompleto.includes("CONTAMAX");
+        })
+        .map(
         (t: {
           creditDebitType?: string;
           transactionName?: string;
