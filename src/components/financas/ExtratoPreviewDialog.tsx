@@ -65,6 +65,7 @@ export function ExtratoPreviewDialog({
   const [syncing, setSyncing] = useState(false);
   const [extrato, setExtrato] = useState<ExtratoItem[]>([]);
   const [fetched, setFetched] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "credito" | "debito">("todos");
   const [syncResult, setSyncResult] = useState<{
     inseridos: number;
     atualizados: number;
@@ -263,8 +264,19 @@ export function ExtratoPreviewDialog({
       setExtrato([]);
       setFetched(false);
       setSyncResult(null);
+      setFiltroTipo("todos");
     }
     onOpenChange(open);
+  };
+
+  // Filtrar extrato por tipo
+  const extratoFiltrado = extrato.filter((item) => {
+    if (filtroTipo === "todos") return true;
+    return item.tipo === filtroTipo;
+  });
+
+  const toggleFiltro = (tipo: "credito" | "debito") => {
+    setFiltroTipo((prev) => (prev === tipo ? "todos" : tipo));
   };
 
   return (
@@ -386,7 +398,14 @@ export function ExtratoPreviewDialog({
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-foreground">Resumo do Período</h3>
             <div className="grid grid-cols-3 gap-2">
-              <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900/30">
+              <button
+                onClick={() => toggleFiltro("credito")}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  filtroTipo === "credito"
+                    ? "bg-green-200 dark:bg-green-900/50 border-green-400 dark:border-green-700 ring-2 ring-green-500 ring-offset-1"
+                    : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30 hover:bg-green-100 dark:hover:bg-green-950/40"
+                }`}
+              >
                 <div className="flex items-center gap-1.5 mb-1">
                   <TrendingUp className="w-4 h-4 text-green-600" />
                   <p className="text-xs font-medium text-muted-foreground">Créditos</p>
@@ -394,8 +413,18 @@ export function ExtratoPreviewDialog({
                 <p className="text-lg font-bold text-green-600">
                   {formatValue(totalCreditos)}
                 </p>
-              </div>
-              <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900/30">
+                {filtroTipo === "credito" && (
+                  <p className="text-xs text-green-600 mt-1">Clique para limpar</p>
+                )}
+              </button>
+              <button
+                onClick={() => toggleFiltro("debito")}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  filtroTipo === "debito"
+                    ? "bg-red-200 dark:bg-red-900/50 border-red-400 dark:border-red-700 ring-2 ring-red-500 ring-offset-1"
+                    : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30 hover:bg-red-100 dark:hover:bg-red-950/40"
+                }`}
+              >
                 <div className="flex items-center gap-1.5 mb-1">
                   <TrendingDown className="w-4 h-4 text-red-600" />
                   <p className="text-xs font-medium text-muted-foreground">Débitos</p>
@@ -403,7 +432,10 @@ export function ExtratoPreviewDialog({
                 <p className="text-lg font-bold text-red-600">
                   {formatValue(totalDebitos)}
                 </p>
-              </div>
+                {filtroTipo === "debito" && (
+                  <p className="text-xs text-red-600 mt-1">Clique para limpar</p>
+                )}
+              </button>
               <div className={`p-3 rounded-lg border ${
                 saldoPeriodo >= 0
                   ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
@@ -426,13 +458,25 @@ export function ExtratoPreviewDialog({
         {/* Lista de Transações */}
         {fetched && (
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-foreground">
-              Transações ({extrato.length})
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">
+                Transações ({extratoFiltrado.length}{filtroTipo !== "todos" ? ` de ${extrato.length}` : ""})
+              </h3>
+              {filtroTipo !== "todos" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFiltroTipo("todos")}
+                  className="h-7 text-xs"
+                >
+                  Limpar filtro
+                </Button>
+              )}
+            </div>
             <ScrollArea className="h-[300px] border rounded-lg bg-muted/30">
-              {extrato.length > 0 ? (
+              {extratoFiltrado.length > 0 ? (
                 <div className="p-2 space-y-2">
-                  {extrato.map((item) => (
+                  {extratoFiltrado.map((item) => (
                     <div
                       key={item.id}
                       className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
