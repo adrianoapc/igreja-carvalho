@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
+import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { anonymizePixDescription } from "@/utils/anonymization";
 import {
   Loader2,
   Download,
@@ -172,8 +174,9 @@ export function ExtratoPreviewDialog({
             ? parseFloat(t.amount.replace(",", ".")) 
             : (t.amount || t.valor || 0);
           
-          const descricaoCompleta = t.descricao || 
+          const descricaoOriginal = t.descricao || 
             [t.transactionName, t.historicComplement].filter(Boolean).join(" - ");
+          const descricaoCompleta = anonymizePixDescription(descricaoOriginal);
           
           const tipoTransacao = t.tipo || 
             (t.creditDebitType?.toUpperCase() === "CREDITO" ? "credito" : "debito");
@@ -264,12 +267,15 @@ export function ExtratoPreviewDialog({
     >
       <div className="space-y-4">
         {/* Header com Título */}
-        <div className="flex items-center gap-2 mb-2">
-          <FileText className="w-5 h-5 text-primary" />
-          <div>
-            <h2 className="text-lg font-semibold">Extrato Bancário</h2>
-            <p className="text-sm text-muted-foreground">{contaNome}</p>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" />
+            <div>
+              <h2 className="text-lg font-semibold">Extrato Bancário</h2>
+              <p className="text-sm text-muted-foreground">{contaNome}</p>
+            </div>
           </div>
+          <HideValuesToggle />
         </div>
 
         {/* Saldo Atual - Card destacado */}
