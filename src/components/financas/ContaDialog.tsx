@@ -29,8 +29,12 @@ interface ContaDialogProps {
 
 export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
   const [nome, setNome] = useState(conta?.nome || "");
-  const [tipo, setTipo] = useState<"bancaria" | "fisica" | "virtual">(conta?.tipo || "bancaria");
-  const [saldoInicial, setSaldoInicial] = useState(conta?.saldo_inicial?.toString() || "0");
+  const [tipo, setTipo] = useState<"bancaria" | "fisica" | "virtual">(
+    conta?.tipo || "bancaria"
+  );
+  const [saldoInicial, setSaldoInicial] = useState(
+    conta?.saldo_inicial?.toString() || "0"
+  );
   const [banco, setBanco] = useState(conta?.banco || "");
   const [agencia, setAgencia] = useState(conta?.agencia || "");
   const [contaNumero, setContaNumero] = useState(conta?.conta_numero || "");
@@ -75,24 +79,24 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
         toast.error("Igreja não identificada.");
         return;
       }
-      const saldoValue = parseFloat(saldoInicial.replace(',', '.')) || 0;
+      const saldoValue = parseFloat(saldoInicial.replace(",", ".")) || 0;
 
       if (conta) {
         let updateQuery = supabase
-          .from('contas')
+          .from("contas")
           .update({
             nome,
             tipo,
-            banco: tipo === 'bancaria' ? banco : null,
-            agencia: tipo === 'bancaria' ? agencia : null,
-            conta_numero: tipo === 'bancaria' ? contaNumero : null,
-            cnpj_banco: tipo === 'bancaria' ? cnpjBanco : null,
+            banco: tipo === "bancaria" ? banco : null,
+            agencia: tipo === "bancaria" ? agencia : null,
+            conta_numero: tipo === "bancaria" ? contaNumero : null,
+            cnpj_banco: tipo === "bancaria" ? cnpjBanco : null,
             observacoes,
           })
-          .eq('id', String(conta.id))
-          .eq('igreja_id', igrejaId);
+          .eq("id", String(conta.id))
+          .eq("igreja_id", igrejaId);
         if (!isAllFiliais && filialId) {
-          updateQuery = updateQuery.eq('filial_id', filialId);
+          updateQuery = updateQuery.eq("filial_id", filialId);
         }
 
         const { error } = await updateQuery;
@@ -100,32 +104,34 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
         if (error) throw error;
         toast.success("Conta atualizada com sucesso!");
       } else {
-        const { error } = await supabase
-          .from('contas')
-          .insert({
-            nome,
-            tipo,
-            saldo_inicial: saldoValue,
-            saldo_atual: saldoValue,
-            banco: tipo === 'bancaria' ? banco : null,
-            agencia: tipo === 'bancaria' ? agencia : null,
-            conta_numero: tipo === 'bancaria' ? contaNumero : null,
-            cnpj_banco: tipo === 'bancaria' ? cnpjBanco : null,
-            observacoes,
-            ativo: true,
-            igreja_id: igrejaId,
-            filial_id: !isAllFiliais ? filialId : null,
-          });
+        const { error } = await supabase.from("contas").insert({
+          nome,
+          tipo,
+          saldo_inicial: saldoValue,
+          saldo_atual: saldoValue,
+          banco: tipo === "bancaria" ? banco : null,
+          agencia: tipo === "bancaria" ? agencia : null,
+          conta_numero: tipo === "bancaria" ? contaNumero : null,
+          cnpj_banco: tipo === "bancaria" ? cnpjBanco : null,
+          observacoes,
+          ativo: true,
+          igreja_id: igrejaId,
+          filial_id: !isAllFiliais ? filialId : null,
+        });
 
         if (error) throw error;
         toast.success("Conta criada com sucesso!");
       }
 
-      queryClient.invalidateQueries({ queryKey: ['contas'] });
-      queryClient.invalidateQueries({ queryKey: ['contas-resumo'] });
+      queryClient.invalidateQueries({ queryKey: ["contas"] });
+      queryClient.invalidateQueries({ queryKey: ["contas-resumo"] });
       onOpenChange(false);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : String(error) || "Erro ao salvar conta");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : String(error) || "Erro ao salvar conta"
+      );
     } finally {
       setLoading(false);
     }
@@ -146,127 +152,154 @@ export function ContaDialog({ open, onOpenChange, conta }: ContaDialogProps) {
     >
       <div className="flex flex-col h-full">
         <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
-          <h2 className="text-lg font-semibold leading-none tracking-tight">{title}</h2>
+          <h2 className="text-lg font-semibold leading-none tracking-tight">
+            {title}
+          </h2>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
           <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium mb-2 block">Tipo de conta *</Label>
-              <RadioGroup value={tipo} onValueChange={(value: "bancaria" | "fisica" | "virtual") => setTipo(value)}>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="bancaria" id="bancaria" />
-                    <Label htmlFor="bancaria" className="cursor-pointer">Bancária</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="fisica" id="fisica" />
-                    <Label htmlFor="fisica" className="cursor-pointer">Física (Caixa)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="virtual" id="virtual" />
-                    <Label htmlFor="virtual" className="cursor-pointer">Virtual</Label>
-                  </div>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div>
-              <Label htmlFor="nome">Nome da conta *</Label>
-              <Input
-                id="nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex: Caixa Geral, Banco do Brasil"
-                required
-              />
-            </div>
-
-            {!conta && (
+            <div className="space-y-4">
               <div>
-                <Label htmlFor="saldo-inicial">Saldo inicial</Label>
+                <Label className="text-sm font-medium mb-2 block">
+                  Tipo de conta *
+                </Label>
+                <RadioGroup
+                  value={tipo}
+                  onValueChange={(value: "bancaria" | "fisica" | "virtual") =>
+                    setTipo(value)
+                  }
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="bancaria" id="bancaria" />
+                      <Label htmlFor="bancaria" className="cursor-pointer">
+                        Bancária
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="fisica" id="fisica" />
+                      <Label htmlFor="fisica" className="cursor-pointer">
+                        Física (Caixa)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="virtual" id="virtual" />
+                      <Label htmlFor="virtual" className="cursor-pointer">
+                        Virtual
+                      </Label>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label htmlFor="nome">Nome da conta *</Label>
                 <Input
-                  id="saldo-inicial"
-                  type="number"
-                  step="0.01"
-                  value={saldoInicial}
-                  onChange={(e) => setSaldoInicial(e.target.value)}
-                  placeholder="0,00"
+                  id="nome"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Ex: Caixa Geral, Banco do Brasil"
+                  required
                 />
               </div>
-            )}
 
-            {tipo === 'bancaria' && (
-              <>
+              {!conta && (
                 <div>
-                  <Label htmlFor="banco">Banco</Label>
+                  <Label htmlFor="saldo-inicial">Saldo inicial</Label>
                   <Input
-                    id="banco"
-                    value={banco}
-                    onChange={(e) => setBanco(e.target.value)}
-                    placeholder="Ex: Banco do Brasil, Santander"
+                    id="saldo-inicial"
+                    type="number"
+                    step="0.01"
+                    value={saldoInicial}
+                    onChange={(e) => setSaldoInicial(e.target.value)}
+                    placeholder="0,00"
                   />
                 </div>
+              )}
 
-                <div>
-                  <Label htmlFor="cnpj-banco">CNPJ do Banco (para integrações)</Label>
-                  <Input
-                    id="cnpj-banco"
-                    value={cnpjBanco}
-                    onChange={(e) => setCnpjBanco(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Ex: 90400888000142 (Santander)"
-                    maxLength={14}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Usado para conectar com APIs bancárias
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+              {tipo === "bancaria" && (
+                <>
                   <div>
-                    <Label htmlFor="agencia">Agência</Label>
+                    <Label htmlFor="banco">Banco</Label>
                     <Input
-                      id="agencia"
-                      value={agencia}
-                      onChange={(e) => setAgencia(e.target.value)}
-                      placeholder="0000"
+                      id="banco"
+                      value={banco}
+                      onChange={(e) => setBanco(e.target.value)}
+                      placeholder="Ex: Banco do Brasil, Santander"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="conta">Conta</Label>
-                    <Input
-                      id="conta"
-                      value={contaNumero}
-                      onChange={(e) => setContaNumero(e.target.value)}
-                      placeholder="00000-0"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
 
-            <div>
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea
-                id="observacoes"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Informações adicionais sobre a conta"
-                rows={3}
-              />
+                  <div>
+                    <Label htmlFor="cnpj-banco">
+                      CNPJ do Banco (para integrações)
+                    </Label>
+                    <Input
+                      id="cnpj-banco"
+                      value={cnpjBanco}
+                      onChange={(e) =>
+                        setCnpjBanco(e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="Ex: 90400888000142 (Santander)"
+                      maxLength={14}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Usado para conectar com APIs bancárias
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="agencia">Agência</Label>
+                      <Input
+                        id="agencia"
+                        value={agencia}
+                        onChange={(e) => setAgencia(e.target.value)}
+                        placeholder="0000"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="conta">Conta</Label>
+                      <Input
+                        id="conta"
+                        value={contaNumero}
+                        onChange={(e) => setContaNumero(e.target.value)}
+                        placeholder="00000-0"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <Label htmlFor="observacoes">Observações</Label>
+                <Textarea
+                  id="observacoes"
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                  placeholder="Informações adicionais sobre a conta"
+                  rows={3}
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-primary">
-              {loading ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="bg-gradient-primary"
+              >
+                {loading ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </form>
         </div>
       </div>
     </ResponsiveDialog>
