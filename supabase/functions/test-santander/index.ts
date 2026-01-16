@@ -348,6 +348,7 @@ Deno.serve(async (req) => {
 
     let clientId: string | null = null
     let clientSecret: string | null = null
+    let applicationKey: string | null = null
     let pfxBlob: string | null = null
     let pfxPassword: string | null = null
 
@@ -357,7 +358,12 @@ Deno.serve(async (req) => {
         clientId = decryptData(secrets.client_id, derivedKey)
       }
       if (secrets.client_secret) {
+        console.log('[test-santander] Attempting to decrypt client_secret...')
         clientSecret = decryptData(secrets.client_secret, derivedKey)
+      }
+      if (secrets.application_key) {
+        console.log('[test-santander] Attempting to decrypt application_key...')
+        applicationKey = decryptData(secrets.application_key, derivedKey)
       }
       if (secrets.pfx_blob) {
         pfxBlob = decryptData(secrets.pfx_blob, derivedKey)
@@ -374,7 +380,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Client ID or Secret not found in decrypted data' }, 400)
     }
 
+    // Para o Santander Trust-Open, o header X-Application-Key costuma ser obrigatório nas chamadas
+    // de saldo/extrato. Sem ele, é comum receber 401 mesmo com token OK.
+    if (!applicationKey) {
+      return jsonResponse({
+        error: 'Application Key not found in decrypted data',
+        hint: 'Preencha o campo Application Key na integração (integracoes_financeiras_secrets.application_key).',
+      }, 400)
+    }
+
     console.log('[test-santander] Credentials decrypted successfully')
+    console.log('[test-santander] application_key length:', applicationKey.length)
+
 
     // Create mTLS HttpClient if PFX certificate is available
 
@@ -459,9 +476,11 @@ Deno.serve(async (req) => {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
+        'X-Application-Key': applicationKey,
       },
       ...(httpClient && { client: httpClient }),
     })
+
 
     let balance = null
     let balanceError = null
@@ -500,9 +519,11 @@ Deno.serve(async (req) => {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
+        'X-Application-Key': applicationKey,
       },
       ...(httpClient && { client: httpClient }),
     })
+
 
     let statement = null
     let statementError = null
