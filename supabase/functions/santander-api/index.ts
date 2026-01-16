@@ -464,21 +464,65 @@ async function syncExtrato(
   for (const tx of transacoes) {
     try {
       const record = tx as Record<string, unknown>
-      
+
+      const pickStr = (...vals: unknown[]) => {
+        for (const v of vals) {
+          if (v === undefined || v === null) continue
+          const s = String(v).trim()
+          if (s) return s
+        }
+        return ''
+      }
+
+      const normalizeDate = (raw: string) => {
+        // Santander costuma retornar DD/MM/YYYY
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+          const [dd, mm, yyyy] = raw.split('/')
+          return `${yyyy}-${mm}-${dd}`
+        }
+        return raw
+      }
+
+      const sha256Hex = async (input: string) => {
+        const bytes = new TextEncoder().encode(input)
+        const digest = await crypto.subtle.digest('SHA-256', bytes)
+        return Array.from(new Uint8Array(digest))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+      }
+
       // Mapear campos do Santander para nosso modelo
-      const externalId = String(record.transactionId || record.fitId || record.id || '')
-      const dataTransacao = String(record.date || record.transactionDate || '')
-      const descricao = String(record.description || record.memo || '')
-      const valorRaw = Number(record.amount || record.value || 0)
+      const descricao = pickStr(
+        record.description,
+        record.memo,
+        record.transactionName
+      )
+
+      const dataTransacaoRaw = pickStr(
+        record.date,
+        record.transactionDate,
+        record.transaction_date
+      )
+      const dataTransacao = normalizeDate(dataTransacaoRaw)
+
+      const valorRaw = Number(
+        pickStr(record.amount, record.value, record.valor, 0).replace(',', '.')
+      )
+
       const saldo = record.balance !== undefined ? Number(record.balance) : null
       const numeroDocumento = record.documentNumber ? String(record.documentNumber) : null
-      
-      // Inferir tipo pelo sinal do valor
+
+      // Inferir tipo pelo sinal do valor (quando possível)
       const tipo = valorRaw >= 0 ? 'credito' : 'debito'
       const valor = Math.abs(valorRaw)
 
+      // ID externo: preferir ID do provedor; fallback determinístico (ADR-022)
+      const providerId = pickStr(record.transactionId, record.fitId, record.id)
+      const fallbackKey = `${dataTransacao}|${valorRaw}|${descricao}|${numeroDocumento ?? ''}|${pickStr(record.creditDebitType)}`
+      const externalId = providerId || await sha256Hex(fallbackKey)
+
       if (!externalId || !dataTransacao) {
-        result.erros.push(`Transação sem ID ou data: ${JSON.stringify(record).substring(0, 100)}`)
+        result.erros.push(`Transação sem ID ou data: ${JSON.stringify(record).substring(0, 160)}`)
         continue
       }
 
