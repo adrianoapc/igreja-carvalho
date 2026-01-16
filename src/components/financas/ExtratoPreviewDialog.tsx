@@ -278,16 +278,21 @@ export function ExtratoPreviewDialog({
         return;
       }
 
-      setSyncResult({
-        inseridos: data.stats?.inserted || 0,
-        atualizados: data.stats?.updated || 0,
-        ignorados: data.stats?.skipped || 0,
-      });
+      const resultado = (data?.resultado || data?.stats || {}) as any;
+      const inseridos = Number(resultado.inseridos ?? resultado.inserted ?? 0);
+      const atualizados = Number(resultado.atualizados ?? resultado.updated ?? 0);
+      const ignorados = Number(resultado.ignorados ?? resultado.skipped ?? 0);
 
-      toast.success("Extrato importado com sucesso!", {
-        description: `${data.stats?.inserted || 0} novos, ${
-          data.stats?.updated || 0
-        } atualizados`,
+      setSyncResult({ inseridos, atualizados, ignorados });
+
+      const errosQtd = Array.isArray(data?.resultado?.erros)
+        ? data.resultado.erros.length
+        : 0;
+
+      toast.success("Extrato importado!", {
+        description: `${inseridos} novos, ${atualizados} atualizados${
+          errosQtd ? ` (${errosQtd} com erro)` : ""
+        }`,
       });
     } catch (err) {
       console.error("Exceção ao sincronizar:", err);
