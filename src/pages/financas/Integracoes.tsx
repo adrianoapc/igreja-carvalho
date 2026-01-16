@@ -130,14 +130,12 @@ export default function Integracoes() {
         return;
       }
 
-      const contaLimpa = contaVinculada.conta_numero.replace(/\D/g, "");
-
-      const { data, error } = await supabase.functions.invoke("test-santander", {
+      // Usar nova edge function santander-api com action: 'saldo'
+      const { data, error } = await supabase.functions.invoke("santander-api", {
         body: {
+          action: "saldo",
           integracao_id: integracao.id,
-          banco_id: contaVinculada.cnpj_banco,
-          agencia: contaVinculada.agencia,
-          conta: contaLimpa,
+          conta_id: contaVinculada.id,
         },
       });
 
@@ -150,8 +148,9 @@ export default function Integracoes() {
       console.log("Test result:", data);
 
       if (data.success) {
+        const saldo = data.balance?.available ?? data.balance?.current ?? "N/A";
         toast.success("Conexão testada com sucesso!", {
-          description: `Saldo disponível: ${data.balance?.available ?? "N/A"}`,
+          description: `Saldo: ${typeof saldo === 'number' ? saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : saldo}`,
         });
       } else if (data.tokenSuccess) {
         toast.warning("Autenticação OK, erro no saldo", {
@@ -159,7 +158,7 @@ export default function Integracoes() {
         });
       } else {
         toast.error("Falha na conexão", {
-          description: data.tokenError || "Verifique os logs",
+          description: data.error || "Verifique os logs",
         });
       }
     } catch (err) {
