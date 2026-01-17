@@ -11,6 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,6 +37,8 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
+
+const ITEMS_PER_PAGE = 15;
 
 interface ExtratoItem {
   id: string;
@@ -63,6 +73,7 @@ export function ConciliacaoManual() {
     null
   );
   const [vincularDialogOpen, setVincularDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Buscar contas
   const { data: contas } = useQuery({
@@ -157,6 +168,18 @@ export function ConciliacaoManual() {
         e.contas?.nome.toLowerCase().includes(search)
     );
   }, [extratos, searchTerm]);
+
+  // Reset page when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedContaId]);
+
+  // Pagination
+  const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
+  const paginatedExtratos = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return extratosFiltrados.slice(start, start + ITEMS_PER_PAGE);
+  }, [extratosFiltrados, currentPage]);
 
   const handleIgnorar = async (extratoId: string) => {
     try {
@@ -289,94 +312,143 @@ export function ConciliacaoManual() {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <ScrollArea className="h-[400px]">
-            <div className="space-y-2">
-              {extratosFiltrados.map((extrato) => (
-                <div
-                  key={extrato.id}
-                  className={`p-4 rounded-lg border ${
-                    extrato.tipo === "credito" || extrato.tipo === "CREDIT"
-                      ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
-                      : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm truncate">
-                          {extrato.descricao}
-                        </p>
-                        <Badge variant="outline" className="text-xs shrink-0">
-                          {extrato.tipo === "credito" ||
-                          extrato.tipo === "CREDIT"
-                            ? "Crédito"
-                            : "Débito"}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>
-                          {format(
-                            parseISO(extrato.data_transacao),
-                            "dd/MM/yyyy",
-                            { locale: ptBR }
+          <>
+            <ScrollArea className="h-[350px]">
+              <div className="space-y-2">
+                {paginatedExtratos.map((extrato) => (
+                  <div
+                    key={extrato.id}
+                    className={`p-4 rounded-lg border ${
+                      extrato.tipo === "credito" || extrato.tipo === "CREDIT"
+                        ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+                        : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-sm truncate">
+                            {extrato.descricao}
+                          </p>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {extrato.tipo === "credito" ||
+                            extrato.tipo === "CREDIT"
+                              ? "Crédito"
+                              : "Débito"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>
+                            {format(
+                              parseISO(extrato.data_transacao),
+                              "dd/MM/yyyy",
+                              { locale: ptBR }
+                            )}
+                          </span>
+                          {extrato.contas && (
+                            <>
+                              <span>•</span>
+                              <span>{extrato.contas.nome}</span>
+                            </>
                           )}
-                        </span>
-                        {extrato.contas && (
-                          <>
-                            <span>•</span>
-                            <span>{extrato.contas.nome}</span>
-                          </>
-                        )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p
+                          className={`font-bold ${
+                            extrato.tipo === "credito" ||
+                            extrato.tipo === "CREDIT"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {formatValue(extrato.valor)}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p
-                        className={`font-bold ${
-                          extrato.tipo === "credito" ||
-                          extrato.tipo === "CREDIT"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
+                    <div className="flex items-center gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleVincular(extrato)}
                       >
-                        {formatValue(extrato.valor)}
-                      </p>
+                        <Link2 className="w-3 h-3 mr-1" />
+                        Vincular
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleIgnorar(extrato.id)}
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Ignorar
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => handleVincular(extrato)}
-                    >
-                      <Link2 className="w-3 h-3 mr-1" />
-                      Vincular
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleIgnorar(extrato.id)}
-                    >
-                      <X className="w-3 h-3 mr-1" />
-                      Ignorar
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
 
-              {extratosFiltrados.length === 0 && !loadingExtratos && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <AlertCircle className="w-10 h-10 text-muted-foreground/40 mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum extrato pendente de conciliação
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Importe extratos na página de Contas para iniciar a
-                    conciliação
-                  </p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+                {extratosFiltrados.length === 0 && !loadingExtratos && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <AlertCircle className="w-10 h-10 text-muted-foreground/40 mb-3" />
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum extrato pendente de conciliação
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Importe extratos na página de Contas para iniciar a
+                      conciliação
+                    </p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-3 border-t mt-3">
+                <p className="text-xs text-muted-foreground">
+                  {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, extratosFiltrados.length)} de {extratosFiltrados.length}
+                </p>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                      let page: number;
+                      if (totalPages <= 3) {
+                        page = i + 1;
+                      } else if (currentPage === 1) {
+                        page = i + 1;
+                      } else if (currentPage === totalPages) {
+                        page = totalPages - 2 + i;
+                      } else {
+                        page = currentPage - 1 + i;
+                      }
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page)}
+                            isActive={currentPage === page}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
 
