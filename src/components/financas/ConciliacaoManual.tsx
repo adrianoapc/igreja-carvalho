@@ -160,13 +160,23 @@ export function ConciliacaoManual() {
   // Filtrar extratos por termo de busca
   const extratosFiltrados = useMemo(() => {
     if (!extratos) return [];
-    if (!searchTerm) return extratos;
-    const search = searchTerm.toLowerCase();
-    return extratos.filter(
-      (e) =>
-        e.descricao.toLowerCase().includes(search) ||
-        e.contas?.nome.toLowerCase().includes(search)
-    );
+    
+    return extratos.filter((e) => {
+      // Filter out CONTAMAX internal transactions
+      if (e.descricao?.toUpperCase().includes("CONTAMAX")) {
+        return false;
+      }
+      
+      // Search filter
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        return (
+          e.descricao.toLowerCase().includes(search) ||
+          e.contas?.nome.toLowerCase().includes(search)
+        );
+      }
+      return true;
+    });
   }, [extratos, searchTerm]);
 
   // Reset page when filters change
