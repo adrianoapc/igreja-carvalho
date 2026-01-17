@@ -40,7 +40,7 @@ import { TransacaoVinculadaDialog } from "./TransacaoVinculadaDialog";
 interface ExtratoItem {
   id: string;
   conta_id: string;
-  data: string;
+  data_transacao: string;
   descricao: string;
   valor: number;
   tipo: string;
@@ -106,7 +106,7 @@ export function HistoricoExtratos() {
         .select(`
           id,
           conta_id,
-          data,
+          data_transacao,
           descricao,
           valor,
           tipo,
@@ -116,18 +116,18 @@ export function HistoricoExtratos() {
           external_id,
           conta:contas(nome, banco)
         `)
-        .order("data", { ascending: false });
+        .order("data_transacao", { ascending: false });
 
       if (contaSelecionada && contaSelecionada !== "all") {
         query = query.eq("conta_id", contaSelecionada);
       }
 
       if (dataInicio) {
-        query = query.gte("data", format(dataInicio, "yyyy-MM-dd"));
+        query = query.gte("data_transacao", format(dataInicio, "yyyy-MM-dd"));
       }
 
       if (dataFim) {
-        query = query.lte("data", format(dataFim, "yyyy-MM-dd"));
+        query = query.lte("data_transacao", format(dataFim, "yyyy-MM-dd"));
       }
 
       const { data, error } = await query;
@@ -462,7 +462,7 @@ export function HistoricoExtratos() {
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-                        <span>{format(parseISO(extrato.data), "dd/MM/yyyy", { locale: ptBR })}</span>
+                        <span>{format(parseISO(extrato.data_transacao), "dd/MM/yyyy", { locale: ptBR })}</span>
                         <span>•</span>
                         <span>{extrato.conta?.nome || "Conta não identificada"}</span>
                         {extrato.conta?.banco && (
@@ -580,7 +580,7 @@ export function HistoricoExtratos() {
             descricao: extratoParaVincular.descricao,
             valor: extratoParaVincular.valor,
             tipo: extratoParaVincular.tipo,
-            data_transacao: extratoParaVincular.data,
+            data_transacao: extratoParaVincular.data_transacao,
             reconciliado: extratoParaVincular.reconciliado,
             transacao_vinculada_id: extratoParaVincular.transacao_vinculada_id,
           }}
