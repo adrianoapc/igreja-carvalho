@@ -28,6 +28,7 @@ import { useHideValues } from "@/hooks/useHideValues";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
+import { anonymizePixDescription } from "@/utils/anonymization";
 import {
   Search,
   Link2,
@@ -338,7 +339,7 @@ export function ConciliacaoManual() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-medium text-sm truncate">
-                            {extrato.descricao}
+                            {anonymizePixDescription(extrato.descricao)}
                           </p>
                           <Badge variant="outline" className="text-xs shrink-0">
                             {extrato.tipo === "credito" ||
