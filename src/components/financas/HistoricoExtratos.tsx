@@ -395,7 +395,12 @@ export function HistoricoExtratos() {
     return (
       <div
         key={extrato.id}
-        className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+        className={cn(
+          "flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-lg border transition-colors",
+          extrato.tipo === "credito" || extrato.tipo === "CREDIT"
+            ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-950/30"
+            : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/30"
+        )}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
