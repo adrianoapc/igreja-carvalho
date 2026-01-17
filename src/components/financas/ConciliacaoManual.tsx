@@ -50,6 +50,7 @@ interface ExtratoItem {
   tipo: string;
   reconciliado: boolean;
   transacao_vinculada_id?: string | null;
+  origem?: string | null;
   contas?: { nome: string } | null;
 }
 
@@ -70,6 +71,8 @@ export function ConciliacaoManual() {
 
   const [selectedContaId, setSelectedContaId] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState<string>("all");
+  const [origemFiltro, setOrigemFiltro] = useState<string>("all");
   const [selectedExtrato, setSelectedExtrato] = useState<ExtratoItem | null>(
     null
   );
@@ -158,7 +161,7 @@ export function ConciliacaoManual() {
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
-  // Filtrar extratos por termo de busca
+  // Filtrar extratos por termo de busca e filtros
   const extratosFiltrados = useMemo(() => {
     if (!extratos) return [];
     
@@ -171,19 +174,33 @@ export function ConciliacaoManual() {
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        return (
-          e.descricao.toLowerCase().includes(search) ||
-          e.contas?.nome.toLowerCase().includes(search)
-        );
+        if (
+          !e.descricao.toLowerCase().includes(search) &&
+          !e.contas?.nome.toLowerCase().includes(search)
+        ) {
+          return false;
+        }
       }
+      
+      // Tipo filter
+      if (tipoFiltro !== "all") {
+        const tipoNormalizado = e.tipo?.toLowerCase() === "credit" ? "credito" : e.tipo?.toLowerCase() === "debit" ? "debito" : e.tipo?.toLowerCase();
+        if (tipoNormalizado !== tipoFiltro) return false;
+      }
+      
+      // Origem filter
+      if (origemFiltro !== "all") {
+        if (e.origem !== origemFiltro) return false;
+      }
+      
       return true;
     });
-  }, [extratos, searchTerm]);
+  }, [extratos, searchTerm, tipoFiltro, origemFiltro]);
 
   // Reset page when filters change
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedContaId]);
+  }, [searchTerm, selectedContaId, tipoFiltro, origemFiltro]);
 
   // Pagination
   const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
@@ -282,8 +299,8 @@ export function ConciliacaoManual() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 relative">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex-1 min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por descrição..."
@@ -293,7 +310,7 @@ export function ConciliacaoManual() {
             />
           </div>
           <Select value={selectedContaId} onValueChange={setSelectedContaId}>
-            <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Todas as contas" />
             </SelectTrigger>
             <SelectContent>
@@ -303,6 +320,26 @@ export function ConciliacaoManual() {
                   {conta.nome}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="credito">Crédito</SelectItem>
+              <SelectItem value="debito">Débito</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={origemFiltro} onValueChange={setOrigemFiltro}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Origem" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="api_santander">API Santander</SelectItem>
+              <SelectItem value="manual">Manual</SelectItem>
             </SelectContent>
           </Select>
         </div>
