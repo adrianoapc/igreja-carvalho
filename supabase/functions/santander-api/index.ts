@@ -492,11 +492,22 @@ async function syncExtrato(
       }
 
       // Mapear campos do Santander para nosso modelo
-      const descricao = pickStr(
+      // Construir descrição completa incluindo historicComplement (dados do pagador/recebedor)
+      const descricaoBase = pickStr(
         record.description,
         record.memo,
         record.transactionName
       )
+      const complemento = pickStr(
+        record.historicComplement,
+        record.payerName,
+        record.receiverName,
+        record.counterPartyName,
+        record.narrative
+      )
+      const descricao = complemento 
+        ? `${descricaoBase} - ${complemento}`
+        : descricaoBase
 
       const dataTransacaoRaw = pickStr(
         record.date,
