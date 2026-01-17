@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 import { TransacaoVinculadaDialog } from "./TransacaoVinculadaDialog";
+import { anonymizePixDescription } from "@/utils/anonymization";
 
 interface ExtratoItem {
   id: string;
@@ -393,7 +394,7 @@ export function HistoricoExtratos() {
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium truncate">{extrato.descricao}</span>
+            <span className="font-medium truncate">{anonymizePixDescription(extrato.descricao)}</span>
             <Badge variant="outline" className={cn("text-xs", status.color)}>
               {status.label}
             </Badge>
