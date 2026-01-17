@@ -426,10 +426,10 @@ export function HistoricoExtratos() {
           <span
             className={cn(
               "font-semibold whitespace-nowrap",
-              extrato.tipo === "credito" ? "text-green-600" : "text-red-600"
+              extrato.tipo === "credito" || extrato.tipo === "CREDIT" ? "text-green-600" : "text-red-600"
             )}
           >
-            {extrato.tipo === "credito" ? "+" : "-"}
+            {extrato.tipo === "credito" || extrato.tipo === "CREDIT" ? "+" : "-"}
             {new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
