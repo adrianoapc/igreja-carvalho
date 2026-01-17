@@ -20,6 +20,19 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Search,
   CalendarIcon,
   Link2,
@@ -29,6 +42,8 @@ import {
   Ban,
   Loader2,
   FileText,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -54,6 +69,10 @@ interface ExtratoItem {
   };
 }
 
+const ITEMS_PER_PAGE = 20;
+
+type GroupByOption = "none" | "status" | "tipo" | "origem" | "conta";
+
 export function HistoricoExtratos() {
   const { igrejaId, filialId } = useAuthContext();
   const queryClient = useQueryClient();
@@ -66,6 +85,12 @@ export function HistoricoExtratos() {
   const [origemFiltro, setOrigemFiltro] = useState<string>("all");
   const [dataInicio, setDataInicio] = useState<Date | undefined>();
   const [dataFim, setDataFim] = useState<Date | undefined>();
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Grouping
+  const [groupBy, setGroupBy] = useState<GroupByOption>("none");
 
   // Dialogs
   const [extratoParaVincular, setExtratoParaVincular] = useState<ExtratoItem | null>(null);
@@ -208,6 +233,68 @@ export function HistoricoExtratos() {
     });
   }, [extratos, searchTerm, statusFiltro, tipoFiltro, origemFiltro]);
 
+  // Reset page when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFiltro, tipoFiltro, origemFiltro, contaSelecionada, dataInicio, dataFim]);
+
+  // Pagination
+  const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
+  const paginatedExtratos = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return extratosFiltrados.slice(start, start + ITEMS_PER_PAGE);
+  }, [extratosFiltrados, currentPage]);
+
+  // Grouping logic
+  const getStatusKey = (extrato: ExtratoItem) => {
+    if (extrato.transacao_vinculada_id) return "conciliado";
+    if (extrato.reconciliado) return "ignorado";
+    return "pendente";
+  };
+
+  const groupedExtratos = useMemo(() => {
+    if (groupBy === "none") return null;
+
+    const groups: Record<string, ExtratoItem[]> = {};
+    
+    paginatedExtratos.forEach((extrato) => {
+      let key = "";
+      switch (groupBy) {
+        case "status":
+          key = getStatusKey(extrato);
+          break;
+        case "tipo":
+          key = extrato.tipo || "sem_tipo";
+          break;
+        case "origem":
+          key = extrato.origem || "sem_origem";
+          break;
+        case "conta":
+          key = extrato.conta?.nome || "sem_conta";
+          break;
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(extrato);
+    });
+
+    return groups;
+  }, [paginatedExtratos, groupBy]);
+
+  const getGroupLabel = (key: string) => {
+    switch (groupBy) {
+      case "status":
+        return key === "conciliado" ? "Conciliados" : key === "ignorado" ? "Ignorados" : "Pendentes";
+      case "tipo":
+        return key === "credito" ? "Crédito" : key === "debito" ? "Débito" : key;
+      case "origem":
+        return key === "api_santander" ? "API Santander" : key === "manual" ? "Manual" : key === "sem_origem" ? "Sem Origem" : key;
+      case "conta":
+        return key === "sem_conta" ? "Sem Conta" : key;
+      default:
+        return key;
+    }
+  };
+
   // Get status info
   const getStatusInfo = (extrato: ExtratoItem) => {
     if (extrato.transacao_vinculada_id) {
@@ -293,6 +380,133 @@ export function HistoricoExtratos() {
     const ignorados = extratos.filter(e => e.reconciliado && !e.transacao_vinculada_id).length;
     return { total, pendentes, conciliados, ignorados };
   }, [extratos]);
+
+  // Render single extrato item
+  const renderExtratoItem = (extrato: ExtratoItem) => {
+    const status = getStatusInfo(extrato);
+    const isLoadingItem = actionLoading === extrato.id;
+
+    return (
+      <div
+        key={extrato.id}
+        className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium truncate">{extrato.descricao}</span>
+            <Badge variant="outline" className={cn("text-xs", status.color)}>
+              {status.label}
+            </Badge>
+            {extrato.origem && (
+              <Badge variant="secondary" className="text-xs">
+                {extrato.origem === "api_santander" ? "API Santander" : "Manual"}
+              </Badge>
+            )}
+          </div>
+          <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+            <span>{format(parseISO(extrato.data_transacao), "dd/MM/yyyy", { locale: ptBR })}</span>
+            <span>•</span>
+            <span>{extrato.conta?.nome || "Conta não identificada"}</span>
+            {extrato.conta?.banco && (
+              <>
+                <span>•</span>
+                <span>{extrato.conta.banco}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "font-semibold whitespace-nowrap",
+              extrato.tipo === "credito" ? "text-green-600" : "text-red-600"
+            )}
+          >
+            {extrato.tipo === "credito" ? "+" : "-"}
+            {new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            }).format(Math.abs(extrato.valor))}
+          </span>
+
+          <div className="flex items-center gap-1">
+            {/* Pendente actions */}
+            {!extrato.reconciliado && !extrato.transacao_vinculada_id && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExtratoParaVincular(extrato)}
+                  disabled={isLoadingItem}
+                >
+                  <Link2 className="w-4 h-4 mr-1" />
+                  Vincular
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleIgnorar(extrato)}
+                  disabled={isLoadingItem}
+                >
+                  {isLoadingItem ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Ban className="w-4 h-4" />
+                  )}
+                </Button>
+              </>
+            )}
+
+            {/* Conciliado actions */}
+            {extrato.transacao_vinculada_id && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTransacaoParaVisualizar(extrato.transacao_vinculada_id)}
+                >
+                  <Eye className="w-4 h-4 mr-1" />
+                  Ver
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDesvincular(extrato)}
+                  disabled={isLoadingItem}
+                >
+                  {isLoadingItem ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Link2Off className="w-4 h-4" />
+                  )}
+                </Button>
+              </>
+            )}
+
+            {/* Ignorado actions */}
+            {extrato.reconciliado && !extrato.transacao_vinculada_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleReativar(extrato)}
+                disabled={isLoadingItem}
+              >
+                {isLoadingItem ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4 mr-1" />
+                    Reativar
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -430,6 +644,21 @@ export function HistoricoExtratos() {
                 Limpar datas
               </Button>
             )}
+
+            {/* Grouping selector */}
+            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByOption)}>
+              <SelectTrigger className="w-[160px]">
+                <Layers className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Agrupar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem agrupamento</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+                <SelectItem value="tipo">Tipo</SelectItem>
+                <SelectItem value="origem">Origem</SelectItem>
+                <SelectItem value="conta">Conta</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* List */}
@@ -443,133 +672,75 @@ export function HistoricoExtratos() {
               <p>Nenhum extrato encontrado</p>
               <p className="text-sm">Importe extratos via integração bancária ou manualmente</p>
             </div>
+          ) : groupBy !== "none" && groupedExtratos ? (
+            // Grouped view
+            <div className="space-y-4">
+              {Object.entries(groupedExtratos).map(([groupKey, items]) => (
+                <Collapsible key={groupKey} defaultOpen>
+                  <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                    <ChevronDown className="w-4 h-4 transition-transform [&[data-state=open]]:rotate-180" />
+                    <span className="font-medium">{getGroupLabel(groupKey)}</span>
+                    <Badge variant="secondary" className="ml-auto">
+                      {items.length}
+                    </Badge>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 space-y-2">
+                    {items.map((extrato) => renderExtratoItem(extrato))}
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+            </div>
           ) : (
+            // Flat list view
             <div className="space-y-2">
-              {extratosFiltrados.map((extrato) => {
-                const status = getStatusInfo(extrato);
-                const isLoading = actionLoading === extrato.id;
+              {paginatedExtratos.map((extrato) => renderExtratoItem(extrato))}
+            </div>
+          )}
 
-                return (
-                  <div
-                    key={extrato.id}
-                    className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{extrato.descricao}</span>
-                        <Badge variant="outline" className={cn("text-xs", status.color)}>
-                          {status.label}
-                        </Badge>
-                        {extrato.origem && (
-                          <Badge variant="secondary" className="text-xs">
-                            {extrato.origem === "api_santander" ? "API Santander" : "Manual"}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-                        <span>{format(parseISO(extrato.data_transacao), "dd/MM/yyyy", { locale: ptBR })}</span>
-                        <span>•</span>
-                        <span>{extrato.conta?.nome || "Conta não identificada"}</span>
-                        {extrato.conta?.banco && (
-                          <>
-                            <span>•</span>
-                            <span>{extrato.conta.banco}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          "font-semibold whitespace-nowrap",
-                          extrato.tipo === "credito" ? "text-green-600" : "text-red-600"
-                        )}
-                      >
-                        {extrato.tipo === "credito" ? "+" : "-"}
-                        {new Intl.NumberFormat("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        }).format(Math.abs(extrato.valor))}
-                      </span>
-
-                      <div className="flex items-center gap-1">
-                        {/* Pendente actions */}
-                        {!extrato.reconciliado && !extrato.transacao_vinculada_id && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setExtratoParaVincular(extrato)}
-                              disabled={isLoading}
-                            >
-                              <Link2 className="w-4 h-4 mr-1" />
-                              Vincular
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleIgnorar(extrato)}
-                              disabled={isLoading}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Ban className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </>
-                        )}
-
-                        {/* Conciliado actions */}
-                        {extrato.transacao_vinculada_id && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setTransacaoParaVisualizar(extrato.transacao_vinculada_id)}
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              Ver
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDesvincular(extrato)}
-                              disabled={isLoading}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Link2Off className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </>
-                        )}
-
-                        {/* Ignorado actions */}
-                        {extrato.reconciliado && !extrato.transacao_vinculada_id && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleReativar(extrato)}
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <RotateCcw className="w-4 h-4 mr-1" />
-                                Reativar
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, extratosFiltrados.length)} de {extratosFiltrados.length}
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let page: number;
+                    if (totalPages <= 5) {
+                      page = i + 1;
+                    } else if (currentPage <= 3) {
+                      page = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      page = totalPages - 4 + i;
+                    } else {
+                      page = currentPage - 2 + i;
+                    }
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </CardContent>
