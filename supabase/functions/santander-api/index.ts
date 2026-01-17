@@ -523,8 +523,23 @@ async function syncExtrato(
       const saldo = record.balance !== undefined ? Number(record.balance) : null
       const numeroDocumento = record.documentNumber ? String(record.documentNumber) : null
 
-      // Inferir tipo pelo sinal do valor (quando possível)
-      const tipo = valorRaw >= 0 ? 'credito' : 'debito'
+      // Inferir tipo: preferir campo explícito do Santander, fallback pelo sinal do valor
+      const creditDebitType = pickStr(record.creditDebitType, record.credit_debit_type, record.type)
+      let tipo: 'credito' | 'debito'
+      
+      if (creditDebitType) {
+        // Santander usa CREDIT/DEBIT ou C/D
+        const normalized = creditDebitType.toUpperCase()
+        if (normalized === 'DEBIT' || normalized === 'D' || normalized === 'DEBITO') {
+          tipo = 'debito'
+        } else {
+          tipo = 'credito'
+        }
+      } else {
+        // Fallback pelo sinal do valor
+        tipo = valorRaw >= 0 ? 'credito' : 'debito'
+      }
+      
       const valor = Math.abs(valorRaw)
 
       // ID externo: preferir ID do provedor; fallback determinístico (ADR-022)
