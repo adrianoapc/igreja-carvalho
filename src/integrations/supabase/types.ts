@@ -5086,6 +5086,91 @@ export type Database = {
           },
         ]
       }
+      pix_webhook_temp: {
+        Row: {
+          banco_id: string | null
+          created_at: string
+          data_pix: string
+          data_recebimento: string
+          descricao: string | null
+          erro_mensagem: string | null
+          id: string
+          igreja_id: string
+          oferta_id: string | null
+          pagador_cpf_cnpj: string | null
+          pagador_nome: string | null
+          pix_id: string
+          processado_em: string | null
+          status: string
+          transacao_id: string | null
+          updated_at: string
+          valor: number
+          webhook_payload: Json | null
+        }
+        Insert: {
+          banco_id?: string | null
+          created_at?: string
+          data_pix: string
+          data_recebimento?: string
+          descricao?: string | null
+          erro_mensagem?: string | null
+          id?: string
+          igreja_id: string
+          oferta_id?: string | null
+          pagador_cpf_cnpj?: string | null
+          pagador_nome?: string | null
+          pix_id: string
+          processado_em?: string | null
+          status?: string
+          transacao_id?: string | null
+          updated_at?: string
+          valor: number
+          webhook_payload?: Json | null
+        }
+        Update: {
+          banco_id?: string | null
+          created_at?: string
+          data_pix?: string
+          data_recebimento?: string
+          descricao?: string | null
+          erro_mensagem?: string | null
+          id?: string
+          igreja_id?: string
+          oferta_id?: string | null
+          pagador_cpf_cnpj?: string | null
+          pagador_nome?: string | null
+          pix_id?: string
+          processado_em?: string | null
+          status?: string
+          transacao_id?: string | null
+          updated_at?: string
+          valor?: number
+          webhook_payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pix_webhook_temp_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
+      }
       posicoes_time: {
         Row: {
           ativo: boolean
