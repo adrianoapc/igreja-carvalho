@@ -410,7 +410,8 @@ export function ConciliacaoManual() {
                               : "text-red-600"
                           }`}
                         >
-                          {formatValue(extrato.valor)}
+                          {extrato.tipo === "credito" || extrato.tipo === "CREDIT" ? "+" : "-"}
+                          {formatValue(Math.abs(extrato.valor))}
                         </p>
                       </div>
                     </div>
