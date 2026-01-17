@@ -116,7 +116,12 @@ export function HistoricoExtratos() {
           external_id,
           conta:contas(nome, banco)
         `)
+        .eq("igreja_id", igrejaId)
         .order("data_transacao", { ascending: false });
+
+      if (filialId) {
+        query = query.eq("filial_id", filialId);
+      }
 
       if (contaSelecionada && contaSelecionada !== "all") {
         query = query.eq("conta_id", contaSelecionada);
