@@ -201,6 +201,11 @@ export function HistoricoExtratos() {
   // Filter extratos
   const extratosFiltrados = useMemo(() => {
     return extratos.filter((extrato) => {
+      // Filter out CONTAMAX internal transactions
+      if (extrato.descricao?.toUpperCase().includes("CONTAMAX")) {
+        return false;
+      }
+
       // Search filter
       if (searchTerm) {
         const termo = searchTerm.toLowerCase();
