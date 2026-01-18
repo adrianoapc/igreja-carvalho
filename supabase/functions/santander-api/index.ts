@@ -3,17 +3,21 @@
  * Edge Function para integração com API Santander
  * 
  * Suporta múltiplas ações:
- * - saldo: Consulta saldo da conta
- * - extrato: Consulta extrato sem persistir
- * - sync: Sincroniza extrato para extratos_bancarios
+ * - saldo: Consulta saldo da conta (Open Banking)
+ * - extrato: Consulta extrato sem persistir (Open Banking)
+ * - sync: Sincroniza extrato para extratos_bancarios (Open Banking)
+ * - registrar_webhook: Registra webhook PIX no Santander (API PIX)
+ * - consultar_webhook: Consulta webhook PIX registrado (API PIX)
  * 
  * POST /functions/v1/santander-api
  * Body: {
- *   action: 'saldo' | 'extrato' | 'sync'
+ *   action: 'saldo' | 'extrato' | 'sync' | 'registrar_webhook' | 'consultar_webhook'
  *   integracao_id: string
- *   conta_id: string          // ID da conta no sistema
- *   data_inicio?: string      // YYYY-MM-DD
- *   data_fim?: string         // YYYY-MM-DD
+ *   conta_id?: string          // ID da conta no sistema (obrigatório para saldo/extrato/sync)
+ *   data_inicio?: string       // YYYY-MM-DD
+ *   data_fim?: string          // YYYY-MM-DD
+ *   chave_pix?: string         // Chave PIX (CNPJ) para registrar_webhook/consultar_webhook
+ *   webhook_url?: string       // URL do webhook para registrar_webhook
  * }
  */
 
@@ -26,8 +30,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Endpoints Open Banking (saldo, extrato, sync)
 const SANTANDER_TOKEN_URL = 'https://trust-open.api.santander.com.br/auth/oauth/v2/token'
 const SANTANDER_BASE_URL = 'https://trust-open.api.santander.com.br/bank_account_information/v1'
+
+// Endpoints PIX BACEN (webhook)
+const SANTANDER_PIX_TOKEN_URL = 'https://trust-pix.santander.com.br/oauth/token'
+const SANTANDER_PIX_BASE_URL = 'https://trust-pix.santander.com.br/api/v1'
 
 // Roles autorizadas para operações bancárias
 const AUTHORIZED_ROLES = ['super_admin', 'admin', 'admin_igreja', 'tesoureiro']
@@ -356,6 +365,146 @@ async function getSantanderToken(
   }
 }
 
+// ==================== PIX API CALLS ====================
+
+async function getSantanderPixToken(
+  creds: SantanderCredentials
+): Promise<{ token: string; expiresIn: number } | { error: string }> {
+  console.log('[santander-api] Requesting PIX OAuth2 token from trust-pix.santander.com.br...')
+
+  const tokenBody = new URLSearchParams({
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    grant_type: 'client_credentials',
+  }).toString()
+
+  const tokenResponse = await fetch(SANTANDER_PIX_TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: tokenBody,
+    ...(creds.httpClient && { client: creds.httpClient }),
+  })
+
+  if (!tokenResponse.ok) {
+    const errorText = await tokenResponse.text()
+    console.error('[santander-api] PIX Token request failed:', tokenResponse.status, errorText)
+    return { error: `Falha na autenticação PIX: ${tokenResponse.status} - ${errorText}` }
+  }
+
+  const tokenData = await tokenResponse.json()
+
+  if (!tokenData.access_token) {
+    return { error: 'Token PIX não retornado pela API' }
+  }
+
+  console.log('[santander-api] PIX Token obtained successfully')
+  return { 
+    token: tokenData.access_token, 
+    expiresIn: tokenData.expires_in 
+  }
+}
+
+async function registrarWebhookPix(
+  creds: SantanderCredentials,
+  chavePix: string,
+  webhookUrl: string
+): Promise<{ success: boolean; error?: string; data?: unknown; status?: number }> {
+  console.log('[santander-api] Registering PIX webhook for key:', chavePix)
+
+  // Obter token PIX
+  const tokenResult = await getSantanderPixToken(creds)
+  if ('error' in tokenResult) {
+    return { success: false, error: tokenResult.error }
+  }
+
+  // Registrar webhook
+  const url = `${SANTANDER_PIX_BASE_URL}/webhook/${encodeURIComponent(chavePix)}`
+  console.log('[santander-api] PUT', url)
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${tokenResult.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ webhookUrl }),
+    ...(creds.httpClient && { client: creds.httpClient }),
+  })
+
+  const responseText = await response.text()
+  let data: unknown = null
+  
+  try {
+    data = JSON.parse(responseText)
+  } catch {
+    data = responseText
+  }
+
+  console.log('[santander-api] Webhook registration response:', response.status, responseText)
+
+  if (!response.ok) {
+    return { 
+      success: false, 
+      error: `PUT webhook falhou: ${response.status}`,
+      data,
+      status: response.status
+    }
+  }
+
+  return { success: true, data, status: response.status }
+}
+
+async function consultarWebhookPix(
+  creds: SantanderCredentials,
+  chavePix: string
+): Promise<{ success: boolean; error?: string; data?: unknown; status?: number }> {
+  console.log('[santander-api] Consulting PIX webhook for key:', chavePix)
+
+  // Obter token PIX
+  const tokenResult = await getSantanderPixToken(creds)
+  if ('error' in tokenResult) {
+    return { success: false, error: tokenResult.error }
+  }
+
+  // Consultar webhook
+  const url = `${SANTANDER_PIX_BASE_URL}/webhook/${encodeURIComponent(chavePix)}`
+  console.log('[santander-api] GET', url)
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${tokenResult.token}`,
+    },
+    ...(creds.httpClient && { client: creds.httpClient }),
+  })
+
+  const responseText = await response.text()
+  let data: unknown = null
+  
+  try {
+    data = JSON.parse(responseText)
+  } catch {
+    data = responseText
+  }
+
+  console.log('[santander-api] Webhook consultation response:', response.status, responseText)
+
+  if (!response.ok) {
+    return { 
+      success: false, 
+      error: `GET webhook falhou: ${response.status}`,
+      data,
+      status: response.status
+    }
+  }
+
+  return { success: true, data, status: response.status }
+}
+
+// ==================== OPEN BANKING API CALLS ====================
+
 async function queryBalance(
   token: string,
   applicationKey: string,
@@ -627,17 +776,33 @@ Deno.serve(async (req) => {
 
     // Parse payload
     const payload = await req.json()
-    const { action, integracao_id, conta_id, data_inicio, data_fim } = payload
+    const { action, integracao_id, conta_id, data_inicio, data_fim, chave_pix, webhook_url } = payload
 
-    if (!action || !['saldo', 'extrato', 'sync'].includes(action)) {
-      return jsonResponse({ error: 'Ação inválida. Use: saldo, extrato ou sync' }, 400)
+    const validActions = ['saldo', 'extrato', 'sync', 'registrar_webhook', 'consultar_webhook']
+    if (!action || !validActions.includes(action)) {
+      return jsonResponse({ error: `Ação inválida. Use: ${validActions.join(', ')}` }, 400)
     }
 
-    if (!integracao_id || !conta_id) {
-      return jsonResponse({ error: 'Campos obrigatórios: integracao_id, conta_id' }, 400)
+    // Validação de campos obrigatórios varia por action
+    const isPixAction = ['registrar_webhook', 'consultar_webhook'].includes(action)
+    
+    if (!integracao_id) {
+      return jsonResponse({ error: 'Campo obrigatório: integracao_id' }, 400)
     }
 
-    console.log(`[santander-api] Action: ${action}, Integração: ${integracao_id}, Conta: ${conta_id}`)
+    if (!isPixAction && !conta_id) {
+      return jsonResponse({ error: 'Campos obrigatórios para esta ação: integracao_id, conta_id' }, 400)
+    }
+
+    if (action === 'registrar_webhook' && (!chave_pix || !webhook_url)) {
+      return jsonResponse({ error: 'Campos obrigatórios: integracao_id, chave_pix, webhook_url' }, 400)
+    }
+
+    if (action === 'consultar_webhook' && !chave_pix) {
+      return jsonResponse({ error: 'Campos obrigatórios: integracao_id, chave_pix' }, 400)
+    }
+
+    console.log(`[santander-api] Action: ${action}, Integração: ${integracao_id}${conta_id ? `, Conta: ${conta_id}` : ''}${chave_pix ? `, ChavePix: ${chave_pix}` : ''}`)
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey)
 
@@ -666,28 +831,37 @@ Deno.serve(async (req) => {
 
     console.log('[santander-api] User authorized:', authResult.context?.userId)
 
-    // Fetch conta details
-    const { data: conta, error: contaError } = await supabaseAdmin
-      .from('contas')
-      .select('id, agencia, conta_numero, cnpj_banco, filial_id')
-      .eq('id', conta_id)
-      .single()
+    // Fetch conta details (only needed for non-PIX actions)
+    let conta: { id: string; agencia: string | null; conta_numero: string | null; cnpj_banco: string | null; filial_id: string | null } | null = null
+    let bancoId = '90400888000142'
+    let agencia = ''
+    let contaLimpa = ''
+    let contaFormatada = ''
 
-    if (contaError || !conta) {
-      console.error('[santander-api] Conta not found:', contaError)
-      return jsonResponse({ error: 'Conta não encontrada' }, 404)
+    if (!isPixAction) {
+      const { data: contaData, error: contaError } = await supabaseAdmin
+        .from('contas')
+        .select('id, agencia, conta_numero, cnpj_banco, filial_id')
+        .eq('id', conta_id)
+        .single()
+
+      if (contaError || !contaData) {
+        console.error('[santander-api] Conta not found:', contaError)
+        return jsonResponse({ error: 'Conta não encontrada' }, 404)
+      }
+
+      if (!contaData.agencia || !contaData.conta_numero) {
+        return jsonResponse({ error: 'Dados da conta incompletos (agência/número)' }, 400)
+      }
+
+      conta = contaData
+      bancoId = conta.cnpj_banco || '90400888000142'
+      agencia = conta.agencia || ''
+      contaLimpa = (conta.conta_numero || '').replace(/\D/g, '')
+      contaFormatada = contaLimpa.padStart(12, '0')
+
+      console.log(`[santander-api] Conta formatada: ${contaLimpa} -> ${contaFormatada}`)
     }
-
-    if (!conta.agencia || !conta.conta_numero) {
-      return jsonResponse({ error: 'Dados da conta incompletos (agência/número)' }, 400)
-    }
-
-    const bancoId = conta.cnpj_banco || '90400888000142'
-    const agencia = conta.agencia
-    const contaLimpa = conta.conta_numero.replace(/\D/g, '')
-    const contaFormatada = contaLimpa.padStart(12, '0')
-
-    console.log(`[santander-api] Conta formatada: ${contaLimpa} -> ${contaFormatada}`)
 
     // Fetch secrets
     const { data: secrets, error: secretsError } = await supabaseAdmin
@@ -747,7 +921,67 @@ Deno.serve(async (req) => {
       console.warn('[santander-api] No PFX certificate found - will attempt standard TLS only')
     }
 
-    // Get OAuth2 token
+    // ==================== PIX ACTIONS (no Open Banking token needed) ====================
+    
+    if (action === 'registrar_webhook') {
+      const creds: SantanderCredentials = {
+        clientId,
+        clientSecret,
+        applicationKey,
+        httpClient
+      }
+
+      const result = await registrarWebhookPix(creds, chave_pix, webhook_url)
+
+      if (!result.success) {
+        return jsonResponse({
+          success: false,
+          error: result.error,
+          detail: result.data,
+          status: result.status
+        }, result.status || 500)
+      }
+
+      return jsonResponse({
+        success: true,
+        action: 'registrar_webhook',
+        message: 'Webhook PIX registrado com sucesso',
+        chavePix: chave_pix,
+        webhookUrl: webhook_url,
+        santanderResponse: result.data
+      })
+    }
+
+    if (action === 'consultar_webhook') {
+      const creds: SantanderCredentials = {
+        clientId,
+        clientSecret,
+        applicationKey,
+        httpClient
+      }
+
+      const result = await consultarWebhookPix(creds, chave_pix)
+
+      if (!result.success) {
+        return jsonResponse({
+          success: false,
+          error: result.error,
+          detail: result.data,
+          status: result.status
+        }, result.status || 500)
+      }
+
+      return jsonResponse({
+        success: true,
+        action: 'consultar_webhook',
+        chavePix: chave_pix,
+        webhook: result.data
+      })
+    }
+
+    // ==================== OPEN BANKING ACTIONS ====================
+
+    // Get OAuth2 token (Open Banking)
     const tokenResult = await getSantanderToken({
       clientId,
       clientSecret,
@@ -846,7 +1080,7 @@ Deno.serve(async (req) => {
         supabaseAdmin,
         conta_id,
         integracao.igreja_id,
-        conta.filial_id,
+        conta?.filial_id || null,
         statementResult.data
       )
 
