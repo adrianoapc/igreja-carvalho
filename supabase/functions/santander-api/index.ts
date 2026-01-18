@@ -371,21 +371,39 @@ async function getSantanderPixToken(
   creds: SantanderCredentials
 ): Promise<{ token: string; expiresIn: number } | { error: string }> {
   console.log('[santander-api] Requesting PIX OAuth2 token from trust-pix.santander.com.br...')
+  console.log('[santander-api] mTLS httpClient present:', !!creds.httpClient)
+
+  // PIX API usa Basic Auth com client_id:client_secret
+  const basicAuth = btoa(`${creds.clientId}:${creds.clientSecret}`)
 
   const tokenBody = new URLSearchParams({
     client_id: creds.clientId,
     client_secret: creds.clientSecret,
     grant_type: 'client_credentials',
+    scope: 'cob.write cob.read cobv.write cobv.read lotecobv.write lotecobv.read pix.write pix.read webhook.write webhook.read payloadlocation.write payloadlocation.read',
   }).toString()
 
-  const tokenResponse = await fetch(SANTANDER_PIX_TOKEN_URL, {
+  console.log('[santander-api] PIX Token request URL:', SANTANDER_PIX_TOKEN_URL)
+  console.log('[santander-api] PIX Token body params: grant_type, scope, client_id, client_secret')
+
+  const fetchOptions: RequestInit & { client?: Deno.HttpClient } = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${basicAuth}`,
     },
     body: tokenBody,
-    ...(creds.httpClient && { client: creds.httpClient }),
-  })
+  }
+
+  // Aplicar mTLS client se disponível
+  if (creds.httpClient) {
+    fetchOptions.client = creds.httpClient
+    console.log('[santander-api] mTLS client attached to fetch request')
+  } else {
+    console.warn('[santander-api] No mTLS client - request may fail!')
+  }
+
+  const tokenResponse = await fetch(SANTANDER_PIX_TOKEN_URL, fetchOptions)
 
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text()
