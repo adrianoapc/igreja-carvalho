@@ -3117,6 +3117,8 @@ export type Database = {
       }
       inscricoes_eventos: {
         Row: {
+          checkin_validado_em: string | null
+          checkin_validado_por: string | null
           created_at: string | null
           evento_id: string
           filial_id: string | null
@@ -3124,12 +3126,15 @@ export type Database = {
           igreja_id: string | null
           observacoes: string | null
           pessoa_id: string
+          qr_token: string | null
           responsavel_inscricao_id: string | null
           status_pagamento: string
           transacao_id: string | null
           updated_at: string | null
         }
         Insert: {
+          checkin_validado_em?: string | null
+          checkin_validado_por?: string | null
           created_at?: string | null
           evento_id: string
           filial_id?: string | null
@@ -3137,12 +3142,15 @@ export type Database = {
           igreja_id?: string | null
           observacoes?: string | null
           pessoa_id: string
+          qr_token?: string | null
           responsavel_inscricao_id?: string | null
           status_pagamento?: string
           transacao_id?: string | null
           updated_at?: string | null
         }
         Update: {
+          checkin_validado_em?: string | null
+          checkin_validado_por?: string | null
           created_at?: string | null
           evento_id?: string
           filial_id?: string | null
@@ -3150,6 +3158,7 @@ export type Database = {
           igreja_id?: string | null
           observacoes?: string | null
           pessoa_id?: string
+          qr_token?: string | null
           responsavel_inscricao_id?: string | null
           status_pagamento?: string
           transacao_id?: string | null
