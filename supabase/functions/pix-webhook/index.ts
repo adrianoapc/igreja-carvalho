@@ -34,7 +34,8 @@ interface PixWebhookPayload {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 // Remove formatação do CNPJ (pontos, barras, hífens)
@@ -97,11 +98,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Health check GET - Requisito Santander
+  if (req.method === 'GET') {
+    console.log('[pix-webhook] Health check GET recebido');
+    return new Response(
+      JSON.stringify({ status: 'ok', message: 'Webhook PIX ativo' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
-    // Validar método
+    // Validar método POST para notificações PIX
     if (req.method !== "POST") {
       return new Response(
-        JSON.stringify({ error: "Only POST allowed" }),
+        JSON.stringify({ error: "Método não permitido. Use GET ou POST." }),
         { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
