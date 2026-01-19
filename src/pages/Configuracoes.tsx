@@ -16,6 +16,7 @@ import {
   GitBranch,
   LayoutList,
   MapPin,
+  Phone,
   Settings,
   Shield,
   Users,
@@ -39,6 +40,7 @@ import AdminPermissions from "@/pages/AdminPermissions";
 import Webhooks from "@/pages/admin/Webhooks";
 import Chatbots from "@/pages/admin/Chatbots";
 import Notificacoes from "@/pages/admin/Notificacoes";
+import WhatsAppNumeros from "@/pages/admin/WhatsAppNumeros";
 import ContasManutencao from "@/pages/financas/ContasManutencao";
 import FiliaisConfig from "@/pages/configuracoes/Filiais";
 import { UserFilialAccessManager } from "@/components/admin/UserFilialAccessManager";
@@ -52,6 +54,7 @@ type ViewState =
   | "WEBHOOKS"
   | "CHATBOTS"
   | "NOTIFICACOES"
+  | "WHATSAPP_NUMEROS"
   | "FINANCEIRO_BASES"
   | "FINANCEIRO_CATEGORIAS"
   | "FINANCEIRO_CENTROS"
@@ -76,6 +79,7 @@ const GERAL_ITEMS: ConfigItem[] = [
   { id: "PERMISSOES", title: "Permissões de Acesso", description: "Funções e acessos por módulo", icon: Shield },
   { id: "NOTIFICACOES", title: "Notificações", description: "Regras e canais de notificação", icon: Bell },
   { id: "WEBHOOKS", title: "Webhooks", description: "Integrações externas (Make, etc.)", icon: Webhook },
+  { id: "WHATSAPP_NUMEROS", title: "Números WhatsApp", description: "Gerenciar números de WhatsApp por filial", icon: Phone },
   { id: "CHATBOTS", title: "Chatbots IA", description: "Configuração de agentes de IA", icon: Bot },
 ];
 
@@ -153,6 +157,7 @@ export default function Configuracoes() {
   if (currentView === "WEBHOOKS") return <Webhooks onBack={goBack} />;
   if (currentView === "CHATBOTS") return <Chatbots onBack={goBack} />;
   if (currentView === "NOTIFICACOES") return <Notificacoes onBack={goBack} />;
+  if (currentView === "WHATSAPP_NUMEROS") return <WhatsAppNumeros onBack={goBack} />;
 
   // Filtrar itens baseado em permissões
   const visibleGeralItems = GERAL_ITEMS.filter(item => {
