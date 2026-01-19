@@ -60,19 +60,26 @@ const extractDestino = (payload: Record<string, unknown>) => {
   const messages = Array.isArray(payload.messages) ? (payload.messages as Array<Record<string, unknown>>) : [];
   const messageMetadata = (messages[0]?.metadata || {}) as Record<string, unknown>;
 
+  const displayPhoneNumber =
+    (payload.display_phone_number as string | undefined) ||
+    (payload.whatsapp_number as string | undefined) ||
+    (metadata.display_phone_number as string | undefined) ||
+    (messageMetadata.display_phone_number as string | undefined) ||
+    (payload.telefone_destino as string | undefined) ||
+    (payload.to as string | undefined) ||
+    undefined;
+
+  if (displayPhoneNumber) {
+    console.log(`[Compartilhe] Número destino identificado: ${displayPhoneNumber}`);
+  }
+
   return {
     phoneNumberId:
       (payload.phone_number_id as string | undefined) ||
       (metadata.phone_number_id as string | undefined) ||
       (messageMetadata.phone_number_id as string | undefined) ||
       undefined,
-    displayPhoneNumber:
-      (payload.display_phone_number as string | undefined) ||
-      (metadata.display_phone_number as string | undefined) ||
-      (messageMetadata.display_phone_number as string | undefined) ||
-      (payload.telefone_destino as string | undefined) ||
-      (payload.to as string | undefined) ||
-      undefined,
+    displayPhoneNumber,
   };
 };
 
