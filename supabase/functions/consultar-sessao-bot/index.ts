@@ -8,9 +8,7 @@ const corsHeaders = {
 
 interface RequestBody {
   telefone: string;
-  phone_number_id?: string;
-  igreja_id?: string;
-  filial_id?: string | null;
+  phone_number_id: string;
 }
 
 serve(async (req: Request) => {
@@ -24,7 +22,7 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = (await req.json()) as RequestBody;
-    const { telefone, phone_number_id, igreja_id, filial_id } = body;
+    const { telefone, phone_number_id } = body;
 
     if (!telefone) {
       return new Response(
@@ -33,67 +31,44 @@ serve(async (req: Request) => {
       );
     }
 
-    if (!igreja_id) {
+    if (!phone_number_id) {
       return new Response(
-        JSON.stringify({ error: "Igreja ID é obrigatório para escopo multi-tenant" }),
+        JSON.stringify({ error: "Phone number ID é obrigatório" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[Consultar Sessão] Telefone: ${telefone}, Igreja: ${igreja_id}, Filial: ${filial_id || "todas"}, Phone Number ID: ${phone_number_id}`);
+    console.log(`[Consultar Sessão] Telefone: ${telefone}, Phone Number ID: ${phone_number_id}`);
 
-    // 1. VALIDAÇÃO MULTI-TENANT: Se phone_number_id foi fornecido, verificar que pertence à Igreja correta
-    if (phone_number_id) {
-      const { data: whatsappNumero, error: whatsappError } = await supabase
-        .from("whatsapp_numeros")
-        .select("id, igreja_id, filial_id, enabled")
-        .eq("phone_number_id", phone_number_id)
-        .single();
+    // 1. VALIDAÇÃO MULTI-TENANT: Consultar church (igreja_id/filial_id) a partir do phone_number_id
+    const { data: whatsappNumero, error: whatsappError } = await supabase
+      .from("whatsapp_numeros")
+      .select("id, igreja_id, filial_id, enabled")
+      .eq("phone_number_id", phone_number_id)
+      .single();
 
-      if (whatsappError || !whatsappNumero) {
-        console.error("[Consultar Sessão] ❌ Phone number ID inválido ou não encontrado:", phone_number_id);
-        return new Response(
-          JSON.stringify({ error: "Phone number ID inválido para esta Igreja" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (!whatsappNumero.enabled) {
-        console.error("[Consultar Sessão] ❌ Phone number ID desativado:", phone_number_id);
-        return new Response(
-          JSON.stringify({ error: "Número WhatsApp desativado" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Validar que phone_number_id pertence à Igreja correta
-      if (whatsappNumero.igreja_id !== igreja_id) {
-        console.error(
-          `[Consultar Sessão] ❌ CROSS-CHURCH ATTEMPT: Phone number ${phone_number_id} belongs to Igreja ${whatsappNumero.igreja_id}, but requesting Igreja ${igreja_id}`
-        );
-        return new Response(
-          JSON.stringify({ error: "Acesso negado: número WhatsApp não pertence a esta Igreja" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Se filial_id foi fornecido no request, validar que corresponde
-      if (filial_id && whatsappNumero.filial_id !== filial_id) {
-        console.warn(
-          `[Consultar Sessão] ⚠️ Filial mismatch: Phone number ${phone_number_id} belongs to filial ${whatsappNumero.filial_id}, but requesting filial ${filial_id}`
-        );
-        // Ainda assim retorna erro para ser seguro
-        return new Response(
-          JSON.stringify({ error: "Número WhatsApp não pertence à filial solicitada" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      console.log(`[Consultar Sessão] ✅ Phone number ID validado para Igreja ${igreja_id} (Filial: ${whatsappNumero.filial_id || "matriz"})`);
+    if (whatsappError || !whatsappNumero) {
+      console.error("[Consultar Sessão] ❌ Phone number ID inválido ou não encontrado:", phone_number_id);
+      return new Response(
+        JSON.stringify({ error: "Phone number ID inválido" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    if (!whatsappNumero.enabled) {
+      console.error("[Consultar Sessão] ❌ Phone number ID desativado:", phone_number_id);
+      return new Response(
+        JSON.stringify({ error: "Número WhatsApp desativado" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const igreja_id = whatsappNumero.igreja_id;
+    const filial_id = whatsappNumero.filial_id;
+
+    console.log(`[Consultar Sessão] ✅ Phone number ID validado para Igreja ${igreja_id} (Filial: ${filial_id || "matriz"})`);
+
     // 2. Buscar ÚLTIMA sessão ativa (mais recente por updated_at)
-    // Com escopo multi-tenant: telefone + igreja_id + filial_id + phone_number_id
     let query = supabase
       .from("atendimentos_bot")
       .select("id, telefone, origem_canal, status, meta_dados, updated_at, created_at, igreja_id, filial_id")
@@ -106,12 +81,6 @@ serve(async (req: Request) => {
     if (phone_number_id) {
       query = query.contains("meta_dados", { phone_number_id });
       console.log(`[Consultar Sessão] Filtrando por phone_number_id: ${phone_number_id}`);
-    }
-
-    // Se filial_id foi fornecido, filtrar por filial específica
-    if (filial_id) {
-      query = query.eq("filial_id", filial_id);
-      console.log(`[Consultar Sessão] Filtrando por filial_id: ${filial_id}`);
     }
 
     const { data: sessoes, error } = await query.limit(1);
