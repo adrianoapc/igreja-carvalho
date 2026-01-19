@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.pix-webhook]
 verify_jwt = false
+
+[functions.consultar-sessao-bot]
+verify_jwt = false
