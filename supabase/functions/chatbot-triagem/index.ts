@@ -208,10 +208,44 @@ serve(async (req: Request) => {
   let requestPayload: RequestBody = {} as RequestBody;
 
   try {
-    const body = (await req.json()) as RequestBody;
+    const body = (await req.json()) as RequestBody & { 
+      whatsapp_number?: string; 
+      display_phone_number?: string;
+      igreja_id?: string;
+      filial_id?: string;
+    };
     requestPayload = body;
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
     let { conteudo_texto } = body;
+
+    // 0. Identificar igreja/filial pelo whatsapp_number
+    const whatsappNumber = body.whatsapp_number ?? body.display_phone_number ?? null;
+    const normalizeDisplayPhone = (tel?: string | null) => (tel || "").replace(/\D/g, "");
+    const whatsappNumeroNormalizado = normalizeDisplayPhone(whatsappNumber);
+    
+    let igrejaId = body.igreja_id ?? null;
+    let filialId = body.filial_id ?? null;
+    
+    if (!igrejaId && whatsappNumeroNormalizado) {
+      console.log(`[Triagem] Buscando igreja pelo whatsapp_number: ${whatsappNumeroNormalizado}`);
+      
+      const { data: rota, error: rotaError } = await supabase
+        .from("whatsapp_numeros")
+        .select("igreja_id, filial_id")
+        .eq("display_phone_number", whatsappNumeroNormalizado)
+        .eq("enabled", true)
+        .maybeSingle();
+      
+      if (rotaError) {
+        console.error(`[Triagem] Erro ao buscar whatsapp_numeros:`, rotaError);
+      }
+      
+      if (rota) {
+        igrejaId = rota.igreja_id;
+        filialId = rota.filial_id;
+        console.log(`[Triagem] Igreja encontrada via whatsapp_number: ${igrejaId}, filial: ${filialId}`);
+      }
+    }
 
     // 1. Configuração
     const config = await getChatbotConfig();
@@ -226,7 +260,7 @@ serve(async (req: Request) => {
     const inputTexto = conteudo_texto || "";
 
     // 3. Gestão de Sessão
-    let { data: sessao } = await supabase
+    let sessaoQuery = supabase
       .from("atendimentos_bot")
       .select("*")
       .eq("telefone", telefone)
@@ -234,15 +268,26 @@ serve(async (req: Request) => {
       .gt(
         "updated_at",
         new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      )
-      .maybeSingle();
+      );
+    
+    if (igrejaId) {
+      sessaoQuery = sessaoQuery.eq("igreja_id", igrejaId);
+    }
+    
+    let { data: sessao } = await sessaoQuery.maybeSingle();
 
     const historico = sessao ? sessao.historico_conversa : [];
 
     if (!sessao) {
       const { data: nova, error } = await supabase
         .from("atendimentos_bot")
-        .insert({ telefone, status: "INICIADO", historico_conversa: [] })
+        .insert({ 
+          telefone, 
+          status: "INICIADO", 
+          historico_conversa: [],
+          igreja_id: igrejaId,
+          filial_id: filialId
+        })
         .select()
         .single();
       if (error || !nova)
