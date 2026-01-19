@@ -31,7 +31,7 @@ export function MobileNavbar() {
     }
   }, [isAdmin, checkPermission, loading]);
 
-  const agendaPath = hasMinisterioAccess ? "/eventos" : "/eventos/lista";
+  const agendaPath = "/eventos/lista";
   const pessoasPath = hasPessoasAccess ? "/pessoas" : "/perfil";
   const PessoasIcon = hasPessoasAccess ? Users : UserCircle;
   const pessoasLabel = hasPessoasAccess ? "Pessoas" : "Perfil";
