@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.checkin-inscricao]
 verify_jwt = false
 
+[functions.inscricao-compartilhe]
+verify_jwt = false
+
 [functions.verificar-escalas-pendentes]
 verify_jwt = false
 
