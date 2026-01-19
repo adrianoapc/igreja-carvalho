@@ -266,11 +266,44 @@ serve(async (req) => {
     // (a) Payload "flat" que já vem normalizado pelo Make
     // (b) Payload bruto do webhook do WhatsApp (messages[].document.url, etc.)
     const body = await req.json();
-    const igrejaId = body?.igreja_id ?? new URL(req.url).searchParams.get("igreja_id");
+    
+    // Extrair whatsapp_number do body (vem do Make)
+    const whatsappNumber = body?.whatsapp_number ?? body?.display_phone_number ?? null;
+    
+    // Normalizar número WhatsApp (remover formatação)
+    const normalizeDisplayPhone = (tel?: string | null) => (tel || "").replace(/\D/g, "");
+    const whatsappNumeroNormalizado = normalizeDisplayPhone(whatsappNumber);
+    
+    // Tentar pegar igreja_id diretamente ou buscar via whatsapp_number
+    let igrejaId = body?.igreja_id ?? new URL(req.url).searchParams.get("igreja_id");
+    let filialIdFromWhatsApp: string | null = null;
+    
+    // Se não veio igreja_id mas veio whatsapp_number, buscar na tabela whatsapp_numeros
+    if (!igrejaId && whatsappNumeroNormalizado) {
+      console.log(`[Financeiro] Buscando igreja pelo whatsapp_number: ${whatsappNumeroNormalizado}`);
+      
+      const { data: rota, error: rotaError } = await supabase
+        .from("whatsapp_numeros")
+        .select("igreja_id, filial_id")
+        .eq("display_phone_number", whatsappNumeroNormalizado)
+        .eq("enabled", true)
+        .maybeSingle();
+      
+      if (rotaError) {
+        console.error(`[Financeiro] Erro ao buscar whatsapp_numeros:`, rotaError);
+      }
+      
+      if (rota) {
+        igrejaId = rota.igreja_id;
+        filialIdFromWhatsApp = rota.filial_id;
+        console.log(`[Financeiro] Igreja encontrada via whatsapp_number: ${igrejaId}, filial: ${filialIdFromWhatsApp}`);
+      }
+    }
 
     if (!igrejaId) {
+      console.error(`[Financeiro] igreja_id não encontrado. whatsapp_number: ${whatsappNumber}`);
       return new Response(
-        JSON.stringify({ error: "igreja_id é obrigatório" }),
+        JSON.stringify({ error: "igreja_id é obrigatório. Envie no body ou configure o whatsapp_number na tabela whatsapp_numeros." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
