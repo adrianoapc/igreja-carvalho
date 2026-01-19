@@ -63,7 +63,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Início", url: "/", icon: LayoutDashboard },
       { title: "Mural & Avisos", url: "/mural", icon: MonitorPlay },
       { title: "Diário de Oração", url: "/intercessao/diario", icon: Heart },
-      { title: "Agenda", url: "/eventos", icon: CalendarDays },
+      { title: "Agenda", url: "/eventos/lista", icon: CalendarDays },
       { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
       { title: "Minha Família", url: "/perfil/familia", icon: Home },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },
@@ -100,6 +100,12 @@ const MENU_GROUPS: MenuGroup[] = [
         title: "Escalas",
         url: "/escalas",
         icon: CalendarCheck,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Eventos › Gestão",
+        url: "/eventos",
+        icon: CalendarDays,
         permission: "ministerio.view",
       },
       {
