@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.checkin-evento]
 verify_jwt = false
 
+[functions.checkin-inscricao]
+verify_jwt = false
+
 [functions.verificar-escalas-pendentes]
 verify_jwt = false
 
