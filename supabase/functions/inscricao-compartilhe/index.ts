@@ -2,38 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const APP_URL = Deno.env.get("APP_URL") || "https://igreja.lovable.app";
-
-const verifyWebhookSecret = (req: Request): { valid: boolean; error?: string } => {
-  const webhookSecret = Deno.env.get("MAKE_WEBHOOK_SECRET");
-
-  if (!webhookSecret) {
-    return { valid: false, error: "Webhook secret not configured" };
-  }
-
-  const requestSecret = req.headers.get("x-webhook-secret");
-  if (!requestSecret) {
-    return { valid: false, error: "Missing x-webhook-secret header" };
-  }
-
-  if (webhookSecret.length !== requestSecret.length) {
-    return { valid: false, error: "Invalid webhook secret" };
-  }
-
-  let result = 0;
-  for (let i = 0; i < webhookSecret.length; i++) {
-    result |= webhookSecret.charCodeAt(i) ^ requestSecret.charCodeAt(i);
-  }
-
-  if (result !== 0) {
-    return { valid: false, error: "Invalid webhook secret" };
-  }
-
-  return { valid: true };
-};
 
 const isYes = (text: string) =>
   ["sim", "s", "ok", "confirmo", "confirmar"].includes(text);
@@ -93,14 +65,6 @@ Deno.serve(async (req) => {
       status: 405,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  }
-
-  const secretCheck = verifyWebhookSecret(req);
-  if (!secretCheck.valid) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Unauthorized", message: secretCheck.error }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
