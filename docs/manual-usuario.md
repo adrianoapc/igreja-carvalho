@@ -2143,34 +2143,37 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
 1. Acesse **Configurações** no menu lateral
 2. Seções disponíveis:
 
+**Menu Geral:**
+
+- Dados da Igreja (logo e contatos), Filiais, Acesso por Filial, Permissões, Notificações, Webhooks, Números WhatsApp (por filial) e Chatbots IA.
+
+**Bloco Financeiro:**
+
+- Bases Ministeriais, Plano de Contas, Centros de Custo, Contas, Formas de Pagamento, Fornecedores e atalho para Configuração Financeira (aparece apenas para admins/permissionados).
+
 **Modo de Manutenção:**
 
-- Ativar/desativar modo manutenção (bloqueia acesso ao sistema)
-- Permitir acesso público durante manutenção
-- Personalizar mensagem de manutenção
+- Toggle no topo ativa/desativa manutenção para a igreja atual (atualiza `app_config.maintenance_mode`).
 
 **Informações Básicas:**
 
-- Nome da igreja
-- Subtítulo
-- Logo (upload com preview)
+- Nome da igreja, subtítulo e logo (upload com preview).
 
 **Webhooks de Integração:**
 
-- Card com link para página dedicada `/admin/webhooks`
-- Gerenciamento seguro de URLs de webhook (valores mascarados)
+- Card com link para página dedicada `/admin/webhooks`.
+- Gerenciamento seguro de URLs de webhook (valores mascarados).
 
 **Notificações & Plantão Pastoral:**
 
-- Telefone do plantão pastoral (para alertas críticos)
-- Provedor WhatsApp: Make.com, Meta Official API, ou Evolution API
-- Campos de credenciais variam conforme provedor selecionado
+- Telefone do plantão pastoral (para alertas críticos).
+- Provedor WhatsApp: Make.com, Meta Official API, ou Evolution API (campos variam conforme provedor).
 
 **IA & Chatbot:**
 
-- Card "Chatbots & Inteligência Artificial" confirma visualmente se o `OPENAI_API_KEY` está presente
-- Botão **Gerenciar Chatbots & IAs** redireciona para a tela administrativa `/admin/chatbots`
-- Dica exibida lembra que os prompts/modelos são ajustados nessa tela dedicada
+- Card "Chatbots & Inteligência Artificial" confirma visualmente se o `OPENAI_API_KEY` está presente.
+- Botão **Gerenciar Chatbots & IAs** redireciona para a tela administrativa `/admin/chatbots`.
+- Dica exibida lembra que os prompts/modelos são ajustados nessa tela dedicada.
 
 ![Configurações Igreja](./screenshots/placeholder-config-igreja.png)
 

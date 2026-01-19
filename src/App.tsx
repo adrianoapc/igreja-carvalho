@@ -122,6 +122,7 @@ const EventoDetalhes = lazy(() => import("./pages/EventoDetalhes"));
 const Telao = lazy(() => import("./pages/Telao"));
 const TelaoLiturgia = lazy(() => import("./pages/TelaoLiturgia"));
 const Checkin = lazy(() => import("./pages/Checkin"));
+const CheckinInscricao = lazy(() => import("./pages/CheckinInscricao"));
 
 // Mídias
 const Midias = lazy(() => import("./pages/Midias"));
@@ -728,6 +729,14 @@ const App = () => (
                     element={
                       <AuthGate>
                         <EventosLiturgia />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/eventos/checkin/:token"
+                    element={
+                      <AuthGate>
+                        <CheckinInscricao />
                       </AuthGate>
                     }
                   />

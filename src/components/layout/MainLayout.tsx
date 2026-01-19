@@ -35,6 +35,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
     "/telao",
     "/player",
     "/liturgia-player",
+    "/eventos/checkin",
   ];
   const shouldShowMobileNav = !hideMobileNavRoutes.some((route) =>
     location.pathname.startsWith(route)

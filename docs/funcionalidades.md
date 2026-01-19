@@ -1557,7 +1557,8 @@ CREATE TABLE extratos_bancarios (
 
 ## 18. Configurações da Igreja
 
-- Painel único para manutenção, identidade visual e integrações críticas
+- Tela de configurações organizada em dois blocos: **Geral** (Dados da Igreja, Filiais, Acesso por Filial, Permissões, Notificações, Webhooks, Números WhatsApp, Chatbots IA) e **Financeiro** (Bases Ministeriais, Plano de Contas, Centros de Custo, Contas, Formas de Pagamento, Fornecedores + atalho para Configuração Financeira).
+- Toggle de **Modo Manutenção** no topo grava em `app_config` filtrando `igreja_id`, evitando afetar outras igrejas.
 - Card "Webhooks de Integração" abre `/admin/webhooks` para gerenciar URLs de forma mascarada
 - Card "Chatbots & Inteligência Artificial" exibe status do `OPENAI_API_KEY` e leva direto à tela `/admin/chatbots` para setup detalhado
 - Configuração de plantão pastoral segue disponível com máscara de telefone e escolha de provedor WhatsApp

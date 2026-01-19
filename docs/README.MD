@@ -93,6 +93,7 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
   - ADR-010 (Intercessão: Redirecionamento Inteligente vs Automação): [`adr/ADR-010-intercessao-redirecionamento-inteligente.md`](adr/ADR-010-intercessao-redirecionamento-inteligente.md)
   - ADR-012 (Intercessão V2, CRM de Evangelismo e Chatbot IA): [`adr/012-intercessao-v2-evangelismo.md`](adr/012-intercessao-v2-evangelismo.md)
   - ADR-014 (Gabinete Digital, Roteamento Pastoral e Unificação de Entradas): [`adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md`](adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
+  - ADR-024 (Webhook PIX Santander com CORS aberto e health check): [`adr/ADR-024-pix-webhook-santander.md`](adr/ADR-024-pix-webhook-santander.md)
 
 ## Como navegar
 

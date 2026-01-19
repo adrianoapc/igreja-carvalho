@@ -8,6 +8,20 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+#### ⚙️ Configurações: Filiais, Acesso por Filial e Números WhatsApp (19 Jan/2026)
+
+- **Tipo**: feature
+- **Resumo**: Tela de Configurações agora separa blocos Geral (Dados da Igreja, Filiais, Acesso por Filial, Permissões, Notificações, Webhooks, Números WhatsApp, Chatbots IA) e Financeiro (Bases, Plano de Contas, Centros, Contas, Formas, Fornecedores), com toggle de Modo Manutenção persisting em `app_config` por igreja.
+- **Módulos afetados**: Admin > Configuração, Finanças (atalhos)
+- **Impacto no usuário**: Admins acessam filiais, números de WhatsApp por filial e permissões a partir de um menu único, e podem ativar/desativar manutenção por igreja.
+
+#### 💳 Webhook PIX Santander (19 Jan/2026)
+
+- **Tipo**: automação
+- **Resumo**: Edge Function `pix-webhook` (GET/POST) aceita health check do Santander, resolve `igreja_id` pela chave PIX (CNPJ) e insere notificações em `pix_webhook_temp` com status `recebido`, incluindo payload bruto e CORS aberto para o banco.
+- **Módulos afetados**: Finanças (Recebíveis/PIX)
+- **Impacto**: Permite ingestão imediata de PIX para conciliação sem expor credenciais no frontend.
+
 #### 👤 Acesso de Membros via Edge Function (14 Jan/2026)
 
 - **Tipo**: feature + automação

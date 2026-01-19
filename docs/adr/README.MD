@@ -93,6 +93,13 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Link:** [ADR-023](ADR-023-conferencia-cega-contagem-dupla.md)
 - **Resumo:** Modelo de contagem dupla independente com snapshot imutável, tolerância configurável (% e R$), blind count (opcional/obrigatório), e base para sincronização com provedores externos via `finance-sync`.
 
+### ADR-024
+
+- **Titulo:** Webhook PIX Santander com CORS aberto e health check
+- **Status:** Aceito
+- **Link:** [ADR-024](ADR-024-pix-webhook-santander.md)
+- **Resumo:** Endpoint GET/POST exigido pelo Santander, CORS aberto somente para o webhook, resolução de `igreja_id` via CNPJ da chave PIX e persistência idempotente em `pix_webhook_temp` com payload bruto.
+
 ---
 
 ## 📐 Relacao com Diagramas
