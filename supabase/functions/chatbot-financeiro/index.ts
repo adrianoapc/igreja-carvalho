@@ -269,6 +269,7 @@ serve(async (req) => {
     
     // Extrair whatsapp_number do body (vem do Make)
     const whatsappNumber = body?.whatsapp_number ?? body?.display_phone_number ?? null;
+    const phoneNumberId = body?.phone_number_id ?? null;
     
     // Normalizar número WhatsApp (remover formatação)
     const normalizeDisplayPhone = (tel?: string | null) => (tel || "").replace(/\D/g, "");
@@ -429,14 +430,17 @@ serve(async (req) => {
     console.log(`[Financeiro] Membro autorizado: ${membroAutorizado.nome} (${membroAutorizado.id})`);
 
     // 3. Busca Sessão Ativa
-    const { data: sessao, error: searchError } = await supabase
+    let querySessao = supabase
       .from("atendimentos_bot")
       .select("*")
       .eq("telefone", telefone)
       .eq("origem_canal", origem_canal)
       .eq("igreja_id", igrejaId)
       .neq("status", "CONCLUIDO")
-      .maybeSingle();
+    if (phoneNumberId) {
+      querySessao = querySessao.contains("meta_dados", { phone_number_id: phoneNumberId });
+    }
+    const { data: sessao, error: searchError } = await querySessao.maybeSingle();
 
     if (searchError) {
       console.error("Erro ao buscar sessão:", searchError);
@@ -466,7 +470,11 @@ serve(async (req) => {
           origem_canal,
           pessoa_id: membroAutorizado.id,
           status: "EM_ANDAMENTO",
-          meta_dados: metaDadosInicial,
+          meta_dados: { 
+            ...metaDadosInicial,
+            phone_number_id: phoneNumberId ?? null,
+            display_phone_number: whatsappNumeroNormalizado || null,
+          },
           igreja_id: igrejaId
         });
 

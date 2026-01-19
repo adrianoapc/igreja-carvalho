@@ -211,6 +211,7 @@ serve(async (req: Request) => {
     const body = (await req.json()) as RequestBody & { 
       whatsapp_number?: string; 
       display_phone_number?: string;
+      phone_number_id?: string;
       igreja_id?: string;
       filial_id?: string;
     };
@@ -220,6 +221,7 @@ serve(async (req: Request) => {
 
     // 0. Identificar igreja/filial pelo whatsapp_number
     const whatsappNumber = body.whatsapp_number ?? body.display_phone_number ?? null;
+    const phoneNumberId = body.phone_number_id ?? null;
     const normalizeDisplayPhone = (tel?: string | null) => (tel || "").replace(/\D/g, "");
     const whatsappNumeroNormalizado = normalizeDisplayPhone(whatsappNumber);
     
@@ -274,6 +276,10 @@ serve(async (req: Request) => {
       sessaoQuery = sessaoQuery.eq("igreja_id", igrejaId);
     }
     
+    // Escopo adicional por phone_number_id (quando disponível)
+    if (phoneNumberId) {
+      sessaoQuery = sessaoQuery.contains("meta_dados", { phone_number_id: phoneNumberId });
+    }
     let { data: sessao } = await sessaoQuery.maybeSingle();
 
     const historico = sessao ? sessao.historico_conversa : [];
@@ -286,7 +292,11 @@ serve(async (req: Request) => {
           status: "INICIADO", 
           historico_conversa: [],
           igreja_id: igrejaId,
-          filial_id: filialId
+          filial_id: filialId,
+          meta_dados: {
+            phone_number_id: phoneNumberId ?? null,
+            display_phone_number: whatsappNumeroNormalizado || null,
+          }
         })
         .select()
         .single();

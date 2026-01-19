@@ -2,7 +2,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 const APP_URL = Deno.env.get("APP_URL") || "https://igreja.lovable.app";
@@ -28,9 +29,17 @@ const normalizeDisplayPhone = (telefone?: string | null) =>
   (telefone || "").replace(/\D/g, "");
 
 const extractDestino = (payload: Record<string, unknown>) => {
-  const metadata = (payload.metadata || payload.meta || {}) as Record<string, unknown>;
-  const messages = Array.isArray(payload.messages) ? (payload.messages as Array<Record<string, unknown>>) : [];
-  const messageMetadata = (messages[0]?.metadata || {}) as Record<string, unknown>;
+  const metadata = (payload.metadata || payload.meta || {}) as Record<
+    string,
+    unknown
+  >;
+  const messages = Array.isArray(payload.messages)
+    ? (payload.messages as Array<Record<string, unknown>>)
+    : [];
+  const messageMetadata = (messages[0]?.metadata || {}) as Record<
+    string,
+    unknown
+  >;
 
   const displayPhoneNumber =
     (payload.display_phone_number as string | undefined) ||
@@ -42,7 +51,9 @@ const extractDestino = (payload: Record<string, unknown>) => {
     undefined;
 
   if (displayPhoneNumber) {
-    console.log(`[Compartilhe] Número destino identificado: ${displayPhoneNumber}`);
+    console.log(
+      `[Compartilhe] Número destino identificado: ${displayPhoneNumber}`
+    );
   }
 
   return {
@@ -77,14 +88,23 @@ Deno.serve(async (req) => {
   const destino = extractDestino(body as Record<string, unknown>);
   const destinoDisplay = normalizeDisplayPhone(destino.displayPhoneNumber);
   const telefoneRaw = body.telefone ?? body.from ?? body?.contacts?.[0]?.wa_id;
-  const nomePerfil = body.nome ?? body.nome_perfil ?? body?.contacts?.[0]?.profile?.name ?? "";
-  const mensagem = body.mensagem ?? body.text ?? body.message ?? body?.messages?.[0]?.text?.body ?? "";
+  const nomePerfil =
+    body.nome ?? body.nome_perfil ?? body?.contacts?.[0]?.profile?.name ?? "";
+  const mensagem =
+    body.mensagem ??
+    body.text ??
+    body.message ??
+    body?.messages?.[0]?.text?.body ??
+    "";
 
   if (!telefoneRaw) {
-    return new Response(JSON.stringify({ success: false, message: "Telefone nao informado" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, message: "Telefone nao informado" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 
   if (!igrejaId) {
@@ -123,20 +143,29 @@ Deno.serve(async (req) => {
 
   if (!igrejaId) {
     return new Response(
-      JSON.stringify({ success: false, message: "Nao foi possivel identificar a igreja." }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        success: false,
+        message: "Nao foi possivel identificar a igreja.",
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 
   const telefone = normalizePhone(String(telefoneRaw));
   const texto = normalizeText(mensagem);
-  const origemCanal = body.origem_canal ?? body.origem ?? "whatsapp_compartilhe";
+  const origemCanal =
+    body.origem_canal ?? body.origem ?? "whatsapp_compartilhe";
 
   const { data: sessao } = await supabase
     .from("atendimentos_bot")
     .select("*")
     .eq("telefone", telefone)
     .eq("origem_canal", origemCanal)
+    // Escopo por número de envio (quando disponível)
+    .contains("meta_dados", destino.phoneNumberId ? { phone_number_id: destino.phoneNumberId } : {})
     .neq("status", "CONCLUIDO")
     .gt("updated_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .maybeSingle();
@@ -165,16 +194,21 @@ Deno.serve(async (req) => {
           flow: "compartilhe",
           step: "confirmacao",
           nome_informado: nomePerfil,
+          phone_number_id: destino.phoneNumberId ?? null,
+          display_phone_number: destinoDisplay || null,
         },
       })
       .select()
       .single();
 
     if (error || !novaSessao) {
-      return new Response(JSON.stringify({ success: false, message: "Erro ao iniciar sessao" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ success: false, message: "Erro ao iniciar sessao" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     sessaoAtual = novaSessao;
@@ -194,11 +228,15 @@ Deno.serve(async (req) => {
         .eq("id", sessaoAtual.id);
 
       return new Response(
-        JSON.stringify({ reply_message: "Qual o nome correto para a inscricao?" }),
+        JSON.stringify({
+          reply_message: "Qual o nome correto para a inscricao?",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
-      const confirmacao = `Confirme seus dados: Nome ${nomeInformado || "(nao informado)"}, Telefone ${telefone}. Responda SIM ou NAO.`;
+      const confirmacao = `Confirme seus dados: Nome ${
+        nomeInformado || "(nao informado)"
+      }, Telefone ${telefone}. Responda SIM ou NAO.`;
       return new Response(JSON.stringify({ reply_message: confirmacao }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -208,14 +246,23 @@ Deno.serve(async (req) => {
   if (step === "correcao") {
     const nomeCorrigido = mensagem?.trim();
     if (!nomeCorrigido) {
-      return new Response(JSON.stringify({ reply_message: "Envie o nome correto, por favor." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ reply_message: "Envie o nome correto, por favor." }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     await supabase
       .from("atendimentos_bot")
-      .update({ meta_dados: { ...meta, step: "confirmacao", nome_informado: nomeCorrigido } })
+      .update({
+        meta_dados: {
+          ...meta,
+          step: "confirmacao",
+          nome_informado: nomeCorrigido,
+        },
+      })
       .eq("id", sessaoAtual.id);
 
     const confirmacao = `Confirme seus dados: Nome ${nomeCorrigido}, Telefone ${telefone}. Responda SIM ou NAO.`;
@@ -233,7 +280,9 @@ Deno.serve(async (req) => {
 
   if (!subtipo) {
     return new Response(
-      JSON.stringify({ reply_message: "Nenhum evento de acao social configurado." }),
+      JSON.stringify({
+        reply_message: "Nenhum evento de acao social disponível.",
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -260,14 +309,21 @@ Deno.serve(async (req) => {
 
   if (!evento) {
     return new Response(
-      JSON.stringify({ reply_message: "Nenhum evento disponivel para inscricao no momento." }),
+      JSON.stringify({
+        reply_message: "Nenhum evento disponivel para inscricao no momento.",
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  if (evento.inscricoes_abertas_ate && evento.inscricoes_abertas_ate < agoraIso) {
+  if (
+    evento.inscricoes_abertas_ate &&
+    evento.inscricoes_abertas_ate < agoraIso
+  ) {
     return new Response(
-      JSON.stringify({ reply_message: "As inscricoes para este evento estao encerradas." }),
+      JSON.stringify({
+        reply_message: "As inscricoes para este evento estao encerradas.",
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -282,7 +338,9 @@ Deno.serve(async (req) => {
 
     if ((count || 0) >= evento.vagas_limite) {
       return new Response(
-        JSON.stringify({ reply_message: "As vagas para este evento estao esgotadas." }),
+        JSON.stringify({
+          reply_message: "As vagas para este evento estao esgotadas.",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -300,7 +358,9 @@ Deno.serve(async (req) => {
 
   let pessoaId: string | null = null;
   if (candidatos && candidatos.length > 0) {
-    const alvo = candidatos.find((p) => normalizePhone(p.telefone || "") === telefone);
+    const alvo = candidatos.find(
+      (p) => normalizePhone(p.telefone || "") === telefone
+    );
     pessoaId = alvo?.id ?? candidatos[0].id ?? null;
   }
 
@@ -318,10 +378,13 @@ Deno.serve(async (req) => {
       .single();
 
     if (error || !novaPessoa) {
-      return new Response(JSON.stringify({ reply_message: "Erro ao registrar seus dados." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ reply_message: "Erro ao registrar seus dados." }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     pessoaId = novaPessoa.id;
@@ -335,7 +398,10 @@ Deno.serve(async (req) => {
     .eq("igreja_id", igrejaId)
     .maybeSingle();
 
-  if (inscricaoExistente && inscricaoExistente.status_pagamento !== "cancelado") {
+  if (
+    inscricaoExistente &&
+    inscricaoExistente.status_pagamento !== "cancelado"
+  ) {
     const qrLink = `${APP_URL}/eventos/checkin/${inscricaoExistente.qr_token}`;
     await supabase
       .from("atendimentos_bot")
@@ -351,7 +417,10 @@ Deno.serve(async (req) => {
     );
   }
 
-  if (inscricaoExistente && inscricaoExistente.status_pagamento === "cancelado") {
+  if (
+    inscricaoExistente &&
+    inscricaoExistente.status_pagamento === "cancelado"
+  ) {
     const statusPagamento = evento.requer_pagamento ? "pendente" : "isento";
     await supabase
       .from("inscricoes_eventos")
@@ -393,10 +462,13 @@ Deno.serve(async (req) => {
     .single();
 
   if (inscricaoError || !novaInscricao) {
-    return new Response(JSON.stringify({ reply_message: "Erro ao criar inscricao." }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ reply_message: "Erro ao criar inscricao." }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 
   const qrLink = `${APP_URL}/eventos/checkin/${novaInscricao.qr_token}`;
@@ -404,7 +476,10 @@ Deno.serve(async (req) => {
     ? `Inscricao registrada. Sua vaga esta reservada por 24h. QR: ${qrLink}`
     : `Inscricao confirmada. QR: ${qrLink}`;
 
-  await supabase.from("atendimentos_bot").update({ status: "CONCLUIDO" }).eq("id", sessaoAtual.id);
+  await supabase
+    .from("atendimentos_bot")
+    .update({ status: "CONCLUIDO" })
+    .eq("id", sessaoAtual.id);
 
   return new Response(
     JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink }),

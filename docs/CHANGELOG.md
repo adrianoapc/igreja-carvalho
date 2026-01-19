@@ -8,6 +8,14 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+#### 🤖 Chatbots WhatsApp: Escopo por phone_number_id (19 Jan/2026)
+
+- **Tipo**: automação
+- **Resumo**: Ajuste nos bots `chatbot-triagem`, `chatbot-financeiro` e `inscricao-compartilhe` para escopar sessões de `atendimentos_bot` também por `phone_number_id` (número de envio do WhatsApp Business), evitando colisões entre conversas iniciadas por diferentes números da igreja.
+- **Módulos afetados**: Automações WhatsApp, `atendimentos_bot`
+- **Impacto**: Respostas retornam pelo mesmo número que recebeu a mensagem; continuidade de rota preservada por número de origem.
+
+
 #### ⚙️ Configurações: Filiais, Acesso por Filial e Números WhatsApp (19 Jan/2026)
 
 - **Tipo**: feature
