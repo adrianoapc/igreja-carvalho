@@ -7524,6 +7524,57 @@ export type Database = {
           },
         ]
       }
+      whatsapp_numeros: {
+        Row: {
+          created_at: string | null
+          display_phone_number: string | null
+          enabled: boolean
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          phone_number_id: string | null
+          provider: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_phone_number?: string | null
+          enabled?: boolean
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          phone_number_id?: string | null
+          provider?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_phone_number?: string | null
+          enabled?: boolean
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          phone_number_id?: string | null
+          provider?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_numeros_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_numeros_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       view_absent_kids: {
