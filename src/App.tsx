@@ -110,6 +110,7 @@ const CursoPlayer = lazy(() => import("./pages/CursoPlayer"));
 // Eventos (Hub)
 const EventosGeral = lazy(() => import("./pages/eventos/Geral"));
 const EventosLista = lazy(() => import("./pages/eventos/Eventos"));
+const AgendaPublica = lazy(() => import("./pages/eventos/AgendaPublica"));
 const EventosTimes = lazy(() => import("./pages/eventos/Times"));
 const EventosCategorias = lazy(() => import("./pages/eventos/Categorias"));
 const EventosPosicoes = lazy(() => import("./pages/eventos/Posicoes"));
@@ -680,7 +681,7 @@ const App = () => (
                     path="/eventos/lista"
                     element={
                       <AuthGate>
-                        <EventosLista />
+                        <AgendaPublica />
                       </AuthGate>
                     }
                   />
