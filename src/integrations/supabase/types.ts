@@ -7534,6 +7534,7 @@ export type Database = {
           igreja_id: string
           phone_number_id: string | null
           provider: string
+          tipo: string | null
           updated_at: string | null
         }
         Insert: {
@@ -7545,6 +7546,7 @@ export type Database = {
           igreja_id: string
           phone_number_id?: string | null
           provider?: string
+          tipo?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -7556,6 +7558,7 @@ export type Database = {
           igreja_id?: string
           phone_number_id?: string | null
           provider?: string
+          tipo?: string | null
           updated_at?: string | null
         }
         Relationships: [
