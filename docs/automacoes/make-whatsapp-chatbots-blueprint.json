@@ -1,0 +1,523 @@
+{
+  "name": "WhatsApp Chatbots - Igreja Carvalho (Multi-tenant)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": 1,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {},
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook",
+            "label": "Webhook",
+            "required": true
+          }
+        ],
+        "expect": []
+      },
+      "webhook": {
+        "url": "https://hook.us1.make.com/XXXXXXXX",
+        "name": "WhatsApp Business Cloud API Webhook",
+        "type": "webhook_get",
+        "headers": {},
+        "response": {
+          "statusCode": 200
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false
+      },
+      "mapper": {
+        "url": "https://SEU_PROJETO.supabase.co/functions/v1/consultar-sessao",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer SUA_SUPABASE_ANON_KEY"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": "",
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "followAllRedirects": false,
+        "secureOptions": "",
+        "body": "{\n  \"telefone\": \"{{1.entry[].changes[].value.messages[].from}}\",\n  \"phone_number_id\": \"{{1.entry[].changes[].value.metadata.phone_number_id}}\"\n}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "HTTP: Consultar Sessão Ativa"
+        },
+        "restore": {
+          "expect": {
+            "method": {
+              "mode": "chose",
+              "label": "POST"
+            },
+            "headers": {
+              "mode": "chose",
+              "items": [
+                null,
+                null
+              ]
+            },
+            "qs": {
+              "mode": "chose"
+            },
+            "bodyType": {
+              "label": "Raw"
+            }
+          },
+          "parameters": {
+            "handleErrors": {
+              "mode": "chose"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 2.5,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false
+              },
+              "mapper": {
+                "url": "https://SEU_PROJETO.supabase.co/functions/v1/chatbot-triagem",
+                "serializeUrl": false,
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Authorization",
+                    "value": "Bearer SUA_SUPABASE_ANON_KEY"
+                  },
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "qs": [],
+                "bodyType": "raw",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "followAllRedirects": false,
+                "secureOptions": "",
+                "body": "{\n  \"telefone\": \"{{1.entry[].changes[].value.messages[].from}}\",\n  \"nome_perfil\": \"{{1.entry[].changes[].value.contacts[].profile.name}}\",\n  \"conteudo_texto\": \"{{1.entry[].changes[].value.messages[].text.body}}\",\n  \"tipo_mensagem\": \"{{1.entry[].changes[].value.messages[].type}}\",\n  \"media_id\": \"{{1.entry[].changes[].value.messages[].audio.id}}\",\n  \"origem_canal\": \"whatsapp\",\n  \"phone_number_id\": \"{{1.entry[].changes[].value.metadata.phone_number_id}}\",\n  \"display_phone_number\": \"{{1.entry[].changes[].value.metadata.display_phone_number}}\"\n}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": -150,
+                  "name": "HTTP: Chatbot Triagem"
+                },
+                "restore": {
+                  "expect": {
+                    "method": {
+                      "mode": "chose",
+                      "label": "POST"
+                    },
+                    "headers": {
+                      "mode": "chose",
+                      "items": [
+                        null,
+                        null
+                      ]
+                    },
+                    "qs": {
+                      "mode": "chose"
+                    },
+                    "bodyType": {
+                      "label": "Raw"
+                    }
+                  },
+                  "parameters": {
+                    "handleErrors": {
+                      "mode": "chose"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "condition": "{{or(contains(toLower(1.entry[].changes[].value.messages[].text.body); \"oração\"); contains(toLower(1.entry[].changes[].value.messages[].text.body); \"pastor\"); contains(toLower(1.entry[].changes[].value.messages[].text.body); \"testemunho\"))}}"
+        },
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false
+              },
+              "mapper": {
+                "url": "https://SEU_PROJETO.supabase.co/functions/v1/chatbot-financeiro",
+                "serializeUrl": false,
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Authorization",
+                    "value": "Bearer SUA_SUPABASE_ANON_KEY"
+                  },
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "qs": [],
+                "bodyType": "raw",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "followAllRedirects": false,
+                "secureOptions": "",
+                "body": "{\n  \"telefone\": \"{{1.entry[].changes[].value.messages[].from}}\",\n  \"nome_perfil\": \"{{1.entry[].changes[].value.contacts[].profile.name}}\",\n  \"mensagem\": \"{{1.entry[].changes[].value.messages[].text.body}}\",\n  \"tipo\": \"{{1.entry[].changes[].value.messages[].type}}\",\n  \"url_anexo\": \"{{1.entry[].changes[].value.messages[].document.url or 1.entry[].changes[].value.messages[].image.url}}\",\n  \"origem_canal\": \"whatsapp_financeiro\",\n  \"phone_number_id\": \"{{1.entry[].changes[].value.metadata.phone_number_id}}\",\n  \"display_phone_number\": \"{{1.entry[].changes[].value.metadata.display_phone_number}}\"\n}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 0,
+                  "name": "HTTP: Chatbot Financeiro"
+                },
+                "restore": {
+                  "expect": {
+                    "method": {
+                      "mode": "chose",
+                      "label": "POST"
+                    },
+                    "headers": {
+                      "mode": "chose",
+                      "items": [
+                        null,
+                        null
+                      ]
+                    },
+                    "qs": {
+                      "mode": "chose"
+                    },
+                    "bodyType": {
+                      "label": "Raw"
+                    }
+                  },
+                  "parameters": {
+                    "handleErrors": {
+                      "mode": "chose"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "condition": "{{or(contains(toLower(1.entry[].changes[].value.messages[].text.body); \"reembolso\"); contains(toLower(1.entry[].changes[].value.messages[].text.body); \"conta\"); contains(toLower(1.entry[].changes[].value.messages[].text.body); \"nota\"))}}"
+        },
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false
+              },
+              "mapper": {
+                "url": "https://SEU_PROJETO.supabase.co/functions/v1/inscricao-compartilhe",
+                "serializeUrl": false,
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Authorization",
+                    "value": "Bearer SUA_SUPABASE_ANON_KEY"
+                  },
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "qs": [],
+                "bodyType": "raw",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "followAllRedirects": false,
+                "secureOptions": "",
+                "body": "{\n  \"telefone\": \"{{1.entry[].changes[].value.messages[].from}}\",\n  \"nome_perfil\": \"{{1.entry[].changes[].value.contacts[].profile.name}}\",\n  \"mensagem\": \"{{1.entry[].changes[].value.messages[].text.body}}\",\n  \"tipo_mensagem\": \"{{1.entry[].changes[].value.messages[].type}}\",\n  \"origem_canal\": \"whatsapp_compartilhe\",\n  \"phone_number_id\": \"{{1.entry[].changes[].value.metadata.phone_number_id}}\",\n  \"display_phone_number\": \"{{1.entry[].changes[].value.metadata.display_phone_number}}\",\n  \"metadata\": {\n    \"phone_number_id\": \"{{1.entry[].changes[].value.metadata.phone_number_id}}\",\n    \"display_phone_number\": \"{{1.entry[].changes[].value.metadata.display_phone_number}}\"\n  },\n  \"messages\": [{\n    \"from\": \"{{1.entry[].changes[].value.messages[].from}}\",\n    \"text\": {\n      \"body\": \"{{1.entry[].changes[].value.messages[].text.body}}\"\n    },\n    \"type\": \"{{1.entry[].changes[].value.messages[].type}}\"\n  }]\n}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 150,
+                  "name": "HTTP: Inscrição Compartilhe"
+                },
+                "restore": {
+                  "expect": {
+                    "method": {
+                      "mode": "chose",
+                      "label": "POST"
+                    },
+                    "headers": {
+                      "mode": "chose",
+                      "items": [
+                        null,
+                        null
+                      ]
+                    },
+                    "qs": {
+                      "mode": "chose"
+                    },
+                    "bodyType": {
+                      "label": "Raw"
+                    }
+                  },
+                  "parameters": {
+                    "handleErrors": {
+                      "mode": "chose"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "condition": "{{or(contains(toLower(1.entry[].changes[].value.messages[].text.body); \"inscrição\"); contains(toLower(1.entry[].changes[].value.messages[].text.body); \"inscricao\"); contains(toLower(1.entry[].changes[].value.messages[].text.body); \"compartilhe\"))}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false
+      },
+      "mapper": {
+        "url": "https://graph.facebook.com/v18.0/{{1.entry[].changes[].value.metadata.phone_number_id}}/messages",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer SEU_WHATSAPP_BUSINESS_TOKEN"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": "",
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "followAllRedirects": false,
+        "secureOptions": "",
+        "body": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{1.entry[].changes[].value.messages[].from}}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{if(exists(3.data.text); 3.data.text; if(exists(3.data.reply_message); 3.data.reply_message; if(exists(4.data.text); 4.data.text; if(exists(4.data.reply_message); 4.data.reply_message; if(exists(5.data.text); 5.data.text; if(exists(5.data.reply_message); 5.data.reply_message; 'Desculpe, ocorreu um erro. Tente novamente.'))))))}}\"\n  }\n}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0,
+          "name": "Send WhatsApp Message (Resposta ao Usuário)"
+        },
+        "restore": {
+          "expect": {
+            "method": {
+              "mode": "chose",
+              "label": "POST"
+            },
+            "headers": {
+              "mode": "chose",
+              "items": [
+                null,
+                null
+              ]
+            },
+            "qs": {
+              "mode": "chose"
+            },
+            "bodyType": {
+              "label": "Raw"
+            }
+          },
+          "parameters": {
+            "handleErrors": {
+              "mode": "chose"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "builtin:BasicFilter",
+      "version": 1,
+      "mapper": {
+        "condition": "{{if(or(exists(3.data.notificar_admin); exists(4.data.notificar_admin); exists(5.data.notificar_admin)); or(3.data.notificar_admin; 4.data.notificar_admin; 5.data.notificar_admin); false)}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0,
+          "name": "Filter: Notificar Admin?"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false
+      },
+      "mapper": {
+        "url": "https://graph.facebook.com/v18.0/{{1.entry[].changes[].value.metadata.phone_number_id}}/messages",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer SEU_WHATSAPP_BUSINESS_TOKEN"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": "",
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "followAllRedirects": false,
+        "secureOptions": "",
+        "body": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{if(exists(3.data.telefone_admin_destino); 3.data.telefone_admin_destino; if(exists(4.data.telefone_admin_destino); 4.data.telefone_admin_destino; if(exists(5.data.telefone_admin_destino); 5.data.telefone_admin_destino; '5517988216456')))}}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"🔔 *Nova Solicitação Pastoral*\\n\\n👤 Contato: {{1.entry[].changes[].value.contacts[].profile.name}}\\n📱 Telefone: {{1.entry[].changes[].value.messages[].from}}\\n📋 Motivo: {{if(exists(3.data.dados_contato.motivo); 3.data.dados_contato.motivo; 'Não especificado')}}\\n\\n_Via WhatsApp Bot_\"\n  }\n}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0,
+          "name": "Send WhatsApp to Admin (Notificação)"
+        },
+        "restore": {
+          "expect": {
+            "method": {
+              "mode": "chose",
+              "label": "POST"
+            },
+            "headers": {
+              "mode": "chose",
+              "items": [
+                null,
+                null
+              ]
+            },
+            "qs": {
+              "mode": "chose"
+            },
+            "bodyType": {
+              "label": "Raw"
+            }
+          },
+          "parameters": {
+            "handleErrors": {
+              "mode": "chose"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

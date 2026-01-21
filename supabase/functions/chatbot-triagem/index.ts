@@ -50,17 +50,18 @@ FLUXOS:
 - ORAÇÃO: Colete dados -> JSON (intencao: PEDIDO_ORACAO).
 - PASTOR: Pergunte motivo -> JSON (intencao: SOLICITACAO_PASTORAL).
 - TESTEMUNHO: Colete relato -> JSON (intencao: TESTEMUNHO).
+- INSCRIÇÃO: Detecte interesse em eventos/compartilhe -> JSON (intencao: INSCRICAO_EVENTO).
 FAQ: Cultos Dom 18h30/Qui 19h30. End: Av. Gabriel Jorge Cury 232.
 
 JSON FINAL:
 \`\`\`json
 {
   "concluido": true,
-  "intencao": "PEDIDO_ORACAO" | "TESTEMUNHO" | "SOLICITACAO_PASTORAL",
+  "intencao": "PEDIDO_ORACAO" | "TESTEMUNHO" | "SOLICITACAO_PASTORAL" | "INSCRICAO_EVENTO",
   "nome_final": "...",
   "motivo_resumo": "...",
   "texto_na_integra": "...",
-  "categoria": "SAUDE|FAMILIA|FINANCEIRO|ESPIRITUAL|GABINETE|OUTROS",
+  "categoria": "SAUDE|FAMILIA|FINANCEIRO|ESPIRITUAL|GABINETE|INSCRICAO|OUTROS",
   "anonimo": false,
   "publicar": false,
   "notificar_admin": false
@@ -281,6 +282,23 @@ serve(async (req: Request) => {
       sessaoQuery = sessaoQuery.contains("meta_dados", { phone_number_id: phoneNumberId });
     }
     let { data: sessao } = await sessaoQuery.maybeSingle();
+
+    // TIMEOUT AUTOMÁTICO: Se sessão tem mais de 24h, finaliza automaticamente
+    if (sessao) {
+      const updatedAt = new Date(sessao.updated_at);
+      const now = new Date();
+      const diffHours = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
+      
+      if (diffHours >= 24) {
+        console.log(`[Triagem] Sessão ${sessao.id} expirou (${diffHours.toFixed(1)}h). Finalizando...`);
+        await supabase
+          .from("atendimentos_bot")
+          .update({ status: "TIMEOUT_24H" })
+          .eq("id", sessao.id);
+        
+        sessao = null; // Força criação de nova sessão
+      }
+    }
 
     const historico = sessao ? sessao.historico_conversa : [];
 
@@ -561,6 +579,49 @@ serve(async (req: Request) => {
         responseMessage = parsedJson.publicar
           ? "Glória a Deus! 🙌"
           : "Amém! Salvo.";
+      }
+
+      // CASO 4: INSCRIÇÃO EM EVENTO (Redireciona para inscricao-compartilhe)
+      else if (parsedJson.intencao === "INSCRICAO_EVENTO") {
+        console.log(`[Triagem] Redirecionando para inscricao-compartilhe...`);
+        
+        // IMPORTANTE: NÃO fechamos a sessão do triagem aqui
+        // A inscricao-compartilhe cria sua PRÓPRIA sessão com origem_canal="whatsapp_compartilhe"
+        // Isso permite múltiplas conversas paralelas sem conflito
+        
+        try {
+          const inscricaoResponse = await fetch(
+            `${SUPABASE_URL}/functions/v1/inscricao-compartilhe`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                telefone,
+                nome_perfil,
+                mensagem: inputTexto,
+                phone_number_id: phoneNumberId,
+                display_phone_number: whatsappNumeroNormalizado,
+                igreja_id: igrejaId,
+                filial_id: filialId,
+              }),
+            }
+          );
+
+          const inscricaoData = await inscricaoResponse.json();
+          responseMessage = inscricaoData.text || inscricaoData.reply_message || "Vou te ajudar com a inscrição!";
+          
+          // Fecha a sessão do TRIAGEM para liberar novo assunto
+          await supabase
+            .from("atendimentos_bot")
+            .update({ status: "CONCLUIDO" })
+            .eq("id", sessao.id);
+        } catch (error) {
+          console.error("[Triagem] Erro ao chamar inscricao-compartilhe:", error);
+          responseMessage = "Desculpe, tive um problema ao processar sua inscrição. Tente novamente.";
+        }
       }
     } else {
       // Conversa continua

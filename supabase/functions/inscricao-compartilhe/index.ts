@@ -156,14 +156,15 @@ Deno.serve(async (req) => {
 
   const telefone = normalizePhone(String(telefoneRaw));
   const texto = normalizeText(mensagem);
-  const origemCanal =
-    body.origem_canal ?? body.origem ?? "whatsapp_compartilhe";
+  const origemCanal = "whatsapp_compartilhe"; // FIXO para não conflitar com triagem
 
+  // Busca sessão de INSCRIÇÃO (origem_canal específico)
   const { data: sessao } = await supabase
     .from("atendimentos_bot")
     .select("*")
     .eq("telefone", telefone)
     .eq("origem_canal", origemCanal)
+    .eq("igreja_id", igrejaId)
     // Escopo por número de envio (quando disponível)
     .contains("meta_dados", destino.phoneNumberId ? { phone_number_id: destino.phoneNumberId } : {})
     .neq("status", "CONCLUIDO")
