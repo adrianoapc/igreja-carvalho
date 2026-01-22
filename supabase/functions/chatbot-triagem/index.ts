@@ -10,7 +10,18 @@ interface RequestBody {
   telefone: string;
   nome_perfil: string;
   tipo_mensagem?: "text" | "audio" | "image";
+  
+  // Campos de texto (múltiplos nomes aceitos para compatibilidade com Make.com)
   conteudo_texto?: string;
+  mensagem?: string;
+  text?: string;
+  message?: string;
+  messages?: Array<{ text?: { body?: string } }>;
+  
+  // Campo whatsapp_number para roteamento
+  whatsapp_number?: string;
+  display_phone_number?: string;
+  
   media_id?: string;
 }
 
@@ -217,8 +228,22 @@ serve(async (req: Request) => {
       filial_id?: string;
     };
     requestPayload = body;
+    
+    // Log de debug para diagnóstico de payloads
+    console.log(`[Triagem] Payload recebido - campos: ${Object.keys(body).join(', ')}`);
+    
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
-    let { conteudo_texto } = body;
+    
+    // Fallback para múltiplos nomes de campo de mensagem (compatibilidade Make.com)
+    let conteudo_texto = 
+      body.mensagem ??
+      body.conteudo_texto ??
+      body.text ??
+      body.message ??
+      body.messages?.[0]?.text?.body ??
+      "";
+    
+    console.log(`[Triagem] Texto extraído: "${(conteudo_texto || "").slice(0, 100)}${(conteudo_texto || "").length > 100 ? '...' : ''}"`);
 
     // 0. Identificar igreja/filial pelo whatsapp_number
     const whatsappNumber = body.whatsapp_number ?? body.display_phone_number ?? null;
