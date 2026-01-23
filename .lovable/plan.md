@@ -1,75 +1,53 @@
 
-# Plano: Correção do Fluxo de Detecção de Inscrição
+# Plano: Corrigir Prioridade do Flow Ativo sobre Keywords
 
 ## Problema Identificado
 
-O fluxo atual tem uma falha crítica:
+O código atual tem uma falha de lógica:
 
-1. A IA é chamada para classificar a mensagem "compartilhe"
-2. A IA responde de forma **conversacional** ("Só confirmando...") em vez de retornar um JSON com `concluido: true` e `intencao: INSCRICAO_EVENTO`
-3. Como `parsedJson?.concluido` é `false`/`undefined`, o código **não entra** no fluxo de inscrição
-4. A resposta da IA é enviada diretamente ao usuário, ignorando completamente a busca de eventos
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  if (meta.flow) {                                           │
+│    switch (meta.flow) {                                     │
+│      case "inscricao": return handleFluxoInscricao();       │
+│      case "oracao":                                         │
+│      case "testemunho":                                     │
+│      case "pastoral":                                       │
+│        console.log("Flow ativo...");                        │
+│        break;  ◄── SAI DO SWITCH, MAS NÃO DA FUNÇÃO!        │
+│    }                                                        │
+│  }                                                          │
+│                                                             │
+│  if (detectarIntencaoInscricao(inputTexto)) {  ◄── EXECUTA! │
+│    return iniciarFluxoInscricao();  // SOBRESCREVE O FLOW   │
+│  }                                                          │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### Evidência dos Logs:
-```
-[Triagem] Sem flow ativo, chamando IA para classificação...
-```
-→ Mas NÃO aparece: `[Triagem] IA retornou JSON concluído. Intenção: INSCRICAO_EVENTO`
-→ Nem: `[Triagem] Iniciando fluxo de inscrição integrado...`
+### Cenário que causou o bug:
+1. Usuário inicia testemunho → sessão criada com `flow: "testemunho"`
+2. Usuário envia: "Deus tem dado... **Compartilhe** com os amados..."
+3. Código verifica `meta.flow = "testemunho"` → faz `break`
+4. Código verifica keyword "compartilhe" → **VAI PARA INSCRIÇÃO!**
+5. Como não há eventos → "No momento não temos eventos..."
 
 ## Solução
 
-Adicionar uma **detecção determinística ANTES da chamada à IA** para palavras-chave de inscrição ("compartilhe", "inscrição", "evento", "quero participar", etc.). Se detectado, ir direto para o fluxo de inscrição sem passar pela IA.
+A detecção de keyword só deve acontecer quando **NÃO** há flow ativo. Adicionar uma condição para pular a verificação de keyword se já existe um flow definido.
 
-### Alteração Técnica
+### Alteração no arquivo `supabase/functions/chatbot-triagem/index.ts`
 
-No arquivo `supabase/functions/chatbot-triagem/index.ts`:
-
-#### 1. Nova função de detecção de palavras-chave
+Linha ~768, modificar a condição:
 
 ```typescript
-// Detectar intenção de inscrição por palavras-chave (SEM IA)
-function detectarIntencaoInscricao(texto: string): boolean {
-  const textoNorm = texto.toLowerCase().trim();
-  const keywords = [
-    "compartilhe",
-    "inscricao",
-    "inscrição",
-    "inscrever",
-    "quero participar",
-    "quero me inscrever",
-    "participar do evento",
-    "evento",
-    "workshop",
-    "conferencia",
-    "conferência",
-  ];
-  return keywords.some((kw) => textoNorm.includes(kw));
-}
-```
-
-#### 2. Verificação ANTES de chamar a IA
-
-Após verificar se há flow ativo (linha ~748), adicionar:
-
-```typescript
-// ========== NOVO: DETECÇÃO DETERMINÍSTICA DE INSCRIÇÃO ==========
+// ANTES (bugado):
 if (detectarIntencaoInscricao(inputTexto)) {
-  console.log(`[Triagem] Detectada intenção de inscrição por palavra-chave. Iniciando fluxo direto...`);
-  return await iniciarFluxoInscricao(
-    sessao,
-    inputTexto,
-    supabase,
-    igrejaId!,
-    filialId,
-    nome_perfil
-  );
-}
 
-// ========== SEM FLOW E SEM KEYWORD: CLASSIFICAR COM IA ==========
+// DEPOIS (corrigido):
+if (!meta.flow && detectarIntencaoInscricao(inputTexto)) {
 ```
 
-## Diagrama do Fluxo Corrigido
+## Fluxo Corrigido
 
 ```text
 MENSAGEM RECEBIDA
@@ -85,44 +63,49 @@ MENSAGEM RECEBIDA
    SIM              NÃO
      │               │
      ▼               ▼
-┌──────────┐  ┌────────────────────────────┐
-│ Handler  │  │ 2. DETECTAR KEYWORD?       │◄── NOVO
-│ Direto   │  │ (compartilhe, inscrição...)│
-└──────────┘  └────────────┬───────────────┘
-                           │
-                  ┌────────┴────────┐
-                  │                 │
-                SIM                NÃO
-                  │                 │
-                  ▼                 ▼
-      ┌───────────────────┐  ┌─────────────────┐
-      │ iniciarFluxo      │  │ 3. CHAMAR IA    │
-      │ Inscricao()       │  │ (classificação) │
-      │ (busca eventos,   │  └────────┬────────┘
-      │  fuzzy match)     │           │
-      └───────────────────┘           ▼
-                              ┌─────────────────┐
-                              │ Processar       │
-                              │ resposta IA     │
-                              └─────────────────┘
+┌──────────────────┐  ┌────────────────────────────┐
+│ HANDLER DO FLOW  │  │ 2. DETECTAR KEYWORD?       │
+│ • inscricao→     │  │ (só se NÃO tem flow!)     │
+│   handleFluxo    │  └────────────┬───────────────┘
+│ • outros →       │               │
+│   continua IA    │      ┌────────┴────────┐
+│   (NÃO pula para │      │                 │
+│    inscrição!)   │    SIM                NÃO
+└──────────────────┘      │                 │
+                          ▼                 ▼
+              ┌───────────────────┐  ┌─────────────────┐
+              │ iniciarFluxo      │  │ 3. CHAMAR IA    │
+              │ Inscricao()       │  │ (classificação) │
+              └───────────────────┘  └─────────────────┘
 ```
 
 ## Resumo das Alterações
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/chatbot-triagem/index.ts` | Adicionar função `detectarIntencaoInscricao()` e verificação antes da chamada à IA |
+| `supabase/functions/chatbot-triagem/index.ts` | Adicionar `!meta.flow &&` na condição de detecção de keyword (linha ~769) |
 
-## Benefícios
+## Código Final
 
-1. **Resposta Instantânea**: Mensagens com "compartilhe" não passam mais pela IA
-2. **Fluxo Correto**: A busca de eventos é executada imediatamente
-3. **Sem Eventos**: Usuário recebe a mensagem correta ("No momento não temos eventos...")
-4. **Menor Custo**: Menos chamadas à IA para casos claros
+```typescript
+// ========== DETECÇÃO DETERMINÍSTICA DE INSCRIÇÃO ==========
+// SÓ detecta keyword se NÃO houver flow ativo na sessão
+if (!meta.flow && detectarIntencaoInscricao(inputTexto)) {
+  console.log(`[Triagem] Detectada intenção de inscrição por palavra-chave. Iniciando fluxo direto...`);
+  return await iniciarFluxoInscricao(
+    sessao,
+    inputTexto,
+    supabase,
+    igrejaId!,
+    filialId,
+    nome_perfil
+  );
+}
+```
 
-## Testes Após Implementação
+## Testes Após Correção
 
-1. Enviar "compartilhe" → deve ir direto para `iniciarFluxoInscricao()`
-2. Sem eventos no banco → responder "No momento não temos eventos..."
-3. Com eventos → listar ou confirmar dados
-4. Mensagens genéricas ("oi", "bom dia") → continuar chamando IA
+1. Iniciar testemunho → enviar texto com "compartilhe" → deve continuar no fluxo de testemunho
+2. Enviar "compartilhe" sem sessão ativa → deve ir para fluxo de inscrição
+3. Estar em fluxo de oração → enviar "quero participar do evento" → deve continuar no fluxo de oração
+4. Sem flow ativo → enviar "quero participar" → deve ir para inscrição
