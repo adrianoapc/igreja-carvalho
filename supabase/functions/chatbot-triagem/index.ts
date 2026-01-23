@@ -261,7 +261,15 @@ function extractJsonAndText(aiContent: string): {
       if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
         try {
           const tempJson = JSON.parse(aiContent.substring(firstOpen, lastClose + 1));
-          if (tempJson.concluido) {
+          // Aceita JSON com concluido OU fluxo_atual OU intencao
+          const isUsefulMeta =
+            typeof tempJson === "object" &&
+            tempJson !== null &&
+            (tempJson.concluido === true ||
+              typeof tempJson.fluxo_atual === "string" ||
+              typeof tempJson.intencao === "string");
+
+          if (isUsefulMeta) {
             parsedJson = tempJson;
             cleanText = aiContent.substring(0, firstOpen).trim();
           }
