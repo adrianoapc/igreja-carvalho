@@ -765,8 +765,9 @@ serve(async (req: Request) => {
       }
     }
 
-    // ========== NOVO: DETECÇÃO DETERMINÍSTICA DE INSCRIÇÃO ==========
-    if (detectarIntencaoInscricao(inputTexto)) {
+    // ========== DETECÇÃO DETERMINÍSTICA DE INSCRIÇÃO ==========
+    // SÓ detecta keyword se NÃO houver flow ativo na sessão
+    if (!meta.flow && detectarIntencaoInscricao(inputTexto)) {
       console.log(`[Triagem] Detectada intenção de inscrição por palavra-chave. Iniciando fluxo direto...`);
       return await iniciarFluxoInscricao(
         sessao,
