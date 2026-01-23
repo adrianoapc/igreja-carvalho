@@ -134,6 +134,24 @@ function inferirEvento(
   return eventoExato || null;
 }
 
+// Detectar intenção de inscrição por palavras-chave (SEM IA)
+function detectarIntencaoInscricao(texto: string): boolean {
+  const textoNorm = texto.toLowerCase().trim();
+  const keywords = [
+    "compartilhe",
+    "inscricao",
+    "inscrição",
+    "inscrever",
+    "quero participar",
+    "quero me inscrever",
+    "participar do evento",
+    "workshop",
+    "conferencia",
+    "conferência",
+  ];
+  return keywords.some((kw) => textoNorm.includes(kw));
+}
+
 // Buscar eventos abertos para inscrição
 async function buscarEventosAbertos(
   supabaseClient: SupabaseClient,
@@ -747,8 +765,21 @@ serve(async (req: Request) => {
       }
     }
 
-    // ========== SEM FLOW ATIVO: CLASSIFICAR COM IA ==========
-    console.log(`[Triagem] Sem flow ativo, chamando IA para classificação...`);
+    // ========== NOVO: DETECÇÃO DETERMINÍSTICA DE INSCRIÇÃO ==========
+    if (detectarIntencaoInscricao(inputTexto)) {
+      console.log(`[Triagem] Detectada intenção de inscrição por palavra-chave. Iniciando fluxo direto...`);
+      return await iniciarFluxoInscricao(
+        sessao,
+        inputTexto,
+        supabase,
+        igrejaId!,
+        filialId,
+        nome_perfil
+      );
+    }
+
+    // ========== SEM FLOW E SEM KEYWORD: CLASSIFICAR COM IA ==========
+    console.log(`[Triagem] Sem flow ativo e sem keyword de inscrição, chamando IA para classificação...`);
 
     const messages = [
       { role: "system", content: config.systemPrompt },
