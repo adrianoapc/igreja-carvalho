@@ -1,160 +1,167 @@
 
 
-# Plano: IA Sempre Informa o Fluxo Atual
+# Plano: Corrigir Persistência do Flow na Continuação de Conversa
 
-## Problema Confirmado
+## Problema Raiz Identificado
 
-O código **já está preparado** para capturar `fluxo_atual` (linhas 109-120 e 401-420), mas o **prompt não instrui a IA a retornar isso**.
+O código tem **dois blocos distintos** de atualização de sessão, mas apenas um salva o flow:
 
-### Situação Atual:
 ```text
-Usuário: "Preciso de uma oração"
-IA responde: "Pode me contar mais sobre o motivo?"
-→ Sem JSON, parsedJson = null, flow = null ❌
+if (parsedJson?.concluido) {
+  // Fecha sessão (não precisa salvar flow)
+  ...
+} else {
+  // Conversa continua → NÃO ESTÁ SALVANDO meta_dados.flow! ❌
+  await supabase.from("atendimentos_bot").update({
+    historico_conversa: [...],  // SÓ histórico, sem meta_dados!
+  }).eq("id", sessao.id);
+}
 ```
 
-### Situação Desejada:
+### Fluxo Atual (Bugado)
+
 ```text
-Usuário: "Preciso de uma oração"
-IA responde: "Pode me contar mais sobre o motivo?"
-{"fluxo_atual": "ORACAO"}
-→ parsedJson.fluxo_atual = "ORACAO", flow = "ORACAO" ✓
+Msg 1: "Tenho um testemunho!"
+     │
+     ▼
+IA: "Pode contar?"
+    {"fluxo_atual": "TESTEMUNHO"}
+     │
+     ▼
+pickFlowFromParsed() → "TESTEMUNHO"
+     │
+     ▼
+BLOCO ELSE → update({ historico_conversa: [...] })
+            ❌ NÃO SALVA meta.flow!
+     │
+     ▼
+Msg 2: "Compartilhe com todos..."
+     │
+     ▼
+meta.flow = undefined (não foi salvo!)
+     │
+     ▼
+!meta.flow = true → detectarIntencaoInscricao("Compartilhe") = true
+     │
+     ▼
+→ INSCRIÇÃO EM EVENTO ❌
 ```
 
----
+## Solução
 
-## Alterações Necessárias
+Modificar o bloco `else` (linhas 987-998) para **incluir a persistência de `meta_dados.flow`** usando o valor já extraído por `pickFlowFromParsed()`.
 
-### 1. Atualizar Prompt no Banco de Dados
+### Alteração no arquivo `supabase/functions/chatbot-triagem/index.ts`
 
-Adicionar nova regra obrigatória no início do prompt (tabela `chatbot_configs`, campo `role_texto`):
-
-```
-📌 REGRA OBRIGATÓRIA - TODA RESPOSTA
-
-Em TODA resposta, SEMPRE inclua ao final um JSON mínimo indicando o fluxo atual:
-
-{"fluxo_atual": "FLUXO_X"}
-
-Onde FLUXO_X deve ser:
-- "DUVIDA" → para fluxo 1 (dúvidas sobre a igreja)
-- "ORACAO" → para fluxo 2 (pedido de oração)
-- "TESTEMUNHO" → para fluxo 3 (testemunho)
-- "PASTORAL" → para fluxo 4 (falar com pastor)
-- "INSCRICAO" → para fluxo 5 (inscrição em evento)
-- "FALLBACK" → quando ainda não identificou a intenção
-
-Exemplos:
-
-Durante coleta de dados (oração):
-"Pode me contar mais sobre seu pedido?"
-{"fluxo_atual": "ORACAO"}
-
-Durante coleta de dados (testemunho):
-"Que alegria! Pode nos contar seu testemunho?"
-{"fluxo_atual": "TESTEMUNHO"}
-
-Ao concluir (adicione os campos completos conforme definido):
-"Vamos orar por você com carinho. 🙏"
-{"concluido": true, "intencao": "PEDIDO_ORACAO", "fluxo_atual": "ORACAO", ...}
+**Linhas 987-998 - ANTES:**
+```typescript
+} else {
+  // Conversa continua
+  await supabase
+    .from("atendimentos_bot")
+    .update({
+      historico_conversa: [
+        ...historico,
+        { role: "user", content: inputTexto },
+        { role: "assistant", content: aiContent },
+      ],
+    })
+    .eq("id", sessao.id);
+}
 ```
 
-### 2. Modificar Regras Existentes no Prompt
+**DEPOIS:**
+```typescript
+} else {
+  // Conversa continua - SALVAR FLOW PARA PROTEGER SESSÃO
+  const inferredFlow = pickFlowFromParsed(parsedJson);
+  const currentMeta = (sessao.meta_dados || {}) as SessionMeta;
+  const novoFlow = inferredFlow || currentMeta.flow;
+  
+  if (novoFlow && novoFlow !== currentMeta.flow) {
+    console.log(`[Triagem] Flow detectado pela IA: ${novoFlow} - salvando para proteção da sessão`);
+  }
+  
+  await supabase
+    .from("atendimentos_bot")
+    .update({
+      historico_conversa: [
+        ...historico,
+        { role: "user", content: inputTexto },
+        { role: "assistant", content: aiContent },
+      ],
+      meta_dados: {
+        ...currentMeta,
+        flow: novoFlow,
+      },
+    })
+    .eq("id", sessao.id);
+}
+```
 
-Alterar as regras atuais que dizem "Gere JSON somente ao final" para:
+### Ajuste Adicional: Normalizar Flow para lowercase
 
-**Antes:**
-> "Nunca gere JSON fora dos fluxos 2, 3, 4 ou 5."
-> "Gere o JSON somente ao final"
+O switch (linhas 755-773) espera valores em **lowercase** (`"testemunho"`, `"oracao"`), mas `pickFlowFromParsed` retorna em **UPPERCASE** (`"TESTEMUNHO"`, `"ORACAO"`).
 
-**Depois:**
-> "Sempre gere `{"fluxo_atual": "X"}` em TODA resposta."
-> "Gere o JSON COMPLETO (com concluido: true) somente ao final"
+**Modificar `pickFlowFromParsed` (linhas ~183):**
 
----
+```typescript
+function pickFlowFromParsed(parsed: Record<string, unknown> | null): string | null {
+  if (!parsed) return null;
+  const fluxoAtual = typeof parsed.fluxo_atual === "string" ? parsed.fluxo_atual : null;
+  if (fluxoAtual && fluxoAtual.trim()) {
+    return fluxoAtual.trim().toLowerCase();  // ← CORRIGIR PARA LOWERCASE
+  }
+  const intencao = typeof parsed.intencao === "string" ? parsed.intencao : null;
+  return mapIntencaoToFlow(intencao)?.toLowerCase() || null;  // ← CORRIGIR AQUI TAMBÉM
+}
+```
 
 ## Fluxo Corrigido
 
 ```text
-1. Usuário: "Preciso de uma oração pela minha família"
-2. IA: "Claro! Pode me contar mais?"
-        {"fluxo_atual": "ORACAO"}     ◄── IA INFORMA
-3. extractJsonAndText() captura o JSON
-4. pickFlowFromParsed() retorna "ORACAO"
-5. sessaoMetaNovo = { ...meta, flow: "ORACAO" }
-6. Salva no banco: meta_dados.flow = "ORACAO" ✓
-
-PRÓXIMA MENSAGEM:
-7. Usuário: "Compartilhe com a equipe de intercessão"
-8. Código carrega sessão: meta.flow = "ORACAO" ✓
-9. Se houver detecção de keyword: !meta.flow = false → IGNORA
-10. Continua no fluxo de oração ✓
+Msg 1: "Tenho um testemunho!"
+     │
+     ▼
+IA: "Pode contar?"
+    {"fluxo_atual": "TESTEMUNHO"}
+     │
+     ▼
+pickFlowFromParsed() → "testemunho" (lowercase)
+     │
+     ▼
+BLOCO ELSE → update({ 
+  historico_conversa: [...],
+  meta_dados: { flow: "testemunho" }  ✓
+})
+     │
+     ▼
+Msg 2: "Compartilhe com todos..."
+     │
+     ▼
+meta.flow = "testemunho" ✓
+     │
+     ▼
+switch("testemunho") → case "testemunho": break;
+     │
+     ▼
+SKIP keyword detection (já tem flow)
+     │
+     ▼
+Continua com IA → coleta testemunho ✓
 ```
-
----
-
-## Prompt Atualizado (Completo)
-
-O prompt deve ser atualizado para incluir a nova seção no início e ajustar as regras existentes.
-
-**Nova seção a adicionar (após "⛔ REGRAS CRÍTICAS"):**
-
-```
-📌 REGRA DE FLUXO (OBRIGATÓRIO EM TODA RESPOSTA)
-
-SEMPRE inclua ao final de cada resposta um JSON mínimo:
-{"fluxo_atual": "X"}
-
-Valores possíveis:
-• "DUVIDA" - Pergunta sobre a igreja (FAQ)
-• "ORACAO" - Pedido de oração
-• "TESTEMUNHO" - Compartilhando testemunho
-• "PASTORAL" - Quer falar com pastor
-• "INSCRICAO" - Interesse em evento
-• "FALLBACK" - Não identificou ainda
-
-Isso é SEPARADO do JSON final. Sempre envie.
-```
-
-**Regra a ajustar:**
-- Remover: "Nunca gere JSON fora dos fluxos 2, 3, 4 ou 5"
-- Adicionar: "O JSON de `fluxo_atual` é obrigatório em TODA resposta. O JSON completo (com `concluido: true`) só ao finalizar."
-
----
 
 ## Resumo das Alterações
 
-| Local | Alteração |
-|-------|-----------|
-| Banco: `chatbot_configs.role_texto` | Adicionar regra obrigatória de `fluxo_atual` |
-| Banco: `chatbot_configs.role_texto` | Remover/ajustar "nunca gere JSON fora dos fluxos" |
-
----
-
-## Por que isso funciona?
-
-1. **O código já está pronto**: `pickFlowFromParsed()` já procura por `fluxo_atual`
-2. **A IA sabe exatamente o fluxo**: Ela não vai confundir "bênção" (oração) com "bênção" (testemunho)
-3. **Proteção contra keywords**: Uma vez que `meta.flow` existe, keywords são ignoradas
-4. **Zero alteração no código da edge function**: Só precisa atualizar o prompt no banco
-
----
+| Arquivo | Linha(s) | Alteração |
+|---------|----------|-----------|
+| `supabase/functions/chatbot-triagem/index.ts` | 183-185 | `pickFlowFromParsed`: converter para lowercase |
+| `supabase/functions/chatbot-triagem/index.ts` | 987-998 | Bloco `else`: incluir `meta_dados.flow` no update |
 
 ## Testes Após Implementação
 
-1. **Oração**: Enviar "Preciso de oração" → IA responde com `{"fluxo_atual": "ORACAO"}`
-2. **Proteção**: Continuar com "Compartilhe com os irmãos" → Deve continuar no fluxo de oração
-3. **Testemunho**: Enviar "Tenho um testemunho" → IA responde com `{"fluxo_atual": "TESTEMUNHO"}`
-4. **Fallback**: Enviar "oi" → IA responde com `{"fluxo_atual": "FALLBACK"}`
-5. **Verificar banco**: `SELECT meta_dados FROM atendimentos_bot` → Deve mostrar `flow` correto
-
----
-
-## SQL para Atualização
-
-```sql
-UPDATE chatbot_configs 
-SET role_texto = '...[prompt atualizado]...'
-WHERE id = '00d1b26f-ed8b-4fb3-a588-b47ab149a48d';
-```
+1. **Testemunho protegido**: "Tenho testemunho" → IA responde → enviar "Compartilhe com todos" → deve continuar testemunho
+2. **Oração protegida**: "Preciso de oração" → IA responde → enviar "Compartilhe sua bênção" → deve continuar oração
+3. **Inscrição normal**: Sem sessão → "Compartilhe" → deve ir para inscrição
+4. **Verificar banco**: `SELECT meta_dados FROM atendimentos_bot` → deve mostrar `flow` em lowercase
 
