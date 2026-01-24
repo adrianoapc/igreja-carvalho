@@ -152,6 +152,28 @@ function detectarIntencaoInscricao(texto: string): boolean {
   return keywords.some((kw) => textoNorm.includes(kw));
 }
 
+// Mapear intenção para flow normalizado
+function mapIntencaoToFlow(intencao?: string | null): string | null {
+  const v = (intencao || "").toUpperCase().trim();
+  if (!v) return null;
+  if (v === "PEDIDO_ORACAO") return "oracao";
+  if (v === "TESTEMUNHO") return "testemunho";
+  if (v === "SOLICITACAO_PASTORAL") return "pastoral";
+  if (v === "INSCRICAO_EVENTO") return "inscricao";
+  return null;
+}
+
+// Extrair flow da resposta da IA (sempre lowercase)
+function pickFlowFromParsed(parsed: Record<string, unknown> | null): string | null {
+  if (!parsed) return null;
+  const fluxoAtual = typeof parsed.fluxo_atual === "string" ? parsed.fluxo_atual : null;
+  if (fluxoAtual && fluxoAtual.trim()) {
+    return fluxoAtual.trim().toLowerCase();
+  }
+  const intencao = typeof parsed.intencao === "string" ? parsed.intencao : null;
+  return mapIntencaoToFlow(intencao);
+}
+
 // Buscar eventos abertos para inscrição
 async function buscarEventosAbertos(
   supabaseClient: SupabaseClient,
@@ -985,7 +1007,15 @@ serve(async (req: Request) => {
         responseMessage = parsedJson.publicar ? "Glória a Deus! 🙌" : "Amém! Salvo.";
       }
     } else {
-      // Conversa continua
+      // Conversa continua - SALVAR FLOW PARA PROTEGER SESSÃO
+      const inferredFlow = pickFlowFromParsed(parsedJson);
+      const currentMeta = (sessao.meta_dados || {}) as SessionMeta;
+      const novoFlow = inferredFlow || currentMeta.flow;
+
+      if (novoFlow && novoFlow !== currentMeta.flow) {
+        console.log(`[Triagem] Flow detectado pela IA: ${novoFlow} - salvando para proteção da sessão`);
+      }
+
       await supabase
         .from("atendimentos_bot")
         .update({
@@ -994,6 +1024,10 @@ serve(async (req: Request) => {
             { role: "user", content: inputTexto },
             { role: "assistant", content: aiContent },
           ],
+          meta_dados: {
+            ...currentMeta,
+            flow: novoFlow,
+          },
         })
         .eq("id", sessao.id);
     }
