@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Users, Plus } from "lucide-react";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -37,9 +37,10 @@ interface CalendarioMensalProps {
   cultos: Evento[];
   escalasCount: Record<string, number>;
   onCultoClick: (culto: Evento) => void;
+  onNovoEvento?: () => void;
 }
 
-export default function CalendarioMensal({ cultos, escalasCount, onCultoClick }: CalendarioMensalProps) {
+export default function CalendarioMensal({ cultos, escalasCount, onCultoClick, onNovoEvento }: CalendarioMensalProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const days = useMemo(() => {
@@ -97,6 +98,16 @@ export default function CalendarioMensal({ cultos, escalasCount, onCultoClick }:
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
+          {onNovoEvento && (
+            <Button 
+              size="sm" 
+              onClick={onNovoEvento}
+              className="ml-2 gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Novo Evento</span>
+            </Button>
+          )}
         </div>
       </div>
 

@@ -666,6 +666,7 @@ export default function Eventos() {
             cultos={filteredEventos as any}
             escalasCount={{}}
             onCultoClick={(e) => handleAbrirEvento(e as Evento)}
+            onNovoEvento={handleNovoEvento}
           />
         </TabsContent>
       </Tabs>
