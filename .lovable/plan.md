@@ -1,167 +1,233 @@
 
+# Plano: Corrigir Ações de Criação de Eventos
 
-# Plano: Corrigir Persistência do Flow na Continuação de Conversa
+## Problema Identificado
 
-## Problema Raiz Identificado
+### Estrutura de Rotas Atual
+| Rota | Componente | Descrição |
+|------|------------|-----------|
+| `/eventos` | `EventosGeral` | Centro de Operações (dashboard) |
+| `/eventos/geral` | `EventosGeral` | Alias do Centro de Operações |
+| `/eventos/lista` | `AgendaPublica` | Visão pública simplificada |
+| `/eventos/gestao` | **NÃO EXISTE** | Tela de gestão com calendário + criar/editar |
 
-O código tem **dois blocos distintos** de atualização de sessão, mas apenas um salva o flow:
+### Problemas Encontrados
+1. **Botão "Agendar agora"** navega para `/eventos/lista` (Agenda Pública) - deveria abrir dialog de criação
+2. **Botão "Novo Evento"** no calendário não funciona porque a tela de gestão (`EventosLista`) não tem rota
+3. **Clique nos dias do calendário** não tem handler para abrir o dialog com data pré-selecionada
+4. **O `EventoDialog`** não aceita uma `initialDate` para pré-preencher a data
 
-```text
-if (parsedJson?.concluido) {
-  // Fecha sessão (não precisa salvar flow)
-  ...
-} else {
-  // Conversa continua → NÃO ESTÁ SALVANDO meta_dados.flow! ❌
-  await supabase.from("atendimentos_bot").update({
-    historico_conversa: [...],  // SÓ histórico, sem meta_dados!
-  }).eq("id", sessao.id);
-}
-```
-
-### Fluxo Atual (Bugado)
-
-```text
-Msg 1: "Tenho um testemunho!"
-     │
-     ▼
-IA: "Pode contar?"
-    {"fluxo_atual": "TESTEMUNHO"}
-     │
-     ▼
-pickFlowFromParsed() → "TESTEMUNHO"
-     │
-     ▼
-BLOCO ELSE → update({ historico_conversa: [...] })
-            ❌ NÃO SALVA meta.flow!
-     │
-     ▼
-Msg 2: "Compartilhe com todos..."
-     │
-     ▼
-meta.flow = undefined (não foi salvo!)
-     │
-     ▼
-!meta.flow = true → detectarIntencaoInscricao("Compartilhe") = true
-     │
-     ▼
-→ INSCRIÇÃO EM EVENTO ❌
-```
+---
 
 ## Solução
 
-Modificar o bloco `else` (linhas 987-998) para **incluir a persistência de `meta_dados.flow`** usando o valor já extraído por `pickFlowFromParsed()`.
+### 1. Adicionar Rota de Gestão
+Criar nova rota `/eventos/gestao` que aponta para o componente `EventosLista`.
 
-### Alteração no arquivo `supabase/functions/chatbot-triagem/index.ts`
+### 2. Corrigir "Agendar Agora" no Centro de Operações
+Adicionar o `EventoDialog` diretamente no `Geral.tsx` para que o botão abra o dialog sem navegar.
 
-**Linhas 987-998 - ANTES:**
+### 3. Habilitar Clique nos Dias do Calendário
+Adicionar handlers de clique no `CalendarioMensal` para criar eventos em datas específicas.
+
+### 4. Aceitar Data Inicial no Dialog
+Modificar `EventoDialog` para aceitar uma `initialDate` e pré-preencher o campo de data.
+
+---
+
+## Detalhes Técnicos
+
+### Arquivo 1: `src/App.tsx`
+**Adicionar nova rota** (após linha 690):
 ```typescript
-} else {
-  // Conversa continua
-  await supabase
-    .from("atendimentos_bot")
-    .update({
-      historico_conversa: [
-        ...historico,
-        { role: "user", content: inputTexto },
-        { role: "assistant", content: aiContent },
-      ],
-    })
-    .eq("id", sessao.id);
-}
-```
-
-**DEPOIS:**
-```typescript
-} else {
-  // Conversa continua - SALVAR FLOW PARA PROTEGER SESSÃO
-  const inferredFlow = pickFlowFromParsed(parsedJson);
-  const currentMeta = (sessao.meta_dados || {}) as SessionMeta;
-  const novoFlow = inferredFlow || currentMeta.flow;
-  
-  if (novoFlow && novoFlow !== currentMeta.flow) {
-    console.log(`[Triagem] Flow detectado pela IA: ${novoFlow} - salvando para proteção da sessão`);
+<Route
+  path="/eventos/gestao"
+  element={
+    <AuthGate>
+      <EventosLista />
+    </AuthGate>
   }
-  
-  await supabase
-    .from("atendimentos_bot")
-    .update({
-      historico_conversa: [
-        ...historico,
-        { role: "user", content: inputTexto },
-        { role: "assistant", content: aiContent },
-      ],
-      meta_dados: {
-        ...currentMeta,
-        flow: novoFlow,
-      },
-    })
-    .eq("id", sessao.id);
-}
+/>
 ```
 
-### Ajuste Adicional: Normalizar Flow para lowercase
+---
 
-O switch (linhas 755-773) espera valores em **lowercase** (`"testemunho"`, `"oracao"`), mas `pickFlowFromParsed` retorna em **UPPERCASE** (`"TESTEMUNHO"`, `"ORACAO"`).
+### Arquivo 2: `src/pages/eventos/Geral.tsx`
 
-**Modificar `pickFlowFromParsed` (linhas ~183):**
-
+**Adicionar imports** (topo do arquivo):
 ```typescript
-function pickFlowFromParsed(parsed: Record<string, unknown> | null): string | null {
-  if (!parsed) return null;
-  const fluxoAtual = typeof parsed.fluxo_atual === "string" ? parsed.fluxo_atual : null;
-  if (fluxoAtual && fluxoAtual.trim()) {
-    return fluxoAtual.trim().toLowerCase();  // ← CORRIGIR PARA LOWERCASE
-  }
-  const intencao = typeof parsed.intencao === "string" ? parsed.intencao : null;
-  return mapIntencaoToFlow(intencao)?.toLowerCase() || null;  // ← CORRIGIR AQUI TAMBÉM
+import EventoDialog from "@/components/eventos/EventoDialog";
+```
+
+**Adicionar estado** (após linha 63):
+```typescript
+const [eventoDialogOpen, setEventoDialogOpen] = useState(false);
+```
+
+**Alterar botão "Agendar agora"** (linha 366):
+```typescript
+// DE:
+<Button variant="link" onClick={() => navigate("/eventos/lista")}>
+  Agendar agora
+</Button>
+
+// PARA:
+<Button variant="link" onClick={() => setEventoDialogOpen(true)}>
+  Agendar agora
+</Button>
+```
+
+**Adicionar o dialog** (antes do fechamento do return):
+```typescript
+<EventoDialog
+  open={eventoDialogOpen}
+  onOpenChange={setEventoDialogOpen}
+  evento={null}
+  onSuccess={() => {
+    loadDashboardData();
+    setEventoDialogOpen(false);
+  }}
+/>
+```
+
+---
+
+### Arquivo 3: `src/components/eventos/CalendarioMensal.tsx`
+
+**Atualizar interface** (linha 36-41):
+```typescript
+interface CalendarioMensalProps {
+  cultos: Evento[];
+  escalasCount: Record<string, number>;
+  onCultoClick: (culto: Evento) => void;
+  onNovoEvento?: () => void;
+  onDayClick?: (date: Date) => void;  // NOVO
 }
 ```
 
-## Fluxo Corrigido
-
-```text
-Msg 1: "Tenho um testemunho!"
-     │
-     ▼
-IA: "Pode contar?"
-    {"fluxo_atual": "TESTEMUNHO"}
-     │
-     ▼
-pickFlowFromParsed() → "testemunho" (lowercase)
-     │
-     ▼
-BLOCO ELSE → update({ 
-  historico_conversa: [...],
-  meta_dados: { flow: "testemunho" }  ✓
-})
-     │
-     ▼
-Msg 2: "Compartilhe com todos..."
-     │
-     ▼
-meta.flow = "testemunho" ✓
-     │
-     ▼
-switch("testemunho") → case "testemunho": break;
-     │
-     ▼
-SKIP keyword detection (já tem flow)
-     │
-     ▼
-Continua com IA → coleta testemunho ✓
+**Adicionar onClick nos dias** (linhas 138-146):
+```typescript
+<div
+  key={day.toISOString()}
+  onClick={() => {
+    // Clique simples em dia vazio abre criação
+    if (dayCultos.length === 0 && onDayClick && isCurrentMonth) {
+      onDayClick(day);
+    }
+  }}
+  onDoubleClick={() => {
+    // Duplo clique sempre abre criação
+    if (onDayClick && isCurrentMonth) {
+      onDayClick(day);
+    }
+  }}
+  className={cn(
+    "min-h-[80px] sm:min-h-[100px] p-1 sm:p-2 border rounded-lg",
+    "transition-colors",
+    !isCurrentMonth && "bg-muted/30",
+    isToday && "border-primary bg-primary/5",
+    dayCultos.length > 0 && "cursor-pointer hover:bg-accent/50",
+    dayCultos.length === 0 && isCurrentMonth && "cursor-pointer hover:bg-primary/10 hover:border-primary/50"
+  )}
+>
 ```
+
+---
+
+### Arquivo 4: `src/pages/eventos/Eventos.tsx`
+
+**Adicionar estado para data inicial** (após linha 138):
+```typescript
+const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
+```
+
+**Adicionar handler de clique no dia** (após handleNovoEvento):
+```typescript
+const handleDayClick = (date: Date) => {
+  setInitialDate(date);
+  setEditingEvento(null);
+  setEventoDialogOpen(true);
+};
+```
+
+**Passar prop para CalendarioMensal** (linhas 665-670):
+```typescript
+<CalendarioMensal
+  cultos={filteredEventos as any}
+  escalasCount={{}}
+  onCultoClick={(e) => handleAbrirEvento(e as Evento)}
+  onNovoEvento={handleNovoEvento}
+  onDayClick={handleDayClick}  // NOVO
+/>
+```
+
+**Passar initialDate para EventoDialog** (linhas 674-682):
+```typescript
+<EventoDialog
+  open={eventoDialogOpen}
+  onOpenChange={(open) => {
+    setEventoDialogOpen(open);
+    if (!open) setInitialDate(undefined);
+  }}
+  evento={editingEvento}
+  initialDate={initialDate}  // NOVO
+  onSuccess={() => {
+    loadEventos();
+    loadKPIs();
+    setInitialDate(undefined);
+  }}
+/>
+```
+
+---
+
+### Arquivo 5: `src/components/eventos/EventoDialog.tsx`
+
+**Atualizar interface** (linhas 61-66):
+```typescript
+interface EventoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  evento?: Evento | null;
+  onSuccess: () => void;
+  initialDate?: Date;  // NOVO
+}
+```
+
+**Atualizar desestruturação do componente:**
+```typescript
+export default function EventoDialog({
+  open,
+  onOpenChange,
+  evento,
+  onSuccess,
+  initialDate,  // NOVO
+}: EventoDialogProps) {
+```
+
+**Usar initialDate nos valores default do form:**
+No `useEffect` que reseta o form, usar `initialDate` como valor padrão para `data_evento` quando não há evento sendo editado.
+
+---
+
+## Comportamento Final Esperado
+
+| Ação | Resultado |
+|------|-----------|
+| Botão "Agendar agora" | Abre dialog de criação |
+| Botão "Novo Evento" no calendário | Abre dialog de criação |
+| Clique em dia vazio | Abre dialog com data pré-selecionada |
+| Duplo clique em qualquer dia | Abre dialog com data pré-selecionada |
+| Clique em evento existente | Abre detalhes do evento |
+
+---
 
 ## Resumo das Alterações
 
-| Arquivo | Linha(s) | Alteração |
-|---------|----------|-----------|
-| `supabase/functions/chatbot-triagem/index.ts` | 183-185 | `pickFlowFromParsed`: converter para lowercase |
-| `supabase/functions/chatbot-triagem/index.ts` | 987-998 | Bloco `else`: incluir `meta_dados.flow` no update |
-
-## Testes Após Implementação
-
-1. **Testemunho protegido**: "Tenho testemunho" → IA responde → enviar "Compartilhe com todos" → deve continuar testemunho
-2. **Oração protegida**: "Preciso de oração" → IA responde → enviar "Compartilhe sua bênção" → deve continuar oração
-3. **Inscrição normal**: Sem sessão → "Compartilhe" → deve ir para inscrição
-4. **Verificar banco**: `SELECT meta_dados FROM atendimentos_bot` → deve mostrar `flow` em lowercase
-
+| Arquivo | Alteração Principal |
+|---------|---------------------|
+| `src/App.tsx` | Adicionar rota `/eventos/gestao` |
+| `src/pages/eventos/Geral.tsx` | Adicionar `EventoDialog` + corrigir botão |
+| `src/components/eventos/CalendarioMensal.tsx` | Adicionar `onDayClick` + handlers de clique |
+| `src/pages/eventos/Eventos.tsx` | Adicionar `initialDate` + `handleDayClick` |
+| `src/components/eventos/EventoDialog.tsx` | Aceitar `initialDate` prop |
