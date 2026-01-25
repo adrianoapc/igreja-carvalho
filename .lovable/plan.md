@@ -1,166 +1,150 @@
 
+# Plano: Correção de Bugs na Navegação e Edição de Eventos
 
-# Plano Consolidado: Gestão Completa de Inscrições em Eventos
+## Diagnóstico dos Problemas
 
-## Visão Geral
+Após análise detalhada, identifiquei **3 problemas principais**:
 
-Este plano unifica duas funcionalidades complementares:
-1. **Criação/Edição**: Permitir configurar inscrição e pagamento ao criar/editar evento
-2. **Visualização**: Exibir aba de inscritos nos detalhes do evento
+| Problema | Causa | Local |
+|----------|-------|-------|
+| Não permite editar evento | `EventoDialog` recebe `evento={null}` fixo | `Geral.tsx:540` |
+| Botão "Novo" não funciona corretamente | Funciona, mas está na página errada (dashboard) | Navegação |
+| Duplo clique no calendário não faz nada | A página Geral não tem calendário interativo | Ausência de feature |
 
 ---
 
-## Parte 1: EventoDialog - Campos de Inscrição e Pagamento
+## Estrutura Atual de Rotas
 
-### Arquivo: `src/components/eventos/EventoDialog.tsx`
-
-#### 1.1 Adicionar estados para dados financeiros
-```typescript
-const [categoriasFinanceiras, setCategoriasFinanceiras] = useState<{id: string; nome: string}[]>([]);
-const [contasFinanceiras, setContasFinanceiras] = useState<{id: string; nome: string}[]>([]);
+```
+/eventos        → EventosGeral (Dashboard - Centro de Operações)
+/eventos/geral  → EventosGeral (Dashboard - Centro de Operações)
+/eventos/gestao → EventosLista (Gestão completa com lista/calendário)
+/eventos/lista  → AgendaPublica (Visualização pública da agenda)
 ```
 
-#### 1.2 Adicionar watches para controle condicional
+**O problema é conceitual**: O Centro de Operações (`/eventos`) é um dashboard de visão geral e não foi projetado para gestão completa. A gestão com calendário interativo está em `/eventos/gestao`.
+
+---
+
+## Solução Proposta
+
+### Opção A: Unificar na mesma página (recomendado)
+Adicionar capacidade de edição e calendário interativo na página principal.
+
+### Alterações no arquivo `src/pages/eventos/Geral.tsx`:
+
+#### 1. Adicionar estado para edição de evento
 ```typescript
-const tipoSelecionado = form.watch("tipo");
-const requerInscricao = form.watch("requer_inscricao");
-const requerPagamento = form.watch("requer_pagamento");
+const [editingEvento, setEditingEvento] = useState<Evento | null>(null);
+const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
 ```
 
-#### 1.3 Carregar categorias e contas financeiras
+#### 2. Adicionar função de edição
 ```typescript
-const loadDadosFinanceiros = async () => {
-  const [catRes, contaRes] = await Promise.all([
-    supabase.from("categorias_financeiras").select("id, nome").eq("ativo", true),
-    supabase.from("contas").select("id, nome").eq("ativo", true)
-  ]);
-  setCategoriasFinanceiras(catRes.data || []);
-  setContasFinanceiras(contaRes.data || []);
+const handleEditarEvento = (evento: Evento) => {
+  setEditingEvento(evento);
+  setEventoDialogOpen(true);
+};
+
+const handleDayClick = (date: Date) => {
+  setInitialDate(date);
+  setEditingEvento(null);
+  setEventoDialogOpen(true);
 };
 ```
 
-#### 1.4 Nova seção de Inscrições (apenas para tipo EVENTO)
+#### 3. Adicionar um calendário compacto (opcional)
+Adicionar o componente `CalendarioMensal` na coluna direita para permitir criação rápida via clique/duplo-clique.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ 📋 INSCRIÇÕES                                           │
-├─────────────────────────────────────────────────────────┤
-│ [ ] Requer Inscrição                                    │
-│                                                         │
-│   Limite de Vagas: [____]   Até: [__/__/__]            │
-│                                                         │
-│   [ ] Evento Pago                                       │
-│                                                         │
-│   Valor: R$ [____]                                      │
-│   Categoria Financeira: [Eventos          ▼]            │
-│   Conta de Destino: [Santander            ▼]            │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### 1.5 Atualizar payload no onSubmit
+#### 4. Corrigir o EventoDialog
 ```typescript
-const payload = {
-  // ... campos existentes ...
-  requer_inscricao: data.requer_inscricao || false,
-  requer_pagamento: data.requer_pagamento || false,
-  valor_inscricao: data.requer_pagamento ? data.valor_inscricao : null,
-  vagas_limite: data.requer_inscricao ? data.vagas_limite : null,
-  inscricoes_abertas_ate: data.requer_inscricao && data.inscricoes_abertas_ate 
-    ? data.inscricoes_abertas_ate.toISOString() 
-    : null,
-  categoria_financeira_id: data.requer_pagamento ? data.categoria_financeira_id : null,
-  conta_financeira_id: data.requer_pagamento ? data.conta_financeira_id : null,
+<EventoDialog
+  open={eventoDialogOpen}
+  onOpenChange={(open) => {
+    setEventoDialogOpen(open);
+    if (!open) {
+      setEditingEvento(null);
+      setInitialDate(undefined);
+    }
+  }}
+  evento={editingEvento}
+  initialDate={initialDate}
+  onSuccess={() => {
+    loadDashboardData();
+    setEventoDialogOpen(false);
+    setEditingEvento(null);
+    setInitialDate(undefined);
+  }}
+/>
+```
+
+#### 5. Permitir edição do próximo evento
+Adicionar botão de edição no card do próximo evento:
+```typescript
+<Button
+  variant="ghost"
+  size="icon"
+  onClick={(e) => {
+    e.stopPropagation();
+    handleEditarEvento(nextEvent);
+  }}
+>
+  <Edit className="h-4 w-4" />
+</Button>
+```
+
+---
+
+## Alternativa B: Redirecionar para Gestão
+
+Se preferir manter as páginas separadas, podemos:
+
+1. Mudar o botão "Novo Evento" para navegar para `/eventos/gestao`
+2. Adicionar link claro "Gerenciar Eventos" que leva à página de gestão
+
+---
+
+## Interface para Buscar Evento para Edição
+
+Como a página Geral carrega apenas o próximo evento, precisamos:
+1. Carregar dados completos do evento ao clicar
+2. Ou buscar do banco quando o usuário clicar em editar
+
+```typescript
+const handleEditarEvento = async (eventoId: string) => {
+  const { data } = await supabase
+    .from("eventos")
+    .select("*")
+    .eq("id", eventoId)
+    .single();
+  
+  if (data) {
+    setEditingEvento(data);
+    setEventoDialogOpen(true);
+  }
 };
-```
-
-#### 1.6 Carregar valores ao editar evento existente
-Atualizar `form.reset` para incluir campos de inscrição.
-
----
-
-## Parte 2: EventoDetalhes - Aba de Inscrições
-
-### Arquivo: `src/pages/EventoDetalhes.tsx`
-
-#### 2.1 Adicionar import do ícone
-```typescript
-import { Ticket } from "lucide-react";
-```
-
-#### 2.2 Adicionar variável de controle
-```typescript
-const mostrarInscricoes = evento?.requer_inscricao === true;
-```
-
-#### 2.3 Adicionar TabsTrigger (após Check-in)
-```typescript
-{mostrarInscricoes && (
-  <TabsTrigger
-    value="inscricoes"
-    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
-  >
-    <Ticket className="h-4 w-4 mr-2" />
-    <span className="hidden sm:inline">Inscrições</span>
-  </TabsTrigger>
-)}
-```
-
-#### 2.4 Adicionar TabsContent
-```typescript
-{mostrarInscricoes && (
-  <TabsContent value="inscricoes" className="mt-6">
-    <InscricoesTabContent 
-      eventoId={id!} 
-      evento={{
-        id: evento.id,
-        titulo: evento.titulo,
-        requer_pagamento: evento.requer_pagamento,
-        valor_inscricao: evento.valor_inscricao,
-        vagas_limite: evento.vagas_limite,
-        categoria_financeira_id: evento.categoria_financeira_id,
-        conta_financeira_id: evento.conta_financeira_id,
-      }}
-    />
-  </TabsContent>
-)}
-```
-
----
-
-## Fluxo Completo do Usuário
-
-```
-1. Criar/Editar Evento
-   └─> Tipo: EVENTO
-       └─> Marcar "Requer Inscrição"
-           └─> Definir vagas e prazo
-           └─> Marcar "Evento Pago" (opcional)
-               └─> Definir valor, categoria e conta
-
-2. Visualizar Evento
-   └─> Se requer_inscricao = true
-       └─> Aba "Inscrições" aparece
-           └─> Ver inscritos, confirmar pagamentos, adicionar manual
 ```
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Alterações |
-|---------|------------|
-| `src/components/eventos/EventoDialog.tsx` | Estados, watches, carregamento de dados financeiros, nova seção UI, payload atualizado, reset com valores existentes |
-| `src/pages/EventoDetalhes.tsx` | Variável de controle, TabsTrigger e TabsContent condicionais para inscrições |
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/eventos/Geral.tsx` | Adicionar estados `editingEvento` e `initialDate` |
+| `src/pages/eventos/Geral.tsx` | Adicionar funções `handleEditarEvento` e `handleDayClick` |
+| `src/pages/eventos/Geral.tsx` | Corrigir props do `EventoDialog` |
+| `src/pages/eventos/Geral.tsx` | Carregar evento completo para edição |
+| `src/pages/eventos/Geral.tsx` | Adicionar botão de edição no card do próximo evento |
+| `src/pages/eventos/Geral.tsx` | (Opcional) Adicionar calendário compacto na coluna lateral |
 
 ---
 
 ## Resultado Esperado
 
-| Ação | Resultado |
-|------|-----------|
-| Criar evento tipo EVENTO | Seção de inscrições disponível |
-| Marcar "Requer Inscrição" | Campos de vagas e prazo aparecem |
-| Marcar "Evento Pago" | Campos de valor e financeiro aparecem |
-| Abrir detalhes de evento com inscrição | Aba "Inscrições" visível |
-| Aba Inscrições | Lista inscritos, KPIs, ações de gestão |
-
+| Ação | Comportamento Atual | Comportamento Após Correção |
+|------|---------------------|----------------------------|
+| Clicar "Novo Evento" | Abre dialog de criação | Abre dialog de criação ✓ |
+| Editar próximo evento | Não é possível | Botão de edição abre dialog preenchido |
+| Duplo clique no calendário | Não existe calendário | Calendário na lateral permite criar evento na data |
+| Clicar no card do evento | Navega para detalhes | Navega para detalhes + botão editar disponível |
