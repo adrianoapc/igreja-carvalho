@@ -1,124 +1,58 @@
 
-# Plano: Eliminar Redundância de Edição na Página de Detalhes
+# Plano: Adicionar Validação de `requer_inscricao` no `inscricao-compartilhe`
 
-## Problema Atual
+## Problema Identificado
 
-Existem **duas interfaces de edição competindo**:
-- Botão "Editar Evento" (header) → Dialog completo
-- Card "Informações do Evento" (aba Visão Geral) → Formulário parcial com "Salvar Alterações"
+| Edge Function | Valida `requer_inscricao`? | Status |
+|---------------|---------------------------|--------|
+| `chatbot-triagem` | ✅ Sim (linha 200) | OK |
+| `inscricao-compartilhe` | ❌ Não | **Precisa corrigir** |
 
-Isso é confuso e redundante.
-
----
-
-## Estratégia Proposta: Unificar para Dialog Completo
-
-### Remover o formulário duplicado e manter apenas o Dialog
-
-A aba "Visão Geral" passa a ser **somente visualização** com um botão de edição que abre o Dialog completo.
+A função `inscricao-compartilhe` filtra eventos apenas pelo subtipo "Ação Social", mas não verifica se o evento realmente requer inscrição. Isso pode causar:
+- Inscrições em eventos que não deveriam ter inscrições
+- Comportamento inconsistente entre os dois canais de inscrição
 
 ---
 
-## Alterações no Arquivo `src/pages/EventoDetalhes.tsx`
+## Solução
 
-### 1. Remover Estados de Formulário Desnecessários
+Adicionar `.eq("requer_inscricao", true)` na query de eventos em `inscricao-compartilhe`.
+
+---
+
+## Alteração no Arquivo
+
+**Arquivo:** `supabase/functions/inscricao-compartilhe/index.ts`
+
+**Linhas 296-306** - Adicionar filtro:
+
 ```typescript
-// REMOVER estes estados:
-const [tema, setTema] = useState("");
-const [pregador, setPregador] = useState("");
-const [local, setLocal] = useState("");
-const [observacoes, setObservacoes] = useState("");
-const [status, setStatus] = useState("planejado");
-
-// REMOVER função handleSave (que salva campos parciais)
-```
-
-### 2. Remover Sincronização de Estados no loadEvento
-```typescript
-// REMOVER estas linhas do loadEvento:
-setTema(normalized.tema || "");
-setPregador(normalized.pregador || "");
-setLocal(normalized.local || "");
-setObservacoes(normalized.observacoes || "");
-setStatus(normalized.status);
-```
-
-### 3. Transformar Card de "Informações" em Visualização
-Substituir o formulário editável por uma exibição limpa dos dados com botão de edição:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ Informações do Evento                    [Editar ✏️]    │
-├─────────────────────────────────────────────────────────┤
-│ Tema: Família de Deus                                   │
-│ Pregador: Pr. Carlos Silva                              │
-│ Local: Templo Sede                                      │
-│ Status: 🟢 Confirmado                                   │
-│                                                         │
-│ Observações:                                            │
-│ Culto especial com participação do coral                │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 4. Mover Botão "Editar" do Header para o Card
-O botão de edição fica **dentro do Card** de informações, não no header global.
-
-### 5. Limpar Header
-Remover o botão "Editar Evento" redundante do header, mantendo apenas:
-- QR Check-in
-- Notificar Escalados  
-- Modo Apresentação
-
----
-
-## Interface Final da Aba "Visão Geral"
-
-```
-┌─ KPI Cards ─────────────────────────────────────────────┐
-│ [⏱ Duração: 90 min] [👥 Escalados: 12] [✓ Liturgia: 8] │
-└─────────────────────────────────────────────────────────┘
-
-┌─ Informações do Evento ─────────────────────────────────┐
-│                                           [✏️ Editar]   │
-│                                                         │
-│ 📋 Tema         Família de Deus                         │
-│ 🎤 Pregador     Pr. Carlos Silva                        │
-│ 📍 Local        Templo Sede                             │
-│ 📊 Status       🟢 Confirmado                           │
-│                                                         │
-│ 📝 Observações                                          │
-│ Culto especial com participação do coral infantil.      │
-└─────────────────────────────────────────────────────────┘
+let eventoQuery = supabase
+  .from("eventos")
+  .select(
+    "id, titulo, data_evento, status, requer_pagamento, valor_inscricao, vagas_limite, inscricoes_abertas_ate, igreja_id"
+  )
+  .eq("igreja_id", igrejaId)
+  .eq("subtipo_id", subtipo.id)
+  .eq("status", "confirmado")
+  .eq("requer_inscricao", true)  // ✅ ADICIONAR ESTA LINHA
+  .gte("data_evento", agoraIso)
+  .order("data_evento", { ascending: true })
+  .limit(1);
 ```
 
 ---
 
-## Resumo das Alterações
+## Resumo
 
-| Ação | Arquivo |
-|------|---------|
-| Remover estados locais do formulário | `EventoDetalhes.tsx` |
-| Remover função `handleSave` | `EventoDetalhes.tsx` |
-| Remover botão "Editar Evento" do header | `EventoDetalhes.tsx` |
-| Substituir formulário por visualização | `EventoDetalhes.tsx` |
-| Adicionar botão "Editar" no CardHeader | `EventoDetalhes.tsx` |
-| Manter `EventoDialog` para edição completa | `EventoDetalhes.tsx` |
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/inscricao-compartilhe/index.ts` | Adicionar `.eq("requer_inscricao", true)` na query (linha 303) |
 
 ---
 
-## Benefícios
+## Benefício
 
-| Antes | Depois |
-|-------|--------|
-| 2 formas de editar (confuso) | 1 única forma (Dialog completo) |
-| Formulário parcial (incompleto) | Edição completa sempre |
-| Botão no header + formulário embaixo | Botão contextual no card |
-| Estados duplicados | Estados limpos |
-
----
-
-## Resultado Esperado
-
-- Clicar no botão "Editar" no card → abre `EventoDialog` com todos os dados
-- Salvar no Dialog → atualiza a visualização automaticamente
-- Interface limpa e sem redundância
+- Garante consistência entre os dois canais de inscrição (chatbot-triagem e inscricao-compartilhe)
+- Previne inscrições em eventos que não estão configurados para aceitar inscrições
+- Evita erros silenciosos quando um evento de "Ação Social" não tem `requer_inscricao` habilitado
