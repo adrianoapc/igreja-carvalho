@@ -22,7 +22,6 @@ import {
   Clock,
   MapPin,
   CalendarCheck,
-  UserPlus,
   AlertCircle,
   CheckCircle2,
   Flame,
@@ -30,16 +29,35 @@ import {
   LayoutTemplate,
   Plus,
   Send,
+  Edit,
 } from "lucide-react";
 import { format, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-interface NextEvent {
+interface Evento {
   id: string;
+  tipo: "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
   titulo: string;
+  descricao: string | null;
   data_evento: string;
-  tipo: string;
+  duracao_minutos: number | null;
   local: string | null;
+  endereco: string | null;
+  pregador: string | null;
+  tema: string | null;
+  status: string;
+  subtipo_id?: string | null;
+  recorrencia?: string | null;
+  requer_inscricao?: boolean | null;
+  requer_pagamento?: boolean | null;
+  valor_inscricao?: number | null;
+  vagas_limite?: number | null;
+  inscricoes_abertas_ate?: string | null;
+  categoria_financeira_id?: string | null;
+  conta_financeira_id?: string | null;
+}
+
+interface NextEvent extends Evento {
   hora: string;
 }
 
@@ -63,6 +81,8 @@ export default function EventosGeral() {
     buracosEscala: 0,
   });
   const [eventoDialogOpen, setEventoDialogOpen] = useState(false);
+  const [editingEvento, setEditingEvento] = useState<Evento | null>(null);
+  const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
 
   const {
     ativo: relogioAtivo,
@@ -84,7 +104,7 @@ export default function EventosGeral() {
       // 1. Próximo Evento
       const { data: nextEvents } = await supabase
         .from("eventos")
-        .select("id, titulo, data_evento, tipo, local")
+        .select("*")
         .gte("data_evento", nowISO)
         .order("data_evento", { ascending: true })
         .limit(1);
@@ -94,8 +114,11 @@ export default function EventosGeral() {
         const dateObj = new Date(evt.data_evento);
         setNextEvent({
           ...evt,
+          tipo: evt.tipo as Evento["tipo"],
           hora: format(dateObj, "HH:mm"),
         });
+      } else {
+        setNextEvent(null);
       }
 
       // 2. Saúde Escalas (Mock Visual para não quebrar se tabelas faltarem)
@@ -156,6 +179,40 @@ export default function EventosGeral() {
     }
   };
 
+  const handleEditarEvento = async (eventoId: string) => {
+    try {
+      const { data } = await supabase
+        .from("eventos")
+        .select("*")
+        .eq("id", eventoId)
+        .maybeSingle();
+
+      if (data) {
+        setEditingEvento({
+          ...data,
+          tipo: data.tipo as Evento["tipo"],
+        });
+        setEventoDialogOpen(true);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar evento para edição:", error);
+    }
+  };
+
+  const handleNovoEvento = (date?: Date) => {
+    setEditingEvento(null);
+    setInitialDate(date);
+    setEventoDialogOpen(true);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setEventoDialogOpen(open);
+    if (!open) {
+      setEditingEvento(null);
+      setInitialDate(undefined);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       {/* Header */}
@@ -180,7 +237,7 @@ export default function EventosGeral() {
           </Button>
           <Button
             size="lg"
-            onClick={() => setEventoDialogOpen(true)}
+            onClick={() => handleNovoEvento()}
             className="bg-primary shadow-lg w-full sm:w-auto"
           >
             <Plus className="mr-2 h-5 w-5" />
@@ -295,13 +352,26 @@ export default function EventosGeral() {
               <CardHeader className="pb-2 pt-6 px-6">
                 <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
                   <div className="space-y-3">
-                    <Badge
-                      className={`${getTipoColor(
-                        nextEvent.tipo
-                      )} px-3 py-1 text-xs uppercase tracking-wider`}
-                    >
-                      {nextEvent.tipo}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={`${getTipoColor(
+                          nextEvent.tipo
+                        )} px-3 py-1 text-xs uppercase tracking-wider`}
+                      >
+                        {nextEvent.tipo}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditarEvento(nextEvent.id);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <CardTitle className="text-3xl md:text-4xl font-bold leading-tight text-foreground">
                       {nextEvent.titulo}
                     </CardTitle>
@@ -365,7 +435,7 @@ export default function EventosGeral() {
           <Card className="h-[200px] flex flex-col items-center justify-center text-muted-foreground bg-muted/30 border-dashed">
               <CalendarCheck className="h-12 w-12 mb-4 opacity-50" />
               <p>Nenhum evento futuro agendado.</p>
-              <Button variant="link" onClick={() => setEventoDialogOpen(true)}>
+              <Button variant="link" onClick={() => handleNovoEvento()}>
                 Agendar agora
               </Button>
             </Card>
@@ -536,11 +606,12 @@ export default function EventosGeral() {
 
       <EventoDialog
         open={eventoDialogOpen}
-        onOpenChange={setEventoDialogOpen}
-        evento={null}
+        onOpenChange={handleDialogClose}
+        evento={editingEvento}
+        initialDate={initialDate}
         onSuccess={() => {
           loadDashboardData();
-          setEventoDialogOpen(false);
+          handleDialogClose(false);
         }}
       />
     </div>
