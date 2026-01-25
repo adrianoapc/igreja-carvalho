@@ -34,6 +34,8 @@ import {
   QrCode,
   Send,
   Loader2,
+  Pencil,
+  Ticket,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -50,8 +52,7 @@ import EscalasTabContent from "@/components/eventos/EscalasTabContent";
 import InscricoesTabContent from "@/components/eventos/InscricoesTabContent";
 import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
 import EscalaTimeline from "@/components/escalas/EscalaTimeline";
-
-import { Ticket } from "lucide-react";
+import EventoDialog from "@/components/eventos/EventoDialog";
 
 interface Evento {
   id: string;
@@ -127,6 +128,7 @@ export default function EventoDetalhes() {
   const [activeTab, setActiveTab] = useState(
     searchParams.get("tab") || "visao-geral"
   );
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Form state
   const [tema, setTema] = useState("");
@@ -319,6 +321,14 @@ export default function EventoDetalhes() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="default"
+            onClick={() => setEditDialogOpen(true)}
+          >
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar Evento
+          </Button>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -374,6 +384,18 @@ export default function EventoDetalhes() {
           </Button>
         </div>
       </div>
+
+      {/* Dialog de Edição Completa */}
+      <EventoDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        evento={evento}
+        onSuccess={() => {
+          setEditDialogOpen(false);
+          loadEvento();
+          loadStats();
+        }}
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
