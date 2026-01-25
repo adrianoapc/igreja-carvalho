@@ -8,16 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
@@ -30,7 +20,6 @@ import {
   Eye,
   ListMusic,
   ClipboardList,
-  Save,
   QrCode,
   Send,
   Loader2,
@@ -121,7 +110,6 @@ export default function EventoDetalhes() {
   const [searchParams] = useSearchParams();
   const [evento, setEvento] = useState<Evento | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [notificando, setNotificando] = useState(false);
   const [escalasCount, setEscalasCount] = useState(0);
   const [liturgiaCount, setLiturgiaCount] = useState(0);
@@ -129,13 +117,6 @@ export default function EventoDetalhes() {
     searchParams.get("tab") || "visao-geral"
   );
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-
-  // Form state
-  const [tema, setTema] = useState("");
-  const [pregador, setPregador] = useState("");
-  const [local, setLocal] = useState("");
-  const [observacoes, setObservacoes] = useState("");
-  const [status, setStatus] = useState("planejado");
 
   useEffect(() => {
     if (id) {
@@ -160,11 +141,6 @@ export default function EventoDetalhes() {
       };
 
       setEvento(normalized);
-      setTema(normalized.tema || "");
-      setPregador(normalized.pregador || "");
-      setLocal(normalized.local || "");
-      setObservacoes(normalized.observacoes || "");
-      setStatus(normalized.status);
     } catch (error: unknown) {
       toast.error("Erro ao carregar evento", {
         description: error instanceof Error ? error.message : String(error),
@@ -192,36 +168,6 @@ export default function EventoDetalhes() {
       setLiturgiaCount(liturgiaRes.count || 0);
     } catch (error) {
       console.error("Erro ao carregar estatísticas:", error);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!evento) return;
-    setSaving(true);
-
-    try {
-      const { error } = await supabase
-        .from("eventos")
-        .update({
-          tema,
-          pregador,
-          local,
-          observacoes,
-          status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", evento.id);
-
-      if (error) throw error;
-
-      toast.success("Alterações salvas com sucesso!");
-      loadEvento();
-    } catch (error: unknown) {
-      toast.error("Erro ao salvar", {
-        description: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -321,14 +267,6 @@ export default function EventoDetalhes() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="default"
-            onClick={() => setEditDialogOpen(true)}
-          >
-            <Pencil className="h-4 w-4 mr-2" />
-            Editar Evento
-          </Button>
-
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -516,77 +454,56 @@ export default function EventoDetalhes() {
             </Card>
           </div>
 
-          {/* Formulário de Edição */}
+          {/* Informações do Evento - Visualização */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Informações do Evento</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setEditDialogOpen(true)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tema">Tema</Label>
-                  <Input
-                    id="tema"
-                    value={tema}
-                    onChange={(e) => setTema(e.target.value)}
-                    placeholder="Tema do culto"
-                  />
-                </div>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {evento.tema && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Tema</p>
+                    <p className="font-medium">{evento.tema}</p>
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="pregador">Pregador</Label>
-                  <Input
-                    id="pregador"
-                    value={pregador}
-                    onChange={(e) => setPregador(e.target.value)}
-                    placeholder="Nome do pregador"
-                  />
-                </div>
+                {evento.pregador && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Pregador</p>
+                    <p className="font-medium">{evento.pregador}</p>
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="local">Local</Label>
-                  <Input
-                    id="local"
-                    value={local}
-                    onChange={(e) => setLocal(e.target.value)}
-                    placeholder="Local do evento"
-                  />
-                </div>
+                {evento.local && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Local</p>
+                    <p className="font-medium">{evento.local}</p>
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="observacoes">Observações</Label>
-                <Textarea
-                  id="observacoes"
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                  placeholder="Observações adicionais"
-                  rows={4}
-                />
-              </div>
+              {evento.observacoes && (
+                <div className="mt-6 space-y-1">
+                  <p className="text-sm text-muted-foreground">Observações</p>
+                  <p className="text-sm">{evento.observacoes}</p>
+                </div>
+              )}
 
-              <div className="flex justify-end pt-4">
-                <Button onClick={handleSave} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Salvando..." : "Salvar Alterações"}
-                </Button>
-              </div>
+              {!evento.tema && !evento.pregador && !evento.local && !evento.observacoes && (
+                <p className="text-sm text-muted-foreground italic">
+                  Nenhuma informação adicional cadastrada.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
