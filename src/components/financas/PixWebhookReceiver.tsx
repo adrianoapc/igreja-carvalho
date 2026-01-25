@@ -40,7 +40,11 @@ export function PixWebhookReceiver() {
   >("recebido");
 
   // Query para buscar PIX recebidos
-  const { data: pixRecebidos = [], isLoading, refetch } = useQuery({
+  const {
+    data: pixRecebidos = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["pix-webhook-temp", igrejaId, filtroStatus],
     queryFn: async () => {
       if (!igrejaId) return [];
@@ -64,7 +68,10 @@ export function PixWebhookReceiver() {
   });
 
   // Calcular totais
-  const totalRecebidos = pixRecebidos.reduce((sum, item) => sum + item.valor, 0);
+  const totalRecebidos = pixRecebidos.reduce(
+    (sum, item) => sum + item.valor,
+    0
+  );
   const quantidadeRecebida = pixRecebidos.length;
 
   const getStatusIcon = (status: string) => {
@@ -85,11 +92,23 @@ export function PixWebhookReceiver() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "recebido":
-        return <Badge variant="outline" className="bg-blue-50">Recebido</Badge>;
+        return (
+          <Badge variant="outline" className="bg-blue-50">
+            Recebido
+          </Badge>
+        );
       case "processado":
-        return <Badge variant="outline" className="bg-green-50">Processado</Badge>;
+        return (
+          <Badge variant="outline" className="bg-green-50">
+            Processado
+          </Badge>
+        );
       case "vinculado":
-        return <Badge variant="outline" className="bg-purple-50">Vinculado</Badge>;
+        return (
+          <Badge variant="outline" className="bg-purple-50">
+            Vinculado
+          </Badge>
+        );
       case "erro":
         return <Badge variant="destructive">Erro</Badge>;
       default:
@@ -163,13 +182,7 @@ export function PixWebhookReceiver() {
       {/* Filtro de Status */}
       <div className="flex gap-2 flex-wrap">
         {(
-          [
-            "todos",
-            "recebido",
-            "processado",
-            "vinculado",
-            "erro",
-          ] as const
+          ["todos", "recebido", "processado", "vinculado", "erro"] as const
         ).map((status) => (
           <Button
             key={status}
@@ -239,9 +252,13 @@ export function PixWebhookReceiver() {
 
                           <p className="text-xs text-muted-foreground mt-1">
                             Recebido em{" "}
-                            {format(new Date(pix.data_pix), "dd/MM/yyyy HH:mm", {
-                              locale: ptBR,
-                            })}
+                            {format(
+                              new Date(pix.data_pix),
+                              "dd/MM/yyyy HH:mm",
+                              {
+                                locale: ptBR,
+                              }
+                            )}
                           </p>
                         </div>
                       </div>

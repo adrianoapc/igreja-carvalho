@@ -9,42 +9,50 @@
 ## 🐛 Problemas Encontrados
 
 ### ❌ Problema 1: Edge Function não estava criptografando dados
+
 **Severidade:** 🔴 CRÍTICA (Segurança)
 
 **Causa:** A função `encryptData()` não existia. Os dados eram salvos em plaintext na tabela `integracoes_financeiras_secrets`.
 
-**Solução:** 
+**Solução:**
+
 - Adicionado `tweetnacl-js` para XSalsa20-Poly1305
 - Implementada função `encryptData()` com nonce aleatório
 - Implementada função `deriveKey()` para derivar chave de `ENCRYPTION_KEY` env var
 - Cada campo sensível agora é criptografado antes de salvar
 
 **Arquivos alterados:**
+
 - `supabase/functions/integracoes-config/index.ts`
 
 ---
 
 ### ❌ Problema 2: Botão "Atualizar" não funcionava
+
 **Severidade:** 🟡 MÉDIA (UX)
 
 **Causa:** Código chamava `refetch()` que não era válido. `refetch` é função interna do hook `useQuery`, não acessível direto.
 
 **Solução:**
+
 - Adicionado `useQueryClient` ao componente
 - Botão agora executa `queryClient.invalidateQueries()`
 - Implementado mesmo padrão no `handleDelete` e callback do dialog
 
 **Arquivos alterados:**
+
 - `src/pages/financas/Integracoes.tsx`
 
 ---
 
 ### ❌ Problema 3: Dados salvos 4x (duplicação)
+
 **Severidade:** 🟡 MÉDIA (Performance/UX)
 
 **Causa:** Provavelmente React Strict Mode em desenvolvimento + listeners duplicados na submissão do dialog.
 
 **Solução:** Após fixar a criptografia, dados salvos apenas 1x. Se persistir, investigar:
+
 1. Remover dados duplicados manualmente
 2. Verificar se há listeners duplicados no dialog
 
@@ -57,12 +65,14 @@
 ### 1. Edge Function: `integracoes-config/index.ts`
 
 **Imports adicionados:**
+
 ```typescript
-import * as nacl from 'npm:tweetnacl@1.0.3'
-import { encodeBase64, decodeBase64 } from 'npm:tweetnacl-util@0.5.2'
+import * as nacl from "npm:tweetnacl@1.0.3";
+import { encodeBase64, decodeBase64 } from "npm:tweetnacl-util@0.5.2";
 ```
 
 **Funções adicionadas:**
+
 ```typescript
 function encryptData(data: string, key: Uint8Array): string
   - Criptografa dados com XSalsa20-Poly1305
@@ -75,6 +85,7 @@ function deriveKey(masterKeyHex: string): Uint8Array
 ```
 
 **Fluxo corrigido:**
+
 1. Validar ENCRYPTION_KEY está configurada
 2. Derivar chave de encryption
 3. Criptografar cada campo sensível:
@@ -91,16 +102,19 @@ function deriveKey(masterKeyHex: string): Uint8Array
 ### 2. Página: `src/pages/financas/Integracoes.tsx`
 
 **Imports adicionados:**
+
 ```typescript
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 ```
 
 **State adicionado:**
+
 ```typescript
 const queryClient = useQueryClient();
 ```
 
 **Funções atualizadas:**
+
 ```typescript
 // Botão Atualizar
 <Button onClick={() =>
@@ -138,7 +152,7 @@ onSuccess={() => {
 
 ```sql
 -- Deletar registros de teste (em plaintext)
-DELETE FROM integracoes_financeiras_secrets 
+DELETE FROM integracoes_financeiras_secrets
 WHERE created_at < NOW() - INTERVAL '1 hour';
 
 -- OU deletar TUDO se foi só teste
@@ -150,6 +164,7 @@ DELETE FROM integracoes_financeiras;
 4. Verifique que ambas as tabelas estão vazias
 
 ### Depois teste novamente:
+
 1. Navegue até `/financas/integracoes`
 2. Clique "Nova Integração"
 3. Preencha e salve
@@ -178,8 +193,9 @@ DELETE FROM integracoes_financeiras;
    - Client Secret: `test_secret_67890`
 
 2. Abra Supabase Dashboard:
+
    ```sql
-   SELECT 
+   SELECT
      id,
      integracao_id,
      client_id,  -- Deve ser: base64(nonce || ciphertext) ilegível
@@ -196,22 +212,25 @@ DELETE FROM integracoes_financeiras;
 ## 📝 Próximos Passos
 
 ### Phase 1b: Decrypt na Edge Function (para Santander/Getnet)
+
 Quando implementar polling de extratos, a Edge Function `santander-extrato` precisará:
+
 1. Ler de `integracoes_financeiras_secrets`
 2. Descriptografar `client_id`, `client_secret`, `pfx_blob`
 3. Usar credenciais para chamar API
 
 **Função necessária:**
+
 ```typescript
 function decryptData(encrypted: string, key: Uint8Array): string {
-  const encryptedBytes = decodeBase64(encrypted)
-  const nonce = encryptedBytes.slice(0, 24)
-  const ciphertext = encryptedBytes.slice(24)
-  
-  const decrypted = nacl.secretbox.open(ciphertext, nonce, key)
-  if (!decrypted) throw new Error('Decryption failed')
-  
-  return new TextDecoder().decode(decrypted)
+  const encryptedBytes = decodeBase64(encrypted);
+  const nonce = encryptedBytes.slice(0, 24);
+  const ciphertext = encryptedBytes.slice(24);
+
+  const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
+  if (!decrypted) throw new Error("Decryption failed");
+
+  return new TextDecoder().decode(decrypted);
 }
 ```
 

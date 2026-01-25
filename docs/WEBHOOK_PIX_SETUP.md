@@ -98,7 +98,7 @@ Sistema classifica por culto (regras - segunda-feira)
 ```json
 {
   "pixId": "e1234567-e123-4567-e123-456789012345",
-  "valor": 250.50,
+  "valor": 250.5,
   "devedor": {
     "nome": "João da Silva",
     "cpf": "12345678900"
@@ -115,18 +115,20 @@ Sistema classifica por culto (regras - segunda-feira)
 **POST** `https://seu-projeto.supabase.co/functions/v1/pix-webhook-receiver`
 
 **Headers:**
+
 ```
 Content-Type: application/json
 X-Igreja-ID: [uuid-da-igreja]
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "success": true,
   "message": "Webhook PIX recebido e armazenado",
   "pixId": "e1234567-e123-4567-e123-456789012345",
-  "valor": 250.50
+  "valor": 250.5
 }
 ```
 
@@ -175,6 +177,7 @@ Sistema reconhece: **PIX já processado** (estava em pix_webhook_temp)
 ### Passo 2: Variáveis de Ambiente
 
 Já estão em `.env.local`:
+
 ```
 SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-key-here
@@ -187,6 +190,7 @@ supabase functions deploy pix-webhook-receiver
 ```
 
 Verificar:
+
 ```bash
 supabase functions list
 ```
@@ -197,26 +201,26 @@ supabase functions list
 
 ### `pix_webhook_temp`
 
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| `id` | UUID | PK, gerado automaticamente |
-| `pix_id` | TEXT | ID único do PIX no banco |
-| `valor` | DECIMAL | Valor do PIX (ex: 250.50) |
-| `pagador_nome` | TEXT | Nome de quem enviou |
-| `pagador_cpf_cnpj` | TEXT | CPF ou CNPJ do pagador |
-| `descricao` | TEXT | Descrição da transferência |
-| `data_pix` | TIMESTAMP | Quando foi enviado (timestamp real) |
-| `data_recebimento` | TIMESTAMP | Quando webhook chegou |
-| `status` | TEXT | recebido \| processado \| vinculado \| erro |
-| `banco_id` | TEXT | CNPJ do banco (ex: 90400888000142) |
-| `igreja_id` | UUID | FK para igrejas |
-| `webhook_payload` | JSONB | Payload completo do webhook |
-| `transacao_id` | UUID | FK para transacoes_financeiras |
-| `oferta_id` | UUID | FK para ofertas (quando vinculado) |
-| `processado_em` | TIMESTAMP | Quando foi processado |
-| `erro_mensagem` | TEXT | Se houver erro |
-| `created_at` | TIMESTAMP | Data de criação |
-| `updated_at` | TIMESTAMP | Última atualização |
+| Campo              | Tipo      | Descrição                                   |
+| ------------------ | --------- | ------------------------------------------- |
+| `id`               | UUID      | PK, gerado automaticamente                  |
+| `pix_id`           | TEXT      | ID único do PIX no banco                    |
+| `valor`            | DECIMAL   | Valor do PIX (ex: 250.50)                   |
+| `pagador_nome`     | TEXT      | Nome de quem enviou                         |
+| `pagador_cpf_cnpj` | TEXT      | CPF ou CNPJ do pagador                      |
+| `descricao`        | TEXT      | Descrição da transferência                  |
+| `data_pix`         | TIMESTAMP | Quando foi enviado (timestamp real)         |
+| `data_recebimento` | TIMESTAMP | Quando webhook chegou                       |
+| `status`           | TEXT      | recebido \| processado \| vinculado \| erro |
+| `banco_id`         | TEXT      | CNPJ do banco (ex: 90400888000142)          |
+| `igreja_id`        | UUID      | FK para igrejas                             |
+| `webhook_payload`  | JSONB     | Payload completo do webhook                 |
+| `transacao_id`     | UUID      | FK para transacoes_financeiras              |
+| `oferta_id`        | UUID      | FK para ofertas (quando vinculado)          |
+| `processado_em`    | TIMESTAMP | Quando foi processado                       |
+| `erro_mensagem`    | TEXT      | Se houver erro                              |
+| `created_at`       | TIMESTAMP | Data de criação                             |
+| `updated_at`       | TIMESTAMP | Última atualização                          |
 
 ### Índices
 
@@ -233,6 +237,7 @@ CREATE INDEX idx_pix_webhook_temp_pix_id ON pix_webhook_temp(pix_id);
 ## 🔧 Edge Function
 
 ### Arquivo
+
 `supabase/functions/pix-webhook-receiver/index.ts`
 
 ### Funcionalidades
@@ -247,16 +252,18 @@ CREATE INDEX idx_pix_webhook_temp_pix_id ON pix_webhook_temp(pix_id);
 ### Response
 
 **Sucesso (200):**
+
 ```json
 {
   "success": true,
   "message": "Webhook PIX recebido e armazenado",
   "pixId": "e1234567-e123-4567-e123-456789012345",
-  "valor": 250.50
+  "valor": 250.5
 }
 ```
 
 **Erro (400):**
+
 ```json
 {
   "error": "Valor inválido ou não informado"
@@ -264,6 +271,7 @@ CREATE INDEX idx_pix_webhook_temp_pix_id ON pix_webhook_temp(pix_id);
 ```
 
 **Erro (500):**
+
 ```json
 {
   "error": "Falha ao processar webhook",
@@ -276,6 +284,7 @@ CREATE INDEX idx_pix_webhook_temp_pix_id ON pix_webhook_temp(pix_id);
 ## 🎨 Componente React
 
 ### Arquivo
+
 `src/components/financas/PixWebhookReceiver.tsx`
 
 ### Funcionalidades
@@ -304,6 +313,7 @@ export function MeuComponente() {
 ### Props
 
 Nenhuma prop obrigatória. Usa:
+
 - `useAuthContext()` para obter `igrejaId`
 - `useQuery()` para buscar dados
 - `useHideValues()` para formatar valores
@@ -334,12 +344,13 @@ curl -X POST \
 ```
 
 **Response esperado:**
+
 ```json
 {
   "success": true,
   "message": "Webhook PIX recebido e armazenado",
   "pixId": "test-pix-001",
-  "valor": 250.50
+  "valor": 250.5
 }
 ```
 
@@ -368,6 +379,7 @@ LIMIT 10;
 ### Problema: Webhook não recebe dados
 
 **Verificações:**
+
 1. URL configurada corretamente no banco? ✓
 2. Header `X-Igreja-ID` está sendo enviado? ✓
 3. Edge Function está deployada? `supabase functions list`
@@ -388,11 +400,13 @@ Value: [uuid-da-sua-igreja]
 ### Problema: Status 500 "Falha ao inserir"
 
 **Causas possíveis:**
+
 1. Igreja ID inválido (não existe em `igrejas`)
 2. Dados duplicados (pix_id já existe)
 3. Valor inválido (null ou <= 0)
 
 **Debug:**
+
 ```sql
 -- Verificar último erro
 SELECT erro_mensagem, webhook_payload, created_at
@@ -405,12 +419,13 @@ LIMIT 1;
 ### Problema: Component não mostra dados
 
 **Verificações:**
-1. `useAuthContext()` retornando `igrejaId`? 
+
+1. `useAuthContext()` retornando `igrejaId`?
 2. RLS policies permitindo leitura?
 3. Dados existem na tabela?
 
 ```sql
-SELECT COUNT(*) FROM pix_webhook_temp 
+SELECT COUNT(*) FROM pix_webhook_temp
 WHERE igreja_id = '[sua-igreja-id]';
 ```
 
@@ -421,6 +436,7 @@ WHERE igreja_id = '[sua-igreja-id]';
 ### Queries Úteis
 
 **PIX recebido hoje:**
+
 ```sql
 SELECT COUNT(*), SUM(valor)
 FROM pix_webhook_temp
@@ -429,6 +445,7 @@ AND igreja_id = '[sua-id]';
 ```
 
 **PIX por status:**
+
 ```sql
 SELECT status, COUNT(*), SUM(valor)
 FROM pix_webhook_temp
@@ -437,6 +454,7 @@ GROUP BY status;
 ```
 
 **PIX ainda não vinculados:**
+
 ```sql
 SELECT *
 FROM pix_webhook_temp

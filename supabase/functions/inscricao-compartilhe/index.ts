@@ -166,7 +166,10 @@ Deno.serve(async (req) => {
     .eq("origem_canal", origemCanal)
     .eq("igreja_id", igrejaId)
     // Escopo por número de envio (quando disponível)
-    .contains("meta_dados", destino.phoneNumberId ? { phone_number_id: destino.phoneNumberId } : {})
+    .contains(
+      "meta_dados",
+      destino.phoneNumberId ? { phone_number_id: destino.phoneNumberId } : {}
+    )
     .neq("status", "CONCLUIDO")
     .gt("updated_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .maybeSingle();

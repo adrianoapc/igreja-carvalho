@@ -6,6 +6,7 @@
 ---
 
 ## 📋 Índice
+
 1. [Situação Atual](#situação-atual)
 2. [Problema](#problema)
 3. [Sugestões de Solução](#sugestões-de-solução)
@@ -56,6 +57,7 @@ EXTRATO (Segunda 16/01 - Santander processa no dia útil)
 ### Desafio Central
 
 Como vincular transações individualizadas do extrato com:
+
 1. **Entrada unificada** do relatório de ofertas
 2. **Culto específico** (qual culto gerou essas ofertas?)
 3. **Período de culto** (transações recebidas entre horário X e Y pertencem ao culto Z)
@@ -176,12 +178,14 @@ Tenta Aplicar Regra
 ### **Fase 1 (Agora)** - Conciliação Manual com Agrupamento
 
 **O que fazer:**
+
 - Tela que mostra relatório de ofertas + extrato do período
 - Usuário agrupa transações manualmente (arrasta e solta / checkboxes)
 - Vincula ao culto
 - Gera relatório de conferência com assinatura
 
 **Por quê:**
+
 - ✅ Rápido de implementar (2-3 dias)
 - ✅ Valida seu fluxo real
 - ✅ Gera dados históricos para análise
@@ -189,6 +193,7 @@ Tenta Aplicar Regra
 - ✅ Usuário aprende o processo
 
 **Resultados:**
+
 - Relatório de ofertas pode ser conferenciado
 - Identifica gargalos reais
 - Base de dados para próxima fase
@@ -198,11 +203,13 @@ Tenta Aplicar Regra
 ### **Fase 2 (Próxima semana após análise)** - Sistema de Regras
 
 **O que fazer:**
+
 - Cria tela de manutenção de regras (criar, editar, deletar)
 - Classifica automaticamente novas transações
 - Dashboard de exceções (o que não casou)
 
 **Benefícios:**
+
 - ✅ Reduz 80% do trabalho manual
 - ✅ Consistência nos critérios
 - ✅ Histórico de mudanças
@@ -213,6 +220,7 @@ Tenta Aplicar Regra
 ### **Fase 3 (Futuro - opcional)** - IA/ML
 
 **O que fazer:**
+
 - Aprende padrões históricos automaticamente
 - Sugere classificações com confiança %
 - Auto-ajusta regras conforme novos dados
@@ -227,23 +235,23 @@ Tenta Aplicar Regra
 interface RegraClassificacao {
   id: string;
   igreja_id: string;
-  
+
   // Identificação
   nome: string;
   descricao?: string;
-  
+
   // Critérios de Classificação
   forma_pagamento: "pix" | "cartao" | "dinheiro" | "transferencia" | "boleto";
   dia_semana?: number; // 0-6 (segunda-domingo)
   hora_inicio?: string; // "08:00"
   hora_fim?: string; // "12:00"
-  
+
   // Associação
   culto_id: string; // Qual culto recebe essa classificação
-  
+
   // Opcional: Filtro por descrição
   padrao_descricao?: string[]; // ["OFERTA", "DÍZIMO"] - palavras-chave
-  
+
   // Metadata
   ativo: boolean;
   prioridade: number; // 1-10 (maior = aplica primeira)
@@ -258,11 +266,11 @@ interface RegraClassificacao {
 ```typescript
 interface TransacaoFinanceira {
   // ... campos existentes
-  
+
   // Novo: Classificação de Culto
   culto_id?: string;
   regra_classificacao_id?: string;
-  
+
   // Novo: Rastreamento de Conciliação
   conciliacao_id?: string; // Link para registro de conciliação
   foi_manual: boolean; // true = usuário classificou, false = automático
@@ -275,24 +283,24 @@ interface TransacaoFinanceira {
 ```typescript
 interface Conciliacao {
   id: string;
-  
+
   // Período
   periodo_inicio: date;
   periodo_fim: date;
-  
+
   // O que foi conciliado
   entrada_oferta_id: string; // Da tabela de ofertas
   transacao_extrato_ids: string[]; // Array de IDs do extrato vinculadas
-  
+
   // Resultado
   culto_id: string;
   status: "pendente" | "conciliada" | "discrepancia" | "revisada";
-  
+
   // Valores
   valor_relatório: number; // Do relatório de ofertas
   valor_extrato: number; // Soma do extrato
   diferenca: number; // valor_relatório - valor_extrato
-  
+
   // Auditoria
   created_by: string;
   created_at: timestamp;
@@ -307,33 +315,33 @@ interface Conciliacao {
 ```typescript
 interface PixWebhookTemp {
   id: string;
-  
+
   // Dados do PIX
   pix_id: string; // Identificador único do PIX no banco
   valor: number;
   pagador?: string;
   descricao?: string;
-  
+
   // Timestamp real (do PIX, não do processamento)
   data_pix: timestamp; // Quando realmente foi enviado
   data_recebimento: timestamp; // Quando chegou no webhook
-  
+
   // Status de processamento
   status: "recebido" | "processado" | "vinculado" | "erro";
-  
+
   // Para qual instituição bancária
   banco_id?: string; // Ex: 90400888000142 (Santander)
   Igreja_id: string;
-  
+
   // Rastreamento
   webhook_payload?: jsonb; // Payload completo do webhook (para auditoria)
   processado_em?: timestamp;
   erro_mensagem?: string;
-  
+
   // Link com sistema
   transacao_id?: string; // FK para transacoes_financeiras quando vinculado
   oferta_id?: string; // FK para ofertas quando vinculado
-  
+
   created_at: timestamp;
   updated_at: timestamp;
 }
@@ -346,17 +354,20 @@ interface PixWebhookTemp {
 ### 1. **Timing é Crítico** 🕐
 
 **Problema:**
+
 - PIX de sexta à noite pode cair na segunda no banco
 - Cartão de débito pode ter atraso de até 3 dias
 - Santander disponibiliza virtualmente no domingo, mas extrato aparece segunda
 
 **Solução:**
+
 - ✅ Permitir janela de **2-3 dias** para agrupamento
 - ✅ Usar `data_pix` (timestamp real) vs `data_extrato` (quando processou)
 - ✅ PIX webhook resolve isso: recebe em tempo real
 - ✅ Dashboard mostra "pendentes de extrato" vs "já conciliados"
 
 **Para Webhook PIX:**
+
 ```
 Domingo 15/01 20:00 - PIX recebido (webhook)
   ↓
@@ -374,15 +385,18 @@ Relatório mostra "domingo" como data correta
 ### 2. **Múltiplos Cultos no Mesmo Dia** 🙏
 
 **Problema:**
+
 - Segunda-feira pode ter culto de oração + culto jovem
 - Ambos recebem PIX no mesmo dia
 - Como diferençar?
 
 **Solução:**
+
 - ✅ Regra precisa de **horário específico**
 - ✅ Prioridade: regras com horário exato > regras genéricas
 
 **Exemplo:**
+
 ```
 REGRA 1 (Alta Prioridade): PIX + Segunda + 19:00-20:00 → Culto Oração
 REGRA 2 (Média Prioridade): PIX + Segunda + 20:30-22:00 → Culto Jovem
@@ -394,16 +408,19 @@ REGRA 3 (Baixa Prioridade): PIX + Segunda → Culto Geral (fallback)
 ### 3. **Ofertas Unificadas vs. Individualizadas** 📊
 
 **Problema:**
+
 - Você pode lançar "PIX total do dia" em uma entrada
 - Ou lançar cada PIX individualmente
 - Sistema precisa lidar com ambos
 
 **Solução:**
+
 - ✅ Adicionar campo `tipo_entrada` em ofertas:
   - `"unificada"` = R$ 5.000 (agrupa múltiplas transações)
   - `"detalhada"` = Cada PIX é uma entrada
 
 **Impacto:**
+
 ```
 Se tipo="unificada" e valor R$ 5.000
   → Busca múltiplas transações que somem R$ 5.000
@@ -417,6 +434,7 @@ Se tipo="detalhada" e valor R$ 500
 ### 4. **Discrepâncias Inevitáveis** 🔴
 
 **Problema:**
+
 - Sempre haverá casos que não batem:
   - PIX perdido/devolvido
   - Lançamento manual incorreto
@@ -424,12 +442,14 @@ Se tipo="detalhada" e valor R$ 500
   - Transação duplicada
 
 **Solução:**
+
 - ✅ Dashboard de exceções para investigar
 - ✅ Campo "observações" para documentar discrepâncias
 - ✅ Status `"discrepancia"` permite revisão posterior
 - ✅ Relatório de não-conciliados
 
 **Dashboard:**
+
 ```
 DISCREPÂNCIAS DETECTADAS
 
@@ -446,12 +466,14 @@ DISCREPÂNCIAS DETECTADAS
 ### 5. **Horários Variam por Culto** ⏰
 
 **Problema:**
+
 - Culto domingo manhã: 8h-12h
 - Culto domingo noite: 18h-20h
 - Culto quarta: 19h-21h
 - Cada um recebe PIX em janelas diferentes
 
 **Solução:**
+
 - ✅ Manutenção de regras por culto
 - ✅ Permitir múltiplas regras por culto (ex: PIX vs Cartão)
 - ✅ Tela de "Agenda de Cultos" vinculada a regras
@@ -461,12 +483,14 @@ DISCREPÂNCIAS DETECTADAS
 ### 6. **Auditoria e Rastreabilidade** 📋
 
 **Importante:**
+
 - Quem classificou?
 - Quando foi classificado?
 - Qual regra aplicou?
 - Houve ajuste manual depois?
 
 **Solução:**
+
 - ✅ Campos `created_by`, `updated_by`
 - ✅ Tabela `conciliacoes` com histórico
 - ✅ Logs de mudanças de regras

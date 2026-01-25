@@ -134,8 +134,8 @@ O sino no canto superior direito mostra suas notificações:
 
 - No detalhe de um **membro** aparece o card “Gerenciamento de Acesso” apenas para admins.
 - Botões disponíveis:
-   - **Criar Acesso**: cria usuário no Supabase com senha temporária e vincula `profiles.user_id`.
-   - **Resetar Senha**: gera nova senha temporária e marca troca no próximo login.
+  - **Criar Acesso**: cria usuário no Supabase com senha temporária e vincula `profiles.user_id`.
+  - **Resetar Senha**: gera nova senha temporária e marca troca no próximo login.
 - Se o usuário já existe, o botão exibido é apenas **Resetar Senha**.
 
 **Exemplos práticos**
@@ -428,7 +428,6 @@ Use o seletor de período no topo:
 #### Cenário 3: Líder Comprou Material e Precisa Ser Reembolsado
 
 1. **Registre o Fato Gerador (Despesa Real)**
-
    - Acesse **Finanças > Saídas**
    - Descrição: "Material de Evangelismo"
    - Categoria: Despesas Ministeriais > Evangelismo
@@ -1256,18 +1255,15 @@ Recorrência permite atribuir o **mesmo voluntário a múltiplos turnos automati
 #### 4 Tipos de Recorrência
 
 1. **Nenhuma** (padrão)
-
    - Apenas 1 slot (data + horário selecionado)
    - Sem repetição
 
 2. **Diária**
-
    - Repete **todos os dias** até o fim do evento
    - RELOGIO de 7 dias = 7 turnos
    - CULTO com duração de 3 dias = 3 turnos
 
 3. **Semanal**
-
    - Repete **mesmo dia da semana**
    - Intervalo de 7 dias
    - Ex: Se escolhe terça → repete todas as terças

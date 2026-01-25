@@ -51,18 +51,22 @@ node test-santander-api.js \
 ## O que o script faz
 
 ### ✓ Teste 1: Conexão mTLS
+
 - Carrega o certificado PFX
 - Cria uma conexão HTTPS com autenticação via certificado
 
 ### ✓ Teste 2: OAuth2
+
 - Envia credenciais (Client ID + Client Secret) para o endpoint de token
 - Valida que recebeu um `access_token` válido
 
 ### ✓ Teste 3: Consulta de Saldo
+
 - Usa o token para chamar o endpoint de saldo
 - Exibe o saldo da conta
 
 ### ✓ Teste 4: Consulta de Extrato
+
 - Usa o token para chamar o endpoint de extrato
 - Busca transações dos últimos 30 dias
 - Exibe as transações retornadas
@@ -136,18 +140,22 @@ node test-santander-api.js \
 ## Troubleshooting
 
 ### Erro: "Arquivo PFX não encontrado"
+
 - Verifique o caminho do arquivo
 - Use caminho absoluto, não relativo
 
 ### Erro: "Falha ao obter token. Status: 401"
+
 - Valide Client ID e Client Secret
 - Verifique se o certificado PFX é válido
 
 ### Erro: "Falha ao consultar saldo. Status: 403"
+
 - Pode ser permissão insuficiente da conta
 - Valide Bank ID, Agency e Account
 
 ### Erro: "ENOTFOUND" ou "ECONNREFUSED"
+
 - Problema de conectividade
 - Verifique se tem acesso à internet
 - Teste ping para `trust-open.api.santander.com.br`
@@ -157,6 +165,7 @@ node test-santander-api.js \
 O script **não persiste nada no banco de dados**, então não há risco de dados de teste ficarem gravados.
 
 Para remover o script após testes:
+
 ```bash
 rm test-santander-api.js
 ```

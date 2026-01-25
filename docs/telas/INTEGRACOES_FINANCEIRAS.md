@@ -4,6 +4,7 @@
 **Permissão Requerida:** `financeiro.admin`  
 **Status:** ✅ Implementada (Phase 1)  
 **Componentes Relacionados:**
+
 - `IntegracaoCriarDialog.tsx` (Modal de criação)
 - `Integracoes.tsx` (Página principal)
 
@@ -12,6 +13,7 @@
 ## Features
 
 ### 📋 Listagem
+
 - **Tabela** com todas as integrações da igreja
 - **Colunas:**
   - Provedor (Santander, Getnet, API Genérica)
@@ -22,6 +24,7 @@
   - Ações (Edit/Delete)
 
 ### ➕ Criar Integração
+
 - **Dialog Modal** com form agnóstico
 - **Campos:**
   - Seletor de provedor (dropdown)
@@ -37,10 +40,12 @@
   - "Salvar Integração" - envia para Edge Function
 
 ### 🗑️ Deletar
+
 - Confirmação em AlertDialog
 - Cascata: deleta também secrets criptografados
 
 ### 🔄 Atualizar
+
 - Botão de refresh para forçar refetch da query
 
 ---
@@ -76,9 +81,11 @@ Data Flow:
 ## API Integration
 
 ### Edge Function: `integracoes-config`
+
 **Endpoint:** POST `/functions/v1/integracoes-config`
 
 **Request Payload:**
+
 ```json
 {
   "action": "create_integracao",
@@ -96,6 +103,7 @@ Data Flow:
 ```
 
 **Response Success (201):**
+
 ```json
 {
   "success": true,
@@ -105,6 +113,7 @@ Data Flow:
 ```
 
 **Response Error (4xx/5xx):**
+
 ```json
 {
   "error": "Error message"
@@ -116,39 +125,44 @@ Data Flow:
 ## Database Schema
 
 ### Table: `integracoes_financeiras`
-| Column | Type | Null | Key | Default |
-|--------|------|------|-----|---------|
-| id | UUID | NO | PK | gen_random_uuid() |
-| igreja_id | UUID | NO | FK | - |
-| filial_id | UUID | YES | FK | NULL |
-| cnpj | TEXT | NO | - | - |
-| provedor | TEXT | NO | - | - |
-| status | TEXT | NO | - | 'ativo' |
-| config | JSONB | NO | - | '{}' |
-| created_at | TIMESTAMPTZ | NO | - | NOW() |
-| updated_at | TIMESTAMPTZ | NO | - | NOW() |
+
+| Column     | Type        | Null | Key | Default           |
+| ---------- | ----------- | ---- | --- | ----------------- |
+| id         | UUID        | NO   | PK  | gen_random_uuid() |
+| igreja_id  | UUID        | NO   | FK  | -                 |
+| filial_id  | UUID        | YES  | FK  | NULL              |
+| cnpj       | TEXT        | NO   | -   | -                 |
+| provedor   | TEXT        | NO   | -   | -                 |
+| status     | TEXT        | NO   | -   | 'ativo'           |
+| config     | JSONB       | NO   | -   | '{}'              |
+| created_at | TIMESTAMPTZ | NO   | -   | NOW()             |
+| updated_at | TIMESTAMPTZ | NO   | -   | NOW()             |
 
 **Indexes:**
+
 - `idx_integracoes_financeiras_igreja` (igreja_id)
 - `idx_integracoes_financeiras_filial` (filial_id)
 - `idx_integracoes_financeiras_provedor` (provedor)
 
 ### Table: `integracoes_financeiras_secrets`
-| Column | Type | Null | Key | Default |
-|--------|------|------|-----|---------|
-| id | UUID | NO | PK | gen_random_uuid() |
-| integracao_id | UUID | NO | FK | - |
-| pfx_blob | BYTEA | YES | - | NULL |
-| pfx_password | TEXT | YES | - | NULL |
-| client_id | TEXT | YES | - | NULL |
-| client_secret | TEXT | YES | - | NULL |
-| application_key | TEXT | YES | - | NULL |
-| created_at | TIMESTAMPTZ | NO | - | NOW() |
+
+| Column          | Type        | Null | Key | Default           |
+| --------------- | ----------- | ---- | --- | ----------------- |
+| id              | UUID        | NO   | PK  | gen_random_uuid() |
+| integracao_id   | UUID        | NO   | FK  | -                 |
+| pfx_blob        | BYTEA       | YES  | -   | NULL              |
+| pfx_password    | TEXT        | YES  | -   | NULL              |
+| client_id       | TEXT        | YES  | -   | NULL              |
+| client_secret   | TEXT        | YES  | -   | NULL              |
+| application_key | TEXT        | YES  | -   | NULL              |
+| created_at      | TIMESTAMPTZ | NO   | -   | NOW()             |
 
 **Indexes:**
+
 - `idx_integracoes_financeiras_secrets_integracao` (integracao_id)
 
 **RLS Policies:**
+
 - SELECT: `false` (blocked)
 - INSERT: `false` (blocked)
 - UPDATE: `false` (blocked)
@@ -161,6 +175,7 @@ Data Flow:
 ## Validations
 
 ### Frontend Validations
+
 - ✅ CNPJ required
 - ✅ Client ID required
 - ✅ Client Secret required
@@ -170,6 +185,7 @@ Data Flow:
 - ✅ Igreja ID required (from session)
 
 ### Backend Validations
+
 - ✅ Bearer token present
 - ✅ User permissions (admin/tesoureiro)
 - ✅ CNPJ format: `/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/`
@@ -180,36 +196,40 @@ Data Flow:
 
 ## Error Handling
 
-| Scenario | UI Behavior |
-|----------|-------------|
-| CNPJ missing | Toast: "CNPJ é obrigatório" |
-| Client ID missing | Toast: "Client ID é obrigatório" |
-| Client Secret missing | Toast: "Client Secret é obrigatório" |
-| PFX file invalid | Toast: "Por favor, selecione um arquivo .pfx válido" |
-| PFX password missing | Toast: "Senha do PFX é obrigatória" |
-| App Key missing (Getnet) | Toast: "Application Key é obrigatória para Getnet" |
-| Edge Function error | Toast: `error?.message \|\| "Erro ao salvar integração"` |
-| Delete error | Toast: "Erro ao deletar integração" |
-| Success | Toast: "Integração criada com sucesso!" |
+| Scenario                 | UI Behavior                                              |
+| ------------------------ | -------------------------------------------------------- |
+| CNPJ missing             | Toast: "CNPJ é obrigatório"                              |
+| Client ID missing        | Toast: "Client ID é obrigatório"                         |
+| Client Secret missing    | Toast: "Client Secret é obrigatório"                     |
+| PFX file invalid         | Toast: "Por favor, selecione um arquivo .pfx válido"     |
+| PFX password missing     | Toast: "Senha do PFX é obrigatória"                      |
+| App Key missing (Getnet) | Toast: "Application Key é obrigatória para Getnet"       |
+| Edge Function error      | Toast: `error?.message \|\| "Erro ao salvar integração"` |
+| Delete error             | Toast: "Erro ao deletar integração"                      |
+| Success                  | Toast: "Integração criada com sucesso!"                  |
 
 ---
 
 ## Screenshots / UX Notes
 
 ### Estado Vazio
+
 - Mensagem: "Nenhuma integração configurada ainda"
 - CTA Button: "Criar primeira integração"
 
 ### Estado Carregando
+
 - Spinner: "Carregando integrações..."
 
 ### Dialog Modal
+
 - Header com título + descrição
 - Form com campos organizados verticalmente
 - Footer com botões "Cancelar" e "Salvar Integração"
 - File input com feedback visual (✓ filename)
 
 ### Tabela
+
 - Header com colunas
 - Rows com dados formatados
 - Ações à direita (Edit/Delete buttons)
@@ -235,15 +255,18 @@ Data Flow:
 ## Related Features
 
 **Phase 2 - Sincronização:**
+
 - Polling de extratos Santander via Edge Function
 - Polling de extratos Getnet via Edge Function
 - Lê credenciais de `integracoes_financeiras_secrets` (decrypt)
 
 **Phase 3 - Reconciliação:**
+
 - Matching entre `transacoes` + `extratos_bancarios`
 - Dashboard com cobertura e divergências
 
 **Phase 4 - Edição:**
+
 - Update status (ativo/inativo)
 - Renovar credenciais/PFX
 - Button "Edit" na tabela

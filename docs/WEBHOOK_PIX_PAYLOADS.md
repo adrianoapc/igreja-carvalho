@@ -26,7 +26,7 @@
   "pixId": "e1234567-e123-4567-e123-456789012345",
   "endToEndId": "E1234567890123456789012345678",
   "txid": "A1234567890123456789012345",
-  "valor": 250.50,
+  "valor": 250.5,
   "status": "CONCLUIDO",
   "calendario": {
     "criacao": "2026-01-19T20:00:00Z",
@@ -62,14 +62,14 @@
 
 ### Mapeamento de Campos
 
-| Campo Santander | Nosso Campo | Descrição |
-|-----------------|------------|-----------|
-| `pixId` | `pix_id` | ID único do PIX |
-| `valor` | `valor` | Valor em reais |
-| `devedor.nome` | `pagador_nome` | Quem enviou |
-| `devedor.cpf / cnpj` | `pagador_cpf_cnpj` | CPF ou CNPJ |
-| `calendario.criacao` | `data_pix` | Data/hora real |
-| `infoAdicionais[0].valor` | `descricao` | Descrição da transferência |
+| Campo Santander           | Nosso Campo        | Descrição                  |
+| ------------------------- | ------------------ | -------------------------- |
+| `pixId`                   | `pix_id`           | ID único do PIX            |
+| `valor`                   | `valor`            | Valor em reais             |
+| `devedor.nome`            | `pagador_nome`     | Quem enviou                |
+| `devedor.cpf / cnpj`      | `pagador_cpf_cnpj` | CPF ou CNPJ                |
+| `calendario.criacao`      | `data_pix`         | Data/hora real             |
+| `infoAdicionais[0].valor` | `descricao`        | Descrição da transferência |
 
 ---
 
@@ -80,7 +80,7 @@
 ```json
 {
   "pixId": "test-pix-001",
-  "valor": 250.50,
+  "valor": 250.5,
   "devedor": {
     "nome": "João da Silva",
     "cpf": "12345678900"
@@ -122,7 +122,7 @@ curl -X POST \
 ```json
 {
   "pixId": "pix-cpf-001",
-  "valor": 100.00,
+  "valor": 100.0,
   "devedor": {
     "nome": "Maria Santos",
     "cpf": "98765432100"
@@ -135,11 +135,12 @@ curl -X POST \
 ```
 
 **Resultado esperado:**
+
 ```json
 {
   "success": true,
   "pixId": "pix-cpf-001",
-  "valor": 100.00,
+  "valor": 100.0,
   "pagador": "Maria Santos",
   "descricao": "Dízimo"
 }
@@ -152,7 +153,7 @@ curl -X POST \
 ```json
 {
   "pixId": "pix-cnpj-001",
-  "valor": 5000.00,
+  "valor": 5000.0,
   "devedor": {
     "nome": "Empresa XYZ Ltda",
     "cnpj": "12345678000190"
@@ -171,7 +172,7 @@ curl -X POST \
 ```json
 {
   "pixId": "pix-anon-001",
-  "valor": 50.00,
+  "valor": 50.0,
   "devedor": {
     "nome": null,
     "cpf": null
@@ -190,7 +191,7 @@ curl -X POST \
 ```json
 {
   "pixId": "pix-grande-001",
-  "valor": 3500.50,
+  "valor": 3500.5,
   "devedor": {
     "nome": "Assembleia de Deus",
     "cnpj": "12345678000190"
@@ -213,7 +214,7 @@ curl -X POST \
   "success": true,
   "message": "Webhook PIX recebido e armazenado",
   "pixId": "pix-cpf-001",
-  "valor": 100.00
+  "valor": 100.0
 }
 ```
 
@@ -259,7 +260,7 @@ curl -X POST \
 ### Query 1: Verificar PIX Recebido
 
 ```sql
-SELECT 
+SELECT
   id,
   pix_id,
   valor,
@@ -274,6 +275,7 @@ LIMIT 10;
 ```
 
 **Resultado esperado:**
+
 ```
 id                                   | pix_id       | valor | pagador_nome  | status    | data_pix              | created_at
 ================================================================================================
@@ -285,7 +287,7 @@ e1234567-a123-4567-e123-456789012345 | pix-cpf-001  | 100   | Maria Santos  | re
 ### Query 2: Somar PIX do Período
 
 ```sql
-SELECT 
+SELECT
   DATE_TRUNC('day', data_pix) as dia,
   COUNT(*) as quantidade,
   SUM(valor) as total
@@ -297,6 +299,7 @@ ORDER BY dia DESC;
 ```
 
 **Resultado esperado:**
+
 ```
 dia              | quantidade | total
 ============================================
@@ -309,7 +312,7 @@ dia              | quantidade | total
 ### Query 3: PIX com Erro
 
 ```sql
-SELECT 
+SELECT
   pix_id,
   valor,
   erro_mensagem,
@@ -325,7 +328,7 @@ ORDER BY created_at DESC;
 ### Query 4: PIX Não Vinculados
 
 ```sql
-SELECT 
+SELECT
   id,
   pix_id,
   valor,
@@ -387,7 +390,7 @@ curl -X POST \
 ### Passo 4: Confirmar no Banco
 
 ```sql
-SELECT * FROM pix_webhook_temp 
+SELECT * FROM pix_webhook_temp
 WHERE pix_id = 'test-manual-001';
 ```
 

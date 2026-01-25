@@ -1,18 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { decode as decodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
-import { getWebhookSecret, getActiveWhatsAppProvider } from "../_shared/secrets.ts";
+import {
+  getWebhookSecret,
+  getActiveWhatsAppProvider,
+} from "../_shared/secrets.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 // Estados da máquina de estados
-type EstadoSessao = 
-  | "AGUARDANDO_COMPROVANTES" 
-  | "AGUARDANDO_DATA" 
-  | "AGUARDANDO_FORMA_PGTO" 
+type EstadoSessao =
+  | "AGUARDANDO_COMPROVANTES"
+  | "AGUARDANDO_DATA"
+  | "AGUARDANDO_FORMA_PGTO"
   | "FINALIZADO";
 
 interface ItemProcessado {
@@ -62,7 +66,7 @@ async function persistirAnexo(
 ): Promise<AnexoPersistido | null> {
   try {
     console.log(`[Storage] Baixando anexo: ${urlOriginal.slice(0, 50)}...`);
-    
+
     // Download do arquivo do WhatsApp (COM autenticação, igual ao chatbot-triagem)
     const fetchHeaders: Record<string, string> = {};
     if (whatsappToken) {
@@ -73,75 +77,84 @@ async function persistirAnexo(
       console.error(`[Storage] Erro ao baixar: ${response.status}`);
       return null;
     }
-    
+
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    
+
     // Detectar tipo de arquivo pelo content-type ou magic bytes
     let contentType = response.headers.get("content-type") || "";
-    
+
     // Verificar magic bytes para PDFs (%PDF-)
-    const pdfMagic = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]); // %PDF-
-    const isPdfByMagic = uint8Array.length >= 5 && 
+    const pdfMagic = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
+    const isPdfByMagic =
+      uint8Array.length >= 5 &&
       pdfMagic.every((byte, i) => uint8Array[i] === byte);
-    
+
     // Determinar tipo real
-    const isPdf = isPdfByMagic || contentType.includes("pdf") || contentType.includes("application/octet-stream");
-    
+    const isPdf =
+      isPdfByMagic ||
+      contentType.includes("pdf") ||
+      contentType.includes("application/octet-stream");
+
     if (isPdf) {
       contentType = "application/pdf";
     } else if (!contentType || contentType.includes("octet-stream")) {
       contentType = "image/jpeg";
     }
-    
-    const extension = isPdf ? "pdf" : (contentType.includes("png") ? "png" : "jpg");
-    
+
+    const extension = isPdf
+      ? "pdf"
+      : contentType.includes("png")
+        ? "png"
+        : "jpg";
+
     // Nome do arquivo no Storage
     const timestamp = Date.now();
     const fileName = `whatsapp/${sessaoId}/${timestamp}.${extension}`;
-    
+
     // Upload para o bucket transaction-attachments
     const { error } = await supabase.storage
       .from("transaction-attachments")
       .upload(fileName, uint8Array, {
         contentType,
-        upsert: false
+        upsert: false,
       });
-    
+
     if (error) {
       console.error(`[Storage] Erro no upload:`, error);
       return null;
     }
-    
+
     // Gerar signed URL (bucket privado)
     const { data: signedUrlData, error: signError } = await supabase.storage
       .from("transaction-attachments")
       .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 ano de validade
-    
+
     if (signError || !signedUrlData?.signedUrl) {
       console.error(`[Storage] Erro ao gerar signed URL:`, signError);
       // Fallback para public URL se signed falhar
       const { data: publicData } = supabase.storage
         .from("transaction-attachments")
         .getPublicUrl(fileName);
-      
+
       console.log(`[Storage] Anexo salvo (public fallback): ${fileName}`);
       return {
         storagePath: fileName,
         signedUrl: publicData?.publicUrl || "",
         contentType,
-        isPdf
+        isPdf,
       };
     }
-    
-    console.log(`[Storage] Anexo salvo com signed URL: ${fileName} (${isPdf ? 'PDF' : 'Image'})`);
+
+    console.log(
+      `[Storage] Anexo salvo com signed URL: ${fileName} (${isPdf ? "PDF" : "Image"})`
+    );
     return {
       storagePath: fileName,
       signedUrl: signedUrlData.signedUrl,
       contentType,
-      isPdf
+      isPdf,
     };
-    
   } catch (error) {
     console.error(`[Storage] Erro ao persistir anexo:`, error);
     return null;
@@ -166,34 +179,37 @@ async function processarNotaFiscal(
 } | null> {
   try {
     console.log(`[OCR] Processando arquivo: ${mimeType}`);
-    
-    const response = await fetch(`${supabaseUrl}/functions/v1/processar-nota-fiscal`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${serviceKey}`,
-        "X-Internal-Call": "true"
-      },
-      body: JSON.stringify({ 
-        imageBase64: base64Data,
-        mimeType,
-        igreja_id: igrejaId
-      })
-    });
-    
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/processar-nota-fiscal`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          "X-Internal-Call": "true",
+        },
+        body: JSON.stringify({
+          imageBase64: base64Data,
+          mimeType,
+          igreja_id: igrejaId,
+        }),
+      }
+    );
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[OCR] Erro: ${response.status} - ${errorText}`);
       return null;
     }
-    
+
     const data = await response.json();
-    
+
     if (!data.success || !data.dados) {
       console.error("[OCR] Resposta sem dados:", data);
       return null;
     }
-    
+
     return {
       valor: data.dados.valor_total || 0,
       fornecedor: data.dados.fornecedor_nome || null,
@@ -201,7 +217,7 @@ async function processarNotaFiscal(
       descricao: data.dados.descricao || null,
       categoria_sugerida_id: data.dados.categoria_sugerida_id || null,
       subcategoria_sugerida_id: data.dados.subcategoria_sugerida_id || null,
-      centro_custo_sugerido_id: data.dados.centro_custo_sugerido_id || null
+      centro_custo_sugerido_id: data.dados.centro_custo_sugerido_id || null,
     };
   } catch (error) {
     console.error(`[OCR] Erro ao processar nota:`, error);
@@ -216,19 +232,21 @@ async function deletarAnexosSessao(
   itens: ItemProcessado[]
 ): Promise<number> {
   let removidos = 0;
-  
+
   for (const item of itens) {
     if (item.anexo_storage) {
       try {
         // Extrair path do URL
         const url = new URL(item.anexo_storage);
-        const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/transaction-attachments\/(.+)/);
+        const pathMatch = url.pathname.match(
+          /\/storage\/v1\/object\/public\/transaction-attachments\/(.+)/
+        );
         if (pathMatch) {
           const filePath = pathMatch[1];
           const { error } = await supabase.storage
             .from("transaction-attachments")
             .remove([filePath]);
-          
+
           if (!error) {
             removidos++;
             console.log(`[Storage] Removido: ${filePath}`);
@@ -239,7 +257,7 @@ async function deletarAnexosSessao(
       }
     }
   }
-  
+
   return removidos;
 }
 
@@ -257,7 +275,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
-    
+
     // Token WhatsApp global como fallback (será substituído por multi-tenant quando tivermos igreja_id)
     let whatsappToken = Deno.env.get("WHATSAPP_API_TOKEN");
 
@@ -266,63 +284,84 @@ serve(async (req) => {
     // (a) Payload "flat" que já vem normalizado pelo Make
     // (b) Payload bruto do webhook do WhatsApp (messages[].document.url, etc.)
     const body = await req.json();
-    
+
     // Extrair whatsapp_number do body (vem do Make)
-    const whatsappNumber = body?.whatsapp_number ?? body?.display_phone_number ?? null;
+    const whatsappNumber =
+      body?.whatsapp_number ?? body?.display_phone_number ?? null;
     const phoneNumberId = body?.phone_number_id ?? null;
-    
+
     // Normalizar número WhatsApp (remover formatação)
-    const normalizeDisplayPhone = (tel?: string | null) => (tel || "").replace(/\D/g, "");
+    const normalizeDisplayPhone = (tel?: string | null) =>
+      (tel || "").replace(/\D/g, "");
     const whatsappNumeroNormalizado = normalizeDisplayPhone(whatsappNumber);
-    
+
     // Tentar pegar igreja_id diretamente ou buscar via whatsapp_number
-    let igrejaId = body?.igreja_id ?? new URL(req.url).searchParams.get("igreja_id");
+    let igrejaId =
+      body?.igreja_id ?? new URL(req.url).searchParams.get("igreja_id");
     let filialIdFromWhatsApp: string | null = null;
-    
+
     // Se não veio igreja_id mas veio whatsapp_number, buscar na tabela whatsapp_numeros
     if (!igrejaId && whatsappNumeroNormalizado) {
-      console.log(`[Financeiro] Buscando igreja pelo whatsapp_number: ${whatsappNumeroNormalizado}`);
-      
+      console.log(
+        `[Financeiro] Buscando igreja pelo whatsapp_number: ${whatsappNumeroNormalizado}`
+      );
+
       const { data: rota, error: rotaError } = await supabase
         .from("whatsapp_numeros")
         .select("igreja_id, filial_id")
         .eq("display_phone_number", whatsappNumeroNormalizado)
         .eq("enabled", true)
         .maybeSingle();
-      
+
       if (rotaError) {
-        console.error(`[Financeiro] Erro ao buscar whatsapp_numeros:`, rotaError);
+        console.error(
+          `[Financeiro] Erro ao buscar whatsapp_numeros:`,
+          rotaError
+        );
       }
-      
+
       if (rota) {
         igrejaId = rota.igreja_id;
         filialIdFromWhatsApp = rota.filial_id;
-        console.log(`[Financeiro] Igreja encontrada via whatsapp_number: ${igrejaId}, filial: ${filialIdFromWhatsApp}`);
+        console.log(
+          `[Financeiro] Igreja encontrada via whatsapp_number: ${igrejaId}, filial: ${filialIdFromWhatsApp}`
+        );
       }
     }
 
     if (!igrejaId) {
-      console.error(`[Financeiro] igreja_id não encontrado. whatsapp_number: ${whatsappNumber}`);
+      console.error(
+        `[Financeiro] igreja_id não encontrado. whatsapp_number: ${whatsappNumber}`
+      );
       return new Response(
-        JSON.stringify({ error: "igreja_id é obrigatório. Envie no body ou configure o whatsapp_number na tabela whatsapp_numeros." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error:
+            "igreja_id é obrigatório. Envie no body ou configure o whatsapp_number na tabela whatsapp_numeros.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
     const makeMsg = Array.isArray(body?.messages) ? body.messages[0] : null;
     const makeTipo = makeMsg?.type ?? null;
 
-    const telefone = body.telefone ?? makeMsg?.from ?? body.from ?? body?.contacts?.[0]?.wa_id ?? null;
-    const origem_canal = body.origem_canal ?? body.origem ?? body.messaging_product ?? "whatsapp";
-    const nome_perfil = body.nome_perfil ?? body?.contacts?.[0]?.profile?.name ?? null;
+    const telefone =
+      body.telefone ??
+      makeMsg?.from ??
+      body.from ??
+      body?.contacts?.[0]?.wa_id ??
+      null;
+    const origem_canal =
+      body.origem_canal ?? body.origem ?? body.messaging_product ?? "whatsapp";
+    const nome_perfil =
+      body.nome_perfil ?? body?.contacts?.[0]?.profile?.name ?? null;
 
     // Mensagem texto pode vir em diferentes campos
     const mensagem =
-      body.mensagem ??
-      body.text ??
-      makeMsg?.text?.body ??
-      body.message ??
-      null;
+      body.mensagem ?? body.text ?? makeMsg?.text?.body ?? body.message ?? null;
 
     const tipo = body.tipo ?? makeTipo ?? null;
 
@@ -341,30 +380,40 @@ serve(async (req) => {
       throw new Error("Telefone e origem_canal são obrigatórios.");
     }
 
-    console.log(`[Financeiro] Msg de ${telefone} no canal ${origem_canal}: ${mensagem || tipo}`);
+    console.log(
+      `[Financeiro] Msg de ${telefone} no canal ${origem_canal}: ${mensagem || tipo}`
+    );
 
     // Log detalhado para debug de anexos
     if (tipo === "image" || tipo === "document") {
-      console.log(`[Financeiro] Anexo recebido - tipo: ${tipo}, url_anexo: ${url_anexo ? 'presente' : 'AUSENTE'}`);
-      console.log(`[Financeiro] Campos do body:`, Object.keys(body).join(', '));
+      console.log(
+        `[Financeiro] Anexo recebido - tipo: ${tipo}, url_anexo: ${url_anexo ? "presente" : "AUSENTE"}`
+      );
+      console.log(`[Financeiro] Campos do body:`, Object.keys(body).join(", "));
       if (!url_anexo) {
-        console.log(`[Financeiro] Body completo para debug:`, JSON.stringify(body).slice(0, 2000));
+        console.log(
+          `[Financeiro] Body completo para debug:`,
+          JSON.stringify(body).slice(0, 2000)
+        );
       }
     }
 
     // 2. Valida se o telefone pertence a um membro autorizado
     // Normaliza telefone removendo DDI (55) e caracteres não numéricos
     const telefoneDigitos = telefone.replace(/\D/g, "");
-    const telefoneSemDDI = telefoneDigitos.startsWith("55") && telefoneDigitos.length > 11
-      ? telefoneDigitos.slice(2)
-      : telefoneDigitos;
+    const telefoneSemDDI =
+      telefoneDigitos.startsWith("55") && telefoneDigitos.length > 11
+        ? telefoneDigitos.slice(2)
+        : telefoneDigitos;
     const telefoneNormalizado = telefoneSemDDI.slice(-11); // Últimos 11 dígitos (DDD + número)
 
     // OBS: Não usamos maybeSingle aqui porque o mesmo telefone pode estar duplicado em mais de um perfil
     // (ex.: pai/filho ou registros duplicados). Nesse caso, escolhemos o melhor candidato.
     const { data: candidatosAutorizados, error: authError } = await supabase
       .from("profiles")
-      .select("id, nome, telefone, autorizado_bot_financeiro, created_at, data_nascimento")
+      .select(
+        "id, nome, telefone, autorizado_bot_financeiro, created_at, data_nascimento"
+      )
       .eq("autorizado_bot_financeiro", true)
       .eq("igreja_id", igrejaId)
       .filter("telefone", "ilike", `%${telefoneNormalizado.slice(-9)}%`) // Busca pelos 9 dígitos finais
@@ -372,7 +421,8 @@ serve(async (req) => {
 
     const normalizarTelefoneDB = (t?: string | null) => {
       const dig = (t || "").replace(/\D/g, "");
-      const semDDI = dig.startsWith("55") && dig.length > 11 ? dig.slice(2) : dig;
+      const semDDI =
+        dig.startsWith("55") && dig.length > 11 ? dig.slice(2) : dig;
       return semDDI.slice(-11);
     };
 
@@ -384,21 +434,33 @@ serve(async (req) => {
       const alvo9 = telefoneNormalizado.slice(-9);
 
       // 1) Match exato pelos 11 dígitos (DDD + número)
-      const exato11 = lista.find((p) => normalizarTelefoneDB(p.telefone) === alvo11);
+      const exato11 = lista.find(
+        (p) => normalizarTelefoneDB(p.telefone) === alvo11
+      );
       if (exato11) return exato11;
 
       // 2) Match pelos 9 dígitos finais (número)
-      const exato9 = lista.find((p) => normalizarTelefoneDB(p.telefone).endsWith(alvo9));
+      const exato9 = lista.find((p) =>
+        normalizarTelefoneDB(p.telefone).endsWith(alvo9)
+      );
       if (exato9) return exato9;
 
       // 3) Fallback: mais antigo (menor data_nascimento) e depois criado primeiro
       return [...lista].sort((a, b) => {
-        const aNasc = a.data_nascimento ? new Date(a.data_nascimento).getTime() : Number.POSITIVE_INFINITY;
-        const bNasc = b.data_nascimento ? new Date(b.data_nascimento).getTime() : Number.POSITIVE_INFINITY;
+        const aNasc = a.data_nascimento
+          ? new Date(a.data_nascimento).getTime()
+          : Number.POSITIVE_INFINITY;
+        const bNasc = b.data_nascimento
+          ? new Date(b.data_nascimento).getTime()
+          : Number.POSITIVE_INFINITY;
         if (aNasc !== bNasc) return aNasc - bNasc;
 
-        const aCreated = a.created_at ? new Date(a.created_at).getTime() : Number.POSITIVE_INFINITY;
-        const bCreated = b.created_at ? new Date(b.created_at).getTime() : Number.POSITIVE_INFINITY;
+        const aCreated = a.created_at
+          ? new Date(a.created_at).getTime()
+          : Number.POSITIVE_INFINITY;
+        const bCreated = b.created_at
+          ? new Date(b.created_at).getTime()
+          : Number.POSITIVE_INFINITY;
         return aCreated - bCreated;
       })[0];
     };
@@ -412,7 +474,11 @@ serve(async (req) => {
     if ((candidatosAutorizados?.length || 0) > 1) {
       console.warn(
         `[Financeiro] Telefone duplicado em perfis autorizados (${telefoneNormalizado}). Candidatos:`,
-        (candidatosAutorizados || []).map((p) => ({ id: p.id, nome: p.nome, telefone: p.telefone }))
+        (candidatosAutorizados || []).map((p) => ({
+          id: p.id,
+          nome: p.nome,
+          telefone: p.telefone,
+        }))
       );
     }
 
@@ -421,13 +487,20 @@ serve(async (req) => {
     }
 
     if (!membroAutorizado) {
-      console.log(`[Financeiro] Telefone ${telefone} não autorizado para bot financeiro`);
-      return new Response(JSON.stringify({
-        text: "⚠️ Você não está autorizado a usar o assistente financeiro. Solicite acesso à secretaria."
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.log(
+        `[Financeiro] Telefone ${telefone} não autorizado para bot financeiro`
+      );
+      return new Response(
+        JSON.stringify({
+          text: "⚠️ Você não está autorizado a usar o assistente financeiro. Solicite acesso à secretaria.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    console.log(`[Financeiro] Membro autorizado: ${membroAutorizado.nome} (${membroAutorizado.id})`);
+    console.log(
+      `[Financeiro] Membro autorizado: ${membroAutorizado.nome} (${membroAutorizado.id})`
+    );
 
     // 3. Busca Sessão Ativa
     let querySessao = supabase
@@ -436,11 +509,14 @@ serve(async (req) => {
       .eq("telefone", telefone)
       .eq("origem_canal", origem_canal)
       .eq("igreja_id", igrejaId)
-      .neq("status", "CONCLUIDO")
+      .neq("status", "CONCLUIDO");
     if (phoneNumberId) {
-      querySessao = querySessao.contains("meta_dados", { phone_number_id: phoneNumberId });
+      querySessao = querySessao.contains("meta_dados", {
+        phone_number_id: phoneNumberId,
+      });
     }
-    const { data: sessao, error: searchError } = await querySessao.maybeSingle();
+    const { data: sessao, error: searchError } =
+      await querySessao.maybeSingle();
 
     if (searchError) {
       console.error("Erro ao buscar sessão:", searchError);
@@ -462,7 +538,7 @@ serve(async (req) => {
           nome_perfil: nome_perfil || membroAutorizado.nome,
           estado_atual: "AGUARDANDO_COMPROVANTES",
           itens: [],
-          valor_total_acumulado: 0
+          valor_total_acumulado: 0,
         };
 
         await supabase.from("atendimentos_bot").insert({
@@ -470,23 +546,29 @@ serve(async (req) => {
           origem_canal,
           pessoa_id: membroAutorizado.id,
           status: "EM_ANDAMENTO",
-          meta_dados: { 
+          meta_dados: {
             ...metaDadosInicial,
             phone_number_id: phoneNumberId ?? null,
             display_phone_number: whatsappNumeroNormalizado || null,
           },
-          igreja_id: igrejaId
+          igreja_id: igrejaId,
         });
 
         const tipoFluxo = isReembolso ? "Reembolso" : "Nova Conta";
-        return new Response(JSON.stringify({
-          text: `🧾 Modo ${tipoFluxo} iniciado!\n\nEnvie a(s) foto(s) dos comprovantes.\nDigite *Fechar* quando terminar.\nDigite *Cancelar* para desistir.`
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            text: `🧾 Modo ${tipoFluxo} iniciado!\n\nEnvie a(s) foto(s) dos comprovantes.\nDigite *Fechar* quando terminar.\nDigite *Cancelar* para desistir.`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
-      return new Response(JSON.stringify({
-        text: "Olá! Sou o assistente financeiro. Para iniciar:\n\n• *Reembolso* - para solicitar ressarcimento\n• *Nova Conta* - para registrar uma despesa"
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          text: "Olá! Sou o assistente financeiro. Para iniciar:\n\n• *Reembolso* - para solicitar ressarcimento\n• *Nova Conta* - para registrar uma despesa",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // --- CENÁRIO B: SESSÃO ATIVA (Processamento) ---
@@ -495,37 +577,57 @@ serve(async (req) => {
 
     // ========== ESTADO: AGUARDANDO_COMPROVANTES ==========
     if (estadoAtual === "AGUARDANDO_COMPROVANTES") {
-      
       // B1. Recebimento de Arquivos (Imagens/PDFs)
       if (tipo === "image" || tipo === "document") {
         if (!url_anexo) {
-          return new Response(JSON.stringify({ text: "Erro: Anexo sem URL." }), { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" } 
-          });
+          return new Response(
+            JSON.stringify({ text: "Erro: Anexo sem URL." }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
         }
 
         // Baixar e salvar no Storage permanentemente
-        const anexoResult = await persistirAnexo(supabase, url_anexo, sessao.id, whatsappToken);
-        
+        const anexoResult = await persistirAnexo(
+          supabase,
+          url_anexo,
+          sessao.id,
+          whatsappToken
+        );
+
         if (!anexoResult) {
-          return new Response(JSON.stringify({ 
-            text: "⚠️ Erro ao salvar o comprovante. Por favor, tente enviar novamente." 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(
+            JSON.stringify({
+              text: "⚠️ Erro ao salvar o comprovante. Por favor, tente enviar novamente.",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
         // Processar via OCR para extrair dados (imagens E PDFs)
         let dadosNota: Awaited<ReturnType<typeof processarNotaFiscal>> = null;
-        
+
         try {
           // Fazer download novamente para base64
           const fileResponse = await fetch(url_anexo);
           const fileBuffer = await fileResponse.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
-          
+          const base64 = btoa(
+            String.fromCharCode(...new Uint8Array(fileBuffer))
+          );
+
           // Determinar mimeType
-          const mimeType = anexoResult.isPdf ? "application/pdf" : anexoResult.contentType;
-          
-          dadosNota = await processarNotaFiscal(supabaseUrl, supabaseKey, base64, mimeType, igrejaId);
+          const mimeType = anexoResult.isPdf
+            ? "application/pdf"
+            : anexoResult.contentType;
+
+          dadosNota = await processarNotaFiscal(
+            supabaseUrl,
+            supabaseKey,
+            base64,
+            mimeType,
+            igrejaId
+          );
         } catch (e) {
           console.error("[OCR] Erro ao converter para base64:", e);
         }
@@ -544,21 +646,24 @@ serve(async (req) => {
           categoria_sugerida_id: dadosNota?.categoria_sugerida_id || null,
           subcategoria_sugerida_id: dadosNota?.subcategoria_sugerida_id || null,
           centro_custo_sugerido_id: dadosNota?.centro_custo_sugerido_id || null,
-          processado_em: new Date().toISOString()
+          processado_em: new Date().toISOString(),
         };
 
         // Atualizar metadados
         const itensAtualizados = [...metaDados.itens, novoItem];
-        const valorTotal = itensAtualizados.reduce((acc, item) => acc + item.valor, 0);
+        const valorTotal = itensAtualizados.reduce(
+          (acc, item) => acc + item.valor,
+          0
+        );
 
         await supabase
           .from("atendimentos_bot")
           .update({
-            meta_dados: { 
-              ...metaDados, 
+            meta_dados: {
+              ...metaDados,
               itens: itensAtualizados,
-              valor_total_acumulado: valorTotal
-            }
+              valor_total_acumulado: valorTotal,
+            },
           })
           .eq("id", sessao.id)
           .eq("igreja_id", igrejaId);
@@ -571,47 +676,61 @@ serve(async (req) => {
         if (dadosNota?.fornecedor) {
           resposta += `🏪 ${dadosNota.fornecedor}\n`;
         }
-        resposta += `\n📊 Total acumulado: ${formatarValor(valorTotal)} (${itensAtualizados.length} ${itensAtualizados.length === 1 ? 'item' : 'itens'})\n`;
+        resposta += `\n📊 Total acumulado: ${formatarValor(valorTotal)} (${itensAtualizados.length} ${itensAtualizados.length === 1 ? "item" : "itens"})\n`;
         resposta += `\nEnvie mais ou digite *Fechar* para concluir.`;
 
-        return new Response(JSON.stringify({ text: resposta }), { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        return new Response(JSON.stringify({ text: resposta }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       // B2. Cancelamento
       if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
-        const itensRemovidos = await deletarAnexosSessao(supabase, metaDados.itens);
-        
+        const itensRemovidos = await deletarAnexosSessao(
+          supabase,
+          metaDados.itens
+        );
+
         await supabase
           .from("atendimentos_bot")
           .update({
             status: "CONCLUIDO",
-            meta_dados: { 
-              ...metaDados, 
+            meta_dados: {
+              ...metaDados,
               estado_atual: "FINALIZADO",
               resultado: "CANCELADO_PELO_USUARIO",
-              itens_removidos: itensRemovidos
-            }
+              itens_removidos: itensRemovidos,
+            },
           })
           .eq("id", sessao.id)
           .eq("igreja_id", igrejaId);
 
-        console.log(`[Financeiro] Sessão ${sessao.id} cancelada. ${itensRemovidos} anexos removidos.`);
+        console.log(
+          `[Financeiro] Sessão ${sessao.id} cancelada. ${itensRemovidos} anexos removidos.`
+        );
 
-        return new Response(JSON.stringify({
-          text: `❌ Solicitação cancelada.\n${itensRemovidos > 0 ? `${itensRemovidos} comprovante(s) descartado(s).` : ''}\n\nDigite *Reembolso* ou *Nova Conta* para iniciar novamente.`
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            text: `❌ Solicitação cancelada.\n${itensRemovidos > 0 ? `${itensRemovidos} comprovante(s) descartado(s).` : ""}\n\nDigite *Reembolso* ou *Nova Conta* para iniciar novamente.`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // B3. Finalização (Comando 'Fechar')
-      if (mensagem && mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)) {
+      if (
+        mensagem &&
+        mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)
+      ) {
         const qtdItens = metaDados.itens.length;
-        
+
         if (qtdItens === 0) {
-          return new Response(JSON.stringify({
-            text: "⚠️ Nenhum comprovante foi enviado ainda.\n\nEnvie a foto antes de fechar ou digite *Cancelar* para desistir."
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(
+            JSON.stringify({
+              text: "⚠️ Nenhum comprovante foi enviado ainda.\n\nEnvie a foto antes de fechar ou digite *Cancelar* para desistir.",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
         // FLUXO CONTA_UNICA: Inserir diretamente
@@ -626,9 +745,14 @@ serve(async (req) => {
             .single();
 
           if (!contaPadrao) {
-            return new Response(JSON.stringify({
-              text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador."
-            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            return new Response(
+              JSON.stringify({
+                text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador.",
+              }),
+              {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
           }
 
           // Criar transações para cada item
@@ -637,19 +761,22 @@ serve(async (req) => {
             const { data: tx, error } = await supabase
               .from("transacoes_financeiras")
               .insert({
-                descricao: item.descricao || `Despesa - ${item.fornecedor || 'WhatsApp'}`,
+                descricao:
+                  item.descricao ||
+                  `Despesa - ${item.fornecedor || "WhatsApp"}`,
                 valor: item.valor || 0,
                 tipo: "saida",
                 tipo_lancamento: "unico",
-                data_vencimento: item.data_emissao || new Date().toISOString().split('T')[0],
+                data_vencimento:
+                  item.data_emissao || new Date().toISOString().split("T")[0],
                 status: "pendente",
                 conta_id: contaPadrao.id,
                 categoria_id: item.categoria_sugerida_id,
                 subcategoria_id: item.subcategoria_sugerida_id,
                 centro_custo_id: item.centro_custo_sugerido_id,
                 anexo_url: item.anexo_storage,
-                observacoes: `Fornecedor: ${item.fornecedor || 'N/A'}\nOrigem: WhatsApp\nSolicitante: ${metaDados.nome_perfil}`,
-                igreja_id: igrejaId
+                observacoes: `Fornecedor: ${item.fornecedor || "N/A"}\nOrigem: WhatsApp\nSolicitante: ${metaDados.nome_perfil}`,
+                igreja_id: igrejaId,
               })
               .select("id")
               .single();
@@ -664,64 +791,79 @@ serve(async (req) => {
             .from("atendimentos_bot")
             .update({
               status: "CONCLUIDO",
-              meta_dados: { 
-                ...metaDados, 
+              meta_dados: {
+                ...metaDados,
                 estado_atual: "FINALIZADO",
                 resultado: "CONTA_UNICA_CRIADA",
-                transacoes_ids: transacoesCriadas
-              }
+                transacoes_ids: transacoesCriadas,
+              },
             })
             .eq("id", sessao.id)
             .eq("igreja_id", igrejaId);
 
-          return new Response(JSON.stringify({
-            text: `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n\nO financeiro irá processar em breve.`
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(
+            JSON.stringify({
+              text: `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n\nO financeiro irá processar em breve.`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
         // FLUXO REEMBOLSO: Perguntar data
         await supabase
           .from("atendimentos_bot")
           .update({
-            meta_dados: { ...metaDados, estado_atual: "AGUARDANDO_DATA" }
+            meta_dados: { ...metaDados, estado_atual: "AGUARDANDO_DATA" },
           })
           .eq("id", sessao.id)
           .eq("igreja_id", igrejaId);
 
-        return new Response(JSON.stringify({
-          text: `📋 *Resumo do Reembolso*\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${qtdItens}\n\n📅 *Quando deseja receber o ressarcimento?*\n\nDigite a data (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*`
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            text: `📋 *Resumo do Reembolso*\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${qtdItens}\n\n📅 *Quando deseja receber o ressarcimento?*\n\nDigite a data (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // Mensagem genérica
-      return new Response(JSON.stringify({
-        text: "📸 Aguardando comprovantes.\n\nEnvie a foto, digite *Fechar* para concluir ou *Cancelar* para desistir."
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          text: "📸 Aguardando comprovantes.\n\nEnvie a foto, digite *Fechar* para concluir ou *Cancelar* para desistir.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ========== ESTADO: AGUARDANDO_DATA ==========
     if (estadoAtual === "AGUARDANDO_DATA") {
       // Cancelamento ainda disponível
       if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
-        const itensRemovidos = await deletarAnexosSessao(supabase, metaDados.itens);
-        
+        const itensRemovidos = await deletarAnexosSessao(
+          supabase,
+          metaDados.itens
+        );
+
         await supabase
           .from("atendimentos_bot")
           .update({
             status: "CONCLUIDO",
-            meta_dados: { 
-              ...metaDados, 
+            meta_dados: {
+              ...metaDados,
               estado_atual: "FINALIZADO",
               resultado: "CANCELADO_PELO_USUARIO",
-              itens_removidos: itensRemovidos
-            }
+              itens_removidos: itensRemovidos,
+            },
           })
           .eq("id", sessao.id)
           .eq("igreja_id", igrejaId);
 
-        return new Response(JSON.stringify({
-          text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // Processar data informada
@@ -729,29 +871,44 @@ serve(async (req) => {
       let dataVencimento: string;
       const hoje = new Date();
 
-      if (textoData.includes("esta semana") || textoData.includes("essa semana")) {
+      if (
+        textoData.includes("esta semana") ||
+        textoData.includes("essa semana")
+      ) {
         // Próxima sexta-feira
         const diasAteSexta = (5 - hoje.getDay() + 7) % 7 || 7;
         const sexta = new Date(hoje);
         sexta.setDate(hoje.getDate() + diasAteSexta);
-        dataVencimento = sexta.toISOString().split('T')[0];
-      } else if (textoData.includes("próximo mês") || textoData.includes("proximo mes")) {
+        dataVencimento = sexta.toISOString().split("T")[0];
+      } else if (
+        textoData.includes("próximo mês") ||
+        textoData.includes("proximo mes")
+      ) {
         // Dia 5 do próximo mês
         const proximoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 5);
-        dataVencimento = proximoMes.toISOString().split('T')[0];
+        dataVencimento = proximoMes.toISOString().split("T")[0];
       } else {
         // Tentar parsear data no formato DD/MM ou DD/MM/AAAA
-        const matchData = textoData.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+        const matchData = textoData.match(
+          /(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/
+        );
         if (matchData) {
           const dia = parseInt(matchData[1]);
           const mes = parseInt(matchData[2]) - 1;
-          const ano = matchData[3] ? (matchData[3].length === 2 ? 2000 + parseInt(matchData[3]) : parseInt(matchData[3])) : hoje.getFullYear();
+          const ano = matchData[3]
+            ? matchData[3].length === 2
+              ? 2000 + parseInt(matchData[3])
+              : parseInt(matchData[3])
+            : hoje.getFullYear();
           const dataInformada = new Date(ano, mes, dia);
-          dataVencimento = dataInformada.toISOString().split('T')[0];
+          dataVencimento = dataInformada.toISOString().split("T")[0];
         } else {
-          return new Response(JSON.stringify({
-            text: "⚠️ Não entendi a data.\n\nDigite no formato DD/MM (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*"
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(
+            JSON.stringify({
+              text: "⚠️ Não entendi a data.\n\nDigite no formato DD/MM (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
       }
 
@@ -759,45 +916,56 @@ serve(async (req) => {
       await supabase
         .from("atendimentos_bot")
         .update({
-          meta_dados: { 
-            ...metaDados, 
+          meta_dados: {
+            ...metaDados,
             estado_atual: "AGUARDANDO_FORMA_PGTO",
-            data_vencimento: dataVencimento
-          }
+            data_vencimento: dataVencimento,
+          },
         })
         .eq("id", sessao.id)
         .eq("igreja_id", igrejaId);
 
-      const dataFormatada = new Date(dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+      const dataFormatada = new Date(
+        dataVencimento + "T12:00:00"
+      ).toLocaleDateString("pt-BR");
 
-      return new Response(JSON.stringify({
-        text: `📅 Data do ressarcimento: *${dataFormatada}*\n\n💳 *Como prefere receber?*\n\n1️⃣ PIX\n2️⃣ Dinheiro\n\nDigite 1 ou 2`
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          text: `📅 Data do ressarcimento: *${dataFormatada}*\n\n💳 *Como prefere receber?*\n\n1️⃣ PIX\n2️⃣ Dinheiro\n\nDigite 1 ou 2`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ========== ESTADO: AGUARDANDO_FORMA_PGTO ==========
     if (estadoAtual === "AGUARDANDO_FORMA_PGTO") {
       // Cancelamento
       if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
-        const itensRemovidos = await deletarAnexosSessao(supabase, metaDados.itens);
-        
+        const itensRemovidos = await deletarAnexosSessao(
+          supabase,
+          metaDados.itens
+        );
+
         await supabase
           .from("atendimentos_bot")
           .update({
             status: "CONCLUIDO",
-            meta_dados: { 
-              ...metaDados, 
+            meta_dados: {
+              ...metaDados,
               estado_atual: "FINALIZADO",
               resultado: "CANCELADO_PELO_USUARIO",
-              itens_removidos: itensRemovidos
-            }
+              itens_removidos: itensRemovidos,
+            },
           })
           .eq("id", sessao.id)
           .eq("igreja_id", igrejaId);
 
-        return new Response(JSON.stringify({
-          text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // Processar escolha
@@ -806,18 +974,24 @@ serve(async (req) => {
 
       if (escolha === "1" || escolha.toLowerCase().includes("pix")) {
         formaPagamento = "pix";
-      } else if (escolha === "2" || escolha.toLowerCase().includes("dinheiro")) {
+      } else if (
+        escolha === "2" ||
+        escolha.toLowerCase().includes("dinheiro")
+      ) {
         formaPagamento = "dinheiro";
       } else {
-        return new Response(JSON.stringify({
-          text: "⚠️ Opção inválida.\n\nDigite:\n1️⃣ PIX\n2️⃣ Dinheiro"
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            text: "⚠️ Opção inválida.\n\nDigite:\n1️⃣ PIX\n2️⃣ Dinheiro",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // ===== CRIAR SOLICITAÇÃO DE REEMBOLSO E ITENS (ADR-001) =====
       // Seguindo arquitetura: itens_reembolso = Fato Gerador (competência)
       // transacoes_financeiras será criada apenas no momento do PAGAMENTO pelo tesoureiro
-      
+
       // 1. Criar solicitação de reembolso (status rascunho para RLS, depois pendente)
       const { data: solicitacao, error: solError } = await supabase
         .from("solicitacoes_reembolso")
@@ -827,16 +1001,19 @@ serve(async (req) => {
           forma_pagamento_preferida: formaPagamento,
           data_vencimento: metaDados.data_vencimento,
           observacoes: `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`,
-          igreja_id: igrejaId
+          igreja_id: igrejaId,
         })
         .select("id")
         .single();
 
       if (solError || !solicitacao) {
         console.error("Erro ao criar solicitação:", solError);
-        return new Response(JSON.stringify({
-          text: "❌ Erro ao criar solicitação. Tente novamente."
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            text: "❌ Erro ao criar solicitação. Tente novamente.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // 2. Criar ITENS de reembolso (fato gerador/competência - para DRE)
@@ -846,9 +1023,11 @@ serve(async (req) => {
           .from("itens_reembolso")
           .insert({
             solicitacao_id: solicitacao.id,
-            descricao: item.descricao || `Comprovante - ${item.fornecedor || 'N/A'}`,
+            descricao:
+              item.descricao || `Comprovante - ${item.fornecedor || "N/A"}`,
             valor: item.valor || 0,
-            data_item: item.data_emissao || new Date().toISOString().split('T')[0],
+            data_item:
+              item.data_emissao || new Date().toISOString().split("T")[0],
             categoria_id: item.categoria_sugerida_id,
             subcategoria_id: item.subcategoria_sugerida_id,
             centro_custo_id: item.centro_custo_sugerido_id,
@@ -882,7 +1061,7 @@ serve(async (req) => {
         try {
           const solicitanteNome = metaDados.nome_perfil || "Membro";
           const valorFormatado = formatarValor(metaDados.valor_total_acumulado);
-          
+
           await supabase.functions.invoke("disparar-alerta", {
             body: {
               evento: "financeiro_reembolso_aprovacao",
@@ -892,14 +1071,19 @@ serve(async (req) => {
                 itens: metaDados.itens.length,
                 solicitacao_id: solicitacao.id,
                 forma_pagamento: formaPagamento,
-                link: `/financas/reembolsos?id=${solicitacao.id}`
+                link: `/financas/reembolsos?id=${solicitacao.id}`,
               },
-              igreja_id: igrejaId
-            }
+              igreja_id: igrejaId,
+            },
           });
-          console.log(`[Financeiro] Notificação de reembolso enviada para tesoureiros`);
+          console.log(
+            `[Financeiro] Notificação de reembolso enviada para tesoureiros`
+          );
         } catch (notifyErr) {
-          console.error("Erro ao notificar tesoureiro (não bloqueia fluxo):", notifyErr);
+          console.error(
+            "Erro ao notificar tesoureiro (não bloqueia fluxo):",
+            notifyErr
+          );
         }
       }
 
@@ -908,34 +1092,42 @@ serve(async (req) => {
         .from("atendimentos_bot")
         .update({
           status: "CONCLUIDO",
-          meta_dados: { 
-            ...metaDados, 
+          meta_dados: {
+            ...metaDados,
             estado_atual: "FINALIZADO",
             forma_pagamento: formaPagamento,
             resultado: "REEMBOLSO_CRIADO",
             solicitacao_reembolso_id: solicitacao.id,
-            itens_ids: itensCriados
-          }
+            itens_ids: itensCriados,
+          },
         })
         .eq("id", sessao.id)
         .eq("igreja_id", igrejaId);
 
-      const dataFormatada = new Date(metaDados.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+      const dataFormatada = new Date(
+        metaDados.data_vencimento + "T12:00:00"
+      ).toLocaleDateString("pt-BR");
       const formaPgtoTexto = formaPagamento === "pix" ? "PIX" : "Dinheiro";
 
-      return new Response(JSON.stringify({
-        text: `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}\n\n🔖 Protocolo: #${solicitacao.id.slice(0,8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          text: `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Estado não reconhecido - reset
-    return new Response(JSON.stringify({
-      text: "⚠️ Sessão em estado inválido. Digite *Cancelar* para reiniciar."
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
+    return new Response(
+      JSON.stringify({
+        text: "⚠️ Sessão em estado inválido. Digite *Cancelar* para reiniciar.",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error: unknown) {
     console.error("Erro crítico:", error);
-    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido";
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

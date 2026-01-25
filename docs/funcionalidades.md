@@ -312,7 +312,6 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
 #### Sistema de Triagem Automática
 
 - **Biblioteca de Triagem**: `src/lib/voluntariado/triagem.ts` (+118 linhas)
-
   - Função `avaliarTriagemVoluntario(perfilStatus, ministerio)` retorna status `aprovado` ou `em_trilha`
   - 5 regras de ministério pré-definidas:
     - **Kids**: Requer ser membro → Trilha Kids
@@ -324,7 +323,6 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
   - Normalização de texto (remove acentos) para matching flexível de nomes de ministério
 
 - **Integração em GerenciarTimeDialog**:
-
   - Carrega perfil da pessoa (`profiles.tipo`) e ministério (`ministerios.nome` + `categoria`)
   - Chama `avaliarTriagemVoluntario()` ao adicionar membro
   - Exibe badge:
@@ -337,7 +335,6 @@ Sistema unificado para agendamento e gestão de **qualquer tipo de evento da igr
   - Track de progresso: Contagem de etapas concluídas vs total
 
 - **Trilhas Mapeadas**: 6 trilhas identificadas:
-
   1. Trilha de Integração (para não-membros)
   2. Trilha Kids
   3. Trilha de Louvor
@@ -731,14 +728,12 @@ Centralizar o cuidado pastoral dos membros através de um sistema de tickets (at
 Atendimentos pastorais são criados automaticamente em 3 cenários:
 
 1. **Via Chatbot (`chatbot-triagem` Edge Function)**
-
    - Membro ou visitante envia mensagem WhatsApp pedindo ajuda pastoral/encaminhamento
    - Se o telefone corresponde a múltiplos `profiles`, o bot escolhe o candidato mais antigo (data de nascimento > data de criação); se nenhum existir, cria/recupera `visitantes_leads`
    - Bot detecta intenção "SOLICITACAO_PASTORAL" ou conversa com índice de gravidade alto
    - Sistema cria `atendimentos_pastorais` com `origem = 'CHATBOT'`, `gravidade` conforme análise IA
 
 2. **Via Análise de Sentimentos (`analise-sentimento-ia` Edge Function)**
-
    - Membro registra sentimento negativo (triste, ansioso, angustiado) 3+ dias consecutivos
    - IA detecta padrão crítico e marca `gravidade = CRITICA` ou `ALTA`
    - Sistema cria `atendimentos_pastorais` com `origem = 'SENTIMENTOS'`

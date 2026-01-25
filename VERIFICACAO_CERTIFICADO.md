@@ -6,7 +6,7 @@
 2. Execute esta query SQL:
 
 ```sql
-SELECT 
+SELECT
   integracao_id,
   client_id,
   pfx_blob,
@@ -42,6 +42,7 @@ curl -X POST https://mcomwaelbwvyotvudnzt.supabase.co/functions/v1/debug-certifi
 ```
 
 Resposta esperada:
+
 ```json
 {
   "success": true,

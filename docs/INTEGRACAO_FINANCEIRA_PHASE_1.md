@@ -3,13 +3,14 @@
 **Data:** 15 de Janeiro de 2026  
 **Status:** ✅ Concluída  
 **Branch:** main  
-**Commits Relacionados:** -  
+**Commits Relacionados:** -
 
 ---
 
 ## Objetivo
 
 Implementar a infraestrutura de configuração para integrações financeiras agnósticas com suporte a múltiplos provedores (Santander, Getnet, API Genérica), incluindo:
+
 1. Tela agnóstica para CRUD de integrações
 2. Edge Function para criptografia segura de credenciais
 3. RLS policies para proteção de dados sensíveis
@@ -19,6 +20,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ## Arquivos Criados
 
 ### 1. **Componente React: `IntegracoesCriarDialog.tsx`**
+
 - **Local:** `src/components/financas/IntegracoesCriarDialog.tsx`
 - **Responsabilidades:**
   - Formulário agnóstico para criar integração
@@ -37,6 +39,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
   - Reset de form e invalidação de cache após sucesso
 
 **Tecnologias:**
+
 - React 18 (hooks: useState, useCallback)
 - shadcn/ui (Select, Switch, Input, Dialog)
 - TanStack Query para cache invalidation
@@ -45,6 +48,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ---
 
 ### 2. **Página React: `Integracoes.tsx`**
+
 - **Local:** `src/pages/financas/Integracoes.tsx`
 - **Responsabilidades:**
   - Listar todas as integrações por chiesa
@@ -64,6 +68,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
   - Loading state
 
 **Tecnologias:**
+
 - React 18
 - TanStack Query (useQuery)
 - shadcn/ui (Table, Badge, Button, AlertDialog)
@@ -73,6 +78,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ---
 
 ### 3. **Edge Function: `integracoes-config/index.ts`**
+
 - **Local:** `supabase/functions/integracoes-config/index.ts`
 - **Responsabilidades:**
   - Autenticação: valida Bearer token
@@ -92,11 +98,13 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
     8. Retorna 201 + `integracao_id`
 
 **CORS Headers:**
+
 - `Access-Control-Allow-Origin: *`
 - `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`
 - `Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type`
 
 **Segurança:**
+
 - Nada logado em console (sem secrets)
 - Criptografia em-memory (não persiste plaintext)
 - Service role para operações privilegiadas
@@ -105,6 +113,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ---
 
 ### 4. **Migration SQL: `20260115140708_add_rls_integracoes_secrets.sql`**
+
 - **Local:** `supabase/migrations/20260115140708_add_rls_integracoes_secrets.sql`
 - **Responsabilidades:**
   - Adiciona RLS policies para `integracoes_financeiras_secrets`
@@ -115,6 +124,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ---
 
 ### 5. **Rota & Import em App.tsx**
+
 - **Import:** linha ~174 adiciona `const FinancasIntegracoes = lazy(...)`
 - **Rota:** `/financas/integracoes` com `requiredPermission="financeiro.admin"`
 - **Comportamento:** Lazy load + AuthGate
@@ -180,6 +190,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ## Estrutura de Dados
 
 ### `integracoes_financeiras` (pública - metadados)
+
 ```sql
 - id: UUID
 - igreja_id: UUID (FK)
@@ -193,6 +204,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ```
 
 ### `integracoes_financeiras_secrets` (protegida por RLS)
+
 ```sql
 - id: UUID
 - integracao_id: UUID (FK, CASCADE)
@@ -209,6 +221,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 ## Validações
 
 ### Côs-Cliente (React Dialog)
+
 - CNPJ: obrigatório
 - Client ID: obrigatório
 - Client Secret: obrigatório
@@ -217,6 +230,7 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 - Application Key: obrigatório se provedor === 'getnet'
 
 ### Lado Servidor (Edge Function)
+
 - Bearer token: obrigatório
 - Permissions: admin ou tesoureiro
 - CNPJ: regex `/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/`
@@ -227,22 +241,23 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 
 ## Segurança
 
-| Aspecto | Implementação |
-|---------|---------------|
-| **Autenticação** | Bearer token via Supabase Auth |
-| **Autorização** | Permissões por role (admin/tesoureiro) validadas via `user_roles` |
-| **Criptografia** | ChaCha20-Poly1305 em-memory; nonce random de 12 bytes |
-| **Armazenamento** | BYTEA encrypted em `integracoes_financeiras_secrets` |
-| **RLS** | Todas políticas bloqueiam SELECT/INSERT/UPDATE/DELETE direto |
-| **CORS** | Allow-Origin: * (seguro via Bearer token) |
-| **Logging** | Nenhuma secret logada em console |
-| **Multi-tenant** | Isolamento via `chiesa_id`; validação em RLS + Edge Function |
+| Aspecto           | Implementação                                                     |
+| ----------------- | ----------------------------------------------------------------- |
+| **Autenticação**  | Bearer token via Supabase Auth                                    |
+| **Autorização**   | Permissões por role (admin/tesoureiro) validadas via `user_roles` |
+| **Criptografia**  | ChaCha20-Poly1305 em-memory; nonce random de 12 bytes             |
+| **Armazenamento** | BYTEA encrypted em `integracoes_financeiras_secrets`              |
+| **RLS**           | Todas políticas bloqueiam SELECT/INSERT/UPDATE/DELETE direto      |
+| **CORS**          | Allow-Origin: \* (seguro via Bearer token)                        |
+| **Logging**       | Nenhuma secret logada em console                                  |
+| **Multi-tenant**  | Isolamento via `chiesa_id`; validação em RLS + Edge Function      |
 
 ---
 
 ## Próximos Passos
 
 ### 🚀 Phase 2: Reconciliação & Polling
+
 1. Criar Edge Function `santander-extrato-v2` para fetch + sincronização
 2. Criar Edge Function `getnet-extrato` para polling
 3. Implementar pg_cron ou Cloud Scheduler para trigger periódico
@@ -251,17 +266,20 @@ Implementar a infraestrutura de configuração para integrações financeiras ag
 6. Armazenar extratos em `extratos_bancarios`
 
 ### 📋 Phase 3: Reconciliação
+
 1. Algoritmo de matching entre `transacoes` + `extratos_bancarios`
 2. RPC `reconciliar_transacoes` para marcar como reconciliadas
 3. Dashboard com % de cobertura, itens pendentes, divergências
 
 ### 🔐 Phase 4: Segurança & Auditoriaação
+
 1. **ADR-024** para estratégia de key rotation
 2. Encrypt key em Vault (não env var)
 3. Audit log para acessos a secrets
 4. Implementar decrypt lazy (apenas quando necessário)
 
 ### 🧪 Phase 5: Testes
+
 1. Unit tests para criptografia
 2. Integration tests para Edge Function
 3. E2E tests para fluxo completo (upload → storage → list)

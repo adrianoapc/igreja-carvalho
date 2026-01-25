@@ -71,7 +71,8 @@ function parseArgs() {
   // Primeiro, carregar variáveis de ambiente (com suporte a prefixos VITE_)
   const envVars = {
     "supabase-url": process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-    "supabase-key": process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    "supabase-key":
+      process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     "integracao-id": process.env.SANTANDER_INTEGRACAO_ID,
     "banco-id": process.env.SANTANDER_BANCO_ID,
     agencia: process.env.SANTANDER_AGENCIA,

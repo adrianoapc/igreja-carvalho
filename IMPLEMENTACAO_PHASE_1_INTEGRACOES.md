@@ -4,13 +4,14 @@
 
 **Commit:** cbf38aa  
 **Data:** 15 de Janeiro de 2026  
-**Branch:** main (sincronizado com origin)  
+**Branch:** main (sincronizado com origin)
 
 ---
 
 ## 📦 O Que Foi Implementado
 
 ### 1. **Tela Agnóstica de Integrações** (`/financas/integracoes`)
+
 - ✅ Listagem de todas as integrações da chiesa
 - ✅ Criação de nova integração com dialog modal
 - ✅ Deleção com confirmação
@@ -19,6 +20,7 @@
 - ✅ Validações côs-cliente e servidor
 
 ### 2. **Edge Function de Criptografia** (`integracoes-config`)
+
 - ✅ Recebe credenciais + PFX em base64
 - ✅ Valida autorização (admin/tesoureiro)
 - ✅ Encripta dados em-memory com ChaCha20-Poly1305
@@ -27,10 +29,12 @@
 - ✅ CORS headers para browser access
 
 ### 3. **RLS Policies de Segurança**
+
 - ✅ Bloqueio de acesso direto à tabela de secrets
 - ✅ Apenas Edge Function (service_role) pode ler/escrever
 
 ### 4. **Documentação Completa**
+
 - ✅ `INTEGRACAO_FINANCEIRA_PHASE_1.md` - Arquitetura detalhada
 - ✅ `telas/INTEGRACOES_FINANCEIRAS.md` - Guia de uso + API
 
@@ -39,11 +43,13 @@
 ## 🎯 Como Usar
 
 ### Acessar a Tela
+
 1. Faça login como **admin** ou **tesoureiro**
 2. Navegue até **Finanças → Integrações Financeiras**
 3. URL: `http://localhost:8080/financas/integracoes`
 
 ### Criar Nova Integração
+
 1. Clique no botão **"+ Nova Integração"**
 2. Preencha o formulário:
    - **Provedor:** Escolha entre Santander, Getnet ou API Genérica
@@ -58,6 +64,7 @@
 4. Pronto! A integração aparecerá na tabela
 
 ### Listar Integrações
+
 - A tabela exibe todas as integrações com:
   - Nome do provedor
   - CNPJ
@@ -66,6 +73,7 @@
 - Use o botão **"Atualizar"** para refetch manual
 
 ### Deletar Integração
+
 1. Clique no ícone de lixeira (🗑️) na linha da integração
 2. Confirme a deleção no dialog
 3. A integração será permanentemente removida
@@ -85,6 +93,7 @@
 ## 🧪 Testes Rápidos
 
 ### Teste 1: Criar Integração Santander
+
 ```
 1. Nova Integração → Provedor: Santander
 2. CNPJ: 11.222.333/0001-81 (teste)
@@ -97,6 +106,7 @@
 ```
 
 ### Teste 2: Criar Integração Getnet
+
 ```
 1. Nova Integração → Provedor: Getnet
 2. CNPJ: 11.222.333/0001-81
@@ -110,6 +120,7 @@
 ```
 
 ### Teste 3: Deletar Integração
+
 ```
 1. Clique no ícone 🗑️ de uma integração
 2. Confirme a deleção
@@ -118,6 +129,7 @@
 ```
 
 ### Teste 4: Validar Criptografia (Backend)
+
 ```
 1. Crie uma integração
 2. No Supabase Dashboard, verifique:
@@ -160,6 +172,7 @@
 ## 🔄 Próximas Fases
 
 ### Phase 2: Sincronização de Extratos (Em breve)
+
 - Edge Function para fetch de extratos Santander (mTLS + JWT)
 - Edge Function para fetch de extratos Getnet (SFTP)
 - Polling automático via pg_cron ou Cloud Scheduler
@@ -167,10 +180,12 @@
 - Armazena em `extratos_bancarios`
 
 ### Phase 3: Reconciliação
+
 - Algoritmo de matching entre `transacoes` + `extratos_bancarios`
 - Dashboard com cobertura, divergências, itens pendentes
 
 ### Phase 4: Edição & Key Rotation
+
 - Botão "Edit" para atualizar credenciais
 - ADR-024 para estratégia de key rotation
 - Encrypt key em Vault (não env var)
@@ -180,22 +195,27 @@
 ## 🐛 Troubleshooting
 
 **Erro: "Authorization header missing"**
+
 - Causa: Sessão expirada ou não logado
 - Solução: Faça logout e login novamente
 
 **Erro: "Insufficient permissions"**
+
 - Causa: Usuário não é admin ou tesoureiro
 - Solução: Verifique permissões em Admin → Usuários
 
 **Erro: "Invalid PFX file"**
+
 - Causa: Arquivo não é .pfx ou está corrompido
 - Solução: Selecione arquivo .pfx válido e tente novamente
 
 **Integração não aparece na tabela**
+
 - Causa: Pode estar em outra filial ou outra igreja
 - Solução: Verifique o filtro de filial selecionado
 
 **Criptografia não funciona**
+
 - Causa: `ENCRYPTION_KEY` não definida em .env.local (Supabase)
 - Solução: Configure chave em edge function secrets
 
@@ -204,6 +224,7 @@
 ## 📞 Suporte
 
 Para dúvidas ou issues:
+
 1. Abra uma issue no GitHub
 2. Mencione a fase (Phase 1: Integrações)
 3. Inclua logs de erro relevantes
@@ -214,11 +235,13 @@ Para dúvidas ou issues:
 ## 📝 Notas Importantes
 
 ⚠️ **IMPORTANTE:** A criptografia usa `ENCRYPTION_KEY` env var. Configure-a em Supabase:
+
 ```bash
 supabase secrets set ENCRYPTION_KEY "sua-chave-segura-de-32-bytes"
 ```
 
 ⚠️ **Banco de Dados:** Execute a migration para criar as tabelas:
+
 ```bash
 supabase migration up
 ```

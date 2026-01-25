@@ -15,7 +15,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 - **Módulos afetados**: Automações WhatsApp, `atendimentos_bot`
 - **Impacto**: Respostas retornam pelo mesmo número que recebeu a mensagem; continuidade de rota preservada por número de origem.
 
-
 #### ⚙️ Configurações: Filiais, Acesso por Filial e Números WhatsApp (19 Jan/2026)
 
 - **Tipo**: feature
@@ -108,27 +107,23 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **Tela `GerenciarDados.tsx`** (`src/pages/financas/GerenciarDados.tsx`):
-
   - Layout com 3 tabs: **Importar** (transações), **Exportar** (transações), **Extratos** (conciliação)
   - Navegação via query params: `?tab=importar&tipo=entrada`
   - Acesso via botões em Entradas/Saídas substituindo links antigos
 
 - **Componente `ImportarTab.tsx`** (`src/components/financas/ImportarTab.tsx`):
-
   - Extraído de `ImportarFinancasPage` (mantém wizard 4 etapas)
   - Upload → Mapeamento → Validação → Confirmação
   - Suporta CSV/XLSX com auto-detecção de colunas
   - Virtualização de preview com `@tanstack/react-virtual`
 
 - **Componente `ExportarTab.tsx`** (`src/components/financas/ExportarTab.tsx`):
-
   - Filtros avançados: tipo, status, período, conta, categoria
   - Seleção de colunas para exportação customizada
   - Preview virtualizado antes do export
   - Exportação para Excel via `xlsx` library
 
 - **Componente `ImportarExtratosTab.tsx`** (`src/components/financas/ImportarExtratosTab.tsx`):
-
   - **Upload**: Aceita CSV, XLSX e **OFX** (até 10MB)
   - **Parser OFX**: Biblioteca `ofx-js` extrai `STMTTRN` (transações bancárias)
     - Campos: `DTPOSTED` (data), `TRNAMT` (valor), `MEMO/NAME` (descrição), `FITID/CHECKNUM` (documento)
@@ -140,7 +135,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
   - **Importação chunk**: Insere em lotes de 200 registros na tabela `extratos_bancarios`
 
 - **Tabela `extratos_bancarios`** (Migration `20260109_extratos_bancarios.sql`):
-
   - Campos: `conta_id` (FK), `igreja_id`, `filial_id`, `data_transacao`, `descricao`, `valor`, `saldo`, `numero_documento`, `tipo` (credito/debito), `reconciliado` (boolean)
   - Índices: `conta_id`, `data_transacao`, `igreja_id`, `filial_id`
   - RLS policies: Multi-tenant por `igreja_id`
@@ -213,7 +207,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **`AuthContextProvider`** (`src/contexts/AuthContextProvider.tsx`):
-
   - Provider React unificando `igrejaId`, `filialId`, `isAllFiliais`, `userId`, `userName`, `userRole`, `permissions`
   - Cache local com TTL de 5min para mitigar timeouts
   - Fallback para localStorage em caso de timeout do Supabase
@@ -221,7 +214,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
   - Fix loop infinito causado por dependências circulares
 
 - **`useFilialPaginatedQuery`** (`src/hooks/useFilialPaginatedQuery.ts`):
-
   - Hook universal para paginação com `@tanstack/react-query`
   - Suporta filtros, ordenação, `igreja_id` e `filial_id` automáticos
   - Helper `flattenPaginatedData` para extrair dados planos
@@ -229,14 +221,12 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
   - Lazy loading: `fetchNextPage()` + `hasNextPage`
 
 - **Migrations**:
-
   - `get_user_auth_context()`: Função PL/pgSQL que busca igreja_id, filial_id, role, permissions em uma query
   - Correção `full_name → nome` em profiles
   - Índices compostos multi-tenant: `(igreja_id, filial_id)` em tabelas críticas
   - Triggers ajustados para contexto multi-tenant
 
 - **Páginas migradas para AuthContext** (15):
-
   - Finanças: `Dashboard.tsx`, `DashboardOfertas.tsx`, `Contas.tsx`, `ContasManutencao.tsx`, `Entradas.tsx`, `Saidas.tsx`, `Projecao.tsx`, `Insights.tsx`, `RelatorioOferta.tsx`, `Reembolsos.tsx`, `FormasPagamento.tsx`
   - Escalas: `Escalas.tsx`
   - Intercessão: `SalaDeGuerra.tsx`
@@ -281,26 +271,22 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **Tabela `short_links`**:
-
   - Campos: `slug`, `target_url`, `igreja_id`, `filial_id`, `created_by`, `expires_at`
   - RLS policies: isolamento por `igreja_id`
   - Índice único em `(slug, igreja_id)`
 
 - **Edge Function `short-links`** (`supabase/functions/short-links/index.ts`):
-
   - Endpoint POST `/short-links` para criar links
   - Geração automática de slug se não fornecido
   - Validação de duplicatas por igreja
   - Suporte a expiração temporal
 
 - **Helper `shortLinkUtils.ts`** (`src/lib/shortLinkUtils.ts`):
-
   - `generateShortLink(target: string, slug?: string)`: Cria link via edge function
   - `getShortLinkUrl(slug: string)`: Retorna URL completa
   - Integração com `igrejaId` e `filialId` do contexto
 
 - **Widgets atualizados**:
-
   - `AniversariosDashboard`: Botão WhatsApp com short link
   - `LinksExternosCard`: Suporte a short links
   - `DashboardAdmin`, `DashboardLeader`, `DashboardMember`: Atalhos rápidos
@@ -334,25 +320,21 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **Tabela `user_filial_access`**:
-
   - Campos: `user_id`, `filial_id`, `granted_by`, `granted_at`
   - Relacionamento N:N entre `profiles` e `filiais`
   - RLS: Usuários veem apenas seus próprios acessos
 
 - **Hook `useUserFilialAccess`** (`src/hooks/useUserFilialAccess.ts`):
-
   - `getUserFilialAccess(userId)`: Lista filiais permitidas para usuário
   - `grantFilialAccess(userId, filialId)`: Concede acesso
   - `revokeFilialAccess(userId, filialId)`: Remove acesso
 
 - **Componente `UserFilialAccessManager`** (`src/components/admin/UserFilialAccessManager.tsx`):
-
   - Interface CRUD para gerenciar acessos
   - Multi-select de filiais por usuário
   - Logs de auditoria (quem concedeu, quando)
 
 - **Atualizações em hooks**:
-
   - `useFilialId`: Agora valida se `filialId` selecionada está em `user_filial_access`
   - `FilialSwitcher`: Filtra lista de filiais com base nos acessos do usuário
   - `usePermissions`: Integra validação de acesso granular
@@ -382,7 +364,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **Telas corrigidas** (20):
-
   - Intercessão: `SalaDeGuerra.tsx`, `Sentimentos.tsx`
   - Finanças: `Financas.tsx`, `DashboardOfertas.tsx`, `ContasAPagarWidget.tsx`, `TransacaoDialog.tsx`, `ImportarExcelDialog.tsx`
   - Projetos: `Projetos.tsx`
@@ -403,7 +384,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
   ```
 
 - **Widgets auditados**:
-
   - `AtencaoPastoralWidget`: Agora filtra ovelhas em risco por filial
   - `ContasAPagarWidget`: Contas vencidas isoladas por igreja/filial
   - `CandidatosPendentesWidget`, `ConvitesPendentesWidget`, `EscalasPendentesWidget`: Filtros aplicados
@@ -430,23 +410,19 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **Triggers atualizados**:
-
   - Contexto `igreja_id` e `filial_id` injetado automaticamente em INSERT/UPDATE
   - Validação de permissões cross-tenant prevenida
   - Logs automáticos de auditoria
 
 - **Tabela `logs_replication`**:
-
   - Rastreia sincronizações entre matriz e filiais
   - Campos: `action`, `table_name`, `record_id`, `igreja_id`, `filial_origem`, `filial_destino`, `data_sync`
 
 - **Function `calcular_risco_pastoral`**:
-
   - Retorna score de risco baseado em: frequência, contribuições, sentimentos, pedidos de oração
   - Usado em widgets de atenção pastoral
 
 - **Migração JWT Metadata**:
-
   - `user_metadata` estruturado com `igreja_id`, `filial_id`, `role`
   - Sincronização automática em login via trigger
 
@@ -479,21 +455,18 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - **Componentes corrigidos**:
-
   - `ConvitesPendentesWidget`: Filtro `igreja_id` em convites pendentes
   - `RegistrarSentimentoDialog`: Validação de igreja ao registrar sentimento
   - `NovaIgrejaDialog`: Correção em aprovisionamento de admin
   - `Eventos.tsx`: Filtro em listagem de eventos
 
 - **Hooks atualizados**:
-
   - `useFilialId`: Timeout estendido de 3s para 10s; fallback para cache localStorage
   - `useIgrejaId`: Cache com TTL de 5min; validação de sessão antes de query
   - `usePermissions`: Validação de igreja no contexto de permissões
   - `useLiturgiaInteligente`: Escopo por igreja
 
 - **Edge Function corrigida**:
-
   - `provisionar-admin-igreja`: Agora cria perfil admin com `igreja_id` correto
   - Validação de duplicidade de email por igreja
 
@@ -543,7 +516,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - Query `calcular_risco_pastoral` considera:
-
   - Frequência baixa (< 3 presenças/mês)
   - Contribuições baixas (< 2 no trimestre)
   - Sentimentos negativos (ansiedade, tristeza, medo nos últimos 30d)
@@ -591,7 +563,6 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Detalhamento técnico:**
 
 - Colunas adicionadas:
-
   - `filial_id` (UUID, nullable) - Time específico de uma filial
   - `vagas_necessarias` (INTEGER, default 1) - Capacidade do time
   - `dificuldade` (TEXT) - Nível: 'facil', 'medio', 'avancado'
