@@ -1,6 +1,7 @@
 // ARQUIVO: src/pages/eventos/Geral.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import EventoDialog from "@/components/eventos/EventoDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useRelogioAgora } from "@/hooks/useRelogioAgora";
 import {
@@ -61,6 +62,7 @@ export default function EventosGeral() {
     voluntariosAtivos: 0,
     buracosEscala: 0,
   });
+  const [eventoDialogOpen, setEventoDialogOpen] = useState(false);
 
   const {
     ativo: relogioAtivo,
@@ -178,7 +180,7 @@ export default function EventosGeral() {
           </Button>
           <Button
             size="lg"
-            onClick={() => navigate("/eventos/lista?novo=true")}
+            onClick={() => setEventoDialogOpen(true)}
             className="bg-primary shadow-lg w-full sm:w-auto"
           >
             <Plus className="mr-2 h-5 w-5" />
@@ -360,10 +362,10 @@ export default function EventosGeral() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="h-[200px] flex flex-col items-center justify-center text-muted-foreground bg-muted/30 border-dashed">
+          <Card className="h-[200px] flex flex-col items-center justify-center text-muted-foreground bg-muted/30 border-dashed">
               <CalendarCheck className="h-12 w-12 mb-4 opacity-50" />
               <p>Nenhum evento futuro agendado.</p>
-              <Button variant="link" onClick={() => navigate("/eventos/lista")}>
+              <Button variant="link" onClick={() => setEventoDialogOpen(true)}>
                 Agendar agora
               </Button>
             </Card>
@@ -531,6 +533,16 @@ export default function EventosGeral() {
           </div>
         </div>
       </div>
+
+      <EventoDialog
+        open={eventoDialogOpen}
+        onOpenChange={setEventoDialogOpen}
+        evento={null}
+        onSuccess={() => {
+          loadDashboardData();
+          setEventoDialogOpen(false);
+        }}
+      />
     </div>
   );
 }

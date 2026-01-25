@@ -38,9 +38,10 @@ interface CalendarioMensalProps {
   escalasCount: Record<string, number>;
   onCultoClick: (culto: Evento) => void;
   onNovoEvento?: () => void;
+  onDayClick?: (date: Date) => void;
 }
 
-export default function CalendarioMensal({ cultos, escalasCount, onCultoClick, onNovoEvento }: CalendarioMensalProps) {
+export default function CalendarioMensal({ cultos, escalasCount, onCultoClick, onNovoEvento, onDayClick }: CalendarioMensalProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const days = useMemo(() => {
@@ -137,12 +138,23 @@ export default function CalendarioMensal({ cultos, escalasCount, onCultoClick, o
               return (
                 <div
                   key={day.toISOString()}
+                  onClick={() => {
+                    if (dayCultos.length === 0 && onDayClick && isCurrentMonth) {
+                      onDayClick(day);
+                    }
+                  }}
+                  onDoubleClick={() => {
+                    if (onDayClick && isCurrentMonth) {
+                      onDayClick(day);
+                    }
+                  }}
                   className={cn(
                     "min-h-[80px] sm:min-h-[100px] p-1 sm:p-2 border rounded-lg",
                     "transition-colors",
                     !isCurrentMonth && "bg-muted/30",
                     isToday && "border-primary bg-primary/5",
-                    dayCultos.length > 0 && "cursor-pointer hover:bg-accent/50"
+                    dayCultos.length > 0 && "cursor-pointer hover:bg-accent/50",
+                    dayCultos.length === 0 && isCurrentMonth && onDayClick && "cursor-pointer hover:bg-primary/10 hover:border-primary/50"
                   )}
                 >
                   {/* Número do dia */}
