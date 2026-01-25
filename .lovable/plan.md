@@ -1,233 +1,166 @@
 
-# Plano: Corrigir Ações de Criação de Eventos
 
-## Problema Identificado
+# Plano Consolidado: Gestão Completa de Inscrições em Eventos
 
-### Estrutura de Rotas Atual
-| Rota | Componente | Descrição |
-|------|------------|-----------|
-| `/eventos` | `EventosGeral` | Centro de Operações (dashboard) |
-| `/eventos/geral` | `EventosGeral` | Alias do Centro de Operações |
-| `/eventos/lista` | `AgendaPublica` | Visão pública simplificada |
-| `/eventos/gestao` | **NÃO EXISTE** | Tela de gestão com calendário + criar/editar |
+## Visão Geral
 
-### Problemas Encontrados
-1. **Botão "Agendar agora"** navega para `/eventos/lista` (Agenda Pública) - deveria abrir dialog de criação
-2. **Botão "Novo Evento"** no calendário não funciona porque a tela de gestão (`EventosLista`) não tem rota
-3. **Clique nos dias do calendário** não tem handler para abrir o dialog com data pré-selecionada
-4. **O `EventoDialog`** não aceita uma `initialDate` para pré-preencher a data
+Este plano unifica duas funcionalidades complementares:
+1. **Criação/Edição**: Permitir configurar inscrição e pagamento ao criar/editar evento
+2. **Visualização**: Exibir aba de inscritos nos detalhes do evento
 
 ---
 
-## Solução
+## Parte 1: EventoDialog - Campos de Inscrição e Pagamento
 
-### 1. Adicionar Rota de Gestão
-Criar nova rota `/eventos/gestao` que aponta para o componente `EventosLista`.
+### Arquivo: `src/components/eventos/EventoDialog.tsx`
 
-### 2. Corrigir "Agendar Agora" no Centro de Operações
-Adicionar o `EventoDialog` diretamente no `Geral.tsx` para que o botão abra o dialog sem navegar.
-
-### 3. Habilitar Clique nos Dias do Calendário
-Adicionar handlers de clique no `CalendarioMensal` para criar eventos em datas específicas.
-
-### 4. Aceitar Data Inicial no Dialog
-Modificar `EventoDialog` para aceitar uma `initialDate` e pré-preencher o campo de data.
-
----
-
-## Detalhes Técnicos
-
-### Arquivo 1: `src/App.tsx`
-**Adicionar nova rota** (após linha 690):
+#### 1.1 Adicionar estados para dados financeiros
 ```typescript
-<Route
-  path="/eventos/gestao"
-  element={
-    <AuthGate>
-      <EventosLista />
-    </AuthGate>
-  }
-/>
+const [categoriasFinanceiras, setCategoriasFinanceiras] = useState<{id: string; nome: string}[]>([]);
+const [contasFinanceiras, setContasFinanceiras] = useState<{id: string; nome: string}[]>([]);
 ```
 
----
-
-### Arquivo 2: `src/pages/eventos/Geral.tsx`
-
-**Adicionar imports** (topo do arquivo):
+#### 1.2 Adicionar watches para controle condicional
 ```typescript
-import EventoDialog from "@/components/eventos/EventoDialog";
+const tipoSelecionado = form.watch("tipo");
+const requerInscricao = form.watch("requer_inscricao");
+const requerPagamento = form.watch("requer_pagamento");
 ```
 
-**Adicionar estado** (após linha 63):
+#### 1.3 Carregar categorias e contas financeiras
 ```typescript
-const [eventoDialogOpen, setEventoDialogOpen] = useState(false);
-```
-
-**Alterar botão "Agendar agora"** (linha 366):
-```typescript
-// DE:
-<Button variant="link" onClick={() => navigate("/eventos/lista")}>
-  Agendar agora
-</Button>
-
-// PARA:
-<Button variant="link" onClick={() => setEventoDialogOpen(true)}>
-  Agendar agora
-</Button>
-```
-
-**Adicionar o dialog** (antes do fechamento do return):
-```typescript
-<EventoDialog
-  open={eventoDialogOpen}
-  onOpenChange={setEventoDialogOpen}
-  evento={null}
-  onSuccess={() => {
-    loadDashboardData();
-    setEventoDialogOpen(false);
-  }}
-/>
-```
-
----
-
-### Arquivo 3: `src/components/eventos/CalendarioMensal.tsx`
-
-**Atualizar interface** (linha 36-41):
-```typescript
-interface CalendarioMensalProps {
-  cultos: Evento[];
-  escalasCount: Record<string, number>;
-  onCultoClick: (culto: Evento) => void;
-  onNovoEvento?: () => void;
-  onDayClick?: (date: Date) => void;  // NOVO
-}
-```
-
-**Adicionar onClick nos dias** (linhas 138-146):
-```typescript
-<div
-  key={day.toISOString()}
-  onClick={() => {
-    // Clique simples em dia vazio abre criação
-    if (dayCultos.length === 0 && onDayClick && isCurrentMonth) {
-      onDayClick(day);
-    }
-  }}
-  onDoubleClick={() => {
-    // Duplo clique sempre abre criação
-    if (onDayClick && isCurrentMonth) {
-      onDayClick(day);
-    }
-  }}
-  className={cn(
-    "min-h-[80px] sm:min-h-[100px] p-1 sm:p-2 border rounded-lg",
-    "transition-colors",
-    !isCurrentMonth && "bg-muted/30",
-    isToday && "border-primary bg-primary/5",
-    dayCultos.length > 0 && "cursor-pointer hover:bg-accent/50",
-    dayCultos.length === 0 && isCurrentMonth && "cursor-pointer hover:bg-primary/10 hover:border-primary/50"
-  )}
->
-```
-
----
-
-### Arquivo 4: `src/pages/eventos/Eventos.tsx`
-
-**Adicionar estado para data inicial** (após linha 138):
-```typescript
-const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
-```
-
-**Adicionar handler de clique no dia** (após handleNovoEvento):
-```typescript
-const handleDayClick = (date: Date) => {
-  setInitialDate(date);
-  setEditingEvento(null);
-  setEventoDialogOpen(true);
+const loadDadosFinanceiros = async () => {
+  const [catRes, contaRes] = await Promise.all([
+    supabase.from("categorias_financeiras").select("id, nome").eq("ativo", true),
+    supabase.from("contas").select("id, nome").eq("ativo", true)
+  ]);
+  setCategoriasFinanceiras(catRes.data || []);
+  setContasFinanceiras(contaRes.data || []);
 };
 ```
 
-**Passar prop para CalendarioMensal** (linhas 665-670):
-```typescript
-<CalendarioMensal
-  cultos={filteredEventos as any}
-  escalasCount={{}}
-  onCultoClick={(e) => handleAbrirEvento(e as Evento)}
-  onNovoEvento={handleNovoEvento}
-  onDayClick={handleDayClick}  // NOVO
-/>
+#### 1.4 Nova seção de Inscrições (apenas para tipo EVENTO)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 📋 INSCRIÇÕES                                           │
+├─────────────────────────────────────────────────────────┤
+│ [ ] Requer Inscrição                                    │
+│                                                         │
+│   Limite de Vagas: [____]   Até: [__/__/__]            │
+│                                                         │
+│   [ ] Evento Pago                                       │
+│                                                         │
+│   Valor: R$ [____]                                      │
+│   Categoria Financeira: [Eventos          ▼]            │
+│   Conta de Destino: [Santander            ▼]            │
+└─────────────────────────────────────────────────────────┘
 ```
 
-**Passar initialDate para EventoDialog** (linhas 674-682):
+#### 1.5 Atualizar payload no onSubmit
 ```typescript
-<EventoDialog
-  open={eventoDialogOpen}
-  onOpenChange={(open) => {
-    setEventoDialogOpen(open);
-    if (!open) setInitialDate(undefined);
-  }}
-  evento={editingEvento}
-  initialDate={initialDate}  // NOVO
-  onSuccess={() => {
-    loadEventos();
-    loadKPIs();
-    setInitialDate(undefined);
-  }}
-/>
+const payload = {
+  // ... campos existentes ...
+  requer_inscricao: data.requer_inscricao || false,
+  requer_pagamento: data.requer_pagamento || false,
+  valor_inscricao: data.requer_pagamento ? data.valor_inscricao : null,
+  vagas_limite: data.requer_inscricao ? data.vagas_limite : null,
+  inscricoes_abertas_ate: data.requer_inscricao && data.inscricoes_abertas_ate 
+    ? data.inscricoes_abertas_ate.toISOString() 
+    : null,
+  categoria_financeira_id: data.requer_pagamento ? data.categoria_financeira_id : null,
+  conta_financeira_id: data.requer_pagamento ? data.conta_financeira_id : null,
+};
+```
+
+#### 1.6 Carregar valores ao editar evento existente
+Atualizar `form.reset` para incluir campos de inscrição.
+
+---
+
+## Parte 2: EventoDetalhes - Aba de Inscrições
+
+### Arquivo: `src/pages/EventoDetalhes.tsx`
+
+#### 2.1 Adicionar import do ícone
+```typescript
+import { Ticket } from "lucide-react";
+```
+
+#### 2.2 Adicionar variável de controle
+```typescript
+const mostrarInscricoes = evento?.requer_inscricao === true;
+```
+
+#### 2.3 Adicionar TabsTrigger (após Check-in)
+```typescript
+{mostrarInscricoes && (
+  <TabsTrigger
+    value="inscricoes"
+    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+  >
+    <Ticket className="h-4 w-4 mr-2" />
+    <span className="hidden sm:inline">Inscrições</span>
+  </TabsTrigger>
+)}
+```
+
+#### 2.4 Adicionar TabsContent
+```typescript
+{mostrarInscricoes && (
+  <TabsContent value="inscricoes" className="mt-6">
+    <InscricoesTabContent 
+      eventoId={id!} 
+      evento={{
+        id: evento.id,
+        titulo: evento.titulo,
+        requer_pagamento: evento.requer_pagamento,
+        valor_inscricao: evento.valor_inscricao,
+        vagas_limite: evento.vagas_limite,
+        categoria_financeira_id: evento.categoria_financeira_id,
+        conta_financeira_id: evento.conta_financeira_id,
+      }}
+    />
+  </TabsContent>
+)}
 ```
 
 ---
 
-### Arquivo 5: `src/components/eventos/EventoDialog.tsx`
+## Fluxo Completo do Usuário
 
-**Atualizar interface** (linhas 61-66):
-```typescript
-interface EventoDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  evento?: Evento | null;
-  onSuccess: () => void;
-  initialDate?: Date;  // NOVO
-}
 ```
+1. Criar/Editar Evento
+   └─> Tipo: EVENTO
+       └─> Marcar "Requer Inscrição"
+           └─> Definir vagas e prazo
+           └─> Marcar "Evento Pago" (opcional)
+               └─> Definir valor, categoria e conta
 
-**Atualizar desestruturação do componente:**
-```typescript
-export default function EventoDialog({
-  open,
-  onOpenChange,
-  evento,
-  onSuccess,
-  initialDate,  // NOVO
-}: EventoDialogProps) {
+2. Visualizar Evento
+   └─> Se requer_inscricao = true
+       └─> Aba "Inscrições" aparece
+           └─> Ver inscritos, confirmar pagamentos, adicionar manual
 ```
-
-**Usar initialDate nos valores default do form:**
-No `useEffect` que reseta o form, usar `initialDate` como valor padrão para `data_evento` quando não há evento sendo editado.
-
----
-
-## Comportamento Final Esperado
-
-| Ação | Resultado |
-|------|-----------|
-| Botão "Agendar agora" | Abre dialog de criação |
-| Botão "Novo Evento" no calendário | Abre dialog de criação |
-| Clique em dia vazio | Abre dialog com data pré-selecionada |
-| Duplo clique em qualquer dia | Abre dialog com data pré-selecionada |
-| Clique em evento existente | Abre detalhes do evento |
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Alteração Principal |
-|---------|---------------------|
-| `src/App.tsx` | Adicionar rota `/eventos/gestao` |
-| `src/pages/eventos/Geral.tsx` | Adicionar `EventoDialog` + corrigir botão |
-| `src/components/eventos/CalendarioMensal.tsx` | Adicionar `onDayClick` + handlers de clique |
-| `src/pages/eventos/Eventos.tsx` | Adicionar `initialDate` + `handleDayClick` |
-| `src/components/eventos/EventoDialog.tsx` | Aceitar `initialDate` prop |
+| Arquivo | Alterações |
+|---------|------------|
+| `src/components/eventos/EventoDialog.tsx` | Estados, watches, carregamento de dados financeiros, nova seção UI, payload atualizado, reset com valores existentes |
+| `src/pages/EventoDetalhes.tsx` | Variável de controle, TabsTrigger e TabsContent condicionais para inscrições |
+
+---
+
+## Resultado Esperado
+
+| Ação | Resultado |
+|------|-----------|
+| Criar evento tipo EVENTO | Seção de inscrições disponível |
+| Marcar "Requer Inscrição" | Campos de vagas e prazo aparecem |
+| Marcar "Evento Pago" | Campos de valor e financeiro aparecem |
+| Abrir detalhes de evento com inscrição | Aba "Inscrições" visível |
+| Aba Inscrições | Lista inscritos, KPIs, ações de gestão |
+
