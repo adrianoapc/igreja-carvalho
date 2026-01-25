@@ -136,6 +136,7 @@ export default function Eventos() {
   const [loading, setLoading] = useState(true);
   const [eventoDialogOpen, setEventoDialogOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<Evento | null>(null);
+  const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -233,6 +234,13 @@ export default function Eventos() {
   });
 
   const handleNovoEvento = () => {
+    setEditingEvento(null);
+    setInitialDate(undefined);
+    setEventoDialogOpen(true);
+  };
+
+  const handleDayClick = (date: Date) => {
+    setInitialDate(date);
     setEditingEvento(null);
     setEventoDialogOpen(true);
   };
@@ -667,17 +675,23 @@ export default function Eventos() {
             escalasCount={{}}
             onCultoClick={(e) => handleAbrirEvento(e as Evento)}
             onNovoEvento={handleNovoEvento}
+            onDayClick={handleDayClick}
           />
         </TabsContent>
       </Tabs>
 
       <EventoDialog
         open={eventoDialogOpen}
-        onOpenChange={setEventoDialogOpen}
+        onOpenChange={(open) => {
+          setEventoDialogOpen(open);
+          if (!open) setInitialDate(undefined);
+        }}
         evento={editingEvento}
+        initialDate={initialDate}
         onSuccess={() => {
           loadEventos();
           loadKPIs();
+          setInitialDate(undefined);
         }}
       />
     </div>

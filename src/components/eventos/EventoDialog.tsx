@@ -63,6 +63,7 @@ interface EventoDialogProps {
   onOpenChange: (open: boolean) => void;
   evento?: Evento | null;
   onSuccess: () => void;
+  initialDate?: Date;
 }
 
 interface Subtipo {
@@ -156,6 +157,7 @@ export default function EventoDialog({
   onOpenChange,
   evento,
   onSuccess,
+  initialDate,
 }: EventoDialogProps) {
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -229,6 +231,7 @@ export default function EventoDialog({
           hora_fim: format(dataFimCalculada, "HH:mm"),
         });
       } else {
+        const defaultDate = initialDate || new Date();
         form.reset({
           tipo: "CULTO",
           titulo: "",
@@ -236,13 +239,13 @@ export default function EventoDialog({
           duracao_minutos: 120,
           status: "planejado",
           usar_data_fim: false,
-          data_evento: new Date(),
-          data_fim: new Date(),
+          data_evento: defaultDate,
+          data_fim: defaultDate,
           hora_fim: "21:00",
         });
       }
     }
-  }, [open, evento]);
+  }, [open, evento, initialDate]);
 
   const loadSubtipos = async (tipo: string) => {
     const tipoEnum = tipo as "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";

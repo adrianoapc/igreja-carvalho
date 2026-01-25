@@ -689,6 +689,14 @@ const App = () => (
                     }
                   />
                   <Route
+                    path="/eventos/gestao"
+                    element={
+                      <AuthGate>
+                        <EventosLista />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
                     path="/eventos/times"
                     element={
                       <AuthGate>
