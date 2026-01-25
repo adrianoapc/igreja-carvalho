@@ -56,6 +56,14 @@ interface Evento {
   tema: string | null;
   status: string;
   subtipo_id?: string | null;
+  // Campos de inscrição
+  requer_inscricao?: boolean | null;
+  requer_pagamento?: boolean | null;
+  valor_inscricao?: number | null;
+  vagas_limite?: number | null;
+  inscricoes_abertas_ate?: string | null;
+  categoria_financeira_id?: string | null;
+  conta_financeira_id?: string | null;
 }
 
 interface EventoDialogProps {
@@ -167,6 +175,8 @@ export default function EventoDialog({
   const [showTemplatePreview, setShowTemplatePreview] = useState(false);
   const [templateApplied, setTemplateApplied] = useState(false);
   const [subtipos, setSubtipos] = useState<Subtipo[]>([]);
+  const [categoriasFinanceiras, setCategoriasFinanceiras] = useState<{id: string; nome: string}[]>([]);
+  const [contasFinanceiras, setContasFinanceiras] = useState<{id: string; nome: string}[]>([]);
 
   const isEditing = !!evento;
 
@@ -180,11 +190,15 @@ export default function EventoDialog({
       duracao_minutos: 120,
       status: "planejado",
       usar_data_fim: false,
+      requer_inscricao: false,
+      requer_pagamento: false,
     },
   });
 
   const tipoSelecionado = form.watch("tipo");
   const usarDataFim = form.watch("usar_data_fim");
+  const requerInscricao = form.watch("requer_inscricao");
+  const requerPagamento = form.watch("requer_pagamento");
 
   useEffect(() => {
     if (tipoSelecionado) {
@@ -229,6 +243,14 @@ export default function EventoDialog({
           usar_data_fim: deveUsarDataFim,
           data_fim: dataFimCalculada,
           hora_fim: format(dataFimCalculada, "HH:mm"),
+          // Campos de inscrição
+          requer_inscricao: evento.requer_inscricao || false,
+          requer_pagamento: evento.requer_pagamento || false,
+          valor_inscricao: evento.valor_inscricao ?? undefined,
+          vagas_limite: evento.vagas_limite ?? null,
+          inscricoes_abertas_ate: evento.inscricoes_abertas_ate ? new Date(evento.inscricoes_abertas_ate) : null,
+          categoria_financeira_id: evento.categoria_financeira_id ?? null,
+          conta_financeira_id: evento.conta_financeira_id ?? null,
         });
       } else {
         const defaultDate = initialDate || new Date();
@@ -266,6 +288,22 @@ export default function EventoDialog({
     setTemplates(data || []);
   };
 
+  const loadDadosFinanceiros = async () => {
+    const [catRes, contaRes] = await Promise.all([
+      supabase.from("categorias_financeiras").select("id, nome").eq("ativo", true).eq("tipo", "entrada"),
+      supabase.from("contas").select("id, nome").eq("ativo", true)
+    ]);
+    setCategoriasFinanceiras(catRes.data || []);
+    setContasFinanceiras(contaRes.data || []);
+  };
+
+  // Carregar dados financeiros quando tipo for EVENTO
+  useEffect(() => {
+    if (tipoSelecionado === "EVENTO" && open) {
+      loadDadosFinanceiros();
+    }
+  }, [tipoSelecionado, open]);
+
   const onSubmit = async (data: EventoFormData) => {
     setLoading(true);
     try {
@@ -297,6 +335,16 @@ export default function EventoDialog({
         pregador: data.pregador,
         tema: data.tema,
         status: data.status,
+        // Campos de inscrição (apenas para EVENTO)
+        requer_inscricao: data.tipo === "EVENTO" ? (data.requer_inscricao || false) : false,
+        requer_pagamento: data.tipo === "EVENTO" && data.requer_inscricao ? (data.requer_pagamento || false) : false,
+        valor_inscricao: data.tipo === "EVENTO" && data.requer_pagamento ? data.valor_inscricao : null,
+        vagas_limite: data.tipo === "EVENTO" && data.requer_inscricao ? data.vagas_limite : null,
+        inscricoes_abertas_ate: data.tipo === "EVENTO" && data.requer_inscricao && data.inscricoes_abertas_ate 
+          ? data.inscricoes_abertas_ate.toISOString() 
+          : null,
+        categoria_financeira_id: data.tipo === "EVENTO" && data.requer_pagamento ? data.categoria_financeira_id : null,
+        conta_financeira_id: data.tipo === "EVENTO" && data.requer_pagamento ? data.conta_financeira_id : null,
       };
 
       if (isEditing) {
@@ -715,6 +763,188 @@ export default function EventoDialog({
                     </FormItem>
                   )}
                 />
+              )}
+
+              {/* SEÇÃO DE INSCRIÇÕES - Apenas para EVENTO */}
+              {isEventoGeral && (
+                <div className="bg-muted/20 p-5 rounded-xl border border-border/60 space-y-4">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+                    📋 Inscrições
+                  </Label>
+
+                  <FormField
+                    control={form.control}
+                    name="requer_inscricao"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-3 space-y-0">
+                        <FormControl>
+                          <input
+                            type="checkbox"
+                            checked={field.value}
+                            onChange={field.onChange}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        </FormControl>
+                        <FormLabel className="font-medium cursor-pointer">
+                          Este evento requer inscrição prévia
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+
+                  {requerInscricao && (
+                    <div className="pl-7 space-y-4 border-l-2 border-primary/20 ml-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="vagas_limite"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Limite de Vagas</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="Ilimitado"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="inscricoes_abertas_ate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Inscrições até</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
+                                      format(field.value, "dd/MM/yyyy")
+                                    ) : (
+                                      <span>Sem limite</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={field.value ?? undefined}
+                                    onSelect={field.onChange}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="requer_pagamento"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-3 space-y-0">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-gray-300"
+                              />
+                            </FormControl>
+                            <FormLabel className="font-medium cursor-pointer">
+                              Evento pago (requer pagamento)
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+
+                      {requerPagamento && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pl-7 border-l-2 border-green-500/20 ml-2">
+                          <FormField
+                            control={form.control}
+                            name="valor_inscricao"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Valor (R$)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0,00"
+                                    {...field}
+                                    value={field.value ?? ""}
+                                    onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="categoria_financeira_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Categoria Financeira</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecione..." />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {categoriasFinanceiras.map((cat) => (
+                                      <SelectItem key={cat.id} value={cat.id}>
+                                        {cat.nome}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="conta_financeira_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Conta de Destino</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecione..." />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {contasFinanceiras.map((conta) => (
+                                      <SelectItem key={conta.id} value={conta.id}>
+                                        {conta.nome}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t sticky bottom-0 bg-background pb-2">

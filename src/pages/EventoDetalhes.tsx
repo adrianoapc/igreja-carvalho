@@ -274,6 +274,7 @@ export default function EventoDetalhes() {
   const mostrarLiturgia = evento.tipo === "CULTO" || evento.tipo === "RELOGIO";
   const mostrarMusica = evento.tipo === "CULTO";
   const mostrarConvites = evento.tipo === "EVENTO";
+  const mostrarInscricoes = evento.requer_inscricao === true;
 
   return (
     <div className="space-y-6">
@@ -420,6 +421,16 @@ export default function EventoDetalhes() {
             <QrCode className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Check-in</span>
           </TabsTrigger>
+
+          {mostrarInscricoes && (
+            <TabsTrigger
+              value="inscricoes"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+            >
+              <Ticket className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Inscrições</span>
+            </TabsTrigger>
+          )}
 
           {mostrarConvites && (
             <TabsTrigger
@@ -594,6 +605,24 @@ export default function EventoDetalhes() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Tab: Inscrições */}
+        {mostrarInscricoes && (
+          <TabsContent value="inscricoes" className="mt-6">
+            <InscricoesTabContent 
+              eventoId={id!} 
+              evento={{
+                id: evento.id,
+                titulo: evento.titulo,
+                requer_pagamento: evento.requer_pagamento,
+                valor_inscricao: evento.valor_inscricao,
+                vagas_limite: evento.vagas_limite,
+                categoria_financeira_id: evento.categoria_financeira_id,
+                conta_financeira_id: evento.conta_financeira_id,
+              }}
+            />
+          </TabsContent>
+        )}
 
         {/* Tab: Convites */}
         {mostrarConvites && (
