@@ -1,201 +1,133 @@
 
 
-# Plano: Verificação de Inscrição + Lista de Espera Interna
+# Plano: Correção da Duplicação de Mensagens e Fluxo Fallback
 
-## Resumo
+## Problema Identificado
 
-Corrigir o bug de inscrição existente e implementar lista de espera **interna** para gestão pela equipe, sem expor detalhes da fila ao usuário.
+Analisando os logs e a base de dados, identifiquei **dois problemas distintos**:
 
----
+### Problema 1: Flow "fallback" Não Tratado
 
-## Alterações no Comportamento
-
-### Resposta ao Usuário (Vagas Esgotadas)
-
-**Antes (proposta anterior)**:
-> "Vagas esgotadas! Você está na posição 5º da lista de espera."
-
-**Agora (ajustado)**:
-> "As vagas para este evento estão esgotadas, mas registramos seu interesse! Caso surja uma vaga, entraremos em contato."
-
-A posição na fila é **somente visível internamente** para a equipe.
-
----
-
-## Estrutura da Tabela
-
-```sql
-CREATE TABLE public.evento_lista_espera (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  evento_id uuid NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
-  nome varchar(255) NOT NULL,
-  telefone varchar(50) NOT NULL,
-  email varchar(255),
-  posicao_fila integer NOT NULL DEFAULT 1,
-  status varchar(20) DEFAULT 'aguardando',
-  -- aguardando: na fila
-  -- contatado: equipe entrou em contato
-  -- convertido: virou inscrição
-  -- expirado: não respondeu / desistiu
-  visitante_lead_id uuid REFERENCES visitantes_leads(id),
-  pessoa_id uuid REFERENCES profiles(id),
-  igreja_id uuid NOT NULL REFERENCES igrejas(id),
-  filial_id uuid REFERENCES filiais(id),
-  created_at timestamptz DEFAULT now(),
-  contatado_em timestamptz,
-  observacoes text,
-  
-  UNIQUE(evento_id, telefone)
-);
-
-CREATE INDEX idx_lista_espera_evento_status ON evento_lista_espera(evento_id, status);
-CREATE INDEX idx_lista_espera_posicao ON evento_lista_espera(evento_id, posicao_fila);
-
-ALTER TABLE evento_lista_espera ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Igreja members can manage" ON evento_lista_espera
-  FOR ALL USING (
-    igreja_id IN (SELECT igreja_id FROM profiles WHERE id = auth.uid())
-  );
-```
-
----
-
-## Configuração Opcional por Evento
-
-Adicionar campo na tabela `eventos`:
-
-```sql
-ALTER TABLE public.eventos
-ADD COLUMN mostrar_posicao_fila boolean DEFAULT false;
-```
-
-Se `mostrar_posicao_fila = true`, informa a posição ao usuário. Caso contrário (padrão), apenas registra internamente.
-
----
-
-## Fluxo no Chatbot
+A IA está retornando `fluxo_atual: "fallback"` que é salvo na sessão:
 
 ```text
-+------------------------------------------------------------------+
-| 1. Buscar pessoa pelo telefone                                   |
-+------------------------------------------------------------------+
-| 2. SE pessoa existe e inscrita -> Retorna QR existente           |
-+------------------------------------------------------------------+
-| 3. Verificar vagas disponíveis                                   |
-+------------------------------------------------------------------+
-| 4. SE vagas esgotadas:                                           |
-|    +----------------------------------------------------+        |
-|    | - Criar/atualizar lead em visitantes_leads         |        |
-|    | - Verificar se já está na lista de espera          |        |
-|    |   - SE sim: "Já registramos seu interesse!"        |        |
-|    |   - SE não: Inserir na fila                        |        |
-|    | - Retornar mensagem genérica (sem posição)         |        |
-|    +----------------------------------------------------+        |
-+------------------------------------------------------------------+
-| 5. SE vagas disponíveis -> Criar inscrição + retornar QR         |
-+------------------------------------------------------------------+
+[Triagem] Flow detectado pela IA: fallback - salvando para proteção da sessão
+[Triagem] Sessão com flow ativo: fallback, step: undefined
 ```
 
----
-
-## Mensagens ao Usuário
-
-| Cenário | Mensagem |
-|---------|----------|
-| Já inscrito | "Você já está inscrito! Seu QR Code: [link]" |
-| Vagas esgotadas (1ª vez) | "As vagas estão esgotadas, mas registramos seu interesse! Caso surja uma vaga, entraremos em contato." |
-| Vagas esgotadas (já na lista) | "Seu interesse já foi registrado anteriormente! Caso surja uma vaga, entraremos em contato." |
-| Inscrito com sucesso | "Inscrição confirmada! Seu QR Code: [link]" |
-
----
-
-## Código da Função `finalizarInscricao`
-
+O switch no código só trata os flows válidos:
 ```typescript
-// Quando vagas esgotadas...
-if ((count || 0) >= evento.vagas_limite) {
-  // Criar/buscar lead
-  let leadId = await buscarOuCriarLead(telefone, nomeConfirmado, igrejaId, filialId);
-
-  // Verificar se já está na lista
-  const { data: jaEspera } = await supabaseClient
-    .from("evento_lista_espera")
-    .select("id")
-    .eq("evento_id", evento.id)
-    .eq("telefone", telefone)
-    .maybeSingle();
-
-  if (jaEspera) {
-    await supabaseClient.from("atendimentos_bot").update({ status: "CONCLUIDO" }).eq("id", sessao.id);
-    return respostaJson(
-      `Seu interesse já foi registrado anteriormente! 📋\n\nCaso surja uma vaga, entraremos em contato.`
-    );
-  }
-
-  // Calcular posição (interno)
-  const { count: posicaoAtual } = await supabaseClient
-    .from("evento_lista_espera")
-    .select("id", { count: "exact", head: true })
-    .eq("evento_id", evento.id);
-
-  const posicao = (posicaoAtual || 0) + 1;
-
-  // Inserir na lista
-  await supabaseClient.from("evento_lista_espera").insert({
-    evento_id: evento.id,
-    nome: nomeConfirmado,
-    telefone,
-    posicao_fila: posicao,
-    status: "aguardando",
-    visitante_lead_id: leadId,
-    pessoa_id: pessoaId,
-    igreja_id: igrejaId,
-    filial_id: filialId,
-  });
-
-  await supabaseClient.from("atendimentos_bot").update({ status: "CONCLUIDO" }).eq("id", sessao.id);
-
-  // Mensagem genérica (sem posição) - ou com posição se configurado
-  let mensagem = `As vagas para "${evento.titulo}" estão esgotadas, mas registramos seu interesse! 📋\n\nCaso surja uma vaga, entraremos em contato.`;
-  
-  if (evento.mostrar_posicao_fila) {
-    mensagem = `As vagas estão esgotadas, mas você foi adicionado à lista de espera! 📋\n\nSua posição: ${posicao}º\n\nCaso surja uma vaga, entraremos em contato.`;
-  }
-
-  return respostaJson(mensagem);
+switch (meta.flow) {
+  case "inscricao":    // ✓ tratado
+  case "oracao":       // ✓ tratado  
+  case "testemunho":   // ✓ tratado
+  case "pastoral":     // ✓ tratado
+  // "fallback" ❌ NÃO TRATADO - cai fora do switch
 }
 ```
 
+Quando `meta.flow = "fallback"` (truthy), a condição para detectar inscrição falha:
+```typescript
+if (!meta.flow && detectarIntencaoInscricao(inputTexto))
+//   ↑ false porque "fallback" é truthy
+```
+
+### Problema 2: Mensagens Duplicadas
+
+Os logs mostram que a mesma mensagem "compartilhe" foi recebida duas vezes em sequência:
+- 17:36:27 - `[Triagem] Texto extraído: "compartilhe"`
+- 17:37:06 - `[Triagem] Texto extraído: "COMPARTILHE"`
+
+Isso pode ser causado por:
+- Make.com com retry automático
+- Webhook duplicado do WhatsApp
+- Timeout na resposta causando reenvio
+
 ---
 
-## Uso Interno pela Equipe
+## Solução Proposta
 
-### Fluxo de Trabalho
+### 1. Validar Flows Salvos na Sessão
 
-1. **Cancelamento/Não Pagamento** acontece
-2. Equipe acessa lista de espera do evento
-3. Contata pessoa na **posição 1** da fila
-4. Atualiza status para "contatado"
-5. Se pessoa aceitar: cria inscrição, marca como "convertido"
-6. Se não responder/recusar: marca como "expirado", passa para próximo
+Modificar a função `pickFlowFromParsed` para retornar `null` quando o flow não é reconhecido:
 
-### Interface Futura (não neste escopo)
+```typescript
+const FLOWS_VALIDOS = ["inscricao", "oracao", "testemunho", "pastoral"];
 
-```text
-+-----------------------------------------------------+
-| Lista de Espera - Compartilhe 2026                  |
-+-----------------------------------------------------+
-| 📋 15 aguardando | ✓ 3 convertidos | ✗ 2 expirados  |
-+-----------------------------------------------------+
-| Pos | Nome           | Telefone        | Status     |
-|-----|----------------|-----------------|------------|
-| 1   | Maria Silva    | (17) 99999-1111 | Aguardando |
-| 2   | João Santos    | (17) 99888-2222 | Contatado  |
-| 3   | Ana Costa      | (17) 99777-3333 | Aguardando |
-+-----------------------------------------------------+
-| Ações: [Marcar Contatado] [Converter em Inscrição]  |
-+-----------------------------------------------------+
+function pickFlowFromParsed(parsed: Record<string, unknown> | null): string | null {
+  if (!parsed) return null;
+  
+  const fluxoAtual = typeof parsed.fluxo_atual === "string" ? parsed.fluxo_atual : null;
+  if (fluxoAtual) {
+    const normalizado = fluxoAtual.trim().toLowerCase();
+    // SÓ retorna se for um flow válido
+    if (FLOWS_VALIDOS.includes(normalizado)) {
+      return normalizado;
+    }
+    return null; // Ignora flows inválidos como "fallback"
+  }
+  
+  const intencao = typeof parsed.intencao === "string" ? parsed.intencao : null;
+  return mapIntencaoToFlow(intencao);
+}
+```
+
+### 2. Tratar Flows Inválidos no Switch
+
+Adicionar tratamento para flows não reconhecidos:
+
+```typescript
+const meta = (sessao.meta_dados || {}) as SessionMeta;
+const FLOWS_VALIDOS = ["inscricao", "oracao", "testemunho", "pastoral"];
+
+// Validar se o flow é reconhecido
+const flowValido = meta.flow && FLOWS_VALIDOS.includes(meta.flow);
+
+if (flowValido) {
+  switch (meta.flow) {
+    case "inscricao":
+      return await handleFluxoInscricao(...);
+    case "oracao":
+    case "testemunho":
+    case "pastoral":
+      break;
+  }
+}
+
+// DETECÇÃO DE INSCRIÇÃO - agora funciona mesmo com flow inválido
+if (!flowValido && detectarIntencaoInscricao(inputTexto)) {
+  // Limpar flow inválido antes de iniciar novo fluxo
+  if (meta.flow && !FLOWS_VALIDOS.includes(meta.flow)) {
+    await supabase.from("atendimentos_bot").update({
+      meta_dados: { ...meta, flow: null }
+    }).eq("id", sessao.id);
+  }
+  return await iniciarFluxoInscricao(...);
+}
+```
+
+### 3. Adicionar Proteção contra Duplicação (Idempotência)
+
+Implementar verificação de mensagem recente duplicada:
+
+```typescript
+// No início do processamento, após obter sessão
+const historico = sessao?.historico_conversa || [];
+const ultimaMensagemUsuario = historico
+  .filter((h: any) => h.role === "user")
+  .slice(-1)[0]?.content;
+
+// Se a última mensagem é idêntica e foi há menos de 5 segundos
+if (ultimaMensagemUsuario === inputTexto && sessao?.updated_at) {
+  const diffMs = Date.now() - new Date(sessao.updated_at).getTime();
+  if (diffMs < 5000) {
+    console.log(`[Triagem] Mensagem duplicada ignorada (${diffMs}ms)`);
+    return new Response(JSON.stringify({ 
+      reply_message: null, 
+      duplicate: true 
+    }), { headers: corsHeaders });
+  }
+}
 ```
 
 ---
@@ -204,27 +136,45 @@ if ((count || 0) >= evento.vagas_limite) {
 
 | Arquivo | Alteração |
 |---------|-----------|
-| **Banco de Dados** | Criar tabela `evento_lista_espera` + campo `mostrar_posicao_fila` em `eventos` |
-| `supabase/functions/chatbot-triagem/index.ts` | Reordenar validações + inserir na lista de espera |
+| `supabase/functions/chatbot-triagem/index.ts` | Validar flows, tratar fallback, proteção duplicação |
 
 ---
 
-## Ordem de Implementação
+## Fluxo Corrigido
 
-1. Migração de banco: criar tabela `evento_lista_espera`
-2. Migração de banco: adicionar campo `mostrar_posicao_fila` em `eventos`
-3. Atualizar `chatbot-triagem/index.ts`:
-   - Verificar inscrição existente ANTES de vagas
-   - Adicionar lógica de lista de espera interna
-4. (Futuro) Interface de gestão da lista de espera
+```text
++------------------------------------------------------------------+
+| 1. Recebe mensagem "compartilhe"                                 |
++------------------------------------------------------------------+
+| 2. Busca sessão existente                                        |
++------------------------------------------------------------------+
+| 3. NOVO: Verifica duplicação (mesma msg < 5s)                    |
+|    SE duplicada -> ignora com reply_message: null                |
++------------------------------------------------------------------+
+| 4. Verifica meta.flow                                            |
+|    SE flow = "fallback" ou inválido -> trata como SEM flow       |
++------------------------------------------------------------------+
+| 5. Detecta keyword "compartilhe"                                 |
+|    -> Inicia fluxo de inscrição                                  |
++------------------------------------------------------------------+
+```
 
 ---
 
 ## Benefícios
 
-- **Zero leads perdidos**: Todo interessado é capturado
-- **Gestão interna**: Equipe controla a fila sem expor detalhes
-- **Flexibilidade**: Configurável se quer mostrar posição ou não
-- **CRM enriquecido**: Leads com interesse específico por evento
-- **Processo organizado**: Contato por ordem de chegada
+- **Correção do bug**: Keyword "compartilhe" funciona mesmo com sessão "suja"
+- **Resiliência**: Flows inválidos da IA são ignorados
+- **Sem duplicação**: Mensagens repetidas em sequência são ignoradas
+- **Logs claros**: Facilita debug futuro
+
+---
+
+## Ordem de Implementação
+
+1. Adicionar lista de flows válidos como constante
+2. Modificar `pickFlowFromParsed` para validar flows
+3. Ajustar lógica do switch para verificar flows válidos
+4. Adicionar verificação de duplicação por idempotência
+5. Testar cenário com "compartilhe" após conversa com IA
 
