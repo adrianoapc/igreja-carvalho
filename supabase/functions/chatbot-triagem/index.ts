@@ -157,6 +157,9 @@ function detectarIntencaoInscricao(texto: string): boolean {
   return keywords.some((kw) => textoNorm.includes(kw));
 }
 
+// Flows válidos reconhecidos pelo sistema
+const FLOWS_VALIDOS = ["inscricao", "oracao", "testemunho", "pastoral"];
+
 // Mapear intenção para flow normalizado
 function mapIntencaoToFlow(intencao?: string | null): string | null {
   const v = (intencao || "").toUpperCase().trim();
@@ -168,7 +171,7 @@ function mapIntencaoToFlow(intencao?: string | null): string | null {
   return null;
 }
 
-// Extrair flow da resposta da IA (sempre lowercase)
+// Extrair flow da resposta da IA (sempre lowercase) - VALIDANDO FLOWS
 function pickFlowFromParsed(
   parsed: Record<string, unknown> | null
 ): string | null {
@@ -176,10 +179,21 @@ function pickFlowFromParsed(
   const fluxoAtual =
     typeof parsed.fluxo_atual === "string" ? parsed.fluxo_atual : null;
   if (fluxoAtual && fluxoAtual.trim()) {
-    return fluxoAtual.trim().toLowerCase();
+    const normalizado = fluxoAtual.trim().toLowerCase();
+    // SÓ retorna se for um flow válido reconhecido
+    if (FLOWS_VALIDOS.includes(normalizado)) {
+      return normalizado;
+    }
+    console.log(`[Triagem] Flow inválido ignorado: "${fluxoAtual}"`);
+    return null; // Ignora flows inválidos como "fallback"
   }
   const intencao = typeof parsed.intencao === "string" ? parsed.intencao : null;
   return mapIntencaoToFlow(intencao);
+}
+
+// Verificar se flow é válido
+function isFlowValido(flow?: string | null): boolean {
+  return !!flow && FLOWS_VALIDOS.includes(flow);
 }
 
 // Buscar eventos abertos para inscrição
@@ -972,7 +986,28 @@ serve(async (req: Request) => {
       }
     }
 
-    const historico = sessao ? sessao.historico_conversa : [];
+    const historico = (sessao?.historico_conversa || []) as Array<{ role: string; content: string }>;
+
+    // ========== PROTEÇÃO CONTRA DUPLICAÇÃO (IDEMPOTÊNCIA) ==========
+    if (sessao && historico.length > 0) {
+      const ultimaMensagemUsuario = historico
+        .filter((h) => h.role === "user")
+        .slice(-1)[0]?.content;
+
+      const inputNormalizado = inputTexto.toLowerCase().trim();
+      const ultimaNormalizada = (ultimaMensagemUsuario || "").toLowerCase().trim();
+
+      if (ultimaNormalizada === inputNormalizado && sessao.updated_at) {
+        const diffMs = Date.now() - new Date(sessao.updated_at).getTime();
+        if (diffMs < 5000) {
+          console.log(`[Triagem] Mensagem duplicada ignorada (${diffMs}ms): "${inputTexto.slice(0, 30)}"`);
+          return new Response(
+            JSON.stringify({ reply_message: null, duplicate: true }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
 
     if (!sessao) {
       const { data: nova, error } = await supabase
@@ -1004,12 +1039,13 @@ serve(async (req: Request) => {
       payload_raw: { texto: inputTexto },
     });
 
-    // ========== NOVO: VERIFICAR FLOW EXISTENTE NA SESSÃO ==========
+    // ========== VERIFICAR FLOW EXISTENTE NA SESSÃO ==========
     const meta = (sessao.meta_dados || {}) as SessionMeta;
+    const flowValido = isFlowValido(meta.flow);
 
-    if (meta.flow) {
+    if (flowValido) {
       console.log(
-        `[Triagem] Sessão com flow ativo: ${meta.flow}, step: ${meta.step}`
+        `[Triagem] Sessão com flow válido: ${meta.flow}, step: ${meta.step}`
       );
 
       // HANDLER DIRETO - sem chamar IA para reclassificar
@@ -1034,11 +1070,22 @@ serve(async (req: Request) => {
           );
           break;
       }
+    } else if (meta.flow) {
+      // Flow inválido detectado (ex: "fallback") - limpar e permitir redetecção
+      console.log(
+        `[Triagem] Flow inválido detectado: "${meta.flow}" - limpando para permitir nova detecção`
+      );
+      await supabase
+        .from("atendimentos_bot")
+        .update({
+          meta_dados: { ...meta, flow: null },
+        })
+        .eq("id", sessao.id);
     }
 
     // ========== DETECÇÃO DETERMINÍSTICA DE INSCRIÇÃO ==========
-    // SÓ detecta keyword se NÃO houver flow ativo na sessão
-    if (!meta.flow && detectarIntencaoInscricao(inputTexto)) {
+    // Detecta keyword se NÃO houver flow VÁLIDO ativo na sessão
+    if (!flowValido && detectarIntencaoInscricao(inputTexto)) {
       console.log(
         `[Triagem] Detectada intenção de inscrição por palavra-chave. Iniciando fluxo direto...`
       );
