@@ -226,9 +226,9 @@ export default function Eventos() {
       statusFilter === "todos" || evento.status === statusFilter;
 
     const matchesDate =
-      (!dateRange.from ||
+      (!dateRange?.from ||
         !isBefore(new Date(evento.data_evento), dateRange.from)) &&
-      (!dateRange.to || !isAfter(new Date(evento.data_evento), dateRange.to));
+      (!dateRange?.to || !isAfter(new Date(evento.data_evento), dateRange.to));
 
     return matchesSearch && matchesTipo && matchesStatus && matchesDate;
   });
@@ -420,8 +420,8 @@ export default function Eventos() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full sm:w-auto">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
+                    {dateRange?.from ? (
+                      dateRange?.to ? (
                         <>
                           {format(dateRange.from, "dd/MM/yy")} -{" "}
                           {format(dateRange.to, "dd/MM/yy")}
