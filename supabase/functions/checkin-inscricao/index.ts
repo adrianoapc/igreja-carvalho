@@ -101,13 +101,15 @@ Deno.serve(async (req) => {
         pessoa,
         evento,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
+      // Business rule response: keep 200 to avoid client treating it as runtime error
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   }
 
   if (evento?.status === "cancelado") {
     return new Response(JSON.stringify({ success: false, message: "Evento cancelado" }), {
-      status: 409,
+      // Business rule response
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -123,7 +125,8 @@ Deno.serve(async (req) => {
           pessoa,
           evento,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
+        // Business rule response
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
   }
@@ -157,7 +160,8 @@ Deno.serve(async (req) => {
         pessoa,
         evento,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
+      // Business rule response
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   }
 
