@@ -64,7 +64,7 @@ interface AulaVinculada {
 }
 
 const normalizeQuizConfig = (
-  value: unknown
+  value: unknown,
 ): Etapa["quiz_config"] | undefined => {
   if (typeof value !== "object" || value === null) return undefined;
   const v = value as Record<string, unknown>;
@@ -78,10 +78,10 @@ const normalizeQuizConfig = (
       const alternativas = Array.isArray(pObj?.alternativas)
         ? pObj.alternativas
         : Array.isArray(pObj?.opcoes)
-        ? pObj.opcoes
-        : [];
+          ? pObj.opcoes
+          : [];
       const respostaCorreta = Number(
-        pObj?.respostaCorreta ?? pObj?.resposta_correta ?? 0
+        pObj?.respostaCorreta ?? pObj?.resposta_correta ?? 0,
       );
       if (!texto || alternativas.length === 0) return null;
       return {
@@ -109,7 +109,7 @@ export default function CursoPlayer() {
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [etapaSelecionada, setEtapaSelecionada] = useState<Etapa | null>(null);
   const [aulaVinculada, setAulaVinculada] = useState<AulaVinculada | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
   const [marcandoConcluido, setMarcandoConcluido] = useState(false);
@@ -181,7 +181,7 @@ export default function CursoPlayer() {
       const { data: etapasData, error: etapasError } = await supabase
         .from("etapas_jornada")
         .select(
-          "id, titulo, ordem, tipo_conteudo, conteudo_url, conteudo_texto, quiz_config, check_automatico, aula_vinculada_id"
+          "id, titulo, ordem, tipo_conteudo, conteudo_url, conteudo_texto, quiz_config, check_automatico, aula_vinculada_id",
         )
         .eq("jornada_id", id)
         .order("ordem");
@@ -198,7 +198,7 @@ export default function CursoPlayer() {
         .eq("status", "concluido");
 
       const conclusoesMap = new Map(
-        presencasData?.map((p) => [p.etapa_id, p.created_at]) || []
+        presencasData?.map((p) => [p.etapa_id, p.created_at]) || [],
       );
 
       const etapasComStatus: Etapa[] = (etapasData || []).map((etapa) => ({
@@ -322,11 +322,11 @@ export default function CursoPlayer() {
                 concluida: true,
                 data_conclusao: new Date().toISOString(),
               }
-            : e
-        )
+            : e,
+        ),
       );
       setEtapaSelecionada((prev) =>
-        prev ? { ...prev, concluida: true } : null
+        prev ? { ...prev, concluida: true } : null,
       );
 
       // Avançar para próxima etapa
@@ -467,7 +467,7 @@ export default function CursoPlayer() {
                       {format(
                         new Date(aulaVinculada.data_inicio),
                         "PPP 'às' HH:mm",
-                        { locale: ptBR }
+                        { locale: ptBR },
                       )}
                     </span>
                   </div>
@@ -754,7 +754,7 @@ export default function CursoPlayer() {
                           em{" "}
                           {format(
                             new Date(etapaSelecionada.data_conclusao),
-                            "dd/MM/yyyy"
+                            "dd/MM/yyyy",
                           )}
                         </span>
                       )}

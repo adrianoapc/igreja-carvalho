@@ -75,7 +75,7 @@ export default function ProjetoDialog({
       setStatus(projeto.status);
       setLiderId(projeto.lider_id);
       setDataInicio(
-        projeto.data_inicio ? new Date(projeto.data_inicio) : undefined
+        projeto.data_inicio ? new Date(projeto.data_inicio) : undefined,
       );
       setDataFim(projeto.data_fim ? new Date(projeto.data_fim) : undefined);
     } else {

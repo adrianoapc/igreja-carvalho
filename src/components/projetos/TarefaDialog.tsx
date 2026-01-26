@@ -89,7 +89,7 @@ export default function TarefaDialog({
       setPrioridade(tarefa.prioridade);
       setResponsavelId(tarefa.responsavel_id);
       setDataVencimento(
-        tarefa.data_vencimento ? new Date(tarefa.data_vencimento) : undefined
+        tarefa.data_vencimento ? new Date(tarefa.data_vencimento) : undefined,
       );
     } else {
       setTitulo("");

@@ -127,26 +127,18 @@ export default function VisaoProjetosWidget() {
         {/* KPIs */}
         <div className="grid grid-cols-2 gap-3">
           <div
-            className={`p-3 rounded-lg ${
-              stats?.tarefasAtrasadas ? "bg-destructive/10" : "bg-muted/50"
-            }`}
+            className={`p-3 rounded-lg ${stats?.tarefasAtrasadas ? "bg-destructive/10" : "bg-muted/50"}`}
           >
             <div className="flex items-center gap-2">
               <AlertTriangle
-                className={`w-4 h-4 ${
-                  stats?.tarefasAtrasadas
-                    ? "text-destructive"
-                    : "text-muted-foreground"
-                }`}
+                className={`w-4 h-4 ${stats?.tarefasAtrasadas ? "text-destructive" : "text-muted-foreground"}`}
               />
               <span className="text-xs text-muted-foreground">
                 Tarefas Atrasadas
               </span>
             </div>
             <p
-              className={`text-2xl font-bold mt-1 ${
-                stats?.tarefasAtrasadas ? "text-destructive" : "text-foreground"
-              }`}
+              className={`text-2xl font-bold mt-1 ${stats?.tarefasAtrasadas ? "text-destructive" : "text-foreground"}`}
             >
               {stats?.tarefasAtrasadas || 0}
             </p>

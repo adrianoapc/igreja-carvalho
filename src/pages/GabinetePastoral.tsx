@@ -17,7 +17,7 @@ import { PastoralCalendarView } from "@/components/gabinete/PastoralCalendarView
 
 // Lazy load Kanban (heavy with DnD)
 const PastoralKanbanView = lazy(
-  () => import("@/components/gabinete/PastoralKanbanView")
+  () => import("@/components/gabinete/PastoralKanbanView"),
 );
 
 type GravidadeEnum = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
@@ -71,7 +71,7 @@ export default function GabinetePastoral() {
   const [busca, setBusca] = useState("");
   const [filtroOrigem, setFiltroOrigem] = useState("TODAS");
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "agenda">(
-    "list"
+    "list",
   );
   const [agendamentoDialogOpen, setAgendamentoDialogOpen] = useState(false);
   const [atendimentoParaAgendar, setAtendimentoParaAgendar] =
@@ -89,7 +89,7 @@ export default function GabinetePastoral() {
           pessoa:profiles!atendimentos_pastorais_pessoa_id_fkey(nome, telefone),
           visitante:visitantes_leads!atendimentos_pastorais_visitante_id_fkey(nome, telefone),
           pastor:profiles!atendimentos_pastorais_pastor_responsavel_id_fkey(nome)
-        `
+        `,
         )
         .order("created_at", { ascending: false });
 

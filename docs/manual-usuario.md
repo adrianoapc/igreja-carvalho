@@ -130,14 +130,6 @@ O sino no canto superior direito mostra suas notificações:
 - **Campos obrigatórios e validações**: Nome é obrigatório; status deve ser um dos valores válidos (Visitante/Frequentador/Membro); contatos ajudam na busca e no follow-up. Em mobile, priorize inserir contato para facilitar ações posteriores.
 - **Vincular funções/roles ministeriais**: No perfil, acesse a área de status/igreja e atribua funções (quando disponível) conforme a liderança definir.
 
-**Gerenciamento de acesso (somente admins)**
-
-- No detalhe de um **membro** aparece o card “Gerenciamento de Acesso” apenas para admins.
-- Botões disponíveis:
-  - **Criar Acesso**: cria usuário no Supabase com senha temporária e vincula `profiles.user_id`.
-  - **Resetar Senha**: gera nova senha temporária e marca troca no próximo login.
-- Se o usuário já existe, o botão exibido é apenas **Resetar Senha**.
-
 **Exemplos práticos**
 
 - Cadastro de novo membro: Pessoas → Membros → **+ Novo** → Nome obrigatório, telefone/email recomendado, status **membro** → Salvar → aparece na lista com badge.
@@ -2139,37 +2131,34 @@ Algumas jornadas/cursos podem exigir pagamento para liberar o conteúdo. O siste
 1. Acesse **Configurações** no menu lateral
 2. Seções disponíveis:
 
-**Menu Geral:**
-
-- Dados da Igreja (logo e contatos), Filiais, Acesso por Filial, Permissões, Notificações, Webhooks, Números WhatsApp (por filial) e Chatbots IA.
-
-**Bloco Financeiro:**
-
-- Bases Ministeriais, Plano de Contas, Centros de Custo, Contas, Formas de Pagamento, Fornecedores e atalho para Configuração Financeira (aparece apenas para admins/permissionados).
-
 **Modo de Manutenção:**
 
-- Toggle no topo ativa/desativa manutenção para a igreja atual (atualiza `app_config.maintenance_mode`).
+- Ativar/desativar modo manutenção (bloqueia acesso ao sistema)
+- Permitir acesso público durante manutenção
+- Personalizar mensagem de manutenção
 
 **Informações Básicas:**
 
-- Nome da igreja, subtítulo e logo (upload com preview).
+- Nome da igreja
+- Subtítulo
+- Logo (upload com preview)
 
 **Webhooks de Integração:**
 
-- Card com link para página dedicada `/admin/webhooks`.
-- Gerenciamento seguro de URLs de webhook (valores mascarados).
+- Card com link para página dedicada `/admin/webhooks`
+- Gerenciamento seguro de URLs de webhook (valores mascarados)
 
 **Notificações & Plantão Pastoral:**
 
-- Telefone do plantão pastoral (para alertas críticos).
-- Provedor WhatsApp: Make.com, Meta Official API, ou Evolution API (campos variam conforme provedor).
+- Telefone do plantão pastoral (para alertas críticos)
+- Provedor WhatsApp: Make.com, Meta Official API, ou Evolution API
+- Campos de credenciais variam conforme provedor selecionado
 
 **IA & Chatbot:**
 
-- Card "Chatbots & Inteligência Artificial" confirma visualmente se o `OPENAI_API_KEY` está presente.
-- Botão **Gerenciar Chatbots & IAs** redireciona para a tela administrativa `/admin/chatbots`.
-- Dica exibida lembra que os prompts/modelos são ajustados nessa tela dedicada.
+- Card "Chatbots & Inteligência Artificial" confirma visualmente se o `OPENAI_API_KEY` está presente
+- Botão **Gerenciar Chatbots & IAs** redireciona para a tela administrativa `/admin/chatbots`
+- Dica exibida lembra que os prompts/modelos são ajustados nessa tela dedicada
 
 ![Configurações Igreja](./screenshots/placeholder-config-igreja.png)
 

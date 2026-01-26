@@ -98,7 +98,7 @@ export default function MinhasEscalas() {
             id,
             nome
           )
-        `
+        `,
         )
         .eq("pessoa_id", profile.id);
 
@@ -122,7 +122,7 @@ export default function MinhasEscalas() {
         .sort(
           (a, b) =>
             new Date(a.culto.data_evento).getTime() -
-            new Date(b.culto.data_evento).getTime()
+            new Date(b.culto.data_evento).getTime(),
         ) as Escala[];
       setEscalas(validEscalas);
     } catch (error) {
@@ -212,11 +212,12 @@ export default function MinhasEscalas() {
   };
 
   const pendentes = escalas.filter(
-    (e) => !e.status_confirmacao || e.status_confirmacao === "pendente"
+    (e) => !e.status_confirmacao || e.status_confirmacao === "pendente",
   );
   const confirmadas = escalas.filter(
     (e) =>
-      e.status_confirmacao === "aceito" || e.status_confirmacao === "confirmado"
+      e.status_confirmacao === "aceito" ||
+      e.status_confirmacao === "confirmado",
   );
   const recusadas = escalas.filter((e) => e.status_confirmacao === "recusado");
 
@@ -278,7 +279,7 @@ export default function MinhasEscalas() {
                           {format(
                             new Date(escala.culto.data_evento),
                             "EEEE, dd 'de' MMMM",
-                            { locale: ptBR }
+                            { locale: ptBR },
                           )}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -350,7 +351,7 @@ export default function MinhasEscalas() {
                           {format(
                             new Date(escala.culto.data_evento),
                             "EEEE, dd 'de' MMMM",
-                            { locale: ptBR }
+                            { locale: ptBR },
                           )}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -399,7 +400,7 @@ export default function MinhasEscalas() {
                           {format(
                             new Date(escala.culto.data_evento),
                             "EEEE, dd 'de' MMMM",
-                            { locale: ptBR }
+                            { locale: ptBR },
                           )}
                         </p>
                       </div>

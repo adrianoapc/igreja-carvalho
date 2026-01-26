@@ -37,10 +37,20 @@ import {
   FileText,
   Loader2,
   Clock,
+  Plus,
+  Pencil,
+  Trash2,
+  Ticket,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { format, differenceInMinutes, addMinutes } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TemplatePreviewDialog } from "./TemplatePreviewDialog";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
 
 // --- Interfaces e Tipos ---
 
@@ -90,6 +100,18 @@ interface Template {
   local_padrao?: string | null;
   pregador_padrao?: string | null;
   incluir_escalas?: boolean | null;
+}
+
+interface Lote {
+  id?: string;
+  nome: string;
+  descricao: string;
+  valor: number;
+  vigencia_inicio: Date | null;
+  vigencia_fim: Date | null;
+  vagas_limite: number | null;
+  ativo: boolean;
+  ordem: number;
 }
 
 // --- Schema de Validação ---
@@ -186,6 +208,11 @@ export default function EventoDialog({
   const [subtipos, setSubtipos] = useState<Subtipo[]>([]);
   const [categoriasFinanceiras, setCategoriasFinanceiras] = useState<{id: string; nome: string}[]>([]);
   const [contasFinanceiras, setContasFinanceiras] = useState<{id: string; nome: string}[]>([]);
+  
+  // Estado para lotes
+  const [lotes, setLotes] = useState<Lote[]>([]);
+  const [loteEditando, setLoteEditando] = useState<number | null>(null);
+  const [mostrarLotes, setMostrarLotes] = useState(false);
 
   const isEditing = !!evento;
 
@@ -223,6 +250,43 @@ export default function EventoDialog({
       }
     }
   }, [tipoSelecionado]);
+
+  // Carregar lotes ao abrir dialog de edição
+  useEffect(() => {
+    if (open && isEditing && evento?.id) {
+      loadLotesExistentes(evento.id);
+    } else if (open && !isEditing) {
+      setLotes([]);
+    }
+  }, [open, isEditing, evento?.id]);
+
+  const loadLotesExistentes = async (eventoId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("evento_lotes")
+        .select("*")
+        .eq("evento_id", eventoId)
+        .order("ordem", { ascending: true });
+
+      if (error) throw error;
+      
+      const lotesFormatados: Lote[] = (data || []).map(l => ({
+        id: l.id,
+        nome: l.nome,
+        descricao: l.descricao || "",
+        valor: l.valor,
+        vigencia_inicio: l.vigencia_inicio ? new Date(l.vigencia_inicio) : null,
+        vigencia_fim: l.vigencia_fim ? new Date(l.vigencia_fim) : null,
+        vagas_limite: l.vagas_limite,
+        ativo: l.ativo,
+        ordem: l.ordem,
+      }));
+      
+      setLotes(lotesFormatados);
+    } catch (error) {
+      console.error("Erro ao carregar lotes:", error);
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -327,6 +391,90 @@ export default function EventoDialog({
     setContasFinanceiras(contaRes.data || []);
   };
 
+  // Funções para gerenciar lotes
+  const adicionarLote = () => {
+    const novoLote: Lote = {
+      nome: "",
+      descricao: "",
+      valor: 0,
+      vigencia_inicio: null,
+      vigencia_fim: null,
+      vagas_limite: null,
+      ativo: true,
+      ordem: lotes.length,
+    };
+    setLotes([...lotes, novoLote]);
+    setLoteEditando(lotes.length);
+  };
+
+  const removerLote = (index: number) => {
+    setLotes(lotes.filter((_, i) => i !== index));
+    if (loteEditando === index) setLoteEditando(null);
+  };
+
+  const atualizarLote = (index: number, campo: keyof Lote, valor: any) => {
+    const novosLotes = [...lotes];
+    novosLotes[index] = { ...novosLotes[index], [campo]: valor };
+    setLotes(novosLotes);
+  };
+
+  const salvarLotes = async (eventoId: string) => {
+    try {
+      // Deletar lotes existentes que não estão mais na lista
+      if (isEditing) {
+        const lotesExistentes = await supabase
+          .from("evento_lotes")
+          .select("id")
+          .eq("evento_id", eventoId);
+        
+        const idsNaLista = lotes.filter(l => l.id).map(l => l.id);
+        const idsParaDeletar = (lotesExistentes.data || [])
+          .map(l => l.id)
+          .filter(id => !idsNaLista.includes(id));
+        
+        if (idsParaDeletar.length > 0) {
+          await supabase
+            .from("evento_lotes")
+            .delete()
+            .in("id", idsParaDeletar);
+        }
+      }
+
+      // Salvar ou atualizar lotes
+      for (const lote of lotes) {
+        const payload = {
+          evento_id: eventoId,
+          nome: lote.nome,
+          descricao: lote.descricao || null,
+          valor: lote.valor,
+          vigencia_inicio: lote.vigencia_inicio?.toISOString() || null,
+          vigencia_fim: lote.vigencia_fim?.toISOString() || null,
+          vagas_limite: lote.vagas_limite,
+          ativo: lote.ativo,
+          ordem: lote.ordem,
+          igreja_id: igrejaId,
+          filial_id: filialId,
+        };
+
+        if (lote.id) {
+          // Atualizar existente
+          await supabase
+            .from("evento_lotes")
+            .update(payload)
+            .eq("id", lote.id);
+        } else {
+          // Inserir novo
+          await supabase
+            .from("evento_lotes")
+            .insert(payload);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao salvar lotes:", error);
+      throw error;
+    }
+  };
+
   // Carregar dados financeiros quando tipo for EVENTO
   useEffect(() => {
     if (tipoSelecionado === "EVENTO" && open && igrejaId) {
@@ -379,9 +527,17 @@ export default function EventoDialog({
 
       if (isEditing) {
         await supabase.from("eventos").update(payload).eq("id", evento!.id);
+        // Salvar lotes se evento requer pagamento
+        if (data.tipo === "EVENTO" && data.requer_pagamento && lotes.length > 0) {
+          await salvarLotes(evento!.id);
+        }
         toast.success("Atualizado!");
       } else {
-        await supabase.from("eventos").insert([payload]).select().single();
+        const { data: novoEvento } = await supabase.from("eventos").insert([payload]).select().single();
+        // Salvar lotes se evento requer pagamento
+        if (novoEvento && data.tipo === "EVENTO" && data.requer_pagamento && lotes.length > 0) {
+          await salvarLotes(novoEvento.id);
+        }
         toast.success("Criado!");
       }
       onSuccess();
@@ -995,6 +1151,196 @@ export default function EventoDialog({
                               </FormItem>
                             )}
                           />
+                        </div>
+                      )}
+
+                      {/* Gerenciamento de Lotes */}
+                      {requerPagamento && (
+                        <div className="space-y-3 pl-7 border-l-2 border-blue-500/20 ml-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Ticket className="h-4 w-4 text-primary" />
+                              <Label className="font-medium">Lotes / Categorias de Ingresso</Label>
+                              <Badge variant="secondary" className="text-xs">
+                                {lotes.length}
+                              </Badge>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setMostrarLotes(!mostrarLotes)}
+                            >
+                              {mostrarLotes ? (
+                                <>
+                                  <ChevronUp className="h-4 w-4 mr-1" />
+                                  Ocultar
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronDown className="h-4 w-4 mr-1" />
+                                  Mostrar
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          {mostrarLotes && (
+                            <div className="space-y-2">
+                              {lotes.length === 0 && (
+                                <Card className="border-dashed">
+                                  <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                                    <Ticket className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                    <p>Nenhum lote configurado</p>
+                                    <p className="text-xs mt-1">
+                                      Crie lotes para preços diferenciados por período
+                                    </p>
+                                  </CardContent>
+                                </Card>
+                              )}
+
+                              {lotes.map((lote, index) => (
+                                <Card key={index} className={cn(!lote.ativo && "opacity-60")}>
+                                  <CardContent className="p-3 space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <Input
+                                        placeholder="Nome do lote *"
+                                        value={lote.nome}
+                                        onChange={(e) => atualizarLote(index, "nome", e.target.value)}
+                                        className="flex-1"
+                                      />
+                                      <div className="flex items-center gap-1">
+                                        <Switch
+                                          checked={lote.ativo}
+                                          onCheckedChange={(checked) => atualizarLote(index, "ativo", checked)}
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => removerLote(index)}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Valor (R$)</Label>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0,00"
+                                          value={lote.valor || ""}
+                                          onChange={(e) =>
+                                            atualizarLote(index, "valor", parseFloat(e.target.value) || 0)
+                                          }
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Vagas</Label>
+                                        <Input
+                                          type="number"
+                                          placeholder="Ilimitado"
+                                          value={lote.vagas_limite ?? ""}
+                                          onChange={(e) =>
+                                            atualizarLote(
+                                              index,
+                                              "vagas_limite",
+                                              e.target.value ? parseInt(e.target.value) : null
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Início</Label>
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !lote.vigencia_inicio && "text-muted-foreground"
+                                              )}
+                                            >
+                                              <CalendarIcon className="mr-2 h-3 w-3" />
+                                              {lote.vigencia_inicio
+                                                ? format(lote.vigencia_inicio, "dd/MM", { locale: ptBR })
+                                                : "Imediato"}
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                              mode="single"
+                                              selected={lote.vigencia_inicio ?? undefined}
+                                              onSelect={(date) =>
+                                                atualizarLote(index, "vigencia_inicio", date || null)
+                                              }
+                                            />
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
+
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Fim</Label>
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !lote.vigencia_fim && "text-muted-foreground"
+                                              )}
+                                            >
+                                              <CalendarIcon className="mr-2 h-3 w-3" />
+                                              {lote.vigencia_fim
+                                                ? format(lote.vigencia_fim, "dd/MM", { locale: ptBR })
+                                                : "Sem limite"}
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                              mode="single"
+                                              selected={lote.vigencia_fim ?? undefined}
+                                              onSelect={(date) =>
+                                                atualizarLote(index, "vigencia_fim", date || null)
+                                              }
+                                            />
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
+                                    </div>
+
+                                    <Input
+                                      placeholder="Descrição (opcional)"
+                                      value={lote.descricao}
+                                      onChange={(e) => atualizarLote(index, "descricao", e.target.value)}
+                                      className="text-sm"
+                                    />
+                                  </CardContent>
+                                </Card>
+                              ))}
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={adicionarLote}
+                                className="w-full"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Adicionar Lote
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

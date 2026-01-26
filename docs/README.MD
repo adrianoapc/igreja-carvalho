@@ -21,12 +21,6 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
   - Controle Multi-Tenant: [`controle-multi-tenant.md`](controle-multi-tenant.md)
   - Guia de importação de extratos (arquivo/API): [`operacoes/importacao-extratos.md`](operacoes/importacao-extratos.md)
   - Replicação de cadastros entre filiais: [`operacoes/replicacao-cadastros-filiais.md`](operacoes/replicacao-cadastros-filiais.md)
-  - Planejamento gestão de ofertas: [`PLANEJAMENTO_GESTAO_OFERTAS.md`](PLANEJAMENTO_GESTAO_OFERTAS.md)
-  - Correções de FKs (perfis x contagens): [`FK_CONSTRAINTS_FIX.md`](FK_CONSTRAINTS_FIX.md)
-  - Correção criação de usuários (Edge Function): [`USER_CREATION_FIX.md`](USER_CREATION_FIX.md)
-  - Especificação Config Financeiro: [`FINANCEIRO_CONFIG_SPEC.md`](FINANCEIRO_CONFIG_SPEC.md)
-  - Setup inicial Config Financeiro (SQL): [`FINANCEIRO_CONFIG_SETUP.sql`](FINANCEIRO_CONFIG_SETUP.sql)
-  - DocOps Review 2026-01-12: [`DOCOPS_REVIEW_2026-01-12.md`](DOCOPS_REVIEW_2026-01-12.md)
 - Arquitetura
   - Visão geral: [`01-Arquitetura/01-arquitetura-geral.MD`](01-Arquitetura/01-arquitetura-geral.MD)
   - Autenticação Supabase: [`01-Arquitetura/02-autenticacao-supabase.MD`](01-Arquitetura/02-autenticacao-supabase.MD)
@@ -84,7 +78,6 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
 - ADRs
   - Lista de ADRs: [`adr/README.MD`](adr/README.MD)
   - ADR-001 (Fato Gerador vs Caixa vs DRE): [`adr/ADR-001-separacao-fato-gerador-caixa-dre.md`](adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
-  - ADR-023 (Conferência Cega — Contagem Dupla): [`adr/ADR-023-conferencia-cega-contagem-dupla.md`](adr/ADR-023-conferencia-cega-contagem-dupla.md)
   - ADR-002 (Autenticação Supabase): [`adr/ADR-002-autenticacao-supabase.md`](adr/ADR-002-autenticacao-supabase.md)
   - ADR-003 (RLS e modelo de permissões): [`adr/ADR-003-rls-e-modelo-permissoes.md`](adr/ADR-003-rls-e-modelo-permissoes.md)
   - ADR-006 (Separação Comunicação e Notificações): [`adr/ADR-006-separacao-comunicacao-notificacoes.md`](adr/ADR-006-separacao-comunicacao-notificacoes.md)
@@ -93,7 +86,6 @@ backend (Supabase), e o guia do usuário do sistema Igreja Carvalho.
   - ADR-010 (Intercessão: Redirecionamento Inteligente vs Automação): [`adr/ADR-010-intercessao-redirecionamento-inteligente.md`](adr/ADR-010-intercessao-redirecionamento-inteligente.md)
   - ADR-012 (Intercessão V2, CRM de Evangelismo e Chatbot IA): [`adr/012-intercessao-v2-evangelismo.md`](adr/012-intercessao-v2-evangelismo.md)
   - ADR-014 (Gabinete Digital, Roteamento Pastoral e Unificação de Entradas): [`adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md`](adr/ADR-014-gabinete-digital-e-roteamento-pastoral.md)
-  - ADR-024 (Webhook PIX Santander com CORS aberto e health check): [`adr/ADR-024-pix-webhook-santander.md`](adr/ADR-024-pix-webhook-santander.md)
 
 ## Como navegar
 

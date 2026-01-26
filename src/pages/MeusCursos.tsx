@@ -41,11 +41,10 @@ interface InscricaoComProgresso {
   etapasConcluidas: number;
 }
 
-interface SupabaseInscricao
-  extends Omit<
-    InscricaoComProgresso,
-    "totalEtapas" | "etapasConcluidas" | "id"
-  > {
+interface SupabaseInscricao extends Omit<
+  InscricaoComProgresso,
+  "totalEtapas" | "etapasConcluidas" | "id"
+> {
   id: string;
 }
 
@@ -114,7 +113,7 @@ export default function MeusCursos() {
           concluido,
           status_pagamento,
           jornada:jornadas!inner(id, titulo, descricao, cor_tema, exibir_portal, requer_pagamento, valor, igreja_id, filial_id)
-        `
+        `,
         )
         .eq("pessoa_id", profile.id)
         .eq("concluido", false)
@@ -183,14 +182,14 @@ export default function MeusCursos() {
       if (inscricoesError) throw inscricoesError;
 
       const idsInscritos = new Set(
-        (inscricoesUsuario || []).map((i) => i.jornada_id)
+        (inscricoesUsuario || []).map((i) => i.jornada_id),
       );
 
       // Buscar TODAS as jornadas disponíveis da igreja (cross-filial)
       const { data: jornadas, error } = await supabase
         .from("jornadas")
         .select(
-          "id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal, filial_id"
+          "id, titulo, descricao, cor_tema, requer_pagamento, valor, ativo, exibir_portal, filial_id",
         )
         .eq("ativo", true)
         .eq("exibir_portal", true)
@@ -220,7 +219,7 @@ export default function MeusCursos() {
   const calcularProgresso = (inscricao: InscricaoComProgresso) => {
     if (inscricao.totalEtapas === 0) return 0;
     return Math.round(
-      (inscricao.etapasConcluidas / inscricao.totalEtapas) * 100
+      (inscricao.etapasConcluidas / inscricao.totalEtapas) * 100,
     );
   };
 
@@ -246,14 +245,12 @@ export default function MeusCursos() {
       // Curso pago
       if (!contaId) {
         toast.error(
-          "Configuração financeira ausente (conta padrão). Configure em Financeiro."
+          "Configuração financeira ausente (conta padrão). Configure em Financeiro.",
         );
         return;
       }
       const hoje = new Date();
-      const data = `${hoje.getFullYear()}-${String(
-        hoje.getMonth() + 1
-      ).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+      const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
 
       const { data: transacaoCriada, error: txError } = await supabase
         .from("transacoes_financeiras")
@@ -287,9 +284,7 @@ export default function MeusCursos() {
       if (inscError) throw inscError;
 
       setPagamentoMensagem(
-        `Inscrição realizada! Para liberar o acesso, realize o pagamento de R$ ${Number(
-          jornada.valor || 0
-        ).toFixed(2)}.`
+        `Inscrição realizada! Para liberar o acesso, realize o pagamento de R$ ${Number(jornada.valor || 0).toFixed(2)}.`,
       );
       setPagamentoDialogOpen(true);
       await Promise.all([fetchInscricoes(), fetchDisponiveis()]);
@@ -360,9 +355,7 @@ export default function MeusCursos() {
                 return (
                   <Card
                     key={inscricao.id}
-                    className={`overflow-hidden hover:shadow-md transition-all ${
-                      bloqueado ? "opacity-90" : "cursor-pointer group"
-                    }`}
+                    className={`overflow-hidden hover:shadow-md transition-all ${bloqueado ? "opacity-90" : "cursor-pointer group"}`}
                     onClick={() =>
                       !bloqueado && navigate(`/cursos/${inscricao.jornada_id}`)
                     }

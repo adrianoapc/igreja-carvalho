@@ -139,9 +139,7 @@ export function ComunicadoDialog({
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2)}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("comunicados")
@@ -612,8 +610,8 @@ export function ComunicadoDialog({
             {isLoading
               ? "Salvando..."
               : comunicado
-              ? "Atualizar"
-              : "Criar Comunicado"}
+                ? "Atualizar"
+                : "Criar Comunicado"}
           </Button>
         </div>
       </div>
