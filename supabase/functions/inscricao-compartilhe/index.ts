@@ -6,7 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const APP_URL = Deno.env.get("APP_URL") || "https://igreja.lovable.app";
+const APP_URL = Deno.env.get("APP_URL") || "https://appcarvalho.lovable.app";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 
 const isYes = (text: string) =>
   ["sim", "s", "ok", "confirmo", "confirmar"].includes(text);
@@ -406,7 +407,8 @@ Deno.serve(async (req) => {
     inscricaoExistente &&
     inscricaoExistente.status_pagamento !== "cancelado"
   ) {
-    const qrLink = `${APP_URL}/eventos/checkin/${inscricaoExistente.qr_token}`;
+    const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
+    const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
     await supabase
       .from("atendimentos_bot")
       .update({ status: "CONCLUIDO" })
@@ -416,6 +418,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         reply_message: `Voce ja esta inscrito. QR: ${qrLink}`,
         qr_url: qrLink,
+        qr_image: qrImage,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -435,7 +438,8 @@ Deno.serve(async (req) => {
       })
       .eq("id", inscricaoExistente.id);
 
-    const qrLink = `${APP_URL}/eventos/checkin/${inscricaoExistente.qr_token}`;
+    const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
+    const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
     await supabase
       .from("atendimentos_bot")
       .update({ status: "CONCLUIDO" })
@@ -446,7 +450,7 @@ Deno.serve(async (req) => {
       : `Inscricao confirmada. QR: ${qrLink}`;
 
     return new Response(
-      JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink }),
+      JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink, qr_image: qrImage }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -475,7 +479,8 @@ Deno.serve(async (req) => {
     );
   }
 
-  const qrLink = `${APP_URL}/eventos/checkin/${novaInscricao.qr_token}`;
+  const qrLink = `${APP_URL}/inscricao/${novaInscricao.qr_token}`;
+  const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${novaInscricao.qr_token}`;
   const mensagemResposta = evento.requer_pagamento
     ? `Inscricao registrada. Sua vaga esta reservada por 24h. QR: ${qrLink}`
     : `Inscricao confirmada. QR: ${qrLink}`;
@@ -486,7 +491,7 @@ Deno.serve(async (req) => {
     .eq("id", sessaoAtual.id);
 
   return new Response(
-    JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink }),
+    JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink, qr_image: qrImage }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 });
