@@ -43,6 +43,7 @@ import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
 import { EventoLotesManager } from "@/components/eventos/EventoLotesManager";
 import EscalaTimeline from "@/components/escalas/EscalaTimeline";
 import EventoDialog from "@/components/eventos/EventoDialog";
+import { CheckinTabContent } from "@/components/eventos/CheckinTabContent";
 
 interface Evento {
   id: string;
@@ -534,16 +535,7 @@ export default function EventoDetalhes() {
 
         {/* Tab: Check-in (sempre) */}
         <TabsContent value="checkin" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Check-in do Evento</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Funcionalidade de check-in em desenvolvimento.
-              </p>
-            </CardContent>
-          </Card>
+          <CheckinTabContent eventoId={id!} />
         </TabsContent>
 
         {/* Tab: Inscrições */}
