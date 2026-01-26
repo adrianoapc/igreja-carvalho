@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CheckinResultFeedback } from "./CheckinResultFeedback";
+import { CheckinConfirmDialog } from "./CheckinConfirmDialog";
 import { Camera, X, RefreshCw } from "lucide-react";
 import { extractEdgeFunctionPayload } from "./edgeFunctionPayload";
 
@@ -26,11 +27,16 @@ type FeedbackState = {
   message?: string;
 } | null;
 
+type ScanStage = "scanning" | "confirming" | "feedback";
+
+interface PendingCheckinData {
+  pessoa?: { id?: string; nome?: string; email?: string; telefone?: string } | null;
+  evento?: { id?: string; titulo?: string } | null;
+}
+
 const extractToken = (input: string): string | null => {
-  // Remove whitespace
   const cleaned = input.trim();
 
-  // Try to extract from URL patterns
   const urlMatch =
     cleaned.match(/\/inscricao\/([a-f0-9-]+)/i) ||
     cleaned.match(/\/checkin\/([a-f0-9-]+)/i);
@@ -39,7 +45,6 @@ const extractToken = (input: string): string | null => {
     return urlMatch[1];
   }
 
-  // Check if it's a direct UUID
   const uuidMatch = cleaned.match(
     /^([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i
   );
@@ -52,7 +57,9 @@ const extractToken = (input: string): string | null => {
 };
 
 export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps) {
+  const [stage, setStage] = useState<ScanStage>("scanning");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [pendingData, setPendingData] = useState<PendingCheckinData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const queryClient = useQueryClient();
 
@@ -75,15 +82,23 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
       const evento = Array.isArray(data.evento) ? data.evento[0] : data.evento;
 
       if (data.success) {
-        setFeedback({
-          type: "success",
-          personName: pessoa?.nome,
-          eventName: evento?.titulo,
-          message: "Entrada liberada",
-        });
-        queryClient.invalidateQueries({ queryKey: ["checkins-recentes"] });
-        queryClient.invalidateQueries({ queryKey: ["checkin-stats"] });
-        onSuccess?.();
+        // Check if document verification is required
+        if (data.exigir_documento) {
+          setPendingData({ pessoa, evento });
+          setStage("confirming");
+        } else {
+          // Direct success - no document verification needed
+          setFeedback({
+            type: "success",
+            personName: pessoa?.nome,
+            eventName: evento?.titulo,
+            message: "Entrada liberada",
+          });
+          setStage("feedback");
+          queryClient.invalidateQueries({ queryKey: ["checkins-recentes"] });
+          queryClient.invalidateQueries({ queryKey: ["checkin-stats"] });
+          onSuccess?.();
+        }
       } else if (data.code === "ALREADY_USED") {
         setFeedback({
           type: "already_used",
@@ -91,6 +106,7 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
           eventName: evento?.titulo,
           message: "Esta inscrição já foi utilizada",
         });
+        setStage("feedback");
       } else if (data.code === "PENDENTE") {
         setFeedback({
           type: "pending_payment",
@@ -98,11 +114,13 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
           eventName: evento?.titulo,
           message: "Pagamento não confirmado",
         });
+        setStage("feedback");
       } else {
         setFeedback({
           type: "error",
           message: data.message || "Erro desconhecido",
         });
+        setStage("feedback");
       }
     },
     onError: (error: Error) => {
@@ -110,6 +128,7 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
         type: "error",
         message: error.message || "Erro ao processar check-in",
       });
+      setStage("feedback");
     },
     onSettled: () => {
       setIsProcessing(false);
@@ -118,7 +137,7 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
 
   const handleScan = useCallback(
     (result: string) => {
-      if (isProcessing || feedback) return;
+      if (isProcessing || stage !== "scanning") return;
 
       const token = extractToken(result);
       if (token) {
@@ -126,15 +145,44 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
         checkinMutation.mutate(token);
       }
     },
-    [isProcessing, feedback, checkinMutation]
+    [isProcessing, stage, checkinMutation]
   );
+
+  const handleConfirmDocument = useCallback(() => {
+    // Document verified - show success feedback
+    setFeedback({
+      type: "success",
+      personName: pendingData?.pessoa?.nome,
+      eventName: pendingData?.evento?.titulo,
+      message: "Entrada liberada",
+    });
+    setStage("feedback");
+    queryClient.invalidateQueries({ queryKey: ["checkins-recentes"] });
+    queryClient.invalidateQueries({ queryKey: ["checkin-stats"] });
+    onSuccess?.();
+  }, [pendingData, queryClient, onSuccess]);
+
+  const handleRejectDocument = useCallback(() => {
+    // Document rejected - go back to scanning
+    setPendingData(null);
+    setStage("scanning");
+  }, []);
+
+  const handleCancelConfirm = useCallback(() => {
+    // Cancel verification - go back to scanning
+    setPendingData(null);
+    setStage("scanning");
+  }, []);
 
   const handleCloseFeedback = useCallback(() => {
     setFeedback(null);
+    setStage("scanning");
   }, []);
 
   const handleClose = useCallback(() => {
     setFeedback(null);
+    setPendingData(null);
+    setStage("scanning");
     setIsProcessing(false);
     onClose();
   }, [onClose]);
@@ -142,13 +190,21 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden">
-        {feedback ? (
+        {stage === "feedback" && feedback ? (
           <CheckinResultFeedback
             type={feedback.type}
             personName={feedback.personName}
             eventName={feedback.eventName}
             message={feedback.message}
             onClose={handleCloseFeedback}
+          />
+        ) : stage === "confirming" && pendingData ? (
+          <CheckinConfirmDialog
+            pessoa={pendingData.pessoa}
+            evento={pendingData.evento}
+            onConfirm={handleConfirmDocument}
+            onReject={handleRejectDocument}
+            onCancel={handleCancelConfirm}
           />
         ) : (
           <>

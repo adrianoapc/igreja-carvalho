@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       checkin_validado_em,
       qr_token,
       pessoa:profiles!inscricoes_eventos_pessoa_id_fkey (id, nome, email, telefone),
-      evento:eventos!inscricoes_eventos_evento_id_fkey (id, titulo, data_evento, status, requer_pagamento)
+      evento:eventos!inscricoes_eventos_evento_id_fkey (id, titulo, data_evento, status, requer_pagamento, exigir_documento_checkin)
       `
     )
     .eq(qrToken ? "qr_token" : "id", qrToken ?? inscricaoId)
@@ -193,6 +193,7 @@ Deno.serve(async (req) => {
     JSON.stringify({
       success: true,
       message: "Check-in confirmado",
+      exigir_documento: evento?.exigir_documento_checkin ?? false,
       pessoa,
       evento,
     }),
