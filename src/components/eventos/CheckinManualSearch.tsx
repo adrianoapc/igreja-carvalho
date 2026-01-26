@@ -14,6 +14,7 @@ import {
   Phone,
   AlertCircle,
 } from "lucide-react";
+import { extractEdgeFunctionPayload } from "./edgeFunctionPayload";
 
 interface CheckinManualSearchProps {
   eventoId: string;
@@ -111,28 +112,9 @@ export function CheckinManualSearch({
         }
       );
 
-      // Handle edge function responses - even non-2xx responses may contain valid data
-      if (data && typeof data === "object" && "success" in data) {
-        return data;
-      }
-      
-      // When status is non-2xx, supabase puts the response in error.context.body or we need to parse error.message
-      if (error) {
-        // Try to parse the JSON from error message (format: "Edge function returned XXX: Error, {...}")
-        const jsonMatch = error.message?.match(/Error, (.+)$/);
-        if (jsonMatch) {
-          try {
-            const parsed = JSON.parse(jsonMatch[1]);
-            if (parsed && typeof parsed === "object" && "success" in parsed) {
-              return parsed;
-            }
-          } catch {
-            // If parsing fails, throw the original error
-          }
-        }
-        throw error;
-      }
-      
+      const payload = extractEdgeFunctionPayload(data, error);
+      if (payload) return payload;
+      if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
