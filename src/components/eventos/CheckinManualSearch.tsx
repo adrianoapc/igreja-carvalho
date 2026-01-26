@@ -111,6 +111,11 @@ export function CheckinManualSearch({
         }
       );
 
+      // Handle edge function responses - even non-2xx responses may contain valid data
+      if (data && typeof data === "object" && "success" in data) {
+        return data;
+      }
+      
       if (error) throw error;
       return data;
     },
