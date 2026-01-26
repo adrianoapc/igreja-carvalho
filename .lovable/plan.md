@@ -1,58 +1,100 @@
 
-# Plano: Adicionar Validação de `requer_inscricao` no `inscricao-compartilhe`
+# Plano: Adicionar Campo de Status no EventoDialog
 
 ## Problema Identificado
 
-| Edge Function | Valida `requer_inscricao`? | Status |
-|---------------|---------------------------|--------|
-| `chatbot-triagem` | ✅ Sim (linha 200) | OK |
-| `inscricao-compartilhe` | ❌ Não | **Precisa corrigir** |
+O `EventoDialog` possui o campo `status` no schema de validação, mas **não há nenhum componente de interface** para permitir que o usuário altere o status do evento. Isso impede:
 
-A função `inscricao-compartilhe` filtra eventos apenas pelo subtipo "Ação Social", mas não verifica se o evento realmente requer inscrição. Isso pode causar:
-- Inscrições em eventos que não deveriam ter inscrições
-- Comportamento inconsistente entre os dois canais de inscrição
+1. Mudar o status de "Planejado" para "Confirmado"
+2. Marcar eventos como "Realizado" ou "Cancelado"
+3. Eventos com inscrições abertas serem encontrados pelo chatbot (que filtra por `status = 'confirmado'`)
 
 ---
 
-## Solução
+## Solução Proposta
 
-Adicionar `.eq("requer_inscricao", true)` na query de eventos em `inscricao-compartilhe`.
+Adicionar um **Select** para o campo `status` no formulário do `EventoDialog`, posicionado estrategicamente para fácil acesso.
 
 ---
 
-## Alteração no Arquivo
+## Alterações Necessárias
 
-**Arquivo:** `supabase/functions/inscricao-compartilhe/index.ts`
+### Arquivo: `src/components/eventos/EventoDialog.tsx`
 
-**Linhas 296-306** - Adicionar filtro:
+**1. Adicionar constante com opções de status (após TIPOS_EVENTO ~linha 160):**
 
 ```typescript
-let eventoQuery = supabase
-  .from("eventos")
-  .select(
-    "id, titulo, data_evento, status, requer_pagamento, valor_inscricao, vagas_limite, inscricoes_abertas_ate, igreja_id"
-  )
-  .eq("igreja_id", igrejaId)
-  .eq("subtipo_id", subtipo.id)
-  .eq("status", "confirmado")
-  .eq("requer_inscricao", true)  // ✅ ADICIONAR ESTA LINHA
-  .gte("data_evento", agoraIso)
-  .order("data_evento", { ascending: true })
-  .limit(1);
+const STATUS_OPTIONS = [
+  { value: "planejado", label: "📝 Planejado", color: "text-muted-foreground" },
+  { value: "confirmado", label: "✅ Confirmado", color: "text-green-600" },
+  { value: "realizado", label: "🏁 Realizado", color: "text-blue-600" },
+  { value: "cancelado", label: "❌ Cancelado", color: "text-red-600" },
+];
+```
+
+**2. Adicionar FormField para Status (após o campo Título/Categoria ~linha 530):**
+
+```typescript
+<FormField
+  control={form.control}
+  name="status"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Status</FormLabel>
+      <Select value={field.value} onValueChange={field.onChange}>
+        <FormControl>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione o status" />
+          </SelectTrigger>
+        </FormControl>
+        <SelectContent>
+          {STATUS_OPTIONS.map((status) => (
+            <SelectItem key={status.value} value={status.value}>
+              <span className={status.color}>{status.label}</span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 ```
 
 ---
 
-## Resumo
+## Layout Sugerido
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/inscricao-compartilhe/index.ts` | Adicionar `.eq("requer_inscricao", true)` na query (linha 303) |
+O campo de Status será adicionado na mesma linha do Título e Subtipo, reorganizando o grid:
+
+| Título (2 colunas) | Subtipo (1 coluna) | Status (1 coluna) |
+|--------------------|--------------------|--------------------|
+
+Ou alternativamente, em uma nova linha dedicada para maior visibilidade.
 
 ---
 
-## Benefício
+## Fluxo do Usuário Após Implementação
 
-- Garante consistência entre os dois canais de inscrição (chatbot-triagem e inscricao-compartilhe)
-- Previne inscrições em eventos que não estão configurados para aceitar inscrições
-- Evita erros silenciosos quando um evento de "Ação Social" não tem `requer_inscricao` habilitado
+1. Usuário cria evento → Status padrão: "Planejado"
+2. Usuário edita evento → Pode alterar para "Confirmado"
+3. Chatbot encontra evento → Filtra por `status = 'confirmado'`
+4. Inscrições funcionam corretamente
+
+---
+
+## Resumo das Alterações
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/eventos/EventoDialog.tsx` | Adicionar constante `STATUS_OPTIONS` |
+| `src/components/eventos/EventoDialog.tsx` | Adicionar `FormField` com `Select` para status |
+
+---
+
+## Benefício Imediato
+
+Após a implementação, você poderá:
+1. Abrir o evento "Compartilhe"
+2. Alterar o status de "Planejado" para "Confirmado"
+3. Testar o chatbot-triagem e ver o evento aparecer corretamente
