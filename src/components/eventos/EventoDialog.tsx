@@ -142,6 +142,7 @@ const eventoSchema = z.object({
   inscricoes_abertas_ate: z.date().optional().nullable(),
   categoria_financeira_id: z.string().optional().nullable(),
   conta_financeira_id: z.string().optional().nullable(),
+  exigir_documento_checkin: z.boolean().default(false),
 });
 
 type EventoFormData = z.infer<typeof eventoSchema>;
@@ -549,6 +550,10 @@ export default function EventoDialog({
           data.tipo === "EVENTO" && data.requer_pagamento
             ? data.conta_financeira_id
             : null,
+        exigir_documento_checkin:
+          data.tipo === "EVENTO" && data.requer_inscricao
+            ? data.exigir_documento_checkin || false
+            : false,
       };
 
       if (isEditing) {
@@ -1129,6 +1134,29 @@ export default function EventoDialog({
                             <FormLabel className="font-medium cursor-pointer">
                               Evento pago (requer pagamento)
                             </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="exigir_documento_checkin"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-3 space-y-0 pt-2 border-t border-border/40">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-0.5">
+                              <FormLabel className="font-medium cursor-pointer">
+                                Exigir documento no check-in
+                              </FormLabel>
+                              <p className="text-xs text-muted-foreground">
+                                Operador valida identidade antes de liberar entrada
+                              </p>
+                            </div>
                           </FormItem>
                         )}
                       />

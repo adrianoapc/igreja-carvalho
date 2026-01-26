@@ -2226,6 +2226,7 @@ export type Database = {
           duracao_minutos: number | null
           endereco: string | null
           exibir_preletor: boolean
+          exigir_documento_checkin: boolean | null
           filial_id: string | null
           id: string
           igreja_id: string | null
@@ -2254,6 +2255,7 @@ export type Database = {
           duracao_minutos?: number | null
           endereco?: string | null
           exibir_preletor?: boolean
+          exigir_documento_checkin?: boolean | null
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
@@ -2282,6 +2284,7 @@ export type Database = {
           duracao_minutos?: number | null
           endereco?: string | null
           exibir_preletor?: boolean
+          exigir_documento_checkin?: boolean | null
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
