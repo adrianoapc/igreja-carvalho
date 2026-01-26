@@ -160,6 +160,13 @@ const TIPOS_EVENTO = [
   },
 ];
 
+const STATUS_OPTIONS = [
+  { value: "planejado", label: "📝 Planejado" },
+  { value: "confirmado", label: "✅ Confirmado" },
+  { value: "realizado", label: "🏁 Realizado" },
+  { value: "cancelado", label: "❌ Cancelado" },
+];
+
 export default function EventoDialog({
   open,
   onOpenChange,
@@ -484,8 +491,8 @@ export default function EventoDialog({
                 )}
               />
 
-              {/* TÍTULO E CATEGORIA */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* TÍTULO, CATEGORIA E STATUS */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <FormField
                   control={form.control}
                   name="titulo"
@@ -536,6 +543,31 @@ export default function EventoDialog({
                 ) : (
                   <div className="hidden md:block"></div>
                 )}
+
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               {/* AGENDAMENTO - Container Cinza */}
