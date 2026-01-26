@@ -55,6 +55,9 @@ const CadastroIndex = lazy(() => import("./pages/cadastro/Index"));
 const CadastroVisitante = lazy(() => import("./pages/cadastro/Visitante"));
 const CadastroMembro = lazy(() => import("./pages/cadastro/Membro"));
 
+// Inscrição Pública (QR Code)
+const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
+
 // Pessoas
 const PessoasIndex = lazy(() => import("./pages/pessoas/index"));
 const PessoasTodos = lazy(() => import("./pages/pessoas/Todos"));
@@ -235,7 +238,7 @@ const App = () => (
                 <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
                 <Route path="/checkin/:tipo/:id" element={<Checkin />} />
 
-                {/* Cadastro Público */}
+{/* Cadastro Público */}
                 <Route path="/cadastro" element={<CadastroIndex />} />
                 <Route
                   path="/cadastro/visitante"
@@ -243,6 +246,9 @@ const App = () => (
                 />
                 <Route path="/cadastro/membro" element={<CadastroMembro />} />
                 <Route path="/cadastro/igreja" element={<NovaIgreja />} />
+
+                {/* Inscrição Pública (QR Code) */}
+                <Route path="/inscricao/:token" element={<InscricaoPublica />} />
 
                 {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}
                 <Route element={<MainLayout />}>
