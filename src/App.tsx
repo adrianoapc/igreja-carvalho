@@ -40,10 +40,10 @@ const Escalas = lazy(() => import("./pages/Escalas"));
 const MinhasEscalas = lazy(() => import("./pages/MinhasEscalas"));
 const Voluntariado = lazy(() => import("./pages/Voluntariado"));
 const VoluntariadoCandidatos = lazy(
-  () => import("./pages/voluntario/Candidatos")
+  () => import("./pages/voluntario/Candidatos"),
 );
 const VoluntariadoHistorico = lazy(
-  () => import("./pages/voluntariado/Historico")
+  () => import("./pages/voluntariado/Historico"),
 );
 const Publicacao = lazy(() => import("./pages/Publicacao"));
 const Comunicados = lazy(() => import("./pages/Comunicados"));
@@ -61,11 +61,11 @@ const PessoasTodos = lazy(() => import("./pages/pessoas/Todos"));
 const PessoasMembros = lazy(() => import("./pages/pessoas/Membros"));
 const PessoasVisitantes = lazy(() => import("./pages/pessoas/Visitantes"));
 const PessoasFrequentadores = lazy(
-  () => import("./pages/pessoas/Frequentadores")
+  () => import("./pages/pessoas/Frequentadores"),
 );
 const PessoasContatos = lazy(() => import("./pages/pessoas/Contatos"));
 const PessoasAlteracoes = lazy(
-  () => import("./pages/pessoas/AlteracoesPendentes")
+  () => import("./pages/pessoas/AlteracoesPendentes"),
 );
 const PessoaDetalhes = lazy(() => import("./pages/PessoaDetalhes"));
 const EditarPessoa = lazy(() => import("./pages/pessoas/EditarPessoa"));
@@ -73,19 +73,19 @@ const EditarPessoa = lazy(() => import("./pages/pessoas/EditarPessoa"));
 // Gabinete
 const GabinetePastoral = lazy(() => import("./pages/GabinetePastoral"));
 const AtendimentoProntuario = lazy(
-  () => import("./pages/gabinete/AtendimentoProntuario")
+  () => import("./pages/gabinete/AtendimentoProntuario"),
 );
 
 // Intercessão
 const Intercessao = lazy(() => import("./pages/Intercessao"));
 const DiarioDeOracao = lazy(
-  () => import("./pages/intercessao/pessoal/DiarioDeOracao")
+  () => import("./pages/intercessao/pessoal/DiarioDeOracao"),
 );
 const SalaDeGuerra = lazy(
-  () => import("./pages/intercessao/ministerio/SalaDeGuerra")
+  () => import("./pages/intercessao/ministerio/SalaDeGuerra"),
 );
 const GestaoEquipes = lazy(
-  () => import("./pages/intercessao/admin/GestaoEquipes")
+  () => import("./pages/intercessao/admin/GestaoEquipes"),
 );
 const Sentimentos = lazy(() => import("./pages/intercessao/admin/Sentimentos"));
 
@@ -110,7 +110,6 @@ const CursoPlayer = lazy(() => import("./pages/CursoPlayer"));
 // Eventos (Hub)
 const EventosGeral = lazy(() => import("./pages/eventos/Geral"));
 const EventosLista = lazy(() => import("./pages/eventos/Eventos"));
-const AgendaPublica = lazy(() => import("./pages/eventos/AgendaPublica"));
 const EventosTimes = lazy(() => import("./pages/eventos/Times"));
 const EventosCategorias = lazy(() => import("./pages/eventos/Categorias"));
 const EventosPosicoes = lazy(() => import("./pages/eventos/Posicoes"));
@@ -123,8 +122,6 @@ const EventoDetalhes = lazy(() => import("./pages/EventoDetalhes"));
 const Telao = lazy(() => import("./pages/Telao"));
 const TelaoLiturgia = lazy(() => import("./pages/TelaoLiturgia"));
 const Checkin = lazy(() => import("./pages/Checkin"));
-const CheckinInscricao = lazy(() => import("./pages/CheckinInscricao"));
-const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
 
 // Mídias
 const Midias = lazy(() => import("./pages/Midias"));
@@ -137,46 +134,35 @@ const FinancasSaidas = lazy(() => import("./pages/financas/Saidas"));
 const FinancasContas = lazy(() => import("./pages/financas/Contas"));
 const FinancasCategorias = lazy(() => import("./pages/financas/Categorias"));
 const FinancasCentrosCusto = lazy(
-  () => import("./pages/financas/CentrosCusto")
+  () => import("./pages/financas/CentrosCusto"),
 );
 const FinancasFornecedores = lazy(
-  () => import("./pages/financas/Fornecedores")
+  () => import("./pages/financas/Fornecedores"),
 );
 const FinancasBases = lazy(() => import("./pages/financas/BasesMinisteriais"));
 const FinancasFormas = lazy(() => import("./pages/financas/FormasPagamento"));
 const FinancasDRE = lazy(() => import("./pages/financas/DRE"));
 const FinancasRelatorioOferta = lazy(
-  () => import("./pages/financas/RelatorioOferta")
-);
-const FinancasSessoesContagem = lazy(
-  () => import("./pages/financas/SessoesContagem")
-);
-const FinancasSessaoLancamentos = lazy(
-  () => import("./pages/financas/SessaoLancamentos")
+  () => import("./pages/financas/RelatorioOferta"),
 );
 const FinancasImportar = lazy(
-  () => import("./pages/financas/ImportarFinancasPage")
+  () => import("./pages/financas/ImportarFinancasPage"),
 );
 const FinancasGerenciarDados = lazy(
-  () => import("./pages/financas/GerenciarDados")
+  () => import("./pages/financas/GerenciarDados"),
 );
 const FinancasReclassificacao = lazy(
-  () => import("./pages/financas/Reclassificacao")
+  () => import("./pages/financas/Reclassificacao"),
 );
 const FinancasReconciliacao = lazy(
-  () => import("./pages/financas/Reconciliacao")
-);
-const FinancasConfigFinanceiro = lazy(
-  () => import("./pages/financas/ConfigFinanceiro")
+  () => import("./pages/financas/Reconciliacao"),
 );
 const FinancasDashboardOfertas = lazy(
-  () => import("./pages/financas/DashboardOfertas")
+  () => import("./pages/financas/DashboardOfertas"),
 );
 const FinancasProjecao = lazy(() => import("./pages/financas/Projecao"));
 const FinancasInsights = lazy(() => import("./pages/financas/Insights"));
 const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
-const FinancasPixRecebido = lazy(() => import("./pages/financas/PixRecebido"));
-const FinancasIntegracoes = lazy(() => import("./pages/financas/Integracoes"));
 
 // Projetos
 const Projetos = lazy(() => import("./pages/Projetos"));
@@ -248,7 +234,6 @@ const App = () => (
                 <Route path="/telao/:id" element={<Telao />} />
                 <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
                 <Route path="/checkin/:tipo/:id" element={<Checkin />} />
-                <Route path="/inscricao/:token" element={<InscricaoPublica />} />
 
                 {/* Cadastro Público */}
                 <Route path="/cadastro" element={<CadastroIndex />} />
@@ -682,14 +667,6 @@ const App = () => (
                     path="/eventos/lista"
                     element={
                       <AuthGate>
-                        <AgendaPublica />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/gestao"
-                    element={
-                      <AuthGate>
                         <EventosLista />
                       </AuthGate>
                     }
@@ -739,14 +716,6 @@ const App = () => (
                     element={
                       <AuthGate>
                         <EventosLiturgia />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/checkin/:token"
-                    element={
-                      <AuthGate>
-                        <CheckinInscricao />
                       </AuthGate>
                     }
                   />
@@ -929,14 +898,6 @@ const App = () => (
                     }
                   />
                   <Route
-                    path="/financas/pix-recebido"
-                    element={
-                      <AuthGate>
-                        <FinancasPixRecebido />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
                     path="/financas/categorias"
                     element={
                       <AuthGate>
@@ -993,22 +954,6 @@ const App = () => (
                     }
                   />
                   <Route
-                    path="/financas/sessoes-contagem"
-                    element={
-                      <AuthGate>
-                        <FinancasSessoesContagem />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/sessoes-contagem/:id"
-                    element={
-                      <AuthGate>
-                        <FinancasSessaoLancamentos />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
                     path="/financas/importar"
                     element={
                       <AuthGate>
@@ -1037,22 +982,6 @@ const App = () => (
                     element={
                       <AuthGate>
                         <FinancasReconciliacao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/config-financeiro"
-                    element={
-                      <AuthGate requiredPermission="financeiro.admin">
-                        <FinancasConfigFinanceiro />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/integracoes"
-                    element={
-                      <AuthGate requiredPermission="financeiro.admin">
-                        <FinancasIntegracoes />
                       </AuthGate>
                     }
                   />
