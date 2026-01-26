@@ -144,7 +144,7 @@ export default function Reembolsos() {
   // Estado do pagamento
   const [contaSaida, setContaSaida] = useState("");
   const [dataPagamento, setDataPagamento] = useState(
-    format(new Date(), "yyyy-MM-dd")
+    format(new Date(), "yyyy-MM-dd"),
   );
   const [contaPadrao, setContaPadrao] = useState("");
 
@@ -567,7 +567,7 @@ export default function Reembolsos() {
             Authorization: `Bearer ${sessionData.session.access_token}`,
             apikey: supabaseAnonKey,
           },
-        }
+        },
       );
 
       if (error) throw error;
@@ -634,7 +634,7 @@ export default function Reembolsos() {
       toast.error(
         error instanceof Error
           ? error.message
-          : String(error) || "Erro ao processar nota fiscal com IA"
+          : String(error) || "Erro ao processar nota fiscal com IA",
       );
     } finally {
       setAiStep("idle");
@@ -804,7 +804,7 @@ export default function Reembolsos() {
                           {format(
                             new Date(solicitacao.data_solicitacao),
                             "dd/MM/yyyy",
-                            { locale: ptBR }
+                            { locale: ptBR },
                           )}
                           {solicitacao.data_vencimento && (
                             <>
@@ -813,7 +813,7 @@ export default function Reembolsos() {
                               {format(
                                 new Date(solicitacao.data_vencimento),
                                 "dd/MM/yyyy",
-                                { locale: ptBR }
+                                { locale: ptBR },
                               )}
                             </>
                           )}
@@ -848,7 +848,7 @@ export default function Reembolsos() {
                           <p className="font-medium">
                             {format(
                               new Date(solicitacao.data_pagamento),
-                              "dd/MM/yyyy"
+                              "dd/MM/yyyy",
                             )}
                           </p>
                         </div>
@@ -904,7 +904,7 @@ export default function Reembolsos() {
                             {format(
                               new Date(solicitacao.data_solicitacao),
                               "dd/MM/yyyy",
-                              { locale: ptBR }
+                              { locale: ptBR },
                             )}
                           </CardDescription>
                         </div>

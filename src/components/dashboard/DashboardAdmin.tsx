@@ -194,7 +194,7 @@ export default function DashboardAdmin() {
     let query = supabase
       .from("comunicados")
       .select(
-        "id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao"
+        "id, titulo, descricao, tipo, nivel_urgencia, imagem_url, link_acao",
       )
       .eq("ativo", true)
       .lte("data_inicio", now)
@@ -208,10 +208,10 @@ export default function DashboardAdmin() {
 
     if (data) {
       const alertasList = data.filter(
-        (c) => c.tipo === "alerta"
+        (c) => c.tipo === "alerta",
       ) as Comunicado[];
       const bannersList = data.filter(
-        (c) => c.tipo === "banner"
+        (c) => c.tipo === "banner",
       ) as Comunicado[];
       setAlertas(alertasList);
       setBanners(bannersList);
@@ -237,7 +237,7 @@ export default function DashboardAdmin() {
     if (contasData) {
       const total = contasData.reduce(
         (acc, c) => acc + Number(c.saldo_atual),
-        0
+        0,
       );
       setSaldoTotalContas(total);
     }
@@ -343,11 +343,11 @@ export default function DashboardAdmin() {
 
     const { data: visitors } = await buildProfilesQuery().eq(
       "status",
-      "visitante"
+      "visitante",
     );
     const { data: frequenters } = await buildProfilesQuery().eq(
       "status",
-      "frequentador"
+      "frequentador",
     );
     const { data: members } = await buildProfilesQuery().eq("status", "membro");
 
@@ -379,7 +379,7 @@ export default function DashboardAdmin() {
         pedido,
         nome_solicitante,
         created_at
-      `
+      `,
       )
       .in("status", ["pendente", "em_oracao"])
       .order("created_at", { ascending: false })
@@ -397,7 +397,7 @@ export default function DashboardAdmin() {
             ...pedido,
             pessoa: null as { nome: string; avatar_url: string | null } | null,
           };
-        })
+        }),
       );
       setPedidosOracao(pedidosWithPessoa);
     }
@@ -412,7 +412,7 @@ export default function DashboardAdmin() {
         titulo,
         nome_externo,
         created_at
-      `
+      `,
       )
       .eq("status", "publico")
       .order("created_at", { ascending: false })
@@ -898,7 +898,7 @@ export default function DashboardAdmin() {
                         {getInitials(
                           pedido.pessoa?.nome ||
                             pedido.nome_solicitante ||
-                            "Anônimo"
+                            "Anônimo",
                         )}
                       </AvatarFallback>
                     </Avatar>
@@ -953,7 +953,7 @@ export default function DashboardAdmin() {
                         {getInitials(
                           testemunho.pessoa?.nome ||
                             testemunho.nome_externo ||
-                            "Anônimo"
+                            "Anônimo",
                         )}
                       </AvatarFallback>
                     </Avatar>
