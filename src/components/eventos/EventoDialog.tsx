@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -174,6 +175,7 @@ export default function EventoDialog({
   onSuccess,
   initialDate,
 }: EventoDialogProps) {
+  const { igrejaId, filialId, isAllFiliais } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
@@ -296,20 +298,41 @@ export default function EventoDialog({
   };
 
   const loadDadosFinanceiros = async () => {
-    const [catRes, contaRes] = await Promise.all([
-      supabase.from("categorias_financeiras").select("id, nome").eq("ativo", true).eq("tipo", "entrada"),
-      supabase.from("contas").select("id, nome").eq("ativo", true)
-    ]);
+    // Não buscar se não tiver igreja
+    if (!igrejaId) return;
+    
+    // Query para categorias - filtrar por igreja
+    let catQuery = supabase
+      .from("categorias_financeiras")
+      .select("id, nome")
+      .eq("ativo", true)
+      .eq("tipo", "entrada")
+      .eq("igreja_id", igrejaId);
+    
+    // Query para contas - filtrar por igreja e opcionalmente por filial
+    let contaQuery = supabase
+      .from("contas")
+      .select("id, nome")
+      .eq("ativo", true)
+      .eq("igreja_id", igrejaId);
+    
+    // Se não for "todas as filiais" e tiver filial específica, filtrar por ela
+    if (!isAllFiliais && filialId) {
+      contaQuery = contaQuery.eq("filial_id", filialId);
+    }
+    
+    const [catRes, contaRes] = await Promise.all([catQuery, contaQuery]);
+    
     setCategoriasFinanceiras(catRes.data || []);
     setContasFinanceiras(contaRes.data || []);
   };
 
   // Carregar dados financeiros quando tipo for EVENTO
   useEffect(() => {
-    if (tipoSelecionado === "EVENTO" && open) {
+    if (tipoSelecionado === "EVENTO" && open && igrejaId) {
       loadDadosFinanceiros();
     }
-  }, [tipoSelecionado, open]);
+  }, [tipoSelecionado, open, igrejaId, filialId, isAllFiliais]);
 
   const onSubmit = async (data: EventoFormData) => {
     setLoading(true);
