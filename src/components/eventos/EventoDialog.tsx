@@ -201,14 +201,18 @@ export default function EventoDialog({
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
-    null
+    null,
   );
   const [showTemplatePreview, setShowTemplatePreview] = useState(false);
   const [templateApplied, setTemplateApplied] = useState(false);
   const [subtipos, setSubtipos] = useState<Subtipo[]>([]);
-  const [categoriasFinanceiras, setCategoriasFinanceiras] = useState<{id: string; nome: string}[]>([]);
-  const [contasFinanceiras, setContasFinanceiras] = useState<{id: string; nome: string}[]>([]);
-  
+  const [categoriasFinanceiras, setCategoriasFinanceiras] = useState<
+    { id: string; nome: string }[]
+  >([]);
+  const [contasFinanceiras, setContasFinanceiras] = useState<
+    { id: string; nome: string }[]
+  >([]);
+
   // Estado para lotes
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loteEditando, setLoteEditando] = useState<number | null>(null);
@@ -269,8 +273,8 @@ export default function EventoDialog({
         .order("ordem", { ascending: true });
 
       if (error) throw error;
-      
-      const lotesFormatados: Lote[] = (data || []).map(l => ({
+
+      const lotesFormatados: Lote[] = (data || []).map((l) => ({
         id: l.id,
         nome: l.nome,
         descricao: l.descricao || "",
@@ -281,7 +285,7 @@ export default function EventoDialog({
         ativo: l.ativo,
         ordem: l.ordem,
       }));
-      
+
       setLotes(lotesFormatados);
     } catch (error) {
       console.error("Erro ao carregar lotes:", error);
@@ -312,7 +316,11 @@ export default function EventoDialog({
           endereco: evento.endereco || "",
           pregador: evento.pregador || "",
           tema: evento.tema || "",
-          status: (evento.status as "planejado" | "confirmado" | "realizado" | "cancelado"),
+          status: evento.status as
+            | "planejado"
+            | "confirmado"
+            | "realizado"
+            | "cancelado",
           usar_data_fim: deveUsarDataFim,
           data_fim: dataFimCalculada,
           hora_fim: format(dataFimCalculada, "HH:mm"),
@@ -321,7 +329,9 @@ export default function EventoDialog({
           requer_pagamento: evento.requer_pagamento || false,
           valor_inscricao: evento.valor_inscricao ?? undefined,
           vagas_limite: evento.vagas_limite ?? null,
-          inscricoes_abertas_ate: evento.inscricoes_abertas_ate ? new Date(evento.inscricoes_abertas_ate) : null,
+          inscricoes_abertas_ate: evento.inscricoes_abertas_ate
+            ? new Date(evento.inscricoes_abertas_ate)
+            : null,
           categoria_financeira_id: evento.categoria_financeira_id ?? null,
           conta_financeira_id: evento.conta_financeira_id ?? null,
         });
@@ -343,7 +353,12 @@ export default function EventoDialog({
   }, [open, evento, initialDate]);
 
   const loadSubtipos = async (tipo: string) => {
-    const tipoEnum = tipo as "CULTO" | "RELOGIO" | "TAREFA" | "EVENTO" | "OUTRO";
+    const tipoEnum = tipo as
+      | "CULTO"
+      | "RELOGIO"
+      | "TAREFA"
+      | "EVENTO"
+      | "OUTRO";
     const { data } = await supabase
       .from("evento_subtipos")
       .select("*")
@@ -364,7 +379,7 @@ export default function EventoDialog({
   const loadDadosFinanceiros = async () => {
     // Não buscar se não tiver igreja
     if (!igrejaId) return;
-    
+
     // Query para categorias - filtrar por igreja
     let catQuery = supabase
       .from("categorias_financeiras")
@@ -372,21 +387,21 @@ export default function EventoDialog({
       .eq("ativo", true)
       .eq("tipo", "entrada")
       .eq("igreja_id", igrejaId);
-    
+
     // Query para contas - filtrar por igreja e opcionalmente por filial
     let contaQuery = supabase
       .from("contas")
       .select("id, nome")
       .eq("ativo", true)
       .eq("igreja_id", igrejaId);
-    
+
     // Se não for "todas as filiais" e tiver filial específica, filtrar por ela
     if (!isAllFiliais && filialId) {
       contaQuery = contaQuery.eq("filial_id", filialId);
     }
-    
+
     const [catRes, contaRes] = await Promise.all([catQuery, contaQuery]);
-    
+
     setCategoriasFinanceiras(catRes.data || []);
     setContasFinanceiras(contaRes.data || []);
   };
@@ -426,17 +441,14 @@ export default function EventoDialog({
           .from("evento_lotes")
           .select("id")
           .eq("evento_id", eventoId);
-        
-        const idsNaLista = lotes.filter(l => l.id).map(l => l.id);
+
+        const idsNaLista = lotes.filter((l) => l.id).map((l) => l.id);
         const idsParaDeletar = (lotesExistentes.data || [])
-          .map(l => l.id)
-          .filter(id => !idsNaLista.includes(id));
-        
+          .map((l) => l.id)
+          .filter((id) => !idsNaLista.includes(id));
+
         if (idsParaDeletar.length > 0) {
-          await supabase
-            .from("evento_lotes")
-            .delete()
-            .in("id", idsParaDeletar);
+          await supabase.from("evento_lotes").delete().in("id", idsParaDeletar);
         }
       }
 
@@ -458,15 +470,10 @@ export default function EventoDialog({
 
         if (lote.id) {
           // Atualizar existente
-          await supabase
-            .from("evento_lotes")
-            .update(payload)
-            .eq("id", lote.id);
+          await supabase.from("evento_lotes").update(payload).eq("id", lote.id);
         } else {
           // Inserir novo
-          await supabase
-            .from("evento_lotes")
-            .insert(payload);
+          await supabase.from("evento_lotes").insert(payload);
         }
       }
     } catch (error) {
@@ -514,28 +521,60 @@ export default function EventoDialog({
         tema: data.tema,
         status: data.status,
         // Campos de inscrição (apenas para EVENTO)
-        requer_inscricao: data.tipo === "EVENTO" ? (data.requer_inscricao || false) : false,
-        requer_pagamento: data.tipo === "EVENTO" && data.requer_inscricao ? (data.requer_pagamento || false) : false,
-        valor_inscricao: data.tipo === "EVENTO" && data.requer_pagamento ? data.valor_inscricao : null,
-        vagas_limite: data.tipo === "EVENTO" && data.requer_inscricao ? data.vagas_limite : null,
-        inscricoes_abertas_ate: data.tipo === "EVENTO" && data.requer_inscricao && data.inscricoes_abertas_ate 
-          ? data.inscricoes_abertas_ate.toISOString() 
-          : null,
-        categoria_financeira_id: data.tipo === "EVENTO" && data.requer_pagamento ? data.categoria_financeira_id : null,
-        conta_financeira_id: data.tipo === "EVENTO" && data.requer_pagamento ? data.conta_financeira_id : null,
+        requer_inscricao:
+          data.tipo === "EVENTO" ? data.requer_inscricao || false : false,
+        requer_pagamento:
+          data.tipo === "EVENTO" && data.requer_inscricao
+            ? data.requer_pagamento || false
+            : false,
+        valor_inscricao:
+          data.tipo === "EVENTO" && data.requer_pagamento
+            ? data.valor_inscricao
+            : null,
+        vagas_limite:
+          data.tipo === "EVENTO" && data.requer_inscricao
+            ? data.vagas_limite
+            : null,
+        inscricoes_abertas_ate:
+          data.tipo === "EVENTO" &&
+          data.requer_inscricao &&
+          data.inscricoes_abertas_ate
+            ? data.inscricoes_abertas_ate.toISOString()
+            : null,
+        categoria_financeira_id:
+          data.tipo === "EVENTO" && data.requer_pagamento
+            ? data.categoria_financeira_id
+            : null,
+        conta_financeira_id:
+          data.tipo === "EVENTO" && data.requer_pagamento
+            ? data.conta_financeira_id
+            : null,
       };
 
       if (isEditing) {
         await supabase.from("eventos").update(payload).eq("id", evento!.id);
         // Salvar lotes se evento requer pagamento
-        if (data.tipo === "EVENTO" && data.requer_pagamento && lotes.length > 0) {
+        if (
+          data.tipo === "EVENTO" &&
+          data.requer_pagamento &&
+          lotes.length > 0
+        ) {
           await salvarLotes(evento!.id);
         }
         toast.success("Atualizado!");
       } else {
-        const { data: novoEvento } = await supabase.from("eventos").insert([payload]).select().single();
+        const { data: novoEvento } = await supabase
+          .from("eventos")
+          .insert([payload])
+          .select()
+          .single();
         // Salvar lotes se evento requer pagamento
-        if (novoEvento && data.tipo === "EVENTO" && data.requer_pagamento && lotes.length > 0) {
+        if (
+          novoEvento &&
+          data.tipo === "EVENTO" &&
+          data.requer_pagamento &&
+          lotes.length > 0
+        ) {
           await salvarLotes(novoEvento.id);
         }
         toast.success("Criado!");
@@ -649,7 +688,7 @@ export default function EventoDialog({
                                 "flex flex-col items-center justify-center text-center h-full p-4 rounded-xl border-2 cursor-pointer transition-all hover:bg-muted/50 min-h-[100px]",
                                 field.value === tipo.value
                                   ? "border-primary bg-primary/5 ring-1 ring-primary shadow-sm"
-                                  : "border-border bg-card/50"
+                                  : "border-border bg-card/50",
                               )}
                             >
                               <span className="text-3xl mb-2">
@@ -729,7 +768,10 @@ export default function EventoDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Status" />
@@ -791,7 +833,7 @@ export default function EventoDialog({
                                   variant="outline"
                                   className={cn(
                                     "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
+                                    !field.value && "text-muted-foreground",
                                   )}
                                 >
                                   {field.value ? (
@@ -850,7 +892,7 @@ export default function EventoDialog({
                                     variant="outline"
                                     className={cn(
                                       "w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground"
+                                      !field.value && "text-muted-foreground",
                                     )}
                                   >
                                     {field.value ? (
@@ -1018,7 +1060,13 @@ export default function EventoDialog({
                                   placeholder="Ilimitado"
                                   {...field}
                                   value={field.value ?? ""}
-                                  onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      e.target.value
+                                        ? parseInt(e.target.value)
+                                        : null,
+                                    )
+                                  }
                                 />
                               </FormControl>
                             </FormItem>
@@ -1037,7 +1085,7 @@ export default function EventoDialog({
                                     variant="outline"
                                     className={cn(
                                       "w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground"
+                                      !field.value && "text-muted-foreground",
                                     )}
                                   >
                                     {field.value ? (
@@ -1048,7 +1096,10 @@ export default function EventoDialog({
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
+                                <PopoverContent
+                                  className="w-auto p-0"
+                                  align="start"
+                                >
                                   <Calendar
                                     mode="single"
                                     selected={field.value ?? undefined}
@@ -1097,7 +1148,13 @@ export default function EventoDialog({
                                     placeholder="0,00"
                                     {...field}
                                     value={field.value ?? ""}
-                                    onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                                    onChange={(e) =>
+                                      field.onChange(
+                                        e.target.value
+                                          ? parseFloat(e.target.value)
+                                          : undefined,
+                                      )
+                                    }
                                   />
                                 </FormControl>
                               </FormItem>
@@ -1110,7 +1167,10 @@ export default function EventoDialog({
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Categoria Financeira</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value ?? undefined}
+                                >
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Selecione..." />
@@ -1134,7 +1194,10 @@ export default function EventoDialog({
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Conta de Destino</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value ?? undefined}
+                                >
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Selecione..." />
@@ -1142,7 +1205,10 @@ export default function EventoDialog({
                                   </FormControl>
                                   <SelectContent>
                                     {contasFinanceiras.map((conta) => (
-                                      <SelectItem key={conta.id} value={conta.id}>
+                                      <SelectItem
+                                        key={conta.id}
+                                        value={conta.id}
+                                      >
                                         {conta.nome}
                                       </SelectItem>
                                     ))}
@@ -1160,7 +1226,9 @@ export default function EventoDialog({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Ticket className="h-4 w-4 text-primary" />
-                              <Label className="font-medium">Lotes / Categorias de Ingresso</Label>
+                              <Label className="font-medium">
+                                Lotes / Categorias de Ingresso
+                              </Label>
                               <Badge variant="secondary" className="text-xs">
                                 {lotes.length}
                               </Badge>
@@ -1193,26 +1261,42 @@ export default function EventoDialog({
                                     <Ticket className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                     <p>Nenhum lote configurado</p>
                                     <p className="text-xs mt-1">
-                                      Crie lotes para preços diferenciados por período
+                                      Crie lotes para preços diferenciados por
+                                      período
                                     </p>
                                   </CardContent>
                                 </Card>
                               )}
 
                               {lotes.map((lote, index) => (
-                                <Card key={index} className={cn(!lote.ativo && "opacity-60")}>
+                                <Card
+                                  key={index}
+                                  className={cn(!lote.ativo && "opacity-60")}
+                                >
                                   <CardContent className="p-3 space-y-3">
                                     <div className="flex items-center justify-between gap-2">
                                       <Input
                                         placeholder="Nome do lote *"
                                         value={lote.nome}
-                                        onChange={(e) => atualizarLote(index, "nome", e.target.value)}
+                                        onChange={(e) =>
+                                          atualizarLote(
+                                            index,
+                                            "nome",
+                                            e.target.value,
+                                          )
+                                        }
                                         className="flex-1"
                                       />
                                       <div className="flex items-center gap-1">
                                         <Switch
                                           checked={lote.ativo}
-                                          onCheckedChange={(checked) => atualizarLote(index, "ativo", checked)}
+                                          onCheckedChange={(checked) =>
+                                            atualizarLote(
+                                              index,
+                                              "ativo",
+                                              checked,
+                                            )
+                                          }
                                         />
                                         <Button
                                           type="button"
@@ -1227,14 +1311,20 @@ export default function EventoDialog({
 
                                     <div className="grid grid-cols-2 gap-2">
                                       <div className="space-y-1">
-                                        <Label className="text-xs">Valor (R$)</Label>
+                                        <Label className="text-xs">
+                                          Valor (R$)
+                                        </Label>
                                         <Input
                                           type="number"
                                           step="0.01"
                                           placeholder="0,00"
                                           value={lote.valor || ""}
                                           onChange={(e) =>
-                                            atualizarLote(index, "valor", parseFloat(e.target.value) || 0)
+                                            atualizarLote(
+                                              index,
+                                              "valor",
+                                              parseFloat(e.target.value) || 0,
+                                            )
                                           }
                                         />
                                       </div>
@@ -1248,7 +1338,9 @@ export default function EventoDialog({
                                             atualizarLote(
                                               index,
                                               "vagas_limite",
-                                              e.target.value ? parseInt(e.target.value) : null
+                                              e.target.value
+                                                ? parseInt(e.target.value)
+                                                : null,
                                             )
                                           }
                                         />
@@ -1257,7 +1349,9 @@ export default function EventoDialog({
 
                                     <div className="grid grid-cols-2 gap-2">
                                       <div className="space-y-1">
-                                        <Label className="text-xs">Início</Label>
+                                        <Label className="text-xs">
+                                          Início
+                                        </Label>
                                         <Popover>
                                           <PopoverTrigger asChild>
                                             <Button
@@ -1266,21 +1360,36 @@ export default function EventoDialog({
                                               size="sm"
                                               className={cn(
                                                 "w-full justify-start text-left font-normal",
-                                                !lote.vigencia_inicio && "text-muted-foreground"
+                                                !lote.vigencia_inicio &&
+                                                  "text-muted-foreground",
                                               )}
                                             >
                                               <CalendarIcon className="mr-2 h-3 w-3" />
                                               {lote.vigencia_inicio
-                                                ? format(lote.vigencia_inicio, "dd/MM", { locale: ptBR })
+                                                ? format(
+                                                    lote.vigencia_inicio,
+                                                    "dd/MM",
+                                                    { locale: ptBR },
+                                                  )
                                                 : "Imediato"}
                                             </Button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-auto p-0" align="start">
+                                          <PopoverContent
+                                            className="w-auto p-0"
+                                            align="start"
+                                          >
                                             <Calendar
                                               mode="single"
-                                              selected={lote.vigencia_inicio ?? undefined}
+                                              selected={
+                                                lote.vigencia_inicio ??
+                                                undefined
+                                              }
                                               onSelect={(date) =>
-                                                atualizarLote(index, "vigencia_inicio", date || null)
+                                                atualizarLote(
+                                                  index,
+                                                  "vigencia_inicio",
+                                                  date || null,
+                                                )
                                               }
                                             />
                                           </PopoverContent>
@@ -1297,21 +1406,35 @@ export default function EventoDialog({
                                               size="sm"
                                               className={cn(
                                                 "w-full justify-start text-left font-normal",
-                                                !lote.vigencia_fim && "text-muted-foreground"
+                                                !lote.vigencia_fim &&
+                                                  "text-muted-foreground",
                                               )}
                                             >
                                               <CalendarIcon className="mr-2 h-3 w-3" />
                                               {lote.vigencia_fim
-                                                ? format(lote.vigencia_fim, "dd/MM", { locale: ptBR })
+                                                ? format(
+                                                    lote.vigencia_fim,
+                                                    "dd/MM",
+                                                    { locale: ptBR },
+                                                  )
                                                 : "Sem limite"}
                                             </Button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-auto p-0" align="start">
+                                          <PopoverContent
+                                            className="w-auto p-0"
+                                            align="start"
+                                          >
                                             <Calendar
                                               mode="single"
-                                              selected={lote.vigencia_fim ?? undefined}
+                                              selected={
+                                                lote.vigencia_fim ?? undefined
+                                              }
                                               onSelect={(date) =>
-                                                atualizarLote(index, "vigencia_fim", date || null)
+                                                atualizarLote(
+                                                  index,
+                                                  "vigencia_fim",
+                                                  date || null,
+                                                )
                                               }
                                             />
                                           </PopoverContent>
@@ -1322,7 +1445,13 @@ export default function EventoDialog({
                                     <Input
                                       placeholder="Descrição (opcional)"
                                       value={lote.descricao}
-                                      onChange={(e) => atualizarLote(index, "descricao", e.target.value)}
+                                      onChange={(e) =>
+                                        atualizarLote(
+                                          index,
+                                          "descricao",
+                                          e.target.value,
+                                        )
+                                      }
                                       className="text-sm"
                                     />
                                   </CardContent>
