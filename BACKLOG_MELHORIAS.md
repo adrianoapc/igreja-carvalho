@@ -422,14 +422,14 @@ Mantenha as entradas organizadas e atualizadas à medida que novos insights fore
 - **Observações:** Integrar com pipeline de notificações existente.
 
 
-### [ ] 42. **Ingressos variáveis por lote e categoria**
+### [x] 42. **Ingressos variáveis por lote e categoria**
 - **Descrição:** Evoluir de preço único para tabela `evento_lotes` (promo, normal, kids) com vigência por data.
 - **Categoria:** Produto / Financeiro
 - **Prioridade:** Média
 - **Impacto Esperado:** Maior flexibilidade de receita e planejamento de caixa.
 - **Esforço Estimado:** Médio
-- **Status:** Pendente
-- **Observações:** Atualizar `AdicionarInscricaoDialog` para seleção de lote.
+- **Status:** ✅ Concluído
+- **Observações:** Tabela `evento_lotes` criada. `AdicionarInscricaoDialog` e `InscricoesTabContent` atualizados. Gerenciador de lotes na aba Inscrições.
 
 
 ### [ ] 43. **Lembrete automático de follow-up**
