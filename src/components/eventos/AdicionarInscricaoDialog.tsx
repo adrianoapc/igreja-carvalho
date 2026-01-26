@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Loader2, UserPlus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, Loader2, UserPlus, Ticket } from "lucide-react";
 
 interface Evento {
   id: string;
@@ -17,6 +18,17 @@ interface Evento {
   valor_inscricao: number | null;
   categoria_financeira_id: string | null;
   conta_financeira_id: string | null;
+}
+
+interface Lote {
+  id: string;
+  nome: string;
+  valor: number;
+  vagas_limite: number | null;
+  vagas_utilizadas: number;
+  vigencia_inicio: string | null;
+  vigencia_fim: string | null;
+  ativo: boolean;
 }
 
 interface Pessoa {
@@ -40,11 +52,12 @@ export function AdicionarInscricaoDialog({
   onOpenChange,
   eventoId,
   evento,
-  onSuccess,
-}: AdicionarInscricaoDialogProps) {
+}: AdicionarInscricaoDialogProps & { onSuccess: () => void }) {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPessoaId, setSelectedPessoaId] = useState<string | null>(null);
+  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
   const [statusPagamento, setStatusPagamento] = useState("pendente");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -54,6 +67,7 @@ export function AdicionarInscricaoDialog({
     if (open) {
       loadPessoas();
       loadInscritos();
+      loadLotes();
     }
   }, [open, eventoId]);
 
@@ -88,6 +102,45 @@ export function AdicionarInscricaoDialog({
     }
   };
 
+  const loadLotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("evento_lotes")
+        .select("*")
+        .eq("evento_id", eventoId)
+        .eq("ativo", true)
+        .order("ordem");
+
+      if (error) throw error;
+      
+      // Filtrar lotes disponíveis (vigência e vagas)
+      const now = new Date();
+      const lotesDisponiveis = (data || []).filter((lote: Lote) => {
+        if (lote.vigencia_inicio && new Date(lote.vigencia_inicio) > now) return false;
+        if (lote.vigencia_fim && new Date(lote.vigencia_fim) < now) return false;
+        if (lote.vagas_limite && lote.vagas_utilizadas >= lote.vagas_limite) return false;
+        return true;
+      });
+      
+      setLotes(lotesDisponiveis);
+      
+      // Se só tem um lote, seleciona automaticamente
+      if (lotesDisponiveis.length === 1) {
+        setSelectedLoteId(lotesDisponiveis[0].id);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar lotes:", error);
+    }
+  };
+
+  const getValorInscricao = () => {
+    if (selectedLoteId) {
+      const lote = lotes.find(l => l.id === selectedLoteId);
+      return lote?.valor || 0;
+    }
+    return evento?.valor_inscricao || 0;
+  };
+
   const handleSubmit = async () => {
     if (!selectedPessoaId) {
       toast.error("Selecione uma pessoa");
@@ -102,16 +155,23 @@ export function AdicionarInscricaoDialog({
         return;
       }
 
+      const valorFinal = getValorInscricao();
+
       // Se pagamento confirmado e evento pago, criar transação
       let transacaoId: string | null = null;
-      if (statusPagamento === "pago" && evento?.requer_pagamento && evento.conta_financeira_id) {
+      if (statusPagamento === "pago" && evento?.requer_pagamento && evento.conta_financeira_id && valorFinal > 0) {
+        const lote = selectedLoteId ? lotes.find(l => l.id === selectedLoteId) : null;
+        const descricaoTx = lote 
+          ? `Inscrição - ${evento.titulo} (${lote.nome})`
+          : `Inscrição - ${evento.titulo}`;
+
         const { data: transacao, error: txError } = await supabase
           .from("transacoes_financeiras")
           .insert({
             tipo: "entrada",
             tipo_lancamento: "avulso",
-            descricao: `Inscrição - ${evento.titulo}`,
-            valor: evento.valor_inscricao || 0,
+            descricao: descricaoTx,
+            valor: valorFinal,
             data_vencimento: new Date().toISOString().split("T")[0],
             data_pagamento: new Date().toISOString().split("T")[0],
             data_competencia: new Date().toISOString().split("T")[0],
@@ -133,14 +193,16 @@ export function AdicionarInscricaoDialog({
           pessoa_id: selectedPessoaId,
           status_pagamento: statusPagamento,
           transacao_id: transacaoId,
+          lote_id: selectedLoteId,
+          valor_pago: statusPagamento === "pago" ? valorFinal : 0,
         });
 
       if (error) throw error;
 
       toast.success("Inscrição adicionada!");
-      onSuccess();
       onOpenChange(false);
       setSelectedPessoaId(null);
+      setSelectedLoteId(null);
       setSearchTerm("");
       setStatusPagamento("pendente");
     } catch (error: unknown) {
@@ -160,6 +222,8 @@ export function AdicionarInscricaoDialog({
   );
 
   const selectedPessoa = pessoas.find(p => p.id === selectedPessoaId);
+  const selectedLote = lotes.find(l => l.id === selectedLoteId);
+  const hasLotes = lotes.length > 0;
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
@@ -192,7 +256,7 @@ export function AdicionarInscricaoDialog({
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           ) : (
-            <ScrollArea className="h-[200px] border rounded-md">
+            <ScrollArea className="h-[180px] border rounded-md">
               <div className="p-2 space-y-1">
                 {filteredPessoas.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">
@@ -233,6 +297,41 @@ export function AdicionarInscricaoDialog({
             </div>
           )}
 
+          {/* Seleção de Lote (se houver lotes) */}
+          {hasLotes && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Ticket className="h-4 w-4" />
+                Categoria / Lote
+              </Label>
+              <Select 
+                value={selectedLoteId || ""} 
+                onValueChange={(val) => setSelectedLoteId(val || null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o lote..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {lotes.map((lote) => (
+                    <SelectItem key={lote.id} value={lote.id}>
+                      <div className="flex items-center justify-between gap-4">
+                        <span>{lote.nome}</span>
+                        <Badge variant="secondary">
+                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lote.valor)}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedLote && selectedLote.vagas_limite && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedLote.vagas_utilizadas}/{selectedLote.vagas_limite} vagas utilizadas
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Status de Pagamento */}
           <div className="space-y-2">
             <Label>Status de Pagamento</Label>
@@ -250,13 +349,16 @@ export function AdicionarInscricaoDialog({
             </Select>
           </div>
 
-          {/* Valor (info) */}
-          {evento?.requer_pagamento && evento.valor_inscricao && (
+          {/* Valor */}
+          {evento?.requer_pagamento && (
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Valor da inscrição:</p>
               <p className="font-bold text-lg">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(evento.valor_inscricao)}
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(getValorInscricao())}
               </p>
+              {selectedLote && (
+                <p className="text-xs text-muted-foreground mt-1">Lote: {selectedLote.nome}</p>
+              )}
             </div>
           )}
         </div>
@@ -265,7 +367,10 @@ export function AdicionarInscricaoDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || !selectedPessoaId}>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={saving || !selectedPessoaId || (hasLotes && !selectedLoteId)}
+          >
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Adicionar
           </Button>

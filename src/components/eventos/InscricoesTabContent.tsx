@@ -45,6 +45,12 @@ interface Evento {
   conta_financeira_id: string | null;
 }
 
+interface Lote {
+  id: string;
+  nome: string;
+  valor: number;
+}
+
 interface Inscricao {
   id: string;
   pessoa_id: string;
@@ -52,6 +58,8 @@ interface Inscricao {
   created_at: string;
   observacoes: string | null;
   transacao_id: string | null;
+  lote_id: string | null;
+  valor_pago: number | null;
   pessoa: {
     id: string;
     nome: string;
@@ -59,6 +67,7 @@ interface Inscricao {
     telefone: string | null;
     avatar_url: string | null;
   };
+  lote?: Lote | null;
 }
 
 interface InscricoesTabContentProps {
@@ -93,6 +102,9 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
           *,
           pessoa:profiles!inscricoes_eventos_pessoa_id_fkey (
             id, nome, email, telefone, avatar_url
+          ),
+          lote:evento_lotes (
+            id, nome, valor
           )
         `)
         .eq("evento_id", eventoId)
@@ -115,13 +127,19 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
       
       // Se está marcando como pago e evento requer pagamento, criar transação
       if (novoStatus === "pago" && evento?.requer_pagamento && !inscricao?.transacao_id) {
+        // Usar valor do lote se existir, senão usar valor padrão do evento
+        const valorInscricao = inscricao?.lote?.valor || evento.valor_inscricao || 0;
+        const descricaoTx = inscricao?.lote 
+          ? `Inscrição - ${evento.titulo} (${inscricao.lote.nome})`
+          : `Inscrição - ${evento.titulo}`;
+
         const { data: transacao, error: txError } = await supabase
           .from("transacoes_financeiras")
           .insert({
             tipo: "entrada",
             tipo_lancamento: "avulso",
-            descricao: `Inscrição - ${evento.titulo}`,
-            valor: evento.valor_inscricao || 0,
+            descricao: descricaoTx,
+            valor: valorInscricao,
             data_vencimento: new Date().toISOString().split("T")[0],
             data_pagamento: new Date().toISOString().split("T")[0],
             data_competencia: new Date().toISOString().split("T")[0],
@@ -138,7 +156,8 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
           .from("inscricoes_eventos")
           .update({ 
             status_pagamento: novoStatus,
-            transacao_id: transacao.id 
+            transacao_id: transacao.id,
+            valor_pago: valorInscricao,
           })
           .eq("id", inscricaoId);
       } else {
@@ -190,7 +209,11 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
     pendentes: inscricoes.filter(i => i.status_pagamento === "pendente").length,
     valorTotal: inscricoes
       .filter(i => i.status_pagamento === "pago")
-      .length * (evento?.valor_inscricao || 0),
+      .reduce((acc, i) => {
+        // Usa valor_pago se disponível, senão usa valor do lote ou valor padrão do evento
+        const valor = i.valor_pago || i.lote?.valor || evento?.valor_inscricao || 0;
+        return acc + valor;
+      }, 0),
   };
 
   if (loading) {
@@ -288,6 +311,7 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                 <TableRow>
                   <TableHead>Participante</TableHead>
                   <TableHead>Contato</TableHead>
+                  <TableHead>Lote / Valor</TableHead>
                   <TableHead>Data Inscrição</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
@@ -297,6 +321,7 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                 {filteredInscricoes.map((inscricao) => {
                   const statusConfig = STATUS_CONFIG[inscricao.status_pagamento] || STATUS_CONFIG.pendente;
                   const StatusIcon = statusConfig.icon;
+                  const valorInscricao = inscricao.valor_pago || inscricao.lote?.valor || evento?.valor_inscricao || 0;
                   
                   return (
                     <TableRow key={inscricao.id}>
@@ -315,6 +340,24 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                         <div className="text-sm">
                           <p>{inscricao.pessoa?.email || "—"}</p>
                           <p className="text-muted-foreground">{inscricao.pessoa?.telefone || "—"}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {inscricao.lote ? (
+                            <>
+                              <p className="font-medium">{inscricao.lote.nome}</p>
+                              <p className="text-muted-foreground">
+                                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorInscricao)}
+                              </p>
+                            </>
+                          ) : evento?.requer_pagamento ? (
+                            <p className="text-muted-foreground">
+                              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorInscricao)}
+                            </p>
+                          ) : (
+                            <p className="text-muted-foreground">—</p>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>

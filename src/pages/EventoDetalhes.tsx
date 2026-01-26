@@ -40,6 +40,7 @@ import MusicaTabContent from "@/components/eventos/MusicaTabContent";
 import EscalasTabContent from "@/components/eventos/EscalasTabContent";
 import InscricoesTabContent from "@/components/eventos/InscricoesTabContent";
 import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
+import { EventoLotesManager } from "@/components/eventos/EventoLotesManager";
 import EscalaTimeline from "@/components/escalas/EscalaTimeline";
 import EventoDialog from "@/components/eventos/EventoDialog";
 
@@ -547,7 +548,16 @@ export default function EventoDetalhes() {
 
         {/* Tab: Inscrições */}
         {mostrarInscricoes && (
-          <TabsContent value="inscricoes" className="mt-6">
+          <TabsContent value="inscricoes" className="mt-6 space-y-6">
+            {/* Gerenciador de Lotes - apenas se evento requer pagamento */}
+            {evento.requer_pagamento && (
+              <EventoLotesManager 
+                eventoId={evento.id}
+                categoriaFinanceiraId={evento.categoria_financeira_id}
+                contaFinanceiraId={evento.conta_financeira_id}
+              />
+            )}
+            
             <InscricoesTabContent 
               eventoId={id!} 
               evento={{

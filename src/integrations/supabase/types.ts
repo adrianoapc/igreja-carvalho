@@ -2088,6 +2088,82 @@ export type Database = {
           },
         ]
       }
+      evento_lotes: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          descricao: string | null
+          evento_id: string
+          filial_id: string | null
+          id: string
+          igreja_id: string | null
+          nome: string
+          ordem: number | null
+          updated_at: string | null
+          vagas_limite: number | null
+          vagas_utilizadas: number | null
+          valor: number
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          evento_id: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string | null
+          nome: string
+          ordem?: number | null
+          updated_at?: string | null
+          vagas_limite?: number | null
+          vagas_utilizadas?: number | null
+          valor?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          evento_id?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string | null
+          nome?: string
+          ordem?: number | null
+          updated_at?: string | null
+          vagas_limite?: number | null
+          vagas_utilizadas?: number | null
+          valor?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evento_lotes_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_lotes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_lotes_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evento_subtipos: {
         Row: {
           ativo: boolean | null
@@ -3126,6 +3202,7 @@ export type Database = {
           id: string
           igreja_id: string | null
           lembrete_pagamento_em: string | null
+          lote_id: string | null
           observacoes: string | null
           pessoa_id: string
           qr_token: string | null
@@ -3133,6 +3210,7 @@ export type Database = {
           status_pagamento: string
           transacao_id: string | null
           updated_at: string | null
+          valor_pago: number | null
         }
         Insert: {
           cancelado_em?: string | null
@@ -3144,6 +3222,7 @@ export type Database = {
           id?: string
           igreja_id?: string | null
           lembrete_pagamento_em?: string | null
+          lote_id?: string | null
           observacoes?: string | null
           pessoa_id: string
           qr_token?: string | null
@@ -3151,6 +3230,7 @@ export type Database = {
           status_pagamento?: string
           transacao_id?: string | null
           updated_at?: string | null
+          valor_pago?: number | null
         }
         Update: {
           cancelado_em?: string | null
@@ -3162,6 +3242,7 @@ export type Database = {
           id?: string
           igreja_id?: string | null
           lembrete_pagamento_em?: string | null
+          lote_id?: string | null
           observacoes?: string | null
           pessoa_id?: string
           qr_token?: string | null
@@ -3169,6 +3250,7 @@ export type Database = {
           status_pagamento?: string
           transacao_id?: string | null
           updated_at?: string | null
+          valor_pago?: number | null
         }
         Relationships: [
           {
@@ -3190,6 +3272,13 @@ export type Database = {
             columns: ["igreja_id"]
             isOneToOne: false
             referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "evento_lotes"
             referencedColumns: ["id"]
           },
           {
@@ -8012,6 +8101,7 @@ export type Database = {
         Args: { p_data?: string; p_igreja_id: string }
         Returns: string
       }
+      check_lote_disponivel: { Args: { p_lote_id: string }; Returns: boolean }
       check_voluntario_conflito:
         | {
             Args: {
