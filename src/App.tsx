@@ -124,6 +124,7 @@ const Telao = lazy(() => import("./pages/Telao"));
 const TelaoLiturgia = lazy(() => import("./pages/TelaoLiturgia"));
 const Checkin = lazy(() => import("./pages/Checkin"));
 const CheckinInscricao = lazy(() => import("./pages/CheckinInscricao"));
+const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
 
 // Mídias
 const Midias = lazy(() => import("./pages/Midias"));
@@ -247,6 +248,7 @@ const App = () => (
                 <Route path="/telao/:id" element={<Telao />} />
                 <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
                 <Route path="/checkin/:tipo/:id" element={<Checkin />} />
+                <Route path="/inscricao/:token" element={<InscricaoPublica />} />
 
                 {/* Cadastro Público */}
                 <Route path="/cadastro" element={<CadastroIndex />} />

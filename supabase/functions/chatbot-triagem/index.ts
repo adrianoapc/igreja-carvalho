@@ -60,7 +60,7 @@ const WHATSAPP_API_TOKEN = Deno.env.get("WHATSAPP_API_TOKEN");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const APP_URL = Deno.env.get("APP_URL") || "https://igreja.lovable.app";
+const APP_URL = Deno.env.get("APP_URL") || "https://appcarvalho.lovable.app";
 
 const FUNCTION_NAME = "chatbot-triagem";
 const UUID_PASTOR_PLANTAO: string | null =
@@ -479,14 +479,15 @@ async function finalizarInscricao(
     inscricaoExistente &&
     inscricaoExistente.status_pagamento !== "cancelado"
   ) {
-    const qrLink = `${APP_URL}/eventos/checkin/${inscricaoExistente.qr_token}`;
+    const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
+    const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
     await supabaseClient
       .from("atendimentos_bot")
       .update({ status: "CONCLUIDO" })
       .eq("id", sessao.id);
     return respostaJson(
       `Você já está inscrito! 🎉\n\nAcesse seu QR Code:\n${qrLink}`,
-      { qr_url: qrLink }
+      { qr_url: qrLink, qr_image: qrImage }
     );
   }
 
@@ -501,7 +502,8 @@ async function finalizarInscricao(
       .update({ status_pagamento: statusPagamento, cancelado_em: null })
       .eq("id", inscricaoExistente.id);
 
-    const qrLink = `${APP_URL}/eventos/checkin/${inscricaoExistente.qr_token}`;
+    const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
+    const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
     await supabaseClient
       .from("atendimentos_bot")
       .update({ status: "CONCLUIDO" })
@@ -510,7 +512,7 @@ async function finalizarInscricao(
     const msg = evento.requer_pagamento
       ? `Inscrição reativada! Sua vaga está reservada por 24h.\n\nQR Code: ${qrLink}`
       : `Inscrição confirmada! 🎉\n\nQR Code: ${qrLink}`;
-    return respostaJson(msg, { qr_url: qrLink });
+    return respostaJson(msg, { qr_url: qrLink, qr_image: qrImage });
   }
 
   // Criar nova inscrição
@@ -533,7 +535,8 @@ async function finalizarInscricao(
     return respostaJson("Erro ao criar inscrição. Tente novamente.");
   }
 
-  const qrLink = `${APP_URL}/eventos/checkin/${novaInscricao.qr_token}`;
+  const qrLink = `${APP_URL}/inscricao/${novaInscricao.qr_token}`;
+  const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${novaInscricao.qr_token}`;
   await supabaseClient
     .from("atendimentos_bot")
     .update({ status: "CONCLUIDO" })
@@ -544,7 +547,7 @@ async function finalizarInscricao(
     : `Inscrição confirmada! 🎉\n\nAqui está seu QR Code:\n${qrLink}`;
 
   console.log(`[Inscricao] Sucesso! Inscrição ${novaInscricao.id} criada.`);
-  return respostaJson(mensagemFinal, { qr_url: qrLink });
+  return respostaJson(mensagemFinal, { qr_url: qrLink, qr_image: qrImage });
 }
 
 async function handleFluxoInscricao(

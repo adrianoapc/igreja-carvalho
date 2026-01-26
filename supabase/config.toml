@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.consultar-sessao-bot]
 verify_jwt = false
+
+[functions.gerar-qrcode-inscricao]
+verify_jwt = false
