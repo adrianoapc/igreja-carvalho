@@ -2088,6 +2088,107 @@ export type Database = {
           },
         ]
       }
+      evento_lista_espera: {
+        Row: {
+          contatado_em: string | null
+          created_at: string | null
+          email: string | null
+          evento_id: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          nome: string
+          observacoes: string | null
+          pessoa_id: string | null
+          posicao_fila: number
+          status: string | null
+          telefone: string
+          visitante_lead_id: string | null
+        }
+        Insert: {
+          contatado_em?: string | null
+          created_at?: string | null
+          email?: string | null
+          evento_id: string
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          nome: string
+          observacoes?: string | null
+          pessoa_id?: string | null
+          posicao_fila?: number
+          status?: string | null
+          telefone: string
+          visitante_lead_id?: string | null
+        }
+        Update: {
+          contatado_em?: string | null
+          created_at?: string | null
+          email?: string | null
+          evento_id?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          nome?: string
+          observacoes?: string | null
+          pessoa_id?: string | null
+          posicao_fila?: number
+          status?: string | null
+          telefone?: string
+          visitante_lead_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evento_lista_espera_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_lista_espera_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_lista_espera_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_lista_espera_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_lista_espera_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "evento_lista_espera_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "evento_lista_espera_visitante_lead_id_fkey"
+            columns: ["visitante_lead_id"]
+            isOneToOne: false
+            referencedRelation: "visitantes_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evento_lotes: {
         Row: {
           ativo: boolean | null
@@ -2232,6 +2333,7 @@ export type Database = {
           igreja_id: string | null
           inscricoes_abertas_ate: string | null
           local: string | null
+          mostrar_posicao_fila: boolean | null
           observacoes: string | null
           pregador: string | null
           requer_inscricao: boolean | null
@@ -2261,6 +2363,7 @@ export type Database = {
           igreja_id?: string | null
           inscricoes_abertas_ate?: string | null
           local?: string | null
+          mostrar_posicao_fila?: boolean | null
           observacoes?: string | null
           pregador?: string | null
           requer_inscricao?: boolean | null
@@ -2290,6 +2393,7 @@ export type Database = {
           igreja_id?: string | null
           inscricoes_abertas_ate?: string | null
           local?: string | null
+          mostrar_posicao_fila?: boolean | null
           observacoes?: string | null
           pregador?: string | null
           requer_inscricao?: boolean | null

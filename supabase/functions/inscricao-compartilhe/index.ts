@@ -276,6 +276,55 @@ Deno.serve(async (req) => {
     });
   }
 
+  // PASSO 1: Buscar pessoa pelo telefone PRIMEIRO (antes de verificar vagas)
+  const nomeFinal = nomeInformado || nomePerfil || "Visitante";
+  const telefoneBusca = telefone.slice(-9);
+
+  const { data: candidatos } = await supabase
+    .from("profiles")
+    .select("id, telefone")
+    .eq("igreja_id", igrejaId)
+    .ilike("telefone", `%${telefoneBusca}%`)
+    .limit(5);
+
+  let pessoaId: string | null = null;
+  if (candidatos && candidatos.length > 0) {
+    const alvo = candidatos.find(
+      (p) => normalizePhone(p.telefone || "") === telefone
+    );
+    pessoaId = alvo?.id ?? candidatos[0].id ?? null;
+  }
+
+  // PASSO 2: Se pessoa existe, verificar inscrição ANTES de validar vagas
+  if (pessoaId) {
+    const { data: inscricaoExistente } = await supabase
+      .from("inscricoes_eventos")
+      .select("id, qr_token, status_pagamento")
+      .eq("pessoa_id", pessoaId)
+      .eq("igreja_id", igrejaId)
+      .maybeSingle();
+
+    // Se encontrou inscricao existente, precisamos buscar o evento dela
+    if (inscricaoExistente && inscricaoExistente.status_pagamento !== "cancelado") {
+      const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
+      const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
+      await supabase
+        .from("atendimentos_bot")
+        .update({ status: "CONCLUIDO" })
+        .eq("id", sessaoAtual.id);
+
+      return new Response(
+        JSON.stringify({
+          reply_message: `Voce ja esta inscrito! Seu QR Code: ${qrLink}`,
+          qr_url: qrLink,
+          qr_image: qrImage,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  // PASSO 3: Buscar subtipo e evento
   const { data: subtipo } = await supabase
     .from("evento_subtipos")
     .select("id")
@@ -297,7 +346,7 @@ Deno.serve(async (req) => {
   let eventoQuery = supabase
     .from("eventos")
     .select(
-      "id, titulo, data_evento, status, requer_pagamento, valor_inscricao, vagas_limite, inscricoes_abertas_ate, igreja_id"
+      "id, titulo, data_evento, status, requer_pagamento, valor_inscricao, vagas_limite, inscricoes_abertas_ate, igreja_id, mostrar_posicao_fila"
     )
     .eq("igreja_id", igrejaId)
     .eq("subtipo_id", subtipo.id)
@@ -333,6 +382,90 @@ Deno.serve(async (req) => {
     );
   }
 
+  // PASSO 4: Se pessoa existe e evento encontrado, verificar inscricao para ESSE evento
+  if (pessoaId) {
+    const { data: inscricaoEvento } = await supabase
+      .from("inscricoes_eventos")
+      .select("id, qr_token, status_pagamento")
+      .eq("evento_id", evento.id)
+      .eq("pessoa_id", pessoaId)
+      .eq("igreja_id", igrejaId)
+      .maybeSingle();
+
+    if (inscricaoEvento && inscricaoEvento.status_pagamento !== "cancelado") {
+      const qrLink = `${APP_URL}/inscricao/${inscricaoEvento.qr_token}`;
+      const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoEvento.qr_token}`;
+      await supabase
+        .from("atendimentos_bot")
+        .update({ status: "CONCLUIDO" })
+        .eq("id", sessaoAtual.id);
+
+      return new Response(
+        JSON.stringify({
+          reply_message: `Voce ja esta inscrito! QR: ${qrLink}`,
+          qr_url: qrLink,
+          qr_image: qrImage,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Reativar inscricao cancelada (se houver vagas)
+    if (inscricaoEvento && inscricaoEvento.status_pagamento === "cancelado") {
+      // Verificar vagas antes de reativar
+      if (evento.vagas_limite) {
+        const { count } = await supabase
+          .from("inscricoes_eventos")
+          .select("id", { count: "exact", head: true })
+          .eq("evento_id", evento.id)
+          .eq("igreja_id", igrejaId)
+          .neq("status_pagamento", "cancelado");
+
+        if ((count || 0) >= evento.vagas_limite) {
+          // Vagas esgotadas - adicionar à lista de espera
+          return await adicionarListaEsperaCompartilhe(
+            supabase,
+            sessaoAtual,
+            evento,
+            telefone,
+            nomeFinal,
+            pessoaId,
+            igrejaId,
+            filialId,
+            corsHeaders
+          );
+        }
+      }
+
+      const statusPagamento = evento.requer_pagamento ? "pendente" : "isento";
+      await supabase
+        .from("inscricoes_eventos")
+        .update({
+          status_pagamento: statusPagamento,
+          cancelado_em: null,
+          lembrete_pagamento_em: null,
+        })
+        .eq("id", inscricaoEvento.id);
+
+      const qrLink = `${APP_URL}/inscricao/${inscricaoEvento.qr_token}`;
+      const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoEvento.qr_token}`;
+      await supabase
+        .from("atendimentos_bot")
+        .update({ status: "CONCLUIDO" })
+        .eq("id", sessaoAtual.id);
+
+      const mensagemResposta = evento.requer_pagamento
+        ? `Inscricao reativada. Sua vaga esta reservada por 24h. QR: ${qrLink}`
+        : `Inscricao confirmada. QR: ${qrLink}`;
+
+      return new Response(
+        JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink, qr_image: qrImage }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  // PASSO 5: Verificar vagas (usuário não está inscrito)
   if (evento.vagas_limite) {
     const { count } = await supabase
       .from("inscricoes_eventos")
@@ -342,33 +475,22 @@ Deno.serve(async (req) => {
       .neq("status_pagamento", "cancelado");
 
     if ((count || 0) >= evento.vagas_limite) {
-      return new Response(
-        JSON.stringify({
-          reply_message: "As vagas para este evento estao esgotadas.",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      // Vagas esgotadas - adicionar à lista de espera
+      return await adicionarListaEsperaCompartilhe(
+        supabase,
+        sessaoAtual,
+        evento,
+        telefone,
+        nomeFinal,
+        pessoaId,
+        igrejaId,
+        filialId,
+        corsHeaders
       );
     }
   }
 
-  const nomeFinal = nomeInformado || nomePerfil || "Visitante";
-
-  const telefoneBusca = telefone.slice(-9);
-  const { data: candidatos } = await supabase
-    .from("profiles")
-    .select("id, telefone")
-    .eq("igreja_id", igrejaId)
-    .ilike("telefone", `%${telefoneBusca}%`)
-    .limit(5);
-
-  let pessoaId: string | null = null;
-  if (candidatos && candidatos.length > 0) {
-    const alvo = candidatos.find(
-      (p) => normalizePhone(p.telefone || "") === telefone
-    );
-    pessoaId = alvo?.id ?? candidatos[0].id ?? null;
-  }
-
+  // PASSO 6: Criar pessoa se necessário
   if (!pessoaId) {
     const { data: novaPessoa, error } = await supabase
       .from("profiles")
@@ -395,66 +517,7 @@ Deno.serve(async (req) => {
     pessoaId = novaPessoa.id;
   }
 
-  const { data: inscricaoExistente } = await supabase
-    .from("inscricoes_eventos")
-    .select("id, qr_token, status_pagamento")
-    .eq("evento_id", evento.id)
-    .eq("pessoa_id", pessoaId)
-    .eq("igreja_id", igrejaId)
-    .maybeSingle();
-
-  if (
-    inscricaoExistente &&
-    inscricaoExistente.status_pagamento !== "cancelado"
-  ) {
-    const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
-    const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
-    await supabase
-      .from("atendimentos_bot")
-      .update({ status: "CONCLUIDO" })
-      .eq("id", sessaoAtual.id);
-
-    return new Response(
-      JSON.stringify({
-        reply_message: `Voce ja esta inscrito. QR: ${qrLink}`,
-        qr_url: qrLink,
-        qr_image: qrImage,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  if (
-    inscricaoExistente &&
-    inscricaoExistente.status_pagamento === "cancelado"
-  ) {
-    const statusPagamento = evento.requer_pagamento ? "pendente" : "isento";
-    await supabase
-      .from("inscricoes_eventos")
-      .update({
-        status_pagamento: statusPagamento,
-        cancelado_em: null,
-        lembrete_pagamento_em: null,
-      })
-      .eq("id", inscricaoExistente.id);
-
-    const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
-    const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
-    await supabase
-      .from("atendimentos_bot")
-      .update({ status: "CONCLUIDO" })
-      .eq("id", sessaoAtual.id);
-
-    const mensagemResposta = evento.requer_pagamento
-      ? `Inscricao reativada. Sua vaga esta reservada por 24h. QR: ${qrLink}`
-      : `Inscricao confirmada. QR: ${qrLink}`;
-
-    return new Response(
-      JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink, qr_image: qrImage }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
+  // PASSO 7: Criar nova inscrição
   const statusPagamento = evento.requer_pagamento ? "pendente" : "isento";
   const { data: novaInscricao, error: inscricaoError } = await supabase
     .from("inscricoes_eventos")
@@ -495,3 +558,107 @@ Deno.serve(async (req) => {
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 });
+
+// Função auxiliar para adicionar à lista de espera interna (Compartilhe)
+// deno-lint-ignore no-explicit-any
+async function adicionarListaEsperaCompartilhe(
+  supabaseClient: any,
+  sessao: Record<string, unknown>,
+  evento: Record<string, unknown>,
+  telefone: string,
+  nome: string,
+  pessoaId: string | null,
+  igrejaId: string,
+  filialId: string | null,
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+  console.log(`[ListaEspera] Vagas esgotadas para evento ${evento.id}, adicionando ${telefone} à lista`);
+
+  // Buscar ou criar lead
+  let leadId: string | null = null;
+  const { data: leadExistente } = await supabaseClient
+    .from("visitantes_leads")
+    .select("id")
+    .eq("telefone", telefone)
+    .eq("igreja_id", igrejaId)
+    .maybeSingle();
+
+  if (leadExistente) {
+    leadId = leadExistente.id;
+  } else {
+    const { data: novoLead } = await supabaseClient
+      .from("visitantes_leads")
+      .insert({
+        nome,
+        telefone,
+        origem: "LISTA_ESPERA",
+        igreja_id: igrejaId,
+        filial_id: filialId,
+      })
+      .select("id")
+      .single();
+    leadId = novoLead?.id ?? null;
+  }
+
+  // Verificar se já está na lista de espera
+  const { data: jaEspera } = await supabaseClient
+    .from("evento_lista_espera")
+    .select("id, posicao_fila")
+    .eq("evento_id", evento.id)
+    .eq("telefone", telefone)
+    .maybeSingle();
+
+  if (jaEspera) {
+    await supabaseClient
+      .from("atendimentos_bot")
+      .update({ status: "CONCLUIDO" })
+      .eq("id", sessao.id);
+    console.log(`[ListaEspera] Usuário já na lista: posição ${jaEspera.posicao_fila}`);
+    return new Response(
+      JSON.stringify({
+        reply_message: `Seu interesse ja foi registrado anteriormente! Caso surja uma vaga, entraremos em contato.`,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Calcular posição na fila
+  const { count: posicaoAtual } = await supabaseClient
+    .from("evento_lista_espera")
+    .select("id", { count: "exact", head: true })
+    .eq("evento_id", evento.id);
+
+  const posicao = (posicaoAtual || 0) + 1;
+
+  // Inserir na lista de espera
+  await supabaseClient.from("evento_lista_espera").insert({
+    evento_id: evento.id,
+    nome,
+    telefone,
+    posicao_fila: posicao,
+    status: "aguardando",
+    visitante_lead_id: leadId,
+    pessoa_id: pessoaId,
+    igreja_id: igrejaId,
+    filial_id: filialId,
+  });
+
+  await supabaseClient
+    .from("atendimentos_bot")
+    .update({ status: "CONCLUIDO" })
+    .eq("id", sessao.id);
+
+  console.log(`[ListaEspera] Usuário adicionado na posição ${posicao}`);
+
+  // Mensagem genérica (sem posição) - ou com posição se configurado
+  let mensagem = `As vagas para "${evento.titulo}" estao esgotadas, mas registramos seu interesse! Caso surja uma vaga, entraremos em contato.`;
+
+  if (evento.mostrar_posicao_fila) {
+    mensagem = `As vagas estao esgotadas, mas voce foi adicionado a lista de espera! Sua posicao: ${posicao}. Caso surja uma vaga, entraremos em contato.`;
+  }
+
+  return new Response(
+    JSON.stringify({ reply_message: mensagem }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
