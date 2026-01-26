@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
     .insert({
       evento_id: inscricao.evento_id,
       pessoa_id: inscricao.pessoa_id,
-      metodo: "inscricao_qr",
+      metodo: "qrcode",
       validado_por: authData.user.id,
       tipo_registro: "inscricao",
     });
