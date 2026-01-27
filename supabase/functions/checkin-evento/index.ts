@@ -228,11 +228,11 @@ Deno.serve(async (req) => {
 
     // Registrar presença baseado no tipo
     if (tipo === "culto") {
-      // Verificar se já existe presença
+      // Verificar se já existe presença consolidada
       const { data: existente } = await supabase
-        .from("presencas_culto")
+        .from("checkins")
         .select("id")
-        .eq("culto_id", evento_id)
+        .eq("evento_id", evento_id)
         .eq("pessoa_id", pessoa.id)
         .maybeSingle();
 
@@ -244,13 +244,14 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Inserir presença
+      // Inserir presença consolidada no evento
       const { error: insertError } = await supabase
-        .from("presencas_culto")
+        .from("checkins")
         .insert({
-          culto_id: evento_id,
+          evento_id: evento_id,
           pessoa_id: pessoa.id,
           metodo: "qrcode",
+          tipo_registro: "qrcode",
         });
 
       if (insertError) {
