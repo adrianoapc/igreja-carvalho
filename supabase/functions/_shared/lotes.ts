@@ -3,7 +3,19 @@
  * Função compartilhada entre chatbot-triagem e inscricao-compartilhe
  */
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+// deno-lint-ignore no-explicit-any
+type SupabaseClientAny = any;
+
+interface LoteRow {
+  id: string;
+  nome: string;
+  valor: number;
+  vagas_limite: number | null;
+  vagas_utilizadas: number | null;
+  vigencia_inicio: string | null;
+  vigencia_fim: string | null;
+  ativo: boolean;
+}
 
 export interface LoteAtivo {
   id: string;
@@ -24,7 +36,7 @@ export interface LoteAtivo {
  * @returns LoteAtivo com vagas disponíveis, ou null se nenhum disponível
  */
 export async function buscarLoteAtivo(
-  supabase: SupabaseClient,
+  supabase: SupabaseClientAny,
   eventoId: string,
   igrejaId: string
 ): Promise<LoteAtivo | null> {
@@ -52,7 +64,7 @@ export async function buscarLoteAtivo(
     }
 
     // Filtrar lotes por vigência (campos podem ser null = sem limite)
-    const lotesVigentes = lotes.filter((lote) => {
+    const lotesVigentes = (lotes as LoteRow[]).filter((lote: LoteRow) => {
       const inicioOk = !lote.vigencia_inicio || new Date(lote.vigencia_inicio) <= new Date(agora);
       const fimOk = !lote.vigencia_fim || new Date(lote.vigencia_fim) >= new Date(agora);
       return inicioOk && fimOk;
@@ -113,7 +125,7 @@ export async function buscarLoteAtivo(
  * @returns Array de lotes ativos com vagas
  */
 export async function buscarTodosLotesAtivos(
-  supabase: SupabaseClient,
+  supabase: SupabaseClientAny,
   eventoId: string,
   igrejaId: string
 ): Promise<LoteAtivo[]> {
