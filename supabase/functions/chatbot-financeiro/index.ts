@@ -14,8 +14,9 @@ const corsHeaders = {
 
 // Estados da máquina de estados
 type EstadoSessao =
-  | "AGUARDANDO_FORMA_INICIAL" // NOVO: Pergunta forma antes dos comprovantes (fluxo DESPESAS)
+  | "AGUARDANDO_FORMA_INICIAL" // Pergunta forma antes dos comprovantes (fluxo DESPESAS)
   | "AGUARDANDO_COMPROVANTES"
+  | "AGUARDANDO_OBSERVACAO"    // NOVO: Pergunta observação/contexto após comprovantes
   | "AGUARDANDO_DATA"
   | "AGUARDANDO_FORMA_PGTO"
   | "FINALIZADO";
@@ -38,15 +39,16 @@ interface ItemProcessado {
 
 interface MetaDados {
   contexto: string;
-  fluxo: "REEMBOLSO" | "CONTA_UNICA" | "DESPESAS"; // NOVO: fluxo DESPESAS
+  fluxo: "REEMBOLSO" | "CONTA_UNICA" | "DESPESAS";
   pessoa_id?: string;
   nome_perfil?: string;
   estado_atual: EstadoSessao;
   itens: ItemProcessado[];
   valor_total_acumulado: number;
   data_vencimento?: string;
-  forma_pagamento?: "pix" | "dinheiro" | "cartao" | "boleto" | "a_definir"; // Expandido
-  baixa_automatica?: boolean; // NOVO: indica se transação já nasce como "pago"
+  forma_pagamento?: "pix" | "dinheiro" | "cartao" | "boleto" | "a_definir";
+  baixa_automatica?: boolean;
+  observacao_usuario?: string;  // NOVO: comentário livre do usuário
   resultado?: string;
   itens_removidos?: number;
 }
@@ -530,10 +532,10 @@ serve(async (req) => {
       const texto = (mensagem || "").toLowerCase();
       const isReembolso = texto.includes("reembolso");
       const isContaUnica = texto.includes("conta") || texto.includes("nota");
-      const isDespesas = texto.includes("despesa") || texto.includes("gasto"); // NOVO
+      const isDespesas = texto.includes("despesa") || texto.includes("gasto");
       const isGatilho = isReembolso || isContaUnica || isDespesas;
 
-      // NOVO: Fluxo DESPESAS - pergunta forma de pagamento primeiro
+      // Fluxo DESPESAS - pergunta forma de pagamento primeiro
       if (isDespesas) {
         const metaDadosInicial: MetaDados = {
           contexto: "FINANCEIRO",
@@ -612,7 +614,7 @@ serve(async (req) => {
     const metaDados = (sessao.meta_dados || {}) as MetaDados;
     const estadoAtual = metaDados.estado_atual || "AGUARDANDO_COMPROVANTES";
 
-    // ========== ESTADO: AGUARDANDO_FORMA_INICIAL (NOVO - Fluxo DESPESAS) ==========
+    // ========== ESTADO: AGUARDANDO_FORMA_INICIAL (Fluxo DESPESAS) ==========
     if (estadoAtual === "AGUARDANDO_FORMA_INICIAL") {
       const escolha = (mensagem || "").trim();
       let formaPagamento: "pix" | "dinheiro" | "cartao" | "boleto" | "a_definir";
@@ -842,7 +844,7 @@ serve(async (req) => {
         );
       }
 
-      // B3. Finalização (Comando 'Fechar')
+      // B3. Finalização (Comando 'Fechar') - TRANSIÇÃO PARA AGUARDANDO_OBSERVACAO
       if (
         mensagem &&
         mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)
@@ -858,190 +860,21 @@ serve(async (req) => {
           );
         }
 
-        // FLUXO DESPESAS: Inserir com baixa automática baseada na forma de pagamento
-        if (metaDados.fluxo === "DESPESAS") {
-          // Buscar conta padrão
-          const { data: contaPadrao } = await supabase
-            .from("contas")
-            .select("id")
-            .eq("ativo", true)
-            .eq("igreja_id", igrejaId)
-            .limit(1)
-            .single();
-
-          if (!contaPadrao) {
-            return new Response(
-              JSON.stringify({
-                text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador.",
-              }),
-              {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              }
-            );
-          }
-
-          // Determinar status baseado na forma de pagamento (baixa automática)
-          const statusTransacao = metaDados.baixa_automatica ? "pago" : "pendente";
-          const dataPagamento = metaDados.baixa_automatica
-            ? new Date().toISOString().split("T")[0]
-            : null;
-
-          const textoForma: Record<string, string> = {
-            dinheiro: "Dinheiro",
-            pix: "PIX",
-            cartao: "Cartão/Boleto",
-            boleto: "Boleto",
-            a_definir: "A definir",
-          };
-
-          // Criar transações para cada item
-          const transacoesCriadas: string[] = [];
-          for (const item of metaDados.itens) {
-            const { data: tx, error } = await supabase
-              .from("transacoes_financeiras")
-              .insert({
-                descricao:
-                  item.descricao ||
-                  `Despesa - ${item.fornecedor || "WhatsApp"}`,
-                valor: item.valor || 0,
-                tipo: "saida",
-                tipo_lancamento: "unico",
-                data_vencimento:
-                  item.data_emissao || new Date().toISOString().split("T")[0],
-                status: statusTransacao, // NOVO: pago ou pendente baseado na forma
-                data_pagamento: dataPagamento, // NOVO: preenchido se baixa automática
-                conta_id: contaPadrao.id,
-                categoria_id: item.categoria_sugerida_id,
-                subcategoria_id: item.subcategoria_sugerida_id,
-                centro_custo_id: item.centro_custo_sugerido_id,
-                anexo_url: item.anexo_storage,
-                observacoes: `Fornecedor: ${item.fornecedor || "N/A"}\nOrigem: WhatsApp\nForma: ${metaDados.forma_pagamento || "N/A"}\nSolicitante: ${metaDados.nome_perfil}`,
-                igreja_id: igrejaId,
-              })
-              .select("id")
-              .single();
-
-            if (!error && tx) {
-              transacoesCriadas.push(tx.id);
-            }
-          }
-
-          // Encerrar sessão
-          await supabase
-            .from("atendimentos_bot")
-            .update({
-              status: "CONCLUIDO",
-              meta_dados: {
-                ...metaDados,
-                estado_atual: "FINALIZADO",
-                resultado: metaDados.baixa_automatica ? "DESPESAS_BAIXA_AUTOMATICA" : "DESPESAS_PENDENTE",
-                transacoes_ids: transacoesCriadas,
-              },
-            })
-            .eq("id", sessao.id)
-            .eq("igreja_id", igrejaId);
-
-          // Mensagem diferenciada por status
-          const msgStatus = metaDados.baixa_automatica
-            ? "💚 Baixa automática realizada!"
-            : "⏳ Aguardando aprovação do tesoureiro.";
-
-          return new Response(
-            JSON.stringify({
-              text: `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n💳 Forma: ${textoForma[metaDados.forma_pagamento || "a_definir"]}\n\n${msgStatus}`,
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // FLUXO CONTA_UNICA: Inserir diretamente (status sempre pendente)
-        if (metaDados.fluxo === "CONTA_UNICA") {
-          // Buscar conta padrão
-          const { data: contaPadrao } = await supabase
-            .from("contas")
-            .select("id")
-            .eq("ativo", true)
-            .eq("igreja_id", igrejaId)
-            .limit(1)
-            .single();
-
-          if (!contaPadrao) {
-            return new Response(
-              JSON.stringify({
-                text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador.",
-              }),
-              {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              }
-            );
-          }
-
-          // Criar transações para cada item
-          const transacoesCriadas: string[] = [];
-          for (const item of metaDados.itens) {
-            const { data: tx, error } = await supabase
-              .from("transacoes_financeiras")
-              .insert({
-                descricao:
-                  item.descricao ||
-                  `Despesa - ${item.fornecedor || "WhatsApp"}`,
-                valor: item.valor || 0,
-                tipo: "saida",
-                tipo_lancamento: "unico",
-                data_vencimento:
-                  item.data_emissao || new Date().toISOString().split("T")[0],
-                status: "pendente",
-                conta_id: contaPadrao.id,
-                categoria_id: item.categoria_sugerida_id,
-                subcategoria_id: item.subcategoria_sugerida_id,
-                centro_custo_id: item.centro_custo_sugerido_id,
-                anexo_url: item.anexo_storage,
-                observacoes: `Fornecedor: ${item.fornecedor || "N/A"}\nOrigem: WhatsApp\nSolicitante: ${metaDados.nome_perfil}`,
-                igreja_id: igrejaId,
-              })
-              .select("id")
-              .single();
-
-            if (!error && tx) {
-              transacoesCriadas.push(tx.id);
-            }
-          }
-
-          // Encerrar sessão
-          await supabase
-            .from("atendimentos_bot")
-            .update({
-              status: "CONCLUIDO",
-              meta_dados: {
-                ...metaDados,
-                estado_atual: "FINALIZADO",
-                resultado: "CONTA_UNICA_CRIADA",
-                transacoes_ids: transacoesCriadas,
-              },
-            })
-            .eq("id", sessao.id)
-            .eq("igreja_id", igrejaId);
-
-          return new Response(
-            JSON.stringify({
-              text: `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n\nO financeiro irá processar em breve.`,
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // FLUXO REEMBOLSO: Perguntar data
+        // NOVO: Transição para AGUARDANDO_OBSERVACAO (pedir comentário do usuário)
         await supabase
           .from("atendimentos_bot")
           .update({
-            meta_dados: { ...metaDados, estado_atual: "AGUARDANDO_DATA" },
+            meta_dados: {
+              ...metaDados,
+              estado_atual: "AGUARDANDO_OBSERVACAO",
+            },
           })
           .eq("id", sessao.id)
           .eq("igreja_id", igrejaId);
 
         return new Response(
           JSON.stringify({
-            text: `📋 *Resumo do Reembolso*\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${qtdItens}\n\n📅 *Quando deseja receber o ressarcimento?*\n\nDigite a data (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*`,
+            text: `📋 *Resumo: ${qtdItens} comprovante(s)*\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n\n✏️ *Deseja adicionar uma observação?*\nEx: "Lanche do infantil" ou "Material reforma cozinha"\n\nDigite a observação ou *Pular* para continuar.`,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -1052,6 +885,193 @@ serve(async (req) => {
         JSON.stringify({
           text: "📸 Aguardando comprovantes.\n\nEnvie a foto, digite *Fechar* para concluir ou *Cancelar* para desistir.",
         }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ========== ESTADO: AGUARDANDO_OBSERVACAO (NOVO) ==========
+    if (estadoAtual === "AGUARDANDO_OBSERVACAO") {
+      const texto = (mensagem || "").trim();
+      
+      // Verificar se quer pular
+      const querPular = /^(pular|skip|nao|não|n|continuar|ok|sim|s)$/i.test(texto.toLowerCase());
+      
+      // Cancelamento ainda disponível
+      if (texto.toLowerCase().match(/cancelar|desistir|sair/)) {
+        const itensRemovidos = await deletarAnexosSessao(
+          supabase,
+          metaDados.itens
+        );
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: {
+              ...metaDados,
+              estado_atual: "FINALIZADO",
+              resultado: "CANCELADO_PELO_USUARIO",
+              itens_removidos: itensRemovidos,
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        return new Response(
+          JSON.stringify({
+            text: `❌ Solicitação cancelada. ${itensRemovidos} comprovante(s) descartado(s).`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Salvar observação (ou null se pulou)
+      const observacaoFinal = querPular ? null : texto;
+      
+      // Decidir próximo estado baseado no fluxo
+      if (metaDados.fluxo === "REEMBOLSO") {
+        // Reembolso: vai para perguntar data
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: {
+              ...metaDados,
+              observacao_usuario: observacaoFinal,
+              estado_atual: "AGUARDANDO_DATA",
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        const qtdItens = metaDados.itens.length;
+        let msgObs = observacaoFinal ? `📝 Obs: ${observacaoFinal}\n\n` : "";
+        
+        return new Response(
+          JSON.stringify({
+            text: `${msgObs}📋 *Resumo do Reembolso*\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${qtdItens}\n\n📅 *Quando deseja receber o ressarcimento?*\n\nDigite a data (ex: 15/01) ou:\n• *esta semana*\n• *próximo mês*`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // FLUXO DESPESAS ou CONTA_UNICA: Finalizar e criar transações
+      // Buscar conta padrão
+      const { data: contaPadrao } = await supabase
+        .from("contas")
+        .select("id")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
+        .limit(1)
+        .single();
+
+      if (!contaPadrao) {
+        return new Response(
+          JSON.stringify({
+            text: "❌ Erro: Nenhuma conta financeira configurada. Contate o administrador.",
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Determinar status baseado na forma de pagamento (baixa automática)
+      const statusTransacao = metaDados.baixa_automatica ? "pago" : "pendente";
+      const dataPagamento = metaDados.baixa_automatica
+        ? new Date().toISOString().split("T")[0]
+        : null;
+
+      const textoForma: Record<string, string> = {
+        dinheiro: "Dinheiro",
+        pix: "PIX",
+        cartao: "Cartão/Boleto",
+        boleto: "Boleto",
+        a_definir: "A definir",
+      };
+
+      // Criar transações para cada item
+      const transacoesCriadas: string[] = [];
+      for (const item of metaDados.itens) {
+        // Montar observações incluindo o comentário do usuário
+        const observacoesTransacao = [
+          item.descricao,
+          observacaoFinal,  // NOVO: incluir observação do usuário
+          `Fornecedor: ${item.fornecedor || "N/A"}`,
+          `Origem: WhatsApp`,
+          `Forma: ${metaDados.forma_pagamento || "N/A"}`,
+          `Solicitante: ${metaDados.nome_perfil}`,
+        ].filter(Boolean).join("\n");
+
+        const { data: tx, error } = await supabase
+          .from("transacoes_financeiras")
+          .insert({
+            descricao:
+              item.descricao ||
+              `Despesa - ${item.fornecedor || "WhatsApp"}`,
+            valor: item.valor || 0,
+            tipo: "saida",
+            tipo_lancamento: "unico",
+            data_vencimento:
+              item.data_emissao || new Date().toISOString().split("T")[0],
+            status: statusTransacao,
+            data_pagamento: dataPagamento,
+            conta_id: contaPadrao.id,
+            categoria_id: item.categoria_sugerida_id,
+            subcategoria_id: item.subcategoria_sugerida_id,
+            centro_custo_id: item.centro_custo_sugerido_id,
+            anexo_url: item.anexo_storage,
+            observacoes: observacoesTransacao,
+            igreja_id: igrejaId,
+          })
+          .select("id")
+          .single();
+
+        if (!error && tx) {
+          transacoesCriadas.push(tx.id);
+        }
+      }
+
+      // Encerrar sessão
+      const resultado = metaDados.fluxo === "DESPESAS"
+        ? (metaDados.baixa_automatica ? "DESPESAS_BAIXA_AUTOMATICA" : "DESPESAS_PENDENTE")
+        : "CONTA_UNICA_CRIADA";
+
+      await supabase
+        .from("atendimentos_bot")
+        .update({
+          status: "CONCLUIDO",
+          meta_dados: {
+            ...metaDados,
+            observacao_usuario: observacaoFinal,
+            estado_atual: "FINALIZADO",
+            resultado,
+            transacoes_ids: transacoesCriadas,
+          },
+        })
+        .eq("id", sessao.id)
+        .eq("igreja_id", igrejaId);
+
+      // Mensagem diferenciada por status
+      let msgFinal = `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}`;
+      
+      if (metaDados.fluxo === "DESPESAS" && metaDados.forma_pagamento) {
+        msgFinal += `\n💳 Forma: ${textoForma[metaDados.forma_pagamento]}`;
+      }
+      
+      if (observacaoFinal) {
+        msgFinal += `\n📝 Obs: ${observacaoFinal}`;
+      }
+      
+      if (metaDados.fluxo === "DESPESAS") {
+        msgFinal += metaDados.baixa_automatica
+          ? "\n\n💚 Baixa automática realizada!"
+          : "\n\n⏳ Aguardando aprovação do tesoureiro.";
+      } else {
+        msgFinal += "\n\nO financeiro irá processar em breve.";
+      }
+
+      return new Response(
+        JSON.stringify({ text: msgFinal }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -1213,6 +1233,11 @@ serve(async (req) => {
       // Seguindo arquitetura: itens_reembolso = Fato Gerador (competência)
       // transacoes_financeiras será criada apenas no momento do PAGAMENTO pelo tesoureiro
 
+      // Montar observação incluindo o comentário do usuário
+      const observacaoReembolso = metaDados.observacao_usuario
+        ? `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)\n📝 ${metaDados.observacao_usuario}`
+        : `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`;
+
       // 1. Criar solicitação de reembolso (status rascunho para RLS, depois pendente)
       const { data: solicitacao, error: solError } = await supabase
         .from("solicitacoes_reembolso")
@@ -1221,7 +1246,7 @@ serve(async (req) => {
           status: "rascunho", // RLS permite inserir itens apenas com status rascunho
           forma_pagamento_preferida: formaPagamento,
           data_vencimento: metaDados.data_vencimento,
-          observacoes: `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`,
+          observacoes: observacaoReembolso,
           igreja_id: igrejaId,
         })
         .select("id")
@@ -1240,12 +1265,16 @@ serve(async (req) => {
       // 2. Criar ITENS de reembolso (fato gerador/competência - para DRE)
       const itensCriados: string[] = [];
       for (const item of metaDados.itens) {
+        // Incluir observação do usuário na descrição do item
+        const descricaoItem = metaDados.observacao_usuario
+          ? `${item.descricao || `Comprovante - ${item.fornecedor || "N/A"}`} - ${metaDados.observacao_usuario}`
+          : item.descricao || `Comprovante - ${item.fornecedor || "N/A"}`;
+
         const { data: itemReembolso, error: itemError } = await supabase
           .from("itens_reembolso")
           .insert({
             solicitacao_id: solicitacao.id,
-            descricao:
-              item.descricao || `Comprovante - ${item.fornecedor || "N/A"}`,
+            descricao: descricaoItem,
             valor: item.valor || 0,
             data_item:
               item.data_emissao || new Date().toISOString().split("T")[0],
@@ -1253,7 +1282,6 @@ serve(async (req) => {
             subcategoria_id: item.subcategoria_sugerida_id,
             centro_custo_id: item.centro_custo_sugerido_id,
             foto_url: item.anexo_storage,
-            // fornecedor_id e base_ministerial_id ficam null por ora (podem ser preenchidos na tela)
             igreja_id: igrejaId,
           })
           .select("id")
@@ -1292,6 +1320,7 @@ serve(async (req) => {
                 itens: metaDados.itens.length,
                 solicitacao_id: solicitacao.id,
                 forma_pagamento: formaPagamento,
+                observacao: metaDados.observacao_usuario || null,
                 link: `/financas/reembolsos?id=${solicitacao.id}`,
               },
               igreja_id: igrejaId,
@@ -1329,10 +1358,15 @@ serve(async (req) => {
         metaDados.data_vencimento + "T12:00:00"
       ).toLocaleDateString("pt-BR");
       const formaPgtoTexto = formaPagamento === "pix" ? "PIX" : "Dinheiro";
+      
+      // Incluir observação na mensagem final se existir
+      const msgObs = metaDados.observacao_usuario 
+        ? `\n📝 Obs: ${metaDados.observacao_usuario}` 
+        : "";
 
       return new Response(
         JSON.stringify({
-          text: `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`,
+          text: `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}${msgObs}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
