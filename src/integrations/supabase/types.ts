@@ -7851,6 +7851,45 @@ export type Database = {
         }
         Relationships: []
       }
+      view_faltas_evento: {
+        Row: {
+          checkin_id: string | null
+          evento_id: string | null
+          faltou: boolean | null
+          inscricao_status: string | null
+          pessoa_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inscricoes_eventos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       view_health_score: {
         Row: {
           avatar_url: string | null
