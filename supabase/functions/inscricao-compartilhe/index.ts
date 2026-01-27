@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buscarLoteAtivo } from "../_shared/lotes.ts"; // ADR-026: Integração de lotes
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -517,7 +518,34 @@ Deno.serve(async (req) => {
     pessoaId = novaPessoa.id;
   }
 
-  // PASSO 7: Criar nova inscrição
+  // PASSO 7: ADR-026 - Buscar lote ativo (antes de criar inscrição)
+  let loteId: string | null = null;
+  let valorPago: number | null = null;
+  
+  const loteAtivo = await buscarLoteAtivo(supabase, evento.id, igrejaId);
+  if (loteAtivo) {
+    loteId = loteAtivo.id;
+    valorPago = loteAtivo.valor;
+    
+    if (loteAtivo.vagas_disponiveis <= 0) {
+      // Lote esgotado durante inscrição - redirecionar para lista de espera
+      return await adicionarListaEsperaCompartilhe(
+        supabase,
+        sessaoAtual,
+        evento,
+        telefone,
+        nomeFinal,
+        pessoaId,
+        igrejaId,
+        filialId,
+        corsHeaders
+      );
+    }
+    
+    console.log(`[Compartilhe] Lote ativo encontrado: ${loteAtivo.nome} (R$ ${loteAtivo.valor})`);
+  }
+
+  // PASSO 8: Criar nova inscrição
   const statusPagamento = evento.requer_pagamento ? "pendente" : "isento";
   const { data: novaInscricao, error: inscricaoError } = await supabase
     .from("inscricoes_eventos")
@@ -525,6 +553,8 @@ Deno.serve(async (req) => {
       evento_id: evento.id,
       pessoa_id: pessoaId,
       status_pagamento: statusPagamento,
+      lote_id: loteId,         // ADR-026: Vincular a lote ativo
+      valor_pago: valorPago,   // ADR-026: Registrar valor do lote
       responsavel_inscricao_id: pessoaId,
       igreja_id: igrejaId,
       filial_id: filialId,
@@ -544,15 +574,26 @@ Deno.serve(async (req) => {
 
   const qrLink = `${APP_URL}/inscricao/${novaInscricao.qr_token}`;
   const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${novaInscricao.qr_token}`;
-  const mensagemResposta = evento.requer_pagamento
-    ? `Inscricao registrada. Sua vaga esta reservada por 24h. QR: ${qrLink}`
-    : `Inscricao confirmada. QR: ${qrLink}`;
-
+  
+  // Finalizar sessão
   await supabase
     .from("atendimentos_bot")
     .update({ status: "CONCLUIDO" })
     .eq("id", sessaoAtual.id);
+  
+  // ADR-026: Mensagem com info do lote quando disponível
+  let mensagemResposta: string;
+  if (loteAtivo && loteAtivo.valor > 0) {
+    mensagemResposta = evento.requer_pagamento
+      ? `Inscricao registrada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! Sua vaga esta reservada por 24h. QR: ${qrLink}`
+      : `Inscricao confirmada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! QR: ${qrLink}`;
+  } else {
+    mensagemResposta = evento.requer_pagamento
+      ? `Inscricao registrada! Sua vaga esta reservada por 24h. QR: ${qrLink}`
+      : `Inscricao confirmada! QR: ${qrLink}`;
+  }
 
+  console.log(`[Compartilhe] Sucesso! Inscrição ${novaInscricao.id} criada${loteId ? ` no lote ${loteId}` : ''}.`);
   return new Response(
     JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink, qr_image: qrImage }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
