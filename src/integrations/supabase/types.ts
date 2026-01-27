@@ -3582,6 +3582,119 @@ export type Database = {
           },
         ]
       }
+      integracao_voluntario: {
+        Row: {
+          candidato_id: string
+          created_at: string | null
+          data_conclusao_esperada: string | null
+          data_jornada_concluida: string | null
+          data_jornada_iniciada: string | null
+          data_resultado_teste: string | null
+          data_teste_agendada: string | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          jornada_id: string | null
+          mentor_id: string | null
+          percentual_jornada: number | null
+          pontuacao_teste: number | null
+          resultado_teste: string | null
+          status: string
+          teste_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          candidato_id: string
+          created_at?: string | null
+          data_conclusao_esperada?: string | null
+          data_jornada_concluida?: string | null
+          data_jornada_iniciada?: string | null
+          data_resultado_teste?: string | null
+          data_teste_agendada?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          jornada_id?: string | null
+          mentor_id?: string | null
+          percentual_jornada?: number | null
+          pontuacao_teste?: number | null
+          resultado_teste?: string | null
+          status?: string
+          teste_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          candidato_id?: string
+          created_at?: string | null
+          data_conclusao_esperada?: string | null
+          data_jornada_concluida?: string | null
+          data_jornada_iniciada?: string | null
+          data_resultado_teste?: string | null
+          data_teste_agendada?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          jornada_id?: string | null
+          mentor_id?: string | null
+          percentual_jornada?: number | null
+          pontuacao_teste?: number | null
+          resultado_teste?: string | null
+          status?: string
+          teste_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracao_voluntario_candidato_id_fkey"
+            columns: ["candidato_id"]
+            isOneToOne: false
+            referencedRelation: "candidatos_voluntario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_voluntario_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_voluntario_jornada_id_fkey"
+            columns: ["jornada_id"]
+            isOneToOne: false
+            referencedRelation: "jornadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_voluntario_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_voluntario_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "integracao_voluntario_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "integracao_voluntario_teste_id_fkey"
+            columns: ["teste_id"]
+            isOneToOne: false
+            referencedRelation: "testes_ministerio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integracoes_financeiras: {
         Row: {
           cnpj: string
@@ -6007,6 +6120,104 @@ export type Database = {
           },
         ]
       }
+      resultados_teste: {
+        Row: {
+          avaliado_por: string | null
+          candidato_id: string
+          created_at: string | null
+          feedback: string | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          integracao_id: string
+          pontuacao_total: number | null
+          resposta_json: Json | null
+          resultado: string
+          teste_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avaliado_por?: string | null
+          candidato_id: string
+          created_at?: string | null
+          feedback?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          integracao_id: string
+          pontuacao_total?: number | null
+          resposta_json?: Json | null
+          resultado: string
+          teste_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avaliado_por?: string | null
+          candidato_id?: string
+          created_at?: string | null
+          feedback?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          integracao_id?: string
+          pontuacao_total?: number | null
+          resposta_json?: Json | null
+          resultado?: string
+          teste_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resultados_teste_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resultados_teste_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "resultados_teste_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "resultados_teste_candidato_id_fkey"
+            columns: ["candidato_id"]
+            isOneToOne: false
+            referencedRelation: "candidatos_voluntario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resultados_teste_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resultados_teste_integracao_id_fkey"
+            columns: ["integracao_id"]
+            isOneToOne: false
+            referencedRelation: "integracao_voluntario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resultados_teste_teste_id_fkey"
+            columns: ["teste_id"]
+            isOneToOne: false
+            referencedRelation: "testes_ministerio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           permission_id: number
@@ -7084,6 +7295,90 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
+      testes_ministerio: {
+        Row: {
+          ativo: boolean | null
+          conteudo_json: Json | null
+          created_at: string | null
+          created_by: string | null
+          descricao: string | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          pontuacao_minima_aprovacao: number | null
+          time_id: string
+          tipo: string
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          conteudo_json?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          descricao?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          pontuacao_minima_aprovacao?: number | null
+          time_id: string
+          tipo: string
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          conteudo_json?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          descricao?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          pontuacao_minima_aprovacao?: number | null
+          time_id?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "testes_ministerio_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "testes_ministerio_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "testes_ministerio_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "testes_ministerio_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "testes_ministerio_time_id_fkey"
+            columns: ["time_id"]
+            isOneToOne: false
+            referencedRelation: "times"
+            referencedColumns: ["id"]
           },
         ]
       }
