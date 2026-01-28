@@ -109,7 +109,7 @@ export default function TestesCrud() {
     queryFn: async () => {
       if (!igrejaId) return [];
 
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       let query = supabase
         .from("testes_ministerio")
         .select(
@@ -151,7 +151,7 @@ export default function TestesCrud() {
 
       if (data.id) {
         // Update
-        // @ts-expect-error - tabela nova, tipos ainda não gerados
+
         const { error } = await supabase
           .from("testes_ministerio")
           .update(payload)
@@ -159,7 +159,7 @@ export default function TestesCrud() {
         if (error) throw error;
       } else {
         // Insert
-        // @ts-expect-error - tabela nova, tipos ainda não gerados
+
         const { error } = await supabase.from("testes_ministerio").insert(payload);
         if (error) throw error;
       }
@@ -181,7 +181,7 @@ export default function TestesCrud() {
   // Mutation para deletar teste
   const deleteMutation = useMutation({
     mutationFn: async (testeId: string) => {
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       const { error } = await supabase
         .from("testes_ministerio")
         .delete()

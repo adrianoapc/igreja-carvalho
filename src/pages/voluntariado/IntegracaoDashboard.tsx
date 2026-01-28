@@ -96,7 +96,7 @@ export default function IntegracaoDashboard() {
     queryFn: async () => {
       if (!igrejaId) return null;
 
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       let query = supabase
         .from("integracao_voluntario")
         .select("id, status", { count: "exact" })
@@ -118,8 +118,9 @@ export default function IntegracaoDashboard() {
         rejeitado: 0,
       };
 
-      data?.forEach((item: { status: keyof typeof byStatus }) => {
-        byStatus[item.status]++;
+      (data || []).forEach((item) => {
+        const s = item.status as keyof typeof byStatus;
+        if (s in byStatus) byStatus[s]++;
       });
 
       return {
@@ -137,7 +138,7 @@ export default function IntegracaoDashboard() {
     queryFn: async () => {
       if (!igrejaId) return [];
 
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       let query = supabase
         .from("integracao_voluntario")
         .select(
@@ -190,20 +191,21 @@ export default function IntegracaoDashboard() {
     queryFn: async () => {
       if (!igrejaId) return [];
 
-      let query = supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("profiles")
         .select("id, nome")
         .eq("igreja_id", igrejaId)
         .eq("ativo", true)
         .order("nome");
 
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
-      return (data as Mentor[]) || [];
+      
+      let filtered = (data || []) as Mentor[];
+      if (!isAllFiliais && filialId) {
+        filtered = filtered.filter(m => (m as unknown as Record<string, string>).filial_id === filialId);
+      }
+      return filtered;
     },
     enabled: !!igrejaId,
   });
@@ -211,7 +213,7 @@ export default function IntegracaoDashboard() {
   // Mutation para atribuir mentor
   const assignMentorMutation = useMutation({
     mutationFn: async ({ integracaoId, mentorId }: { integracaoId: string; mentorId: string }) => {
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       const { error } = await supabase
         .from("integracao_voluntario")
         .update({ mentor_id: mentorId })
@@ -236,7 +238,7 @@ export default function IntegracaoDashboard() {
   // Mutation para avançar status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ integracaoId, newStatus }: { integracaoId: string; newStatus: string }) => {
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       const { error } = await supabase
         .from("integracao_voluntario")
         .update({ status: newStatus })

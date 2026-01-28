@@ -592,7 +592,7 @@ Deno.serve(async (req) => {
 
   // ADR-026: Mensagem com info do lote quando disponível
   let mensagemResposta: string;
-  if (loteAtivo?.valor > 0) {
+  if (loteAtivo && typeof loteAtivo.valor === "number" && loteAtivo.valor > 0) {
     mensagemResposta = evento.requer_pagamento
       ? `Inscricao registrada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! Sua vaga esta reservada por 24h. QR: ${qrLink}`
       : `Inscricao confirmada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! QR: ${qrLink}`;

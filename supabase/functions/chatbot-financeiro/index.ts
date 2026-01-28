@@ -61,14 +61,63 @@ interface AnexoPersistido {
   isPdf: boolean;
 }
 
+// Função auxiliar para resolver media_id para URL real via Graph API
+async function resolverMediaUrl(
+  mediaIdOrUrl: string,
+  whatsappToken?: string
+): Promise<string | null> {
+  // Se já é uma URL válida, retornar diretamente
+  if (mediaIdOrUrl.startsWith("http://") || mediaIdOrUrl.startsWith("https://")) {
+    return mediaIdOrUrl;
+  }
+
+  // Se é só números, é um media_id - precisa buscar a URL na Graph API
+  if (/^\d+$/.test(mediaIdOrUrl) && whatsappToken) {
+    try {
+      console.log(`[Storage] Resolvendo media_id ${mediaIdOrUrl} via Graph API...`);
+      const urlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaIdOrUrl}`, {
+        headers: { Authorization: `Bearer ${whatsappToken}` },
+      });
+      
+      if (!urlRes.ok) {
+        console.error(`[Storage] Erro ao buscar media URL: ${urlRes.status}`);
+        return null;
+      }
+      
+      const mediaData = await urlRes.json();
+      if (!mediaData.url) {
+        console.error("[Storage] Graph API não retornou URL:", mediaData);
+        return null;
+      }
+      
+      console.log(`[Storage] URL obtida com sucesso`);
+      return mediaData.url;
+    } catch (e) {
+      console.error("[Storage] Erro ao resolver media_id:", e);
+      return null;
+    }
+  }
+
+  console.error(`[Storage] Formato de URL/media_id inválido: ${mediaIdOrUrl.slice(0, 50)}`);
+  return null;
+}
+
 async function persistirAnexo(
   // deno-lint-ignore no-explicit-any
   supabase: any,
-  urlOriginal: string,
+  urlOriginalOrMediaId: string,
   sessaoId: string,
   whatsappToken?: string
 ): Promise<AnexoPersistido | null> {
   try {
+    // Primeiro, resolver o media_id para URL real se necessário
+    const urlOriginal = await resolverMediaUrl(urlOriginalOrMediaId, whatsappToken);
+    
+    if (!urlOriginal) {
+      console.error(`[Storage] Não foi possível resolver URL para: ${urlOriginalOrMediaId.slice(0, 50)}`);
+      return null;
+    }
+    
     console.log(`[Storage] Baixando anexo: ${urlOriginal.slice(0, 50)}...`);
 
     // Download do arquivo do WhatsApp (COM autenticação, igual ao chatbot-triagem)
