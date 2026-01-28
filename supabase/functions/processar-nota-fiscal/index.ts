@@ -706,6 +706,7 @@ serve(async (req) => {
               const cat = freq(transacoesHist, "categoria_id");
               const sub = freq(transacoesHist, "subcategoria_id");
               const cc = freq(transacoesHist, "centro_custo_id");
+              const bm = freq(transacoesHist, "base_ministerial_id");
               const contaHist = freq(transacoesHist, "conta_id");
               const formaHist = freq(transacoesHist, "forma_pagamento");
 
@@ -714,7 +715,7 @@ serve(async (req) => {
                   cat || "nenhuma"
                 }, subcategoria: ${sub || "nenhuma"}, centro_custo: ${
                   cc || "nenhum"
-                }`
+                }, base_ministerial: ${bm || "nenhuma"}`
               );
 
               if (!notaFiscalData.categoria_sugerida_id && cat) {
@@ -733,6 +734,12 @@ serve(async (req) => {
                 (notaFiscalData as any).centro_custo_sugerido_id = cc;
                 console.log(
                   `[processar-nota-fiscal] Centro de custo preenchido do histórico: ${cc}`
+                );
+              }
+              if (!(notaFiscalData as any).base_ministerial_sugerido_id && bm) {
+                (notaFiscalData as any).base_ministerial_sugerido_id = bm;
+                console.log(
+                  `[processar-nota-fiscal] Base ministerial preenchida do histórico: ${bm}`
                 );
               }
               if (!(notaFiscalData as any).conta_sugerida_id && contaHist) {
