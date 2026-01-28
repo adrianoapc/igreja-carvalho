@@ -83,7 +83,8 @@ export function CheckinTabContent({ eventoId }: CheckinTabContentProps) {
           total,
           presentes: presentes_count,
           pendentes,
-          percentual: total > 0 ? Math.round((presentes_count / total) * 100) : 0,
+          percentual:
+            total > 0 ? Math.round((presentes_count / total) * 100) : 0,
         };
       } catch (error) {
         console.error("Erro na query de stats:", error);
@@ -95,7 +96,9 @@ export function CheckinTabContent({ eventoId }: CheckinTabContentProps) {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["checkin-stats", eventoId] });
-    queryClient.invalidateQueries({ queryKey: ["checkins-recentes", eventoId] });
+    queryClient.invalidateQueries({
+      queryKey: ["checkins-recentes", eventoId],
+    });
   };
 
   return (
@@ -178,7 +181,10 @@ export function CheckinTabContent({ eventoId }: CheckinTabContentProps) {
       </Card>
 
       {/* Busca Manual */}
-      <CheckinManualSearch eventoId={eventoId} onCheckinSuccess={handleRefresh} />
+      <CheckinManualSearch
+        eventoId={eventoId}
+        onCheckinSuccess={handleRefresh}
+      />
 
       {/* Lista de Check-ins Recentes */}
       <CheckinRecentList eventoId={eventoId} />

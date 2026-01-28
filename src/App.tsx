@@ -244,7 +244,7 @@ const App = () => (
                 <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
                 <Route path="/checkin/:tipo/:id" element={<Checkin />} />
 
-{/* Cadastro Público */}
+                {/* Cadastro Público */}
                 <Route path="/cadastro" element={<CadastroIndex />} />
                 <Route
                   path="/cadastro/visitante"
@@ -254,7 +254,10 @@ const App = () => (
                 <Route path="/cadastro/igreja" element={<NovaIgreja />} />
 
                 {/* Inscrição Pública (QR Code) */}
-                <Route path="/inscricao/:token" element={<InscricaoPublica />} />
+                <Route
+                  path="/inscricao/:token"
+                  element={<InscricaoPublica />}
+                />
 
                 {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}
                 <Route element={<MainLayout />}>

@@ -101,7 +101,7 @@ export default function KidsDashboard() {
                 ? age - 1
                 : age;
             return actualAge < 13;
-          }
+          },
         );
 
         const criancaIds = criancas?.map((c: { id: string }) => c.id) || [];
@@ -143,7 +143,7 @@ export default function KidsDashboard() {
           .select("id")
           .gte(
             "data_evento",
-            new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+            new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
           )
           .lte("data_evento", new Date().toISOString());
         if (igrejaId) {
@@ -221,7 +221,7 @@ export default function KidsDashboard() {
         const { data: todosProfiles } = (await profilesQuery.not(
           "data_nascimento",
           "is",
-          null
+          null,
         )) as { data: { id: string; data_nascimento: string }[] | null };
 
         // Filtrar apenas crianças menores de 13 anos
@@ -236,7 +236,7 @@ export default function KidsDashboard() {
                 ? age - 1
                 : age;
             return actualAge < 13;
-          }
+          },
         );
 
         if (!criancas || criancas.length === 0) return [];
@@ -247,7 +247,7 @@ export default function KidsDashboard() {
           .select("id, pessoa_id, evento_id, created_at")
           .in(
             "pessoa_id",
-            criancas.map((c) => c.id)
+            criancas.map((c) => c.id),
           )
           .order("created_at", { ascending: false })
           .limit(5);
@@ -306,7 +306,7 @@ export default function KidsDashboard() {
         const { data: todosProfiles, error } = (await profilesQuery.not(
           "data_nascimento",
           "is",
-          null
+          null,
         )) as {
           data: Array<{
             id: string;
@@ -331,19 +331,19 @@ export default function KidsDashboard() {
                 ? age - 1
                 : age;
             return actualAge < 13;
-          }
+          },
         );
 
         const comAlergias =
           criancas?.filter(
             (c: { alergias?: string | null }) =>
-              c.alergias && c.alergias.trim().length > 0
+              c.alergias && c.alergias.trim().length > 0,
           ).length || 0;
         const comNecessidades =
           criancas?.filter(
             (c: { necessidades_especiais?: string | null }) =>
               c.necessidades_especiais &&
-              c.necessidades_especiais.trim().length > 0
+              c.necessidades_especiais.trim().length > 0,
           ).length || 0;
 
         return {
@@ -431,7 +431,7 @@ export default function KidsDashboard() {
                   ...acc,
                   [key]: Math.round((val / total) * 100),
                 }),
-                {} as Record<string, number>
+                {} as Record<string, number>,
               );
 
         return { counts: humorCounts, percentages };
@@ -469,7 +469,7 @@ export default function KidsDashboard() {
         let preocupantesQuery = supabase
           .from("kids_diario")
           .select(
-            "crianca_id, humor, crianca:profiles!kids_diario_crianca_id_fkey(nome, avatar_url)"
+            "crianca_id, humor, crianca:profiles!kids_diario_crianca_id_fkey(nome, avatar_url)",
           )
           .gte("created_at", startDate.toISOString())
           .in("humor", ["choroso", "triste", "agitado"]);
@@ -618,8 +618,8 @@ export default function KidsDashboard() {
               {selectedPeriod === "hoje"
                 ? "Hoje"
                 : selectedPeriod === "semana"
-                ? "na Semana"
-                : "no Mês"}
+                  ? "na Semana"
+                  : "no Mês"}
             </CardTitle>
             <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
@@ -884,8 +884,8 @@ export default function KidsDashboard() {
                                 {mood === "choroso"
                                   ? "😢 Choroso"
                                   : mood === "triste"
-                                  ? "😔 Triste"
-                                  : "🤪 Agitado"}
+                                    ? "😔 Triste"
+                                    : "🤪 Agitado"}
                               </Badge>
                             ))}
                           </div>

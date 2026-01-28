@@ -225,7 +225,10 @@ export default function Voluntariado() {
             return {
               ...ministerio,
               vagas_abertas: vagasAbertas,
-              dificuldade: (ministerio.dificuldade || "médio") as "fácil" | "médio" | "avançado",
+              dificuldade: (ministerio.dificuldade || "médio") as
+                | "fácil"
+                | "médio"
+                | "avançado",
             };
           }),
         );
@@ -513,7 +516,7 @@ export default function Voluntariado() {
                 <p className="text-base text-muted-foreground mb-4">
                   Quer saber mais sobre o processo de integração?
                 </p>
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => setIntegracaoModalOpen(true)}
                 >
@@ -525,7 +528,7 @@ export default function Voluntariado() {
         )}
 
         {/* Modal de Informações sobre Integração */}
-        <IntegracaoInfoModal 
+        <IntegracaoInfoModal
           open={integracaoModalOpen}
           onOpenChange={setIntegracaoModalOpen}
         />

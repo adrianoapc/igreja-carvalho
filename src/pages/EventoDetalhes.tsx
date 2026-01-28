@@ -118,7 +118,7 @@ export default function EventoDetalhes() {
   const [escalasCount, setEscalasCount] = useState(0);
   const [liturgiaCount, setLiturgiaCount] = useState(0);
   const [activeTab, setActiveTab] = useState(
-    searchParams.get("tab") || "visao-geral"
+    searchParams.get("tab") || "visao-geral",
   );
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
@@ -184,7 +184,7 @@ export default function EventoDetalhes() {
         "disparar-escala",
         {
           body: { evento_id: evento.id },
-        }
+        },
       );
 
       if (error) throw error;
@@ -470,7 +470,11 @@ export default function EventoDetalhes() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Informações do Evento</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setEditDialogOpen(true)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditDialogOpen(true)}
+              >
                 <Pencil className="h-4 w-4 mr-2" />
                 Editar
               </Button>
@@ -500,7 +504,9 @@ export default function EventoDetalhes() {
 
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
+                  <Badge className={statusConfig.color}>
+                    {statusConfig.label}
+                  </Badge>
                 </div>
               </div>
 
@@ -511,11 +517,14 @@ export default function EventoDetalhes() {
                 </div>
               )}
 
-              {!evento.tema && !evento.pregador && !evento.local && !evento.observacoes && (
-                <p className="text-sm text-muted-foreground italic">
-                  Nenhuma informação adicional cadastrada.
-                </p>
-              )}
+              {!evento.tema &&
+                !evento.pregador &&
+                !evento.local &&
+                !evento.observacoes && (
+                  <p className="text-sm text-muted-foreground italic">
+                    Nenhuma informação adicional cadastrada.
+                  </p>
+                )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -558,15 +567,15 @@ export default function EventoDetalhes() {
           <TabsContent value="inscricoes" className="mt-6 space-y-6">
             {/* Gerenciador de Lotes - apenas se evento requer pagamento */}
             {evento.requer_pagamento && (
-              <EventoLotesManager 
+              <EventoLotesManager
                 eventoId={evento.id}
                 categoriaFinanceiraId={evento.categoria_financeira_id}
                 contaFinanceiraId={evento.conta_financeira_id}
               />
             )}
-            
-            <InscricoesTabContent 
-              eventoId={id!} 
+
+            <InscricoesTabContent
+              eventoId={id!}
               evento={{
                 id: evento.id,
                 titulo: evento.titulo,

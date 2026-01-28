@@ -54,7 +54,7 @@ const extractDestino = (payload: Record<string, unknown>) => {
 
   if (displayPhoneNumber) {
     console.log(
-      `[Compartilhe] Número destino identificado: ${displayPhoneNumber}`
+      `[Compartilhe] Número destino identificado: ${displayPhoneNumber}`,
     );
   }
 
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
     // Escopo por número de envio (quando disponível)
     .contains(
       "meta_dados",
-      destino.phoneNumberId ? { phone_number_id: destino.phoneNumberId } : {}
+      destino.phoneNumberId ? { phone_number_id: destino.phoneNumberId } : {},
     )
     .neq("status", "CONCLUIDO")
     .gt("updated_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         reply_message: "Para iniciar a inscricao, envie a palavra COMPARTILHE.",
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           reply_message: "Qual o nome correto para a inscricao?",
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     } else {
       const confirmacao = `Confirme seus dados: Nome ${
@@ -256,7 +256,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ reply_message: "Envie o nome correto, por favor." }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
   let pessoaId: string | null = null;
   if (candidatos && candidatos.length > 0) {
     const alvo = candidatos.find(
-      (p) => normalizePhone(p.telefone || "") === telefone
+      (p) => normalizePhone(p.telefone || "") === telefone,
     );
     pessoaId = alvo?.id ?? candidatos[0].id ?? null;
   }
@@ -306,7 +306,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     // Se encontrou inscricao existente, precisamos buscar o evento dela
-    if (inscricaoExistente && inscricaoExistente.status_pagamento !== "cancelado") {
+    if (
+      inscricaoExistente &&
+      inscricaoExistente.status_pagamento !== "cancelado"
+    ) {
       const qrLink = `${APP_URL}/inscricao/${inscricaoExistente.qr_token}`;
       const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${inscricaoExistente.qr_token}`;
       await supabase
@@ -320,7 +323,7 @@ Deno.serve(async (req) => {
           qr_url: qrLink,
           qr_image: qrImage,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
   }
@@ -338,7 +341,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         reply_message: "Nenhum evento de acao social disponível.",
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -347,7 +350,7 @@ Deno.serve(async (req) => {
   let eventoQuery = supabase
     .from("eventos")
     .select(
-      "id, titulo, data_evento, status, requer_pagamento, valor_inscricao, vagas_limite, inscricoes_abertas_ate, igreja_id, mostrar_posicao_fila"
+      "id, titulo, data_evento, status, requer_pagamento, valor_inscricao, vagas_limite, inscricoes_abertas_ate, igreja_id, mostrar_posicao_fila",
     )
     .eq("igreja_id", igrejaId)
     .eq("subtipo_id", subtipo.id)
@@ -367,7 +370,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         reply_message: "Nenhum evento disponivel para inscricao no momento.",
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -379,7 +382,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         reply_message: "As inscricoes para este evento estao encerradas.",
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -407,7 +410,7 @@ Deno.serve(async (req) => {
           qr_url: qrLink,
           qr_image: qrImage,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -433,7 +436,7 @@ Deno.serve(async (req) => {
             pessoaId,
             igrejaId,
             filialId,
-            corsHeaders
+            corsHeaders,
           );
         }
       }
@@ -460,8 +463,12 @@ Deno.serve(async (req) => {
         : `Inscricao confirmada. QR: ${qrLink}`;
 
       return new Response(
-        JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink, qr_image: qrImage }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          reply_message: mensagemResposta,
+          qr_url: qrLink,
+          qr_image: qrImage,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
   }
@@ -486,7 +493,7 @@ Deno.serve(async (req) => {
         pessoaId,
         igrejaId,
         filialId,
-        corsHeaders
+        corsHeaders,
       );
     }
   }
@@ -511,7 +518,7 @@ Deno.serve(async (req) => {
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -521,12 +528,12 @@ Deno.serve(async (req) => {
   // PASSO 6: ADR-026 - Buscar lote ativo (antes de criar inscrição)
   let loteId: string | null = null;
   let valorPago: number | null = null;
-  
+
   const loteAtivo = await buscarLoteAtivo(supabase, evento.id, igrejaId);
   if (loteAtivo) {
     loteId = loteAtivo.id;
     valorPago = loteAtivo.valor;
-    
+
     if (loteAtivo.vagas_disponiveis <= 0) {
       // Lote esgotado durante inscrição - redirecionar para lista de espera
       return await adicionarListaEsperaCompartilhe(
@@ -538,11 +545,13 @@ Deno.serve(async (req) => {
         pessoaId,
         igrejaId,
         filialId,
-        corsHeaders
+        corsHeaders,
       );
     }
 
-    console.log(`[Compartilhe] Lote ativo encontrado: ${loteAtivo.nome} (R$ ${loteAtivo.valor})`);
+    console.log(
+      `[Compartilhe] Lote ativo encontrado: ${loteAtivo.nome} (R$ ${loteAtivo.valor})`,
+    );
   }
 
   // PASSO 7: Criar nova inscrição
@@ -553,8 +562,8 @@ Deno.serve(async (req) => {
       evento_id: evento.id,
       pessoa_id: pessoaId,
       status_pagamento: statusPagamento,
-      lote_id: loteId,         // ADR-026: Vincular a lote ativo
-      valor_pago: valorPago,   // ADR-026: Registrar valor do lote
+      lote_id: loteId, // ADR-026: Vincular a lote ativo
+      valor_pago: valorPago, // ADR-026: Registrar valor do lote
       responsavel_inscricao_id: pessoaId,
       igreja_id: igrejaId,
       filial_id: filialId,
@@ -568,19 +577,19 @@ Deno.serve(async (req) => {
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
   const qrLink = `${APP_URL}/inscricao/${novaInscricao.qr_token}`;
   const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${novaInscricao.qr_token}`;
-  
+
   // Finalizar sessão
   await supabase
     .from("atendimentos_bot")
     .update({ status: "CONCLUIDO" })
     .eq("id", sessaoAtual.id);
-  
+
   // ADR-026: Mensagem com info do lote quando disponível
   let mensagemResposta: string;
   if (loteAtivo?.valor > 0) {
@@ -593,10 +602,16 @@ Deno.serve(async (req) => {
       : `Inscricao confirmada! QR: ${qrLink}`;
   }
 
-  console.log(`[Compartilhe] Sucesso! Inscrição ${novaInscricao.id} criada${loteId ? ` no lote ${loteId}` : ''}.`);
+  console.log(
+    `[Compartilhe] Sucesso! Inscrição ${novaInscricao.id} criada${loteId ? ` no lote ${loteId}` : ""}.`,
+  );
   return new Response(
-    JSON.stringify({ reply_message: mensagemResposta, qr_url: qrLink, qr_image: qrImage }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    JSON.stringify({
+      reply_message: mensagemResposta,
+      qr_url: qrLink,
+      qr_image: qrImage,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
 
@@ -611,9 +626,11 @@ async function adicionarListaEsperaCompartilhe(
   pessoaId: string | null,
   igrejaId: string,
   filialId: string | null,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
 ): Promise<Response> {
-  console.log(`[ListaEspera] Vagas esgotadas para evento ${evento.id}, adicionando ${telefone} à lista`);
+  console.log(
+    `[ListaEspera] Vagas esgotadas para evento ${evento.id}, adicionando ${telefone} à lista`,
+  );
 
   // Buscar ou criar lead
   let leadId: string | null = null;
@@ -654,12 +671,14 @@ async function adicionarListaEsperaCompartilhe(
       .from("atendimentos_bot")
       .update({ status: "CONCLUIDO" })
       .eq("id", sessao.id);
-    console.log(`[ListaEspera] Usuário já na lista: posição ${jaEspera.posicao_fila}`);
+    console.log(
+      `[ListaEspera] Usuário já na lista: posição ${jaEspera.posicao_fila}`,
+    );
     return new Response(
       JSON.stringify({
         reply_message: `Seu interesse ja foi registrado anteriormente! Caso surja uma vaga, entraremos em contato.`,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -698,8 +717,7 @@ async function adicionarListaEsperaCompartilhe(
     mensagem = `As vagas estao esgotadas, mas voce foi adicionado a lista de espera! Sua posicao: ${posicao}. Caso surja uma vaga, entraremos em contato.`;
   }
 
-  return new Response(
-    JSON.stringify({ reply_message: mensagem }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  return new Response(JSON.stringify({ reply_message: mensagem }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }

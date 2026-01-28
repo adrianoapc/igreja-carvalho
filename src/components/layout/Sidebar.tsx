@@ -66,7 +66,11 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Diário de Oração", url: "/intercessao/diario", icon: Heart },
       { title: "Agenda", url: "/eventos/lista", icon: CalendarDays },
       { title: "Voluntariado", url: "/voluntariado", icon: Briefcase },
-      { title: "Minha Jornada", url: "/voluntariado/minha-jornada", icon: Target },
+      {
+        title: "Minha Jornada",
+        url: "/voluntariado/minha-jornada",
+        icon: Target,
+      },
       { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
       { title: "Minha Família", url: "/perfil/wallet", icon: Users },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },

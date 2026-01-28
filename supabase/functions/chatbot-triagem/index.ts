@@ -103,12 +103,12 @@ const DEFAULT_AUDIO_MODEL = "whisper-1";
 
 const isAfirmativo = (text: string): boolean =>
   /^(sim|s|ok|isso|confirmo|confirmar|pode|certo|correto|confirma|isso\s*mesmo|yes|ss)$/i.test(
-    text.trim()
+    text.trim(),
   );
 
 const isNegativo = (text: string): boolean =>
   /^(nao|não|n|errado|corrigir|cancelar|cancela|mudar|incorreto|no)$/i.test(
-    text.trim()
+    text.trim(),
   );
 
 const normalizePhone = (telefone: string): string => {
@@ -125,7 +125,7 @@ const normalizeDisplayPhone = (tel?: string | null): string =>
 // Fuzzy match de evento pelo texto do usuário
 function inferirEvento(
   eventos: Array<{ id: string; titulo: string }>,
-  textoUsuario: string
+  textoUsuario: string,
 ): { id: string; titulo: string } | null {
   const textoNorm = textoUsuario.toLowerCase().trim();
 
@@ -174,7 +174,7 @@ function mapIntencaoToFlow(intencao?: string | null): string | null {
 
 // Extrair flow da resposta da IA (sempre lowercase) - VALIDANDO FLOWS
 function pickFlowFromParsed(
-  parsed: Record<string, unknown> | null
+  parsed: Record<string, unknown> | null,
 ): string | null {
   if (!parsed) return null;
   const fluxoAtual =
@@ -201,14 +201,14 @@ function isFlowValido(flow?: string | null): boolean {
 async function buscarEventosAbertos(
   supabaseClient: SupabaseClient,
   igrejaId: string,
-  filialId: string | null
+  filialId: string | null,
 ): Promise<Evento[]> {
   const agora = new Date().toISOString();
 
   let query = supabaseClient
     .from("eventos")
     .select(
-      "id, titulo, data_evento, vagas_limite, requer_pagamento, inscricoes_abertas_ate"
+      "id, titulo, data_evento, vagas_limite, requer_pagamento, inscricoes_abertas_ate",
     )
     .eq("igreja_id", igrejaId)
     .eq("status", "confirmado")
@@ -225,7 +225,7 @@ async function buscarEventosAbertos(
 
   // Filtrar eventos com inscrições ainda abertas
   return (eventos || []).filter(
-    (e) => !e.inscricoes_abertas_ate || e.inscricoes_abertas_ate >= agora
+    (e) => !e.inscricoes_abertas_ate || e.inscricoes_abertas_ate >= agora,
   );
 }
 
@@ -233,7 +233,7 @@ async function buscarEventosAbertos(
 async function atualizarMetaSessao(
   supabaseClient: SupabaseClient,
   sessaoId: string,
-  novaMeta: SessionMeta
+  novaMeta: SessionMeta,
 ): Promise<void> {
   await supabaseClient
     .from("atendimentos_bot")
@@ -247,7 +247,7 @@ async function atualizarMetaSessao(
 // Resposta JSON padronizada
 function respostaJson(
   message: string,
-  extras: Record<string, unknown> = {}
+  extras: Record<string, unknown> = {},
 ): Response {
   return new Response(JSON.stringify({ reply_message: message, ...extras }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -310,7 +310,7 @@ function extractJsonAndText(aiContent: string): {
       if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
         try {
           const tempJson = JSON.parse(
-            aiContent.substring(firstOpen, lastClose + 1)
+            aiContent.substring(firstOpen, lastClose + 1),
           );
           // Aceita JSON com concluido OU fluxo_atual OU intencao
           const isUsefulMeta =
@@ -342,7 +342,7 @@ function extractJsonAndText(aiContent: string): {
 
 // --- ROTEAMENTO DE PASTOR ---
 async function definirPastorResponsavel(
-  perfilUsuario: Record<string, unknown>
+  perfilUsuario: Record<string, unknown>,
 ): Promise<string | null> {
   if (perfilUsuario?.lider_id) {
     return perfilUsuario.lider_id as string;
@@ -353,7 +353,7 @@ async function definirPastorResponsavel(
 // --- ÁUDIO ---
 async function processarAudio(
   mediaId: string,
-  audioModel: string
+  audioModel: string,
 ): Promise<string | null> {
   try {
     if (!WHATSAPP_API_TOKEN || !OPENAI_API_KEY) return null;
@@ -375,7 +375,7 @@ async function processarAudio(
         method: "POST",
         headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
         body: formData,
-      }
+      },
     );
     const data = await openAiRes.json();
     return data.text;
@@ -391,7 +391,7 @@ async function finalizarInscricao(
   meta: SessionMeta,
   supabaseClient: SupabaseClient,
   igrejaId: string,
-  filialId: string | null
+  filialId: string | null,
 ): Promise<Response> {
   const telefone = sessao.telefone as string;
   const nomeFinal = meta.nome_confirmado || "Visitante";
@@ -399,19 +399,19 @@ async function finalizarInscricao(
 
   if (!eventoId) {
     return respostaJson(
-      "Erro: evento não identificado. Por favor, inicie novamente."
+      "Erro: evento não identificado. Por favor, inicie novamente.",
     );
   }
 
   console.log(
-    `[Inscricao] Finalizando inscrição: evento=${eventoId}, nome=${nomeFinal}, tel=${telefone}`
+    `[Inscricao] Finalizando inscrição: evento=${eventoId}, nome=${nomeFinal}, tel=${telefone}`,
   );
 
   // Buscar evento para validar (incluindo campo mostrar_posicao_fila)
   const { data: evento } = await supabaseClient
     .from("eventos")
     .select(
-      "id, titulo, requer_pagamento, vagas_limite, inscricoes_abertas_ate, igreja_id, mostrar_posicao_fila"
+      "id, titulo, requer_pagamento, vagas_limite, inscricoes_abertas_ate, igreja_id, mostrar_posicao_fila",
     )
     .eq("id", eventoId)
     .single();
@@ -438,7 +438,7 @@ async function finalizarInscricao(
   let pessoaId: string | null = null;
   if (candidatos && candidatos.length > 0) {
     const alvo = candidatos.find(
-      (p) => normalizePhone(p.telefone || "") === telefoneNormalizado
+      (p) => normalizePhone(p.telefone || "") === telefoneNormalizado,
     );
     pessoaId = alvo?.id ?? candidatos[0].id ?? null;
   }
@@ -466,7 +466,7 @@ async function finalizarInscricao(
       console.log(`[Inscricao] Usuário já inscrito: ${inscricaoExistente.id}`);
       return respostaJson(
         `Você já está inscrito! 🎉\n\nAcesse seu QR Code:\n${qrLink}`,
-        { qr_url: qrLink, qr_image: qrImage }
+        { qr_url: qrLink, qr_image: qrImage },
       );
     }
 
@@ -494,7 +494,7 @@ async function finalizarInscricao(
             nomeFinal,
             pessoaId,
             igrejaId,
-            filialId
+            filialId,
           );
         }
       }
@@ -538,7 +538,7 @@ async function finalizarInscricao(
         nomeFinal,
         pessoaId,
         igrejaId,
-        filialId
+        filialId,
       );
     }
   }
@@ -567,12 +567,12 @@ async function finalizarInscricao(
   // PASSO 5: ADR-026 - Buscar lote ativo (antes de criar inscrição)
   let loteId: string | null = null;
   let valorPago: number | null = null;
-  
+
   const loteAtivo = await buscarLoteAtivo(supabaseClient, evento.id, igrejaId);
   if (loteAtivo) {
     loteId = loteAtivo.id;
     valorPago = loteAtivo.valor;
-    
+
     if (loteAtivo.vagas_disponiveis <= 0) {
       // Lote esgotado durante inscrição - redirecionar para lista de espera
       return await adicionarListaEspera(
@@ -583,11 +583,13 @@ async function finalizarInscricao(
         nomeFinal,
         pessoaId,
         igrejaId,
-        filialId
+        filialId,
       );
     }
 
-    console.log(`[Inscricao] Lote ativo encontrado: ${loteAtivo.nome} (R$ ${loteAtivo.valor})`);
+    console.log(
+      `[Inscricao] Lote ativo encontrado: ${loteAtivo.nome} (R$ ${loteAtivo.valor})`,
+    );
   }
 
   // PASSO 6: Criar nova inscrição
@@ -598,8 +600,8 @@ async function finalizarInscricao(
       evento_id: evento.id,
       pessoa_id: pessoaId,
       status_pagamento: statusPagamento,
-      lote_id: loteId,         // ADR-026: Vincular a lote ativo
-      valor_pago: valorPago,   // ADR-026: Registrar valor do lote
+      lote_id: loteId, // ADR-026: Vincular a lote ativo
+      valor_pago: valorPago, // ADR-026: Registrar valor do lote
       responsavel_inscricao_id: pessoaId,
       igreja_id: igrejaId,
       filial_id: filialId,
@@ -614,13 +616,13 @@ async function finalizarInscricao(
 
   const qrLink = `${APP_URL}/inscricao/${novaInscricao.qr_token}`;
   const qrImage = `${SUPABASE_URL}/functions/v1/gerar-qrcode-inscricao?token=${novaInscricao.qr_token}`;
-  
+
   // Finalizar sessão
   await supabaseClient
     .from("atendimentos_bot")
     .update({ status: "CONCLUIDO" })
     .eq("id", sessao.id);
-  
+
   // ADR-026: Mensagem com info do lote quando disponível
   let mensagemFinal: string;
   if (loteAtivo?.valor > 0) {
@@ -633,7 +635,9 @@ async function finalizarInscricao(
       : `Inscrição confirmada! 🎉\n\nAqui está seu QR Code:\n${qrLink}`;
   }
 
-  console.log(`[Inscricao] Sucesso! Inscrição ${novaInscricao.id} criada${loteId ? ` no lote ${loteId}` : ""}.`);
+  console.log(
+    `[Inscricao] Sucesso! Inscrição ${novaInscricao.id} criada${loteId ? ` no lote ${loteId}` : ""}.`,
+  );
   return respostaJson(mensagemFinal, { qr_url: qrLink, qr_image: qrImage });
 }
 
@@ -646,9 +650,11 @@ async function adicionarListaEspera(
   nome: string,
   pessoaId: string | null,
   igrejaId: string,
-  filialId: string | null
+  filialId: string | null,
 ): Promise<Response> {
-  console.log(`[ListaEspera] Vagas esgotadas para evento ${evento.id}, adicionando ${telefone} à lista`);
+  console.log(
+    `[ListaEspera] Vagas esgotadas para evento ${evento.id}, adicionando ${telefone} à lista`,
+  );
 
   // Buscar ou criar lead
   let leadId: string | null = null;
@@ -689,9 +695,11 @@ async function adicionarListaEspera(
       .from("atendimentos_bot")
       .update({ status: "CONCLUIDO" })
       .eq("id", sessao.id);
-    console.log(`[ListaEspera] Usuário já na lista: posição ${jaEspera.posicao_fila}`);
+    console.log(
+      `[ListaEspera] Usuário já na lista: posição ${jaEspera.posicao_fila}`,
+    );
     return respostaJson(
-      `Seu interesse já foi registrado anteriormente! 📋\n\nCaso surja uma vaga, entraremos em contato.`
+      `Seu interesse já foi registrado anteriormente! 📋\n\nCaso surja uma vaga, entraremos em contato.`,
     );
   }
 
@@ -740,13 +748,13 @@ async function handleFluxoInscricao(
   supabaseClient: SupabaseClient,
   igrejaId: string,
   filialId: string | null,
-  nomePerfil: string
+  nomePerfil: string,
 ): Promise<Response> {
   const step = meta.step || "inicial";
   const textoNorm = texto.toLowerCase().trim();
 
   console.log(
-    `[Inscricao] handleFluxoInscricao - step: ${step}, texto: "${textoNorm}"`
+    `[Inscricao] handleFluxoInscricao - step: ${step}, texto: "${textoNorm}"`,
   );
 
   // STEP: Usuário escolhendo de uma lista de eventos
@@ -767,11 +775,11 @@ async function handleFluxoInscricao(
       });
 
       return respostaJson(
-        `Evento: *${eventoEscolhido.titulo}*\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`
+        `Evento: *${eventoEscolhido.titulo}*\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
       );
     }
     return respostaJson(
-      `Por favor, digite o número do evento (1 a ${meta.eventos_disponiveis.length}).`
+      `Por favor, digite o número do evento (1 a ${meta.eventos_disponiveis.length}).`,
     );
   }
 
@@ -784,12 +792,12 @@ async function handleFluxoInscricao(
         meta,
         supabaseClient,
         igrejaId,
-        filialId
+        filialId,
       );
     }
     if (isNegativo(textoNorm)) {
       console.log(
-        `[Inscricao] Resposta negativa detectada, solicitando correção...`
+        `[Inscricao] Resposta negativa detectada, solicitando correção...`,
       );
       await atualizarMetaSessao(supabaseClient, sessao.id as string, {
         ...meta,
@@ -800,7 +808,7 @@ async function handleFluxoInscricao(
     // Resposta ambígua - repetir pergunta
     console.log(`[Inscricao] Resposta ambígua: "${textoNorm}"`);
     return respostaJson(
-      `Nome: ${meta.nome_confirmado || nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`
+      `Nome: ${meta.nome_confirmado || nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
     );
   }
 
@@ -816,7 +824,7 @@ async function handleFluxoInscricao(
       nome_confirmado: nomeCorrigido,
     });
     return respostaJson(
-      `Nome: ${nomeCorrigido}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`
+      `Nome: ${nomeCorrigido}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
     );
   }
 
@@ -827,7 +835,7 @@ async function handleFluxoInscricao(
     supabaseClient,
     igrejaId,
     filialId,
-    nomePerfil
+    nomePerfil,
   );
 }
 
@@ -837,16 +845,16 @@ async function iniciarFluxoInscricao(
   supabaseClient: SupabaseClient,
   igrejaId: string,
   filialId: string | null,
-  nomePerfil: string
+  nomePerfil: string,
 ): Promise<Response> {
   console.log(
-    `[Inscricao] iniciarFluxoInscricao - igreja=${igrejaId}, filial=${filialId}`
+    `[Inscricao] iniciarFluxoInscricao - igreja=${igrejaId}, filial=${filialId}`,
   );
 
   const eventos = await buscarEventosAbertos(
     supabaseClient,
     igrejaId,
-    filialId
+    filialId,
   );
   console.log(`[Inscricao] Eventos encontrados: ${eventos.length}`);
 
@@ -857,7 +865,7 @@ async function iniciarFluxoInscricao(
       .update({ status: "CONCLUIDO" })
       .eq("id", sessao.id);
     return respostaJson(
-      "No momento não temos eventos com inscrições abertas, mas agradecemos muito seu contato! 🙏"
+      "No momento não temos eventos com inscrições abertas, mas agradecemos muito seu contato! 🙏",
     );
   }
 
@@ -867,7 +875,7 @@ async function iniciarFluxoInscricao(
   if (eventoInferido || eventos.length === 1) {
     const evento = eventoInferido || eventos[0];
     console.log(
-      `[Inscricao] Evento identificado: ${evento.titulo} (${evento.id})`
+      `[Inscricao] Evento identificado: ${evento.titulo} (${evento.id})`,
     );
 
     await atualizarMetaSessao(supabaseClient, sessao.id as string, {
@@ -882,7 +890,7 @@ async function iniciarFluxoInscricao(
     });
 
     return respostaJson(
-      `Encontrei o evento *${evento.titulo}*! 🎉\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`
+      `Encontrei o evento *${evento.titulo}*! 🎉\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
     );
   }
 
@@ -905,7 +913,7 @@ async function iniciarFluxoInscricao(
   });
 
   return respostaJson(
-    `Temos ${eventos.length} eventos com inscrições abertas:\n\n${lista}\n\nDigite o *número* do evento desejado.`
+    `Temos ${eventos.length} eventos com inscrições abertas:\n\n${lista}\n\nDigite o *número* do evento desejado.`,
   );
 }
 
@@ -923,7 +931,7 @@ serve(async (req: Request) => {
     requestPayload = body;
 
     console.log(
-      `[Triagem] Payload recebido - campos: ${Object.keys(body).join(", ")}`
+      `[Triagem] Payload recebido - campos: ${Object.keys(body).join(", ")}`,
     );
 
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
@@ -938,7 +946,7 @@ serve(async (req: Request) => {
       "";
 
     console.log(
-      `[Triagem] Texto extraído: "${(conteudo_texto || "").slice(0, 100)}"`
+      `[Triagem] Texto extraído: "${(conteudo_texto || "").slice(0, 100)}"`,
     );
 
     // Identificar igreja/filial pelo whatsapp_number
@@ -952,7 +960,7 @@ serve(async (req: Request) => {
 
     if (!igrejaId && whatsappNumeroNormalizado) {
       console.log(
-        `[Triagem] Buscando igreja pelo whatsapp_number: ${whatsappNumeroNormalizado}`
+        `[Triagem] Buscando igreja pelo whatsapp_number: ${whatsappNumeroNormalizado}`,
       );
 
       const { data: rota } = await supabase
@@ -966,7 +974,7 @@ serve(async (req: Request) => {
         igrejaId = rota.igreja_id;
         filialId = rota.filial_id;
         console.log(
-          `[Triagem] Igreja encontrada: ${igrejaId}, filial: ${filialId}`
+          `[Triagem] Igreja encontrada: ${igrejaId}, filial: ${filialId}`,
         );
       }
     }
@@ -991,7 +999,7 @@ serve(async (req: Request) => {
       .neq("status", "CONCLUIDO")
       .gt(
         "updated_at",
-        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       );
 
     if (igrejaId) {
@@ -1015,7 +1023,7 @@ serve(async (req: Request) => {
 
       if (diffHours >= 24) {
         console.log(
-          `[Triagem] Sessão ${sessao.id} expirou (${diffHours.toFixed(1)}h). Finalizando...`
+          `[Triagem] Sessão ${sessao.id} expirou (${diffHours.toFixed(1)}h). Finalizando...`,
         );
         await supabase
           .from("atendimentos_bot")
@@ -1025,7 +1033,10 @@ serve(async (req: Request) => {
       }
     }
 
-    const historico = (sessao?.historico_conversa || []) as Array<{ role: string; content: string }>;
+    const historico = (sessao?.historico_conversa || []) as Array<{
+      role: string;
+      content: string;
+    }>;
 
     // ========== PROTEÇÃO CONTRA DUPLICAÇÃO (IDEMPOTÊNCIA) ==========
     if (sessao && historico.length > 0) {
@@ -1034,15 +1045,19 @@ serve(async (req: Request) => {
         .slice(-1)[0]?.content;
 
       const inputNormalizado = inputTexto.toLowerCase().trim();
-      const ultimaNormalizada = (ultimaMensagemUsuario || "").toLowerCase().trim();
+      const ultimaNormalizada = (ultimaMensagemUsuario || "")
+        .toLowerCase()
+        .trim();
 
       if (ultimaNormalizada === inputNormalizado && sessao.updated_at) {
         const diffMs = Date.now() - new Date(sessao.updated_at).getTime();
         if (diffMs < 5000) {
-          console.log(`[Triagem] Mensagem duplicada ignorada (${diffMs}ms): "${inputTexto.slice(0, 30)}"`);
+          console.log(
+            `[Triagem] Mensagem duplicada ignorada (${diffMs}ms): "${inputTexto.slice(0, 30)}"`,
+          );
           return new Response(
             JSON.stringify({ reply_message: null, duplicate: true }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
       }
@@ -1084,7 +1099,7 @@ serve(async (req: Request) => {
 
     if (flowValido) {
       console.log(
-        `[Triagem] Sessão com flow válido: ${meta.flow}, step: ${meta.step}`
+        `[Triagem] Sessão com flow válido: ${meta.flow}, step: ${meta.step}`,
       );
 
       // HANDLER DIRETO - sem chamar IA para reclassificar
@@ -1097,7 +1112,7 @@ serve(async (req: Request) => {
             supabase,
             igrejaId!,
             filialId,
-            nome_perfil
+            nome_perfil,
           );
 
         case "oracao":
@@ -1105,14 +1120,14 @@ serve(async (req: Request) => {
         case "pastoral":
           // Para outros flows, continua com IA mas NÃO reclassifica
           console.log(
-            `[Triagem] Flow ${meta.flow} - continuando coleta com IA`
+            `[Triagem] Flow ${meta.flow} - continuando coleta com IA`,
           );
           break;
       }
     } else if (meta.flow) {
       // Flow inválido detectado (ex: "fallback") - limpar e permitir redetecção
       console.log(
-        `[Triagem] Flow inválido detectado: "${meta.flow}" - limpando para permitir nova detecção`
+        `[Triagem] Flow inválido detectado: "${meta.flow}" - limpando para permitir nova detecção`,
       );
       await supabase
         .from("atendimentos_bot")
@@ -1126,7 +1141,7 @@ serve(async (req: Request) => {
     // Detecta keyword se NÃO houver flow VÁLIDO ativo na sessão
     if (!flowValido && detectarIntencaoInscricao(inputTexto)) {
       console.log(
-        `[Triagem] Detectada intenção de inscrição por palavra-chave. Iniciando fluxo direto...`
+        `[Triagem] Detectada intenção de inscrição por palavra-chave. Iniciando fluxo direto...`,
       );
       return await iniciarFluxoInscricao(
         sessao,
@@ -1134,13 +1149,13 @@ serve(async (req: Request) => {
         supabase,
         igrejaId!,
         filialId,
-        nome_perfil
+        nome_perfil,
       );
     }
 
     // ========== SEM FLOW E SEM KEYWORD: CLASSIFICAR COM IA ==========
     console.log(
-      `[Triagem] Sem flow ativo e sem keyword de inscrição, chamando IA para classificação...`
+      `[Triagem] Sem flow ativo e sem keyword de inscrição, chamando IA para classificação...`,
     );
 
     const messages = [
@@ -1165,7 +1180,7 @@ serve(async (req: Request) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ model: config.textModel, messages }),
-        }
+        },
       );
       const data = await res.json();
       aiContent = data.choices?.[0]?.message?.content || "";
@@ -1194,7 +1209,7 @@ serve(async (req: Request) => {
     // ========== LÓGICA DE NEGÓCIO ==========
     if (parsedJson?.concluido) {
       console.log(
-        `[Triagem] IA retornou JSON concluído. Intenção: ${parsedJson.intencao}`
+        `[Triagem] IA retornou JSON concluído. Intenção: ${parsedJson.intencao}`,
       );
 
       // CASO ESPECIAL: INSCRIÇÃO EM EVENTO - USAR FLUXO INTEGRADO
@@ -1206,7 +1221,7 @@ serve(async (req: Request) => {
           supabase,
           igrejaId!,
           filialId,
-          nome_perfil
+          nome_perfil,
         );
       }
 
@@ -1360,7 +1375,7 @@ serve(async (req: Request) => {
 
       if (novoFlow && novoFlow !== currentMeta.flow) {
         console.log(
-          `[Triagem] Flow detectado pela IA: ${novoFlow} - salvando para proteção da sessão`
+          `[Triagem] Flow detectado pela IA: ${novoFlow} - salvando para proteção da sessão`,
         );
       }
 
@@ -1412,14 +1427,14 @@ serve(async (req: Request) => {
           motivo: parsedJson?.motivo_resumo || "",
         },
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Erro desconhecido";
     console.error("ERRO FATAL:", msg);
     return new Response(
       JSON.stringify({ error: "Erro interno", details: msg }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: corsHeaders },
     );
   }
 });
