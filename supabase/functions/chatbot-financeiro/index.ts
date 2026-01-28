@@ -1102,6 +1102,7 @@ serve(async (req) => {
             anexo_url: item.anexo_storage,
             observacoes: observacoesTransacao,
             igreja_id: igrejaId,
+            filial_id: filialIdFromWhatsApp,
           })
           .select("id")
           .single();
