@@ -25,7 +25,8 @@ import {
   Droplets,
   Cloud,
   Zap,
-  Meh
+  Meh,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -135,6 +136,41 @@ function getDisplayRole(storedRole: string | null | undefined, isReverse: boolea
 
   // Outros casos genéricos
   return "Familiar";
+}
+
+/**
+ * Retorna label e ícone bonito para cada tipo de parentesco
+ */
+function getParentescoInfo(tipo: string | undefined): { label: string; icon: React.ReactNode } {
+  switch (tipo?.toLowerCase()) {
+    case 'filho':
+    case 'filha':
+      return { label: 'Filho(a)', icon: <Baby className="h-4 w-4 text-primary" /> };
+    case 'conjuge':
+    case 'esposo':
+    case 'esposa':
+      return { label: 'Cônjuge', icon: <Heart className="h-4 w-4 text-pink-500" /> };
+    case 'pai':
+    case 'mae':
+    case 'mãe':
+      return { label: tipo?.toLowerCase() === 'pai' ? 'Pai' : 'Mãe', icon: <User className="h-4 w-4 text-blue-500" /> };
+    case 'irmao':
+    case 'irma':
+    case 'irmã':
+      return { label: 'Irmão(ã)', icon: <Users className="h-4 w-4 text-green-500" /> };
+    case 'avo':
+    case 'avo-paterno':
+    case 'ava-paterna':
+      return { label: 'Avó/Avô', icon: <User className="h-4 w-4 text-purple-500" /> };
+    case 'tia':
+    case 'tio':
+      return { label: 'Tia/Tio', icon: <User className="h-4 w-4 text-orange-500" /> };
+    case 'prima':
+    case 'primo':
+      return { label: 'Prima/Primo', icon: <Users className="h-4 w-4 text-amber-500" /> };
+    default:
+      return { label: tipo || 'Familiar', icon: <User className="h-4 w-4 text-muted-foreground" /> };
+  }
 }
 
 export default function FamilyWallet() {
@@ -512,22 +548,32 @@ export default function FamilyWallet() {
   const firstName = profile?.nome ? profile.nome.split(' ')[0] : "Usuário";
   // Gera URL do QR Code usando API pública e segura (apenas para visualização)
   // O dado embutido é o ID do perfil do pai/mãe
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${profile?.id}&color=000000&bgcolor=ffffff`;
+  const qrCodeUrl = profile?.id 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${profile.id}&color=000000&bgcolor=ffffff`
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20 animate-in fade-in duration-500">
       
       {/* 1. HEADER */}
-      <div className="bg-white sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm border-b border-gray-100">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="-ml-2 hover:bg-gray-100 rounded-full">
-          <ArrowLeft className="h-6 w-6 text-gray-700" />
+      <div className="bg-gradient-to-r from-primary/95 to-primary text-white sticky top-0 z-10 px-4 py-4 flex items-center justify-between shadow-md">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => navigate("/")} 
+          className="-ml-2 hover:bg-white/20 rounded-full text-white"
+        >
+          <ArrowLeft className="h-6 w-6" />
         </Button>
-        <h1 className="text-lg font-semibold text-gray-800">Carteira da Família</h1>
+        <div className="flex-1 text-center">
+          <h1 className="text-lg font-bold">Carteira da Família</h1>
+          <p className="text-xs text-white/80">Gerencie sua família</p>
+        </div>
         <Button 
           variant="ghost" 
           size="icon" 
           onClick={() => setVincularResponsavelOpen(true)}
-          className="hover:bg-gray-100 rounded-full text-gray-700"
+          className="hover:bg-white/20 rounded-full text-white"
           title="Gerenciar responsáveis"
         >
           <Users className="h-6 w-6" />
@@ -565,45 +611,59 @@ export default function FamilyWallet() {
         )}
         
         {/* 2. PASSAPORTE KIDS (Zero Click) */}
-        <Card className="bg-primary text-primary-foreground overflow-hidden border-0 shadow-lg relative">
-          <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none" />
-          
-          <CardContent className="p-6 flex flex-col items-center text-center gap-4 relative z-10">
-            {/* QR Code visível diretamente */}
-            <div className="bg-white p-4 rounded-xl shadow-md relative">
-              <img 
-                src={qrCodeUrl} 
-                alt="QR Code do Usuário" 
-                className="w-40 h-40 object-contain"
-              />
-              {/* Logo Watermark */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
-                <Baby className="w-12 h-12 text-black" />
-              </div>
-            </div>
+        {qrCodeUrl ? (
+          <Card className="bg-primary text-primary-foreground overflow-hidden border-0 shadow-lg relative">
+            <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none" />
             
-            <div>
-              <h3 className="text-xl font-bold flex items-center justify-center gap-2">
-                Passaporte Kids <ScanLine className="h-4 w-4 opacity-70" />
-              </h3>
-              <p className="text-primary-foreground/90 text-sm mt-1">
-                Aproxime este código do Scanner
-              </p>
-              <p className="text-primary-foreground/60 text-xs mt-2 uppercase tracking-widest">
-                {profile?.nome?.split(' ')[0]} · {profile?.id?.slice(0, 8)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            <CardContent className="p-6 flex flex-col items-center text-center gap-4 relative z-10">
+              {/* QR Code visível diretamente */}
+              <div className="bg-white p-4 rounded-xl shadow-md relative">
+                <img 
+                  src={qrCodeUrl} 
+                  alt="QR Code do Usuário" 
+                  className="w-40 h-40 object-contain"
+                />
+                {/* Logo Watermark */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
+                  <Baby className="w-12 h-12 text-black" />
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-xl font-bold flex items-center justify-center gap-2">
+                  Passaporte Kids <ScanLine className="h-4 w-4 opacity-70" />
+                </h3>
+                <p className="text-primary-foreground/90 text-sm mt-1">
+                  Aproxime este código do Scanner
+                </p>
+                <p className="text-primary-foreground/60 text-xs mt-2 uppercase tracking-widest">
+                  {profile?.nome?.split(' ')[0]} · {profile?.id?.slice(0, 8)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-primary text-primary-foreground overflow-hidden border-0 shadow-lg">
+            <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+              <div className="w-40 h-40 bg-white/20 rounded-xl flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-white/50 animate-spin" />
+              </div>
+              <h3 className="text-xl font-bold">Passaporte Kids <ScanLine className="h-4 w-4 opacity-70" /></h3>
+              <p className="text-primary-foreground/90 text-sm">Gerando seu código...</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 3. LISTA DE FAMILIARES */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-800">Minha Família</h2>
+          <div className="flex items-center justify-between mb-4 px-1">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Minha Família</h2>
+              <p className="text-xs text-gray-500 mt-1">Gerencie seus familiares</p>
+            </div>
             <Button 
-              variant="outline" 
               size="sm" 
-              className="gap-2 text-primary border-primary/20 hover:bg-primary/5 rounded-full"
+              className="gap-2 rounded-full bg-primary hover:bg-primary/90 text-white shadow-md"
               onClick={() => setDrawerOpen(true)}
             >
               <Plus className="h-4 w-4" />
@@ -614,19 +674,24 @@ export default function FamilyWallet() {
           <div className="space-y-3">
             {/* Card do Usuário Logado */}
             {profile && (
-               <Card className="overflow-hidden border-gray-100 shadow-sm bg-white/80">
+              <Card className="overflow-hidden border-0 shadow-md bg-gradient-to-r from-primary/10 to-primary/5 hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 flex items-center gap-4">
-                  <Avatar className="h-14 w-14 border-2 border-white shadow-sm">
+                  <Avatar className="h-14 w-14 border-3 border-primary shadow-md">
                     <AvatarImage src={profile.avatar_url || ""} />
-                    <AvatarFallback className="bg-blue-100 text-blue-600">
+                    <AvatarFallback className="bg-primary/20 text-primary">
                       <User className="h-6 w-6" />
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">
-                      Eu ({firstName})
+                    <h3 className="font-semibold text-gray-900 truncate text-base">
+                      Você ({firstName})
                     </h3>
-                    <p className="text-sm text-gray-500">Responsável</p>
+                    <p className="text-sm text-primary font-medium">Responsável Legal</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="inline-flex items-center gap-1 px-2 py-1 bg-primary/20 rounded-full">
+                      <CheckCircle className="h-4 w-4 text-primary" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -646,34 +711,42 @@ export default function FamilyWallet() {
               const mood = diary ? getMoodEmoji(diary.humor) : null;
               
               return (
-                <Card key={member.id} className={`overflow-hidden shadow-sm hover:shadow-md transition-all group bg-white ${isCheckedIn ? 'border-2 border-green-400' : 'border-gray-100'}`}>
+                <Card key={member.id} className={`overflow-hidden shadow-md hover:shadow-lg transition-all border-0 ${isCheckedIn ? 'ring-2 ring-green-400 bg-green-50/30' : 'bg-white'}`}>
                   <CardContent className="p-4 space-y-3">
                     {/* Seção de Informações Cadastrais */}
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-14 w-14 border-2 border-white shadow-sm relative shrink-0">
+                    <div className="flex items-start gap-4">
+                      <Avatar className="h-14 w-14 border-3 shadow-md relative shrink-0" style={{borderColor: isChild ? '#f59e0b' : '#3b82f6'}}>
                         <AvatarImage src={member.avatar_url || ""} />
-                        <AvatarFallback className={`${isChild ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
+                        <AvatarFallback className={`${isChild ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
                           {isChild ? <Baby className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                         </AvatarFallback>
                         {isCheckedIn && (
-                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
-                            <CheckCircle className="w-3 h-3 text-white" />
+                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center border-3 border-white shadow-md">
+                            <CheckCircle className="w-4 h-4 text-white" />
                           </div>
                         )}
                       </Avatar>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-gray-900 truncate">{member.nome}</h3>
+                          <h3 className="font-semibold text-gray-900 truncate text-base">{member.nome}</h3>
                           {isCheckedIn && (
-                            <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1">
+                            <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1 shadow-sm">
                               <Clock className="w-3 h-3" />
                               No Kids
                             </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <span className="capitalize">{member.tipo_parentesco || 'Familiar'}</span>
+                          {(() => {
+                            const parentescoInfo = getParentescoInfo(member.tipo_parentesco);
+                            return (
+                              <div className="flex items-center gap-1">
+                                {parentescoInfo.icon}
+                                <span>{parentescoInfo.label}</span>
+                              </div>
+                            );
+                          })()}
                           {member.data_nascimento && (
                             <>
                               <span className="text-gray-300">•</span>

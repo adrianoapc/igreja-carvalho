@@ -20,6 +20,7 @@ import {
   Eye,
   ListMusic,
   ClipboardList,
+  ClipboardCheck,
   QrCode,
   Send,
   Loader2,
@@ -40,6 +41,7 @@ import MusicaTabContent from "@/components/eventos/MusicaTabContent";
 import EscalasTabContent from "@/components/eventos/EscalasTabContent";
 import InscricoesTabContent from "@/components/eventos/InscricoesTabContent";
 import ConvitesTabContent from "@/components/eventos/ConvitesTabContent";
+import ChamadaTabContent from "@/components/eventos/ChamadaTabContent";
 import { EventoLotesManager } from "@/components/eventos/EventoLotesManager";
 import EscalaTimeline from "@/components/escalas/EscalaTimeline";
 import EventoDialog from "@/components/eventos/EventoDialog";
@@ -384,6 +386,14 @@ export default function EventoDetalhes() {
             <span className="hidden sm:inline">Check-in</span>
           </TabsTrigger>
 
+          <TabsTrigger
+            value="chamada"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+          >
+            <ClipboardCheck className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Chamada</span>
+          </TabsTrigger>
+
           {mostrarInscricoes && (
             <TabsTrigger
               value="inscricoes"
@@ -536,6 +546,11 @@ export default function EventoDetalhes() {
         {/* Tab: Check-in (sempre) */}
         <TabsContent value="checkin" className="mt-6">
           <CheckinTabContent eventoId={id!} />
+        </TabsContent>
+
+        {/* Tab: Chamada (sempre) */}
+        <TabsContent value="chamada" className="mt-6">
+          <ChamadaTabContent eventoId={id!} />
         </TabsContent>
 
         {/* Tab: Inscrições */}
