@@ -785,17 +785,34 @@ serve(async (req) => {
         let dadosNota: Awaited<ReturnType<typeof processarNotaFiscal>> = null;
 
         try {
-          // Fazer download novamente para base64
-          const fileResponse = await fetch(url_anexo);
+          // Usar a URL do storage (já resolvida e salva) para o OCR
+          // Não usar url_anexo diretamente pois pode ser um media_id
+          const urlParaOcr = anexoResult.signedUrl;
+          console.log(`[OCR] Baixando arquivo do storage para processamento...`);
+          
+          const fileResponse = await fetch(urlParaOcr);
+          if (!fileResponse.ok) {
+            throw new Error(`Erro ao baixar do storage: ${fileResponse.status}`);
+          }
+          
           const fileBuffer = await fileResponse.arrayBuffer();
-          const base64 = btoa(
-            String.fromCharCode(...new Uint8Array(fileBuffer))
-          );
+          const uint8Arr = new Uint8Array(fileBuffer);
+          
+          // Converter para base64 de forma mais robusta
+          let base64 = '';
+          const chunkSize = 0x8000; // 32KB chunks
+          for (let i = 0; i < uint8Arr.length; i += chunkSize) {
+            const chunk = uint8Arr.subarray(i, Math.min(i + chunkSize, uint8Arr.length));
+            base64 += String.fromCharCode.apply(null, Array.from(chunk));
+          }
+          base64 = btoa(base64);
 
           // Determinar mimeType
           const mimeType = anexoResult.isPdf
             ? "application/pdf"
             : anexoResult.contentType;
+
+          console.log(`[OCR] Enviando para processamento: ${mimeType}, ${Math.round(uint8Arr.length/1024)}KB`);
 
           dadosNota = await processarNotaFiscal(
             supabaseUrl,
@@ -804,8 +821,10 @@ serve(async (req) => {
             mimeType,
             igrejaId
           );
+          
+          console.log(`[OCR] Resultado: valor=${dadosNota?.valor}, fornecedor=${dadosNota?.fornecedor}`);
         } catch (e) {
-          console.error("[OCR] Erro ao converter para base64:", e);
+          console.error("[OCR] Erro ao processar para OCR:", e);
         }
 
         // Criar item processado
