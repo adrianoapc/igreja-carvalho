@@ -29,11 +29,13 @@ interface ItemProcessado {
   anexo_is_pdf: boolean;
   valor: number;
   fornecedor: string | null;
+  fornecedor_id: string | null;
   data_emissao: string | null;
   descricao: string | null;
   categoria_sugerida_id: string | null;
   subcategoria_sugerida_id: string | null;
   centro_custo_sugerido_id: string | null;
+  base_ministerial_sugerido_id: string | null;
   processado_em: string;
 }
 
@@ -224,11 +226,13 @@ async function processarNotaFiscal(
 ): Promise<{
   valor: number;
   fornecedor: string | null;
+  fornecedor_id: string | null;
   data_emissao: string | null;
   descricao: string | null;
   categoria_sugerida_id: string | null;
   subcategoria_sugerida_id: string | null;
   centro_custo_sugerido_id: string | null;
+  base_ministerial_sugerido_id: string | null;
 } | null> {
   try {
     console.log(`[OCR] Processando arquivo: ${mimeType}`);
@@ -266,11 +270,13 @@ async function processarNotaFiscal(
     return {
       valor: data.dados.valor_total || 0,
       fornecedor: data.dados.fornecedor_nome || null,
+      fornecedor_id: data.dados.fornecedor_id || null,
       data_emissao: data.dados.data_emissao || null,
       descricao: data.dados.descricao || null,
       categoria_sugerida_id: data.dados.categoria_sugerida_id || null,
       subcategoria_sugerida_id: data.dados.subcategoria_sugerida_id || null,
       centro_custo_sugerido_id: data.dados.centro_custo_sugerido_id || null,
+      base_ministerial_sugerido_id: data.dados.base_ministerial_sugerido_id || null,
     };
   } catch (error) {
     console.error(`[OCR] Erro ao processar nota:`, error);
@@ -836,11 +842,13 @@ serve(async (req) => {
           anexo_is_pdf: anexoResult.isPdf,
           valor: dadosNota?.valor || 0,
           fornecedor: dadosNota?.fornecedor || null,
+          fornecedor_id: dadosNota?.fornecedor_id || null,
           data_emissao: dadosNota?.data_emissao || null,
           descricao: dadosNota?.descricao || null,
           categoria_sugerida_id: dadosNota?.categoria_sugerida_id || null,
           subcategoria_sugerida_id: dadosNota?.subcategoria_sugerida_id || null,
           centro_custo_sugerido_id: dadosNota?.centro_custo_sugerido_id || null,
+          base_ministerial_sugerido_id: dadosNota?.base_ministerial_sugerido_id || null,
           processado_em: new Date().toISOString(),
         };
 
@@ -1081,7 +1089,7 @@ serve(async (req) => {
           }
         }
 
-        console.log(`[Transação] Criando: valor=${item.valor}, fornecedor=${item.fornecedor}, data=${dataVencimento}`);
+        console.log(`[Transação] Criando: valor=${item.valor}, fornecedor=${item.fornecedor} (id: ${item.fornecedor_id}), data=${dataVencimento}, categoria=${item.categoria_sugerida_id}, centro_custo=${item.centro_custo_sugerido_id}, base_ministerial=${item.base_ministerial_sugerido_id}`);
 
         const { data: tx, error } = await supabase
           .from("transacoes_financeiras")
@@ -1093,12 +1101,15 @@ serve(async (req) => {
             tipo: "saida",
             tipo_lancamento: "unico",
             data_vencimento: dataVencimento,
+            data_competencia: dataVencimento, // Competência = data do comprovante
             status: statusTransacao,
             data_pagamento: dataPagamento,
             conta_id: contaPadrao.id,
             categoria_id: item.categoria_sugerida_id,
             subcategoria_id: item.subcategoria_sugerida_id,
             centro_custo_id: item.centro_custo_sugerido_id,
+            base_ministerial_id: item.base_ministerial_sugerido_id,
+            fornecedor_id: item.fornecedor_id,
             anexo_url: item.anexo_storage,
             observacoes: observacoesTransacao,
             igreja_id: igrejaId,
