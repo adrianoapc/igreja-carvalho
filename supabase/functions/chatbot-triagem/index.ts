@@ -625,7 +625,7 @@ async function finalizarInscricao(
 
   // ADR-026: Mensagem com info do lote quando disponível
   let mensagemFinal: string;
-  if (loteAtivo?.valor > 0) {
+  if (loteAtivo && typeof loteAtivo.valor === "number" && loteAtivo.valor > 0) {
     mensagemFinal = evento.requer_pagamento
       ? `Inscrição registrada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! 🎉\n\nSua vaga está reservada por 24h.\n\nQR Code: ${qrLink}`
       : `Inscrição confirmada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! 🎉\n\nQR Code: ${qrLink}`;

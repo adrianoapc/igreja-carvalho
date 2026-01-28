@@ -62,7 +62,7 @@ export default function MeuTeste() {
     queryFn: async () => {
       if (!testeId) throw new Error("ID do teste não fornecido");
 
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       const { data, error } = await supabase
         .from("testes_ministerio")
         .select("*")
@@ -91,7 +91,7 @@ export default function MeuTeste() {
 
       if (!candidatura) return null;
 
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       const { data, error } = await supabase
         .from("resultados_teste")
         .select("*")
@@ -119,7 +119,7 @@ export default function MeuTeste() {
 
       if (!candidatura) throw new Error("Candidatura não encontrada");
 
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
+
       const { data: integracao } = await supabase
         .from("integracao_voluntario")
         .select("id")
@@ -135,16 +135,17 @@ export default function MeuTeste() {
         })),
       };
 
-      // @ts-expect-error - tabela nova, tipos ainda não gerados
-      const { error } = await supabase.from("resultados_teste").insert({
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("resultados_teste").insert({
         integracao_id: integracao.id,
         teste_id: testeId,
         candidato_id: candidatura.id,
         resposta_json: respostaJson,
         resultado: "aprovado", // Temporário - será avaliado pelo mentor
         pontuacao_total: 0,
-        igreja_id: profile.igreja_id,
-        filial_id: profile.filial_id,
+        igreja_id: (profile as unknown as Record<string, string>)?.igreja_id,
+        filial_id: (profile as unknown as Record<string, string>)?.filial_id,
       });
 
       if (error) throw error;
@@ -181,7 +182,7 @@ export default function MeuTeste() {
     e.preventDefault();
 
     const perguntas = teste?.conteudo_json?.perguntas || [];
-    const respostasObrigatorias = perguntas.filter((p) => p.tipo !== "opcional");
+    const respostasObrigatorias = perguntas.filter((p) => (p as { tipo: string }).tipo !== "opcional");
 
     if (Object.keys(respostas).length < respostasObrigatorias.length) {
       toast({
