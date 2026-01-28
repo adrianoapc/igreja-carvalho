@@ -1206,24 +1206,6 @@ export function TransacaoDialog({
           </div>
         </div>
 
-        <div>
-          <Label>Conta *</Label>
-          <Select value={contaId} onValueChange={setContaId} required>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione a conta" />
-            </SelectTrigger>
-            <SelectContent>
-              {contas
-                ?.filter((c) => c.id)
-                .map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label>Vencimento *</Label>

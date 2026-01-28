@@ -1053,9 +1053,6 @@ serve(async (req) => {
 
       // Determinar status baseado na forma de pagamento (baixa automática)
       const statusTransacao = metaDados.baixa_automatica ? "pago" : "pendente";
-      const dataPagamento = metaDados.baixa_automatica
-        ? new Date().toISOString().split("T")[0]
-        : null;
 
       const textoForma: Record<string, string> = {
         dinheiro: "Dinheiro",
@@ -1065,19 +1062,19 @@ serve(async (req) => {
         a_definir: "A definir",
       };
 
+      // Mapear forma de pagamento para valor do banco
+      const formasPagamentoMap: Record<string, string> = {
+        dinheiro: "Dinheiro",
+        pix: "PIX",
+        cartao: "Cartão de Crédito",
+        boleto: "Boleto Bancário",
+        a_definir: "",
+      };
+      const formaPagamentoBanco = formasPagamentoMap[metaDados.forma_pagamento || ""] || null;
+
       // Criar transações para cada item
       const transacoesCriadas: string[] = [];
       for (const item of metaDados.itens) {
-        // Montar observações incluindo o comentário do usuário
-        const observacoesTransacao = [
-          observacaoFinal,  // Observação do usuário primeiro
-          item.descricao,
-          `Fornecedor: ${item.fornecedor || "N/A"}`,
-          `Origem: WhatsApp`,
-          `Forma: ${metaDados.forma_pagamento || "N/A"}`,
-          `Solicitante: ${metaDados.nome_perfil}`,
-        ].filter(Boolean).join("\n");
-
         // Converter data de DD/MM/YYYY para YYYY-MM-DD
         let dataVencimento = new Date().toISOString().split("T")[0];
         if (item.data_emissao) {
@@ -1089,7 +1086,20 @@ serve(async (req) => {
           }
         }
 
-        console.log(`[Transação] Criando: valor=${item.valor}, fornecedor=${item.fornecedor} (id: ${item.fornecedor_id}), data=${dataVencimento}, categoria=${item.categoria_sugerida_id}, centro_custo=${item.centro_custo_sugerido_id}, base_ministerial=${item.base_ministerial_sugerido_id}`);
+        // Se baixa automática, data de pagamento = data do comprovante (não data atual)
+        const dataPagamentoFinal = metaDados.baixa_automatica ? dataVencimento : null;
+
+        // Montar observações incluindo o comentário do usuário
+        const observacoesTransacao = [
+          observacaoFinal,  // Observação do usuário primeiro
+          item.descricao,
+          `Fornecedor: ${item.fornecedor || "N/A"}`,
+          `Origem: WhatsApp`,
+          `Forma: ${metaDados.forma_pagamento || "N/A"}`,
+          `Solicitante: ${metaDados.nome_perfil}`,
+        ].filter(Boolean).join("\n");
+
+        console.log(`[Transação] Criando: valor=${item.valor}, fornecedor=${item.fornecedor} (id: ${item.fornecedor_id}), data=${dataVencimento}, data_pagamento=${dataPagamentoFinal}, forma=${formaPagamentoBanco}, categoria=${item.categoria_sugerida_id}, centro_custo=${item.centro_custo_sugerido_id}, base_ministerial=${item.base_ministerial_sugerido_id}`);
 
         const { data: tx, error } = await supabase
           .from("transacoes_financeiras")
@@ -1103,13 +1113,14 @@ serve(async (req) => {
             data_vencimento: dataVencimento,
             data_competencia: dataVencimento, // Competência = data do comprovante
             status: statusTransacao,
-            data_pagamento: dataPagamento,
+            data_pagamento: dataPagamentoFinal,
             conta_id: contaPadrao.id,
             categoria_id: item.categoria_sugerida_id,
             subcategoria_id: item.subcategoria_sugerida_id,
             centro_custo_id: item.centro_custo_sugerido_id,
             base_ministerial_id: item.base_ministerial_sugerido_id,
             fornecedor_id: item.fornecedor_id,
+            forma_pagamento: formaPagamentoBanco,
             anexo_url: item.anexo_storage,
             observacoes: observacoesTransacao,
             igreja_id: igrejaId,
