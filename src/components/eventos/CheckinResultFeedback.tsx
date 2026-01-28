@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { CheckCircle2, XCircle, AlertTriangle, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -53,31 +54,42 @@ export function CheckinResultFeedback({
   const config = feedbackConfig[type];
   const Icon = config.icon;
 
+  // Auto-close after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose?.();
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex flex-col items-center justify-center p-6 text-white animate-in fade-in duration-200",
+        "flex flex-col items-center justify-center p-8 text-white text-center rounded-lg",
         config.bgClass
       )}
       onClick={onClose}
+      role="dialog"
+      aria-label="Resultado do check-in"
     >
-      <Icon className={cn("w-24 h-24 mb-6", config.iconClass)} />
+      <Icon className={cn("w-20 h-20 mb-4", config.iconClass)} />
       
-      <h2 className="text-2xl font-bold mb-2 text-center">{config.title}</h2>
+      <h2 className="text-2xl font-bold mb-2">{config.title}</h2>
       
       {personName && (
-        <p className="text-xl font-medium text-center mb-1">{personName}</p>
+        <p className="text-lg font-medium mb-1">{personName}</p>
       )}
       
       {eventName && (
-        <p className="text-lg opacity-90 text-center mb-4">{eventName}</p>
+        <p className="text-base opacity-90 mb-3">{eventName}</p>
       )}
       
       {message && (
-        <p className="text-base opacity-80 text-center">{message}</p>
+        <p className="text-sm opacity-80 mb-4">{message}</p>
       )}
       
-      <p className="mt-8 text-sm opacity-70">Toque para continuar</p>
+      <p className="text-xs opacity-70 mt-4">Fechando automaticamente...</p>
     </div>
   );
 }

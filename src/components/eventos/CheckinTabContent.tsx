@@ -17,35 +17,78 @@ export function CheckinTabContent({ eventoId }: CheckinTabContentProps) {
   const [scannerOpen, setScannerOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Estatísticas de check-in
+  // Estatísticas de check-in - híbrido baseado em requer_inscricao
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["checkin-stats", eventoId],
     queryFn: async () => {
-      // Total de inscritos
-      const { count: total, error: totalError } = await supabase
-        .from("inscricoes_eventos")
-        .select("id", { count: "exact", head: true })
-        .eq("evento_id", eventoId)
-        .is("cancelado_em", null);
+      try {
+        // Buscar dados do evento
+        const { data: evento, error: eventoError } = await supabase
+          .from("eventos")
+          .select("requer_inscricao, tipo")
+          .eq("id", eventoId)
+          .single();
 
-      if (totalError) throw totalError;
+        if (eventoError) {
+          console.error("Erro ao buscar evento:", eventoError);
+          throw eventoError;
+        }
 
-      // Presentes (com check-in)
-      const { count: presentes, error: presentesError } = await supabase
-        .from("inscricoes_eventos")
-        .select("id", { count: "exact", head: true })
-        .eq("evento_id", eventoId)
-        .is("cancelado_em", null)
-        .not("checkin_validado_em", "is", null);
+        let total = 0;
 
-      if (presentesError) throw presentesError;
+        // Se requer inscrição, contar inscritos
+        if (evento?.requer_inscricao) {
+          const { count: inscritos, error: inscritos_error } = await supabase
+            .from("inscricoes_eventos")
+            .select("id", { count: "exact", head: true })
+            .eq("evento_id", eventoId)
+            .is("cancelado_em", null);
 
-      return {
-        total: total || 0,
-        presentes: presentes || 0,
-        pendentes: (total || 0) - (presentes || 0),
-        percentual: total ? Math.round(((presentes || 0) / total) * 100) : 0,
-      };
+          if (inscritos_error) {
+            console.error("Erro ao contar inscritos:", inscritos_error);
+            throw inscritos_error;
+          }
+          total = inscritos || 0;
+        } else {
+          // Se não requer inscrição (tipo culto), contar membros
+          const { count: membros, error: membros_error } = await supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "membro");
+
+          if (membros_error) {
+            console.error("Erro ao contar membros:", membros_error);
+            throw membros_error;
+          }
+          total = membros || 0;
+        }
+
+        // Presentes (sempre da tabela checkins - fonte de verdade)
+        const { count: presentes, error: presentesError } = await supabase
+          .from("checkins")
+          .select("id", { count: "exact", head: true })
+          .eq("evento_id", eventoId);
+
+        if (presentesError) {
+          console.error("Erro ao contar presentes:", presentesError);
+          throw presentesError;
+        }
+
+        const presentes_count = presentes || 0;
+        const pendentes = Math.max(0, total - presentes_count);
+
+        console.log("Stats calculados:", { total, presentes_count, pendentes });
+
+        return {
+          total,
+          presentes: presentes_count,
+          pendentes,
+          percentual: total > 0 ? Math.round((presentes_count / total) * 100) : 0,
+        };
+      } catch (error) {
+        console.error("Erro na query de stats:", error);
+        throw error;
+      }
     },
     refetchInterval: 10000, // Atualiza a cada 10 segundos
   });
@@ -145,6 +188,7 @@ export function CheckinTabContent({ eventoId }: CheckinTabContentProps) {
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onSuccess={handleRefresh}
+        eventoId={eventoId}
       />
     </div>
   );

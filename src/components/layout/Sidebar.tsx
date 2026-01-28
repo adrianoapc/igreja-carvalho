@@ -36,6 +36,7 @@ import {
   Heart,
   Sparkles,
   Smile,
+  Target,
 } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 import { usePermissions, Permission } from "@/hooks/usePermissions";
@@ -64,8 +65,10 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Mural & Avisos", url: "/mural", icon: MonitorPlay },
       { title: "Diário de Oração", url: "/intercessao/diario", icon: Heart },
       { title: "Agenda", url: "/eventos/lista", icon: CalendarDays },
+      { title: "Voluntariado", url: "/voluntariado", icon: Briefcase },
+      { title: "Minha Jornada", url: "/voluntariado/minha-jornada", icon: Target },
       { title: "Meus Cursos", url: "/cursos", icon: GraduationCap },
-      { title: "Minha Família", url: "/perfil/familia", icon: Home },
+      { title: "Minha Família", url: "/perfil/wallet", icon: Users },
       { title: "Minhas Escalas", url: "/minhas-escalas", icon: CalendarCheck },
     ],
   },
@@ -79,20 +82,32 @@ const MENU_GROUPS: MenuGroup[] = [
         permission: "ministerio.view",
       },
       {
-        title: "Kids › Check-in",
+        title: "Kids",
+        url: "/kids/dashboard",
+        icon: Baby,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Kids › Gestão",
         url: "/kids",
         icon: Baby,
         permission: "ministerio.view",
       },
       {
-        title: "Voluntariado",
-        url: "/voluntariado",
-        icon: Briefcase,
+        title: "Voluntariado › Gestão",
+        url: "/voluntariado/candidatos",
+        icon: ClipboardCheck,
         permission: "ministerio.view",
       },
       {
-        title: "Voluntariado › Candidatos",
-        url: "/voluntariado/candidatos",
+        title: "Voluntariado › Integração",
+        url: "/voluntariado/integracao",
+        icon: ClipboardCheck,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Voluntariado › Testes",
+        url: "/voluntariado/testes",
         icon: ClipboardCheck,
         permission: "ministerio.view",
       },
@@ -106,6 +121,12 @@ const MENU_GROUPS: MenuGroup[] = [
         title: "Eventos › Gestão",
         url: "/eventos",
         icon: CalendarDays,
+        permission: "ministerio.view",
+      },
+      {
+        title: "Eventos › Chamada",
+        url: "/chamada",
+        icon: ClipboardCheck,
         permission: "ministerio.view",
       },
       {

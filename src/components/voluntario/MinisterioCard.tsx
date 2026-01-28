@@ -30,16 +30,22 @@ export default function MinisterioCard({
   desabilitado,
   motivo,
 }: MinisterioCardProps) {
+  const semVagas = vagas !== undefined && vagas === 0;
+  const isDesabilitado = desabilitado || semVagas;
+  const motivoExibir = semVagas 
+    ? "Não há vagas disponíveis no momento. Tente novamente mais tarde!"
+    : motivo;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={!desabilitado ? { translateY: -4 } : {}}
+      whileHover={!isDesabilitado ? { translateY: -4 } : {}}
       transition={{ duration: 0.3 }}
     >
       <Card
         className={`relative overflow-hidden transition-all ${
-          desabilitado
+          isDesabilitado
             ? "opacity-60 cursor-not-allowed bg-muted/30"
             : "hover:shadow-lg cursor-pointer hover:border-primary/50"
         }`}
@@ -55,9 +61,12 @@ export default function MinisterioCard({
               </div>
               <div className="flex-1">
                 <CardTitle className="text-lg">{nome}</CardTitle>
-                {vagas && (
+                {vagas !== undefined && (
                   <CardDescription className="text-xs mt-1">
-                    {vagas} vagas disponíveis
+                    {vagas > 0 
+                      ? `${vagas} ${vagas === 1 ? 'vaga disponível' : 'vagas disponíveis'}`
+                      : 'Sem vagas no momento'
+                    }
                   </CardDescription>
                 )}
               </div>
@@ -99,23 +108,23 @@ export default function MinisterioCard({
           )}
 
           <motion.div
-            whileHover={!desabilitado ? { x: 4 } : {}}
+            whileHover={!isDesabilitado ? { x: 4 } : {}}
             transition={{ duration: 0.2 }}
           >
             <Button
               onClick={onSelect}
-              disabled={desabilitado}
+              disabled={isDesabilitado}
               className="w-full gap-2"
-              variant={desabilitado ? "outline" : "default"}
+              variant={isDesabilitado ? "outline" : "default"}
             >
-              {desabilitado ? "Indisponível" : "Candidatar-se"}
+              {isDesabilitado ? "Indisponível" : "Candidatar-se"}
               <ChevronRight className="w-4 h-4" />
             </Button>
           </motion.div>
 
-          {desabilitado && motivo && (
+          {isDesabilitado && motivoExibir && (
             <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-              {motivo}
+              {motivoExibir}
             </p>
           )}
         </CardContent>

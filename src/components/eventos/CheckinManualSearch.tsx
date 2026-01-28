@@ -108,7 +108,7 @@ export function CheckinManualSearch({
       const { data, error } = await supabase.functions.invoke(
         "checkin-inscricao",
         {
-          body: { qr_token: qrToken },
+          body: { qr_token: qrToken, contexto_evento_id: eventoId },
         }
       );
 
@@ -132,7 +132,15 @@ export function CheckinManualSearch({
           )
         );
       } else {
-        toast.error(data.message || "Erro ao realizar check-in");
+        if (data.code === "WRONG_EVENT") {
+          toast.error("Este QR Code pertence a outro evento.");
+        } else if (data.code === "ALREADY_USED") {
+          toast.error("Inscrição já utilizada.");
+        } else if (data.code === "PENDENTE") {
+          toast.error("Pagamento não confirmado.");
+        } else {
+          toast.error(data.message || "Erro ao realizar check-in");
+        }
       }
     },
     onError: (error: Error) => {

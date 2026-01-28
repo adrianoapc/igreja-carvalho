@@ -14,6 +14,7 @@ import MinhaInscricaoCard from "@/components/voluntariado/MinhaInscricaoCard";
 import MinisterioCard from "@/components/voluntario/MinisterioCard";
 import InscricaoModal from "@/components/voluntario/InscricaoModal";
 import StatusTimeline from "@/components/voluntario/StatusTimeline";
+import { IntegracaoInfoModal } from "@/components/voluntariado/IntegracaoInfoModal";
 import { Loader2, Heart, Users, Zap, Target } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +26,7 @@ interface Ministerio {
   descricao: string;
   cor: string;
   vagas_necessarias: number;
+  vagas_abertas: number; // Vagas realmente disponíveis (necessárias - ocupadas)
   dificuldade: "fácil" | "médio" | "avançado";
   requisitos?: string[];
 }
@@ -54,11 +56,12 @@ export default function Voluntariado() {
   const { user, profile, loading: authLoading } = useAuth();
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [minhasCandidaturas, setMinhasCandidaturas] = useState<Candidatura[]>(
-    []
+    [],
   );
   const [ministerios, setMinisterios] = useState<Ministerio[]>([]);
   const [loadingCandidatura, setLoadingCandidatura] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [integracaoModalOpen, setIntegracaoModalOpen] = useState(false);
   const [ministerioSelecionado, setMinisterioSelecionado] = useState<
     string | null
   >(null);
@@ -66,7 +69,7 @@ export default function Voluntariado() {
   const [statsHero, setStatsHero] = useState({
     ministerios: 0,
     voluntarios: 0,
-    aprovacoesMes: 0,
+    vagasAbertas: 0,
   });
 
   // Preencher dados do perfil se logado
@@ -87,7 +90,7 @@ export default function Voluntariado() {
       const { data, error } = await supabase
         .from("candidatos_voluntario")
         .select(
-          "id, ministerio, disponibilidade, experiencia, status, created_at"
+          "id, ministerio, disponibilidade, experiencia, status, created_at",
         )
         .eq("pessoa_id", profile.id)
         .order("created_at", { ascending: false });
@@ -118,8 +121,10 @@ export default function Voluntariado() {
       if (!isAllFiliais && filialId) {
         try {
           // tenta aplicar filial_id se existir
-          timesQuery = (timesQuery as any).eq("filial_id", filialId);
-        } catch {}
+          timesQuery = timesQuery.eq("filial_id", filialId);
+        } catch {
+          // Ignora erro se coluna filial_id não existir
+        }
       }
       const timesRes = await timesQuery;
 
@@ -133,33 +138,10 @@ export default function Voluntariado() {
         membrosQuery = membrosQuery.eq("filial_id", filialId);
       const membrosRes = await membrosQuery;
 
-      // Aprovações no mês
-      const now = new Date();
-      const startMonth = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        1
-      ).toISOString();
-      const nextMonth = new Date(
-        now.getFullYear(),
-        now.getMonth() + 1,
-        1
-      ).toISOString();
-      let aprovQuery = supabase
-        .from("candidatos_voluntario")
-        .select("id", { count: "exact" })
-        .eq("status", "aprovado")
-        .eq("igreja_id", igrejaId)
-        .gte("data_avaliacao", startMonth)
-        .lt("data_avaliacao", nextMonth);
-      if (!isAllFiliais && filialId)
-        aprovQuery = aprovQuery.eq("filial_id", filialId);
-      const aprovRes = await aprovQuery;
-
       setStatsHero({
         ministerios: timesRes.count || 0,
         voluntarios: membrosRes.count || 0,
-        aprovacoesMes: aprovRes.count || 0,
+        vagasAbertas: 0, // Será calculado ao carregar ministérios
       });
     };
     loadHeroStats();
@@ -173,7 +155,7 @@ export default function Voluntariado() {
       let query = supabase
         .from("times")
         .select(
-          "id, nome, descricao, cor, vagas_necessarias, dificuldade, ativo"
+          "id, nome, descricao, cor, vagas_necessarias, dificuldade, ativo, categoria",
         )
         .eq("ativo", true)
         .eq("igreja_id", igrejaId);
@@ -184,17 +166,77 @@ export default function Voluntariado() {
 
       const { data, error } = await query.order("nome");
 
-      if (!error && data) {
-        setMinisterios(
-          data.map((t: any) => ({
-            id: t.id,
-            nome: t.nome,
-            descricao: t.descricao || "Ministério da igreja",
-            cor: t.cor || "bg-blue-500",
-            vagas_necessarias: t.vagas_necessarias || 1,
-            dificuldade: t.dificuldade || "médio",
-          }))
+      // Debug: mostrar todos os times encontrados
+      console.log(
+        "[Voluntariado] Times encontrados:",
+        data?.map((t) => ({ id: t.id, nome: t.nome, categoria: t.categoria })),
+      );
+
+      // Filtrar times técnicos (Pastores, etc) que não são ministérios
+      const timesFiltrados =
+        data?.filter(
+          (t) =>
+            t.nome.toLowerCase() !== "pastores" &&
+            t.categoria?.toLowerCase() !== "pastores",
+        ) || [];
+
+      console.log(
+        "[Voluntariado] Times após filtro:",
+        timesFiltrados?.map((t) => ({
+          id: t.id,
+          nome: t.nome,
+          categoria: t.categoria,
+        })),
+      );
+
+      if (!error && timesFiltrados.length > 0) {
+        const ministeriosData = timesFiltrados.map((t) => ({
+          id: t.id,
+          nome: t.nome,
+          descricao: t.descricao || "Ministério da igreja",
+          cor: t.cor || "bg-blue-500",
+          vagas_necessarias: t.vagas_necessarias || 1,
+          vagas_abertas: 0, // Será calculado logo abaixo
+          dificuldade: t.dificuldade || "médio",
+        }));
+
+        // Calcular vagas abertas para cada ministério
+        let vagasTotal = 0;
+        const ministeriosComVagas = await Promise.all(
+          ministeriosData.map(async (ministerio) => {
+            const { count: membrosCount } = await supabase
+              .from("membros_time")
+              .select("id", { count: "exact", head: true })
+              .eq("time_id", ministerio.id)
+              .eq("ativo", true);
+
+            const vagasAbertas = Math.max(
+              0,
+              ministerio.vagas_necessarias - (membrosCount || 0),
+            );
+
+            // Debug log
+            console.log(
+              `[Voluntariado] ${ministerio.nome}: ${ministerio.vagas_necessarias} vagas necessárias, ${membrosCount || 0} membros ativos, ${vagasAbertas} vagas abertas`,
+            );
+
+            vagasTotal += vagasAbertas;
+
+            return {
+              ...ministerio,
+              vagas_abertas: vagasAbertas,
+              dificuldade: (ministerio.dificuldade || "médio") as "fácil" | "médio" | "avançado",
+            };
+          }),
         );
+
+        setMinisterios(ministeriosComVagas);
+
+        // Atualizar stat de vagas abertas
+        setStatsHero((prev) => ({
+          ...prev,
+          vagasAbertas: vagasTotal,
+        }));
       }
     };
     loadMinisterios();
@@ -285,7 +327,7 @@ export default function Voluntariado() {
   }
 
   const candidaturasAtivas = minhasCandidaturas.filter(
-    (c) => c.status !== "rejeitado"
+    (c) => c.status !== "rejeitado",
   );
 
   return (
@@ -333,8 +375,8 @@ export default function Voluntariado() {
                 },
                 {
                   icon: Target,
-                  label: "Aprovações no mês",
-                  value: statsHero.aprovacoesMes,
+                  label: "Oportunidades Abertas",
+                  value: statsHero.vagasAbertas,
                 },
               ].map((stat, idx) => (
                 <motion.div
@@ -384,11 +426,11 @@ export default function Voluntariado() {
                     descricao={ministerio.descricao}
                     icone={Heart}
                     cor={ministerio.cor}
-                    vagas={ministerio.vagas_necessarias}
+                    vagas={ministerio.vagas_abertas}
                     dificuldade={ministerio.dificuldade}
                     requisitos={ministerio.requisitos || []}
                     desabilitado={ministeriosBloqueados.includes(
-                      ministerio.nome
+                      ministerio.nome,
                     )}
                     motivo={
                       ministeriosBloqueados.includes(ministerio.nome)
@@ -471,13 +513,22 @@ export default function Voluntariado() {
                 <p className="text-base text-muted-foreground mb-4">
                   Quer saber mais sobre o processo de integração?
                 </p>
-                <Button variant="outline" asChild>
-                  <a href="#como-funciona">Ver processo</a>
+                <Button 
+                  variant="outline"
+                  onClick={() => setIntegracaoModalOpen(true)}
+                >
+                  Ver processo
                 </Button>
               </CardContent>
             </Card>
           </motion.div>
         )}
+
+        {/* Modal de Informações sobre Integração */}
+        <IntegracaoInfoModal 
+          open={integracaoModalOpen}
+          onOpenChange={setIntegracaoModalOpen}
+        />
       </div>
     </div>
   );

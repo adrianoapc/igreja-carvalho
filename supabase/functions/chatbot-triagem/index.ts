@@ -3,7 +3,7 @@ import {
   createClient,
   SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { buscarLoteAtivo } from "../_shared/lotes.ts"; // ADR-016: Integração de lotes
+import { buscarLoteAtivo } from "../_shared/lotes.ts"; // ADR-026: Integração de lotes
 
 // --- INTERFACES ---
 interface RequestBody {
@@ -564,7 +564,7 @@ async function finalizarInscricao(
     pessoaId = novaPessoa.id;
   }
 
-  // PASSO 5: ADR-016 - Buscar lote ativo (antes de criar inscrição)
+  // PASSO 5: ADR-026 - Buscar lote ativo (antes de criar inscrição)
   let loteId: string | null = null;
   let valorPago: number | null = null;
   
@@ -586,7 +586,7 @@ async function finalizarInscricao(
         filialId
       );
     }
-    
+
     console.log(`[Inscricao] Lote ativo encontrado: ${loteAtivo.nome} (R$ ${loteAtivo.valor})`);
   }
 
@@ -598,8 +598,8 @@ async function finalizarInscricao(
       evento_id: evento.id,
       pessoa_id: pessoaId,
       status_pagamento: statusPagamento,
-      lote_id: loteId,         // ADR-016: Vincular a lote ativo
-      valor_pago: valorPago,   // ADR-016: Registrar valor do lote
+      lote_id: loteId,         // ADR-026: Vincular a lote ativo
+      valor_pago: valorPago,   // ADR-026: Registrar valor do lote
       responsavel_inscricao_id: pessoaId,
       igreja_id: igrejaId,
       filial_id: filialId,
@@ -621,9 +621,9 @@ async function finalizarInscricao(
     .update({ status: "CONCLUIDO" })
     .eq("id", sessao.id);
   
-  // ADR-016: Mensagem com info do lote quando disponível
+  // ADR-026: Mensagem com info do lote quando disponível
   let mensagemFinal: string;
-  if (loteAtivo && loteAtivo.valor > 0) {
+  if (loteAtivo?.valor > 0) {
     mensagemFinal = evento.requer_pagamento
       ? `Inscrição registrada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! 🎉\n\nSua vaga está reservada por 24h.\n\nQR Code: ${qrLink}`
       : `Inscrição confirmada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! 🎉\n\nQR Code: ${qrLink}`;
@@ -633,7 +633,7 @@ async function finalizarInscricao(
       : `Inscrição confirmada! 🎉\n\nAqui está seu QR Code:\n${qrLink}`;
   }
 
-  console.log(`[Inscricao] Sucesso! Inscrição ${novaInscricao.id} criada${loteId ? ` no lote ${loteId}` : ''}.`);
+  console.log(`[Inscricao] Sucesso! Inscrição ${novaInscricao.id} criada${loteId ? ` no lote ${loteId}` : ""}.`);
   return respostaJson(mensagemFinal, { qr_url: qrLink, qr_image: qrImage });
 }
 

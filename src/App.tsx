@@ -45,6 +45,12 @@ const VoluntariadoCandidatos = lazy(
 const VoluntariadoHistorico = lazy(
   () => import("./pages/voluntariado/Historico"),
 );
+const TestesCrud = lazy(() => import("./pages/voluntariado/TestesCrud"));
+const IntegracaoDashboard = lazy(
+  () => import("./pages/voluntariado/IntegracaoDashboard"),
+);
+const MeuTeste = lazy(() => import("./pages/voluntariado/MeuTeste"));
+const MinhaJornada = lazy(() => import("./pages/voluntariado/MinhaJornada"));
 const Publicacao = lazy(() => import("./pages/Publicacao"));
 const Comunicados = lazy(() => import("./pages/Comunicados"));
 const Announcements = lazy(() => import("./pages/Announcements"));
@@ -331,6 +337,38 @@ const App = () => (
                     element={
                       <AuthGate>
                         <VoluntariadoHistorico />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/voluntariado/testes"
+                    element={
+                      <AuthGate>
+                        <TestesCrud />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/voluntariado/integracao"
+                    element={
+                      <AuthGate>
+                        <IntegracaoDashboard />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/voluntariado/meu-teste/:testeId"
+                    element={
+                      <AuthGate>
+                        <MeuTeste />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/voluntariado/minha-jornada"
+                    element={
+                      <AuthGate>
+                        <MinhaJornada />
                       </AuthGate>
                     }
                   />

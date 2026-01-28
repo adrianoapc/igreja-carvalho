@@ -33,6 +33,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useFilialId } from "@/hooks/useFilialId";
+import { KidsManualCheckin } from "@/components/kids/KidsManualCheckin";
 
 export default function KidsDashboard() {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
@@ -1070,6 +1071,8 @@ export default function KidsDashboard() {
           </Link>
         </Card>
       </div>
+
+      <KidsManualCheckin />
     </div>
   );
 }

@@ -518,7 +518,7 @@ Deno.serve(async (req) => {
     pessoaId = novaPessoa.id;
   }
 
-  // PASSO 7: ADR-026 - Buscar lote ativo (antes de criar inscrição)
+  // PASSO 6: ADR-026 - Buscar lote ativo (antes de criar inscrição)
   let loteId: string | null = null;
   let valorPago: number | null = null;
   
@@ -541,11 +541,11 @@ Deno.serve(async (req) => {
         corsHeaders
       );
     }
-    
+
     console.log(`[Compartilhe] Lote ativo encontrado: ${loteAtivo.nome} (R$ ${loteAtivo.valor})`);
   }
 
-  // PASSO 8: Criar nova inscrição
+  // PASSO 7: Criar nova inscrição
   const statusPagamento = evento.requer_pagamento ? "pendente" : "isento";
   const { data: novaInscricao, error: inscricaoError } = await supabase
     .from("inscricoes_eventos")
@@ -583,7 +583,7 @@ Deno.serve(async (req) => {
   
   // ADR-026: Mensagem com info do lote quando disponível
   let mensagemResposta: string;
-  if (loteAtivo && loteAtivo.valor > 0) {
+  if (loteAtivo?.valor > 0) {
     mensagemResposta = evento.requer_pagamento
       ? `Inscricao registrada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! Sua vaga esta reservada por 24h. QR: ${qrLink}`
       : `Inscricao confirmada no lote "${loteAtivo.nome}" (R$ ${loteAtivo.valor.toFixed(2)})! QR: ${qrLink}`;

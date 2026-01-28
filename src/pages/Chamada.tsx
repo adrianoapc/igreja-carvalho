@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, Calendar, CheckCircle2, Users, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, Users, AlertCircle, Check, Loader } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import {
@@ -38,7 +38,11 @@ interface Evento {
 export default function Chamada() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [optimisticStates, setOptimisticStates] = useState<Record<string, boolean>>({});
+  
+  // Estado local para presenças (true = presente, false = ausente)
+  // Por padrão, todos começam como "presente"
+  const [presencas, setPresencas] = useState<Record<string, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   // Buscar culto mais próximo (hoje ou mais recente)
   const { data: culto, isLoading: loadingCulto } = useQuery({
@@ -73,21 +77,121 @@ export default function Chamada() {
     },
   });
 
-  // Buscar lista de chamada
+  // Buscar lista de membros/inscritos (híbrido baseado em requer_inscricao)
   const { data: membros, isLoading: loadingMembros } = useQuery({
     queryKey: ["lista-chamada", culto?.id],
     queryFn: async () => {
       if (!culto?.id) return [];
       
-      const { data, error } = await supabase.rpc("get_minha_lista_chamada", {
-        p_evento_id: culto.id,
-      });
+      try {
+        // Buscar dados do evento para saber se requer inscrição
+        const { data: evento, error: eventoError } = await supabase
+          .from("eventos")
+          .select("requer_inscricao, tipo")
+          .eq("id", culto.id)
+          .single();
 
-      if (error) throw error;
-      return (data as MembroChamada[]) || [];
+        if (eventoError) {
+          console.error("Erro ao buscar evento:", eventoError);
+          throw eventoError;
+        }
+
+        console.log("Evento carregado:", evento);
+
+        let pessoas: Array<{ id: string; nome: string; avatar_url: string | null }> = [];
+
+        // Se requer inscrição, buscar inscritos
+        if (evento?.requer_inscricao) {
+          console.log("Buscando inscritos (requer_inscricao=true)");
+          const { data: inscritos, error: inscritos_error } = await supabase
+            .from("inscricoes_eventos")
+            .select("pessoa_id")
+            .eq("evento_id", culto.id)
+            .is("cancelado_em", null);
+
+          if (inscritos_error) {
+            console.error("Erro ao buscar inscritos:", inscritos_error);
+            throw inscritos_error;
+          }
+
+          // Buscar dados dos profiles dos inscritos
+          const pessoaIds = (inscritos || []).map(i => i.pessoa_id);
+          console.log("Pessoa IDs inscritos:", pessoaIds);
+          
+          if (pessoaIds.length > 0) {
+            const { data: profiles, error: profilesError } = await supabase
+              .from("profiles")
+              .select("id, nome, avatar_url")
+              .in("id", pessoaIds)
+              .order("nome");
+
+            if (profilesError) {
+              console.error("Erro ao buscar profiles dos inscritos:", profilesError);
+              throw profilesError;
+            }
+            pessoas = profiles || [];
+            console.log("Profiles dos inscritos carregados:", pessoas.length);
+          }
+        } else {
+          // Se não requer inscrição (culto), buscar membros
+          console.log("Buscando membros (requer_inscricao=false)");
+          const { data: profiles, error: profilesError } = await supabase
+            .from("profiles")
+            .select("id, nome, avatar_url")
+            .eq("status", "membro")
+            .order("nome");
+
+          if (profilesError) {
+            console.error("Erro ao buscar membros:", profilesError);
+            throw profilesError;
+          }
+          pessoas = profiles || [];
+          console.log("Membros carregados:", pessoas.length);
+        }
+
+        // Buscar as presenças JÁ REGISTRADAS deste evento
+        const { data: checkins, error: checkinsError } = await supabase
+          .from("checkins")
+          .select("pessoa_id")
+          .eq("evento_id", culto.id);
+
+        if (checkinsError) {
+          console.error("Erro ao buscar checkins:", checkinsError);
+          throw checkinsError;
+        }
+
+        const checkinIds = new Set(checkins?.map(c => c.pessoa_id) || []);
+        console.log("Checkins carregados:", checkinIds.size);
+
+        // Montar lista de membros/inscritos
+        return pessoas.map(p => ({
+          pessoa_id: p.id,
+          nome: p.nome,
+          avatar_url: p.avatar_url,
+          nome_grupo: "Participante",
+          tipo_grupo: "geral",
+          ja_marcado: checkinIds.has(p.id),
+        } as MembroChamada));
+      } catch (error) {
+        console.error("Erro ao buscar lista de chamada:", error);
+        return [];
+      }
     },
     enabled: !!culto?.id,
   });
+
+  // Inicializar presenças quando membros carregarem
+  // Usa os checkins já gravados como fonte de verdade
+  React.useEffect(() => {
+    if (membros && membros.length > 0) {
+      const presencasIniciais: Record<string, boolean> = {};
+      membros.forEach(m => {
+        // VERDADE DO BANCO: ja_marcado indica se foi gravado um checkin
+        presencasIniciais[m.pessoa_id] = m.ja_marcado; // true se tem checkin, false se não tem
+      });
+      setPresencas(presencasIniciais);
+    }
+  }, [membros]);
 
   // Buscar user_id atual
   const { data: currentUser } = useQuery({
@@ -98,58 +202,68 @@ export default function Chamada() {
     },
   });
 
-  // Mutation para marcar presença
-  const marcarPresenca = useMutation({
-    mutationFn: async ({ pessoaId, marcar }: { pessoaId: string; marcar: boolean }) => {
-      if (!culto?.id || !currentUser?.id) throw new Error("Dados incompletos");
+  // Função para salvar TODAS as presenças de uma vez
+  const handleSalvarPresencas = async () => {
+    if (!culto?.id || !currentUser?.id || !membros) return;
 
-      if (marcar) {
-        const { error } = await supabase.from("checkins").insert({
-          evento_id: culto.id,
-          pessoa_id: pessoaId,
-          metodo: "lider_celula",
-          validado_por: currentUser.id,
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
+    setIsSaving(true);
+    try {
+      // Separar quem vai ficar marcado vs desmarcado
+      const paraMarcados: string[] = [];
+      const paraDesmarcados: string[] = [];
+
+      membros.forEach(m => {
+        const currentState = presencas[m.pessoa_id];
+        const previousState = m.ja_marcado;
+
+        // Se mudou de desmarcado para marcado
+        if (currentState === true && previousState === false) {
+          paraMarcados.push(m.pessoa_id);
+        }
+        // Se mudou de marcado para desmarcado
+        else if (currentState === false && previousState === true) {
+          paraDesmarcados.push(m.pessoa_id);
+        }
+      });
+
+      // Deletar os desmarcados
+      if (paraDesmarcados.length > 0) {
+        const { error: deleteError } = await supabase
           .from("checkins")
           .delete()
           .eq("evento_id", culto.id)
-          .eq("pessoa_id", pessoaId);
-        if (error) throw error;
+          .in("pessoa_id", paraDesmarcados);
+
+        if (deleteError) throw deleteError;
       }
-    },
-    onMutate: async ({ pessoaId, marcar }) => {
-      // Optimistic update
-      setOptimisticStates((prev) => ({ ...prev, [pessoaId]: marcar }));
-    },
-    onSuccess: () => {
+
+      // Inserir os marcados
+      if (paraMarcados.length > 0) {
+        const { error: insertError } = await supabase
+          .from("checkins")
+          .insert(
+            paraMarcados.map(pessoaId => ({
+              evento_id: culto.id,
+              pessoa_id: pessoaId,
+              metodo: "lider_celula",
+              validado_por: currentUser.id,
+            }))
+          );
+
+        if (insertError) throw insertError;
+      }
+
+      const totalAlteracoes = paraMarcados.length + paraDesmarcados.length;
+      toast.success(`✅ ${totalAlteracoes} mudança(s) salva(s)!`);
       queryClient.invalidateQueries({ queryKey: ["lista-chamada", culto?.id] });
-    },
-    onError: (error, { pessoaId }) => {
-      // Reverter estado otimista
-      setOptimisticStates((prev) => {
-        const newState = { ...prev };
-        delete newState[pessoaId];
-        return newState;
-      });
-      toast.error("Erro ao registrar presença", {
-        description: "Tente novamente em alguns segundos.",
-      });
-      console.error("Erro:", error);
-    },
-    onSettled: (_, __, { pessoaId }) => {
-      // Limpar estado otimista após conclusão
-      setTimeout(() => {
-        setOptimisticStates((prev) => {
-          const newState = { ...prev };
-          delete newState[pessoaId];
-          return newState;
-        });
-      }, 500);
-    },
-  });
+      queryClient.invalidateQueries({ queryKey: ["chamada-stats", culto?.id] });
+    } catch (error) {
+      console.error("Erro ao salvar presenças:", error);
+      toast.error("Erro ao salvar presenças");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Agrupar membros por grupo
   const membrosAgrupados = useMemo(() => {
@@ -166,23 +280,16 @@ export default function Chamada() {
   const { presentes, total, porcentagem } = useMemo(() => {
     if (!membros) return { presentes: 0, total: 0, porcentagem: 0 };
     const total = membros.length;
-    const presentes = membros.filter((m) => {
-      const isOptimistic = optimisticStates[m.pessoa_id];
-      return isOptimistic !== undefined ? isOptimistic : m.ja_marcado;
-    }).length;
+    const presentes = Object.values(presencas).filter(Boolean).length;
     return { presentes, total, porcentagem: total > 0 ? (presentes / total) * 100 : 0 };
-  }, [membros, optimisticStates]);
+  }, [membros, presencas]);
 
-  // Estado efetivo (considerando otimismo)
-  const getEstadoEfetivo = (membro: MembroChamada) => {
-    if (optimisticStates[membro.pessoa_id] !== undefined) {
-      return optimisticStates[membro.pessoa_id];
-    }
-    return membro.ja_marcado;
-  };
-
-  const handleToggle = (pessoaId: string, marcado: boolean) => {
-    marcarPresenca.mutate({ pessoaId, marcar: !marcado });
+  // Alternar presença (desmarcar ausente)
+  const handleTogglePresenca = (pessoaId: string) => {
+    setPresencas(prev => ({
+      ...prev,
+      [pessoaId]: !prev[pessoaId],
+    }));
   };
 
   if (loadingCulto) {
@@ -215,11 +322,31 @@ export default function Chamada() {
     );
   }
 
+  if (!membros || membros.length === 0) {
+    return (
+      <div className="min-h-screen p-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
+        </Button>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Users className="w-12 h-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold">Nenhum membro encontrado</h3>
+            <p className="text-muted-foreground text-sm mt-2">
+              Não há membros para fazer chamada neste culto.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const dataCulto = new Date(culto.data_evento);
   const isHoje = new Date().toDateString() === dataCulto.toDateString();
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-32">
       {/* Header */}
       <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 border-b">
         <div className="p-4">
@@ -268,20 +395,10 @@ export default function Chamada() {
               <Skeleton key={i} className="h-16 w-full rounded-lg" />
             ))}
           </div>
-        ) : Object.keys(membrosAgrupados).length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Users className="w-12 h-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold">Nenhum membro encontrado</h3>
-              <p className="text-muted-foreground text-sm mt-2">
-                Você não tem membros para fazer chamada neste culto.
-              </p>
-            </CardContent>
-          </Card>
         ) : (
           <Accordion type="multiple" defaultValue={Object.keys(membrosAgrupados)} className="space-y-3">
             {Object.entries(membrosAgrupados).map(([grupo, membrosList]) => {
-              const presentesGrupo = membrosList.filter((m) => getEstadoEfetivo(m)).length;
+              const presentesGrupo = membrosList.filter((m) => presencas[m.pessoa_id] === true).length;
               
               return (
                 <AccordionItem key={grupo} value={grupo} className="border rounded-lg overflow-hidden">
@@ -296,14 +413,13 @@ export default function Chamada() {
                   <AccordionContent className="pb-0">
                     <div className="divide-y">
                       {membrosList.map((membro) => {
-                        const marcado = getEstadoEfetivo(membro);
-                        const isLoading = optimisticStates[membro.pessoa_id] !== undefined;
+                        const marcado = presencas[membro.pessoa_id] === true;
                         
                         return (
                           <div
                             key={membro.pessoa_id}
                             className={`flex items-center justify-between p-4 transition-colors ${
-                              marcado ? "bg-primary/5" : ""
+                              marcado ? "bg-primary/5" : "bg-destructive/5"
                             }`}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -315,18 +431,17 @@ export default function Chamada() {
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium truncate">{membro.nome}</p>
-                                {marcado && (
-                                  <p className="text-xs text-primary flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    Presente
+                                {!marcado && (
+                                  <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Ausente
                                   </p>
                                 )}
                               </div>
                             </div>
                             <Switch
                               checked={marcado}
-                              onCheckedChange={() => handleToggle(membro.pessoa_id, marcado)}
-                              disabled={isLoading}
+                              onCheckedChange={() => handleTogglePresenca(membro.pessoa_id)}
                               className="data-[state=checked]:bg-primary"
                             />
                           </div>
@@ -339,6 +454,44 @@ export default function Chamada() {
             })}
           </Accordion>
         )}
+      </div>
+
+      {/* Footer: Botão Salvar Fixo */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 flex gap-3">
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => {
+            // Resetar para o estado original do banco
+            const presencasReset: Record<string, boolean> = {};
+            membros?.forEach(m => {
+              presencasReset[m.pessoa_id] = m.ja_marcado; // Volta ao estado original
+            });
+            setPresencas(presencasReset);
+          }}
+          disabled={isSaving}
+          className="flex-1"
+        >
+          Descartar Alterações
+        </Button>
+        <Button
+          size="lg"
+          onClick={handleSalvarPresencas}
+          disabled={isSaving}
+          className="flex-1"
+        >
+          {isSaving ? (
+            <>
+              <Loader className="w-4 h-4 mr-2 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Check className="w-4 h-4 mr-2" />
+              Salvar Presença
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );

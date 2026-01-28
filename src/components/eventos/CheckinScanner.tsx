@@ -18,6 +18,7 @@ interface CheckinScannerProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  eventoId: string; // Garantir que o QR pertence ao evento atual
 }
 
 type FeedbackState = {
@@ -56,7 +57,7 @@ const extractToken = (input: string): string | null => {
   return null;
 };
 
-export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps) {
+export function CheckinScanner({ open, onClose, onSuccess, eventoId }: CheckinScannerProps) {
   const [stage, setStage] = useState<ScanStage>("scanning");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [pendingData, setPendingData] = useState<PendingCheckinData | null>(null);
@@ -65,23 +66,33 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
 
   const checkinMutation = useMutation({
     mutationFn: async (qrToken: string) => {
-      const { data, error } = await supabase.functions.invoke(
-        "checkin-inscricao",
-        {
-          body: { qr_token: qrToken },
-        }
-      );
+      try {
+        console.log('[CheckinScanner] Iniciando checkin com token:', qrToken);
+        const { data, error } = await supabase.functions.invoke(
+          "checkin-inscricao",
+          {
+            body: { qr_token: qrToken, contexto_evento_id: eventoId },
+          }
+        );
 
-      const payload = extractEdgeFunctionPayload(data, error);
-      if (payload) return payload;
-      if (error) throw error;
-      return data;
+        console.log('[CheckinScanner] Response:', { data, error });
+
+        const payload = extractEdgeFunctionPayload(data, error);
+        if (payload) return payload;
+        if (error) throw new Error(error.message || 'Erro na resposta do servidor');
+        return data;
+      } catch (err) {
+        console.error('[CheckinScanner] Error:', err);
+        throw err;
+      }
     },
     onSuccess: (data) => {
+      console.log('[CheckinScanner] Success response:', data);
       const pessoa = Array.isArray(data.pessoa) ? data.pessoa[0] : data.pessoa;
       const evento = Array.isArray(data.evento) ? data.evento[0] : data.evento;
 
       if (data.success) {
+        console.log('[CheckinScanner] Check-in bem-sucedido');
         // Check if document verification is required
         if (data.exigir_documento) {
           setPendingData({ pessoa, evento });
@@ -100,6 +111,7 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
           onSuccess?.();
         }
       } else if (data.code === "ALREADY_USED") {
+        console.log('[CheckinScanner] Inscrição já utilizada');
         setFeedback({
           type: "already_used",
           personName: pessoa?.nome,
@@ -108,6 +120,7 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
         });
         setStage("feedback");
       } else if (data.code === "PENDENTE") {
+        console.log('[CheckinScanner] Pagamento pendente');
         setFeedback({
           type: "pending_payment",
           personName: pessoa?.nome,
@@ -115,7 +128,17 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
           message: "Pagamento não confirmado",
         });
         setStage("feedback");
+      } else if (data.code === "WRONG_EVENT") {
+        console.log('[CheckinScanner] QR de outro evento');
+        setFeedback({
+          type: "error",
+          personName: pessoa?.nome,
+          eventName: evento?.titulo,
+          message: "Este QR Code pertence a outro evento.",
+        });
+        setStage("feedback");
       } else {
+        console.log('[CheckinScanner] Erro desconhecido:', data.message);
         setFeedback({
           type: "error",
           message: data.message || "Erro desconhecido",
@@ -124,9 +147,10 @@ export function CheckinScanner({ open, onClose, onSuccess }: CheckinScannerProps
       }
     },
     onError: (error: Error) => {
+      console.error('[CheckinScanner] Mutation error:', error);
       setFeedback({
         type: "error",
-        message: error.message || "Erro ao processar check-in",
+        message: error.message || "Erro ao processar check-in. Tente novamente.",
       });
       setStage("feedback");
     },

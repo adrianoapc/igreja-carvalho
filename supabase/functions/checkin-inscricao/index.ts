@@ -8,6 +8,7 @@ const corsHeaders = {
 type CheckinRequest = {
   qr_token?: string;
   inscricao_id?: string;
+  contexto_evento_id?: string; // Evento da página onde o check-in está sendo realizado
 };
 
 Deno.serve(async (req) => {
@@ -56,6 +57,7 @@ Deno.serve(async (req) => {
 
   const qrToken = payload.qr_token?.trim();
   const inscricaoId = payload.inscricao_id?.trim();
+  const contextoEventoId = payload.contexto_evento_id?.trim();
 
   if (!qrToken && !inscricaoId) {
     return new Response(JSON.stringify({ success: false, message: "qr_token or inscricao_id is required" }), {
@@ -91,6 +93,21 @@ Deno.serve(async (req) => {
   // Handle evento as potentially array from join
   const evento = Array.isArray(inscricao.evento) ? inscricao.evento[0] : inscricao.evento;
   const pessoa = Array.isArray(inscricao.pessoa) ? inscricao.pessoa[0] : inscricao.pessoa;
+
+  // Se a função foi chamada com um contexto de evento (página específica), validar que o QR pertence a esse evento
+  if (contextoEventoId && inscricao.evento_id !== contextoEventoId) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        code: "WRONG_EVENT",
+        message: "Inscrição pertence a outro evento",
+        pessoa,
+        evento,
+      }),
+      // Regra de negócio: manter 200 para o cliente tratar como feedback
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    );
+  }
 
   if (inscricao.checkin_validado_em) {
     return new Response(
