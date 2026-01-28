@@ -1062,13 +1062,26 @@ serve(async (req) => {
       for (const item of metaDados.itens) {
         // Montar observações incluindo o comentário do usuário
         const observacoesTransacao = [
+          observacaoFinal,  // Observação do usuário primeiro
           item.descricao,
-          observacaoFinal,  // NOVO: incluir observação do usuário
           `Fornecedor: ${item.fornecedor || "N/A"}`,
           `Origem: WhatsApp`,
           `Forma: ${metaDados.forma_pagamento || "N/A"}`,
           `Solicitante: ${metaDados.nome_perfil}`,
         ].filter(Boolean).join("\n");
+
+        // Converter data de DD/MM/YYYY para YYYY-MM-DD
+        let dataVencimento = new Date().toISOString().split("T")[0];
+        if (item.data_emissao) {
+          const partes = item.data_emissao.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (partes) {
+            dataVencimento = `${partes[3]}-${partes[2]}-${partes[1]}`;
+          } else if (item.data_emissao.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            dataVencimento = item.data_emissao;
+          }
+        }
+
+        console.log(`[Transação] Criando: valor=${item.valor}, fornecedor=${item.fornecedor}, data=${dataVencimento}`);
 
         const { data: tx, error } = await supabase
           .from("transacoes_financeiras")
@@ -1079,8 +1092,7 @@ serve(async (req) => {
             valor: item.valor || 0,
             tipo: "saida",
             tipo_lancamento: "unico",
-            data_vencimento:
-              item.data_emissao || new Date().toISOString().split("T")[0],
+            data_vencimento: dataVencimento,
             status: statusTransacao,
             data_pagamento: dataPagamento,
             conta_id: contaPadrao.id,
@@ -1094,8 +1106,12 @@ serve(async (req) => {
           .select("id")
           .single();
 
-        if (!error && tx) {
+        if (error) {
+          console.error(`[Transação] Erro ao criar:`, error.message, error.details);
+        }
+        if (tx) {
           transacoesCriadas.push(tx.id);
+          console.log(`[Transação] Criada com sucesso: ${tx.id}`);
         }
       }
 
