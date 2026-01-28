@@ -325,8 +325,14 @@ serve(async (req) => {
       }
     }
 
-    const { imageBase64, mimeType, igreja_id: igrejaId } = await req.json();
-    const { filial_id: filialId } = await req.json();
+    // IMPORTANT: req.json() só pode ser consumido UMA vez (senão dá "Body already consumed")
+    const body = await req.json();
+    const {
+      imageBase64,
+      mimeType,
+      igreja_id: igrejaId,
+      filial_id: filialId,
+    } = body ?? {};
 
     if (!igrejaId) {
       return new Response(
