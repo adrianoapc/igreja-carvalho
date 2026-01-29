@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { normalizarTelefone } from "../_shared/telefone-utils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -164,8 +165,8 @@ Deno.serve(async (req) => {
         )
       }
       
-      // Normalizar telefone (remover formatação)
-      const telefoneNormalizado = visitanteData.telefone?.replace(/\D/g, '') || null
+      // Normalizar telefone usando utilitário compartilhado
+      const telefoneNormalizado = normalizarTelefone(visitanteData.telefone);
       
       // Verificar se já existe uma pessoa com o mesmo email ou telefone
       let visitanteExistente = null
@@ -327,8 +328,8 @@ Deno.serve(async (req) => {
         )
       }
       
-      // Normalizar telefone e CEP
-      const telefoneNormalizado = membroData.telefone?.replace(/\D/g, '') || null
+      // Normalizar telefone e CEP usando utilitário compartilhado
+      const telefoneNormalizado = normalizarTelefone(membroData.telefone);
       const cepNormalizado = membroData.cep?.replace(/\D/g, '') || null
       
       // Preparar dados novos

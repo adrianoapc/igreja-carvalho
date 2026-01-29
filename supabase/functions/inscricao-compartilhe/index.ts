@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buscarLoteAtivo } from "../_shared/lotes.ts"; // ADR-026: Integração de lotes
+import { normalizarTelefone, formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,13 +20,8 @@ const isNo = (text: string) =>
 const normalizeText = (text: string | null | undefined) =>
   (text || "").trim().toLowerCase();
 
-const normalizePhone = (telefone: string) => {
-  const digits = telefone.replace(/\D/g, "");
-  if (digits.startsWith("55") && digits.length > 11) {
-    return digits.slice(2);
-  }
-  return digits;
-};
+// Função local normalizePhone substituída pelo utilitário compartilhado
+const normalizePhone = (telefone: string) => normalizarTelefone(telefone) || telefone.replace(/\D/g, "");
 
 const normalizeDisplayPhone = (telefone?: string | null) =>
   (telefone || "").replace(/\D/g, "");

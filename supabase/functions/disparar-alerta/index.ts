@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { getWebhookConfig, getActiveWhatsAppProvider } from "../_shared/secrets.ts";
 import { resolverWebhookComRemetente, getActiveWhatsAppProviderWithFallback } from "../_shared/webhook-resolver.ts";
+import { formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
