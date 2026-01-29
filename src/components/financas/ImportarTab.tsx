@@ -525,14 +525,25 @@ export function ImportarTab() {
       );
       if (ccEncontrado) centroCustoId = ccEncontrado.id;
     }
-    let status = "pendente";
-    if (mapping.status) {
-      const s = String(row[mapping.status] || "").toLowerCase();
-      if (s.includes("pago") || s.includes("recebido")) status = "pago";
-    }
+    // Primeiro parsear data_pagamento para usar na inferência de status
     const dataPagamento = mapping.data_pagamento
       ? parseData(row[mapping.data_pagamento])
       : null;
+
+    // Determinar status: prioridade para coluna explícita, fallback para data_pagamento
+    let status = "pendente";
+    if (mapping.status) {
+      const s = String(row[mapping.status] || "").toLowerCase();
+      if (s.includes("pago") || s.includes("recebido")) {
+        status = "pago";
+      } else if (s.includes("cancelado") || s.includes("estornado")) {
+        status = "cancelado";
+      }
+    }
+    // Se status ficou pendente mas tem data_pagamento → inferir como pago
+    if (status === "pendente" && dataPagamento) {
+      status = "pago";
+    }
     const observacoes = mapping.observacoes
       ? String(row[mapping.observacoes] ?? "")
       : null;
