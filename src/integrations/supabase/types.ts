@@ -1566,6 +1566,126 @@ export type Database = {
           },
         ]
       }
+      conciliacoes_lote: {
+        Row: {
+          conta_id: string | null
+          created_at: string | null
+          created_by: string | null
+          diferenca: number | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          observacoes: string | null
+          status: string
+          transacao_id: string
+          updated_at: string | null
+          valor_extratos: number
+          valor_transacao: number
+        }
+        Insert: {
+          conta_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          diferenca?: number | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          observacoes?: string | null
+          status?: string
+          transacao_id: string
+          updated_at?: string | null
+          valor_extratos?: number
+          valor_transacao: number
+        }
+        Update: {
+          conta_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          diferenca?: number | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          observacoes?: string | null
+          status?: string
+          transacao_id?: string
+          updated_at?: string | null
+          valor_extratos?: number
+          valor_transacao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacoes_lote_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
+      }
+      conciliacoes_lote_extratos: {
+        Row: {
+          conciliacao_lote_id: string
+          created_at: string | null
+          extrato_id: string
+          id: string
+        }
+        Insert: {
+          conciliacao_lote_id: string
+          created_at?: string | null
+          extrato_id: string
+          id?: string
+        }
+        Update: {
+          conciliacao_lote_id?: string
+          created_at?: string | null
+          extrato_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacoes_lote_extratos_conciliacao_lote_id_fkey"
+            columns: ["conciliacao_lote_id"]
+            isOneToOne: false
+            referencedRelation: "conciliacoes_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: true
+            referencedRelation: "extratos_bancarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_igreja: {
         Row: {
           created_at: string | null
