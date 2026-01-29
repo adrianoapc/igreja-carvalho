@@ -252,14 +252,68 @@ export function ImportarExcelWizard({
 
   const parseData = (data: unknown): string | null => {
     if (!data) return null;
+    
+    // Handle Excel serial dates (numbers between 1 and 100000 are likely dates)
+    if (typeof data === "number" && data > 1 && data < 100000) {
+      // Excel epoch: 1899-12-30
+      const excelEpoch = new Date(1899, 11, 30);
+      const date = new Date(excelEpoch.getTime() + data * 86400000);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        // Validate year is reasonable (1900-2100)
+        if (year >= 1900 && year <= 2100) {
+          return date.toISOString().split("T")[0];
+        }
+      }
+      return null;
+    }
+    
     const s = String(data).trim();
+    
+    // Check if it's a numeric string that could be Excel serial date
+    if (/^\d+$/.test(s)) {
+      const num = parseInt(s, 10);
+      if (num > 1 && num < 100000) {
+        const excelEpoch = new Date(1899, 11, 30);
+        const date = new Date(excelEpoch.getTime() + num * 86400000);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          if (year >= 1900 && year <= 2100) {
+            return date.toISOString().split("T")[0];
+          }
+        }
+      }
+      return null;
+    }
+    
+    // dd/MM/yyyy format
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
       const [d, m, y] = s.split("/");
-      return `${y}-${m}-${d}`;
+      const year = parseInt(y, 10);
+      if (year >= 1900 && year <= 2100) {
+        return `${y}-${m}-${d}`;
+      }
+      return null;
     }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    const dt = new Date(s as string);
-    if (!isNaN(dt.getTime())) return dt.toISOString().split("T")[0];
+    
+    // yyyy-MM-dd format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const year = parseInt(s.substring(0, 4), 10);
+      if (year >= 1900 && year <= 2100) {
+        return s;
+      }
+      return null;
+    }
+    
+    // Try native Date parsing as fallback
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const year = dt.getFullYear();
+      if (year >= 1900 && year <= 2100) {
+        return dt.toISOString().split("T")[0];
+      }
+    }
+    
     return null;
   };
 
