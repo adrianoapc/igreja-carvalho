@@ -1,134 +1,108 @@
 
-# Plano: Correção da Forma de Pagamento e Descrição de Ofertas
 
-## Problema Identificado
+# Plano: Corrigir Parsing de Data e Adicionar Download de Erros na Validação
 
-### 1. Inconsistência no Campo `forma_pagamento`
+## Problema 1: Data importando com 1 dia a menos
 
-Há uma incompatibilidade entre como diferentes partes do sistema salvam e leem o campo `forma_pagamento`:
+### Causa Raiz
+A biblioteca `xlsx` pode converter células formatadas como "Data" no Excel para **serial date** (número), mesmo quando o conteúdo visual é `dd/MM/yyyy`. Quando isso acontece, o parsing atual pode ter imprecisões de timezone.
 
-| Local | O que salva/espera |
-|-------|-------------------|
-| `RelatorioOferta.tsx` | Salva **ID** (UUID) ✅ |
-| `TransacaoDialog.tsx` (Select) | Usa **nome** como `value` ❌ |
-| `TransacaoDialog.tsx` (ao criar) | Salva **nome** (string) ❌ |
+### Solução
+Forçar o `xlsx` a ler todas as células como texto bruto usando a opção `raw: false` e `dateNF: undefined` ao parsear a planilha. Isso evita a conversão automática para serial date.
 
-Por isso, ao editar uma transação criada pelo Relatório de Ofertas, o Select não encontra o valor (ID) na lista de opções (que usam nomes).
+**Arquivo:** `src/components/financas/ImportarTab.tsx`
 
-### 2. Descrição Genérica (conforme discutido anteriormente)
-A descrição não inclui a forma de pagamento nem diferencia físico/digital.
+**Alteração na função `parseSheet` (linha ~166-191):**
+
+```typescript
+const parseSheet = (wb: WorkBook, sheetName: string) => {
+  try {
+    const worksheet = wb.Sheets[sheetName];
+    // Forçar leitura como texto para evitar conversão automática de datas
+    const jsonData = utils.sheet_to_json(worksheet, { 
+      defval: "",
+      raw: false,  // <-- Força formato de exibição em vez de valor bruto
+      dateNF: "dd/mm/yyyy"  // <-- Formato de data esperado
+    });
+    // ... resto do código
+  }
+};
+```
+
+**Impacto:** Datas que antes vinham como `45936` (serial) agora virão como `"05/10/2025"` (string), sendo parseadas corretamente pelo regex existente.
 
 ---
 
-## Solução Proposta
+## Problema 2: Botão de download de erros sumiu
 
-### Mudança 1: Padronizar `forma_pagamento` para usar ID
+### Causa Raiz
+O botão "Baixar CSV" só aparece no **step 3** (importação em progresso), dentro do bloco `{rejected.length > 0}`. Na etapa de **validação (step 2)**, os erros são exibidos mas não há opção de download.
 
-Atualizar o `TransacaoDialog.tsx` para usar **ID** em vez de **nome**:
+### Solução
+Adicionar botão de download também na seção de validação (step 2).
 
-**Linha 1182 (Antes):**
+**Arquivo:** `src/components/financas/ImportarTab.tsx`
+
+**Alteração no step 2 (linhas ~1277-1290):**
+
+Adicionar botão de download junto aos botões "Desmarcar todos" e "Marcar todos":
+
 ```tsx
-<SelectItem key={f.id} value={f.nome}>
-  {f.nome}
-</SelectItem>
-```
-
-**Linha 1182 (Depois):**
-```tsx
-<SelectItem key={f.id} value={f.id}>
-  {f.nome}
-</SelectItem>
-```
-
-Isso corrige:
-- A exibição ao editar (o ID salvo será encontrado)
-- O salvamento no dialog (passará a salvar ID em vez de nome)
-
-### Mudança 2: Corrigir Descrição no RelatorioOferta
-
-Alterar o formato da descrição em 3 locais:
-
-**Formato atual:**
-```
-"Oferta - Culto 05/10/2025"
-"Digital - Culto 05/10/2025"
-```
-
-**Formato novo:**
-```
-"Físico (Dinheiro) - Oferta - Culto 05/10/2025"
-"Digital (PIX) - Culto 05/10/2025"
+{step === 2 && (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <h3 className="font-semibold text-sm">
+        Resumo de Validação ({validationIssues.length} problemas)
+      </h3>
+      {validationIssues.length > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const csvContent = validationIssues
+              .map((issue) => 
+                `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`
+              )
+              .join("\n");
+            const blob = new Blob(
+              [`Linha,Problemas\n${csvContent}`],
+              { type: "text/csv;charset=utf-8;" }
+            );
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "erros_validacao.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          <Download className="w-4 h-4 mr-1" />
+          Baixar Erros
+        </Button>
+      )}
+    </div>
+    {/* ... resto do conteúdo de validação */}
+  </div>
+)}
 ```
 
 ---
 
-## Arquivos a Modificar
+## Resumo das Alterações
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `TransacaoDialog.tsx` (linha 1182) | Mudar `value={f.nome}` para `value={f.id}` |
-| `RelatorioOferta.tsx` (linha 907) | Atualizar descrição em `handleConfirmarOferta` |
-| `RelatorioOferta.tsx` (linha 2082) | Atualizar descrição para lançamentos físicos diretos |
-| `RelatorioOferta.tsx` (linha 2131) | Atualizar descrição para lançamentos digitais diretos |
+| `ImportarTab.tsx` | Adicionar `raw: false` no `sheet_to_json` para evitar conversão automática de datas |
+| `ImportarTab.tsx` | Adicionar botão "Baixar Erros" na etapa de validação (step 2) |
+| `ImportarExcelWizard.tsx` | Mesmas correções (consistência entre componentes) |
 
 ---
 
-## Detalhamento Técnico
+## Por que não precisa de reset?
 
-### TransacaoDialog.tsx - Correção do Select
+O código está funcional — apenas falta:
+1. **Robustez no parsing**: Evitar que o xlsx converta datas automaticamente
+2. **UX de download**: Adicionar botão que já existe no step 3 também no step 2
 
-```tsx
-// Antes (usa nome)
-<SelectItem key={f.id} value={f.nome}>
-  {f.nome}
-</SelectItem>
+Essas são alterações pontuais que não afetam o estado da aplicação ou banco de dados.
 
-// Depois (usa ID)
-<SelectItem key={f.id} value={f.id}>
-  {f.nome}
-</SelectItem>
-```
-
-### RelatorioOferta.tsx - handleConfirmarOferta (linha 904-910)
-
-```tsx
-// Antes
-descricao: `Oferta - Culto ${format(new Date(metadata.data_evento), "dd/MM/yyyy")}`
-
-// Depois
-descricao: `${forma.is_digital ? "Digital" : "Físico"} (${forma.nome}) - Oferta - Culto ${format(new Date(metadata.data_evento), "dd/MM/yyyy")}`
-```
-
-### RelatorioOferta.tsx - Lançamentos Físicos Diretos (linhas 2079-2085)
-
-```tsx
-// Antes
-descricao: `${(l.tipo || "oferta").charAt(0).toUpperCase() + (l.tipo || "oferta").slice(1)} - Culto ${format(dataCulto, "dd/MM/yyyy")}`
-
-// Depois
-descricao: `Físico (${forma?.nome || "N/A"}) - ${(l.tipo || "Oferta").charAt(0).toUpperCase() + (l.tipo || "oferta").slice(1)} - Culto ${format(dataCulto, "dd/MM/yyyy")}`
-```
-
-### RelatorioOferta.tsx - Lançamentos Digitais Diretos (linhas 2128-2134)
-
-```tsx
-// Antes
-descricao: `Digital - Culto ${format(dataCulto, "dd/MM/yyyy")}`
-
-// Depois
-descricao: `Digital (${forma?.nome || "N/A"}) - Culto ${format(dataCulto, "dd/MM/yyyy")}`
-```
-
----
-
-## Impacto
-
-### Dados Existentes
-- Transações criadas pelo TransacaoDialog (salvam nome) → Continuarão funcionando pois o Select agora busca por ID, mas transações antigas salvas com nome não terão match. 
-- **Sugestão**: Após implementar, podemos rodar uma query para corrigir registros antigos que usam nome → ID.
-
-### Resultado Final
-
-1. Campo "Forma de pgto" aparecerá corretamente preenchido
-2. Descrições serão mais claras: `"Digital (PIX) - Culto 05/10/2025"`
-3. Sistema consistente usando IDs para referência de formas de pagamento
