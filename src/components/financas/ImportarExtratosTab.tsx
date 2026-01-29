@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   AlertCircle,
   CheckCircle2,
+  Download,
 } from "lucide-react";
 import { OFXParser } from "ofx-js";
 
@@ -68,11 +69,32 @@ const inferirTipo = (
 
 const parseValor = (valor: unknown): number => {
   if (valor === undefined || valor === null) return 0;
-  const valorStr = String(valor)
-    .replace(/\s|R\$|€|£/g, "")
-    .replace(/\./g, "")
-    .replace(/,/g, ".");
-  const n = parseFloat(valorStr);
+  
+  // Se já é número, retorna direto
+  if (typeof valor === "number") return valor;
+  
+  let str = String(valor).trim();
+  
+  // Remove símbolos de moeda e espaços
+  str = str.replace(/[¤$\u20AC£¥R\s]/g, "");
+  
+  // Auto-detectar formato pelo último separador
+  const lastComma = str.lastIndexOf(",");
+  const lastDot = str.lastIndexOf(".");
+  
+  // Determina se vírgula é o separador decimal (formato BR: 1.234,56)
+  // ou se ponto é o separador decimal (formato US: 1,234.56)
+  const isCommaDecimal = lastComma > lastDot;
+  
+  if (isCommaDecimal) {
+    // Formato BR: 1.234,56 → remove pontos (milhares), troca vírgula por ponto
+    str = str.replace(/\./g, "").replace(",", ".");
+  } else {
+    // Formato US: 1,234.56 → remove vírgulas (milhares)
+    str = str.replace(/,/g, "");
+  }
+  
+  const n = parseFloat(str);
   return isNaN(n) ? 0 : n;
 };
 
@@ -250,14 +272,15 @@ export function ImportarExtratosTab() {
   const parseSheet = (wb: WorkBook, sheetName: string) => {
     try {
       const worksheet = wb.Sheets[sheetName];
-      const aoa = utils.sheet_to_json(worksheet, { header: 1 }) as Array<
+      // Forçar leitura como texto para evitar conversão automática de datas
+      const aoa = utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: "dd/mm/yyyy" }) as Array<
         Array<unknown>
       >;
       const headerRow = (aoa[0] || []) as Array<unknown>;
       let columnNames = headerRow
         .map((h) => String(h || "").trim())
         .filter((h) => h.length > 0);
-      const jsonData = utils.sheet_to_json(worksheet, { defval: "" });
+      const jsonData = utils.sheet_to_json(worksheet, { defval: "", raw: false, dateNF: "dd/mm/yyyy" });
       if (!columnNames.length) {
         const firstRow = (jsonData[0] || {}) as Record<string, unknown>;
         columnNames = Object.keys(firstRow);
@@ -631,35 +654,63 @@ export function ImportarExtratosTab() {
 
       {/* Validação */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const next = { ...excluded };
-              validationIssues.forEach((issue) => {
-                next[issue.index] = false;
-              });
-              setExcluded(next);
-            }}
-            disabled={!validationIssues.length}
-          >
-            Desmarcar todos
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const next = { ...excluded };
-              validationIssues.forEach((issue) => {
-                next[issue.index] = true;
-              });
-              setExcluded(next);
-            }}
-            disabled={!validationIssues.length}
-          >
-            Marcar todos
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = { ...excluded };
+                validationIssues.forEach((issue) => {
+                  next[issue.index] = false;
+                });
+                setExcluded(next);
+              }}
+              disabled={!validationIssues.length}
+            >
+              Desmarcar todos
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = { ...excluded };
+                validationIssues.forEach((issue) => {
+                  next[issue.index] = true;
+                });
+                setExcluded(next);
+              }}
+              disabled={!validationIssues.length}
+            >
+              Marcar todos
+            </Button>
+          </div>
+          {validationIssues.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const csvContent = validationIssues
+                  .map((issue) => 
+                    `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`
+                  )
+                  .join("\n");
+                const blob = new Blob(
+                  [`Linha,Problemas\n${csvContent}`],
+                  { type: "text/csv;charset=utf-8;" }
+                );
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "erros_validacao.csv";
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Baixar Erros
+            </Button>
+          )}
         </div>
 
         {validationIssues.length === 0 ? (

@@ -74,7 +74,8 @@ export function ImportarExcelDialog({
       const data = await file.arrayBuffer();
       const workbook = read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json(worksheet);
+      // Forçar leitura como texto para evitar conversão automática de datas
+      const jsonData = utils.sheet_to_json(worksheet, { raw: false, dateNF: "dd/mm/yyyy" });
 
       if (jsonData.length === 0) {
         toast.error("Arquivo vazio ou sem dados válidos");
@@ -129,11 +130,34 @@ export function ImportarExcelDialog({
   };
 
   const parseValor = (valor: unknown): number => {
-    if (!valor) return 0;
-    const valorStr = String(valor)
-      .replace(/[^\d,.-]/g, "")
-      .replace(",", ".");
-    return parseFloat(valorStr) || 0;
+    if (valor === undefined || valor === null) return 0;
+    
+    // Se já é número, retorna direto
+    if (typeof valor === "number") return valor;
+    
+    let str = String(valor).trim();
+    
+    // Remove símbolos de moeda e espaços
+    str = str.replace(/[¤$\u20AC£¥R\s]/g, "");
+    
+    // Auto-detectar formato pelo último separador
+    const lastComma = str.lastIndexOf(",");
+    const lastDot = str.lastIndexOf(".");
+    
+    // Determina se vírgula é o separador decimal (formato BR: 1.234,56)
+    // ou se ponto é o separador decimal (formato US: 1,234.56)
+    const isCommaDecimal = lastComma > lastDot;
+    
+    if (isCommaDecimal) {
+      // Formato BR: 1.234,56 → remove pontos (milhares), troca vírgula por ponto
+      str = str.replace(/\./g, "").replace(",", ".");
+    } else {
+      // Formato US: 1,234.56 → remove vírgulas (milhares)
+      str = str.replace(/,/g, "");
+    }
+    
+    const n = parseFloat(str);
+    return isNaN(n) ? 0 : n;
   };
 
   const parseData = (data: unknown): string | null => {
