@@ -4,6 +4,7 @@ import {
   SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { buscarLoteAtivo } from "../_shared/lotes.ts"; // ADR-026: Integração de lotes
+import { normalizarTelefone, formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
 
 // --- INTERFACES ---
 interface RequestBody {
@@ -111,13 +112,8 @@ const isNegativo = (text: string): boolean =>
     text.trim(),
   );
 
-const normalizePhone = (telefone: string): string => {
-  const digits = telefone.replace(/\D/g, "");
-  if (digits.startsWith("55") && digits.length > 11) {
-    return digits.slice(2);
-  }
-  return digits;
-};
+// Função local normalizePhone substituída pelo utilitário compartilhado
+const normalizePhone = normalizarTelefone;
 
 const normalizeDisplayPhone = (tel?: string | null): string =>
   (tel || "").replace(/\D/g, "");
@@ -425,7 +421,7 @@ async function finalizarInscricao(
   }
 
   // PASSO 1: Buscar pessoa pelo telefone PRIMEIRO (antes de verificar vagas)
-  const telefoneNormalizado = normalizePhone(telefone);
+  const telefoneNormalizado = normalizePhone(telefone) || telefone.replace(/\D/g, "");
   const telefoneBusca = telefoneNormalizado.slice(-9);
 
   const { data: candidatos } = await supabaseClient

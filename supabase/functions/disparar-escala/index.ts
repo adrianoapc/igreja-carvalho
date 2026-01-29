@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolverWebhookComRemetente } from "../_shared/webhook-resolver.ts";
+import { formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,9 +148,14 @@ serve(async (req) => {
         continue;
       }
 
-      // Limpar telefone (apenas números)
-      const telefoneLimpo = String(telefone).replace(/\D/g, '');
-      const telefoneFormatado = telefoneLimpo.startsWith('55') ? telefoneLimpo : `55${telefoneLimpo}`;
+      // Formatar telefone para WhatsApp usando utilitário compartilhado
+      const telefoneFormatado = formatarParaWhatsApp(String(telefone)) || "";
+      
+      if (!telefoneFormatado) {
+        console.log(`Pulando ${nome} - telefone inválido`);
+        detalhes.push(`${nome}: telefone inválido`);
+        continue;
+      }
 
       // Determinar função/posição
       const funcaoEscala = posicao?.nome || time?.nome || 'Voluntário';

@@ -5,6 +5,7 @@ import {
   getWebhookSecret,
   getActiveWhatsAppProvider,
 } from "../_shared/secrets.ts";
+import { normalizarTelefone, formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -458,13 +459,8 @@ serve(async (req) => {
     }
 
     // 2. Valida se o telefone pertence a um membro autorizado
-    // Normaliza telefone removendo DDI (55) e caracteres não numéricos
-    const telefoneDigitos = telefone.replace(/\D/g, "");
-    const telefoneSemDDI =
-      telefoneDigitos.startsWith("55") && telefoneDigitos.length > 11
-        ? telefoneDigitos.slice(2)
-        : telefoneDigitos;
-    const telefoneNormalizado = telefoneSemDDI.slice(-11); // Últimos 11 dígitos (DDD + número)
+    // Normaliza telefone usando utilitário compartilhado
+    const telefoneNormalizado = normalizarTelefone(telefone) || telefone.replace(/\D/g, "").slice(-11);
 
     // OBS: Não usamos maybeSingle aqui porque o mesmo telefone pode estar duplicado em mais de um perfil
     // (ex.: pai/filho ou registros duplicados). Nesse caso, escolhemos o melhor candidato.
@@ -478,12 +474,8 @@ serve(async (req) => {
       .filter("telefone", "ilike", `%${telefoneNormalizado.slice(-9)}%`) // Busca pelos 9 dígitos finais
       .limit(5);
 
-    const normalizarTelefoneDB = (t?: string | null) => {
-      const dig = (t || "").replace(/\D/g, "");
-      const semDDI =
-        dig.startsWith("55") && dig.length > 11 ? dig.slice(2) : dig;
-      return semDDI.slice(-11);
-    };
+    // Função auxiliar para normalizar telefone do DB usando utilitário compartilhado
+    const normalizarTelefoneDB = (t?: string | null) => normalizarTelefone(t) || "";
 
     const escolherMelhorCandidato = (rows: typeof candidatosAutorizados) => {
       const lista = rows || [];
