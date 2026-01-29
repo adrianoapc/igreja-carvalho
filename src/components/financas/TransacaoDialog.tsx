@@ -1179,7 +1179,7 @@ export function TransacaoDialog({
                 {formasPagamento
                   ?.filter((f) => f.id)
                   .map((f) => (
-                    <SelectItem key={f.id} value={f.nome}>
+                    <SelectItem key={f.id} value={f.id}>
                       {f.nome}
                     </SelectItem>
                   ))}

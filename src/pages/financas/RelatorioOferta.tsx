@@ -904,7 +904,7 @@ export default function RelatorioOferta() {
         const transacao = {
           tipo: "entrada",
           tipo_lancamento: "unico",
-          descricao: `Oferta - Culto ${format(
+          descricao: `${forma.is_digital ? "Digital" : "Físico"} (${forma.nome}) - Oferta - Culto ${format(
             new Date(metadata.data_evento),
             "dd/MM/yyyy"
           )}`,
@@ -2079,8 +2079,8 @@ export default function RelatorioOferta() {
                         fisicoTransacoes.push({
                           tipo: "entrada",
                           tipo_lancamento: "unico",
-                          descricao: `${
-                            (l.tipo || "oferta").charAt(0).toUpperCase() +
+                          descricao: `Físico (${forma?.nome || "N/A"}) - ${
+                            (l.tipo || "Oferta").charAt(0).toUpperCase() +
                             (l.tipo || "oferta").slice(1)
                           } - Culto ${format(dataCulto, "dd/MM/yyyy")}`,
                           valor: valorNumerico,
@@ -2128,7 +2128,7 @@ export default function RelatorioOferta() {
                         digitaisTransacoes.push({
                           tipo: "entrada",
                           tipo_lancamento: "unico",
-                          descricao: `Digital - Culto ${format(
+                          descricao: `Digital (${forma?.nome || "N/A"}) - Culto ${format(
                             dataCulto,
                             "dd/MM/yyyy"
                           )}`,
