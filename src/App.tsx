@@ -193,6 +193,7 @@ const ConfiguracoesIgreja = lazy(() => import("./pages/ConfiguracoesIgreja"));
 const SuperAdminDashboard = lazy(() => import("./pages/superadmin/Dashboard"));
 const SuperAdminIgrejas = lazy(() => import("./pages/superadmin/Igrejas"));
 const SuperAdminMetricas = lazy(() => import("./pages/superadmin/Metricas"));
+const SuperAdminConfiguracoesGlobais = lazy(() => import("./pages/superadmin/ConfiguracoesGlobais"));
 const NovaIgreja = lazy(() => import("./pages/cadastro/NovaIgreja"));
 
 const queryClient = new QueryClient();
@@ -1121,6 +1122,10 @@ const App = () => (
                   <Route
                     path="/superadmin/metricas"
                     element={<SuperAdminMetricas />}
+                  />
+                  <Route
+                    path="/superadmin/config-globais"
+                    element={<SuperAdminConfiguracoesGlobais />}
                   />
                 </Route>
 
