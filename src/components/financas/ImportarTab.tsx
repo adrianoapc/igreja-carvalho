@@ -167,7 +167,8 @@ export function ImportarTab() {
     try {
       const worksheet = wb.Sheets[sheetName];
       // Obter cabeçalhos diretamente da primeira linha para garantir todas as colunas
-      const aoa = utils.sheet_to_json(worksheet, { header: 1 }) as Array<
+      // Forçar leitura como texto para evitar conversão automática de datas
+      const aoa = utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: "dd/mm/yyyy" }) as Array<
         Array<unknown>
       >;
       const headerRow = (aoa[0] || []) as Array<unknown>;
@@ -175,7 +176,7 @@ export function ImportarTab() {
         .map((h) => String(h || "").trim())
         .filter((h) => h.length > 0);
       // Fallback: se não houver cabeçalhos válidos, derive de keys da primeira linha dos dados
-      const jsonData = utils.sheet_to_json(worksheet, { defval: "" });
+      const jsonData = utils.sheet_to_json(worksheet, { defval: "", raw: false, dateNF: "dd/mm/yyyy" });
       if (!columnNames.length) {
         const firstRow = (jsonData[0] || {}) as Record<string, unknown>;
         columnNames = Object.keys(firstRow);
@@ -1276,9 +1277,37 @@ export function ImportarTab() {
 
         {step === 2 && (
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm">
-              Resumo de Validação ({validationIssues.length} problemas)
-            </h3>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="font-semibold text-sm">
+                Resumo de Validação ({validationIssues.length} problemas)
+              </h3>
+              {validationIssues.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const csvContent = validationIssues
+                      .map((issue) => 
+                        `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`
+                      )
+                      .join("\n");
+                    const blob = new Blob(
+                      [`Linha,Problemas\n${csvContent}`],
+                      { type: "text/csv;charset=utf-8;" }
+                    );
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "erros_validacao.csv";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Baixar Erros
+                </Button>
+              )}
+            </div>
             {validationIssues.length === 0 ? (
               <Alert>
                 <CheckCircle2 className="h-4 w-4 text-green-600" />

@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   AlertCircle,
   CheckCircle2,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -166,7 +167,8 @@ export function ImportarExcelWizard({
   const parseSheet = (wb: WorkBook, sheetName: string) => {
     try {
       const worksheet = wb.Sheets[sheetName];
-      const jsonData = utils.sheet_to_json(worksheet);
+      // Forçar leitura como texto para evitar conversão automática de datas
+      const jsonData = utils.sheet_to_json(worksheet, { raw: false, dateNF: "dd/mm/yyyy" });
       const firstRow = (jsonData[0] || {}) as Record<string, unknown>;
       const columnNames = Object.keys(firstRow);
       setColumns(columnNames);
@@ -1054,7 +1056,35 @@ export function ImportarExcelWizard({
 
             {step === 2 && (
               <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Resumo de Validação</h3>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="font-semibold text-sm">Resumo de Validação ({validationIssues.length} problemas)</h3>
+                  {validationIssues.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const csvContent = validationIssues
+                          .map((issue) => 
+                            `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`
+                          )
+                          .join("\n");
+                        const blob = new Blob(
+                          [`Linha,Problemas\n${csvContent}`],
+                          { type: "text/csv;charset=utf-8;" }
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "erros_validacao.csv";
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      Baixar Erros
+                    </Button>
+                  )}
+                </div>
                 {validationIssues.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Nenhum erro encontrado.
