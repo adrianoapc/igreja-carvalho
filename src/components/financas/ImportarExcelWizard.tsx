@@ -276,14 +276,18 @@ export function ImportarExcelWizard({
     
     // Handle Excel serial dates (numbers between 1 and 100000 are likely dates)
     if (typeof data === "number" && data > 1 && data < 100000) {
-      // Excel epoch: 1899-12-30
-      const excelEpoch = new Date(1899, 11, 30);
-      const date = new Date(excelEpoch.getTime() + data * 86400000);
+      // Excel epoch: 1899-12-30 (using UTC to avoid timezone issues)
+      // Excel serial date = days since 1899-12-30
+      const excelEpochMs = Date.UTC(1899, 11, 30);
+      const dateMs = excelEpochMs + data * 86400000;
+      const date = new Date(dateMs);
       if (!isNaN(date.getTime())) {
-        const year = date.getFullYear();
+        const year = date.getUTCFullYear();
         // Validate year is reasonable (1900-2100)
         if (year >= 1900 && year <= 2100) {
-          return date.toISOString().split("T")[0];
+          const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+          const day = String(date.getUTCDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
         }
       }
       return null;
@@ -295,12 +299,15 @@ export function ImportarExcelWizard({
     if (/^\d+$/.test(s)) {
       const num = parseInt(s, 10);
       if (num > 1 && num < 100000) {
-        const excelEpoch = new Date(1899, 11, 30);
-        const date = new Date(excelEpoch.getTime() + num * 86400000);
+        const excelEpochMs = Date.UTC(1899, 11, 30);
+        const dateMs = excelEpochMs + num * 86400000;
+        const date = new Date(dateMs);
         if (!isNaN(date.getTime())) {
-          const year = date.getFullYear();
+          const year = date.getUTCFullYear();
           if (year >= 1900 && year <= 2100) {
-            return date.toISOString().split("T")[0];
+            const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+            const day = String(date.getUTCDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
           }
         }
       }
