@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolverWebhookComRemetente } from "../_shared/webhook-resolver.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,52 +50,34 @@ serve(async (req) => {
       );
     }
 
-    // 2. Buscar configurações da igreja para validar se WhatsApp está ativo
-    const whatsappTipos = ['whatsapp_make', 'whatsapp_meta', 'whatsapp_evolution'];
-    const { data: whatsappConfigs, error: configError } = await supabase
-      .from('webhooks')
-      .select('tipo')
-      .eq('igreja_id', culto.igreja_id)
-      .in('tipo', whatsappTipos)
-      .eq('enabled', true);
+    // 2. Buscar webhook de escalas usando resolver com fallback 3 níveis
+    // Buscar filial_id do culto se existir
+    const { data: cultoFilial } = await supabase
+      .from('cultos')
+      .select('filial_id')
+      .eq('id', culto_id)
+      .single();
 
-    if (configError) {
-      console.error('Erro ao buscar configurações:', configError);
-    }
+    const filialId = cultoFilial?.filial_id || null;
 
-    if (!whatsappConfigs || whatsappConfigs.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Envio de WhatsApp desativado nas configurações da igreja' 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const resolucao = await resolverWebhookComRemetente(
+      supabase,
+      culto.igreja_id,
+      filialId,
+      'make_escalas'
+    );
 
-    // Buscar URL do webhook de escalas por igreja
-    const { data: webhookConfig, error: webhookError } = await supabase
-      .from('webhooks')
-      .select('url, enabled')
-      .eq('igreja_id', culto.igreja_id)
-      .eq('tipo', 'make_escalas')
-      .maybeSingle();
-
-    if (webhookError) {
-      console.error('Erro ao buscar webhook de escalas:', webhookError);
-      return new Response(
-        JSON.stringify({ success: false, message: 'Erro ao buscar webhook de escalas' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!webhookConfig?.url || !webhookConfig.enabled) {
-      console.error('Webhook de escalas não configurado');
+    if (!resolucao) {
+      console.error('Webhook de escalas não configurado em nenhum nível');
       return new Response(
         JSON.stringify({ success: false, message: 'Webhook de escalas não configurado' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`📤 Usando webhook nível: ${resolucao.webhookNivel}`);
+    console.log(`📱 Remetente: ${resolucao.whatsappRemetente || 'não definido'}`);
+    console.log(`🆔 Sender ID: ${resolucao.whatsappSenderId || 'não definido'}`);
 
     // Formatar data: "Domingo, 12/10 às 19h"
     const dataCulto = new Date(culto.data_culto);
@@ -176,10 +159,13 @@ serve(async (req) => {
 
       const payload = {
         telefone: telefoneFormatado,
+        whatsapp_remetente: resolucao.whatsappRemetente,
+        whatsapp_sender_id: resolucao.whatsappSenderId,
         nome_voluntario: nome,
         data_culto: dataFormatada,
         funcao_escala: funcaoEscala,
         observacoes: observacoesEscala,
+        webhook_nivel: resolucao.webhookNivel,
         // Campo completo com função + observações para facilitar uso no Make
         descricao_completa: observacoesEscala ? `${funcaoEscala}: ${observacoesEscala}` : funcaoEscala
       };
@@ -187,7 +173,7 @@ serve(async (req) => {
       console.log(`Enviando para ${nome} (${telefoneFormatado}): ${funcaoEscala}`);
 
       try {
-        const webhookResponse = await fetch(webhookConfig.url, {
+        const webhookResponse = await fetch(resolucao.webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

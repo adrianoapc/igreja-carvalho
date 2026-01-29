@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { getWebhookConfig, getActiveWhatsAppProvider } from "../_shared/secrets.ts";
+import { resolverWebhookComRemetente, getActiveWhatsAppProviderWithFallback } from "../_shared/webhook-resolver.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -188,33 +189,35 @@ async function dispararInApp(
   return true;
 }
 
-// Disparar notificação via WhatsApp (Multi-tenant - busca config por igreja)
+// Disparar notificação via WhatsApp (Multi-tenant com fallback 3 níveis)
 async function dispararWhatsAppMultiTenant(
   supabase: SupabaseClient,
   igrejaId: string,
   telefone: string,
   mensagem: string,
   evento: string,
-  templateMeta?: string | null
+  templateMeta?: string | null,
+  filialId?: string | null
 ): Promise<boolean> {
   if (!telefone) {
     console.warn("Telefone não disponível, pulando WhatsApp");
     return false;
   }
 
-  // Buscar provedor WhatsApp ativo para a igreja
-  const provider = await getActiveWhatsAppProvider(supabase, igrejaId);
+  // Buscar provedor WhatsApp ativo com fallback em 3 níveis
+  const provider = await getActiveWhatsAppProviderWithFallback(supabase, igrejaId, filialId || null);
   
   if (!provider) {
-    console.warn(`Nenhum provedor WhatsApp configurado para igreja ${igrejaId}`);
+    console.warn(`Nenhum provedor WhatsApp configurado (igreja: ${igrejaId}, filial: ${filialId || 'N/A'})`);
     return false;
   }
 
-  const { tipo, config } = provider;
+  const { tipo, resolucao } = provider;
+  console.log(`📤 Usando webhook nível: ${resolucao.webhookNivel}`);
 
-  // Rota Make (webhook)
+  // Rota Make (webhook) - agora inclui remetente no payload
   if (tipo === "whatsapp_make") {
-    if (!config.url) {
+    if (!resolucao.webhookUrl) {
       console.warn("URL do webhook Make não configurada");
       return false;
     }
@@ -222,12 +225,15 @@ async function dispararWhatsAppMultiTenant(
     try {
       const payload = {
         telefone,
+        whatsapp_remetente: resolucao.whatsappRemetente,
+        whatsapp_sender_id: resolucao.whatsappSenderId,
         mensagem,
         template: evento,
+        webhook_nivel: resolucao.webhookNivel,
         timestamp: new Date().toISOString(),
       };
 
-      const response = await fetch(config.url, {
+      const response = await fetch(resolucao.webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -238,7 +244,7 @@ async function dispararWhatsAppMultiTenant(
         return false;
       }
 
-      console.log(`✅ WhatsApp (Make) disparado para ${telefone}`);
+      console.log(`✅ WhatsApp (Make) disparado para ${telefone} via ${resolucao.webhookNivel}`);
       return true;
     } catch (error) {
       console.error("Erro ao chamar webhook Make:", error);

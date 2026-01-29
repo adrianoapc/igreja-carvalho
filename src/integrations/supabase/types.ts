@@ -7964,39 +7964,42 @@ export type Database = {
           enabled: boolean
           filial_id: string | null
           id: string
-          igreja_id: string
+          igreja_id: string | null
           secret: string | null
           secret_encrypted: string | null
           secret_hint: string | null
           tipo: string
           updated_at: string | null
           url: string | null
+          whatsapp_numero_id: string | null
         }
         Insert: {
           created_at?: string | null
           enabled?: boolean
           filial_id?: string | null
           id?: string
-          igreja_id: string
+          igreja_id?: string | null
           secret?: string | null
           secret_encrypted?: string | null
           secret_hint?: string | null
           tipo: string
           updated_at?: string | null
           url?: string | null
+          whatsapp_numero_id?: string | null
         }
         Update: {
           created_at?: string | null
           enabled?: boolean
           filial_id?: string | null
           id?: string
-          igreja_id?: string
+          igreja_id?: string | null
           secret?: string | null
           secret_encrypted?: string | null
           secret_hint?: string | null
           tipo?: string
           updated_at?: string | null
           url?: string | null
+          whatsapp_numero_id?: string | null
         }
         Relationships: [
           {
@@ -8013,6 +8016,13 @@ export type Database = {
             referencedRelation: "igrejas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "webhooks_whatsapp_numero_id_fkey"
+            columns: ["whatsapp_numero_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_numeros"
+            referencedColumns: ["id"]
+          },
         ]
       }
       whatsapp_numeros: {
@@ -8022,7 +8032,7 @@ export type Database = {
           enabled: boolean
           filial_id: string | null
           id: string
-          igreja_id: string
+          igreja_id: string | null
           phone_number_id: string | null
           provider: string
           tipo: string | null
@@ -8034,7 +8044,7 @@ export type Database = {
           enabled?: boolean
           filial_id?: string | null
           id?: string
-          igreja_id: string
+          igreja_id?: string | null
           phone_number_id?: string | null
           provider?: string
           tipo?: string | null
@@ -8046,7 +8056,7 @@ export type Database = {
           enabled?: boolean
           filial_id?: string | null
           id?: string
-          igreja_id?: string
+          igreja_id?: string | null
           phone_number_id?: string | null
           provider?: string
           tipo?: string | null
