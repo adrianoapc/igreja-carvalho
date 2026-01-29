@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,17 +6,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Phone, Plus, Save, Trash2, Loader2, ArrowLeft, Building2, Edit } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Phone, Plus, Trash2, Loader2, ArrowLeft, Building2, Edit, Globe, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface WhatsAppNumero {
   id: string;
-  igreja_id: string;
+  igreja_id: string | null;
   filial_id: string | null;
   phone_number_id: string | null;
   display_phone_number: string | null;
@@ -38,6 +39,7 @@ interface Props {
 
 export default function WhatsAppNumeros({ onBack }: Props) {
   const { igrejaId } = useIgrejaId();
+  const { isSuperAdmin } = useSuperAdmin();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingNumero, setEditingNumero] = useState<WhatsAppNumero | null>(null);
@@ -51,7 +53,7 @@ export default function WhatsAppNumeros({ onBack }: Props) {
     enabled: true,
   });
 
-  // Fetch WhatsApp numbers
+  // Fetch WhatsApp numbers (igreja + globais do sistema)
   const { data: numeros = [], isLoading } = useQuery({
     queryKey: ["whatsapp-numeros", igrejaId],
     queryFn: async () => {
@@ -59,7 +61,7 @@ export default function WhatsAppNumeros({ onBack }: Props) {
       const { data, error } = await supabase
         .from("whatsapp_numeros")
         .select("*, filial:filiais(nome)")
-        .eq("igreja_id", igrejaId)
+        .or(`igreja_id.eq.${igrejaId},igreja_id.is.null`)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
@@ -161,6 +163,12 @@ export default function WhatsAppNumeros({ onBack }: Props) {
   });
 
   const handleOpenDialog = (numero?: WhatsAppNumero) => {
+    // Não permite editar números globais se não for super admin
+    if (numero && numero.igreja_id === null && !isSuperAdmin) {
+      toast.error("Números globais do sistema não podem ser editados");
+      return;
+    }
+
     if (numero) {
       setEditingNumero(numero);
       setFormData({
@@ -203,6 +211,27 @@ export default function WhatsAppNumeros({ onBack }: Props) {
     saveMutation.mutate({ ...formData, id: editingNumero?.id });
   };
 
+  const handleDelete = (numero: WhatsAppNumero) => {
+    // Não permite deletar números globais se não for super admin
+    if (numero.igreja_id === null && !isSuperAdmin) {
+      toast.error("Números globais do sistema não podem ser removidos");
+      return;
+    }
+    
+    if (confirm("Deseja remover este número?")) {
+      deleteMutation.mutate(numero.id);
+    }
+  };
+
+  const handleToggle = (numero: WhatsAppNumero, enabled: boolean) => {
+    // Não permite alterar status de números globais se não for super admin
+    if (numero.igreja_id === null && !isSuperAdmin) {
+      toast.error("Números globais do sistema não podem ser alterados");
+      return;
+    }
+    toggleMutation.mutate({ id: numero.id, enabled });
+  };
+
   const getProviderLabel = (provider: string) => {
     switch (provider) {
       case "meta": return "Meta Cloud API";
@@ -220,6 +249,13 @@ export default function WhatsAppNumeros({ onBack }: Props) {
       default: return "bg-muted text-muted-foreground";
     }
   };
+
+  const isGlobal = (numero: WhatsAppNumero) => numero.igreja_id === null;
+  const isReadOnly = (numero: WhatsAppNumero) => isGlobal(numero) && !isSuperAdmin;
+
+  // Separar números da igreja e globais para exibição
+  const numerosIgreja = numeros.filter(n => n.igreja_id !== null);
+  const numerosGlobais = numeros.filter(n => n.igreja_id === null);
 
   return (
     <div className="space-y-6">
@@ -337,15 +373,110 @@ export default function WhatsAppNumeros({ onBack }: Props) {
         </Dialog>
       </div>
 
-      {/* List */}
+      {/* Números Globais do Sistema */}
+      {numerosGlobais.length > 0 && (
+        <Card className="border-purple-200 dark:border-purple-800">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Globe className="h-4 w-4 text-purple-600" />
+              Números Globais do Sistema
+              <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                Padrão
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              Números disponíveis para todas as igrejas (somente leitura)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {numerosGlobais.map((numero) => (
+                <div
+                  key={numero.id}
+                  className="flex items-center justify-between p-4 rounded-lg border bg-purple-50/50 dark:bg-purple-900/10"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30">
+                      <Globe className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{numero.display_phone_number || "Sem número"}</span>
+                        <Badge variant="outline" className={getProviderColor(numero.provider)}>
+                          {getProviderLabel(numero.provider)}
+                        </Badge>
+                        {!numero.enabled && (
+                          <Badge variant="secondary">Desativado</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Globe className="h-3 w-3" />
+                        Global do Sistema
+                        {numero.phone_number_id && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-xs">ID: {numero.phone_number_id}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {isSuperAdmin ? (
+                      <>
+                        <Switch
+                          checked={numero.enabled}
+                          onCheckedChange={(checked) => handleToggle(numero, checked)}
+                          disabled={toggleMutation.isPending}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDialog(numero)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(numero)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="outline" className="gap-1">
+                            <Lock className="h-3 w-3" />
+                            Somente leitura
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Número global do sistema. Cadastre um número próprio para sua igreja.
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Números da Igreja */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Phone className="h-4 w-4" />
-            Números Cadastrados
+            Números da Igreja
           </CardTitle>
           <CardDescription>
-            Números de WhatsApp configurados para envio de mensagens
+            Números de WhatsApp configurados para sua igreja
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -353,15 +484,20 @@ export default function WhatsAppNumeros({ onBack }: Props) {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : numeros.length === 0 ? (
+          ) : numerosIgreja.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Phone className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              <p>Nenhum número cadastrado</p>
-              <p className="text-sm">Clique em "Novo Número" para adicionar</p>
+              <p>Nenhum número cadastrado para sua igreja</p>
+              <p className="text-sm">
+                {numerosGlobais.length > 0 
+                  ? "Você está usando os números globais do sistema. Clique em \"Novo Número\" para personalizar."
+                  : "Clique em \"Novo Número\" para adicionar"
+                }
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {numeros.map((numero) => (
+              {numerosIgreja.map((numero) => (
                 <div
                   key={numero.id}
                   className="flex items-center justify-between p-4 rounded-lg border bg-card"
@@ -396,7 +532,7 @@ export default function WhatsAppNumeros({ onBack }: Props) {
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={numero.enabled}
-                      onCheckedChange={(checked) => toggleMutation.mutate({ id: numero.id, enabled: checked })}
+                      onCheckedChange={(checked) => handleToggle(numero, checked)}
                       disabled={toggleMutation.isPending}
                     />
                     <Button
@@ -410,11 +546,7 @@ export default function WhatsAppNumeros({ onBack }: Props) {
                       variant="ghost"
                       size="icon"
                       className="text-destructive hover:text-destructive"
-                      onClick={() => {
-                        if (confirm("Deseja remover este número?")) {
-                          deleteMutation.mutate(numero.id);
-                        }
-                      }}
+                      onClick={() => handleDelete(numero)}
                       disabled={deleteMutation.isPending}
                     >
                       <Trash2 className="h-4 w-4" />

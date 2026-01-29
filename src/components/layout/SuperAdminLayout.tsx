@@ -26,12 +26,14 @@ import {
   ChevronDown,
   Shield,
   Bell,
+  Globe,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/superadmin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/superadmin/igrejas", label: "Igrejas", icon: Building2 },
   { href: "/superadmin/metricas", label: "Métricas", icon: BarChart3 },
+  { href: "/superadmin/config-globais", label: "Globais", icon: Globe },
   { href: "/superadmin/billing", label: "Billing", icon: CreditCard, disabled: true },
   { href: "/superadmin/config", label: "Configurações", icon: Settings, disabled: true },
 ];
