@@ -1,175 +1,133 @@
 
+# Plano: Correção do Botão Agendar, Exibição de Erros de Importação e Acesso aos Contatos
 
-# Plano: Normalização de Telefones com Suporte a WhatsApp
+## Resumo dos Problemas Identificados
 
-## Resumo do Problema
+### 1. Botão "Agendar" na Lista de Pessoas
+- **Problema:** O botão navega para `/eventos/nova-agenda` que **não existe** como rota no sistema
+- **Localização:** `src/pages/pessoas/Todos.tsx` (linhas 367 e 477)
+- **Solução:** Alterar para abrir o `AgendarContatoDialog`, que:
+  - Cria contatos agendados na tabela `visitante_contatos`
+  - Permite definir responsável, tipo (telefone/WhatsApp/email/presencial) e observações
+  - Já possui toda a lógica pronta
 
-O sistema armazena telefones em 3 formatos diferentes:
-- `17996486580` (apenas DDD + número)
-- `+5517996486580` (com + e código de país)
-- `5517996486580` (código de país sem +)
+### 2. Tela de Contatos Agendados "Sumiu"
+- **Realidade:** A tela **existe** e está acessível em `/pessoas/contatos`
+- **Acesso atual:** Dashboard Pessoas → Card "Contatos Agendados"
+- **Arquivo:** `src/pages/pessoas/Contatos.tsx`
+- **Sugestão:** Adicionar ícone/botão de atalho no header da página Todos.tsx para acesso rápido
 
-Isso causa:
-1. **Duplicatas não detectadas** ao comparar telefones
-2. **Potencial falha no envio** para a API do WhatsApp (que exige código de país)
+### 3. Importação: Linhas Rejeitadas sem Detalhes de Erro
+- **Problema:** O usuário vê "100 linhas rejeitadas" mas não consegue ver **quais erros** antes de reimportar
+- **Situação atual:**
+  - `ImportarExcelWizard.tsx`: Tem botão "Baixar CSV de rejeitadas" (funciona)
+  - `ImportarTab.tsx`: Mostra apenas mensagem "Verifique os erros antes de retentar" sem detalhes
+- **Solução:** Adicionar lista visual expandível mostrando cada linha rejeitada com seu erro específico
 
-## Solução: Duas Funções Complementares
-
-### Arquitetura de Normalização
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                     FLUXO DE TELEFONES                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ENTRADA (qualquer formato)                                     │
-│  ├── +5517996486580                                             │
-│  ├── 5517996486580                                              │
-│  └── 17996486580                                                │
-│           │                                                     │
-│           ▼                                                     │
-│  ┌─────────────────────┐                                        │
-│  │ normalizarTelefone  │  Remove +, remove 55 se > 11 dígitos   │
-│  │ (para armazenamento)│                                        │
-│  └─────────────────────┘                                        │
-│           │                                                     │
-│           ▼                                                     │
-│  BANCO DE DADOS: 17996486580 (padrão único)                     │
-│           │                                                     │
-│           ▼                                                     │
-│  ┌─────────────────────┐                                        │
-│  │ formatarParaWhatsApp│  Adiciona 55 se não tiver              │
-│  │ (para envio)        │                                        │
-│  └─────────────────────┘                                        │
-│           │                                                     │
-│           ▼                                                     │
-│  API WHATSAPP: 5517996486580 (com código país)                  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+---
 
 ## Alterações Técnicas
 
-### 1. Criar Utilitário Compartilhado
+### Parte 1: Corrigir Botão "Agendar"
 
-**Arquivo:** `supabase/functions/_shared/telefone-utils.ts`
+**Arquivo:** `src/pages/pessoas/Todos.tsx`
 
-```typescript
-/**
- * Normaliza telefone para armazenamento (sem código de país)
- * Entrada: qualquer formato
- * Saída: apenas DDD + número (10-11 dígitos)
- */
-export function normalizarTelefone(telefone: string | null | undefined): string | null {
-  if (!telefone) return null;
-  
-  let digits = telefone.replace(/\D/g, "");
-  
-  // Remove código de país 55 se presente e telefone tem mais de 11 dígitos
-  if (digits.startsWith("55") && digits.length > 11) {
-    digits = digits.slice(2);
-  }
-  
-  // Validar: deve ter 10 ou 11 dígitos
-  if (digits.length < 10 || digits.length > 11) {
-    console.warn(`Telefone inválido: ${telefone} -> ${digits}`);
-    return digits.length > 0 ? digits : null;
-  }
-  
-  return digits;
-}
+1. Importar o componente `AgendarContatoDialog`
+2. Adicionar estados para controlar o diálogo:
+   ```typescript
+   const [agendarDialogOpen, setAgendarDialogOpen] = useState(false);
+   const [pessoaSelecionada, setPessoaSelecionada] = useState<Pessoa | null>(null);
+   ```
+3. Substituir o `navigate` pelo handler:
+   ```typescript
+   onClick={() => {
+     setPessoaSelecionada(pessoa);
+     setAgendarDialogOpen(true);
+   }}
+   ```
+4. Adicionar o diálogo no JSX:
+   ```tsx
+   <AgendarContatoDialog
+     open={agendarDialogOpen}
+     onOpenChange={setAgendarDialogOpen}
+     visitanteId={pessoaSelecionada?.id || ""}
+     visitanteNome={pessoaSelecionada?.nome || ""}
+     onSuccess={() => {/* opcional: refetch contatos */}}
+   />
+   ```
 
-/**
- * Formata telefone para envio via API WhatsApp (com código de país)
- * Entrada: formato normalizado do banco (DDD + número)
- * Saída: 55 + DDD + número
- */
-export function formatarParaWhatsApp(telefone: string | null | undefined): string | null {
-  if (!telefone) return null;
-  
-  const digits = telefone.replace(/\D/g, "");
-  
-  // Se já tem código de país, retorna como está
-  if (digits.startsWith("55") && digits.length > 11) {
-    return digits;
-  }
-  
-  // Adiciona código do país
-  return `55${digits}`;
-}
+### Parte 2: Adicionar Atalho para Contatos Agendados
+
+**Arquivo:** `src/pages/pessoas/Todos.tsx`
+
+Adicionar botão no header:
+```tsx
+<Button
+  variant="outline"
+  size="sm"
+  onClick={() => navigate("/pessoas/contatos")}
+>
+  <PhoneCall className="w-4 h-4 mr-2" />
+  Contatos Agendados
+</Button>
 ```
 
-### 2. Atualizar Edge Functions
+### Parte 3: Exibir Erros de Linhas Rejeitadas
+
+**Arquivo:** `src/components/financas/ImportarTab.tsx`
+
+1. Adicionar componente `Collapsible` de `@radix-ui/react-collapsible`
+2. Após a mensagem "X linhas rejeitadas", adicionar lista expandível:
+   ```tsx
+   {rejected.length > 0 && (
+     <Collapsible>
+       <CollapsibleTrigger className="flex items-center gap-2 text-sm">
+         <ChevronDown className="w-4 h-4" />
+         Ver detalhes dos erros ({rejected.length})
+       </CollapsibleTrigger>
+       <CollapsibleContent>
+         <ScrollArea className="max-h-48">
+           {rejected.map((r) => (
+             <div key={r.index} className="text-xs border-b py-1">
+               <span className="font-medium">Linha {r.index + 2}:</span> {r.reason}
+             </div>
+           ))}
+         </ScrollArea>
+       </CollapsibleContent>
+     </Collapsible>
+   )}
+   ```
+3. Manter o botão "Baixar CSV" existente como opção adicional
+
+---
+
+## Integração com Relatório Pastoral (Futuro)
+
+Conforme ADR-014, o sistema já possui a estrutura para vincular contatos ao gabinete pastoral:
+
+- **Tabela `atendimentos_pastorais`:** Armazena tickets de cuidado pastoral
+- **Tabela `visitante_contatos`:** Armazena follow-ups de equipe de recepção
+
+**Opções para integração:**
+1. **Registro automático:** Quando um contato for marcado como "Realizado" em `/pessoas/contatos`, criar entrada em relatório/log pastoral
+2. **Promoção manual:** Botão "Encaminhar para Gabinete" que cria um `atendimento_pastoral` a partir do contato realizado
+3. **Dashboard unificado:** Criar aba no Gabinete Pastoral que mostra histórico de contatos da pessoa
+
+**Recomendação:** Implementar primeiro o fluxo básico (correção do botão) e depois discutir qual nível de integração com o gabinete pastoral faz sentido para o workflow da igreja.
+
+---
+
+## Resumo de Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `chatbot-triagem/index.ts` | Importar e usar `normalizarTelefone` do utilitário compartilhado |
-| `chatbot-financeiro/index.ts` | Importar e usar `normalizarTelefone` do utilitário compartilhado |
-| `inscricao-compartilhe/index.ts` | Importar e usar `normalizarTelefone` do utilitário compartilhado |
-| `cadastro-publico/index.ts` | Importar e usar `normalizarTelefone` |
-| `disparar-alerta/index.ts` | Usar `formatarParaWhatsApp` antes de enviar para API Meta |
-| `disparar-escala/index.ts` | Usar `formatarParaWhatsApp` antes de enviar |
+| `src/pages/pessoas/Todos.tsx` | Substituir navigate por AgendarContatoDialog + Adicionar atalho para /pessoas/contatos |
+| `src/components/financas/ImportarTab.tsx` | Adicionar lista expandível de erros de linhas rejeitadas |
 
-### 3. Atualizar Frontend (validators.ts)
+---
 
-**Arquivo:** `src/lib/validators.ts`
+## Esclarecimentos
 
-Adicionar mesmas funções para uso no frontend:
-- `normalizarTelefone()` - para salvar no banco
-- `formatarParaWhatsApp()` - (opcional, não usado no front)
-
-### 4. Migração SQL para Corrigir Dados Existentes
-
-```sql
--- Normalizar telefones existentes para padrão: DDD + número (10-11 dígitos)
-UPDATE profiles
-SET telefone = 
-  CASE 
-    -- Telefone com +55: remove + e 55
-    WHEN telefone LIKE '+55%' 
-    THEN SUBSTRING(REGEXP_REPLACE(telefone, '\D', '', 'g') FROM 3)
-    -- Telefone com 55 no início e mais de 11 dígitos: remove 55
-    WHEN LENGTH(REGEXP_REPLACE(telefone, '\D', '', 'g')) > 11 
-     AND REGEXP_REPLACE(telefone, '\D', '', 'g') LIKE '55%'
-    THEN SUBSTRING(REGEXP_REPLACE(telefone, '\D', '', 'g') FROM 3)
-    -- Caso contrário: apenas remove caracteres não numéricos
-    ELSE REGEXP_REPLACE(telefone, '\D', '', 'g')
-  END
-WHERE telefone IS NOT NULL
-  AND telefone != REGEXP_REPLACE(telefone, '\D', '', 'g');
-```
-
-### 5. Melhorar Busca de Duplicatas no cadastro-publico
-
-Antes de inserir um novo visitante, buscar em múltiplos formatos:
-
-```typescript
-const telefoneNormalizado = normalizarTelefone(visitanteData.telefone);
-if (telefoneNormalizado) {
-  const { data: byTelefone } = await supabase
-    .from('profiles')
-    .select('*')
-    .in('status', ['visitante', 'frequentador', 'membro'])
-    .eq('telefone', telefoneNormalizado)  // Busca exata no formato normalizado
-    .limit(1);
-}
-```
-
-Após a migração, todos os telefones estarão no mesmo formato, então a busca exata funcionará.
-
-## Benefícios
-
-1. **Formato único no banco** - Facilita comparação e evita duplicatas
-2. **Compatibilidade com WhatsApp** - Função de formatação adiciona 55 apenas quando necessário
-3. **Código centralizado** - Utilitário compartilhado evita duplicação
-4. **Dados legados corrigidos** - Migração SQL normaliza registros antigos
-
-## Ordem de Implementação
-
-1. Criar `supabase/functions/_shared/telefone-utils.ts`
-2. Executar migração SQL para corrigir dados existentes
-3. Atualizar `cadastro-publico` para usar normalização
-4. Atualizar demais edge functions
-5. Atualizar `src/lib/validators.ts` no frontend
-6. Atualizar formulários de cadastro manual
-
+1. **A rota `/pessoas/contatos` existe** - está registrada no App.tsx e funciona
+2. **O AgendarContatoDialog funciona com qualquer pessoa** - usa `visitante_id` mas aceita qualquer `profile.id`
+3. **O ImportarExcelWizard já tem "Baixar CSV de rejeitadas"** - o ImportarTab precisa da mesma funcionalidade visual
