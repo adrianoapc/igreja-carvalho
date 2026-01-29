@@ -55,6 +55,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { getActiveWhatsAppProviderWithFallback } from "../_shared/webhook-resolver.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,7 +87,6 @@ serve(async (req) => {
       payload = {};
     }
 
-    const whatsappTipos = ['whatsapp_make', 'whatsapp_meta', 'whatsapp_evolution'];
     let igrejaIds: string[] = [];
 
     if (payload.igreja_id) {
@@ -104,26 +104,20 @@ serve(async (req) => {
       igrejaIds = (igrejas || []).map((igreja) => igreja.id);
     }
 
-    const processIgreja = async (igrejaId: string) => {
-      const { data: whatsappConfigs, error: whatsappError } = await supabase
-        .from('webhooks')
-        .select('tipo')
-        .eq('igreja_id', igrejaId)
-        .in('tipo', whatsappTipos)
-        .eq('enabled', true);
+  const processIgreja = async (igrejaId: string) => {
+    // Verificar se há provedor WhatsApp configurado (com fallback para global)
+    const whatsappProvider = await getActiveWhatsAppProviderWithFallback(supabase, igrejaId, null);
 
-      if (whatsappError) {
-        console.error('Erro ao buscar webhooks de WhatsApp:', whatsappError);
-      }
+    if (!whatsappProvider) {
+      console.log(`⚠️ Nenhum provedor WhatsApp configurado - igreja ${igrejaId}`);
+      return {
+        igreja_id: igrejaId,
+        lembretes_enviados: 0,
+        mensagem: "WhatsApp não configurado para esta igreja",
+      };
+    }
 
-      if (!whatsappConfigs || whatsappConfigs.length === 0) {
-        console.log(`⚠️ WhatsApp desativado nas configurações - igreja ${igrejaId}`);
-        return {
-          igreja_id: igrejaId,
-          lembretes_enviados: 0,
-          mensagem: "WhatsApp desativado nas configurações da igreja",
-        };
-      }
+    console.log(`✓ Provedor WhatsApp: ${whatsappProvider.tipo} (nível: ${whatsappProvider.resolucao.webhookNivel})`);
 
       // Calcular janela de tempo: entre 24h e 48h a partir de agora
       const agora = new Date();
