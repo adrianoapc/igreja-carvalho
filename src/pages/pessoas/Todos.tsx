@@ -32,7 +32,9 @@ import {
   ArrowLeft,
   Download,
   Filter,
+  PhoneCall,
 } from "lucide-react";
+import { AgendarContatoDialog } from "@/components/visitantes/AgendarContatoDialog";
 import { toast } from "@/hooks/use-toast";
 import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
 import {
@@ -74,6 +76,8 @@ export default function TodosPessoas() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [filterHasEmail, setFilterHasEmail] = useState(false);
+  const [agendarDialogOpen, setAgendarDialogOpen] = useState(false);
+  const [pessoaSelecionada, setPessoaSelecionada] = useState<Pessoa | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const {
@@ -223,6 +227,14 @@ export default function TodosPessoas() {
             Visualize todas as pessoas cadastradas
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/pessoas/contatos")}
+        >
+          <PhoneCall className="w-4 h-4 mr-2" />
+          Contatos
+        </Button>
         <Button variant="outline" size="sm" onClick={handleExportar}>
           <Download className="w-4 h-4 mr-2" />
           Exportar
@@ -363,9 +375,10 @@ export default function TodosPessoas() {
                         variant="ghost"
                         size="sm"
                         className="min-h-[44px]"
-                        onClick={() =>
-                          navigate(`/eventos/nova-agenda?membroId=${pessoa.id}`)
-                        }
+                        onClick={() => {
+                          setPessoaSelecionada(pessoa);
+                          setAgendarDialogOpen(true);
+                        }}
                       >
                         Agendar
                       </Button>
@@ -473,9 +486,10 @@ export default function TodosPessoas() {
                   <Button
                     variant="outline"
                     className="flex-1 min-h-[44px]"
-                    onClick={() =>
-                      navigate(`/eventos/nova-agenda?membroId=${pessoa.id}`)
-                    }
+                    onClick={() => {
+                      setPessoaSelecionada(pessoa);
+                      setAgendarDialogOpen(true);
+                    }}
                   >
                     Agendar
                   </Button>
@@ -594,6 +608,14 @@ export default function TodosPessoas() {
           </div>
         </div>
       </ResponsiveDialog>
+
+      <AgendarContatoDialog
+        open={agendarDialogOpen}
+        onOpenChange={setAgendarDialogOpen}
+        visitanteId={pessoaSelecionada?.id || ""}
+        visitanteNome={pessoaSelecionada?.nome || ""}
+        onSuccess={() => {}}
+      />
     </div>
   );
 }

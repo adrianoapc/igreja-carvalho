@@ -23,7 +23,11 @@ import {
   CheckCircle2,
   ArrowLeft,
   ChevronRight,
+  ChevronDown,
+  Download,
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Types
 type TipoTransacao = "entrada" | "saida";
@@ -1398,13 +1402,63 @@ export function ImportarTab() {
               </div>
             </div>
             {rejected.length > 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-xs">
-                  {rejected.length} linha(s) rejeitada(s). Verifique os erros
-                  antes de retentar.
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-2">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    {rejected.length} linha(s) rejeitada(s). Verifique os erros
+                    antes de retentar.
+                  </AlertDescription>
+                </Alert>
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full justify-between px-2 py-1 rounded hover:bg-muted">
+                    <span className="flex items-center gap-2">
+                      <ChevronDown className="w-4 h-4" />
+                      Ver detalhes dos erros ({rejected.length})
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const csvContent = rejected
+                          .map((r) => `${r.index + 2},"${r.reason.replace(/"/g, '""')}"`)
+                          .join("\n");
+                        const blob = new Blob(
+                          [`Linha,Erro\n${csvContent}`],
+                          { type: "text/csv;charset=utf-8;" }
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "linhas_rejeitadas.csv";
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      Baixar CSV
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <ScrollArea className="max-h-48 mt-2 border rounded-md">
+                      <div className="p-2 space-y-1">
+                        {rejected.map((r) => (
+                          <div
+                            key={r.index}
+                            className="text-xs border-b border-border/50 py-1.5 px-2 last:border-b-0"
+                          >
+                            <span className="font-medium text-destructive">
+                              Linha {r.index + 2}:
+                            </span>{" "}
+                            <span className="text-muted-foreground">{r.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
             )}
             {chunkProgress.processed === chunkProgress.total &&
               chunkProgress.total > 0 && (
