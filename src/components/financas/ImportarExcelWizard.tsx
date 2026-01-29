@@ -346,14 +346,14 @@ export function ImportarExcelWizard({
       // Subcategoria (opcional)
       if (mapping.subcategoria && subcategorias) {
         const nomeSub = row[mapping.subcategoria];
-        const subOk = subcategorias.find(
-          (s) =>
-            s.nome.toLowerCase() ===
-            String(nomeSub || "")
-              .toLowerCase()
-              .trim()
-        );
-        if (!subOk) msgs.push("Subcategoria não encontrada");
+        // Só valida se o campo tiver valor preenchido (subcategoria é opcional)
+        const nomeSubStr = String(nomeSub || "").trim();
+        if (nomeSubStr) {
+          const subOk = subcategorias.find(
+            (s) => s.nome.toLowerCase() === nomeSubStr.toLowerCase()
+          );
+          if (!subOk) msgs.push("Subcategoria não encontrada");
+        }
       }
 
       if (msgs.length) {

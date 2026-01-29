@@ -353,53 +353,53 @@ export function ImportarTab() {
       if (mapping.subcategoria && subcategorias) {
         const nomeSub = row[mapping.subcategoria];
         fieldValues.subcategoria = nomeSub;
-        const subOk = subcategorias.find(
-          (s) =>
-            s.nome.toLowerCase() ===
-            String(nomeSub || "")
-              .toLowerCase()
-              .trim()
-        );
-        if (!subOk) msgs.push("Subcategoria não encontrada");
+        // Só valida se o campo tiver valor preenchido (subcategoria é opcional)
+        const nomeSubStr = String(nomeSub || "").trim();
+        if (nomeSubStr) {
+          const subOk = subcategorias.find(
+            (s) => s.nome.toLowerCase() === nomeSubStr.toLowerCase()
+          );
+          if (!subOk) msgs.push("Subcategoria não encontrada");
+        }
       }
 
       if (mapping.base_ministerial && basesMinisteriais) {
         const nomeBase = row[mapping.base_ministerial];
         fieldValues.base_ministerial = nomeBase;
-        const baseOk = basesMinisteriais.find(
-          (b) =>
-            b.titulo.toLowerCase() ===
-            String(nomeBase || "")
-              .toLowerCase()
-              .trim()
-        );
-        if (!baseOk) msgs.push("Base ministerial não encontrada");
+        // Só valida se o campo tiver valor preenchido (base ministerial é opcional)
+        const nomeBaseStr = String(nomeBase || "").trim();
+        if (nomeBaseStr) {
+          const baseOk = basesMinisteriais.find(
+            (b) => b.titulo.toLowerCase() === nomeBaseStr.toLowerCase()
+          );
+          if (!baseOk) msgs.push("Base ministerial não encontrada");
+        }
       }
 
       if (mapping.centro_custo && centrosCusto) {
         const nomeCC = row[mapping.centro_custo];
         fieldValues.centro_custo = nomeCC;
-        const ccOk = centrosCusto.find(
-          (c) =>
-            c.nome.toLowerCase() ===
-            String(nomeCC || "")
-              .toLowerCase()
-              .trim()
-        );
-        if (!ccOk) msgs.push("Centro de custo não encontrado");
+        // Só valida se o campo tiver valor preenchido (centro de custo é opcional)
+        const nomeCCStr = String(nomeCC || "").trim();
+        if (nomeCCStr) {
+          const ccOk = centrosCusto.find(
+            (c) => c.nome.toLowerCase() === nomeCCStr.toLowerCase()
+          );
+          if (!ccOk) msgs.push("Centro de custo não encontrado");
+        }
       }
 
       if (mapping.fornecedor && fornecedores) {
         const nomeFornecedor = row[mapping.fornecedor];
         fieldValues.fornecedor = nomeFornecedor;
-        const fornOk = fornecedores.find(
-          (f) =>
-            f.nome.toLowerCase() ===
-            String(nomeFornecedor || "")
-              .toLowerCase()
-              .trim()
-        );
-        if (!fornOk) msgs.push("Fornecedor não encontrado");
+        // Só valida se o campo tiver valor preenchido (fornecedor é opcional)
+        const nomeFornecedorStr = String(nomeFornecedor || "").trim();
+        if (nomeFornecedorStr) {
+          const fornOk = fornecedores.find(
+            (f) => f.nome.toLowerCase() === nomeFornecedorStr.toLowerCase()
+          );
+          if (!fornOk) msgs.push("Fornecedor não encontrado");
+        }
       }
 
       // Capturar valores opcionais numéricos (não geram erro se ausentes)
