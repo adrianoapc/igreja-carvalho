@@ -242,11 +242,32 @@ export function ImportarExcelWizard({
 
   const parseValor = (valor: unknown): number => {
     if (valor === undefined || valor === null) return 0;
-    const valorStr = String(valor)
-      .replace(/[\sR$€£%]/g, "")
-      .replace(/\./g, "")
-      .replace(/,/g, ".");
-    const n = parseFloat(valorStr);
+    
+    // Se já é número, retorna direto
+    if (typeof valor === "number") return valor;
+    
+    let str = String(valor).trim();
+    
+    // Remove símbolos de moeda e espaços
+    str = str.replace(/[¤$\u20AC£¥R\s]/g, "");
+    
+    // Auto-detectar formato pelo último separador
+    const lastComma = str.lastIndexOf(",");
+    const lastDot = str.lastIndexOf(".");
+    
+    // Determina se vírgula é o separador decimal (formato BR: 1.234,56)
+    // ou se ponto é o separador decimal (formato US: 1,234.56)
+    const isCommaDecimal = lastComma > lastDot;
+    
+    if (isCommaDecimal) {
+      // Formato BR: 1.234,56 → remove pontos (milhares), troca vírgula por ponto
+      str = str.replace(/\./g, "").replace(",", ".");
+    } else {
+      // Formato US: 1,234.56 → remove vírgulas (milhares)
+      str = str.replace(/,/g, "");
+    }
+    
+    const n = parseFloat(str);
     return isNaN(n) ? 0 : n;
   };
 
