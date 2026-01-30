@@ -12,6 +12,7 @@ import {
   FileEdit,
   Heart,
   Search,
+  Plus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboar
 import { LinksExternosCard } from "@/components/pessoas/LinksExternosCard";
 import { PerfisPendentes } from "@/components/pessoas/PerfisPendentes";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { CadastrarPessoaDialog } from "@/components/pessoas/CadastrarPessoaDialog";
 
 export default function Pessoas() {
   const navigate = useNavigate();
@@ -30,6 +32,7 @@ export default function Pessoas() {
     loading: authLoading,
   } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState("");
+  const [cadastrarOpen, setCadastrarOpen] = useState(false);
   const [stats, setStats] = useState([
     {
       title: "Total de Pessoas",
@@ -213,40 +216,49 @@ export default function Pessoas() {
         </p>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar + Register Button */}
       <Card>
         <CardContent className="p-4 md:p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar pessoa por nome, email ou telefone..."
-              className="pl-10 text-sm md:text-base"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && searchTerm.trim()) {
-                  navigate(
-                    `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`
-                  );
-                }
-              }}
-            />
-            {searchTerm && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-auto p-1"
-                onClick={() => {
-                  if (searchTerm.trim()) {
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar pessoa por nome, email ou telefone..."
+                className="pl-10 text-sm md:text-base"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchTerm.trim()) {
                     navigate(
                       `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`
                     );
                   }
                 }}
-              >
-                Buscar
-              </Button>
-            )}
+              />
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-auto p-1"
+                  onClick={() => {
+                    if (searchTerm.trim()) {
+                      navigate(
+                        `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`
+                      );
+                    }
+                  }}
+                >
+                  Buscar
+                </Button>
+              )}
+            </div>
+            <Button
+              onClick={() => setCadastrarOpen(true)}
+              className="shrink-0"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Cadastrar Pessoa
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -448,6 +460,16 @@ export default function Pessoas() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog de Cadastro */}
+      <CadastrarPessoaDialog
+        open={cadastrarOpen}
+        onOpenChange={setCadastrarOpen}
+        onSuccess={() => {
+          // Recarregar estatísticas
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }
