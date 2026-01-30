@@ -1394,6 +1394,8 @@ serve(async (req) => {
             foto_url: item.anexo_storage,
             igreja_id: igrejaId,
             filial_id: filialIdFromWhatsApp,
+            fornecedor_id: item.fornecedor_id,
+            base_ministerial_id: item.base_ministerial_sugerido_id,
           })
           .select("id")
           .single();
