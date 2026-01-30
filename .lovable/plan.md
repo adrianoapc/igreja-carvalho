@@ -1,108 +1,145 @@
 
+# Plano: ADR-027 - Definição de Valor vs Valor Líquido e Sincronização de Importação
 
-# Plano: Corrigir Parsing de Data e Adicionar Download de Erros na Validação
+## Resumo Executivo
 
-## Problema 1: Data importando com 1 dia a menos
+Este plano documenta formalmente a diferença entre **valor bruto** e **valor líquido** nas transações financeiras, e sincroniza a importação de saídas com a de entradas, adicionando suporte aos campos de ajuste financeiro.
 
-### Causa Raiz
-A biblioteca `xlsx` pode converter células formatadas como "Data" no Excel para **serial date** (número), mesmo quando o conteúdo visual é `dd/MM/yyyy`. Quando isso acontece, o parsing atual pode ter imprecisões de timezone.
+---
 
-### Solução
-Forçar o `xlsx` a ler todas as células como texto bruto usando a opção `raw: false` e `dateNF: undefined` ao parsear a planilha. Isso evita a conversão automática para serial date.
+## Parte 1: Documentação Arquitetural (ADR-027)
 
-**Arquivo:** `src/components/financas/ImportarTab.tsx`
+### Arquivo a criar
+`docs/adr/ADR-027-valor-bruto-vs-valor-liquido.md`
 
-**Alteração na função `parseSheet` (linha ~166-191):**
+### Conteúdo
+
+Define formalmente:
+- **`valor` (Bruto)**: Valor original da nota/fatura → Usado para DRE (competência)
+- **`valor_liquido` (Caixa)**: Valor efetivamente pago → Usado para conciliação bancária
+- **Fórmula**: `valor_liquido = valor + juros + multas + taxas_administrativas - desconto`
+
+Impacto:
+- DRE usa `valor` para categoria principal
+- Ajustes vão para categorias financeiras separadas
+- Conciliação bancária usa `valor_liquido`
+
+### Atualização do README
+Adicionar entrada para ADR-027 no `docs/adr/README.MD`
+
+---
+
+## Parte 2: Implementação no ImportarExcelDialog.tsx (Saídas)
+
+### 2.1 Expandir ColumnMapping (linha ~35-49)
+
+Adicionar campos que já existem no ImportarTab.tsx:
 
 ```typescript
-const parseSheet = (wb: WorkBook, sheetName: string) => {
-  try {
-    const worksheet = wb.Sheets[sheetName];
-    // Forçar leitura como texto para evitar conversão automática de datas
-    const jsonData = utils.sheet_to_json(worksheet, { 
-      defval: "",
-      raw: false,  // <-- Força formato de exibição em vez de valor bruto
-      dateNF: "dd/mm/yyyy"  // <-- Formato de data esperado
-    });
-    // ... resto do código
-  }
+type ColumnMapping = {
+  // ... campos existentes ...
+  valor_liquido?: string;  // Novo: mapeia "valor_pago"
+  multas?: string;
+  juros?: string;
+  desconto?: string;
+  taxas_administrativas?: string;
 };
 ```
 
-**Impacto:** Datas que antes vinham como `45936` (serial) agora virão como `"05/10/2025"` (string), sendo parseadas corretamente pelo regex existente.
+### 2.2 Atualizar autoDetectMapping (linha ~91-120)
 
----
+Adicionar detecção automática:
 
-## Problema 2: Botão de download de erros sumiu
+```typescript
+// Detectar valor_liquido/valor_pago
+if (colLower.includes("valor_pago") || colLower.includes("liquido") || colLower.includes("pago")) 
+  autoMapping.valor_liquido = col;
 
-### Causa Raiz
-O botão "Baixar CSV" só aparece no **step 3** (importação em progresso), dentro do bloco `{rejected.length > 0}`. Na etapa de **validação (step 2)**, os erros são exibidos mas não há opção de download.
-
-### Solução
-Adicionar botão de download também na seção de validação (step 2).
-
-**Arquivo:** `src/components/financas/ImportarTab.tsx`
-
-**Alteração no step 2 (linhas ~1277-1290):**
-
-Adicionar botão de download junto aos botões "Desmarcar todos" e "Marcar todos":
-
-```tsx
-{step === 2 && (
-  <div className="space-y-4">
-    <div className="flex items-center justify-between">
-      <h3 className="font-semibold text-sm">
-        Resumo de Validação ({validationIssues.length} problemas)
-      </h3>
-      {validationIssues.length > 0 && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            const csvContent = validationIssues
-              .map((issue) => 
-                `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`
-              )
-              .join("\n");
-            const blob = new Blob(
-              [`Linha,Problemas\n${csvContent}`],
-              { type: "text/csv;charset=utf-8;" }
-            );
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "erros_validacao.csv";
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          <Download className="w-4 h-4 mr-1" />
-          Baixar Erros
-        </Button>
-      )}
-    </div>
-    {/* ... resto do conteúdo de validação */}
-  </div>
-)}
+// Detectar ajustes
+if (colLower.includes("multa")) autoMapping.multas = col;
+if (colLower.includes("juros")) autoMapping.juros = col;
+if (colLower.includes("desconto")) autoMapping.desconto = col;
+if (colLower.includes("taxa")) autoMapping.taxas_administrativas = col;
 ```
 
+### 2.3 Atualizar processarImportacao (linhas ~319-455)
+
+Parsear novos campos e calcular `valor_liquido`:
+
+```typescript
+// Parsear ajustes
+const multas = mapping.multas ? parseValor(row[mapping.multas]) : 0;
+const juros = mapping.juros ? parseValor(row[mapping.juros]) : 0;
+const desconto = mapping.desconto ? parseValor(row[mapping.desconto]) : 0;
+const taxasAdm = mapping.taxas_administrativas 
+  ? parseValor(row[mapping.taxas_administrativas]) : 0;
+
+// Calcular valor_liquido
+const valorLiquido = mapping.valor_liquido 
+  ? parseValor(row[mapping.valor_liquido])
+  : valor + juros + multas + taxasAdm - desconto;
+
+// Incluir na transação
+transacoes.push({
+  // ... campos existentes ...
+  valor_liquido: valorLiquido || valor,
+  multas: multas || null,
+  juros: juros || null,
+  desconto: desconto || null,
+  taxas_administrativas: taxasAdm || null,
+});
+```
+
+### 2.4 Adicionar campos na UI de mapeamento
+
+Novos selects na interface (após linha ~600):
+- Valor Pago (Líquido)
+- Juros
+- Multas  
+- Desconto
+- Taxas Administrativas
+
 ---
 
-## Resumo das Alterações
+## Arquivos Afetados
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `ImportarTab.tsx` | Adicionar `raw: false` no `sheet_to_json` para evitar conversão automática de datas |
-| `ImportarTab.tsx` | Adicionar botão "Baixar Erros" na etapa de validação (step 2) |
-| `ImportarExcelWizard.tsx` | Mesmas correções (consistência entre componentes) |
+| Arquivo | Ação |
+|---------|------|
+| `docs/adr/ADR-027-valor-bruto-vs-valor-liquido.md` | Criar |
+| `docs/adr/README.MD` | Atualizar (adicionar entrada) |
+| `src/components/financas/ImportarExcelDialog.tsx` | Modificar |
 
 ---
 
-## Por que não precisa de reset?
+## Detalhes Técnicos
 
-O código está funcional — apenas falta:
-1. **Robustez no parsing**: Evitar que o xlsx converta datas automaticamente
-2. **UX de download**: Adicionar botão que já existe no step 3 também no step 2
+### Regra de Cálculo
 
-Essas são alterações pontuais que não afetam o estado da aplicação ou banco de dados.
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│  Se valor_pago informado:                                           │
+│    valor_liquido = valor_pago                                       │
+│                                                                     │
+│  Senão, se ajustes informados:                                      │
+│    valor_liquido = valor + juros + multas + taxas - desconto        │
+│                                                                     │
+│  Senão:                                                             │
+│    valor_liquido = valor (cópia)                                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
+### Compatibilidade
+
+- Nenhuma migração de banco necessária (campos já existem)
+- ReconciliacaoBancaria já usa `valor_liquido || valor` (compatível)
+- DRE pode evoluir para usar `valor` para categoria + ajustes separados
+
+---
+
+## Validação
+
+Após implementação, testar:
+1. Importar planilha só com `valor` → `valor_liquido` deve copiar `valor`
+2. Importar com `valor` e `valor_pago` → `valor_liquido` deve usar `valor_pago`
+3. Importar com `valor` e ajustes → `valor_liquido` deve ser calculado
+4. Conciliação bancária deve encontrar match pelo `valor_liquido`
