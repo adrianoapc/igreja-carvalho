@@ -949,9 +949,12 @@ export function ImportarExcelDialog({
                   </div>
                 </div>
 
-                {/* Ajustes Financeiros */}
-                <div className="mt-4 pt-3 border-t">
-                  <h4 className="text-xs font-medium text-muted-foreground mb-3">Ajustes Financeiros (opcional)</h4>
+                {/* Ajustes Financeiros - Valor Líquido, Juros, Multas, etc */}
+                <div className="mt-4 pt-4 border-t border-dashed">
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3">💰 Ajustes Financeiros (opcional)</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    O valor líquido será calculado automaticamente: valor + juros + multas + taxas - desconto
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs">Valor Pago (Líquido)</Label>
