@@ -26,7 +26,9 @@ import {
   formatCurrencyForExport,
 } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { usePagination } from "@/hooks/usePagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 // import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
@@ -238,7 +240,7 @@ export default function Saidas() {
         return false;
       }
 
-      return true;
+    return true;
     });
   }, [
     transacoes,
@@ -248,6 +250,24 @@ export default function Saidas() {
     fornecedorFilter,
     statusFilter,
   ]);
+
+  // Pagination
+  const {
+    currentPage,
+    totalPages,
+    paginatedData: transacoesPaginadas,
+    goToPage,
+    hasNextPage,
+    hasPrevPage,
+    startIndex,
+    endIndex,
+    totalItems,
+  } = usePagination(transacoesFiltradas, { pageSize: 20 });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    goToPage(1);
+  }, [busca, contaFilter, categoriaFilter, fornecedorFilter, statusFilter, selectedMonth, customRange]);
 
   const formatCurrency = (value: number) => {
     return formatValue(value);
@@ -575,119 +595,133 @@ export default function Saidas() {
               Carregando...
             </p>
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
-            <div className="space-y-2">
-              {transacoesFiltradas.map((transacao) => (
-                <div
-                  key={transacao.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                  onDoubleClick={() => {
-                    setEditingTransacao(transacao as any);
-                    setDialogOpen(true);
-                  }}
-                >
-                  {/* Data Compact - Mobile */}
-                  <div className="flex-shrink-0 text-center w-12 md:w-14">
-                    <div className="text-xs md:text-sm font-bold text-foreground">
-                      {format(new Date(transacao.data_vencimento), "dd", {
-                        locale: ptBR,
-                      })}
+            <>
+              <div className="space-y-2">
+                {transacoesPaginadas.map((transacao) => (
+                  <div
+                    key={transacao.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    onDoubleClick={() => {
+                      setEditingTransacao(transacao as any);
+                      setDialogOpen(true);
+                    }}
+                  >
+                    {/* Data Compact - Mobile */}
+                    <div className="flex-shrink-0 text-center w-12 md:w-14">
+                      <div className="text-xs md:text-sm font-bold text-foreground">
+                        {format(new Date(transacao.data_vencimento), "dd", {
+                          locale: ptBR,
+                        })}
+                      </div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
+                        {format(new Date(transacao.data_vencimento), "MMM", {
+                          locale: ptBR,
+                        })}
+                      </div>
                     </div>
-                    <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
-                      {format(new Date(transacao.data_vencimento), "MMM", {
-                        locale: ptBR,
-                      })}
-                    </div>
-                  </div>
 
-                  {/* Divider */}
-                  <div className="h-10 w-px bg-border" />
+                    {/* Divider */}
+                    <div className="h-10 w-px bg-border" />
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm md:text-base truncate">
-                      {transacao.descricao}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                      {transacao.fornecedor && (
-                        <>
-                          <span className="truncate">
-                            {transacao.fornecedor.nome}
-                          </span>
-                          {transacao.categoria && <span>•</span>}
-                        </>
-                      )}
-                      {transacao.categoria && (
-                        <>
-                          <span
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{
-                              backgroundColor:
-                                transacao.categoria.cor || "#666",
-                            }}
-                          />
-                          <span className="truncate">
-                            {transacao.categoria.nome}
-                          </span>
-                        </>
-                      )}
-                      {transacao.conta && (
-                        <>
-                          <span>•</span>
-                          <span className="truncate">
-                            {transacao.conta.nome}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Value & Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="text-right">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
-                          {formatCurrency(Number(transacao.valor))}
-                        </p>
-                        {transacao.solicitacao_reembolso_id && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400"
-                                >
-                                  <ReceiptText className="w-2.5 h-2.5" />
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Reembolso</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm md:text-base truncate">
+                        {transacao.descricao}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                        {transacao.fornecedor && (
+                          <>
+                            <span className="truncate">
+                              {transacao.fornecedor.nome}
+                            </span>
+                            {transacao.categoria && <span>•</span>}
+                          </>
+                        )}
+                        {transacao.categoria && (
+                          <>
+                            <span
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{
+                                backgroundColor:
+                                  transacao.categoria.cor || "#666",
+                              }}
+                            />
+                            <span className="truncate">
+                              {transacao.categoria.nome}
+                            </span>
+                          </>
+                        )}
+                        {transacao.conta && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate">
+                              {transacao.conta.nome}
+                            </span>
+                          </>
                         )}
                       </div>
-                      <Badge
-                        className={`text-[10px] md:text-xs ${getStatusColorDynamic(
-                          transacao
-                        )}`}
-                      >
-                        {getStatusDisplay(transacao)}
-                      </Badge>
                     </div>
-                    <TransacaoActionsMenu
-                      transacaoId={transacao.id}
-                      status={transacao.status}
-                      tipo="saida"
-                      isReembolso={!!transacao.solicitacao_reembolso_id}
-                      onEdit={() => {
-                        setEditingTransacao(transacao);
-                        setDialogOpen(true);
-                      }}
-                    />
+
+                    {/* Value & Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <div className="flex items-center gap-1.5 justify-end">
+                          <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
+                            {formatCurrency(Number(transacao.valor))}
+                          </p>
+                          {transacao.solicitacao_reembolso_id && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400"
+                                  >
+                                    <ReceiptText className="w-2.5 h-2.5" />
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Reembolso</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                        <Badge
+                          className={`text-[10px] md:text-xs ${getStatusColorDynamic(
+                            transacao
+                          )}`}
+                        >
+                          {getStatusDisplay(transacao)}
+                        </Badge>
+                      </div>
+                      <TransacaoActionsMenu
+                        transacaoId={transacao.id}
+                        status={transacao.status}
+                        tipo="saida"
+                        isReembolso={!!transacao.solicitacao_reembolso_id}
+                        onEdit={() => {
+                          setEditingTransacao(transacao);
+                          setDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={goToPage}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                totalItems={totalItems}
+                hasNextPage={hasNextPage}
+                hasPrevPage={hasPrevPage}
+              />
+            </>
           ) : (
             <p className="text-sm md:text-base text-muted-foreground text-center py-4">
               Nenhuma saída encontrada para o período selecionado.
