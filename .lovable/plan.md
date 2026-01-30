@@ -1,132 +1,192 @@
 
 
-# Adicionar Botão de Cadastro Rápido na Página Pessoas
+# Auto-completar Endereço por CEP + Campo de Ano Opcional no Aniversário
 
-## Problema
+## Situação Atual
 
-Atualmente, para cadastrar uma pessoa pelo painel administrativo:
-- **Visitantes/Frequentadores**: É preciso ir em Pessoas → Visitantes → Registrar
-- **Membros**: Não existe fluxo direto - apenas o card de "Links Externos" para auto-cadastro
+### Problema 1: CEP
+- Os campos de CEP nos formulários de pessoas **não fazem busca automática**
+- O usuário precisa digitar manualmente todos os campos de endereço
+- Isso causa erros de digitação e torna o cadastro mais lento
 
-Isso torna o processo pouco intuitivo para a secretaria/liderança que precisa cadastrar pessoas manualmente.
-
----
-
-## Proposta de Solução
-
-### Opção Implementada
-
-Adicionar um **botão CTA principal** no dashboard de Pessoas que abre um fluxo de cadastro com seleção do tipo de pessoa:
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  Pessoas                                                      │
-│  Dashboard centralizado de gestão de pessoas                  │
-│                                                               │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │ 🔍 Buscar pessoa por nome, email ou telefone...        │  │
-│  └────────────────────────────────────────────────────────┘  │
-│                                                               │
-│  [+ Cadastrar Pessoa]  ← NOVO BOTÃO PRINCIPAL                 │
-│                                                               │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐             │
-│  │  Total  │ │Visitant.│ │ Frequen.│ │ Membros │             │
-│  │  120    │ │   45    │ │   35    │ │   40    │             │
-│  └─────────┘ └─────────┘ └─────────┘ └─────────┘             │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### Modal de Cadastro Unificado
-
-Ao clicar em "+ Cadastrar Pessoa", abre um modal com:
-
-1. **Seleção do tipo** (visitante, frequentador, membro)
-2. **Formulário adaptável** baseado no tipo selecionado:
-   - Visitante/Frequentador: Formulário simplificado (nome, contato, origem)
-   - Membro: Formulário mais completo (dados pessoais, endereço, dados eclesiásticos)
+### Problema 2: Aniversário
+- Atualmente o campo de aniversário só aceita **dia e mês**
+- O ano é gravado como `1900` por padrão (apenas para permitir filtros de aniversariantes)
+- Não há opção de informar o ano real de nascimento quando conhecido
 
 ---
 
-## Detalhes da Implementação
+## Proposta de Implementação
 
-### 1. Modificar página `src/pages/pessoas/index.tsx`
+### 1. Hook Reutilizável para Busca de CEP
 
-Adicionar botão "+ Cadastrar Pessoa" no header, logo após a barra de busca:
+Criar um hook `useCepAutocomplete` que:
+- Monitora o valor do CEP digitado
+- Quando CEP tem 8 dígitos, consulta a API ViaCEP
+- Retorna os dados do endereço para preencher automaticamente
 
-```tsx
-<Button
-  className="bg-gradient-primary shadow-soft"
-  onClick={() => setCadastrarOpen(true)}
->
-  <UserPlus className="w-4 h-4 mr-2" />
-  Cadastrar Pessoa
-</Button>
+**API ViaCEP** (gratuita, sem necessidade de API key):
+```
+GET https://viacep.com.br/ws/{cep}/json/
 ```
 
-### 2. Criar componente `CadastrarPessoaDialog.tsx`
-
-Modal com duas etapas:
-
-**Etapa 1 - Seleção do Tipo:**
-```text
-┌────────────────────────────────────────┐
-│  Cadastrar Nova Pessoa                 │
-├────────────────────────────────────────┤
-│  Que tipo de pessoa você quer          │
-│  cadastrar?                            │
-│                                        │
-│  ┌────────────────────────────────┐   │
-│  │ 👤 Visitante                    │   │
-│  │ Primeira vez na igreja          │   │
-│  └────────────────────────────────┘   │
-│                                        │
-│  ┌────────────────────────────────┐   │
-│  │ 🔄 Frequentador                 │   │
-│  │ Já frequenta regularmente       │   │
-│  └────────────────────────────────┘   │
-│                                        │
-│  ┌────────────────────────────────┐   │
-│  │ ⭐ Membro                       │   │
-│  │ Membro oficial da igreja        │   │
-│  └────────────────────────────────┘   │
-│                                        │
-│  [Cancelar]                            │
-└────────────────────────────────────────┘
+Retorna:
+```json
+{
+  "cep": "01310-100",
+  "logradouro": "Avenida Paulista",
+  "complemento": "de 1047 a 1865 - lado ímpar",
+  "bairro": "Bela Vista",
+  "localidade": "São Paulo",
+  "uf": "SP"
+}
 ```
 
-**Etapa 2 - Formulário:**
-- Reutiliza lógica do `RegistrarVisitanteDialog` para visitantes/frequentadores
-- Formulário expandido para membros (mais campos)
+### 2. Campo de Ano Opcional
 
-### 3. Fluxo de Dados
-
-| Tipo | Campos Principais | Status no DB |
-|------|-------------------|--------------|
-| Visitante | Nome, contato, origem | `visitante` |
-| Frequentador | Nome, contato, origem | `frequentador` |
-| Membro | Nome, contato, dados pessoais, dados igreja | `membro` |
+Adicionar um terceiro select para o **ano de nascimento** (opcional):
+- Lista de anos de 1920 até o ano atual
+- Se não preenchido, mantém comportamento atual (ano 1900)
+- Se preenchido, grava a data completa com o ano real
 
 ---
 
 ## Arquivos a Criar/Modificar
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/pessoas/CadastrarPessoaDialog.tsx` | **Criar** - Modal unificado de cadastro |
-| `src/pages/pessoas/index.tsx` | Modificar - Adicionar botão e integrar modal |
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| `src/hooks/useCepAutocomplete.ts` | **Criar** | Hook para consultar ViaCEP |
+| `src/components/pessoas/CadastrarPessoaDialog.tsx` | Modificar | Adicionar auto-complete de CEP e campo de ano |
+| `src/components/pessoas/EditarContatosDialog.tsx` | Modificar | Adicionar auto-complete de CEP |
+| `src/components/pessoas/EditarDadosPessoaisDialog.tsx` | Modificar | Adicionar campo de ano opcional |
 
 ---
 
-## Benefícios
+## Detalhes Técnicos
 
-1. **Acesso Direto**: Secretária não precisa navegar por subpáginas
-2. **Fluxo Unificado**: Um único ponto de entrada para todos os tipos
-3. **Consistência**: Mesma experiência de cadastro em todo o sistema
-4. **Reutilização**: Aproveita validações existentes do `RegistrarVisitanteDialog`
+### Hook useCepAutocomplete
+
+```typescript
+interface CepData {
+  logradouro: string;
+  bairro: string;
+  localidade: string;
+  uf: string;
+  erro?: boolean;
+}
+
+function useCepAutocomplete() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const buscarCep = async (cep: string): Promise<CepData | null> => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return null;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `https://viacep.com.br/ws/${cepLimpo}/json/`
+      );
+      const data = await response.json();
+
+      if (data.erro) {
+        setError('CEP não encontrado');
+        return null;
+      }
+
+      return data;
+    } catch {
+      setError('Erro ao buscar CEP');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { buscarCep, loading, error };
+}
+```
+
+### Integração no Formulário de Cadastro
+
+O campo de CEP terá um `onBlur` que dispara a busca:
+
+```tsx
+const handleCepBlur = async () => {
+  const dados = await buscarCep(formData.cep);
+  if (dados) {
+    setFormData({
+      ...formData,
+      logradouro: dados.logradouro,
+      bairro: dados.bairro,
+      cidade: dados.localidade,
+      estado: dados.uf,
+    });
+  }
+};
+```
+
+Indicador visual de loading durante a busca:
+- Spinner no campo de CEP enquanto busca
+- Toast de erro se CEP não encontrado
+
+### Campo de Ano no Aniversário
+
+Layout atualizado:
+
+```text
+Data de aniversário
+┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐
+│  Dia   ▼    │ │   Mês   ▼   │ │  Ano (opcional)   ▼    │
+└─────────────┘ └─────────────┘ └─────────────────────────┘
+```
+
+Lógica de gravação:
+```typescript
+// Se ano preenchido, usa o ano real
+// Se não, usa 1900 como placeholder
+const ano = formData.ano_nascimento || "1900";
+const dataNascimento = `${ano}-${formData.mes_nascimento}-${formData.dia_nascimento}`;
+```
+
+### Lista de Anos
+
+```typescript
+const anoAtual = new Date().getFullYear();
+const anos = Array.from(
+  { length: anoAtual - 1920 + 1 }, 
+  (_, i) => (anoAtual - i).toString()
+);
+// Gera: ["2025", "2024", "2023", ..., "1920"]
+```
 
 ---
 
-## Resultado Visual Esperado
+## Fluxo de Uso - CEP
 
-O dashboard de Pessoas terá um botão proeminente no topo, ao lado da busca ou logo abaixo do título, permitindo cadastro rápido de qualquer tipo de pessoa com um clique.
+1. Usuário digita o CEP no campo
+2. Ao sair do campo (blur), sistema busca na API ViaCEP
+3. Se encontrado: preenche automaticamente logradouro, bairro, cidade e estado
+4. Se não encontrado: mostra mensagem "CEP não encontrado"
+5. Usuário pode editar os campos preenchidos se necessário
+
+## Fluxo de Uso - Ano de Nascimento
+
+1. Usuário seleciona dia e mês (obrigatório para aniversariantes)
+2. Opcionalmente seleciona o ano de nascimento
+3. Se ano informado: grava data completa (ex: 1985-03-15)
+4. Se ano não informado: grava com ano 1900 (ex: 1900-03-15)
+
+---
+
+## Resultado Esperado
+
+**Após implementação:**
+- Cadastro de endereço 80% mais rápido (apenas digitar CEP)
+- Menos erros de digitação em endereços
+- Possibilidade de calcular idade real quando ano é informado
+- Compatibilidade retroativa (sistema continua funcionando com registros sem ano)
 
