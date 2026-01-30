@@ -29,7 +29,9 @@ import {
   formatBooleanForExport,
 } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { usePagination } from "@/hooks/usePagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 // import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
@@ -206,9 +208,27 @@ export default function Entradas() {
         return false;
       }
 
-      return true;
+    return true;
     });
   }, [transacoes, busca, contaFilter, categoriaFilter, statusFilter]);
+
+  // Pagination
+  const {
+    currentPage,
+    totalPages,
+    paginatedData: transacoesPaginadas,
+    goToPage,
+    hasNextPage,
+    hasPrevPage,
+    startIndex,
+    endIndex,
+    totalItems,
+  } = usePagination(transacoesFiltradas, { pageSize: 20 });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    goToPage(1);
+  }, [busca, contaFilter, categoriaFilter, statusFilter, selectedMonth, customRange]);
 
   const formatCurrency = (value: number) => {
     return formatValue(value);
@@ -544,7 +564,7 @@ export default function Entradas() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transacoesFiltradas.map((transacao) => (
+                    {transacoesPaginadas.map((transacao) => (
                       <TableRow
                         key={transacao.id}
                         className="hover:bg-muted/50"
@@ -613,7 +633,7 @@ export default function Entradas() {
 
               {/* Cards Mobile */}
               <div className="md:hidden space-y-2 p-4">
-                {transacoesFiltradas.map((transacao) => (
+                {transacoesPaginadas.map((transacao) => (
                   <div
                     key={transacao.id}
                     className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
@@ -697,6 +717,18 @@ export default function Entradas() {
                   </div>
                 ))}
               </div>
+
+              {/* Pagination */}
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={goToPage}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                totalItems={totalItems}
+                hasNextPage={hasNextPage}
+                hasPrevPage={hasPrevPage}
+              />
             </>
           ) : (
             <p className="text-sm md:text-base text-muted-foreground text-center py-4">
