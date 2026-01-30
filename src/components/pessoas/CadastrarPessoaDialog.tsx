@@ -18,6 +18,8 @@ import { Loader2, UserPlus, UserCheck, Users, ArrowLeft } from "lucide-react";
 import InputMask from "react-input-mask";
 import { removerFormatacao } from "@/lib/validators";
 import { Card, CardContent } from "@/components/ui/card";
+import { useCepAutocomplete } from "@/hooks/useCepAutocomplete";
+import { cn } from "@/lib/utils";
 
 interface CadastrarPessoaDialogProps {
   open: boolean;
@@ -63,6 +65,7 @@ export function CadastrarPessoaDialog({
     tipo: "" as TipoPessoa | "",
     dia_nascimento: "",
     mes_nascimento: "",
+    ano_nascimento: "",
     entrou_por: "",
     observacoes: "",
     aceitou_jesus: false,
@@ -83,6 +86,27 @@ export function CadastrarPessoaDialog({
     estado: "",
   });
   const { toast } = useToast();
+  const { buscarCep, loading: cepLoading, error: cepError } = useCepAutocomplete();
+
+  const handleCepBlur = async () => {
+    const dados = await buscarCep(formData.cep);
+    if (dados) {
+      setFormData((prev) => ({
+        ...prev,
+        logradouro: dados.logradouro || prev.logradouro,
+        bairro: dados.bairro || prev.bairro,
+        cidade: dados.localidade || prev.cidade,
+        estado: dados.uf || prev.estado,
+      }));
+    }
+    if (cepError) {
+      toast({
+        title: "Aviso",
+        description: cepError,
+        variant: "destructive",
+      });
+    }
+  };
 
   const dias = Array.from({ length: 31 }, (_, i) =>
     (i + 1).toString().padStart(2, "0")
@@ -101,6 +125,11 @@ export function CadastrarPessoaDialog({
     { value: "11", label: "Novembro" },
     { value: "12", label: "Dezembro" },
   ];
+  const anoAtual = new Date().getFullYear();
+  const anos = Array.from(
+    { length: anoAtual - 1920 + 1 },
+    (_, i) => (anoAtual - i).toString()
+  );
   const opcoesComoConheceu = [
     { value: "indicacao", label: "Indicação de amigo/familiar" },
     { value: "redes_sociais", label: "Redes sociais" },
@@ -136,6 +165,7 @@ export function CadastrarPessoaDialog({
       tipo: "",
       dia_nascimento: "",
       mes_nascimento: "",
+      ano_nascimento: "",
       entrou_por: "",
       observacoes: "",
       aceitou_jesus: false,
@@ -238,7 +268,8 @@ export function CadastrarPessoaDialog({
       // Construir data_nascimento
       let dataNascimento = null;
       if (formData.dia_nascimento && formData.mes_nascimento) {
-        dataNascimento = `1900-${formData.mes_nascimento}-${formData.dia_nascimento}`;
+        const ano = formData.ano_nascimento || "1900";
+        dataNascimento = `${ano}-${formData.mes_nascimento}-${formData.dia_nascimento}`;
       }
 
       // Dados base
@@ -471,7 +502,7 @@ export function CadastrarPessoaDialog({
 
           <div className="space-y-2">
             <Label>Data de aniversário</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Select
                 value={formData.dia_nascimento}
                 onValueChange={(value) =>
@@ -504,6 +535,24 @@ export function CadastrarPessoaDialog({
                   {meses.map((mes) => (
                     <SelectItem key={mes.value} value={mes.value}>
                       {mes.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={formData.ano_nascimento}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, ano_nascimento: value })
+                }
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Ano (opc.)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {anos.map((ano) => (
+                    <SelectItem key={ano} value={ano}>
+                      {ano}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -599,22 +648,29 @@ export function CadastrarPessoaDialog({
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="cep">CEP</Label>
-                  <InputMask
-                    mask="99999-999"
-                    value={formData.cep}
-                    onChange={(e) =>
-                      setFormData({ ...formData, cep: e.target.value })
-                    }
-                    disabled={loading}
-                  >
-                    {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                      <Input
-                        {...inputProps}
-                        id="cep"
-                        placeholder="00000-000"
-                      />
+                  <div className="relative">
+                    <InputMask
+                      mask="99999-999"
+                      value={formData.cep}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cep: e.target.value })
+                      }
+                      onBlur={handleCepBlur}
+                      disabled={loading}
+                    >
+                      {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
+                        <Input
+                          {...inputProps}
+                          id="cep"
+                          placeholder="00000-000"
+                          className={cn(cepLoading && "pr-10")}
+                        />
+                      )}
+                    </InputMask>
+                    {cepLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
                     )}
-                  </InputMask>
+                  </div>
                 </div>
                 <div className="col-span-2 space-y-2">
                   <Label htmlFor="logradouro">Logradouro</Label>
@@ -629,7 +685,6 @@ export function CadastrarPessoaDialog({
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="numero">Número</Label>

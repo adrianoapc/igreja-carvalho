@@ -36,6 +36,13 @@ const dadosPessoaisSchema = z.object({
   necessidades_especiais: z.string().max(500).nullable(),
 });
 
+// Generate years from 1920 to current year
+const anoAtual = new Date().getFullYear();
+const anos = Array.from(
+  { length: anoAtual - 1920 + 1 },
+  (_, i) => (anoAtual - i).toString()
+);
+
 interface EditarDadosPessoaisDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -52,6 +59,17 @@ interface EditarDadosPessoaisDialogProps {
   onSuccess: () => void;
 }
 
+// Helper to parse existing date
+const parseDateParts = (dateStr: string | null) => {
+  if (!dateStr) return { dia: "", mes: "", ano: "" };
+  const [year, month, day] = dateStr.split("-");
+  return {
+    dia: day || "",
+    mes: month || "",
+    ano: year === "1900" ? "" : year || "",
+  };
+};
+
 export function EditarDadosPessoaisDialog({
   open,
   onOpenChange,
@@ -60,9 +78,14 @@ export function EditarDadosPessoaisDialog({
   onSuccess,
 }: EditarDadosPessoaisDialogProps) {
   const [loading, setLoading] = useState(false);
+  
+  const dateParts = parseDateParts(dadosAtuais.data_nascimento);
+  
   const [formData, setFormData] = useState({
     sexo: dadosAtuais.sexo || "",
-    data_nascimento: dadosAtuais.data_nascimento || "",
+    dia_nascimento: dateParts.dia,
+    mes_nascimento: dateParts.mes,
+    ano_nascimento: dateParts.ano,
     estado_civil: dadosAtuais.estado_civil || "",
     data_casamento: dadosAtuais.data_casamento || "",
     rg: dadosAtuais.rg || "",
@@ -71,11 +94,32 @@ export function EditarDadosPessoaisDialog({
   });
   const { toast } = useToast();
 
+  const dias = Array.from({ length: 31 }, (_, i) =>
+    (i + 1).toString().padStart(2, "0")
+  );
+  const meses = [
+    { value: "01", label: "Janeiro" },
+    { value: "02", label: "Fevereiro" },
+    { value: "03", label: "Março" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Maio" },
+    { value: "06", label: "Junho" },
+    { value: "07", label: "Julho" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Setembro" },
+    { value: "10", label: "Outubro" },
+    { value: "11", label: "Novembro" },
+    { value: "12", label: "Dezembro" },
+  ];
+
   useEffect(() => {
     if (open) {
+      const parts = parseDateParts(dadosAtuais.data_nascimento);
       setFormData({
         sexo: dadosAtuais.sexo || "",
-        data_nascimento: dadosAtuais.data_nascimento || "",
+        dia_nascimento: parts.dia,
+        mes_nascimento: parts.mes,
+        ano_nascimento: parts.ano,
         estado_civil: dadosAtuais.estado_civil || "",
         data_casamento: dadosAtuais.data_casamento || "",
         rg: dadosAtuais.rg || "",
@@ -89,7 +133,17 @@ export function EditarDadosPessoaisDialog({
     e.preventDefault();
 
     try {
-      const validatedData = dadosPessoaisSchema.parse(formData);
+      // Build data_nascimento from parts
+      let dataNascimento = null;
+      if (formData.dia_nascimento && formData.mes_nascimento) {
+        const ano = formData.ano_nascimento || "1900";
+        dataNascimento = `${ano}-${formData.mes_nascimento}-${formData.dia_nascimento}`;
+      }
+
+      const validatedData = dadosPessoaisSchema.parse({
+        ...formData,
+        data_nascimento: dataNascimento,
+      });
       setLoading(true);
 
       const { error } = await supabase
@@ -162,15 +216,60 @@ export function EditarDadosPessoaisDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dataNascimento">Data de Nascimento</Label>
-              <Input
-                id="dataNascimento"
-                type="date"
-                value={formData.data_nascimento}
-                onChange={(e) =>
-                  setFormData({ ...formData, data_nascimento: e.target.value })
-                }
-              />
+              <Label>Data de Nascimento</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Select
+                  value={formData.dia_nascimento}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, dia_nascimento: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Dia" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dias.map((dia) => (
+                      <SelectItem key={dia} value={dia}>
+                        {dia}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={formData.mes_nascimento}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, mes_nascimento: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {meses.map((mes) => (
+                      <SelectItem key={mes.value} value={mes.value}>
+                        {mes.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={formData.ano_nascimento}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, ano_nascimento: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ano (opc.)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {anos.map((ano) => (
+                      <SelectItem key={ano} value={ano}>
+                        {ano}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">

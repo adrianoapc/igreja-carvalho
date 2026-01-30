@@ -10,6 +10,8 @@ import { Loader2 } from "lucide-react";
 import { z } from "zod";
 import InputMask from "react-input-mask";
 import { removerFormatacao } from "@/lib/validators";
+import { useCepAutocomplete } from "@/hooks/useCepAutocomplete";
+import { cn } from "@/lib/utils";
 
 const contatosSchema = z.object({
   cep: z.string().max(10).nullable(),
@@ -55,6 +57,27 @@ export function EditarContatosDialog({
     telefone: dadosAtuais.telefone || "",
   });
   const { toast } = useToast();
+  const { buscarCep, loading: cepLoading, error: cepError } = useCepAutocomplete();
+
+  const handleCepBlur = async () => {
+    const dados = await buscarCep(formData.cep);
+    if (dados) {
+      setFormData((prev) => ({
+        ...prev,
+        endereco: dados.logradouro || prev.endereco,
+        bairro: dados.bairro || prev.bairro,
+        cidade: dados.localidade || prev.cidade,
+        estado: dados.uf || prev.estado,
+      }));
+    }
+    if (cepError) {
+      toast({
+        title: "Aviso",
+        description: cepError,
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -131,21 +154,28 @@ export function EditarContatosDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cep">CEP</Label>
-              <InputMask
-                mask="99999-999"
-                value={formData.cep}
-                onChange={(e) =>
-                  setFormData({ ...formData, cep: e.target.value })
-                }
-              >
-                {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                  <Input
-                    {...inputProps}
-                    id="cep"
-                    placeholder="00000-000"
-                  />
+              <div className="relative">
+                <InputMask
+                  mask="99999-999"
+                  value={formData.cep}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cep: e.target.value })
+                  }
+                  onBlur={handleCepBlur}
+                >
+                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
+                    <Input
+                      {...inputProps}
+                      id="cep"
+                      placeholder="00000-000"
+                      className={cn(cepLoading && "pr-10")}
+                    />
+                  )}
+                </InputMask>
+                {cepLoading && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
                 )}
-              </InputMask>
+              </div>
             </div>
 
             <div className="space-y-2">
