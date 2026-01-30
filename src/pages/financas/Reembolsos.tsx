@@ -50,11 +50,13 @@ import {
   ChevronLeft,
   Upload,
   FileText,
+  Eye,
 } from "lucide-react";
 import {
   AIProcessingOverlay,
   type AIProcessingStep,
 } from "@/components/financas/AIProcessingOverlay";
+import { ReembolsoDetalhesDialog } from "@/components/financas/ReembolsoDetalhesDialog";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -115,6 +117,7 @@ export default function Reembolsos() {
   const [userRoles, setUserRoles] = useState<AppRole[]>([]);
   const [novoReembolsoOpen, setNovoReembolsoOpen] = useState(false);
   const [pagarReembolsoOpen, setPagarReembolsoOpen] = useState(false);
+  const [detalhesOpen, setDetalhesOpen] = useState(false);
   const [solicitacaoSelecionada, setSolicitacaoSelecionada] =
     useState<SolicitacaoReembolso | null>(null);
   const [etapaWizard, setEtapaWizard] = useState(1);
@@ -864,6 +867,20 @@ export default function Reembolsos() {
                         <p className="text-sm">{solicitacao.observacoes}</p>
                       </div>
                     )}
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSolicitacaoSelecionada(solicitacao);
+                          setDetalhesOpen(true);
+                        }}
+                        className="gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Ver Detalhes
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -942,7 +959,18 @@ export default function Reembolsos() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSolicitacaoSelecionada(solicitacao);
+                            setDetalhesOpen(true);
+                          }}
+                          className="gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          Ver Detalhes
+                        </Button>
                         <Button
                           onClick={() => {
                             setSolicitacaoSelecionada(solicitacao);
@@ -1483,6 +1511,22 @@ export default function Reembolsos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Detalhes do Reembolso */}
+      <ReembolsoDetalhesDialog
+        open={detalhesOpen}
+        onOpenChange={setDetalhesOpen}
+        solicitacao={solicitacaoSelecionada}
+        canEdit={
+          isAdmin ||
+          (solicitacaoSelecionada?.solicitante_id === profile?.id &&
+            ["rascunho", "pendente"].includes(solicitacaoSelecionada?.status || ""))
+        }
+        onItemUpdated={() => {
+          queryClient.invalidateQueries({ queryKey: ["minhas-solicitacoes"] });
+          queryClient.invalidateQueries({ queryKey: ["todas-solicitacoes"] });
+        }}
+      />
     </div>
   );
 }
