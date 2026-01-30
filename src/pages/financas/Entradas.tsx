@@ -597,7 +597,7 @@ export default function Entradas() {
                         </TableCell>
                         <TableCell className="text-sm">
                           {format(
-                            new Date(transacao.data_vencimento),
+                            new Date(transacao.data_vencimento + "T00:00:00"),
                             "dd/MM/yyyy",
                             { locale: ptBR }
                           )}
@@ -645,12 +645,12 @@ export default function Entradas() {
                     {/* Data Compact - Mobile */}
                     <div className="flex-shrink-0 text-center w-12">
                       <div className="text-xs font-bold text-foreground">
-                        {format(new Date(transacao.data_vencimento), "dd", {
+                        {format(new Date(transacao.data_vencimento + "T00:00:00"), "dd", {
                           locale: ptBR,
                         })}
                       </div>
                       <div className="text-[10px] text-muted-foreground uppercase">
-                        {format(new Date(transacao.data_vencimento), "MMM", {
+                        {format(new Date(transacao.data_vencimento + "T00:00:00"), "MMM", {
                           locale: ptBR,
                         })}
                       </div>
