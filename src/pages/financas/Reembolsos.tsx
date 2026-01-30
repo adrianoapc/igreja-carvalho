@@ -192,8 +192,9 @@ export default function Reembolsos() {
         .eq("solicitante_id", profile?.id)
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      // Incluir solicitações sem filial definida (vindas do WhatsApp)
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       const { data, error } = await query;
 
@@ -214,8 +215,9 @@ export default function Reembolsos() {
         .in("status", ["pendente", "aprovado"])
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
+      // Incluir solicitações sem filial definida (vindas do WhatsApp)
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       const { data, error } = await query;
 
