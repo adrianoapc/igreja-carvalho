@@ -86,6 +86,13 @@ O objetivo e manter rastreabilidade e clareza sobre **por que o sistema e assim*
 - **Link:** [ADR-022](ADR-022-importacao-extratos-api.md)
 - **Resumo:** Conectores por provedor usando polling inicial com backoff, dedupe/idempotencia antes de persistir em `extratos_bancarios`, armazenamento seguro de credenciais e observabilidade basica.
 
+### ADR-027
+
+- **Titulo:** Definição de Valor Bruto vs Valor Líquido
+- **Status:** Aceito
+- **Link:** [ADR-027](ADR-027-valor-bruto-vs-valor-liquido.md)
+- **Resumo:** Formaliza a distinção entre `valor` (bruto, para DRE) e `valor_liquido` (pago, para conciliação bancária), incluindo fórmula de cálculo com juros, multas, descontos e taxas. Sincroniza campos de ajuste financeiro na importação de saídas.
+
 ---
 
 ## 📐 Relacao com Diagramas
