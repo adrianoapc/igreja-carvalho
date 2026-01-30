@@ -609,12 +609,12 @@ export default function Saidas() {
                     {/* Data Compact - Mobile */}
                     <div className="flex-shrink-0 text-center w-12 md:w-14">
                       <div className="text-xs md:text-sm font-bold text-foreground">
-                        {format(new Date(transacao.data_vencimento), "dd", {
+                        {format(new Date(transacao.data_vencimento + "T00:00:00"), "dd", {
                           locale: ptBR,
                         })}
                       </div>
                       <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
-                        {format(new Date(transacao.data_vencimento), "MMM", {
+                        {format(new Date(transacao.data_vencimento + "T00:00:00"), "MMM", {
                           locale: ptBR,
                         })}
                       </div>
