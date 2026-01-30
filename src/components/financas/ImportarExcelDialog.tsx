@@ -162,31 +162,75 @@ export function ImportarExcelDialog({
 
   const parseData = (data: unknown): string | null => {
     if (!data) return null;
-    try {
-      // Tentar diferentes formatos de data
-      const dataStr = String(data).trim();
-
-      // dd/mm/yyyy
-      if (dataStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-        const [dia, mes, ano] = dataStr.split("/");
-        return `${ano}-${mes}-${dia}`;
-      }
-
-      // yyyy-mm-dd
-      if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        return dataStr;
-      }
-
-      // Tentar parse como data
-      const date = new Date(data as string | number);
+    
+    // Handle Excel serial dates (numbers between 1 and 100000 are likely dates)
+    if (typeof data === "number" && data > 1 && data < 100000) {
+      // Excel epoch: 1899-12-30 (using UTC to avoid timezone issues)
+      const excelEpochMs = Date.UTC(1899, 11, 30);
+      const dateMs = excelEpochMs + data * 86400000;
+      const date = new Date(dateMs);
       if (!isNaN(date.getTime())) {
-        return date.toISOString().split("T")[0];
+        const year = date.getUTCFullYear();
+        // Validate year is reasonable (1900-2100)
+        if (year >= 1900 && year <= 2100) {
+          const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+          const day = String(date.getUTCDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        }
       }
-
-      return null;
-    } catch {
       return null;
     }
+    
+    const s = String(data).trim();
+    
+    // Check if it's a numeric string that could be Excel serial date
+    if (/^\d+$/.test(s)) {
+      const num = parseInt(s, 10);
+      if (num > 1 && num < 100000) {
+        const excelEpochMs = Date.UTC(1899, 11, 30);
+        const dateMs = excelEpochMs + num * 86400000;
+        const date = new Date(dateMs);
+        if (!isNaN(date.getTime())) {
+          const year = date.getUTCFullYear();
+          if (year >= 1900 && year <= 2100) {
+            const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+            const day = String(date.getUTCDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+          }
+        }
+      }
+      return null;
+    }
+    
+    // dd/MM/yyyy format
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+      const [d, m, y] = s.split("/");
+      const year = parseInt(y, 10);
+      if (year >= 1900 && year <= 2100) {
+        return `${y}-${m}-${d}`;
+      }
+      return null;
+    }
+    
+    // yyyy-MM-dd format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const year = parseInt(s.substring(0, 4), 10);
+      if (year >= 1900 && year <= 2100) {
+        return s;
+      }
+      return null;
+    }
+    
+    // Try native Date parsing as fallback
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const year = dt.getFullYear();
+      if (year >= 1900 && year <= 2100) {
+        return dt.toISOString().split("T")[0];
+      }
+    }
+    
+    return null;
   };
 
   const validateMapping = (): boolean => {
