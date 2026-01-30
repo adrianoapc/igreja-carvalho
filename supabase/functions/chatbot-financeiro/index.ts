@@ -1369,14 +1369,24 @@ serve(async (req) => {
           ? `${item.descricao || `Comprovante - ${item.fornecedor || "N/A"}`} - ${metaDados.observacao_usuario}`
           : item.descricao || `Comprovante - ${item.fornecedor || "N/A"}`;
 
+        // Converter data de DD/MM/YYYY para YYYY-MM-DD (formato PostgreSQL)
+        let dataItem = new Date().toISOString().split("T")[0];
+        if (item.data_emissao) {
+          const partes = item.data_emissao.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (partes) {
+            dataItem = `${partes[3]}-${partes[2]}-${partes[1]}`;
+          } else if (item.data_emissao.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            dataItem = item.data_emissao; // Já está no formato ISO
+          }
+        }
+
         const { data: itemReembolso, error: itemError } = await supabase
           .from("itens_reembolso")
           .insert({
             solicitacao_id: solicitacao.id,
             descricao: descricaoItem,
             valor: item.valor || 0,
-            data_item:
-              item.data_emissao || new Date().toISOString().split("T")[0],
+            data_item: dataItem,
             categoria_id: item.categoria_sugerida_id,
             subcategoria_id: item.subcategoria_sugerida_id,
             centro_custo_id: item.centro_custo_sugerido_id,
