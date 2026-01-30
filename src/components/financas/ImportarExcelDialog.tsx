@@ -35,6 +35,7 @@ interface ImportarExcelDialogProps {
 type ColumnMapping = {
   descricao?: string;
   valor?: string;
+  valor_liquido?: string;
   data_vencimento?: string;
   data_pagamento?: string;
   status?: string;
@@ -46,6 +47,10 @@ type ColumnMapping = {
   forma_pagamento?: string;
   fornecedor?: string;
   observacoes?: string;
+  multas?: string;
+  juros?: string;
+  desconto?: string;
+  taxas_administrativas?: string;
 };
 
 export function ImportarExcelDialog({
@@ -92,23 +97,26 @@ export function ImportarExcelDialog({
       columnNames.forEach((col) => {
         const colLower = col.toLowerCase().trim();
         if (colLower.includes("descri")) autoMapping.descricao = col;
-        if (colLower.includes("valor") && !colLower.includes("liquido"))
+        if (colLower.includes("valor") && !colLower.includes("liquido") && !colLower.includes("pago"))
           autoMapping.valor = col;
+        if (colLower.includes("valor_pago") || colLower.includes("liquido") || (colLower.includes("pago") && colLower.includes("valor")))
+          autoMapping.valor_liquido = col;
         if (colLower.includes("vencimento") || colLower.includes("data_venc"))
           autoMapping.data_vencimento = col;
-        if (colLower.includes("pagamento") || colLower.includes("data_pag"))
+        if ((colLower.includes("pagamento") && colLower.includes("data")) || colLower.includes("data_pag"))
           autoMapping.data_pagamento = col;
         if (colLower.includes("status") || colLower.includes("situacao"))
           autoMapping.status = col;
         if (colLower.includes("conta")) autoMapping.conta = col;
-        if (colLower.includes("categoria")) autoMapping.categoria = col;
+        if (colLower.includes("categoria") && !colLower.includes("sub"))
+          autoMapping.categoria = col;
         if (colLower.includes("subcat") || colLower.includes("sub-categ"))
           autoMapping.subcategoria = col;
         if (colLower.includes("centro") || colLower.includes("custo"))
           autoMapping.centro_custo = col;
         if (colLower.includes("ministerial") || colLower.includes("base"))
           autoMapping.base_ministerial = col;
-        if (colLower.includes("forma") || colLower.includes("pagamento"))
+        if (colLower.includes("forma") && !colLower.includes("pagamento"))
           autoMapping.forma_pagamento = col;
         if (
           colLower.includes("fornecedor") ||
@@ -117,6 +125,11 @@ export function ImportarExcelDialog({
           autoMapping.fornecedor = col;
         if (colLower.includes("observ") || colLower.includes("obs"))
           autoMapping.observacoes = col;
+        // Novos campos de ajuste financeiro
+        if (colLower.includes("multa")) autoMapping.multas = col;
+        if (colLower.includes("juros")) autoMapping.juros = col;
+        if (colLower.includes("desconto")) autoMapping.desconto = col;
+        if (colLower.includes("taxa")) autoMapping.taxas_administrativas = col;
       });
 
       setMapping(autoMapping);
@@ -434,10 +447,27 @@ export function ImportarExcelDialog({
             ? row[mapping.observacoes]
             : null;
 
+          // Parsear ajustes financeiros
+          const multasVal = mapping.multas ? parseValor(row[mapping.multas]) : 0;
+          const jurosVal = mapping.juros ? parseValor(row[mapping.juros]) : 0;
+          const descontoVal = mapping.desconto ? parseValor(row[mapping.desconto]) : 0;
+          const taxasAdmVal = mapping.taxas_administrativas 
+            ? parseValor(row[mapping.taxas_administrativas]) : 0;
+
+          // Calcular valor_liquido: se informado usa direto, senão calcula
+          const valorLiquido = mapping.valor_liquido 
+            ? parseValor(row[mapping.valor_liquido])
+            : valor + jurosVal + multasVal + taxasAdmVal - descontoVal;
+
           transacoes.push({
             tipo,
             descricao,
             valor,
+            valor_liquido: valorLiquido || valor,
+            multas: multasVal || null,
+            juros: jurosVal || null,
+            desconto: descontoVal || null,
+            taxas_administrativas: taxasAdmVal || null,
             data_vencimento: dataVencimento,
             data_pagamento: dataPagamento,
             status,
@@ -565,6 +595,7 @@ export function ImportarExcelDialog({
                       const headers = [
                         "descricao",
                         "valor",
+                        "valor_pago",
                         "data_vencimento",
                         "data_pagamento",
                         "status",
@@ -576,6 +607,10 @@ export function ImportarExcelDialog({
                         "fornecedor",
                         "forma_pagamento",
                         "observacoes",
+                        "juros",
+                        "multas",
+                        "desconto",
+                        "taxas_administrativas",
                       ];
                       const csv = headers.join(",") + "\n";
                       const blob = new Blob([csv], {
@@ -911,6 +946,122 @@ export function ImportarExcelDialog({
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                {/* Ajustes Financeiros */}
+                <div className="mt-4 pt-3 border-t">
+                  <h4 className="text-xs font-medium text-muted-foreground mb-3">Ajustes Financeiros (opcional)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Valor Pago (Líquido)</Label>
+                      <Select
+                        value={mapping.valor_liquido}
+                        onValueChange={(v) =>
+                          setMapping({ ...mapping, valor_liquido: v })
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione a coluna" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {columns.map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Juros</Label>
+                      <Select
+                        value={mapping.juros}
+                        onValueChange={(v) =>
+                          setMapping({ ...mapping, juros: v })
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione a coluna" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {columns.map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Multas</Label>
+                      <Select
+                        value={mapping.multas}
+                        onValueChange={(v) =>
+                          setMapping({ ...mapping, multas: v })
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione a coluna" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {columns.map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Desconto</Label>
+                      <Select
+                        value={mapping.desconto}
+                        onValueChange={(v) =>
+                          setMapping({ ...mapping, desconto: v })
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione a coluna" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {columns.map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Taxas Administrativas</Label>
+                      <Select
+                        value={mapping.taxas_administrativas}
+                        onValueChange={(v) =>
+                          setMapping({ ...mapping, taxas_administrativas: v })
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione a coluna" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {columns.map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
