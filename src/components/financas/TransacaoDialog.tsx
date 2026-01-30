@@ -57,6 +57,7 @@ interface TransacaoDialogProps {
     id?: string | number;
     descricao?: string | null;
     valor?: number | null;
+    valor_liquido?: number | null;
     data_vencimento?: string | null;
     data_competencia?: string | null;
     data_pagamento?: string | null;
@@ -110,6 +111,7 @@ export function TransacaoDialog({
   >("unico");
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
+  const [valorLiquido, setValorLiquido] = useState("");
   const [dataVencimento, setDataVencimento] = useState<Date>(new Date());
   const [dataCompetencia, setDataCompetencia] = useState<Date>(new Date());
   const [contaId, setContaId] = useState("");
@@ -144,7 +146,13 @@ export function TransacaoDialog({
   useEffect(() => {
     if (transacao && open) {
       setDescricao(transacao.descricao || "");
-      setValor(String(transacao.valor || ""));
+      // Formatar valor como moeda BR (ex: 1234.50 -> "1.234,50")
+      const formatarValorBR = (num: number | null | undefined) => {
+        if (num == null) return "";
+        return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+      setValor(formatarValorBR(transacao.valor));
+      setValorLiquido(formatarValorBR(transacao.valor_liquido));
       setDataVencimento(
         transacao.data_vencimento
           ? new Date(transacao.data_vencimento)
@@ -209,6 +217,7 @@ export function TransacaoDialog({
   const resetForm = () => {
     setDescricao("");
     setValor("");
+    setValorLiquido("");
     setDataVencimento(new Date());
     setDataCompetencia(new Date());
     setContaId("");
@@ -837,11 +846,26 @@ export function TransacaoDialog({
         anexoPath = signedData.signedUrl;
       }
 
+      // Calcular valor_liquido
+      const jurosNum = juros ? parseFloat(juros.replace(",", ".")) : 0;
+      const multasNum = multas ? parseFloat(multas.replace(",", ".")) : 0;
+      const descontoNum = desconto ? parseFloat(desconto.replace(",", ".")) : 0;
+      const taxasAdmNum = taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(",", ".")) : 0;
+      
+      let valorLiquidoFinal: number;
+      if (valorLiquido && valorLiquido.trim() !== "") {
+        valorLiquidoFinal = parseFloat(valorLiquido.replace(/\./g, "").replace(",", "."));
+      } else {
+        // Calcular automaticamente: valor + juros + multas + taxas - desconto
+        valorLiquidoFinal = valorNumerico + jurosNum + multasNum + taxasAdmNum - descontoNum;
+      }
+
       const transacaoData = {
         tipo,
         tipo_lancamento: tipoLancamento,
         descricao,
         valor: valorNumerico,
+        valor_liquido: valorLiquidoFinal,
         data_vencimento: format(dataVencimento, "yyyy-MM-dd"),
         data_competencia: format(dataCompetencia, "yyyy-MM-dd"),
         data_pagamento:
@@ -873,14 +897,10 @@ export function TransacaoDialog({
         anexo_url: anexoPath || null,
         lancado_por: userData.user?.id,
         status: foiPago ? "pago" : "pendente",
-        juros: foiPago && juros ? parseFloat(juros.replace(",", ".")) : 0,
-        multas: foiPago && multas ? parseFloat(multas.replace(",", ".")) : 0,
-        desconto:
-          foiPago && desconto ? parseFloat(desconto.replace(",", ".")) : 0,
-        taxas_administrativas:
-          foiPago && taxasAdministrativas
-            ? parseFloat(taxasAdministrativas.replace(",", "."))
-            : 0,
+        juros: foiPago ? jurosNum : 0,
+        multas: foiPago ? multasNum : 0,
+        desconto: foiPago ? descontoNum : 0,
+        taxas_administrativas: foiPago ? taxasAdmNum : 0,
         igreja_id: igrejaId,
         filial_id: isAllFiliais ? null : filialId,
       };
@@ -1143,28 +1163,42 @@ export function TransacaoDialog({
           />
         </div>
 
-        <div>
-          <Label htmlFor="valor">Valor *</Label>
-          <Input
-            id="valor"
-            type="text"
-            inputMode="decimal"
-            value={valor}
-            onChange={handleValorChange}
-            placeholder="0,00"
-            required
-            className="md:hidden text-lg h-12 border-2 border-primary bg-primary/5"
-          />
-          <Input
-            id="valor-desktop"
-            type="text"
-            inputMode="decimal"
-            value={valor}
-            onChange={handleValorChange}
-            placeholder="0,00"
-            required
-            className="hidden md:block text-base h-10"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="valor">Valor (Bruto) *</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+              <Input
+                id="valor"
+                type="text"
+                inputMode="decimal"
+                value={valor}
+                onChange={handleValorChange}
+                placeholder="0,00"
+                required
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="valor-liquido">Valor Pago (Líquido)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+              <Input
+                id="valor-liquido"
+                type="text"
+                inputMode="decimal"
+                value={valorLiquido}
+                onChange={handleDecimalChange(setValorLiquido)}
+                placeholder="0,00"
+                className="pl-9"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Deixe vazio para calcular automaticamente
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
