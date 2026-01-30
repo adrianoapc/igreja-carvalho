@@ -846,11 +846,13 @@ export function TransacaoDialog({
         anexoPath = signedData.signedUrl;
       }
 
-      // Calcular valor_liquido
-      const jurosNum = juros ? parseFloat(juros.replace(",", ".")) : 0;
-      const multasNum = multas ? parseFloat(multas.replace(",", ".")) : 0;
+      // Calcular valor_liquido conforme ADR-027
+      // Desconto e taxas podem existir antes do pagamento (previsíveis)
+      // Juros e multas só existem após pagamento (atraso)
       const descontoNum = desconto ? parseFloat(desconto.replace(",", ".")) : 0;
       const taxasAdmNum = taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(",", ".")) : 0;
+      const jurosNum = foiPago && juros ? parseFloat(juros.replace(",", ".")) : 0;
+      const multasNum = foiPago && multas ? parseFloat(multas.replace(",", ".")) : 0;
       
       let valorLiquidoFinal: number;
       if (valorLiquido && valorLiquido.trim() !== "") {
@@ -897,10 +899,12 @@ export function TransacaoDialog({
         anexo_url: anexoPath || null,
         lancado_por: userData.user?.id,
         status: foiPago ? "pago" : "pendente",
-        juros: foiPago ? jurosNum : 0,
-        multas: foiPago ? multasNum : 0,
-        desconto: foiPago ? descontoNum : 0,
-        taxas_administrativas: foiPago ? taxasAdmNum : 0,
+        // Juros e multas só quando pago (atraso)
+        juros: jurosNum,
+        multas: multasNum,
+        // Desconto e taxas sempre persistem (conhecidos antes do pagamento)
+        desconto: descontoNum,
+        taxas_administrativas: taxasAdmNum,
         igreja_id: igrejaId,
         filial_id: isAllFiliais ? null : filialId,
       };
@@ -1387,6 +1391,36 @@ export function TransacaoDialog({
         </div>
       </div>
 
+      {/* Ajustes de Valor (previsíveis - antes do pagamento) */}
+      <div className="border-t pt-3 space-y-3">
+        <h4 className="font-medium text-sm">Ajustes de Valor (Previstos)</h4>
+        <p className="text-xs text-muted-foreground">
+          Desconto e taxas conhecidos. O valor líquido será calculado automaticamente.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label>Desconto</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={desconto}
+              onChange={handleDecimalChange(setDesconto)}
+              placeholder="0,00"
+            />
+          </div>
+          <div>
+            <Label>Taxas Administrativas</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={taxasAdministrativas}
+              onChange={handleDecimalChange(setTaxasAdministrativas)}
+              placeholder="0,00"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Confirmação de pagamento */}
       <div className="p-3 border border-primary/20 rounded-lg bg-primary/5 space-y-3">
         <div className="flex items-center justify-between">
@@ -1434,6 +1468,9 @@ export function TransacaoDialog({
               </Popover>
             </div>
 
+            <p className="text-xs text-muted-foreground">
+              Juros e multas por atraso (se houver):
+            </p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Juros</Label>
@@ -1452,26 +1489,6 @@ export function TransacaoDialog({
                   inputMode="decimal"
                   value={multas}
                   onChange={handleDecimalChange(setMultas)}
-                  placeholder="0,00"
-                />
-              </div>
-              <div>
-                <Label>Desconto</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={desconto}
-                  onChange={handleDecimalChange(setDesconto)}
-                  placeholder="0,00"
-                />
-              </div>
-              <div>
-                <Label>Taxas</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={taxasAdministrativas}
-                  onChange={handleDecimalChange(setTaxasAdministrativas)}
                   placeholder="0,00"
                 />
               </div>
