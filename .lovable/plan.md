@@ -1,145 +1,141 @@
 
-# Plano: ADR-027 - Definição de Valor vs Valor Líquido e Sincronização de Importação
+# Correção: Itens de Reembolso Não Salvando no Banco
 
-## Resumo Executivo
+## Diagnóstico
 
-Este plano documenta formalmente a diferença entre **valor bruto** e **valor líquido** nas transações financeiras, e sincroniza a importação de saídas com a de entradas, adicionando suporte aos campos de ajuste financeiro.
-
----
-
-## Parte 1: Documentação Arquitetural (ADR-027)
-
-### Arquivo a criar
-`docs/adr/ADR-027-valor-bruto-vs-valor-liquido.md`
-
-### Conteúdo
-
-Define formalmente:
-- **`valor` (Bruto)**: Valor original da nota/fatura → Usado para DRE (competência)
-- **`valor_liquido` (Caixa)**: Valor efetivamente pago → Usado para conciliação bancária
-- **Fórmula**: `valor_liquido = valor + juros + multas + taxas_administrativas - desconto`
-
-Impacto:
-- DRE usa `valor` para categoria principal
-- Ajustes vão para categorias financeiras separadas
-- Conciliação bancária usa `valor_liquido`
-
-### Atualização do README
-Adicionar entrada para ADR-027 no `docs/adr/README.MD`
-
----
-
-## Parte 2: Implementação no ImportarExcelDialog.tsx (Saídas)
-
-### 2.1 Expandir ColumnMapping (linha ~35-49)
-
-Adicionar campos que já existem no ImportarTab.tsx:
-
-```typescript
-type ColumnMapping = {
-  // ... campos existentes ...
-  valor_liquido?: string;  // Novo: mapeia "valor_pago"
-  multas?: string;
-  juros?: string;
-  desconto?: string;
-  taxas_administrativas?: string;
-};
-```
-
-### 2.2 Atualizar autoDetectMapping (linha ~91-120)
-
-Adicionar detecção automática:
-
-```typescript
-// Detectar valor_liquido/valor_pago
-if (colLower.includes("valor_pago") || colLower.includes("liquido") || colLower.includes("pago")) 
-  autoMapping.valor_liquido = col;
-
-// Detectar ajustes
-if (colLower.includes("multa")) autoMapping.multas = col;
-if (colLower.includes("juros")) autoMapping.juros = col;
-if (colLower.includes("desconto")) autoMapping.desconto = col;
-if (colLower.includes("taxa")) autoMapping.taxas_administrativas = col;
-```
-
-### 2.3 Atualizar processarImportacao (linhas ~319-455)
-
-Parsear novos campos e calcular `valor_liquido`:
-
-```typescript
-// Parsear ajustes
-const multas = mapping.multas ? parseValor(row[mapping.multas]) : 0;
-const juros = mapping.juros ? parseValor(row[mapping.juros]) : 0;
-const desconto = mapping.desconto ? parseValor(row[mapping.desconto]) : 0;
-const taxasAdm = mapping.taxas_administrativas 
-  ? parseValor(row[mapping.taxas_administrativas]) : 0;
-
-// Calcular valor_liquido
-const valorLiquido = mapping.valor_liquido 
-  ? parseValor(row[mapping.valor_liquido])
-  : valor + juros + multas + taxasAdm - desconto;
-
-// Incluir na transação
-transacoes.push({
-  // ... campos existentes ...
-  valor_liquido: valorLiquido || valor,
-  multas: multas || null,
-  juros: juros || null,
-  desconto: desconto || null,
-  taxas_administrativas: taxasAdm || null,
-});
-```
-
-### 2.4 Adicionar campos na UI de mapeamento
-
-Novos selects na interface (após linha ~600):
-- Valor Pago (Líquido)
-- Juros
-- Multas  
-- Desconto
-- Taxas Administrativas
-
----
-
-## Arquivos Afetados
-
-| Arquivo | Ação |
-|---------|------|
-| `docs/adr/ADR-027-valor-bruto-vs-valor-liquido.md` | Criar |
-| `docs/adr/README.MD` | Atualizar (adicionar entrada) |
-| `src/components/financas/ImportarExcelDialog.tsx` | Modificar |
-
----
-
-## Detalhes Técnicos
-
-### Regra de Cálculo
+**Problema identificado**: A data do comprovante vem no formato brasileiro `DD/MM/YYYY` (ex: `30/01/2023`), mas o PostgreSQL espera formato ISO `YYYY-MM-DD`. O INSERT falha silenciosamente com erro:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│  Se valor_pago informado:                                           │
-│    valor_liquido = valor_pago                                       │
-│                                                                     │
-│  Senão, se ajustes informados:                                      │
-│    valor_liquido = valor + juros + multas + taxas - desconto        │
-│                                                                     │
-│  Senão:                                                             │
-│    valor_liquido = valor (cópia)                                    │
-└─────────────────────────────────────────────────────────────────────┘
+date/time field value out of range: "30/01/2023"
 ```
 
-### Compatibilidade
+**Evidência no banco**:
+- Solicitação `#4BE6A6CB` foi criada com `valor_total: R$ 0,00`
+- Tabela `itens_reembolso` está vazia (0 registros)
+- Meta dados da sessão do bot mostram `itens_ids: []` (array vazio)
 
-- Nenhuma migração de banco necessária (campos já existem)
-- ReconciliacaoBancaria já usa `valor_liquido || valor` (compatível)
-- DRE pode evoluir para usar `valor` para categoria + ajustes separados
+**Dados que deveriam ter sido salvos** (capturados pelo WhatsApp):
+- Valor: R$ 1.399,90
+- Fornecedor: HAVAN S.A.
+- Descrição: CAIXA AMPLIFICADA PCX6
+- Data: 30/01/2023
 
 ---
 
-## Validação
+## Correção Necessária
 
-Após implementação, testar:
-1. Importar planilha só com `valor` → `valor_liquido` deve copiar `valor`
-2. Importar com `valor` e `valor_pago` → `valor_liquido` deve usar `valor_pago`
-3. Importar com `valor` e ajustes → `valor_liquido` deve ser calculado
-4. Conciliação bancária deve encontrar match pelo `valor_liquido`
+### Edge Function `chatbot-financeiro/index.ts`
+
+**Localização**: Linhas 1376-1379
+
+**Código atual** (com bug):
+```typescript
+data_item:
+  item.data_emissao || new Date().toISOString().split("T")[0],
+```
+
+**Código corrigido**:
+```typescript
+// Converter data de DD/MM/YYYY para YYYY-MM-DD
+let dataItem = new Date().toISOString().split("T")[0];
+if (item.data_emissao) {
+  const partes = item.data_emissao.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (partes) {
+    dataItem = `${partes[3]}-${partes[2]}-${partes[1]}`;
+  } else if (item.data_emissao.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    dataItem = item.data_emissao; // Já está no formato ISO
+  }
+}
+// ...
+data_item: dataItem,
+```
+
+---
+
+## Correções Adicionais
+
+### 1. Adicionar Trigger para Recalcular `valor_total`
+
+Criar trigger que recalcula automaticamente quando itens são inseridos/atualizados/deletados:
+
+```sql
+CREATE OR REPLACE FUNCTION atualizar_valor_total_solicitacao()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE solicitacoes_reembolso
+  SET valor_total = (
+    SELECT COALESCE(SUM(valor), 0) 
+    FROM itens_reembolso 
+    WHERE solicitacao_id = COALESCE(NEW.solicitacao_id, OLD.solicitacao_id)
+  )
+  WHERE id = COALESCE(NEW.solicitacao_id, OLD.solicitacao_id);
+  
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trigger_atualizar_valor_total
+AFTER INSERT OR UPDATE OR DELETE ON itens_reembolso
+FOR EACH ROW
+EXECUTE FUNCTION atualizar_valor_total_solicitacao();
+```
+
+### 2. Corrigir View para Contar de `itens_reembolso`
+
+A view atual conta de `transacoes_financeiras`, mas deveria contar de `itens_reembolso`:
+
+```sql
+CREATE OR REPLACE VIEW view_solicitacoes_reembolso AS
+SELECT 
+  sr.*,
+  p.nome AS solicitante_nome,
+  p.email AS solicitante_email,
+  p.telefone AS solicitante_telefone,
+  p.avatar_url AS solicitante_avatar,
+  (SELECT count(*) FROM itens_reembolso ir 
+   WHERE ir.solicitacao_id = sr.id) AS quantidade_itens
+FROM solicitacoes_reembolso sr
+JOIN profiles p ON p.id = sr.solicitante_id
+ORDER BY sr.created_at DESC;
+```
+
+### 3. Corrigir Filtro de `filial_id` no Frontend
+
+Em `Reembolsos.tsx`, incluir solicitações sem filial definida:
+
+```typescript
+// Antes
+query = query.eq("filial_id", filialId);
+
+// Depois
+query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+```
+
+---
+
+## Sequência de Implementação
+
+1. **Edge Function**: Corrigir conversão de data (prioridade máxima)
+2. **Migração SQL**: Criar trigger e atualizar view
+3. **Frontend**: Ajustar filtro de filial
+4. **Reprocessar dados**: Inserir o item manualmente para a solicitação existente
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/functions/chatbot-financeiro/index.ts` | Converter data DD/MM/YYYY → YYYY-MM-DD |
+| Migração SQL | Trigger + View |
+| `src/pages/financas/Reembolsos.tsx` | Filtro de filial_id |
+
+---
+
+## Teste de Validação
+
+Após correção:
+1. Enviar novo comprovante pelo WhatsApp
+2. Verificar se o item aparece em `itens_reembolso`
+3. Verificar se `valor_total` é calculado automaticamente
+4. Verificar se a solicitação aparece na tela de Reembolsos
