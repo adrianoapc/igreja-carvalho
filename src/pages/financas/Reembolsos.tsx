@@ -835,7 +835,7 @@ export default function Reembolsos() {
                       <div>
                         <p className="text-sm text-muted-foreground">Itens</p>
                         <p className="font-medium">
-                          {/* solicitacao.quantidade_itens */} -
+                          {solicitacao.quantidade_itens || 0}
                         </p>
                       </div>
                       <div>
@@ -924,7 +924,7 @@ export default function Reembolsos() {
                         <div>
                           <p className="text-sm text-muted-foreground">Itens</p>
                           <p className="font-medium">
-                            {/* solicitacao.quantidade_itens */} -
+                            {solicitacao.quantidade_itens || 0}
                           </p>
                         </div>
                         <div>

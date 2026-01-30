@@ -1347,6 +1347,7 @@ serve(async (req) => {
           data_vencimento: metaDados.data_vencimento,
           observacoes: observacaoReembolso,
           igreja_id: igrejaId,
+          filial_id: filialIdFromWhatsApp,
         })
         .select("id")
         .single();
@@ -1392,6 +1393,7 @@ serve(async (req) => {
             centro_custo_id: item.centro_custo_sugerido_id,
             foto_url: item.anexo_storage,
             igreja_id: igrejaId,
+            filial_id: filialIdFromWhatsApp,
           })
           .select("id")
           .single();
