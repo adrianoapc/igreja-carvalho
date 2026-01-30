@@ -247,16 +247,23 @@ export function TransacaoDialog({
 
   // Queries para selects
   const { data: contas } = useQuery({
-    queryKey: ["contas-select"],
+    queryKey: ["contas-select", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from("contas")
         .select("id, nome")
         .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!igrejaId,
   });
 
   const { data: categorias } = useQuery({
