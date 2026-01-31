@@ -63,7 +63,7 @@ const COL_MIN_WIDTH_PX = 140;
 export function ImportarTab() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tipoParam = searchParams.get("tipo") as TipoTransacao | null;
+  const tipoParam = searchParams.get("tipo");
   const tipo: TipoTransacao =
     tipoParam === "saida" || tipoParam === "saidas" ? "saida" : "entrada";
 
