@@ -64,7 +64,8 @@ export function ImportarTab() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tipoParam = searchParams.get("tipo") as TipoTransacao | null;
-  const tipo: TipoTransacao = tipoParam === "saida" ? "saida" : "entrada";
+  const tipo: TipoTransacao =
+    tipoParam === "saida" || tipoParam === "saidas" ? "saida" : "entrada";
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);

@@ -314,14 +314,14 @@ export default function WhatsAppNumeros({ onBack }: Props) {
               <div className="space-y-2">
                 <Label htmlFor="filial">Filial</Label>
                 <Select
-                  value={formData.filial_id}
-                  onValueChange={(value) => setFormData({ ...formData, filial_id: value })}
+                  value={formData.filial_id || "todas"}
+                  onValueChange={(value) => setFormData({ ...formData, filial_id: value === "todas" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Todas as filiais" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas as filiais</SelectItem>
+                    <SelectItem value="todas">Todas as filiais</SelectItem>
                     {filiais.map((filial) => (
                       <SelectItem key={filial.id} value={filial.id}>
                         {filial.nome}

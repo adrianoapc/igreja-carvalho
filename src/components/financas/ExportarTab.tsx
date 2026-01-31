@@ -84,8 +84,10 @@ const COLUNAS_DISPONIVEIS = [
 export function ExportarTab() {
   const [searchParams] = useSearchParams();
   const tipoParam = searchParams.get("tipo");
+  const tipoInicial: TipoExportacao =
+    tipoParam === "saidas" || tipoParam === "saida" ? "saidas" : "entradas";
   const [tipoExportacao, setTipoExportacao] = useState<TipoExportacao>(
-    tipoParam === "saidas" ? "saidas" : "entradas"
+    tipoInicial
   );
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
   const [dataInicio, setDataInicio] = useState<Date | undefined>(

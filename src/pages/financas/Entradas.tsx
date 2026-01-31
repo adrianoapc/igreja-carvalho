@@ -2,14 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Plus,
   ArrowLeft,
   Calendar,
@@ -20,7 +12,15 @@ import {
   Paperclip,
   X,
   Download,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   exportToExcel,
@@ -50,6 +50,7 @@ import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useQueryClient } from "@tanstack/react-query";
+import { MonthPicker } from "@/components/financas/MonthPicker";
 
 export default function Entradas() {
   const navigate = useNavigate();
@@ -78,6 +79,10 @@ export default function Entradas() {
   const [contaFilter, setContaFilter] = useState("all");
   const [categoriaFilter, setCategoriaFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Estados para agrupamento por data
+  const [agruparPorData, setAgruparPorData] = useState(false);
+  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set());
 
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
@@ -211,6 +216,41 @@ export default function Entradas() {
     return true;
     });
   }, [transacoes, busca, contaFilter, categoriaFilter, statusFilter]);
+  
+  // Agrupar transações por data
+  const transacoesAgrupadas = useMemo(() => {
+    if (!agruparPorData || !transacoesFiltradas) return {};
+    
+    const grupos: Record<string, typeof transacoesFiltradas> = {};
+    
+    transacoesFiltradas.forEach(transacao => {
+      const dataKey = format(new Date(transacao.data_vencimento + "T00:00:00"), "yyyy-MM-dd");
+      if (!grupos[dataKey]) {
+        grupos[dataKey] = [];
+      }
+      grupos[dataKey].push(transacao);
+    });
+    
+    return grupos;
+  }, [transacoesFiltradas, agruparPorData]);
+  
+  // Ordenar as datas dos grupos (mais recente primeiro)
+  const datasOrdenadas = useMemo(() => {
+    return Object.keys(transacoesAgrupadas).sort((a, b) => 
+      new Date(b).getTime() - new Date(a).getTime()
+    );
+  }, [transacoesAgrupadas]);
+  
+  // Toggle de grupo expandido
+  const toggleGrupo = (dataKey: string) => {
+    const novosExpandidos = new Set(gruposExpandidos);
+    if (novosExpandidos.has(dataKey)) {
+      novosExpandidos.delete(dataKey);
+    } else {
+      novosExpandidos.add(dataKey);
+    }
+    setGruposExpandidos(novosExpandidos);
+  };
 
   // Pagination
   const {
@@ -347,6 +387,12 @@ export default function Entradas() {
 
         {/* Lado Direito: Filtros + Novo */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end flex-wrap">
+          <MonthPicker
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+          />
           <FiltrosSheet
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
@@ -376,23 +422,15 @@ export default function Entradas() {
           <Button
             variant="outline"
             onClick={() =>
-              navigate("/financas/gerenciar-dados?tab=exportar&tipo=entradas")
+              navigate("/financas/gerenciar-dados?tab=exportar&tipo=entrada")
             }
             size="sm"
           >
-            <Download className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline text-xs">Exportar</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() =>
-              navigate("/financas/gerenciar-dados?tab=importar&tipo=entrada")
-            }
-            size="sm"
-            className="hidden md:inline-flex"
-          >
-            <Upload className="w-4 h-4 mr-1" />
-            <span className="text-xs">Importar</span>
+            <span className="flex items-center gap-1 mr-1">
+              <Download className="w-4 h-4" />
+              <Upload className="w-4 h-4" />
+            </span>
+            <span className="hidden sm:inline text-xs">Arquivos</span>
           </Button>
           <Button
             className="bg-gradient-primary shadow-soft whitespace-nowrap"
@@ -534,9 +572,25 @@ export default function Entradas() {
       {/* Lista de Transações */}
       <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">
-            Lista de Entradas
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg md:text-xl">
+              Lista de Entradas
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAgruparPorData(!agruparPorData);
+                if (!agruparPorData) {
+                  // Ao ativar agrupamento, expandir todos os grupos
+                  setGruposExpandidos(new Set(Object.keys(transacoesAgrupadas)));
+                }
+              }}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              {agruparPorData ? "Visão Lista" : "Agrupar por Data"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -545,94 +599,138 @@ export default function Entradas() {
             </p>
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
             <>
-              {/* Tabela Desktop */}
-              <div className="hidden md:block overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="text-xs">Descrição</TableHead>
-                      <TableHead className="text-xs">Conta</TableHead>
-                      <TableHead className="text-xs">Categoria</TableHead>
-                      <TableHead className="text-xs">Vencimento</TableHead>
-                      <TableHead className="text-xs text-right">
-                        Valor
-                      </TableHead>
-                      <TableHead className="text-xs">Status</TableHead>
-                      <TableHead className="text-xs text-center">
-                        Ações
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transacoesPaginadas.map((transacao) => (
-                      <TableRow
-                        key={transacao.id}
-                        className="hover:bg-muted/50"
-                        onDoubleClick={() => {
-                          setEditingTransacao(transacao as any);
-                          setDialogOpen(true);
-                        }}
-                      >
-                        <TableCell className="text-sm font-medium">
-                          {transacao.descricao}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {transacao.conta?.nome || "-"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {transacao.categoria ? (
-                            <div className="flex items-center gap-1">
-                              <span
-                                className="w-2 h-2 rounded-full"
-                                style={{
-                                  backgroundColor:
-                                    transacao.categoria.cor || "#666",
-                                }}
-                              />
-                              <span>{transacao.categoria.nome}</span>
+              {agruparPorData ? (
+                <div className="space-y-3 p-4">
+                  {datasOrdenadas.map((dataKey) => {
+                    const grupo = transacoesAgrupadas[dataKey];
+                    const totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+                    const isExpandido = gruposExpandidos.has(dataKey);
+                    
+                    return (
+                      <div key={dataKey} className="border rounded-lg overflow-hidden">
+                        {/* Header do grupo */}
+                        <button
+                          onClick={() => toggleGrupo(dataKey)}
+                          className="w-full flex items-center justify-between p-3 bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {isExpandido ? (
+                              <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                            )}
+                            <div className="text-left">
+                              <div className="font-semibold text-sm">
+                                {format(new Date(dataKey + "T00:00:00"), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {grupo.length} {grupo.length === 1 ? 'transação' : 'transações'}
+                              </div>
                             </div>
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {format(
-                            new Date(transacao.data_vencimento + "T00:00:00"),
-                            "dd/MM/yyyy",
-                            { locale: ptBR }
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm font-semibold text-right text-green-600">
-                          {formatCurrency(Number(transacao.valor))}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <Badge
-                            className={`text-xs ${getStatusColorDynamic(
-                              transacao
-                            )}`}
-                          >
-                            {getStatusDisplay(transacao)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-center">
-                          <TransacaoActionsMenu
-                            transacaoId={transacao.id}
-                            status={transacao.status}
-                            tipo="entrada"
-                            onEdit={() => {
-                              setEditingTransacao(transacao);
-                              setDialogOpen(true);
-                            }}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-base font-bold text-green-600">
+                              {formatCurrency(totalGrupo)}
+                            </div>
+                          </div>
+                        </button>
+                        
+                        {/* Lista de transações do grupo */}
+                        {isExpandido && (
+                          <div className="divide-y">
+                            {grupo.map((transacao) => (
+                              <div
+                                key={transacao.id}
+                                className="flex items-center gap-3 p-3 bg-card hover:bg-accent/50 transition-colors"
+                                onDoubleClick={() => {
+                                  setEditingTransacao(transacao as any);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                {/* Data Compact */}
+                                <div className="flex-shrink-0 text-center w-12">
+                                  <div className="text-xs font-bold text-foreground">
+                                    {format(new Date(transacao.data_vencimento + "T00:00:00"), "dd", {
+                                      locale: ptBR,
+                                    })}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground uppercase">
+                                    {format(new Date(transacao.data_vencimento + "T00:00:00"), "MMM", {
+                                      locale: ptBR,
+                                    })}
+                                  </div>
+                                </div>
 
-              {/* Cards Mobile */}
-              <div className="md:hidden space-y-2 p-4">
+                                {/* Divider */}
+                                <div className="h-10 w-px bg-border" />
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-sm truncate">
+                                    {transacao.descricao}
+                                  </h3>
+                                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                    {transacao.categoria && (
+                                      <>
+                                        <span
+                                          className="w-2 h-2 rounded-full flex-shrink-0"
+                                          style={{
+                                            backgroundColor:
+                                              transacao.categoria.cor || "#666",
+                                          }}
+                                        />
+                                        <span className="truncate">
+                                          {transacao.categoria.nome}
+                                        </span>
+                                      </>
+                                    )}
+                                    {transacao.conta && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="truncate">
+                                          {transacao.conta.nome}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Value & Actions */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <div className="text-right">
+                                    <p className="text-base font-bold text-green-600 whitespace-nowrap">
+                                      {formatCurrency(Number(transacao.valor))}
+                                    </p>
+                                    <Badge
+                                      className={`text-[10px] ${getStatusColorDynamic(
+                                        transacao
+                                      )}`}
+                                    >
+                                      {getStatusDisplay(transacao)}
+                                    </Badge>
+                                  </div>
+                                  <TransacaoActionsMenu
+                                    transacaoId={transacao.id}
+                                    status={transacao.status}
+                                    tipo="entrada"
+                                    onEdit={() => {
+                                      setEditingTransacao(transacao);
+                                      setDialogOpen(true);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <>
+              {/* Lista de cards - responsiva */}
+              <div className="space-y-2 p-4 md:p-6 pt-0">
                 {transacoesPaginadas.map((transacao) => (
                   <div
                     key={transacao.id}
@@ -642,14 +740,14 @@ export default function Entradas() {
                       setDialogOpen(true);
                     }}
                   >
-                    {/* Data Compact - Mobile */}
-                    <div className="flex-shrink-0 text-center w-12">
-                      <div className="text-xs font-bold text-foreground">
+                    {/* Data Compact */}
+                    <div className="flex-shrink-0 text-center w-12 md:w-14">
+                      <div className="text-xs md:text-sm font-bold text-foreground">
                         {format(new Date(transacao.data_vencimento + "T00:00:00"), "dd", {
                           locale: ptBR,
                         })}
                       </div>
-                      <div className="text-[10px] text-muted-foreground uppercase">
+                      <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
                         {format(new Date(transacao.data_vencimento + "T00:00:00"), "MMM", {
                           locale: ptBR,
                         })}
@@ -661,7 +759,7 @@ export default function Entradas() {
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm truncate">
+                      <h3 className="font-semibold text-sm md:text-base truncate">
                         {transacao.descricao}
                       </h3>
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
@@ -693,11 +791,11 @@ export default function Entradas() {
                     {/* Value & Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <div className="text-right">
-                        <p className="text-base font-bold text-green-600 whitespace-nowrap">
+                        <p className="text-base md:text-lg font-bold text-green-600 whitespace-nowrap">
                           {formatCurrency(Number(transacao.valor))}
                         </p>
                         <Badge
-                          className={`text-[10px] ${getStatusColorDynamic(
+                          className={`text-[10px] md:text-xs ${getStatusColorDynamic(
                             transacao
                           )}`}
                         >
@@ -717,18 +815,22 @@ export default function Entradas() {
                   </div>
                 ))}
               </div>
+              </>
+              )}
 
-              {/* Pagination */}
-              <TablePagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={goToPage}
-                startIndex={startIndex}
-                endIndex={endIndex}
-                totalItems={totalItems}
-                hasNextPage={hasNextPage}
-                hasPrevPage={hasPrevPage}
-              />
+              {/* Pagination - apenas na visão lista */}
+              {!agruparPorData && (
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalItems={totalItems}
+                  hasNextPage={hasNextPage}
+                  hasPrevPage={hasPrevPage}
+                />
+              )}
             </>
           ) : (
             <p className="text-sm md:text-base text-muted-foreground text-center py-4">

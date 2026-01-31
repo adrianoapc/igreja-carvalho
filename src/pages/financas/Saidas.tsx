@@ -12,6 +12,8 @@ import {
   X,
   Download,
   ReceiptText,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import {
   Tooltip,
@@ -47,6 +49,7 @@ import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useQueryClient } from "@tanstack/react-query";
+import { MonthPicker } from "@/components/financas/MonthPicker";
 
 export default function Saidas() {
   const navigate = useNavigate();
@@ -76,6 +79,10 @@ export default function Saidas() {
   const [categoriaFilter, setCategoriaFilter] = useState("all");
   const [fornecedorFilter, setFornecedorFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Estados para agrupamento por data
+  const [agruparPorData, setAgruparPorData] = useState(false);
+  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set());
 
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
@@ -251,6 +258,41 @@ export default function Saidas() {
     statusFilter,
   ]);
 
+  // Agrupar transações por data
+  const transacoesAgrupadas = useMemo(() => {
+    if (!agruparPorData || !transacoesFiltradas) return {};
+    
+    const grupos: Record<string, typeof transacoesFiltradas> = {};
+    
+    transacoesFiltradas.forEach(transacao => {
+      const dataKey = format(new Date(transacao.data_vencimento + "T00:00:00"), "yyyy-MM-dd");
+      if (!grupos[dataKey]) {
+        grupos[dataKey] = [];
+      }
+      grupos[dataKey].push(transacao);
+    });
+    
+    return grupos;
+  }, [transacoesFiltradas, agruparPorData]);
+  
+  // Ordenar as datas dos grupos (mais recente primeiro)
+  const datasOrdenadas = useMemo(() => {
+    return Object.keys(transacoesAgrupadas).sort((a, b) => 
+      new Date(b).getTime() - new Date(a).getTime()
+    );
+  }, [transacoesAgrupadas]);
+  
+  // Toggle de grupo expandido
+  const toggleGrupo = (dataKey: string) => {
+    const novosExpandidos = new Set(gruposExpandidos);
+    if (novosExpandidos.has(dataKey)) {
+      novosExpandidos.delete(dataKey);
+    } else {
+      novosExpandidos.add(dataKey);
+    }
+    setGruposExpandidos(novosExpandidos);
+  };
+
   // Pagination
   const {
     currentPage,
@@ -387,6 +429,12 @@ export default function Saidas() {
 
         {/* Lado Direito: Filtros + Novo */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end flex-wrap">
+          <MonthPicker
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+          />
           <FiltrosSheet
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
@@ -419,23 +467,15 @@ export default function Saidas() {
           <Button
             variant="outline"
             onClick={() =>
-              navigate("/financas/gerenciar-dados?tab=exportar&tipo=saidas")
+              navigate("/financas/gerenciar-dados?tab=exportar&tipo=saida")
             }
             size="sm"
           >
-            <Download className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline text-xs">Exportar</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() =>
-              navigate("/financas/gerenciar-dados?tab=importar&tipo=saida")
-            }
-            size="sm"
-            className="hidden md:inline-flex"
-          >
-            <Upload className="w-4 h-4 mr-1" />
-            <span className="text-xs">Importar</span>
+            <span className="flex items-center gap-1 mr-1">
+              <Download className="w-4 h-4" />
+              <Upload className="w-4 h-4" />
+            </span>
+            <span className="hidden sm:inline text-xs">Arquivos</span>
           </Button>
           <Button
             className="bg-gradient-primary shadow-soft whitespace-nowrap"
@@ -587,7 +627,23 @@ export default function Saidas() {
       {/* Lista de Transações */}
       <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">Lista de Saídas</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg md:text-xl">Lista de Saídas</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAgruparPorData(!agruparPorData);
+                if (!agruparPorData) {
+                  // Ao ativar agrupamento, expandir todos os grupos
+                  setGruposExpandidos(new Set(Object.keys(transacoesAgrupadas)));
+                }
+              }}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              {agruparPorData ? "Visão Lista" : "Agrupar por Data"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
           {isLoading ? (
@@ -596,8 +652,165 @@ export default function Saidas() {
             </p>
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
             <>
-              <div className="space-y-2">
-                {transacoesPaginadas.map((transacao) => (
+              {agruparPorData ? (
+                <div className="space-y-3">
+                  {datasOrdenadas.map((dataKey) => {
+                    const grupo = transacoesAgrupadas[dataKey];
+                    const totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+                    const isExpandido = gruposExpandidos.has(dataKey);
+                    
+                    return (
+                      <div key={dataKey} className="border rounded-lg overflow-hidden">
+                        {/* Header do grupo */}
+                        <button
+                          onClick={() => toggleGrupo(dataKey)}
+                          className="w-full flex items-center justify-between p-3 bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {isExpandido ? (
+                              <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                            )}
+                            <div className="text-left">
+                              <div className="font-semibold text-sm">
+                                {format(new Date(dataKey + "T00:00:00"), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {grupo.length} {grupo.length === 1 ? 'transação' : 'transações'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-base font-bold text-red-600">
+                              {formatCurrency(totalGrupo)}
+                            </div>
+                          </div>
+                        </button>
+                        
+                        {/* Lista de transações do grupo */}
+                        {isExpandido && (
+                          <div className="divide-y">
+                            {grupo.map((transacao) => (
+                              <div
+                                key={transacao.id}
+                                className="flex items-center gap-3 p-3 bg-card hover:bg-accent/50 transition-colors"
+                                onDoubleClick={() => {
+                                  setEditingTransacao(transacao as any);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                {/* Data Compact - Mobile */}
+                                <div className="flex-shrink-0 text-center w-12 md:w-14">
+                                  <div className="text-xs md:text-sm font-bold text-foreground">
+                                    {format(new Date(transacao.data_vencimento + "T00:00:00"), "dd", {
+                                      locale: ptBR,
+                                    })}
+                                  </div>
+                                  <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
+                                    {format(new Date(transacao.data_vencimento + "T00:00:00"), "MMM", {
+                                      locale: ptBR,
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="h-10 w-px bg-border" />
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-sm md:text-base truncate">
+                                    {transacao.descricao}
+                                  </h3>
+                                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                    {transacao.fornecedor && (
+                                      <>
+                                        <span className="truncate">
+                                          {transacao.fornecedor.nome}
+                                        </span>
+                                        {transacao.categoria && <span>•</span>}
+                                      </>
+                                    )}
+                                    {transacao.categoria && (
+                                      <>
+                                        <span
+                                          className="w-2 h-2 rounded-full flex-shrink-0"
+                                          style={{
+                                            backgroundColor:
+                                              transacao.categoria.cor || "#666",
+                                          }}
+                                        />
+                                        <span className="truncate">
+                                          {transacao.categoria.nome}
+                                        </span>
+                                      </>
+                                    )}
+                                    {transacao.conta && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="truncate">
+                                          {transacao.conta.nome}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Value & Actions */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <div className="text-right">
+                                    <div className="flex items-center gap-1.5 justify-end">
+                                      <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
+                                        {formatCurrency(Number(transacao.valor))}
+                                      </p>
+                                      {transacao.solicitacao_reembolso_id && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge
+                                                variant="outline"
+                                                className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400"
+                                              >
+                                                <ReceiptText className="w-2.5 h-2.5" />
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Reembolso</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
+                                    </div>
+                                    <Badge
+                                      className={`text-[10px] md:text-xs ${getStatusColorDynamic(
+                                        transacao
+                                      )}`}
+                                    >
+                                      {getStatusDisplay(transacao)}
+                                    </Badge>
+                                  </div>
+                                  <TransacaoActionsMenu
+                                    transacaoId={transacao.id}
+                                    status={transacao.status}
+                                    tipo="saida"
+                                    isReembolso={!!transacao.solicitacao_reembolso_id}
+                                    onEdit={() => {
+                                      setEditingTransacao(transacao);
+                                      setDialogOpen(true);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {transacoesPaginadas.map((transacao) => (
                   <div
                     key={transacao.id}
                     className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
@@ -708,10 +921,12 @@ export default function Saidas() {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              )}
 
-              {/* Pagination */}
-              <TablePagination
+              {/* Pagination - apenas na visão lista */}
+              {!agruparPorData && (
+                <TablePagination
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={goToPage}
@@ -721,6 +936,7 @@ export default function Saidas() {
                 hasNextPage={hasNextPage}
                 hasPrevPage={hasPrevPage}
               />
+              )}
             </>
           ) : (
             <p className="text-sm md:text-base text-muted-foreground text-center py-4">

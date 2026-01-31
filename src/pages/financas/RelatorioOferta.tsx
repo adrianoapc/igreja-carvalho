@@ -1369,11 +1369,12 @@ export default function RelatorioOferta() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0 space-y-4">
-                <div className="grid grid-cols-3 md:grid-cols-5 gap-3 text-xs font-semibold text-muted-foreground px-1">
-                  <span>Membro</span>
-                  <span>Tipo</span>
+                <div className="grid grid-cols-6 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2">
+                  <span>Pessoa</span>
                   <span>Forma</span>
+                  <span>Categoria</span>
                   <span>Conta</span>
+                  <span>Origem</span>
                   <span>Valor</span>
                 </div>
                 <div className="space-y-3">
@@ -1398,7 +1399,7 @@ export default function RelatorioOferta() {
                     return (
                       <div
                         key={linha.id}
-                        className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center p-3 border rounded-lg"
+                        className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center p-3 border rounded-lg"
                       >
                         <div>
                           <PessoaCombobox
@@ -1406,44 +1407,10 @@ export default function RelatorioOferta() {
                             onChange={(v) =>
                               atualizarLinha(linha.id, { pessoaId: v })
                             }
-                            placeholder="Membro (opcional)"
+                            placeholder="Pessoa (opcional)"
                           />
                         </div>
 
-                        <div>
-                          <Select
-                            value={
-                              linha.categoriaId
-                                ? `${linha.tipo || "oferta"}:${
-                                    linha.categoriaId
-                                  }`
-                                : undefined
-                            }
-                            onValueChange={(v) => {
-                              const [tipoSel, catId] = v.split(":");
-                              atualizarLinha(linha.id, {
-                                tipo: tipoSel as any,
-                                categoriaId: catId,
-                              });
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecionar tipo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {tiposFisicosPermitidos.map((c: any) => {
-                                const key = categoriaToTipo(c.nome || "");
-                                const label = c.nome as string;
-                                const value = `${key}:${c.id}`;
-                                return (
-                                  <SelectItem key={c.id} value={value}>
-                                    {label}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                        </div>
                         <div className="space-y-1">
                           <Select
                             value={linha.formaId}
@@ -1473,6 +1440,41 @@ export default function RelatorioOferta() {
                         </div>
 
                         <div>
+                          <Select
+                            value={
+                              linha.categoriaId
+                                ? `${linha.tipo || "oferta"}:${
+                                    linha.categoriaId
+                                  }`
+                                : undefined
+                            }
+                            onValueChange={(v) => {
+                              const [tipoSel, catId] = v.split(":");
+                              atualizarLinha(linha.id, {
+                                tipo: tipoSel as any,
+                                categoriaId: catId,
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecionar categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {tiposFisicosPermitidos.map((c: any) => {
+                                const key = categoriaToTipo(c.nome || "");
+                                const label = c.nome as string;
+                                const value = `${key}:${c.id}`;
+                                return (
+                                  <SelectItem key={c.id} value={value}>
+                                    {label}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
                           {mapeamentos.length === 0 ? (
                             <p className="text-xs text-destructive">
                               Sem conta mapeada
@@ -1498,18 +1500,21 @@ export default function RelatorioOferta() {
                           )}
                         </div>
 
-                        <Input
-                          id={`valor-${linha.id}`}
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="0,00"
-                          value={linha.valor}
-                          onChange={(e) =>
-                            handleValorChange(linha.id, e.target.value)
-                          }
-                        />
+                        <div className="text-xs text-muted-foreground">
+                          <span>Manual</span>
+                        </div>
 
-                        <div className="flex md:justify-end">
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            id={`valor-${linha.id}`}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0,00"
+                            value={linha.valor}
+                            onChange={(e) =>
+                              handleValorChange(linha.id, e.target.value)
+                            }
+                          />
                           <Button
                             type="button"
                             variant="ghost"

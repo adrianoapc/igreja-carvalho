@@ -157,6 +157,9 @@ const FinancasRelatorioOferta = lazy(
 const FinancasImportar = lazy(
   () => import("./pages/financas/ImportarFinancasPage"),
 );
+const FinancasConfigFinanceiro = lazy(
+  () => import("./pages/financas/ConfigFinanceiro"),
+);
 const FinancasGerenciarDados = lazy(
   () => import("./pages/financas/GerenciarDados"),
 );
@@ -165,6 +168,9 @@ const FinancasReclassificacao = lazy(
 );
 const FinancasReconciliacao = lazy(
   () => import("./pages/financas/Reconciliacao"),
+);
+const FinancasSessoesContagem = lazy(
+  () => import("./pages/financas/SessoesContagem"),
 );
 const FinancasDashboardOfertas = lazy(
   () => import("./pages/financas/DashboardOfertas"),
@@ -1010,6 +1016,14 @@ const App = () => (
                     }
                   />
                   <Route
+                    path="/financas/config-financeiro"
+                    element={
+                      <AuthGate>
+                        <FinancasConfigFinanceiro />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
                     path="/financas/gerenciar-dados"
                     element={
                       <AuthGate>
@@ -1030,6 +1044,14 @@ const App = () => (
                     element={
                       <AuthGate>
                         <FinancasReconciliacao />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/financas/sessoes-contagem"
+                    element={
+                      <AuthGate>
+                        <FinancasSessoesContagem />
                       </AuthGate>
                     }
                   />
