@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Download, FileSpreadsheet, Calendar } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, Calendar, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { exportToExcel } from "@/lib/exportUtils";
 import { toast } from "sonner";
@@ -48,21 +49,35 @@ interface SecaoAgrupada {
 
 export default function DRE() {
   const navigate = useNavigate();
+  const { igrejaId, loading: authLoading } = useAuthContext();
   const currentYear = new Date().getFullYear();
   const [anoSelecionado, setAnoSelecionado] = useState(currentYear);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   const { data: dreData, isLoading } = useQuery({
-    queryKey: ["dre-anual", anoSelecionado],
+    queryKey: ["dre-anual", anoSelecionado, igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return [];
       const { data, error } = await supabase.rpc("get_dre_anual", { p_ano: anoSelecionado });
       if (error) throw error;
       return data as DreItem[];
     },
+    enabled: !authLoading && !!igrejaId,
   });
 
   // Processar e agrupar dados
   const dadosAgrupados = processarDados(dreData || []);
   const resultadoLiquido = calcularResultadoLiquido(dadosAgrupados);
+
+  const toggleSection = (sectionName: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(sectionName)) {
+      newExpanded.delete(sectionName);
+    } else {
+      newExpanded.add(sectionName);
+    }
+    setExpandedSections(newExpanded);
+  };
 
   const formatCurrency = (value: number | null | undefined) => {
     if (value === null || value === undefined || value === 0) return "-";
@@ -210,25 +225,31 @@ export default function DRE() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dadosAgrupados.map((secao) => (
-                  <>
-                    {/* Header da Seção */}
-                    <TableRow key={secao.secao} className="bg-primary/10 hover:bg-primary/15">
-                      <TableCell colSpan={14} className="font-bold text-primary py-2">
-                        {secao.secao || "Sem Classificação"}
-                      </TableCell>
-                    </TableRow>
-                    {/* Categorias */}
-                    {secao.categorias.map((cat) => (
-                      <TableRow key={cat.categoria_id} className="hover:bg-muted/30">
-                        <TableCell className="pl-6 text-sm">{cat.categoria_nome}</TableCell>
+                {dadosAgrupados.map((secao) => {
+                  const isExpanded = expandedSections.has(secao.secao);
+                  return (
+                    <>
+                      {/* Header da Seção com totais - Colapsável */}
+                      <TableRow
+                        key={secao.secao}
+                        className="bg-primary/10 hover:bg-primary/15 cursor-pointer"
+                        onClick={() => toggleSection(secao.secao)}
+                      >
+                        <TableCell className="font-bold text-primary py-3 flex items-center gap-2">
+                          {isExpanded ? (
+                            <ChevronDown className="w-5 h-5 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="w-5 h-5 flex-shrink-0" />
+                          )}
+                          <span>{secao.secao || "Sem Classificação"}</span>
+                        </TableCell>
                         {MESES.map((_, idx) => {
-                          const valor = cat.valores[idx + 1] || 0;
+                          const valor = secao.totaisMes[idx + 1] || 0;
                           return (
                             <TableCell
                               key={idx}
                               className={cn(
-                                "text-right text-sm tabular-nums",
+                                "text-right font-semibold text-sm tabular-nums",
                                 valor === 0 && "text-muted-foreground/40",
                                 valor < 0 && "text-destructive",
                                 valor > 0 && "text-green-600"
@@ -240,46 +261,51 @@ export default function DRE() {
                         })}
                         <TableCell
                           className={cn(
-                            "text-right font-medium tabular-nums bg-muted/30",
-                            cat.totalAno < 0 && "text-destructive",
-                            cat.totalAno > 0 && "text-green-600"
+                            "text-right font-bold tabular-nums bg-muted/50",
+                            secao.totalAno < 0 && "text-destructive",
+                            secao.totalAno > 0 && "text-green-600"
                           )}
                         >
-                          {formatCurrency(cat.totalAno)}
+                          {formatCurrency(secao.totalAno)}
                         </TableCell>
                       </TableRow>
-                    ))}
-                    {/* Subtotal da Seção */}
-                    <TableRow className="bg-muted/20 border-b-2">
-                      <TableCell className="font-semibold text-sm">Subtotal {secao.secao}</TableCell>
-                      {MESES.map((_, idx) => {
-                        const valor = secao.totaisMes[idx + 1] || 0;
-                        return (
-                          <TableCell
-                            key={idx}
-                            className={cn(
-                              "text-right font-medium text-sm tabular-nums",
-                              valor === 0 && "text-muted-foreground/40",
-                              valor < 0 && "text-destructive",
-                              valor > 0 && "text-green-600"
-                            )}
-                          >
-                            {formatCurrency(valor)}
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell
-                        className={cn(
-                          "text-right font-bold tabular-nums bg-muted/50",
-                          secao.totalAno < 0 && "text-destructive",
-                          secao.totalAno > 0 && "text-green-600"
-                        )}
-                      >
-                        {formatCurrency(secao.totalAno)}
-                      </TableCell>
-                    </TableRow>
-                  </>
-                ))}
+                      {/* Categorias detalhadas - Mostradas quando expandida */}
+                      {isExpanded &&
+                        secao.categorias.map((cat) => (
+                          <TableRow key={cat.categoria_id} className="hover:bg-muted/30 bg-muted/10">
+                            <TableCell className="pl-10 text-sm text-muted-foreground">
+                              {cat.categoria_nome}
+                            </TableCell>
+                            {MESES.map((_, idx) => {
+                              const valor = cat.valores[idx + 1] || 0;
+                              return (
+                                <TableCell
+                                  key={idx}
+                                  className={cn(
+                                    "text-right text-xs tabular-nums",
+                                    valor === 0 && "text-muted-foreground/40",
+                                    valor < 0 && "text-destructive",
+                                    valor > 0 && "text-green-600"
+                                  )}
+                                >
+                                  {formatCurrency(valor)}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell
+                              className={cn(
+                                "text-right text-xs font-medium tabular-nums",
+                                cat.totalAno < 0 && "text-destructive",
+                                cat.totalAno > 0 && "text-green-600"
+                              )}
+                            >
+                              {formatCurrency(cat.totalAno)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </>
+                  );
+                })}
                 {/* Resultado Líquido */}
                 <TableRow className="bg-card border-t-4 border-primary">
                   <TableCell className="font-bold text-lg py-4">RESULTADO LÍQUIDO</TableCell>
