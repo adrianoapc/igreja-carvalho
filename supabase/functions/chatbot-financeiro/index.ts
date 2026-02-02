@@ -17,9 +17,12 @@ const corsHeaders = {
 type EstadoSessao =
   | "AGUARDANDO_FORMA_INICIAL" // Pergunta forma antes dos comprovantes (fluxo DESPESAS)
   | "AGUARDANDO_COMPROVANTES"
-  | "AGUARDANDO_OBSERVACAO"    // NOVO: Pergunta observação/contexto após comprovantes
+  | "AGUARDANDO_OBSERVACAO"    // Pergunta observação/contexto após comprovantes
   | "AGUARDANDO_DATA"
   | "AGUARDANDO_FORMA_PGTO"
+  // Estados para fluxo TRANSFERENCIA
+  | "TRANSFERENCIA_AGUARDANDO_CONTA_ORIGEM"
+  | "TRANSFERENCIA_AGUARDANDO_CONFIRMACAO"
   | "FINALIZADO";
 
 interface ItemProcessado {
@@ -38,11 +41,26 @@ interface ItemProcessado {
   centro_custo_sugerido_id: string | null;
   base_ministerial_sugerido_id: string | null;
   processado_em: string;
+  // Campos específicos para detecção de depósito
+  tipo_documento?: "nota_fiscal" | "comprovante_deposito" | "outro";
+  banco_detectado?: string | null;
+  cnpj_banco_detectado?: string | null;
+}
+
+// Dados de transferência detectada via OCR
+interface DadosTransferencia {
+  valor: number;
+  banco_destino: string | null;
+  cnpj_banco: string | null;
+  data_deposito: string | null;
+  conta_origem_sugerida_id?: string | null;
+  conta_destino_sugerida_id?: string | null;
+  descricao?: string | null;
 }
 
 interface MetaDados {
   contexto: string;
-  fluxo: "REEMBOLSO" | "CONTA_UNICA" | "DESPESAS";
+  fluxo: "REEMBOLSO" | "CONTA_UNICA" | "DESPESAS" | "TRANSFERENCIA";
   pessoa_id?: string;
   nome_perfil?: string;
   estado_atual: EstadoSessao;
@@ -51,9 +69,14 @@ interface MetaDados {
   data_vencimento?: string;
   forma_pagamento?: "pix" | "dinheiro" | "cartao" | "boleto" | "a_definir";
   baixa_automatica?: boolean;
-  observacao_usuario?: string;  // NOVO: comentário livre do usuário
+  observacao_usuario?: string;
   resultado?: string;
   itens_removidos?: number;
+  // Campos específicos para TRANSFERENCIA
+  transferencia?: DadosTransferencia;
+  conta_origem_id?: string;
+  conta_destino_id?: string;
+  anexo_comprovante?: string;
 }
 
 // Função para fazer download de anexo do WhatsApp e upload para Storage
@@ -580,7 +603,75 @@ serve(async (req) => {
       const isReembolso = texto.includes("reembolso");
       const isContaUnica = texto.includes("conta") || texto.includes("nota");
       const isDespesas = texto.includes("despesa") || texto.includes("gasto");
-      const isGatilho = isReembolso || isContaUnica || isDespesas;
+      const isTransferencia = texto.includes("transferência") || texto.includes("transferencia") || 
+                              texto.includes("depósito") || texto.includes("deposito");
+      const isGatilho = isReembolso || isContaUnica || isDespesas || isTransferencia;
+
+      // Fluxo TRANSFERENCIA - depósito entre contas
+      if (isTransferencia) {
+        // Buscar contas disponíveis e mapeamentos configurados
+        const { data: contasAtivas } = await supabase
+          .from("contas")
+          .select("id, nome, tipo, banco, cnpj_banco")
+          .eq("ativo", true)
+          .eq("igreja_id", igrejaId)
+          .order("nome");
+
+        const { data: configFinanceiro } = await supabase
+          .from("financeiro_config")
+          .select("mapeamentos_transferencia")
+          .eq("igreja_id", igrejaId)
+          .maybeSingle();
+
+        const mapeamentos = (configFinanceiro?.mapeamentos_transferencia || []) as Array<{
+          conta_origem_id: string;
+          conta_destino_id: string;
+          nome_sugestao: string;
+        }>;
+
+        // Montar lista de contas para seleção
+        const listaContas = (contasAtivas || [])
+          .map((c, i) => `${i + 1}️⃣ ${c.nome}${c.banco ? ` (${c.banco})` : ""}`)
+          .join("\n");
+
+        const metaDadosInicial: MetaDados = {
+          contexto: "FINANCEIRO",
+          fluxo: "TRANSFERENCIA",
+          pessoa_id: membroAutorizado.id,
+          nome_perfil: nome_perfil || membroAutorizado.nome,
+          estado_atual: "TRANSFERENCIA_AGUARDANDO_CONTA_ORIGEM",
+          itens: [],
+          valor_total_acumulado: 0,
+          transferencia: {
+            valor: 0,
+            banco_destino: null,
+            cnpj_banco: null,
+            data_deposito: null,
+          },
+        };
+
+        await supabase.from("atendimentos_bot").insert({
+          telefone,
+          origem_canal,
+          pessoa_id: membroAutorizado.id,
+          status: "EM_ANDAMENTO",
+          meta_dados: {
+            ...metaDadosInicial,
+            phone_number_id: phoneNumberId ?? null,
+            display_phone_number: whatsappNumeroNormalizado || null,
+            contas_disponiveis: contasAtivas || [],
+            mapeamentos_transferencia: mapeamentos,
+          },
+          igreja_id: igrejaId,
+        });
+
+        return new Response(
+          JSON.stringify({
+            text: `🔄 *Transferência entre Contas*\n\n📸 Envie o *comprovante de depósito* para detectar automaticamente.\n\nOu informe manualmente:\n\n💰 *De qual conta está saindo o dinheiro?*\n\n${listaContas}\n\nDigite o número ou envie o comprovante.`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       // Fluxo DESPESAS - pergunta forma de pagamento primeiro
       if (isDespesas) {
@@ -651,7 +742,7 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({
-          text: "Olá! Sou o assistente financeiro. Para iniciar:\n\n• *Despesas* - registrar gastos (dinheiro, PIX, cartão)\n• *Reembolso* - solicitar ressarcimento pessoal\n• *Nova Conta* - registrar conta a pagar",
+          text: "Olá! Sou o assistente financeiro. Para iniciar:\n\n• *Despesas* - registrar gastos (dinheiro, PIX, cartão)\n• *Reembolso* - solicitar ressarcimento pessoal\n• *Nova Conta* - registrar conta a pagar\n• *Transferência* - movimentar entre contas (depósito)",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -1480,6 +1571,523 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           text: `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}${msgObs}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ========== ESTADO: TRANSFERENCIA_AGUARDANDO_CONTA_ORIGEM ==========
+    if (estadoAtual === "TRANSFERENCIA_AGUARDANDO_CONTA_ORIGEM") {
+      const contasDisponiveis = ((metaDados as any).contas_disponiveis || []) as Array<{
+        id: string;
+        nome: string;
+        tipo: string;
+        banco: string | null;
+        cnpj_banco: string | null;
+      }>;
+      const mapeamentos = ((metaDados as any).mapeamentos_transferencia || []) as Array<{
+        conta_origem_id: string;
+        conta_destino_id: string;
+        nome_sugestao: string;
+      }>;
+
+      // Cancelamento
+      if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair/)) {
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: {
+              ...metaDados,
+              estado_atual: "FINALIZADO",
+              resultado: "CANCELADO_PELO_USUARIO",
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        return new Response(
+          JSON.stringify({
+            text: "❌ Transferência cancelada.\n\nDigite *Transferência* para iniciar novamente.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Recebimento de imagem = comprovante de depósito
+      if (tipo === "image" || tipo === "document") {
+        if (!url_anexo) {
+          return new Response(
+            JSON.stringify({ text: "Erro: Anexo sem URL." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Persistir anexo
+        const anexoResult = await persistirAnexo(supabase, url_anexo, sessao.id, whatsappToken);
+        if (!anexoResult) {
+          return new Response(
+            JSON.stringify({ text: "⚠️ Erro ao salvar comprovante. Tente novamente." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Processar OCR para extrair dados do depósito
+        let dadosDeposito: { valor: number; banco?: string; cnpj?: string; data?: string; descricao?: string } | null = null;
+        try {
+          const fileResponse = await fetch(anexoResult.signedUrl);
+          if (fileResponse.ok) {
+            const fileBuffer = await fileResponse.arrayBuffer();
+            const uint8Arr = new Uint8Array(fileBuffer);
+            
+            let base64 = '';
+            const chunkSize = 0x8000;
+            for (let i = 0; i < uint8Arr.length; i += chunkSize) {
+              const chunk = uint8Arr.subarray(i, Math.min(i + chunkSize, uint8Arr.length));
+              base64 += String.fromCharCode.apply(null, Array.from(chunk));
+            }
+            base64 = btoa(base64);
+
+            const mimeType = anexoResult.isPdf ? "application/pdf" : anexoResult.contentType;
+            const ocrResult = await processarNotaFiscal(supabaseUrl, supabaseKey, base64, mimeType, igrejaId);
+            
+            if (ocrResult) {
+              dadosDeposito = {
+                valor: ocrResult.valor || 0,
+                banco: ocrResult.fornecedor || undefined,
+                descricao: ocrResult.descricao || undefined,
+                data: ocrResult.data_emissao || undefined,
+              };
+            }
+          }
+        } catch (e) {
+          console.error("[OCR Deposito] Erro:", e);
+        }
+
+        // Tentar detectar conta destino pelo banco
+        let contaDestinoSugerida: typeof contasDisponiveis[0] | undefined;
+        if (dadosDeposito?.banco) {
+          const bancoNome = dadosDeposito.banco.toLowerCase();
+          contaDestinoSugerida = contasDisponiveis.find(c => 
+            c.banco?.toLowerCase().includes(bancoNome) || 
+            c.nome.toLowerCase().includes(bancoNome)
+          );
+        }
+
+        // Buscar sugestão de origem via mapeamentos
+        let contaOrigemSugerida: typeof contasDisponiveis[0] | undefined;
+        if (contaDestinoSugerida) {
+          const mapeamentoMatch = mapeamentos.find(m => m.conta_destino_id === contaDestinoSugerida!.id);
+          if (mapeamentoMatch) {
+            contaOrigemSugerida = contasDisponiveis.find(c => c.id === mapeamentoMatch.conta_origem_id);
+          }
+        }
+
+        // Se encontrou sugestões completas, ir direto para confirmação
+        if (dadosDeposito?.valor && contaOrigemSugerida && contaDestinoSugerida) {
+          await supabase
+            .from("atendimentos_bot")
+            .update({
+              meta_dados: {
+                ...metaDados,
+                estado_atual: "TRANSFERENCIA_AGUARDANDO_CONFIRMACAO",
+                transferencia: {
+                  valor: dadosDeposito.valor,
+                  banco_destino: contaDestinoSugerida.banco,
+                  cnpj_banco: contaDestinoSugerida.cnpj_banco,
+                  data_deposito: dadosDeposito.data,
+                  conta_origem_sugerida_id: contaOrigemSugerida.id,
+                  conta_destino_sugerida_id: contaDestinoSugerida.id,
+                  descricao: dadosDeposito.descricao,
+                },
+                conta_origem_id: contaOrigemSugerida.id,
+                conta_destino_id: contaDestinoSugerida.id,
+                anexo_comprovante: anexoResult.signedUrl,
+                valor_total_acumulado: dadosDeposito.valor,
+              },
+            })
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
+
+          return new Response(
+            JSON.stringify({
+              text: `📸 *Depósito detectado!*\n\n💰 Valor: ${formatarValor(dadosDeposito.valor)}\n🏦 Destino: ${contaDestinoSugerida.nome}\n💵 Origem: ${contaOrigemSugerida.nome}\n${dadosDeposito.data ? `📅 Data: ${dadosDeposito.data}` : ""}\n\n✅ *Confirmar transferência?*\n\nDigite *Sim* para confirmar ou *Não* para corrigir.`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Se detectou parcialmente, pedir confirmação manual
+        const listaContas = contasDisponiveis
+          .map((c, i) => `${i + 1}️⃣ ${c.nome}${c.banco ? ` (${c.banco})` : ""}`)
+          .join("\n");
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: {
+              ...metaDados,
+              anexo_comprovante: anexoResult.signedUrl,
+              transferencia: {
+                ...metaDados.transferencia,
+                valor: dadosDeposito?.valor || 0,
+                banco_destino: dadosDeposito?.banco || null,
+                data_deposito: dadosDeposito?.data || null,
+                descricao: dadosDeposito?.descricao || null,
+              },
+              valor_total_acumulado: dadosDeposito?.valor || 0,
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        let resposta = `📸 Comprovante recebido!\n`;
+        if (dadosDeposito?.valor) {
+          resposta += `💰 Valor detectado: ${formatarValor(dadosDeposito.valor)}\n`;
+        }
+        if (dadosDeposito?.banco) {
+          resposta += `🏦 Banco detectado: ${dadosDeposito.banco}\n`;
+        }
+        resposta += `\n💵 *De qual conta está saindo o dinheiro?*\n\n${listaContas}\n\nDigite o número.`;
+
+        return new Response(
+          JSON.stringify({ text: resposta }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Seleção manual de conta origem por número
+      const escolha = parseInt((mensagem || "").trim());
+      if (!isNaN(escolha) && escolha >= 1 && escolha <= contasDisponiveis.length) {
+        const contaOrigem = contasDisponiveis[escolha - 1];
+
+        // Listar outras contas como destino (excluindo a origem)
+        const contasDestino = contasDisponiveis.filter(c => c.id !== contaOrigem.id);
+        const listaDestino = contasDestino
+          .map((c, i) => `${i + 1}️⃣ ${c.nome}${c.banco ? ` (${c.banco})` : ""}`)
+          .join("\n");
+
+        // Verificar se já tem valor detectado via OCR
+        const valorDetectado = metaDados.transferencia?.valor || 0;
+        
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: {
+              ...metaDados,
+              conta_origem_id: contaOrigem.id,
+              estado_atual: "TRANSFERENCIA_AGUARDANDO_CONFIRMACAO",
+              contas_destino_disponiveis: contasDestino,
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        let resposta = `✅ Origem: *${contaOrigem.nome}*\n`;
+        if (valorDetectado > 0) {
+          resposta += `💰 Valor: ${formatarValor(valorDetectado)}\n`;
+        }
+        resposta += `\n🏦 *Para qual conta vai o dinheiro?*\n\n${listaDestino}\n\nDigite o número da conta destino.`;
+
+        return new Response(
+          JSON.stringify({ text: resposta }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          text: "⚠️ Opção inválida.\n\nEnvie o comprovante de depósito ou digite o número da conta de origem.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ========== ESTADO: TRANSFERENCIA_AGUARDANDO_CONFIRMACAO ==========
+    if (estadoAtual === "TRANSFERENCIA_AGUARDANDO_CONFIRMACAO") {
+      const contasDisponiveis = ((metaDados as any).contas_disponiveis || []) as Array<{
+        id: string;
+        nome: string;
+        tipo: string;
+        banco: string | null;
+        cnpj_banco: string | null;
+      }>;
+      const contasDestinoDisponiveis = ((metaDados as any).contas_destino_disponiveis || []) as typeof contasDisponiveis;
+
+      // Cancelamento
+      if (mensagem && mensagem.toLowerCase().match(/cancelar|desistir|sair|não|nao/)) {
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: {
+              ...metaDados,
+              estado_atual: "FINALIZADO",
+              resultado: "CANCELADO_PELO_USUARIO",
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        return new Response(
+          JSON.stringify({
+            text: "❌ Transferência cancelada.\n\nDigite *Transferência* para iniciar novamente.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Se ainda não tem conta destino, processar seleção
+      if (!metaDados.conta_destino_id && contasDestinoDisponiveis.length > 0) {
+        const escolha = parseInt((mensagem || "").trim());
+        if (!isNaN(escolha) && escolha >= 1 && escolha <= contasDestinoDisponiveis.length) {
+          const contaDestino = contasDestinoDisponiveis[escolha - 1];
+          
+          // Atualizar com conta destino
+          await supabase
+            .from("atendimentos_bot")
+            .update({
+              meta_dados: {
+                ...metaDados,
+                conta_destino_id: contaDestino.id,
+              },
+            })
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
+
+          // Buscar nome da conta origem
+          const contaOrigem = contasDisponiveis.find(c => c.id === metaDados.conta_origem_id);
+          const valorTransferencia = metaDados.transferencia?.valor || metaDados.valor_total_acumulado || 0;
+
+          // Se já tem valor, pedir confirmação
+          if (valorTransferencia > 0) {
+            return new Response(
+              JSON.stringify({
+                text: `📋 *Resumo da Transferência:*\n\n💵 De: ${contaOrigem?.nome || "N/A"}\n🏦 Para: ${contaDestino.nome}\n💰 Valor: ${formatarValor(valorTransferencia)}\n\n✅ *Confirmar?*\n\nDigite *Sim* para confirmar.`,
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Se não tem valor, pedir
+          return new Response(
+            JSON.stringify({
+              text: `✅ Destino: *${contaDestino.nome}*\n\n💰 *Qual o valor da transferência?*\n\nDigite apenas o número (ex: 1500.00)`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      // Se já tem as contas mas precisa do valor
+      if (metaDados.conta_origem_id && metaDados.conta_destino_id && (!metaDados.transferencia?.valor || metaDados.transferencia.valor === 0)) {
+        const valorStr = (mensagem || "").replace(/[^\d.,]/g, "").replace(",", ".");
+        const valorNum = parseFloat(valorStr);
+        
+        if (!isNaN(valorNum) && valorNum > 0) {
+          // Atualizar com valor
+          const contaOrigem = contasDisponiveis.find(c => c.id === metaDados.conta_origem_id);
+          const contaDestino = contasDisponiveis.find(c => c.id === metaDados.conta_destino_id);
+
+          await supabase
+            .from("atendimentos_bot")
+            .update({
+              meta_dados: {
+                ...metaDados,
+                transferencia: {
+                  ...metaDados.transferencia,
+                  valor: valorNum,
+                },
+                valor_total_acumulado: valorNum,
+              },
+            })
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
+
+          return new Response(
+            JSON.stringify({
+              text: `📋 *Resumo da Transferência:*\n\n💵 De: ${contaOrigem?.nome || "N/A"}\n🏦 Para: ${contaDestino?.nome || "N/A"}\n💰 Valor: ${formatarValor(valorNum)}\n\n✅ *Confirmar?*\n\nDigite *Sim* para confirmar ou *Cancelar* para desistir.`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      // Confirmação final
+      if (mensagem && mensagem.toLowerCase().match(/sim|confirma|ok|s$/)) {
+        const valorFinal = metaDados.transferencia?.valor || metaDados.valor_total_acumulado || 0;
+        
+        if (valorFinal <= 0) {
+          return new Response(
+            JSON.stringify({ text: "⚠️ Valor inválido. Informe o valor da transferência." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!metaDados.conta_origem_id || !metaDados.conta_destino_id) {
+          return new Response(
+            JSON.stringify({ text: "⚠️ Contas não definidas. Reinicie o processo." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Buscar categoria "Transferência entre Contas"
+        const { data: categoriaTransferencia } = await supabase
+          .from("categorias_financeiras")
+          .select("id")
+          .eq("nome", "Transferência entre Contas")
+          .eq("igreja_id", igrejaId)
+          .maybeSingle();
+
+        const categoriaId = categoriaTransferencia?.id || null;
+        const dataHoje = new Date().toISOString().split("T")[0];
+
+        // Criar registro de transferência
+        const { data: transferencia, error: transfError } = await supabase
+          .from("transferencias_contas")
+          .insert({
+            conta_origem_id: metaDados.conta_origem_id,
+            conta_destino_id: metaDados.conta_destino_id,
+            valor: valorFinal,
+            data_transferencia: dataHoje,
+            data_competencia: dataHoje,
+            observacoes: `Via WhatsApp por ${metaDados.nome_perfil}`,
+            anexo_url: metaDados.anexo_comprovante || null,
+            igreja_id: igrejaId,
+            filial_id: filialIdFromWhatsApp,
+            criado_por: metaDados.pessoa_id,
+            sessao_id: sessao.id,
+          })
+          .select("id")
+          .single();
+
+        if (transfError || !transferencia) {
+          console.error("[Transferencia] Erro ao criar:", transfError);
+          return new Response(
+            JSON.stringify({ text: "❌ Erro ao criar transferência. Tente novamente." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Criar transação de SAÍDA
+        const { data: txSaida } = await supabase
+          .from("transacoes_financeiras")
+          .insert({
+            descricao: `Transferência para conta destino`,
+            valor: valorFinal,
+            tipo: "saida",
+            tipo_lancamento: "unico",
+            data_vencimento: dataHoje,
+            data_competencia: dataHoje,
+            data_pagamento: dataHoje,
+            status: "pago",
+            conta_id: metaDados.conta_origem_id,
+            categoria_id: categoriaId,
+            transferencia_id: transferencia.id,
+            observacoes: `Transferência entre contas - Via WhatsApp`,
+            anexo_url: metaDados.anexo_comprovante || null,
+            igreja_id: igrejaId,
+            filial_id: filialIdFromWhatsApp,
+          })
+          .select("id")
+          .single();
+
+        // Criar transação de ENTRADA
+        const { data: txEntrada } = await supabase
+          .from("transacoes_financeiras")
+          .insert({
+            descricao: `Transferência de conta origem`,
+            valor: valorFinal,
+            tipo: "entrada",
+            tipo_lancamento: "unico",
+            data_vencimento: dataHoje,
+            data_competencia: dataHoje,
+            data_pagamento: dataHoje,
+            status: "pago",
+            conta_id: metaDados.conta_destino_id,
+            categoria_id: categoriaId,
+            transferencia_id: transferencia.id,
+            observacoes: `Transferência entre contas - Via WhatsApp`,
+            anexo_url: metaDados.anexo_comprovante || null,
+            igreja_id: igrejaId,
+            filial_id: filialIdFromWhatsApp,
+          })
+          .select("id")
+          .single();
+
+        // Atualizar transferência com os IDs das transações
+        if (txSaida && txEntrada) {
+          await supabase
+            .from("transferencias_contas")
+            .update({
+              transacao_saida_id: txSaida.id,
+              transacao_entrada_id: txEntrada.id,
+            })
+            .eq("id", transferencia.id);
+
+          // Atualizar saldos das contas manualmente
+          try {
+            const { data: contaOrigemData } = await supabase
+              .from("contas")
+              .select("saldo_atual")
+              .eq("id", metaDados.conta_origem_id)
+              .single();
+
+            if (contaOrigemData) {
+              await supabase
+                .from("contas")
+                .update({ saldo_atual: contaOrigemData.saldo_atual - valorFinal })
+                .eq("id", metaDados.conta_origem_id);
+            }
+
+            const { data: contaDestinoData } = await supabase
+              .from("contas")
+              .select("saldo_atual")
+              .eq("id", metaDados.conta_destino_id)
+              .single();
+
+            if (contaDestinoData) {
+              await supabase
+                .from("contas")
+                .update({ saldo_atual: contaDestinoData.saldo_atual + valorFinal })
+                .eq("id", metaDados.conta_destino_id);
+            }
+          } catch (saldoErr) {
+            console.error("[Transferencia] Erro ao atualizar saldos:", saldoErr);
+          }
+        }
+
+        // Encerrar sessão
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: {
+              ...metaDados,
+              estado_atual: "FINALIZADO",
+              resultado: "TRANSFERENCIA_CRIADA",
+              transferencia_id: transferencia.id,
+              transacao_saida_id: txSaida?.id,
+              transacao_entrada_id: txEntrada?.id,
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        const contaOrigem = contasDisponiveis.find(c => c.id === metaDados.conta_origem_id);
+        const contaDestino = contasDisponiveis.find(c => c.id === metaDados.conta_destino_id);
+
+        return new Response(
+          JSON.stringify({
+            text: `✅ *Transferência Realizada!*\n\n💵 De: ${contaOrigem?.nome || "N/A"}\n🏦 Para: ${contaDestino?.nome || "N/A"}\n💰 Valor: ${formatarValor(valorFinal)}\n\n🔖 Protocolo: #${transferencia.id.slice(0, 8).toUpperCase()}\n\nSaldos atualizados automaticamente.`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          text: "⚠️ Não entendi. Digite *Sim* para confirmar ou *Cancelar* para desistir.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

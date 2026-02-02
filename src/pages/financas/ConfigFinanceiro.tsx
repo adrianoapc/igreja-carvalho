@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,13 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Trash2, ArrowRight } from "lucide-react";
+
+type MapeamentoTransferencia = {
+  conta_origem_id: string;
+  conta_destino_id: string;
+  nome_sugestao: string;
+};
 
 type FinanceiroConfig = {
   id?: string;
@@ -36,6 +43,7 @@ type FinanceiroConfig = {
   tipos_permitidos_fisico?: string[] | null;
   tipos_permitidos_digital?: string[] | null;
   valor_zero_policy?: string | null;
+  mapeamentos_transferencia?: MapeamentoTransferencia[] | null;
 };
 
 export default function ConfigFinanceiro() {
@@ -55,6 +63,7 @@ export default function ConfigFinanceiro() {
   const [valorZeroPolicy, setValorZeroPolicy] = useState<string>(
     "allow-zero-with-confirmation"
   );
+  const [mapeamentos, setMapeamentos] = useState<MapeamentoTransferencia[]>([]);
 
   const { data: cfg } = useQuery({
     queryKey: ["financeiro-config", igrejaId, filialId, isAllFiliais],
@@ -116,6 +125,24 @@ export default function ConfigFinanceiro() {
     enabled: !!igrejaId && !authLoading,
   });
 
+  // Contas para mapeamentos de transferência
+  const { data: contasAtivas } = useQuery({
+    queryKey: ["contas-transferencia-config", igrejaId, filialId, isAllFiliais],
+    queryFn: async () => {
+      if (!igrejaId) return [] as { id: string; nome: string; banco: string | null }[];
+      let q = supabase
+        .from("contas")
+        .select("id, nome, banco")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
+        .order("nome");
+      if (!isAllFiliais && filialId) q = q.eq("filial_id", filialId);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!igrejaId && !authLoading,
+  });
+
   useEffect(() => {
     if (!igrejaId) return;
     if (cfg) {
@@ -158,6 +185,13 @@ export default function ConfigFinanceiro() {
       setValorZeroPolicy(
         cfg.valor_zero_policy || "allow-zero-with-confirmation"
       );
+      // Carregar mapeamentos de transferência (tipo JSONB)
+      const mapeamentosData = (cfg as any).mapeamentos_transferencia;
+      if (Array.isArray(mapeamentosData)) {
+        setMapeamentos(mapeamentosData);
+      } else {
+        setMapeamentos([]);
+      }
     } else {
       setForm({
         igreja_id: igrejaId,
@@ -177,6 +211,7 @@ export default function ConfigFinanceiro() {
         tipos_permitidos_fisico: [],
         tipos_permitidos_digital: [],
         valor_zero_policy: "allow-zero-with-confirmation",
+        mapeamentos_transferencia: [],
       });
       setPeriodosText("Manhã,Noite");
       setSelFormasFisicas([]);
@@ -184,6 +219,7 @@ export default function ConfigFinanceiro() {
       setSelTiposFisico([]);
       setSelTiposDigital([]);
       setValorZeroPolicy("allow-zero-with-confirmation");
+      setMapeamentos([]);
     }
   }, [cfg, igrejaId, filialId, isAllFiliais]);
 
@@ -218,6 +254,7 @@ export default function ConfigFinanceiro() {
             tipos_permitidos_fisico: selTiposFisico,
             tipos_permitidos_digital: selTiposDigital,
             valor_zero_policy: valorZeroPolicy,
+            mapeamentos_transferencia: mapeamentos,
           })
           .eq("id", form.id)
           .eq("igreja_id", igrejaId);
@@ -238,6 +275,7 @@ export default function ConfigFinanceiro() {
             tipos_permitidos_fisico: selTiposFisico,
             tipos_permitidos_digital: selTiposDigital,
             valor_zero_policy: valorZeroPolicy,
+            mapeamentos_transferencia: mapeamentos,
           },
           { onConflict: "igreja_id,filial_id" }
         );
@@ -536,6 +574,102 @@ export default function ConfigFinanceiro() {
               className="bg-gradient-primary"
             >
               {saving ? "Salvando..." : "Salvar Parâmetros"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mapeamentos de Transferência (Fase 3) */}
+      <Card className="shadow-soft">
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg">Mapeamentos de Transferência (Chatbot)</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Configure sugestões automáticas para o chatbot financeiro. Quando um depósito for detectado na conta destino, o bot sugerirá a conta origem configurada.
+          </p>
+          
+          {mapeamentos.map((m, idx) => (
+            <div key={idx} className="flex items-center gap-2 p-3 border rounded bg-muted/30">
+              <Select
+                value={m.conta_origem_id}
+                onValueChange={(v) => {
+                  const updated = [...mapeamentos];
+                  updated[idx] = { ...m, conta_origem_id: v };
+                  setMapeamentos(updated);
+                }}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Conta Origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(contasAtivas || []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome} {c.banco ? `(${c.banco})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              
+              <Select
+                value={m.conta_destino_id}
+                onValueChange={(v) => {
+                  const updated = [...mapeamentos];
+                  updated[idx] = { ...m, conta_destino_id: v };
+                  setMapeamentos(updated);
+                }}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Conta Destino" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(contasAtivas || []).filter(c => c.id !== m.conta_origem_id).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome} {c.banco ? `(${c.banco})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Input
+                placeholder="Nome sugestão"
+                value={m.nome_sugestao}
+                onChange={(e) => {
+                  const updated = [...mapeamentos];
+                  updated[idx] = { ...m, nome_sugestao: e.target.value };
+                  setMapeamentos(updated);
+                }}
+                className="w-40"
+              />
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMapeamentos(mapeamentos.filter((_, i) => i !== idx))}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          ))}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMapeamentos([...mapeamentos, { conta_origem_id: "", conta_destino_id: "", nome_sugestao: "" }])}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Mapeamento
+          </Button>
+
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-gradient-primary"
+            >
+              {saving ? "Salvando..." : "Salvar Configurações"}
             </Button>
           </div>
         </CardContent>
