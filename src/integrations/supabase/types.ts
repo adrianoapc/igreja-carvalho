@@ -2876,6 +2876,7 @@ export type Database = {
           integracao_banco_enabled: boolean
           integracao_gateway_enabled: boolean
           integracao_pix_enabled: boolean
+          mapeamentos_transferencia: Json | null
           mapping_default_conta_por_forma: Json
           periodos: string[] | null
           sync_strategy: string
@@ -2899,6 +2900,7 @@ export type Database = {
           integracao_banco_enabled?: boolean
           integracao_gateway_enabled?: boolean
           integracao_pix_enabled?: boolean
+          mapeamentos_transferencia?: Json | null
           mapping_default_conta_por_forma?: Json
           periodos?: string[] | null
           sync_strategy?: string
@@ -2922,6 +2924,7 @@ export type Database = {
           integracao_banco_enabled?: boolean
           integracao_gateway_enabled?: boolean
           integracao_pix_enabled?: boolean
+          mapeamentos_transferencia?: Json | null
           mapping_default_conta_por_forma?: Json
           periodos?: string[] | null
           sync_strategy?: string
@@ -7646,6 +7649,7 @@ export type Database = {
           tipo: string
           tipo_lancamento: string
           total_parcelas: number | null
+          transferencia_id: string | null
           updated_at: string
           valor: number
           valor_liquido: number | null
@@ -7685,6 +7689,7 @@ export type Database = {
           tipo: string
           tipo_lancamento: string
           total_parcelas?: number | null
+          transferencia_id?: string | null
           updated_at?: string
           valor: number
           valor_liquido?: number | null
@@ -7724,6 +7729,7 @@ export type Database = {
           tipo?: string
           tipo_lancamento?: string
           total_parcelas?: number | null
+          transferencia_id?: string | null
           updated_at?: string
           valor?: number
           valor_liquido?: number | null
@@ -7833,6 +7839,137 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "subcategorias_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_transferencia_id_fkey"
+            columns: ["transferencia_id"]
+            isOneToOne: false
+            referencedRelation: "transferencias_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transferencias_contas: {
+        Row: {
+          anexo_url: string | null
+          conta_destino_id: string
+          conta_origem_id: string
+          created_at: string
+          criado_por: string | null
+          data_competencia: string
+          data_transferencia: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          observacoes: string | null
+          sessao_id: string | null
+          status: string
+          transacao_entrada_id: string | null
+          transacao_saida_id: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          anexo_url?: string | null
+          conta_destino_id: string
+          conta_origem_id: string
+          created_at?: string
+          criado_por?: string | null
+          data_competencia?: string
+          data_transferencia?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          observacoes?: string | null
+          sessao_id?: string | null
+          status?: string
+          transacao_entrada_id?: string | null
+          transacao_saida_id?: string | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          anexo_url?: string | null
+          conta_destino_id?: string
+          conta_origem_id?: string
+          created_at?: string
+          criado_por?: string | null
+          data_competencia?: string
+          data_transferencia?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          observacoes?: string | null
+          sessao_id?: string | null
+          status?: string
+          transacao_entrada_id?: string | null
+          transacao_saida_id?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transferencias_contas_conta_destino_id_fkey"
+            columns: ["conta_destino_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_conta_origem_id_fkey"
+            columns: ["conta_origem_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos_bot"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
+            columns: ["transacao_entrada_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
+            columns: ["transacao_entrada_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
+            columns: ["transacao_saida_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
+            columns: ["transacao_saida_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
           },
         ]
       }

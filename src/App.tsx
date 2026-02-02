@@ -178,6 +178,7 @@ const FinancasDashboardOfertas = lazy(
 const FinancasProjecao = lazy(() => import("./pages/financas/Projecao"));
 const FinancasInsights = lazy(() => import("./pages/financas/Insights"));
 const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
+const FinancasTransferencias = lazy(() => import("./pages/financas/Transferencias"));
 
 // Projetos
 const Projetos = lazy(() => import("./pages/Projetos"));
@@ -948,6 +949,14 @@ const App = () => (
                     element={
                       <AuthGate>
                         <FinancasReembolsos />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/financas/transferencias"
+                    element={
+                      <AuthGate>
+                        <FinancasTransferencias />
                       </AuthGate>
                     }
                   />

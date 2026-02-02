@@ -16,6 +16,7 @@ import {
   TestTube2,
   Loader2,
   FileText,
+  ArrowRightLeft,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ import { toast } from "sonner";
 import { ContaDialog } from "@/components/financas/ContaDialog";
 import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
 import { ExtratoPreviewDialog } from "@/components/financas/ExtratoPreviewDialog";
+import { TransferenciaDialog } from "@/components/financas/TransferenciaDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -55,6 +57,7 @@ export default function Contas() {
   } | null>(null);
   const [testingContaId, setTestingContaId] = useState<string | null>(null);
   const [extratoDialogOpen, setExtratoDialogOpen] = useState(false);
+  const [transferenciaDialogOpen, setTransferenciaDialogOpen] = useState(false);
   const [extratoContaData, setExtratoContaData] = useState<{
     id: string;
     nome: string;
@@ -416,19 +419,39 @@ export default function Contas() {
           <HideValuesToggle />
         </div>
 
-        {/* Lado Direito: Novo */}
-        <Button
-          className="bg-gradient-primary shadow-soft whitespace-nowrap w-full md:w-auto"
-          onClick={() => {
-            setSelectedConta(null);
-            setContaDialogOpen(true);
-          }}
-          size="sm"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          <span className="hidden sm:inline text-xs">Nova Conta</span>
-          <span className="sm:hidden text-xs">Nova</span>
-        </Button>
+        {/* Lado Direito: Botões */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <Button
+            variant="outline"
+            onClick={() => setTransferenciaDialogOpen(true)}
+            size="sm"
+            className="flex-1 md:flex-none"
+          >
+            <ArrowRightLeft className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline text-xs">Transferir</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/financas/transferencias")}
+            size="sm"
+            className="flex-1 md:flex-none"
+          >
+            <List className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline text-xs">Histórico</span>
+          </Button>
+          <Button
+            className="bg-gradient-primary shadow-soft whitespace-nowrap flex-1 md:flex-none"
+            onClick={() => {
+              setSelectedConta(null);
+              setContaDialogOpen(true);
+            }}
+            size="sm"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline text-xs">Nova Conta</span>
+            <span className="sm:hidden text-xs">Nova</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filtro de Período Global */}
@@ -789,6 +812,11 @@ export default function Contas() {
           cnpjBanco={extratoContaData.cnpjBanco}
         />
       )}
+
+      <TransferenciaDialog
+        open={transferenciaDialogOpen}
+        onOpenChange={setTransferenciaDialogOpen}
+      />
     </div>
   );
 }
