@@ -1,62 +1,184 @@
 
-# Links Externos de Cadastro com Tokens Opacos
+# Transferência entre Contas — Proposta Técnica
 
-## Resumo
+## Resumo Executivo
 
-Implementar um sistema seguro de links externos de cadastro usando **tokens opacos** de 12 caracteres (ex: `/c/7Kx9mPqR2wYn`) que impedem enumeração e vazamento de dados, garantindo que cada cadastro seja corretamente vinculado a uma igreja e filial.
-
----
-
-## Problema Atual
-
-| Componente | Status | Problema |
-|------------|--------|----------|
-| `shortLinkUtils.ts` | Quebrado | Codificação base58 perde dados do UUID |
-| Rota `/s/:slug` | Inexistente | Nenhuma rota captura esses links |
-| `cadastro-publico` | Falho | Não persiste `igreja_id` nem `filial_id` |
-| Visitantes cadastrados | Órfãos | Ficam sem vínculo com igreja/filial |
+Implementar funcionalidade de transferência entre contas que:
+- **Cria duas transações vinculadas** (saída da origem + entrada no destino)
+- **Não impacta o DRE** (usa categoria existente "Transferência entre Contas")
+- **Funciona via UI e via Chatbot** (detecta comprovante de depósito)
+- **É configurável** para mapeamentos automáticos (ex: "Dinheiro Ofertas" → "Banco Santander")
 
 ---
 
-## Solução: Token Opaco
+## Modelo de Dados
 
-- Token aleatório de 12 caracteres (alfabeto sem ambíguos)
-- Armazenado na coluna `link_token` da tabela `filiais`
-- Gerado automaticamente via trigger ao criar filial
-- Impossível de adivinhar (~58^12 = 1.4×10^21 combinações)
+### Nova Tabela: `transferencias_contas`
 
-**Exemplo de URLs:**
-```
-https://app.../c/7Kx9mPqR2wYn
-https://app.../c/7Kx9mPqR2wYn?tipo=visitante
-https://app.../c/7Kx9mPqR2wYn?tipo=membro&aceitou=true
-```
+Centraliza a operação e vincula as duas transações geradas.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID | PK |
+| `conta_origem_id` | UUID FK | Conta de onde sai o dinheiro |
+| `conta_destino_id` | UUID FK | Conta para onde vai o dinheiro |
+| `valor` | NUMERIC | Valor transferido |
+| `data_transferencia` | DATE | Quando ocorreu |
+| `data_competencia` | DATE | Para relatórios (geralmente = data_transferencia) |
+| `transacao_saida_id` | UUID FK | Transação de saída gerada |
+| `transacao_entrada_id` | UUID FK | Transação de entrada gerada |
+| `observacoes` | TEXT | Comentário livre |
+| `anexo_url` | TEXT | Comprovante |
+| `igreja_id` | UUID FK | Multi-tenant |
+| `filial_id` | UUID FK | Escopo filial |
+| `criado_por` | UUID FK | Usuário ou bot que criou |
+| `sessao_id` | UUID FK | Se veio do chatbot |
+| `created_at` | TIMESTAMPTZ | Auditoria |
+
+### Alteração: `transacoes_financeiras`
+
+Adicionar coluna para identificar transações de transferência:
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `transferencia_id` | UUID FK | Referência à transferência que gerou esta transação |
+
+Isso permite:
+- Identificar rapidamente que a transação é parte de uma transferência
+- Evitar que ela apareça em relatórios de movimentação real
+- Facilitar estorno (cancelar ambas as pernas)
 
 ---
 
 ## Fluxo de Funcionamento
 
 ```text
-1. Admin acessa "Links Externos" em Pessoas
+1. Usuário inicia transferência
    ↓
-2. Sistema busca link_token da filial atual
+2. Seleciona: Conta Origem, Conta Destino, Valor, Data
    ↓
-3. Gera links: https://app.../c/{token}?tipo=visitante
+3. Sistema valida:
+   - Contas diferentes
+   - Saldo suficiente (opcional, configurável)
    ↓
-4. Admin compartilha link (WhatsApp, QR Code)
+4. Sistema cria registro em transferencias_contas
    ↓
-5. Visitante acessa link
+5. Sistema cria 2 transações vinculadas:
+   - SAÍDA: conta_origem, categoria="Transferência entre Contas", tipo="saida"
+   - ENTRADA: conta_destino, categoria="Transferência entre Contas", tipo="entrada"
    ↓
-6. ShortLinkRedirect.tsx busca filial pelo token
+6. Saldos das contas são atualizados (trigger ou update direto)
    ↓
-7. Redireciona para /cadastro/visitante?igreja_id=X&filial_id=Y
-   ↓
-8. Formulário captura IDs da URL
-   ↓
-9. Edge function salva visitante COM igreja_id e filial_id
-   ↓
-10. Visitante aparece na lista da filial correta!
+7. DRE não é afetado (secao_dre = "Não faz parte do DRE")
 ```
+
+---
+
+## Integração com Chatbot Financeiro
+
+### Novo Fluxo: `TRANSFERENCIA`
+
+Ativado quando:
+- Usuário envia palavra-chave: "transferência", "depósito", "deposito"
+- Ou IA detecta comprovante de depósito bancário (não nota fiscal)
+
+### Máquina de Estados
+
+```text
+AGUARDANDO_GATILHO
+  ↓ (usuário: "transferência" ou envia comprovante de depósito)
+AGUARDANDO_CONTA_ORIGEM
+  ↓ (usuário escolhe ou sistema sugere via OCR)
+AGUARDANDO_CONTA_DESTINO
+  ↓ (usuário escolhe ou sistema sugere via mapeamento)
+AGUARDANDO_CONFIRMACAO
+  ↓ (usuário confirma)
+FINALIZADO
+```
+
+### OCR para Comprovantes de Depósito
+
+O sistema detectaria:
+- Valor depositado
+- Conta destino (via CNPJ do banco ou nome)
+- Data
+
+E sugeriria automaticamente:
+- "Detectei depósito de R$ 5.000 no Santander em 02/02. Confirmar saída de qual conta?"
+
+### Mapeamentos Automáticos (Configurável)
+
+Nova tabela `transferencias_config` ou coluna em `financeiro_config`:
+
+```json
+{
+  "mapeamentos_transferencia": [
+    {
+      "conta_origem_id": "uuid-conta-dinheiro-ofertas",
+      "conta_destino_id": "uuid-conta-santander",
+      "nome_sugestao": "Oferta → Banco"
+    }
+  ]
+}
+```
+
+Quando o bot detecta depósito no Santander, já sugere "Dinheiro Ofertas" como origem.
+
+---
+
+## Interface UI
+
+### Opção 1: Botão "Transferir" na Tela de Contas
+
+Na listagem de contas, um botão "Transferir" que abre modal com:
+- Select: Conta Origem
+- Select: Conta Destino
+- Input: Valor
+- DatePicker: Data
+- Textarea: Observações
+- Upload: Comprovante (opcional)
+
+### Opção 2: Novo Tipo de Lançamento
+
+No `TransacaoDialog`, adicionar tipo: `"transferencia"` além de `"unico" | "recorrente" | "parcelado"`.
+
+Quando selecionado, mostra campos específicos de transferência.
+
+---
+
+## Tratamento no DRE
+
+A categoria "Transferência entre Contas" já existe com `secao_dre = "Não faz parte do DRE"`.
+
+A função `get_dre_anual` já filtra corretamente por `secao_dre`, então as transferências não aparecerão no DRE.
+
+Para garantia adicional, podemos:
+1. Verificar se a query do DRE exclui essa seção (já faz pelo JOIN)
+2. Adicionar flag `eh_transferencia` na transação (já teremos via `transferencia_id IS NOT NULL`)
+
+---
+
+## Relatórios
+
+### Novo Relatório: "Movimentações Internas"
+
+Mostra todas as transferências com:
+- Data
+- Conta Origem → Conta Destino
+- Valor
+- Quem fez
+- Status (executada, pendente, estornada)
+
+Isso separa claramente das movimentações operacionais.
+
+---
+
+## Estorno de Transferência
+
+- Usuário clica em "Estornar" na transferência
+- Sistema marca `status = 'estornado'`
+- Sistema estorna as duas transações vinculadas
+- Saldos são revertidos
 
 ---
 
@@ -64,182 +186,56 @@ https://app.../c/7Kx9mPqR2wYn?tipo=membro&aceitou=true
 
 | Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| **Migração SQL** | Criar | Adicionar `link_token` + trigger de geração automática |
-| `src/pages/cadastro/ShortLinkRedirect.tsx` | Criar | Resolver token e redirecionar |
-| `src/App.tsx` | Modificar | Adicionar rota `/c/:token` |
-| `src/pages/cadastro/Visitante.tsx` | Modificar | Ler `igreja_id`/`filial_id` da URL e passar para edge |
-| `src/pages/cadastro/Membro.tsx` | Modificar | Ler `igreja_id`/`filial_id` da URL e passar para edge |
-| `src/pages/cadastro/Index.tsx` | Modificar | Ler IDs da URL e propagar para subpáginas |
-| `supabase/functions/cadastro-publico/index.ts` | Modificar | Aceitar e persistir `igreja_id`/`filial_id` |
-| `src/components/pessoas/LinksExternosCard.tsx` | Modificar | Buscar `link_token` e gerar links com ele |
-| `src/lib/shortLinkUtils.ts` | Remover | Não mais necessário |
+| Migração SQL | Criar | Tabela `transferencias_contas`, coluna `transferencia_id` |
+| `chatbot-financeiro/index.ts` | Modificar | Adicionar fluxo TRANSFERENCIA |
+| `src/components/financas/TransferenciaDialog.tsx` | Criar | Modal de transferência |
+| `src/pages/financas/Transferencias.tsx` | Criar | Listagem de transferências |
+| `src/components/financas/ContasTab.tsx` | Modificar | Botão "Transferir" |
+| `financeiro_config` | Modificar | Mapeamentos de transferência |
 
 ---
 
-## Detalhes Técnicos
+## Segurança e Validações
 
-### 1. Migração SQL
-
-```sql
--- Adicionar coluna para token de link público
-ALTER TABLE filiais ADD COLUMN link_token TEXT UNIQUE;
-
--- Função para gerar token seguro (exclui caracteres ambíguos: 0, O, I, l, 1)
-CREATE OR REPLACE FUNCTION generate_secure_token(length INT DEFAULT 12)
-RETURNS TEXT AS $$
-DECLARE
-  chars TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  result TEXT := '';
-BEGIN
-  FOR i IN 1..length LOOP
-    result := result || substr(chars, floor(random() * length(chars) + 1)::int, 1);
-  END LOOP;
-  RETURN result;
-END;
-$$ LANGUAGE plpgsql;
-
--- Trigger para auto-gerar token em novas filiais
-CREATE OR REPLACE FUNCTION set_filial_link_token()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.link_token IS NULL THEN
-    LOOP
-      NEW.link_token := generate_secure_token(12);
-      EXIT WHEN NOT EXISTS (SELECT 1 FROM filiais WHERE link_token = NEW.link_token);
-    END LOOP;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER filiais_set_link_token
-BEFORE INSERT ON filiais
-FOR EACH ROW
-EXECUTE FUNCTION set_filial_link_token();
-
--- Gerar tokens para filiais existentes
-UPDATE filiais 
-SET link_token = generate_secure_token(12) 
-WHERE link_token IS NULL;
-```
-
-### 2. ShortLinkRedirect.tsx (Nova Página)
-
-```tsx
-// src/pages/cadastro/ShortLinkRedirect.tsx
-export default function ShortLinkRedirect() {
-  const { token } = useParams();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    async function resolveToken() {
-      const { data: filial } = await supabase
-        .from('filiais')
-        .select('id, igreja_id')
-        .eq('link_token', token)
-        .single();
-
-      if (!filial) {
-        setError(true);
-        return;
-      }
-
-      // Determinar destino baseado no tipo
-      const tipo = searchParams.get('tipo') || 'visitante';
-      const aceitou = searchParams.get('aceitou');
-
-      const params = new URLSearchParams();
-      params.set('igreja_id', filial.igreja_id);
-      params.set('filial_id', filial.id);
-      if (aceitou) params.set('aceitou', aceitou);
-
-      let path = '/cadastro';
-      if (tipo === 'visitante') path = '/cadastro/visitante';
-      else if (tipo === 'membro') path = '/cadastro/membro';
-
-      navigate(`${path}?${params.toString()}`, { replace: true });
-    }
-
-    resolveToken();
-  }, [token]);
-
-  if (error) {
-    return <div>Link inválido ou expirado</div>;
-  }
-
-  return <Loader2 className="animate-spin" />;
-}
-```
-
-### 3. Modificações no cadastro-publico Edge Function
-
-Adicionar campos `igreja_id` e `filial_id` na inserção de visitantes:
-
-```typescript
-// Na interface CadastroVisitanteData
-interface CadastroVisitanteData {
-  // ... campos existentes ...
-  igreja_id?: string;  // NOVO
-  filial_id?: string;  // NOVO
-}
-
-// Na inserção
-const { data: newData, error: insertError } = await supabase
-  .from('profiles')
-  .insert({
-    // ... campos existentes ...
-    igreja_id: visitanteData.igreja_id || null,
-    filial_id: visitanteData.filial_id || null,
-  })
-```
-
-### 4. LinksExternosCard Atualizado
-
-```tsx
-// Buscar link_token da filial atual
-const { data: filial } = useQuery({
-  queryKey: ['filial-link-token', filialId],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from('filiais')
-      .select('link_token')
-      .eq('id', filialId)
-      .single();
-    return data;
-  },
-  enabled: !!filialId && !isAllFiliais
-});
-
-// Gerar links usando o token
-const links = [
-  {
-    title: "Link para Visitantes",
-    url: `${baseUrl}/c/${filial?.link_token}?tipo=visitante`,
-  },
-  // ...
-];
-```
-
----
-
-## Segurança
-
-| Aspecto | Proteção |
-|---------|----------|
-| Adivinhação de token | Impossível (58^12 combinações) |
-| Enumeração de igrejas | Impossível (tokens aleatórios) |
-| Rate limiting | Já implementado (10 req/min) |
-| IP blocking | Já implementado |
-| Dados expostos | Apenas nome retornado (mínimo necessário) |
+| Validação | Descrição |
+|-----------|-----------|
+| Contas diferentes | Não permite transferir para mesma conta |
+| Valor positivo | Valor deve ser > 0 |
+| Contas ativas | Ambas devem estar ativas |
+| Permissão | Apenas tesoureiros e admins |
+| Multi-tenant | RLS por `igreja_id` |
 
 ---
 
 ## Resultado Esperado
 
-- Links de cadastro funcionais e seguros
-- Visitantes corretamente vinculados à igreja/filial de origem
-- URLs curtas e amigáveis para QR Codes
-- Impossível descobrir links de outras igrejas
-- Compatível com fluxo multi-tenant existente
+- Transferências não poluem DRE
+- Fácil rastrear movimentações internas
+- Bot detecta depósitos e sugere transferência
+- Mapeamentos configuráveis reduzem trabalho manual
+- Saldos das contas sempre corretos
+- Auditoria completa (quem, quando, de onde, para onde)
+
+---
+
+## Alternativas Consideradas
+
+### Usar Apenas Duas Transações Manuais
+- Problema: Sem vínculo, difícil rastrear como par
+- Decisão: Rejeitada por falta de integridade
+
+### Usar Campo `transferencia_relacionada_id` em Transações
+- Problema: Não centraliza metadados (observações, quem fez)
+- Decisão: Tabela dedicada é mais limpa
+
+### Não Criar Transações, Apenas Atualizar Saldos
+- Problema: Perde histórico e auditoria
+- Decisão: Transações são necessárias para rastreabilidade
+
+---
+
+## Prioridade de Implementação
+
+1. **Fase 1**: Migração SQL + UI básica (modal de transferência)
+2. **Fase 2**: Integração com chatbot (detecção de depósito)
+3. **Fase 3**: Mapeamentos automáticos e sugestões inteligentes
