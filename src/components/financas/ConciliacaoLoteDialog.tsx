@@ -53,13 +53,22 @@ export function ConciliacaoLoteDialog({
 }: ConciliacaoLoteDialogProps) {
   const { formatValue } = useHideValues();
   
-  // Date range state - default to ±3 days from transaction
+  // Date range state - default to ±3 days from transaction (with null guard)
+  const defaultDate = transacao?.data_pagamento 
+    ? parseISO(transacao.data_pagamento) 
+    : new Date();
+  
   const [dataInicio, setDataInicio] = useState(
-    format(subDays(parseISO(transacao.data_pagamento), 3), "yyyy-MM-dd")
+    format(subDays(defaultDate, 3), "yyyy-MM-dd")
   );
   const [dataFim, setDataFim] = useState(
-    format(addDays(parseISO(transacao.data_pagamento), 3), "yyyy-MM-dd")
+    format(addDays(defaultDate, 3), "yyyy-MM-dd")
   );
+
+  // Early return if no transaction
+  if (!transacao) {
+    return null;
+  }
 
   const {
     extratosDisponiveis,
