@@ -13,12 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { MonthPicker } from "./MonthPicker";
 import {
   Pagination,
   PaginationContent,
@@ -34,7 +29,6 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Search,
-  CalendarIcon,
   Link2,
   Link2Off,
   Eye,
@@ -85,8 +79,8 @@ export function HistoricoExtratos() {
   const [statusFiltro, setStatusFiltro] = useState<string>("all");
   const [tipoFiltro, setTipoFiltro] = useState<string>("all");
   const [origemFiltro, setOrigemFiltro] = useState<string>("all");
-  const [dataInicio, setDataInicio] = useState<Date | undefined>();
-  const [dataFim, setDataFim] = useState<Date | undefined>();
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,8 +120,21 @@ export function HistoricoExtratos() {
 
   // Fetch all extratos
   const { data: extratos = [], isLoading } = useQuery({
-    queryKey: ["extratos-historico", igrejaId, filialId, contaSelecionada, dataInicio, dataFim],
+    queryKey: ["extratos-historico", igrejaId, filialId, contaSelecionada, selectedMonth, customRange],
     queryFn: async () => {
+      // Calcular datas baseado no MonthPicker
+      let dataInicio: Date;
+      let dataFim: Date;
+      
+      if (customRange) {
+        dataInicio = customRange.from;
+        dataFim = customRange.to;
+      } else {
+        // Mês selecionado: primeiro e último dia
+        dataInicio = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+        dataFim = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+      }
+      
       let query = supabase
         .from("extratos_bancarios")
         .select(`
@@ -154,13 +161,8 @@ export function HistoricoExtratos() {
         query = query.eq("conta_id", contaSelecionada);
       }
 
-      if (dataInicio) {
-        query = query.gte("data_transacao", formatLocalDate(dataInicio));
-      }
-
-      if (dataFim) {
-        query = query.lte("data_transacao", formatLocalDate(dataFim));
-      }
+      query = query.gte("data_transacao", formatLocalDate(dataInicio));
+      query = query.lte("data_transacao", formatLocalDate(dataFim));
 
       const { data, error } = await query;
       if (error) throw error;
@@ -243,7 +245,7 @@ export function HistoricoExtratos() {
   // Reset page when filters change
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFiltro, tipoFiltro, origemFiltro, contaSelecionada, dataInicio, dataFim]);
+  }, [searchTerm, statusFiltro, tipoFiltro, origemFiltro, contaSelecionada, selectedMonth, customRange]);
 
   // Pagination
   const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
@@ -610,68 +612,12 @@ export function HistoricoExtratos() {
               </SelectContent>
             </Select>
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-[140px] justify-start text-left font-normal",
-                    !dataInicio && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dataInicio ? format(dataInicio, "dd/MM/yyyy", { locale: ptBR }) : "Data início"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dataInicio}
-                  onSelect={setDataInicio}
-                  locale={ptBR}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-[140px] justify-start text-left font-normal",
-                    !dataFim && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dataFim ? format(dataFim, "dd/MM/yyyy", { locale: ptBR }) : "Data fim"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dataFim}
-                  onSelect={setDataFim}
-                  locale={ptBR}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-
-            {(dataInicio || dataFim) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setDataInicio(undefined);
-                  setDataFim(undefined);
-                }}
-              >
-                Limpar datas
-              </Button>
-            )}
+            <MonthPicker
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+            />
 
             {/* Grouping selector */}
             <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByOption)}>
