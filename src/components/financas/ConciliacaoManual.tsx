@@ -32,6 +32,7 @@ import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 import { ConciliacaoLoteDialog } from "./ConciliacaoLoteDialog";
+import { DividirExtratoDialog } from "./DividirExtratoDialog";
 import { ResultadoReconciliacaoDialog, MatchResult } from "./ResultadoReconciliacaoDialog";
 import { anonymizePixDescription } from "@/utils/anonymization";
 import {
@@ -45,6 +46,7 @@ import {
   Layers,
   FileText,
   ArrowRightLeft,
+  Split,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 15;
@@ -96,6 +98,7 @@ export function ConciliacaoManual() {
   const [origemFiltro, setOrigemFiltro] = useState<string>("all");
   const [selectedExtrato, setSelectedExtrato] = useState<ExtratoItem | null>(null);
   const [vincularDialogOpen, setVincularDialogOpen] = useState(false);
+  const [dividirDialogOpen, setDividirDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Transacao tab state
@@ -212,6 +215,40 @@ export function ConciliacaoManual() {
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
+  // Fetch transaction IDs that are already reconciled (via any method)
+  const { data: transacoesJaVinculadas } = useQuery({
+    queryKey: ["transacoes-ja-vinculadas", igrejaId],
+    queryFn: async () => {
+      if (!igrejaId) return new Set<string>();
+
+      // 1:1 - extratos com transacao_vinculada_id
+      const { data: vinculadas1to1 } = await supabase
+        .from("extratos_bancarios")
+        .select("transacao_vinculada_id")
+        .eq("igreja_id", igrejaId)
+        .not("transacao_vinculada_id", "is", null);
+
+      // N:1 - conciliações em lote
+      const { data: lotes } = await supabase
+        .from("conciliacoes_lote")
+        .select("transacao_id")
+        .eq("igreja_id", igrejaId);
+
+      // 1:N - divisões (transações usadas em divisões de extrato)
+      const { data: divisoes } = await supabase
+        .from("conciliacoes_divisao_transacoes")
+        .select("transacao_id");
+
+      const ids = new Set<string>();
+      vinculadas1to1?.forEach((e) => e.transacao_vinculada_id && ids.add(e.transacao_vinculada_id));
+      lotes?.forEach((l) => l.transacao_id && ids.add(l.transacao_id));
+      divisoes?.forEach((d) => d.transacao_id && ids.add(d.transacao_id));
+
+      return ids;
+    },
+    enabled: !igrejaLoading && !!igrejaId,
+  });
+
   // Filter statements
   const extratosFiltrados = useMemo(() => {
     if (!extratos) return [];
@@ -242,11 +279,15 @@ export function ConciliacaoManual() {
     });
   }, [extratos, searchTerm, tipoFiltro, origemFiltro]);
 
-  // Filter transactions (those not yet fully reconciled via batch)
+  // Filter transactions - exclude those already reconciled via any method
   const transacoesPendentes = useMemo(() => {
     if (!transacoes) return [];
-    
+
     return transacoes.filter((t) => {
+      // Exclude transactions already reconciled
+      if (transacoesJaVinculadas?.has(t.id)) return false;
+
+      // Search filter
       if (transacaoSearchTerm) {
         const search = transacaoSearchTerm.toLowerCase();
         if (
@@ -258,7 +299,7 @@ export function ConciliacaoManual() {
       }
       return true;
     });
-  }, [transacoes, transacaoSearchTerm]);
+  }, [transacoes, transacaoSearchTerm, transacoesJaVinculadas]);
 
   // Reset pages on filter change
   useMemo(() => {
@@ -413,6 +454,11 @@ export function ConciliacaoManual() {
     setVincularDialogOpen(true);
   };
 
+  const handleDividir = (extrato: ExtratoItem) => {
+    setSelectedExtrato(extrato);
+    setDividirDialogOpen(true);
+  };
+
   const handleConciliarLote = (transacao: Transacao) => {
     setSelectedTransacao(transacao);
     setLoteDialogOpen(true);
@@ -421,11 +467,13 @@ export function ConciliacaoManual() {
   const handleVinculado = () => {
     refetchExtratos();
     queryClient.invalidateQueries({ queryKey: ["transacoes-conciliacao"] });
+    queryClient.invalidateQueries({ queryKey: ["transacoes-ja-vinculadas"] });
   };
 
   const handleLoteConciliado = () => {
     refetchExtratos();
     queryClient.invalidateQueries({ queryKey: ["transacoes-conciliacao"] });
+    queryClient.invalidateQueries({ queryKey: ["transacoes-ja-vinculadas"] });
   };
 
   const pendentes = extratosFiltrados.length;
@@ -596,6 +644,14 @@ export function ConciliacaoManual() {
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => handleDividir(extrato)}
+                          >
+                            <Split className="w-3 h-3 mr-1" />
+                            Dividir
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => handleIgnorar(extrato.id)}
                           >
                             <X className="w-3 h-3 mr-1" />
@@ -859,6 +915,14 @@ export function ConciliacaoManual() {
           onVinculado={handleVinculado}
         />
       )}
+
+      {/* Dialog de Divisão 1:N */}
+      <DividirExtratoDialog
+        open={dividirDialogOpen}
+        onOpenChange={setDividirDialogOpen}
+        extrato={selectedExtrato}
+        onSuccess={handleVinculado}
+      />
 
       {/* Dialog de Conciliação em Lote */}
       {selectedTransacao && (
