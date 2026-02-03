@@ -222,6 +222,34 @@ export function useConciliacaoLote({
 
       if (updateError) throw updateError;
 
+      // Insert audit logs for batch reconciliation
+      const extratosParaLog = extratosFiltrados.filter(e => selectedExtratos.has(e.id));
+      const auditLogs = extratosParaLog.map(extrato => ({
+        extrato_id: extrato.id,
+        transacao_id: transacao.id,
+        conciliacao_lote_id: lote.id,
+        igreja_id: igrejaId,
+        filial_id: filialId || null,
+        conta_id: effectiveContaId || null,
+        tipo_reconciliacao: "lote" as const,
+        valor_extrato: Math.abs(extrato.valor),
+        valor_transacao: valorTransacao,
+        diferenca: Math.abs(Math.abs(extrato.valor) - valorTransacao),
+        usuario_id: user.id,
+        observacoes: `Conciliação em lote - ${status}`,
+      }));
+
+      if (auditLogs.length > 0) {
+        const { error: auditError } = await supabase
+          .from("reconciliacao_audit_logs")
+          .insert(auditLogs);
+        
+        if (auditError) {
+          console.warn("Erro ao inserir logs de auditoria:", auditError);
+          // Não falha a operação principal por causa do log
+        }
+      }
+
       return { loteId: lote.id, count: selectedExtratos.size, status };
     },
     onSuccess: (result) => {
@@ -234,6 +262,8 @@ export function useConciliacaoLote({
       queryClient.invalidateQueries({ queryKey: ["extratos-pendentes"] });
       queryClient.invalidateQueries({ queryKey: ["transacoes-conciliacao"] });
       queryClient.invalidateQueries({ queryKey: ["transacoes-pendentes-lote"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliacao-cobertura"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliacao-estatisticas"] });
     },
     onError: (error) => {
       console.error("Erro ao criar lote:", error);

@@ -6175,6 +6175,110 @@ export type Database = {
           },
         ]
       }
+      reconciliacao_audit_logs: {
+        Row: {
+          conciliacao_lote_id: string | null
+          conta_id: string | null
+          created_at: string
+          diferenca: number | null
+          extrato_id: string | null
+          filial_id: string | null
+          id: string
+          igreja_id: string | null
+          observacoes: string | null
+          score: number | null
+          tipo_reconciliacao: string
+          transacao_id: string | null
+          usuario_id: string | null
+          valor_extrato: number | null
+          valor_transacao: number | null
+        }
+        Insert: {
+          conciliacao_lote_id?: string | null
+          conta_id?: string | null
+          created_at?: string
+          diferenca?: number | null
+          extrato_id?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string | null
+          observacoes?: string | null
+          score?: number | null
+          tipo_reconciliacao: string
+          transacao_id?: string | null
+          usuario_id?: string | null
+          valor_extrato?: number | null
+          valor_transacao?: number | null
+        }
+        Update: {
+          conciliacao_lote_id?: string | null
+          conta_id?: string | null
+          created_at?: string
+          diferenca?: number | null
+          extrato_id?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string | null
+          observacoes?: string | null
+          score?: number | null
+          tipo_reconciliacao?: string
+          transacao_id?: string | null
+          usuario_id?: string | null
+          valor_extrato?: number | null
+          valor_transacao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliacao_audit_logs_conciliacao_lote_id_fkey"
+            columns: ["conciliacao_lote_id"]
+            isOneToOne: false
+            referencedRelation: "conciliacoes_lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "extratos_bancarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
+      }
       respostas_quiz: {
         Row: {
           aprovado: boolean | null
@@ -8666,6 +8770,81 @@ export type Database = {
         }
         Relationships: []
       }
+      view_reconciliacao_cobertura: {
+        Row: {
+          conta_id: string | null
+          conta_nome: string | null
+          extratos_pendentes: number | null
+          extratos_reconciliados: number | null
+          filial_id: string | null
+          igreja_id: string | null
+          percentual_cobertura: number | null
+          periodo: string | null
+          total_extratos: number | null
+          valor_pendente: number | null
+          valor_reconciliado: number | null
+          valor_total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extratos_bancarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_reconciliacao_estatisticas: {
+        Row: {
+          conta_id: string | null
+          diferenca_media: number | null
+          filial_id: string | null
+          igreja_id: string | null
+          periodo: string | null
+          quantidade: number | null
+          score_medio: number | null
+          tipo_reconciliacao: string | null
+          valor_total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliacao_audit_logs_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       view_room_occupancy: {
         Row: {
           capacity: number | null
@@ -8799,10 +8978,21 @@ export type Database = {
         Args: { p_pedido_id: string }
         Returns: string
       }
-      aplicar_conciliacao: {
-        Args: { p_extrato_id: string; p_transacao_id: string }
-        Returns: boolean
-      }
+      aplicar_conciliacao:
+        | {
+            Args: { p_extrato_id: string; p_transacao_id: string }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_extrato_id: string
+              p_score?: number
+              p_tipo?: string
+              p_transacao_id: string
+              p_usuario_id?: string
+            }
+            Returns: boolean
+          }
       aprovar_onboarding: { Args: { p_request_id: string }; Returns: Json }
       buscar_pessoa_por_contato: {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
