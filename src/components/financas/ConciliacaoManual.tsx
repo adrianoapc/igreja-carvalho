@@ -81,8 +81,12 @@ export function ConciliacaoManual() {
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("extrato");
 
-  // Date filter state
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  // Date filter state - start with previous month since current month often has no data yet
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const now = new Date();
+    // Default to previous month to show recent data
+    return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  });
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
   // Extrato tab state
