@@ -1,32 +1,61 @@
 
-# Plano: Adicionar Filtro de Datas na Conciliação Manual
+# Plano: Melhorar Sugestões de Transações no Vincular
 
-## Contexto
-A tela de Conciliação Manual (`ConciliacaoManual.tsx`) atualmente busca extratos e transações dos últimos **90 dias fixos**. Você sugeriu adicionar um filtro de datas para delimitar melhor o período de busca, tornando a navegação mais eficiente.
+## Problemas Identificados
 
-## O Que Será Feito
+### 1. Transações Já Vinculadas Aparecendo como Sugestão
+Atualmente, a lista `transacoesDisponiveis` passada para o `VincularTransacaoDialog` inclui todas as transações do período, mesmo aquelas que já estão vinculadas a outros extratos. Isso polui a lista e pode causar confusão.
 
-### 1. Adicionar Componente de Filtro de Período
-Reutilizar o componente `MonthPicker` já existente no projeto ou criar um seletor de datas simples para permitir escolher:
-- Data inicial
-- Data final
-- Ou selecionar por mês (como na tela de Entradas/Saídas)
+### 2. Filtro de Mês Rígido
+Se o usuário está com o MonthPicker em janeiro, mas a despesa (reembolso) foi lançada em dezembro, essa transação não aparecerá como opção. O sistema precisa de uma janela mais flexível ou indicar claramente o período atual.
 
-### 2. Layout do Filtro
-O filtro será posicionado junto aos demais filtros existentes (busca, conta, tipo, origem):
+---
 
-```text
-+--------------------------------------------------+
-| [🔍 Buscar...] [📅 Período] [Conta ▼] [Tipo ▼]   |
-+--------------------------------------------------+
+## Soluções Propostas
+
+### Solução 1: Excluir Transações Já Vinculadas
+
+**Alteração em `ConciliacaoManual.tsx` e `DashboardConciliacao.tsx`:**
+
+Antes de passar `transacoesDisponiveis` para o dialog, filtrar as transações que já possuem vínculo com algum extrato:
+
+```typescript
+// Buscar IDs de transações já vinculadas
+const { data: vinculadas } = useQuery({
+  queryKey: ["transacoes-vinculadas", igrejaId],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("extratos_bancarios")
+      .select("transacao_vinculada_id")
+      .not("transacao_vinculada_id", "is", null);
+    return new Set(data?.map(e => e.transacao_vinculada_id) || []);
+  },
+});
+
+// Ao passar para o dialog:
+transacoesDisponiveis={(transacoes || []).filter(t => !vinculadas?.has(t.id))}
 ```
 
-### 3. Impacto nas Queries
-- Query de extratos pendentes: filtrar por `data_transacao` dentro do período
-- Query de transações: filtrar por `data_pagamento` dentro do período
+### Solução 2: Expandir Janela de Busca no VincularTransacaoDialog
 
-### 4. Sincronização com Dashboard
-Opcionalmente, aplicar o mesmo filtro de período no `DashboardConciliacao` para consistência.
+**Modificar `VincularTransacaoDialog.tsx`:**
+
+Adicionar um indicador visual do período filtrado e uma opção para buscar em período mais amplo:
+
+1. Mostrar badge com o período atual: `"Jan 2026"`
+2. Adicionar botão "Buscar em todos os períodos" que amplia a janela de busca
+3. Ou: Buscar automaticamente ±30 dias da data do extrato sendo vinculado
+
+### Alternativa Mais Simples (Recomendada)
+
+O dialog `VincularTransacaoDialog` pode buscar suas próprias transações com uma janela flexível baseada na data do extrato:
+
+```typescript
+// Dentro do VincularTransacaoDialog, buscar transações ±60 dias do extrato
+const dataExtrato = parseISO(extrato.data_transacao);
+const inicio = format(subDays(dataExtrato, 60), "yyyy-MM-dd");
+const fim = format(addDays(dataExtrato, 60), "yyyy-MM-dd");
+```
 
 ---
 
@@ -34,41 +63,66 @@ Opcionalmente, aplicar o mesmo filtro de período no `DashboardConciliacao` para
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `ConciliacaoManual.tsx` | Adicionar estados `dataInicio` e `dataFim`, inputs de data ou MonthPicker, e aplicar filtros nas queries |
-| `DashboardConciliacao.tsx` | (Opcional) Adicionar mesmo filtro de período |
+| `VincularTransacaoDialog.tsx` | Buscar transações próprias com janela flexível (+/- 60 dias) e excluir já vinculadas |
+| `ConciliacaoManual.tsx` | Remover passagem de `transacoesDisponiveis` (agora buscado internamente) |
+| `DashboardConciliacao.tsx` | Remover passagem de `transacoesDisponiveis` (agora buscado internamente) |
+
+---
 
 ## Detalhes Técnicos
 
-### Estados a Adicionar
+### Query Interna no VincularTransacaoDialog
+
 ```typescript
-const [dataInicio, setDataInicio] = useState(() => 
-  format(subDays(new Date(), 30), "yyyy-MM-dd")
-);
-const [dataFim, setDataFim] = useState(() => 
-  format(new Date(), "yyyy-MM-dd")
-);
+const { data: transacoesDisponiveis, isLoading } = useQuery({
+  queryKey: ["transacoes-para-vincular", extrato.id, igrejaId],
+  queryFn: async () => {
+    // Janela de ±60 dias baseada no extrato
+    const dataExtrato = parseISO(extrato.data_transacao);
+    const dataInicio = format(subDays(dataExtrato, 60), "yyyy-MM-dd");
+    const dataFim = format(addDays(dataExtrato, 60), "yyyy-MM-dd");
+
+    // Buscar transações não vinculadas no período
+    const { data: transacoes } = await supabase
+      .from("transacoes_financeiras")
+      .select(`id, descricao, valor, tipo, data_pagamento, 
+               categorias_financeiras(nome)`)
+      .eq("igreja_id", igrejaId)
+      .eq("status", "pago")
+      .gte("data_pagamento", dataInicio)
+      .lte("data_pagamento", dataFim);
+
+    // Buscar IDs já vinculados
+    const { data: vinculados } = await supabase
+      .from("extratos_bancarios")
+      .select("transacao_vinculada_id")
+      .not("transacao_vinculada_id", "is", null);
+
+    const idsVinculados = new Set(
+      vinculados?.map(e => e.transacao_vinculada_id) || []
+    );
+
+    // Filtrar transações disponíveis
+    return transacoes?.filter(t => !idsVinculados.has(t.id)) || [];
+  },
+  enabled: open && !!igrejaId,
+});
 ```
 
-### Modificação da Query de Extratos
-```typescript
-// Antes
-.order("data_transacao", { ascending: false })
-.limit(100);
+### Indicador Visual do Período
 
-// Depois
-.gte("data_transacao", dataInicio)
-.lte("data_transacao", dataFim)
-.order("data_transacao", { ascending: false })
-.limit(100);
+```tsx
+<Badge variant="outline" className="text-xs">
+  Buscando: {format(subDays(parseISO(extrato.data_transacao), 60), "dd/MM")} 
+  a {format(addDays(parseISO(extrato.data_transacao), 60), "dd/MM/yyyy")}
+</Badge>
 ```
-
-### Componente de UI
-Usar dois inputs de data lado a lado ou integrar com o `MonthPicker` já utilizado em outras telas.
 
 ---
 
 ## Resultado Esperado
-O usuário poderá:
-1. Selecionar um período específico (ex: "01/01/2026 a 31/01/2026")
-2. A lista de extratos e transações será filtrada automaticamente
-3. Fica mais fácil reconciliar períodos específicos sem ver dados de 90 dias misturados
+
+1. **Sem duplicatas**: Transações já vinculadas a outros extratos não aparecem como sugestão
+2. **Janela flexível**: Mesmo se o extrato for de janeiro, transações de dezembro/fevereiro aparecem
+3. **Transparência**: Usuário vê claramente qual período está sendo buscado
+4. **Independência**: O dialog não depende mais do período selecionado no MonthPicker da tela pai
