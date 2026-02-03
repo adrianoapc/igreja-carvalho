@@ -766,7 +766,6 @@ export function DashboardConciliacao() {
           open={vincularDialogOpen}
           onOpenChange={setVincularDialogOpen}
           extrato={selectedExtrato}
-          transacoesDisponiveis={transacoes || []}
           onVinculado={handleSuccess}
         />
       )}
