@@ -169,9 +169,9 @@ export function VincularTransacaoDialog({
       open={open}
       onOpenChange={onOpenChange}
       trigger={null}
-      dialogContentProps={{ className: "max-w-xl" }}
+      dialogContentProps={{ className: "max-w-xl max-h-[85vh] overflow-hidden flex flex-col" }}
     >
-      <div className="space-y-4">
+      <div className="space-y-4 flex flex-col min-h-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-2">
           <Link2 className="w-5 h-5 text-primary" />
@@ -222,7 +222,7 @@ export function VincularTransacaoDialog({
         </div>
 
         {/* Lista de Transações */}
-        <ScrollArea className="h-[300px] border rounded-lg">
+        <ScrollArea className="flex-1 min-h-0 max-h-[280px] border rounded-lg">
           {transacoesComScore.length > 0 ? (
             <RadioGroup
               value={selectedTransacaoId || ""}
