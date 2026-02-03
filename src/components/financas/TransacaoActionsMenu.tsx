@@ -6,7 +6,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import {
+  MoreVertical,
+  Edit,
+  Trash2,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,14 +36,25 @@ interface TransacaoActionsMenuProps {
   status: string;
   tipo: "entrada" | "saida";
   isReembolso?: boolean;
+  isDinheiro?: boolean;
+  conferidoManual?: boolean;
   onEdit: () => void;
 }
 
-export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = false, onEdit }: TransacaoActionsMenuProps) {
+export function TransacaoActionsMenu({
+  transacaoId,
+  status,
+  tipo,
+  isReembolso = false,
+  isDinheiro = false,
+  conferidoManual = false,
+  onEdit,
+}: TransacaoActionsMenuProps) {
   const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditWarningDialog, setShowEditWarningDialog] = useState(false);
-  const [showConfirmarPagamentoDialog, setShowConfirmarPagamentoDialog] = useState(false);
+  const [showConfirmarPagamentoDialog, setShowConfirmarPagamentoDialog] =
+    useState(false);
 
   const handleStatusChange = async (newStatus: string) => {
     try {
@@ -48,7 +66,7 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
         desconto?: number;
         taxas_administrativas?: number;
       } = { status: newStatus };
-      
+
       // Se marcar como pendente, remover todos os dados de pagamento/recebimento
       if (newStatus === "pendente") {
         updateData.data_pagamento = null;
@@ -65,9 +83,11 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
 
       if (error) throw error;
 
-      toast.success(`Status atualizado para ${newStatus === 'pendente' ? 'Pendente' : 'Pago'}`);
-      queryClient.invalidateQueries({ queryKey: ['entradas'] });
-      queryClient.invalidateQueries({ queryKey: ['saidas'] });
+      toast.success(
+        `Status atualizado para ${newStatus === "pendente" ? "Pendente" : "Pago"}`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["entradas"] });
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
       toast.error("Erro ao atualizar status");
@@ -84,11 +104,32 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
       if (error) throw error;
 
       toast.success("Transação excluída com sucesso");
-      queryClient.invalidateQueries({ queryKey: ['entradas'] });
-      queryClient.invalidateQueries({ queryKey: ['saidas'] });
+      queryClient.invalidateQueries({ queryKey: ["entradas"] });
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
     } catch (error) {
       console.error("Erro ao excluir:", error);
       toast.error("Erro ao excluir transação");
+    }
+  };
+
+  const handleToggleConferidoManual = async () => {
+    try {
+      const { error } = await supabase
+        .from("transacoes_financeiras")
+        .update({ conferido_manual: !conferidoManual })
+        .eq("id", transacaoId);
+
+      if (error) throw error;
+
+      toast.success(
+        conferidoManual ? "Conferência removida" : "Marcado como conferido",
+      );
+      queryClient.invalidateQueries({ queryKey: ["entradas"] });
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
+      queryClient.invalidateQueries({ queryKey: ["sessao-lancamentos"] });
+    } catch (error) {
+      console.error("Erro ao atualizar conferência:", error);
+      toast.error("Erro ao atualizar conferência");
     }
   };
 
@@ -120,7 +161,9 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {status !== "pago" && (
-            <DropdownMenuItem onClick={() => setShowConfirmarPagamentoDialog(true)}>
+            <DropdownMenuItem
+              onClick={() => setShowConfirmarPagamentoDialog(true)}
+            >
               <CheckCircle2 className="mr-2 h-4 w-4" />
               Marcar como Pago
             </DropdownMenuItem>
@@ -130,6 +173,17 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
               <Clock className="mr-2 h-4 w-4" />
               Marcar como Pendente
             </DropdownMenuItem>
+          )}
+          {isDinheiro && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleToggleConferidoManual}>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                {conferidoManual
+                  ? "Remover Conferido"
+                  : "Marcar como Conferido"}
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -143,7 +197,10 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
       </DropdownMenu>
 
       {/* Dialog de aviso para edição de transação de reembolso */}
-      <AlertDialog open={showEditWarningDialog} onOpenChange={setShowEditWarningDialog}>
+      <AlertDialog
+        open={showEditWarningDialog}
+        onOpenChange={setShowEditWarningDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -152,11 +209,15 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <Alert variant="default" className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50">
+                <Alert
+                  variant="default"
+                  className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50"
+                >
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-amber-800 dark:text-amber-200">
-                    Este valor está vinculado a uma solicitação de reembolso. 
-                    Alterações manuais podem gerar inconsistências entre os módulos.
+                    Este valor está vinculado a uma solicitação de reembolso.
+                    Alterações manuais podem gerar inconsistências entre os
+                    módulos.
                   </AlertDescription>
                 </Alert>
                 <p className="text-sm text-muted-foreground">
@@ -185,18 +246,24 @@ export function TransacaoActionsMenu({ transacaoId, status, tipo, isReembolso = 
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      Esta transação está vinculada a uma solicitação de reembolso. 
-                      Excluí-la pode gerar inconsistências no módulo de reembolsos.
+                      Esta transação está vinculada a uma solicitação de
+                      reembolso. Excluí-la pode gerar inconsistências no módulo
+                      de reembolsos.
                     </AlertDescription>
                   </Alert>
                 )}
-                <p>Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.</p>
+                <p>
+                  Tem certeza que deseja excluir esta transação? Esta ação não
+                  pode ser desfeita.
+                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete}>
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -86,8 +86,11 @@ export default function EventosGeral() {
 
   const {
     ativo: relogioAtivo,
+    agendado: relogioAgendado,
     sentinelaAtual,
     proximoSentinela,
+    inicioEvento,
+    turnosSemSentinela,
     loading: loadingRelogio,
     eventoId: relogioId,
   } = useRelogioAgora();
@@ -137,7 +140,7 @@ export default function EventosGeral() {
           total_vagas: 15,
           preenchidas: index === 0 ? 12 : 8,
           status: index === 0 ? "ok" : "atencao",
-        })
+        }),
       );
       setEscalasHealth(healthMock);
 
@@ -250,88 +253,92 @@ export default function EventosGeral() {
         {/* COLUNA ESQUERDA (8/12) */}
         <div className="lg:col-span-8 space-y-8">
           {/* Widget Relógio */}
-          {relogioAtivo && !loadingRelogio && (
+          {!loadingRelogio && (relogioAtivo || relogioAgendado) && (
             <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900 shadow-sm">
-              <CardContent className="p-5 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-5 w-full">
-                  <div className="relative shrink-0">
-                    <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-20"></div>
-                    <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 border-2 border-blue-200">
-                      <Flame className="h-7 w-7 fill-blue-600" />
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-blue-900 dark:text-blue-100 flex items-center gap-3">
-                      Relógio de Oração
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-200 text-blue-800 hover:bg-blue-200 px-2"
-                      >
-                        Ao Vivo
-                      </Badge>
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mt-2 text-blue-700 dark:text-blue-300">
-                      <div className="flex items-center gap-2 bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full">
-                        <span className="font-semibold text-xs uppercase tracking-wide opacity-70">
-                          Sentinela
-                        </span>
-                        {sentinelaAtual ? (
-                          <span className="font-bold flex items-center gap-1.5">
-                            <User className="h-3.5 w-3.5" />{" "}
-                            {sentinelaAtual.nome}
-                          </span>
-                        ) : (
-                          <span className="text-amber-600 font-bold flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" /> Vago
-                          </span>
-                        )}
+              <CardContent className="p-5">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-5">
+                    <div className="relative shrink-0">
+                      <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-20"></div>
+                      <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 border-2 border-blue-200">
+                        <Flame className="h-7 w-7 fill-blue-600" />
                       </div>
-                      {sentinelaAtual && (
-                        <span className="text-xs font-medium opacity-80">
-                          até {sentinelaAtual.ate}
-                        </span>
-                      )}
                     </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-4 md:pt-0 border-blue-200/50">
-                  <div className="text-right hidden md:block min-w-[100px]">
-                    <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-0.5">
-                      Próximo
-                    </p>
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 truncate max-w-[120px]">
-                        {proximoSentinela ? proximoSentinela.nome : "—"}
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-bold text-lg text-blue-900 dark:text-blue-100">
+                          Relógio de Oração
+                        </h3>
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-200 text-blue-800 hover:bg-blue-200 px-2"
+                        >
+                          {relogioAtivo ? "Ao vivo" : "Agendado"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        Relógio
                       </p>
-                      {proximoSentinela && (
-                        <p className="text-xs text-blue-700 dark:text-blue-300">
-                          às {proximoSentinela.inicio}
+                      {inicioEvento && (
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                          Início: {inicioEvento}
                         </p>
                       )}
+                      {turnosSemSentinela > 0 && (
+                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                          {turnosSemSentinela} turno(s) sem sentinela
+                        </p>
+                      )}
+                      {sentinelaAtual && (
+                        <div className="mt-3">
+                          <Button
+                            variant="outline"
+                            className="border-blue-500 text-blue-700 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-950"
+                            onClick={() =>
+                              navigate(
+                                `/oracao/player/${sentinelaAtual.escalaId}`,
+                              )
+                            }
+                          >
+                            Abrir Player
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    {sentinelaAtual && (
+
+                  <div className="flex flex-col items-start md:items-end gap-1 text-sm text-blue-700 dark:text-blue-300">
+                    <span className="font-semibold">
+                      {relogioAtivo ? "Sentinela atual" : "Próximo sentinela"}
+                    </span>
+                    <span className="font-medium">
+                      {relogioAtivo
+                        ? sentinelaAtual?.nome || "Vago"
+                        : proximoSentinela?.nome || "Vago"}
+                    </span>
+                    {!relogioAtivo && !proximoSentinela && (
+                      <span className="text-xs text-blue-700/80 dark:text-blue-300/80">
+                        Ainda sem sentinelas escalados
+                      </span>
+                    )}
+                    {relogioAtivo && sentinelaAtual && (
+                      <span className="text-xs">até {sentinelaAtual.ate}</span>
+                    )}
+                    {!relogioAtivo && proximoSentinela && (
+                      <span className="text-xs">
+                        às {proximoSentinela.inicio}
+                      </span>
+                    )}
+                    {relogioId && (
                       <Button
-                        variant="outline"
-                        className="w-full md:w-auto border-blue-500 text-blue-700 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-950"
+                        className="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
                         onClick={() =>
-                          navigate(`/oracao/player/${sentinelaAtual.escalaId}`)
+                          navigate(`/eventos/${relogioId}?tab=escalas`)
                         }
                       >
-                        <Flame className="h-4 w-4 mr-2" />
-                        Abrir Player
+                        Ver Grade
                       </Button>
                     )}
-                    <Button
-                      className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all hover:scale-105"
-                      onClick={() =>
-                        navigate(`/eventos/${relogioId}?tab=escalas`)
-                      }
-                    >
-                      Ver Grade
-                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -355,7 +362,7 @@ export default function EventosGeral() {
                     <div className="flex items-center gap-2">
                       <Badge
                         className={`${getTipoColor(
-                          nextEvent.tipo
+                          nextEvent.tipo,
                         )} px-3 py-1 text-xs uppercase tracking-wider`}
                       >
                         {nextEvent.tipo}
@@ -432,7 +439,7 @@ export default function EventosGeral() {
               </CardContent>
             </Card>
           ) : (
-          <Card className="h-[200px] flex flex-col items-center justify-center text-muted-foreground bg-muted/30 border-dashed">
+            <Card className="h-[200px] flex flex-col items-center justify-center text-muted-foreground bg-muted/30 border-dashed">
               <CalendarCheck className="h-12 w-12 mb-4 opacity-50" />
               <p>Nenhum evento futuro agendado.</p>
               <Button variant="link" onClick={() => handleNovoEvento()}>

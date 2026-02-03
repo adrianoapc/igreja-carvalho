@@ -80,15 +80,87 @@ export function TransferenciaDialog({
     queryKey: ["categoria-transferencia", igrejaId],
     queryFn: async () => {
       if (!igrejaId) return null;
-      const { data, error } = await supabase
+      
+      // Buscar categoria de SAÍDA
+      const { data: catSaida } = await supabase
         .from("categorias_financeiras")
-        .select("id")
+        .select("id, nome")
         .eq("igreja_id", igrejaId)
-        .ilike("nome", "%transferência%entre%contas%")
+        .eq("tipo", "saida")
+        .ilike("nome", "%transferência%")
         .limit(1)
         .single();
 
-      if (error && error.code !== "PGRST116") throw error;
+      // Buscar categoria de ENTRADA  
+      const { data: catEntrada } = await supabase
+        .from("categorias_financeiras")
+        .select("id, nome")
+        .eq("igreja_id", igrejaId)
+        .eq("tipo", "entrada")
+        .ilike("nome", "%transferência%")
+        .limit(1)
+        .single();
+
+      return {
+        saida: catSaida,
+        entrada: catEntrada
+      };
+    },
+    enabled: open && !!igrejaId,
+  });
+
+  // Buscar subcategoria "Depósito Caixa" para SAÍDA
+  const { data: subcategoriaDepositoSaida } = useQuery({
+    queryKey: ["subcategoria-deposito-saida", igrejaId, categoriaTransferencia?.saida?.id],
+    queryFn: async () => {
+      if (!igrejaId || !categoriaTransferencia?.saida?.id) return null;
+      
+      const { data } = await supabase
+        .from("subcategorias_financeiras")
+        .select("id")
+        .eq("categoria_id", categoriaTransferencia.saida.id)
+        .ilike("nome", "%depósito%caixa%")
+        .limit(1)
+        .single();
+
+      return data;
+    },
+    enabled: open && !!igrejaId && !!categoriaTransferencia?.saida?.id,
+  });
+
+  // Buscar Base Ministerial "Administração Geral"
+  const { data: baseMinisterial } = useQuery({
+    queryKey: ["base-ministerial-admin", igrejaId],
+    queryFn: async () => {
+      if (!igrejaId) return null;
+      
+      const { data } = await supabase
+        .from("bases_ministeriais")
+        .select("id")
+        .eq("igreja_id", igrejaId)
+        .ilike("titulo", "%administração%geral%")
+        .limit(1)
+        .single();
+
+      return data;
+    },
+    enabled: open && !!igrejaId,
+  });
+
+  // Buscar Centro de Custo "Administração"
+  const { data: centroCusto } = useQuery({
+    queryKey: ["centro-custo-admin", igrejaId],
+    queryFn: async () => {
+      if (!igrejaId) return null;
+      
+      const { data } = await supabase
+        .from("centros_custo")
+        .select("id")
+        .eq("igreja_id", igrejaId)
+        .ilike("nome", "%administração%")
+        .limit(1)
+        .single();
+
       return data;
     },
     enabled: open && !!igrejaId,
@@ -116,9 +188,9 @@ export function TransferenciaDialog({
       return;
     }
 
-    if (!categoriaTransferencia) {
+    if (!categoriaTransferencia?.saida || !categoriaTransferencia?.entrada) {
       toast.error(
-        "Categoria 'Transferência entre Contas' não encontrada. Crie-a em Categorias."
+        "Categorias de transferência não encontradas. Crie categorias 'Transferência' para entrada e saída."
       );
       return;
     }
@@ -157,8 +229,12 @@ export function TransferenciaDialog({
           data_pagamento: dataTransferencia,
           data_competencia: dataTransferencia,
           status: "pago",
+          forma_pagamento: "Transferência Bancária",
           conta_id: contaOrigem,
-          categoria_id: categoriaTransferencia.id,
+          categoria_id: categoriaTransferencia.saida.id,
+          subcategoria_id: subcategoriaDepositoSaida?.id || null,
+          base_ministerial_id: baseMinisterial?.id || null,
+          centro_custo_id: centroCusto?.id || null,
           transferencia_id: transferencia.id,
           igreja_id: igrejaId!,
           filial_id: !isAllFiliais ? filialId : null,
@@ -180,8 +256,12 @@ export function TransferenciaDialog({
           data_pagamento: dataTransferencia,
           data_competencia: dataTransferencia,
           status: "pago",
+          forma_pagamento: "Transferência Bancária",
           conta_id: contaDestino,
-          categoria_id: categoriaTransferencia.id,
+          categoria_id: categoriaTransferencia.entrada.id,
+          subcategoria_id: subcategoriaDepositoEntrada?.id || null,
+          base_ministerial_id: baseMinisterial?.id || null,
+          centro_custo_id: centroCusto?.id || null,
           transferencia_id: transferencia.id,
           igreja_id: igrejaId!,
           filial_id: !isAllFiliais ? filialId : null,
@@ -199,23 +279,6 @@ export function TransferenciaDialog({
           transacao_entrada_id: transacaoEntrada.id,
         })
         .eq("id", transferencia.id);
-
-      // 5. Atualizar saldos das contas
-      if (contaOrigemData) {
-        await supabase
-          .from("contas")
-          .update({ saldo_atual: (contaOrigemData.saldo_atual || 0) - valorNum })
-          .eq("id", contaOrigem);
-      }
-
-      if (contaDestinoData) {
-        await supabase
-          .from("contas")
-          .update({
-            saldo_atual: (contaDestinoData.saldo_atual || 0) + valorNum,
-          })
-          .eq("id", contaDestino);
-      }
 
       toast.success("Transferência realizada com sucesso!");
 

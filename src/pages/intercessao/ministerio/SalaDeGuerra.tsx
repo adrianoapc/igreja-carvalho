@@ -31,6 +31,7 @@ import {
   CheckCircle,
   UserPlus,
   ChevronDown,
+  Flame,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,7 @@ import { NovoPedidoDialog } from "@/components/pedidos/NovoPedidoDialog";
 import { PedidoDetailsDialog } from "@/components/pedidos/PedidoDetailsDialog";
 import { NovoTestemunhoDialog } from "@/components/testemunhos/NovoTestemunhoDialog";
 import { TestemunhoDetailsDialog } from "@/components/testemunhos/TestemunhoDetailsDialog";
+import { useRelogioAgora } from "@/hooks/useRelogioAgora";
 import {
   useFilialPaginatedQuery,
   flattenPaginatedData,
@@ -104,9 +106,20 @@ export default function SalaDeGuerra() {
     isAllFiliais,
     loading: authLoading,
   } = useAuthContext();
+  const {
+    ativo: relogioAtivo,
+    agendado: relogioAgendado,
+    evento: relogioEvento,
+    sentinelaAtual,
+    proximoSentinela,
+    inicioEvento,
+    turnosSemSentinela,
+    eventoId: relogioId,
+    loading: loadingRelogio,
+  } = useRelogioAgora();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"pedidos" | "testemunhos">(
-    "pedidos"
+    "pedidos",
   );
 
   // Pedidos - State
@@ -176,10 +189,16 @@ export default function SalaDeGuerra() {
   });
 
   // Dados planos - extract pages from the query result
-  const pedidosPagesData = (pedidosPages as unknown as { pages?: unknown[][] })?.pages || [];
-  const testemunhosPagesData = (testemunhosPages as unknown as { pages?: unknown[][] })?.pages || [];
-  const pedidos = flattenPaginatedData(pedidosPagesData as Record<string, unknown>[][]) as unknown as Pedido[];
-  const testemunhos = flattenPaginatedData(testemunhosPagesData as Record<string, unknown>[][]) as unknown as Testemunho[];
+  const pedidosPagesData =
+    (pedidosPages as unknown as { pages?: unknown[][] })?.pages || [];
+  const testemunhosPagesData =
+    (testemunhosPages as unknown as { pages?: unknown[][] })?.pages || [];
+  const pedidos = flattenPaginatedData(
+    pedidosPagesData as Record<string, unknown>[][],
+  ) as unknown as Pedido[];
+  const testemunhos = flattenPaginatedData(
+    testemunhosPagesData as Record<string, unknown>[][],
+  ) as unknown as Testemunho[];
 
   // Filtros Pedidos - Client side (para busca textual)
   const filteredPedidos = useMemo(() => {
@@ -214,7 +233,7 @@ export default function SalaDeGuerra() {
   // Atribuir pedido ao usuário atual
   const handleAtribuirPedido = async (
     pedidoId: string,
-    e: React.MouseEvent
+    e: React.MouseEvent,
   ) => {
     e.stopPropagation(); // Evita abrir o dialog
 
@@ -248,7 +267,7 @@ export default function SalaDeGuerra() {
   // Marcar pedido como orado
   const handleMarcarComoOrado = async (
     pedidoId: string,
-    e: React.MouseEvent
+    e: React.MouseEvent,
   ) => {
     e.stopPropagation(); // Evita abrir o dialog
 
@@ -286,7 +305,7 @@ export default function SalaDeGuerra() {
     }));
     exportToExcel(
       exportData,
-      `pedidos_oracao_${new Date().toISOString().split("T")[0]}`
+      `pedidos_oracao_${new Date().toISOString().split("T")[0]}`,
     );
     toast.success("Pedidos exportados com sucesso!");
   };
@@ -304,7 +323,7 @@ export default function SalaDeGuerra() {
     }));
     exportToExcel(
       exportData,
-      `testemunhos_${new Date().toISOString().split("T")[0]}`
+      `testemunhos_${new Date().toISOString().split("T")[0]}`,
     );
     toast.success("Testemunhos exportados com sucesso!");
   };
@@ -333,424 +352,501 @@ export default function SalaDeGuerra() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="border-b bg-card shadow-soft">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="p-0 h-auto w-auto"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Sala de Guerra</h1>
-              <p className="text-sm md:text-base text-muted-foreground mt-1">
-                Área de trabalho dos intercessores - ore pelos pedidos da
-                comunidade
-              </p>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="p-0 h-auto w-auto"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Sala de Guerra</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Área de trabalho dos intercessores - ore pelos pedidos da
+              comunidade
+            </p>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "pedidos" | "testemunhos")}
-          className="w-full"
-        >
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="pedidos" className="flex items-center gap-2">
-              <Heart className="w-4 h-4" />
-              Pedidos de Oração
-            </TabsTrigger>
-            <TabsTrigger
-              value="testemunhos"
-              className="flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              Testemunhos
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Tab: Pedidos */}
-          <TabsContent value="pedidos" className="space-y-4">
-            {/* Filtros */}
-            <Card className="shadow-soft">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Filtros de Pedidos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-                  <Input
-                    placeholder="Buscar por pedido ou solicitante..."
-                    value={searchPedidos}
-                    onChange={(e) => setSearchPedidos(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Select
-                    value={statusFilterPedidos}
-                    onValueChange={setStatusFilterPedidos}
-                  >
-                    <SelectTrigger className="w-full md:w-[180px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos Status</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="em_oracao">Em Oração</SelectItem>
-                      <SelectItem value="respondido">Respondido</SelectItem>
-                      <SelectItem value="arquivado">Arquivado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={tipoFilterPedidos}
-                    onValueChange={setTipoFilterPedidos}
-                  >
-                    <SelectTrigger className="w-full md:w-[180px]">
-                      <SelectValue placeholder="Tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIPO_PEDIDOS.map((tipo) => (
-                        <SelectItem key={tipo.value} value={tipo.value}>
-                          {tipo.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    onClick={handleExportPedidos}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Exportar
-                  </Button>
+      {!loadingRelogio && (relogioAtivo || relogioAgendado) && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900 shadow-soft">
+          <CardContent className="p-5">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="relative shrink-0">
+                  <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-20"></div>
+                  <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 border-2 border-blue-200">
+                    <Flame className="h-6 w-6 fill-blue-600" />
+                  </div>
                 </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg text-blue-900 dark:text-blue-100">
+                      Relógio de Oração
+                    </h3>
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-200 text-blue-800 hover:bg-blue-200"
+                    >
+                      {relogioAtivo ? "Ao vivo" : "Agendado"}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    {relogioEvento?.titulo || "Relógio"}
+                  </p>
+                  {inicioEvento && (
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      Início: {inicioEvento}
+                    </p>
+                  )}
+                  {turnosSemSentinela > 0 && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                      {turnosSemSentinela} turno(s) sem sentinela
+                    </p>
+                  )}
+                  {sentinelaAtual && (
+                    <div className="mt-3">
+                      <Button
+                        variant="outline"
+                        className="border-blue-500 text-blue-700 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-950"
+                        onClick={() =>
+                          navigate(`/oracao/player/${sentinelaAtual.escalaId}`)
+                        }
+                      >
+                        Abrir Player
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col items-start md:items-end gap-1 text-sm text-blue-700 dark:text-blue-300">
+                <span className="font-semibold">
+                  {relogioAtivo ? "Sentinela atual" : "Próximo sentinela"}
+                </span>
+                <span className="font-medium">
+                  {relogioAtivo
+                    ? sentinelaAtual?.nome || "Vago"
+                    : proximoSentinela?.nome || "Vago"}
+                </span>
+                {!relogioAtivo && !proximoSentinela && (
+                  <span className="text-xs text-blue-700/80 dark:text-blue-300/80">
+                    Ainda sem sentinelas escalados
+                  </span>
+                )}
+                {relogioAtivo && sentinelaAtual && (
+                  <span className="text-xs">até {sentinelaAtual.ate}</span>
+                )}
+                {!relogioAtivo && proximoSentinela && (
+                  <span className="text-xs">às {proximoSentinela.inicio}</span>
+                )}
+                {relogioId && (
+                  <Button
+                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() =>
+                      navigate(`/eventos/${relogioId}?tab=escalas`)
+                    }
+                  >
+                    Ver Grade
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "pedidos" | "testemunhos")}
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="pedidos" className="flex items-center gap-2">
+            <Heart className="w-4 h-4" />
+            Pedidos de Oração
+          </TabsTrigger>
+          <TabsTrigger value="testemunhos" className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            Testemunhos
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Tab: Pedidos */}
+        <TabsContent value="pedidos" className="space-y-4">
+          {/* Filtros */}
+          <Card className="shadow-soft">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Search className="w-4 h-4" />
+                Filtros de Pedidos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+                <Input
+                  placeholder="Buscar por pedido ou solicitante..."
+                  value={searchPedidos}
+                  onChange={(e) => setSearchPedidos(e.target.value)}
+                  className="flex-1"
+                />
+                <Select
+                  value={statusFilterPedidos}
+                  onValueChange={setStatusFilterPedidos}
+                >
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos Status</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="em_oracao">Em Oração</SelectItem>
+                    <SelectItem value="respondido">Respondido</SelectItem>
+                    <SelectItem value="arquivado">Arquivado</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={tipoFilterPedidos}
+                  onValueChange={setTipoFilterPedidos}
+                >
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPO_PEDIDOS.map((tipo) => (
+                      <SelectItem key={tipo.value} value={tipo.value}>
+                        {tipo.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleExportPedidos}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Ações */}
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              {filteredPedidos.length}{" "}
+              {filteredPedidos.length === 1
+                ? "pedido encontrado"
+                : "pedidos encontrados"}
+            </p>
+            <Button onClick={() => setNovoPedidoOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Pedido
+            </Button>
+          </div>
+
+          {/* Lista de Pedidos */}
+          {isLoadingPedidos ? (
+            <Card className="shadow-soft">
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">Carregando pedidos...</p>
               </CardContent>
             </Card>
+          ) : errorPedidos ? (
+            <Card className="shadow-soft">
+              <CardContent className="p-8 text-center">
+                <p className="text-red-600">
+                  Erro ao carregar pedidos: {errorPedidos.message}
+                </p>
+              </CardContent>
+            </Card>
+          ) : filteredPedidos.length === 0 ? (
+            <Card className="shadow-soft">
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  Nenhum pedido encontrado
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredPedidos.map((pedido) => (
+                <Card
+                  key={pedido.id}
+                  className="shadow-soft hover:shadow-medium transition-all"
+                >
+                  <CardHeader className="pb-3 p-4 md:p-6">
+                    <div className="flex flex-col gap-3">
+                      <div
+                        className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 cursor-pointer"
+                        onClick={() => {
+                          setSelectedPedido(pedido);
+                          setPedidoDetailsOpen(true);
+                        }}
+                      >
+                        <div className="flex-1">
+                          <CardTitle className="text-base mb-2">
+                            {pedido.pedido}
+                          </CardTitle>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {pedido.tipo}
+                            </Badge>
+                            <Badge
+                              className={`text-xs ${getStatusColor(
+                                pedido.status,
+                              )}`}
+                            >
+                              {getStatusLabel(pedido.status)}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {getNomeSolicitante(pedido)}
+                            </span>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {new Date(pedido.data_criacao).toLocaleDateString(
+                                "pt-BR",
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-            {/* Ações */}
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">
-                {filteredPedidos.length}{" "}
-                {filteredPedidos.length === 1
-                  ? "pedido encontrado"
-                  : "pedidos encontrados"}
-              </p>
-              <Button onClick={() => setNovoPedidoOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Pedido
-              </Button>
-            </div>
-
-            {/* Lista de Pedidos */}
-            {isLoadingPedidos ? (
-              <Card className="shadow-soft">
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">Carregando pedidos...</p>
-                </CardContent>
-              </Card>
-            ) : errorPedidos ? (
-              <Card className="shadow-soft">
-                <CardContent className="p-8 text-center">
-                  <p className="text-red-600">
-                    Erro ao carregar pedidos: {errorPedidos.message}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : filteredPedidos.length === 0 ? (
-              <Card className="shadow-soft">
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">
-                    Nenhum pedido encontrado
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {filteredPedidos.map((pedido) => (
-                  <Card
-                    key={pedido.id}
-                    className="shadow-soft hover:shadow-medium transition-all"
-                  >
-                    <CardHeader className="pb-3 p-4 md:p-6">
-                      <div className="flex flex-col gap-3">
-                        <div
-                          className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 cursor-pointer"
+                      {/* Botões de Ação Rápida */}
+                      <div className="flex flex-wrap gap-2">
+                        {pedido.status === "pendente" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => handleAtribuirPedido(pedido.id, e)}
+                            className="flex-1 sm:flex-none"
+                          >
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            Atribuir a mim
+                          </Button>
+                        )}
+                        {pedido.status === "em_oracao" && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={(e) => handleMarcarComoOrado(pedido.id, e)}
+                            className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Marcar como Orado
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           onClick={() => {
                             setSelectedPedido(pedido);
                             setPedidoDetailsOpen(true);
                           }}
+                          className="flex-1 sm:flex-none"
                         >
-                          <div className="flex-1">
-                            <CardTitle className="text-base mb-2">
-                              {pedido.pedido}
-                            </CardTitle>
-                            <div className="flex flex-wrap gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                {pedido.tipo}
-                              </Badge>
-                              <Badge
-                                className={`text-xs ${getStatusColor(
-                                  pedido.status
-                                )}`}
-                              >
-                                {getStatusLabel(pedido.status)}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <User className="w-3 h-3" />
-                                {getNomeSolicitante(pedido)}
-                              </span>
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(
-                                  pedido.data_criacao
-                                ).toLocaleDateString("pt-BR")}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Botões de Ação Rápida */}
-                        <div className="flex flex-wrap gap-2">
-                          {pedido.status === "pendente" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) =>
-                                handleAtribuirPedido(pedido.id, e)
-                              }
-                              className="flex-1 sm:flex-none"
-                            >
-                              <UserPlus className="w-4 h-4 mr-2" />
-                              Atribuir a mim
-                            </Button>
-                          )}
-                          {pedido.status === "em_oracao" && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={(e) =>
-                                handleMarcarComoOrado(pedido.id, e)
-                              }
-                              className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Marcar como Orado
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setSelectedPedido(pedido);
-                              setPedidoDetailsOpen(true);
-                            }}
-                            className="flex-1 sm:flex-none"
-                          >
-                            Ver Detalhes
-                          </Button>
-                        </div>
+                          Ver Detalhes
+                        </Button>
                       </div>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </div>
-            )}
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
 
-            {/* Botão "Carregar mais" - Pedidos */}
-            {hasNextPagePedidos && (
-              <div className="flex justify-center pt-4">
-                <Button
-                  onClick={() => fetchNextPagePedidos()}
-                  variant="outline"
-                  disabled={isLoadingPedidos}
-                >
-                  <ChevronDown className="w-4 h-4 mr-2" />
-                  {isLoadingPedidos ? "Carregando..." : "Carregar mais pedidos"}
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Tab: Testemunhos */}
-          <TabsContent value="testemunhos" className="space-y-4">
-            {/* Filtros */}
-            <Card className="shadow-soft">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Filtros de Testemunhos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-                  <Input
-                    placeholder="Buscar por título ou mensagem..."
-                    value={searchTestemunhos}
-                    onChange={(e) => setSearchTestemunhos(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Select
-                    value={statusFilterTestemunhos}
-                    onValueChange={(v) =>
-                      setStatusFilterTestemunhos(
-                        v as "aberto" | "publico" | "arquivado"
-                      )
-                    }
-                  >
-                    <SelectTrigger className="w-full md:w-[180px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="aberto">Aberto</SelectItem>
-                      <SelectItem value="publico">Público</SelectItem>
-                      <SelectItem value="arquivado">Arquivado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={categoriaFilter}
-                    onValueChange={setCategoriaFilter}
-                  >
-                    <SelectTrigger className="w-full md:w-[180px]">
-                      <SelectValue placeholder="Categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIAS_TESTEMUNHOS.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    onClick={handleExportTestemunhos}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Exportar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Ações */}
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">
-                {filteredTestemunhos.length}{" "}
-                {filteredTestemunhos.length === 1
-                  ? "testemunho encontrado"
-                  : "testemunhos encontrados"}
-              </p>
-              <Button onClick={() => setNovoTestemunhoOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Testemunho
+          {/* Botão "Carregar mais" - Pedidos */}
+          {hasNextPagePedidos && (
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => fetchNextPagePedidos()}
+                variant="outline"
+                disabled={isLoadingPedidos}
+              >
+                <ChevronDown className="w-4 h-4 mr-2" />
+                {isLoadingPedidos ? "Carregando..." : "Carregar mais pedidos"}
               </Button>
             </div>
+          )}
+        </TabsContent>
 
-            {/* Lista de Testemunhos */}
-            {isLoadingTestemunhos ? (
-              <Card className="shadow-soft">
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">
-                    Carregando testemunhos...
-                  </p>
-                </CardContent>
-              </Card>
-            ) : filteredTestemunhos.length === 0 ? (
-              <Card className="shadow-soft">
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">
-                    Nenhum testemunho encontrado
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {filteredTestemunhos.map((testemunho) => (
-                  <Card
-                    key={testemunho.id}
-                    className="shadow-soft hover:shadow-medium transition-all cursor-pointer"
-                    onClick={() => {
-                      setSelectedTestemunho(testemunho);
-                      setTestemunhoDetailsOpen(true);
-                    }}
-                  >
-                    <CardHeader className="pb-3 p-4 md:p-6">
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <CardTitle className="text-base mb-2">
-                            {testemunho.titulo}
-                          </CardTitle>
-                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                            {testemunho.mensagem}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="outline" className="text-xs">
-                              {testemunho.categoria}
-                            </Badge>
-                            {testemunho.publicar ? (
-                              <Badge className="text-xs bg-green-100 text-green-700 dark:bg-green-900/20">
-                                Publicado
-                              </Badge>
-                            ) : (
-                              <Badge
-                                className={`text-xs ${getStatusColor(
-                                  testemunho.status
-                                )}`}
-                              >
-                                {getStatusLabel(testemunho.status)}
-                              </Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {testemunho.anonimo
-                                ? "Anônimo"
-                                : testemunho.profiles?.nome || "Não informado"}
-                            </span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {new Date(
-                                testemunho.created_at
-                              ).toLocaleDateString("pt-BR")}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            {/* Botão "Carregar mais" - Testemunhos */}
-            {hasNextPageTestemunhos && (
-              <div className="flex justify-center pt-4">
-                <Button
-                  onClick={() => fetchNextPageTestemunhos()}
-                  variant="outline"
-                  disabled={isLoadingTestemunhos}
+        {/* Tab: Testemunhos */}
+        <TabsContent value="testemunhos" className="space-y-4">
+          {/* Filtros */}
+          <Card className="shadow-soft">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Search className="w-4 h-4" />
+                Filtros de Testemunhos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+                <Input
+                  placeholder="Buscar por título ou mensagem..."
+                  value={searchTestemunhos}
+                  onChange={(e) => setSearchTestemunhos(e.target.value)}
+                  className="flex-1"
+                />
+                <Select
+                  value={statusFilterTestemunhos}
+                  onValueChange={(v) =>
+                    setStatusFilterTestemunhos(
+                      v as "aberto" | "publico" | "arquivado",
+                    )
+                  }
                 >
-                  <ChevronDown className="w-4 h-4 mr-2" />
-                  {isLoadingTestemunhos
-                    ? "Carregando..."
-                    : "Carregar mais testemunhos"}
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aberto">Aberto</SelectItem>
+                    <SelectItem value="publico">Público</SelectItem>
+                    <SelectItem value="arquivado">Arquivado</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={categoriaFilter}
+                  onValueChange={setCategoriaFilter}
+                >
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIAS_TESTEMUNHOS.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleExportTestemunhos}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
                 </Button>
               </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
+            </CardContent>
+          </Card>
+
+          {/* Ações */}
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              {filteredTestemunhos.length}{" "}
+              {filteredTestemunhos.length === 1
+                ? "testemunho encontrado"
+                : "testemunhos encontrados"}
+            </p>
+            <Button onClick={() => setNovoTestemunhoOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Testemunho
+            </Button>
+          </div>
+
+          {/* Lista de Testemunhos */}
+          {isLoadingTestemunhos ? (
+            <Card className="shadow-soft">
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  Carregando testemunhos...
+                </p>
+              </CardContent>
+            </Card>
+          ) : filteredTestemunhos.length === 0 ? (
+            <Card className="shadow-soft">
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  Nenhum testemunho encontrado
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredTestemunhos.map((testemunho) => (
+                <Card
+                  key={testemunho.id}
+                  className="shadow-soft hover:shadow-medium transition-all cursor-pointer"
+                  onClick={() => {
+                    setSelectedTestemunho(testemunho);
+                    setTestemunhoDetailsOpen(true);
+                  }}
+                >
+                  <CardHeader className="pb-3 p-4 md:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <CardTitle className="text-base mb-2">
+                          {testemunho.titulo}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {testemunho.mensagem}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {testemunho.categoria}
+                          </Badge>
+                          {testemunho.publicar ? (
+                            <Badge className="text-xs bg-green-100 text-green-700 dark:bg-green-900/20">
+                              Publicado
+                            </Badge>
+                          ) : (
+                            <Badge
+                              className={`text-xs ${getStatusColor(
+                                testemunho.status,
+                              )}`}
+                            >
+                              {getStatusLabel(testemunho.status)}
+                            </Badge>
+                          )}
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            {testemunho.anonimo
+                              ? "Anônimo"
+                              : testemunho.profiles?.nome || "Não informado"}
+                          </span>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(testemunho.created_at).toLocaleDateString(
+                              "pt-BR",
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Botão "Carregar mais" - Testemunhos */}
+          {hasNextPageTestemunhos && (
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => fetchNextPageTestemunhos()}
+                variant="outline"
+                disabled={isLoadingTestemunhos}
+              >
+                <ChevronDown className="w-4 h-4 mr-2" />
+                {isLoadingTestemunhos
+                  ? "Carregando..."
+                  : "Carregar mais testemunhos"}
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
       <NovoPedidoDialog

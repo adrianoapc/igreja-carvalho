@@ -26,7 +26,11 @@ import {
   ChevronDown,
   Download,
 } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Types
@@ -85,7 +89,7 @@ export function ImportarTab() {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>(
-    []
+    [],
   );
   const [excluded, setExcluded] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -138,7 +142,7 @@ export function ImportarTab() {
 
   const gridTemplate = useMemo(
     () => `repeat(${columns.length}, minmax(${COL_MIN_WIDTH_PX}px, 1fr))`,
-    [columns.length]
+    [columns.length],
   );
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,15 +173,21 @@ export function ImportarTab() {
       const worksheet = wb.Sheets[sheetName];
       // Obter cabeçalhos diretamente da primeira linha para garantir todas as colunas
       // Forçar leitura como texto para evitar conversão automática de datas
-      const aoa = utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: "dd/mm/yyyy" }) as Array<
-        Array<unknown>
-      >;
+      const aoa = utils.sheet_to_json(worksheet, {
+        header: 1,
+        raw: false,
+        dateNF: "dd/mm/yyyy",
+      }) as Array<Array<unknown>>;
       const headerRow = (aoa[0] || []) as Array<unknown>;
       let columnNames = headerRow
         .map((h) => String(h || "").trim())
         .filter((h) => h.length > 0);
       // Fallback: se não houver cabeçalhos válidos, derive de keys da primeira linha dos dados
-      const jsonData = utils.sheet_to_json(worksheet, { defval: "", raw: false, dateNF: "dd/mm/yyyy" });
+      const jsonData = utils.sheet_to_json(worksheet, {
+        defval: "",
+        raw: false,
+        dateNF: "dd/mm/yyyy",
+      });
       if (!columnNames.length) {
         const firstRow = (jsonData[0] || {}) as Record<string, unknown>;
         columnNames = Object.keys(firstRow);
@@ -237,23 +247,23 @@ export function ImportarTab() {
 
   const parseValor = (valor: unknown): number => {
     if (valor === undefined || valor === null) return 0;
-    
+
     // Se já é número, retorna direto
     if (typeof valor === "number") return valor;
-    
+
     let str = String(valor).trim();
-    
+
     // Remove símbolos de moeda e espaços
     str = str.replace(/[¤$\u20AC£¥R\s]/g, "");
-    
+
     // Auto-detectar formato pelo último separador
     const lastComma = str.lastIndexOf(",");
     const lastDot = str.lastIndexOf(".");
-    
+
     // Determina se vírgula é o separador decimal (formato BR: 1.234,56)
     // ou se ponto é o separador decimal (formato US: 1,234.56)
     const isCommaDecimal = lastComma > lastDot;
-    
+
     if (isCommaDecimal) {
       // Formato BR: 1.234,56 → remove pontos (milhares), troca vírgula por ponto
       str = str.replace(/\./g, "").replace(",", ".");
@@ -261,13 +271,13 @@ export function ImportarTab() {
       // Formato US: 1,234.56 → remove vírgulas (milhares)
       str = str.replace(/,/g, "");
     }
-    
+
     const n = parseFloat(str);
     return isNaN(n) ? 0 : n;
   };
   const parseData = (data: unknown): string | null => {
     if (!data) return null;
-    
+
     // Handle Excel serial dates (numbers between 1 and 100000 are likely dates)
     if (typeof data === "number" && data > 1 && data < 100000) {
       // Excel epoch: 1899-12-30 (using UTC to avoid timezone issues)
@@ -286,9 +296,9 @@ export function ImportarTab() {
       }
       return null;
     }
-    
+
     const s = String(data).trim();
-    
+
     // Check if it's a numeric string that could be Excel serial date
     if (/^\d+$/.test(s)) {
       const num = parseInt(s, 10);
@@ -307,7 +317,7 @@ export function ImportarTab() {
       }
       return null;
     }
-    
+
     // dd/MM/yyyy format
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
       const [d, m, y] = s.split("/");
@@ -317,7 +327,7 @@ export function ImportarTab() {
       }
       return null;
     }
-    
+
     // yyyy-MM-dd format
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       const year = parseInt(s.substring(0, 4), 10);
@@ -326,7 +336,7 @@ export function ImportarTab() {
       }
       return null;
     }
-    
+
     // Try native Date parsing as fallback
     const dt = new Date(s);
     if (!isNaN(dt.getTime())) {
@@ -335,7 +345,7 @@ export function ImportarTab() {
         return dt.toISOString().split("T")[0];
       }
     }
-    
+
     return null;
   };
 
@@ -420,7 +430,7 @@ export function ImportarTab() {
             c.nome.toLowerCase() ===
             String(nomeConta || "")
               .toLowerCase()
-              .trim()
+              .trim(),
         );
         if (!contaOk) msgs.push("Conta não encontrada");
       }
@@ -432,7 +442,7 @@ export function ImportarTab() {
             c.nome.toLowerCase() ===
             String(nomeCategoria || "")
               .toLowerCase()
-              .trim()
+              .trim(),
         );
         if (!categoriaOk) msgs.push("Categoria não encontrada");
         else if (categoriaOk.tipo !== tipo)
@@ -445,7 +455,7 @@ export function ImportarTab() {
         const nomeSubStr = String(nomeSub || "").trim();
         if (nomeSubStr) {
           const subOk = subcategorias.find(
-            (s) => s.nome.toLowerCase() === nomeSubStr.toLowerCase()
+            (s) => s.nome.toLowerCase() === nomeSubStr.toLowerCase(),
           );
           if (!subOk) msgs.push("Subcategoria não encontrada");
         }
@@ -458,7 +468,7 @@ export function ImportarTab() {
         const nomeBaseStr = String(nomeBase || "").trim();
         if (nomeBaseStr) {
           const baseOk = basesMinisteriais.find(
-            (b) => b.titulo.toLowerCase() === nomeBaseStr.toLowerCase()
+            (b) => b.titulo.toLowerCase() === nomeBaseStr.toLowerCase(),
           );
           if (!baseOk) msgs.push("Base ministerial não encontrada");
         }
@@ -471,7 +481,7 @@ export function ImportarTab() {
         const nomeCCStr = String(nomeCC || "").trim();
         if (nomeCCStr) {
           const ccOk = centrosCusto.find(
-            (c) => c.nome.toLowerCase() === nomeCCStr.toLowerCase()
+            (c) => c.nome.toLowerCase() === nomeCCStr.toLowerCase(),
           );
           if (!ccOk) msgs.push("Centro de custo não encontrado");
         }
@@ -484,7 +494,7 @@ export function ImportarTab() {
         const nomeFornecedorStr = String(nomeFornecedor || "").trim();
         if (nomeFornecedorStr) {
           const fornOk = fornecedores.find(
-            (f) => f.nome.toLowerCase() === nomeFornecedorStr.toLowerCase()
+            (f) => f.nome.toLowerCase() === nomeFornecedorStr.toLowerCase(),
           );
           if (!fornOk) msgs.push("Fornecedor não encontrado");
         }
@@ -509,7 +519,7 @@ export function ImportarTab() {
     toast[issues.length ? "warning" : "success"](
       issues.length
         ? `${issues.length} linhas com problemas`
-        : "Validação concluída sem erros"
+        : "Validação concluída sem erros",
     );
   };
 
@@ -520,7 +530,7 @@ export function ImportarTab() {
     fornecedores?: Array<{ id: string; nome: string }>,
     subcategorias?: Array<{ id: string; nome: string }>,
     basesMinisteriais?: Array<{ id: string; titulo: string }>,
-    centrosCusto?: Array<{ id: string; nome: string }>
+    centrosCusto?: Array<{ id: string; nome: string }>,
   ) => {
     const rawDescricao = mapping.descricao ? row[mapping.descricao] : null;
     const descricao = rawDescricao != null ? String(rawDescricao) : "";
@@ -545,7 +555,7 @@ export function ImportarTab() {
           c.nome.toLowerCase() ===
           String(nomeConta || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (contaEncontrada) contaId = contaEncontrada.id;
     }
@@ -557,7 +567,7 @@ export function ImportarTab() {
           c.nome.toLowerCase() ===
           String(nomeCategoria || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (categoriaEncontrada) categoriaId = categoriaEncontrada.id;
     }
@@ -569,7 +579,7 @@ export function ImportarTab() {
           f.nome.toLowerCase() ===
           String(nomeFornecedor || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (fornecedorEncontrado) fornecedorId = fornecedorEncontrado.id;
     }
@@ -581,7 +591,7 @@ export function ImportarTab() {
           s.nome.toLowerCase() ===
           String(nomeSub || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (subEncontrada) subcategoriaId = subEncontrada.id;
     }
@@ -593,7 +603,7 @@ export function ImportarTab() {
           b.titulo.toLowerCase() ===
           String(nomeBase || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (baseEncontrada) baseMinisterialId = baseEncontrada.id;
     }
@@ -605,7 +615,7 @@ export function ImportarTab() {
           c.nome.toLowerCase() ===
           String(nomeCC || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (ccEncontrado) centroCustoId = ccEncontrado.id;
     }
@@ -729,8 +739,8 @@ export function ImportarTab() {
           fornecedores || [],
           subcategorias || [],
           basesMinisteriais || [],
-          centrosCusto || []
-        )
+          centrosCusto || [],
+        ),
       );
 
       const total = transacoes.length;
@@ -818,7 +828,7 @@ export function ImportarTab() {
 
     if (
       !confirm(
-        "Tem certeza? Isso deletará todas as transações importadas neste lote."
+        "Tem certeza? Isso deletará todas as transações importadas neste lote.",
       )
     ) {
       return;
@@ -840,7 +850,7 @@ export function ImportarTab() {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ job_id: currentJobId }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -850,7 +860,7 @@ export function ImportarTab() {
 
       const result = await response.json();
       toast.success(
-        `Importação desfeita. ${result.deleted_count} transações deletadas.`
+        `Importação desfeita. ${result.deleted_count} transações deletadas.`,
       );
 
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
@@ -874,7 +884,7 @@ export function ImportarTab() {
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Erro ao desfazer importação"
+        err instanceof Error ? err.message : "Erro ao desfazer importação",
       );
     } finally {
       setLoading(false);
@@ -1245,7 +1255,7 @@ export function ImportarTab() {
                                 className="px-3 py-2 whitespace-nowrap"
                               >
                                 {String(
-                                  (row as Record<string, unknown>)[col] || ""
+                                  (row as Record<string, unknown>)[col] || "",
                                 )}
                               </div>
                             ))}
@@ -1288,14 +1298,14 @@ export function ImportarTab() {
                   size="sm"
                   onClick={() => {
                     const csvContent = validationIssues
-                      .map((issue) => 
-                        `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`
+                      .map(
+                        (issue) =>
+                          `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`,
                       )
                       .join("\n");
-                    const blob = new Blob(
-                      [`Linha,Problemas\n${csvContent}`],
-                      { type: "text/csv;charset=utf-8;" }
-                    );
+                    const blob = new Blob([`Linha,Problemas\n${csvContent}`], {
+                      type: "text/csv;charset=utf-8;",
+                    });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = url;
@@ -1441,7 +1451,7 @@ export function ImportarTab() {
                               <span className="font-medium">Descrição:</span>{" "}
                               {String(
                                 rows[issue.index][mapping.descricao || ""] ||
-                                  "—"
+                                  "—",
                               )}
                             </div>
                           </div>
@@ -1466,7 +1476,7 @@ export function ImportarTab() {
                                       {String(value || "—")}
                                     </span>
                                   </div>
-                                )
+                                ),
                               )}
                             </div>
                           )}
@@ -1504,7 +1514,7 @@ export function ImportarTab() {
                   style={{
                     width: chunkProgress.total
                       ? `${Math.round(
-                          (chunkProgress.processed / chunkProgress.total) * 100
+                          (chunkProgress.processed / chunkProgress.total) * 100,
                         )}%`
                       : "0%",
                   }}
@@ -1518,7 +1528,7 @@ export function ImportarTab() {
                 <p className="font-semibold">
                   {chunkProgress.total
                     ? `${Math.round(
-                        (chunkProgress.processed / chunkProgress.total) * 100
+                        (chunkProgress.processed / chunkProgress.total) * 100,
                       )}%`
                     : "0%"}
                 </p>
@@ -1545,12 +1555,14 @@ export function ImportarTab() {
                       onClick={(e) => {
                         e.stopPropagation();
                         const csvContent = rejected
-                          .map((r) => `${r.index + 2},"${r.reason.replace(/"/g, '""')}"`)
+                          .map(
+                            (r) =>
+                              `${r.index + 2},"${r.reason.replace(/"/g, '""')}"`,
+                          )
                           .join("\n");
-                        const blob = new Blob(
-                          [`Linha,Erro\n${csvContent}`],
-                          { type: "text/csv;charset=utf-8;" }
-                        );
+                        const blob = new Blob([`Linha,Erro\n${csvContent}`], {
+                          type: "text/csv;charset=utf-8;",
+                        });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement("a");
                         a.href = url;
@@ -1574,7 +1586,9 @@ export function ImportarTab() {
                             <span className="font-medium text-destructive">
                               Linha {r.index + 2}:
                             </span>{" "}
-                            <span className="text-muted-foreground">{r.reason}</span>
+                            <span className="text-muted-foreground">
+                              {r.reason}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -1674,7 +1688,7 @@ export function ImportarTab() {
             <Button
               onClick={() =>
                 navigate(
-                  "/financas/" + (tipo === "entrada" ? "entradas" : "saidas")
+                  "/financas/" + (tipo === "entrada" ? "entradas" : "saidas"),
                 )
               }
             >

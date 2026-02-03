@@ -64,7 +64,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { title: "Início", url: "/", icon: LayoutDashboard },
       { title: "Mural & Avisos", url: "/mural", icon: MonitorPlay },
       { title: "Diário de Oração", url: "/intercessao/diario", icon: Heart },
-      { title: "Agenda", url: "/eventos/lista", icon: CalendarDays },
+      { title: "Agenda", url: "/agenda", icon: CalendarDays },
       { title: "Voluntariado", url: "/voluntariado", icon: Briefcase },
       {
         title: "Minha Jornada",

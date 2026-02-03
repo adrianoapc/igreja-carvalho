@@ -24,6 +24,7 @@ import {
   parseISO,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatLocalDate, startOfMonthLocal, endOfMonthLocal } from "@/utils/dateUtils";
 import {
   BarChart,
   Bar,
@@ -68,14 +69,14 @@ export default function Dashboard() {
   const getDateRange = () => {
     if (customRange) {
       return {
-        inicio: customRange.from.toISOString().split("T")[0],
-        fim: customRange.to.toISOString().split("T")[0],
+        inicio: formatLocalDate(customRange.from),
+        fim: formatLocalDate(customRange.to),
       };
     }
 
     return {
-      inicio: startOfMonth(selectedMonth).toISOString().split("T")[0],
-      fim: endOfMonth(selectedMonth).toISOString().split("T")[0],
+      inicio: formatLocalDate(startOfMonthLocal(selectedMonth)),
+      fim: formatLocalDate(endOfMonthLocal(selectedMonth)),
     };
   };
 
@@ -193,11 +194,11 @@ export default function Dashboard() {
         .eq("igreja_id", igrejaId)
         .gte(
           "data_vencimento",
-          startOfMonth(mesAnterior).toISOString().split("T")[0]
+          formatLocalDate(startOfMonthLocal(mesAnterior))
         )
         .lte(
           "data_vencimento",
-          endOfMonth(mesAnterior).toISOString().split("T")[0]
+          formatLocalDate(endOfMonthLocal(mesAnterior))
         );
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);

@@ -26,6 +26,7 @@ const Install = lazy(() => import("./pages/Install"));
 const BiometricLogin = lazy(() => import("./pages/BiometricLogin"));
 const ContextSelect = lazy(() => import("./pages/ContextSelect"));
 const ForcedPasswordChange = lazy(() => import("./pages/ForcedPasswordChange"));
+const ReviewPage = lazy(() => import("./pages/ReviewPage"));
 
 // Módulos
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -183,6 +184,7 @@ const FinancasTransferencias = lazy(() => import("./pages/financas/Transferencia
 // Projetos
 const Projetos = lazy(() => import("./pages/Projetos"));
 const ProjetoDetalhes = lazy(() => import("./pages/ProjetoDetalhes"));
+const Backlog = lazy(() => import("./pages/Backlog"));
 
 // Oração
 const PrayerPlayer = lazy(() => import("./pages/oracao/Player"));
@@ -200,7 +202,9 @@ const ConfiguracoesIgreja = lazy(() => import("./pages/ConfiguracoesIgreja"));
 const SuperAdminDashboard = lazy(() => import("./pages/superadmin/Dashboard"));
 const SuperAdminIgrejas = lazy(() => import("./pages/superadmin/Igrejas"));
 const SuperAdminMetricas = lazy(() => import("./pages/superadmin/Metricas"));
-const SuperAdminConfiguracoesGlobais = lazy(() => import("./pages/superadmin/ConfiguracoesGlobais"));
+const SuperAdminConfiguracoesGlobais = lazy(
+  () => import("./pages/superadmin/ConfiguracoesGlobais"),
+);
 const NovaIgreja = lazy(() => import("./pages/cadastro/NovaIgreja"));
 
 const queryClient = new QueryClient();
@@ -274,6 +278,23 @@ const App = () => (
                     element={
                       <AuthGate>
                         <Dashboard />
+                      </AuthGate>
+                    }
+                  />
+
+                  <Route
+                    path="/revisao"
+                    element={
+                      <AuthGate>
+                        <ReviewPage />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/revisao/:slug"
+                    element={
+                      <AuthGate>
+                        <ReviewPage />
                       </AuthGate>
                     }
                   />
@@ -1072,6 +1093,14 @@ const App = () => (
                     element={
                       <AuthGate>
                         <Projetos />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/projetos/backlog"
+                    element={
+                      <AuthGate>
+                        <Backlog />
                       </AuthGate>
                     }
                   />

@@ -43,7 +43,6 @@ export function ReconciliacaoBancaria() {
       let query = supabase
         .from("transacoes_financeiras")
         .select("*")
-        .eq("status", "pago")
         .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);

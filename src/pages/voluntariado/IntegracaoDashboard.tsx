@@ -310,16 +310,22 @@ export default function IntegracaoDashboard() {
   );
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Integração de Voluntários</h1>
-        <p className="text-muted-foreground">
-          Acompanhe o progresso dos candidatos no fluxo de integração
-        </p>
+    <div className="space-y-4 md:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Users className="w-8 h-8 text-primary" />
+            Integração de Voluntários
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Acompanhe o progresso dos candidatos no fluxo de integração
+          </p>
+        </div>
       </div>
 
       {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">

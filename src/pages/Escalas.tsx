@@ -125,17 +125,32 @@ export default function Escalas() {
   const loadMembros = async () => {
     if (!timeSelecionado) return;
     try {
-      let query = supabase
-        .from("membros_time")
-        .select(`*, profiles:pessoa_id(nome), posicoes_time:posicao_id(nome)`)
-        .eq("time_id", timeSelecionado)
-        .eq("ativo", true);
-      if (igrejaId) query = query.eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setMembros(data || []);
+      if (timeSelecionado === "todos") {
+        // Carregar membros de todos os times
+        let query = supabase
+          .from("membros_time")
+          .select(
+            `*, profiles:pessoa_id(nome), posicoes_time:posicao_id(nome), times:time_id(nome, cor)`,
+          )
+          .eq("ativo", true);
+        if (igrejaId) query = query.eq("igreja_id", igrejaId);
+        if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+        const { data, error } = await query;
+        if (error) throw error;
+        setMembros(data || []);
+      } else {
+        // Carregar membros de um time específico
+        let query = supabase
+          .from("membros_time")
+          .select(`*, profiles:pessoa_id(nome), posicoes_time:posicao_id(nome)`)
+          .eq("time_id", timeSelecionado)
+          .eq("ativo", true);
+        if (igrejaId) query = query.eq("igreja_id", igrejaId);
+        if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+        const { data, error } = await query;
+        if (error) throw error;
+        setMembros(data || []);
+      }
     } catch (error: unknown) {
       toast.error("Erro ao carregar membros", {
         description: error instanceof Error ? error.message : String(error),
@@ -173,9 +188,14 @@ export default function Escalas() {
       let query = supabase
         .from("escalas")
         .select("*")
-        .eq("time_id", timeSelecionado)
         .in("evento_id", cultoIds)
         .eq("igreja_id", igrejaId);
+
+      // Se não é "todos", filtrar por time específico
+      if (timeSelecionado !== "todos") {
+        query = query.eq("time_id", timeSelecionado);
+      }
+
       if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
       const { data, error } = await query;
 
@@ -190,7 +210,7 @@ export default function Escalas() {
 
   const isEscalado = (pessoaId: string, cultoId: string) => {
     return escalas.some(
-      (e) => e.pessoa_id === pessoaId && e.evento_id === cultoId
+      (e) => e.pessoa_id === pessoaId && e.evento_id === cultoId,
     );
   };
 
@@ -214,10 +234,10 @@ export default function Escalas() {
   const handleToggleEscala = async (
     pessoaId: string,
     cultoId: string,
-    posicaoId: string | null
+    posicaoId: string | null,
   ) => {
     const existente = escalas.find(
-      (e) => e.pessoa_id === pessoaId && e.evento_id === cultoId
+      (e) => e.pessoa_id === pessoaId && e.evento_id === cultoId,
     );
 
     if (existente) {
@@ -259,7 +279,7 @@ export default function Escalas() {
       `Enviando ${pendentesList.length} mensagens via WhatsApp...`,
       {
         description: "Os voluntários pendentes serão notificados em breve.",
-      }
+      },
     );
   };
 
@@ -316,6 +336,12 @@ export default function Escalas() {
             <SelectValue placeholder="Selecione o time" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="todos">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Todos os Times
+              </div>
+            </SelectItem>
             {times.map((time) => (
               <SelectItem key={time.id} value={time.id}>
                 <div className="flex items-center gap-2">
@@ -412,7 +438,7 @@ export default function Escalas() {
                 <tbody>
                   {membros.map((membro) => {
                     const totalEscalas = cultos.filter((c) =>
-                      isEscalado(membro.pessoa_id, c.id)
+                      isEscalado(membro.pessoa_id, c.id),
                     ).length;
 
                     return (
@@ -438,11 +464,11 @@ export default function Escalas() {
                         {cultos.map((culto) => {
                           const escalado = isEscalado(
                             membro.pessoa_id,
-                            culto.id
+                            culto.id,
                           );
                           const confirmado = isConfirmado(
                             membro.pessoa_id,
-                            culto.id
+                            culto.id,
                           );
 
                           return (
@@ -457,7 +483,7 @@ export default function Escalas() {
                                     handleToggleEscala(
                                       membro.pessoa_id,
                                       culto.id,
-                                      membro.posicao_id
+                                      membro.posicao_id,
                                     )
                                   }
                                   className="h-4 w-4"
@@ -489,7 +515,7 @@ export default function Escalas() {
                     <td className="p-2 md:p-3 text-xs">Total por Evento</td>
                     {cultos.map((culto) => {
                       const total = membros.filter((m) =>
-                        isEscalado(m.pessoa_id, culto.id)
+                        isEscalado(m.pessoa_id, culto.id),
                       ).length;
                       return (
                         <td key={culto.id} className="p-2 md:p-3 text-center">

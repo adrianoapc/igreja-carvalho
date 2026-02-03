@@ -11,6 +11,7 @@ import {
   Cake,
   Phone,
   Heart,
+  Archive,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,6 +55,7 @@ export default function DashboardLeader() {
     membrosCelula: 0,
     visitantesPendentes: 0,
     relatoriosAtrasados: 0,
+    backlogTarefas: 0,
   });
   const [aniversariantes, setAniversariantes] = useState<Aniversariante[]>([]);
   const [sentimentoDialogOpen, setSentimentoDialogOpen] = useState(false);
@@ -133,6 +135,21 @@ export default function DashboardLeader() {
       ...prev,
       visitantesPendentes: visitantesCount || 0,
     }));
+
+    // Tarefas em backlog
+    let backlogQuery = supabase
+      .from("tarefas")
+      .select("*", { count: "exact", head: true })
+      .is("projeto_id", null);
+    if (igrejaId) backlogQuery = backlogQuery.eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId)
+      backlogQuery = backlogQuery.eq("filial_id", filialId);
+    const { count: backlogCount } = await backlogQuery;
+
+    setStats((prev) => ({
+      ...prev,
+      backlogTarefas: backlogCount || 0,
+    }));
   };
 
   const fetchAniversariantes = async () => {
@@ -156,7 +173,7 @@ export default function DashboardLeader() {
           const thisYearBirthday = new Date(
             today.getFullYear(),
             nascimento.getMonth(),
-            nascimento.getDate()
+            nascimento.getDate(),
           );
           return isWithinInterval(thisYearBirthday, {
             start: today,
@@ -219,7 +236,7 @@ export default function DashboardLeader() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="shadow-soft">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-full bg-primary/10">
@@ -261,6 +278,25 @@ export default function DashboardLeader() {
               </p>
               <p className="text-sm text-muted-foreground">
                 Relatórios Atrasados
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="shadow-soft cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => navigate("/projetos/backlog")}
+        >
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-full bg-blue-500/10">
+              <Archive className="w-6 h-6 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">
+                {stats.backlogTarefas}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Tarefas em Backlog
               </p>
             </div>
           </CardContent>
@@ -308,7 +344,7 @@ export default function DashboardLeader() {
               const thisYearBirthday = new Date(
                 today.getFullYear(),
                 nascimento.getMonth(),
-                nascimento.getDate()
+                nascimento.getDate(),
               );
               const isToday = isSameDay(thisYearBirthday, today);
 

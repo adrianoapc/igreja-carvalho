@@ -50,6 +50,7 @@ interface TarefaDialogProps {
     responsavel_id: string | null;
   } | null;
   onSuccess: () => void;
+  permitirSemProjeto?: boolean;
 }
 
 export default function TarefaDialog({
@@ -58,6 +59,7 @@ export default function TarefaDialog({
   projetoId,
   tarefa,
   onSuccess,
+  permitirSemProjeto = false,
 }: TarefaDialogProps) {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [loading, setLoading] = useState(false);
@@ -109,8 +111,7 @@ export default function TarefaDialog({
 
     setLoading(true);
     try {
-      const payload = {
-        projeto_id: projetoId,
+      const payload: any = {
         titulo: titulo.trim(),
         descricao: descricao.trim() || null,
         status,
@@ -122,6 +123,13 @@ export default function TarefaDialog({
         igreja_id: igrejaId,
         filial_id: isAllFiliais ? null : filialId,
       };
+
+      // Apenas adiciona projeto_id se não for permitir sem projeto ou se houver projetoId
+      if (!permitirSemProjeto || projetoId) {
+        payload.projeto_id = projetoId || null;
+      } else {
+        payload.projeto_id = null;
+      }
 
       if (tarefa) {
         const { error } = await supabase
@@ -204,6 +212,7 @@ export default function TarefaDialog({
                   <SelectItem value="todo">Não Iniciado</SelectItem>
                   <SelectItem value="doing">Em Execução</SelectItem>
                   <SelectItem value="done">Finalizado</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
             </div>

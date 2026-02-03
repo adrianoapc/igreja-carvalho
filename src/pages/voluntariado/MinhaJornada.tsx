@@ -30,7 +30,13 @@ import { useNavigate } from "react-router-dom";
 interface MinhaIntegracao {
   id: string;
   candidato_id: string;
-  status: "entrevista" | "trilha" | "mentoria" | "teste" | "ativo" | "rejeitado";
+  status:
+    | "entrevista"
+    | "trilha"
+    | "mentoria"
+    | "teste"
+    | "ativo"
+    | "rejeitado";
   percentual_jornada: number;
   data_jornada_iniciada: string | null;
   data_conclusao_esperada: string | null;
@@ -56,7 +62,9 @@ interface MinhaIntegracao {
 export default function MinhaJornada() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [integracaoSelecionadaId, setIntegracaoSelecionadaId] = useState<string | null>(null);
+  const [integracaoSelecionadaId, setIntegracaoSelecionadaId] = useState<
+    string | null
+  >(null);
 
   // Query para buscar minhas integrações de voluntário (não jornadas genéricas)
   const { data: integracoes, isLoading } = useQuery({
@@ -64,7 +72,10 @@ export default function MinhaJornada() {
     queryFn: async () => {
       if (!profile?.id) return null;
 
-      console.log("[MinhaJornada] Buscando integrações para profile:", profile.id);
+      console.log(
+        "[MinhaJornada] Buscando integrações para profile:",
+        profile.id,
+      );
 
       // Buscar todas as candidaturas aprovadas ou em processo
       const { data: candidaturas, error: candidaturasError } = await supabase
@@ -75,7 +86,10 @@ export default function MinhaJornada() {
         .order("created_at", { ascending: false });
 
       if (candidaturasError) {
-        console.error("[MinhaJornada] Erro ao buscar candidaturas:", candidaturasError);
+        console.error(
+          "[MinhaJornada] Erro ao buscar candidaturas:",
+          candidaturasError,
+        );
         throw candidaturasError;
       }
 
@@ -84,14 +98,17 @@ export default function MinhaJornada() {
         return null;
       }
 
-      console.log("[MinhaJornada] Candidaturas encontradas:", candidaturas.length);
+      console.log(
+        "[MinhaJornada] Candidaturas encontradas:",
+        candidaturas.length,
+      );
 
       const candidaturasIds = candidaturas.map((c) => c.id);
 
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       const integracaoQuery = supabase.from("integracao_voluntario");
-      
+
       const { data, error } = await integracaoQuery
         .select(
           `
@@ -107,7 +124,7 @@ export default function MinhaJornada() {
           pontuacao_teste,
           mentor:profiles!integracao_voluntario_mentor_id_fkey (nome, telefone, email),
           jornada:jornadas!integracao_voluntario_jornada_id_fkey (titulo, descricao)
-        `
+        `,
         )
         .in("candidato_id", candidaturasIds)
         .order("updated_at", { ascending: false });
@@ -116,18 +133,27 @@ export default function MinhaJornada() {
         console.error("[MinhaJornada] Erro ao buscar integração:", error);
         // Se a tabela não existe, retornar null ao invés de erro
         if (error.code === "42P01") {
-          console.warn("[MinhaJornada] Tabela integracao_voluntario não existe ainda");
+          console.warn(
+            "[MinhaJornada] Tabela integracao_voluntario não existe ainda",
+          );
           return null;
         }
         throw error;
       }
-      
+
       if (!data || (Array.isArray(data) && data.length === 0)) {
-        console.log("[MinhaJornada] Nenhuma integração encontrada. Candidatos:", candidaturasIds);
+        console.log(
+          "[MinhaJornada] Nenhuma integração encontrada. Candidatos:",
+          candidaturasIds,
+        );
         return null;
       }
 
-      console.log("[MinhaJornada] ✅ Integrações encontradas:", Array.isArray(data) ? data.length : 1, data);
+      console.log(
+        "[MinhaJornada] ✅ Integrações encontradas:",
+        Array.isArray(data) ? data.length : 1,
+        data,
+      );
 
       const candidaturasMap = new Map(
         candidaturas.map((candidatura) => [candidatura.id, candidatura]),
@@ -193,13 +219,14 @@ export default function MinhaJornada() {
       case "entrevista":
         return {
           title: "Aguardando Entrevista",
-          description: "Em breve você será contatado para agendar sua entrevista inicial.",
+          description:
+            "Em breve você será contatado para agendar sua entrevista inicial.",
           icon: Clock,
         };
       case "trilha":
         return {
           title: "Complete sua Jornada",
-          description: `Você está em ${target.percentual_jornada}% da trilha "${target.jornada?.titulo || 'de formação'}". Continue progredindo!`,
+          description: `Você está em ${target.percentual_jornada}% da trilha "${target.jornada?.titulo || "de formação"}". Continue progredindo!`,
           icon: BookOpen,
           action: () => navigate("/cursos"),
           actionLabel: "Ver Jornada",
@@ -214,16 +241,19 @@ export default function MinhaJornada() {
         if (target.teste_id && !target.resultado_teste) {
           return {
             title: "Teste Disponível",
-            description: "Seu teste de aptidão está pronto. Clique abaixo para iniciar.",
+            description:
+              "Seu teste de aptidão está pronto. Clique abaixo para iniciar.",
             icon: ClipboardCheck,
-            action: () => navigate(`/voluntariado/meu-teste/${target.teste_id}`),
+            action: () =>
+              navigate(`/voluntariado/meu-teste/${target.teste_id}`),
             actionLabel: "Fazer Teste",
           };
         }
         if (target.resultado_teste === "pendente") {
           return {
             title: "Aguardando Avaliação",
-            description: "Você completou o teste. Aguarde a avaliação do seu mentor.",
+            description:
+              "Você completou o teste. Aguarde a avaliação do seu mentor.",
             icon: Clock,
           };
         }
@@ -245,7 +275,7 @@ export default function MinhaJornada() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-12 flex items-center justify-center">
+      <div className="py-12 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
@@ -253,11 +283,11 @@ export default function MinhaJornada() {
 
   if (!integracao) {
     return (
-      <div className="container mx-auto py-12">
+      <div className="py-12">
         <Alert>
           <AlertDescription>
-            Você ainda não está em processo de integração. Candidate-se a um ministério para
-            iniciar sua jornada!
+            Você ainda não está em processo de integração. Candidate-se a um
+            ministério para iniciar sua jornada!
           </AlertDescription>
         </Alert>
         <Button onClick={() => navigate("/voluntariado")} className="mt-4">
@@ -281,11 +311,31 @@ export default function MinhaJornada() {
   // Cores por etapa (seguindo paleta do IntegracaoInfoModal)
   const statusStepsWithColors = statusSteps.map((step, idx) => {
     const colorMap = {
-      entrevista: { bg: "bg-blue-50", icon: "bg-blue-100 text-blue-700", line: "bg-blue-600" },
-      trilha: { bg: "bg-green-50", icon: "bg-green-100 text-green-700", line: "bg-green-600" },
-      mentoria: { bg: "bg-purple-50", icon: "bg-purple-100 text-purple-700", line: "bg-purple-600" },
-      teste: { bg: "bg-orange-50", icon: "bg-orange-100 text-orange-700", line: "bg-orange-600" },
-      ativo: { bg: "bg-yellow-50", icon: "bg-yellow-100 text-yellow-700", line: "bg-yellow-600" },
+      entrevista: {
+        bg: "bg-blue-50",
+        icon: "bg-blue-100 text-blue-700",
+        line: "bg-blue-600",
+      },
+      trilha: {
+        bg: "bg-green-50",
+        icon: "bg-green-100 text-green-700",
+        line: "bg-green-600",
+      },
+      mentoria: {
+        bg: "bg-purple-50",
+        icon: "bg-purple-100 text-purple-700",
+        line: "bg-purple-600",
+      },
+      teste: {
+        bg: "bg-orange-50",
+        icon: "bg-orange-100 text-orange-700",
+        line: "bg-orange-600",
+      },
+      ativo: {
+        bg: "bg-yellow-50",
+        icon: "bg-yellow-100 text-yellow-700",
+        line: "bg-yellow-600",
+      },
     };
     return {
       ...step,
@@ -294,11 +344,12 @@ export default function MinhaJornada() {
   });
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Minha Jornada de Integração</h1>
         <p className="text-muted-foreground">
-          Acompanhe seu progresso no ministério {integracao.candidato.ministerio}
+          Acompanhe seu progresso no ministério{" "}
+          {integracao.candidato.ministerio}
         </p>
       </div>
 
@@ -307,7 +358,8 @@ export default function MinhaJornada() {
           <CardHeader>
             <CardTitle>Suas Jornadas</CardTitle>
             <CardDescription>
-              Você possui {integracoes.length} integrações ativas. Selecione uma para visualizar.
+              Você possui {integracoes.length} integrações ativas. Selecione uma
+              para visualizar.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -462,7 +514,9 @@ export default function MinhaJornada() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   Iniciada em{" "}
-                  {new Date(integracao.data_jornada_iniciada).toLocaleDateString("pt-BR")}
+                  {new Date(
+                    integracao.data_jornada_iniciada,
+                  ).toLocaleDateString("pt-BR")}
                 </div>
               )}
             </CardContent>
@@ -509,29 +563,32 @@ export default function MinhaJornada() {
         )}
 
         {/* Prazo */}
-        {integracao.data_conclusao_esperada && integracao.status !== "ativo" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Prazo de Conclusão
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">
-                {new Date(integracao.data_conclusao_esperada).toLocaleDateString("pt-BR")}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {Math.ceil(
-                  (new Date(integracao.data_conclusao_esperada).getTime() -
-                    new Date().getTime()) /
-                    (1000 * 60 * 60 * 24)
-                )}{" "}
-                dias restantes
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {integracao.data_conclusao_esperada &&
+          integracao.status !== "ativo" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Prazo de Conclusão
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">
+                  {new Date(
+                    integracao.data_conclusao_esperada,
+                  ).toLocaleDateString("pt-BR")}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {Math.ceil(
+                    (new Date(integracao.data_conclusao_esperada).getTime() -
+                      new Date().getTime()) /
+                      (1000 * 60 * 60 * 24),
+                  )}{" "}
+                  dias restantes
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
         {/* Resultado do Teste */}
         {integracao.resultado_teste && integracao.pontuacao_teste !== null && (
@@ -545,7 +602,9 @@ export default function MinhaJornada() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Pontuação</span>
-                <span className="text-2xl font-bold">{integracao.pontuacao_teste}%</span>
+                <span className="text-2xl font-bold">
+                  {integracao.pontuacao_teste}%
+                </span>
               </div>
               <Badge
                 variant="default"
@@ -555,7 +614,9 @@ export default function MinhaJornada() {
                     : "bg-red-100 text-red-800"
                 }
               >
-                {integracao.resultado_teste === "aprovado" ? "Aprovado" : "Reprovado"}
+                {integracao.resultado_teste === "aprovado"
+                  ? "Aprovado"
+                  : "Reprovado"}
               </Badge>
             </CardContent>
           </Card>

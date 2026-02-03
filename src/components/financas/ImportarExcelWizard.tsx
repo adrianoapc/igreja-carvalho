@@ -36,11 +36,15 @@ type ColumnMapping = {
   valor?: string;
   data_vencimento?: string;
   data_pagamento?: string;
+  data_competencia?: string;
   status?: string;
   conta?: string;
   categoria?: string;
   subcategoria?: string;
   fornecedor?: string;
+  forma_pagamento?: string;
+  base_ministerial?: string;
+  centro_custo?: string;
   observacoes?: string;
 };
 
@@ -367,22 +371,50 @@ export function ImportarExcelWizard({
     }
 
     // Fetch entidades para validação de FK
-    const { data: contas } = await supabase
+    if (!igrejaId) {
+      toast.error("Contexto da igreja não identificado");
+      return;
+    }
+
+    let contasQuery = supabase
       .from("contas")
       .select("id, nome")
-      .eq("ativo", true);
-    const { data: categorias } = await supabase
+      .eq("ativo", true)
+      .eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) {
+      contasQuery = contasQuery.eq("filial_id", filialId);
+    }
+    const { data: contas } = await contasQuery;
+
+    let categoriasQuery = supabase
       .from("categorias_financeiras")
       .select("id, nome, tipo")
-      .eq("ativo", true);
-    const { data: fornecedores } = await supabase
+      .eq("ativo", true)
+      .eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) {
+      categoriasQuery = categoriasQuery.eq("filial_id", filialId);
+    }
+    const { data: categorias } = await categoriasQuery;
+
+    let fornecedoresQuery = supabase
       .from("fornecedores")
       .select("id, nome, cnpj")
-      .eq("ativo", true);
-    const { data: subcategorias } = await supabase
+      .eq("ativo", true)
+      .eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) {
+      fornecedoresQuery = fornecedoresQuery.eq("filial_id", filialId);
+    }
+    const { data: fornecedores } = await fornecedoresQuery;
+
+    let subcategoriasQuery = supabase
       .from("subcategorias_financeiras")
       .select("id, nome")
-      .eq("ativo", true);
+      .eq("ativo", true)
+      .eq("igreja_id", igrejaId);
+    if (!isAllFiliais && filialId) {
+      subcategoriasQuery = subcategoriasQuery.eq("filial_id", filialId);
+    }
+    const { data: subcategorias } = await subcategoriasQuery;
 
     const issues: ValidationIssue[] = [];
     const newExcluded: Record<number, boolean> = { ...excluded };
@@ -458,7 +490,9 @@ export function ImportarExcelWizard({
     contas: Array<{ id: string; nome: string }>,
     categorias: Array<{ id: string; nome: string; tipo: string }>,
     fornecedores?: Array<{ id: string; nome: string }>,
-    subcategorias?: Array<{ id: string; nome: string }>
+    subcategorias?: Array<{ id: string; nome: string }>,
+    basesMinisteriais?: Array<{ id: string; titulo: string }>,
+    centrosCusto?: Array<{ id: string; nome: string }>
   ) => {
     const descricao = mapping.descricao ? row[mapping.descricao] : null;
     const valor = mapping.valor ? parseValor(row[mapping.valor]) : 0;
@@ -517,6 +551,44 @@ export function ImportarExcelWizard({
     const dataPagamento = mapping.data_pagamento
       ? parseData(row[mapping.data_pagamento])
       : null;
+    
+    // Data de competência (se não houver, usar data_vencimento)
+    const dataCompetencia = mapping.data_competencia
+      ? parseData(row[mapping.data_competencia])
+      : dataVencimento;
+
+    // Forma de pagamento (string literal)
+    const formaPagamento = mapping.forma_pagamento
+      ? String(row[mapping.forma_pagamento] || "").trim() || null
+      : null;
+
+    // Base ministerial
+    let baseMinisterialId: string | null = null;
+    if (mapping.base_ministerial && basesMinisteriais) {
+      const nomeBase = row[mapping.base_ministerial];
+      const baseEncontrada = basesMinisteriais.find(
+        (b) =>
+          b.titulo.toLowerCase() ===
+          String(nomeBase || "")
+            .toLowerCase()
+            .trim()
+      );
+      if (baseEncontrada) baseMinisterialId = baseEncontrada.id;
+    }
+
+    // Centro de custo
+    let centroCustoId: string | null = null;
+    if (mapping.centro_custo && centrosCusto) {
+      const nomeCentro = row[mapping.centro_custo];
+      const centroEncontrado = centrosCusto.find(
+        (c) =>
+          c.nome.toLowerCase() ===
+          String(nomeCentro || "")
+            .toLowerCase()
+            .trim()
+      );
+      if (centroEncontrado) centroCustoId = centroEncontrado.id;
+    }
 
     // Determinar status: prioridade para coluna explícita, fallback para data_pagamento
     let status = "pendente";
@@ -539,12 +611,16 @@ export function ImportarExcelWizard({
       valor,
       data_vencimento: dataVencimento,
       data_pagamento: dataPagamento,
+      data_competencia: dataCompetencia,
       status,
       tipo_lancamento: "unico",
       conta_id: contaId,
       categoria_id: categoriaId,
       subcategoria_id: subcategoriaId,
       fornecedor_id: fornecedorId,
+      forma_pagamento: formaPagamento,
+      base_ministerial_id: baseMinisterialId,
+      centro_custo_id: centroCustoId,
       observacoes: observacoes ? String(observacoes) : null,
       igreja_id: igrejaId,
       filial_id: isAllFiliais ? null : filialId,
@@ -560,23 +636,66 @@ export function ImportarExcelWizard({
     setLoading(true);
     setStep(3);
     try {
-      const { data: contas } = await supabase
+      let contasQuery = supabase
         .from("contas")
         .select("id, nome")
-        .eq("ativo", true);
-      const { data: categorias } = await supabase
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        contasQuery = contasQuery.eq("filial_id", filialId);
+      }
+      const { data: contas } = await contasQuery;
+
+      let categoriasQuery = supabase
         .from("categorias_financeiras")
         .select("id, nome, tipo")
         .eq("ativo", true)
-        .eq("tipo", tipo);
-      const { data: fornecedores } = await supabase
+        .eq("tipo", tipo)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        categoriasQuery = categoriasQuery.eq("filial_id", filialId);
+      }
+      const { data: categorias } = await categoriasQuery;
+
+      let fornecedoresQuery = supabase
         .from("fornecedores")
         .select("id, nome")
-        .eq("ativo", true);
-      const { data: subcategorias } = await supabase
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        fornecedoresQuery = fornecedoresQuery.eq("filial_id", filialId);
+      }
+      const { data: fornecedores } = await fornecedoresQuery;
+
+      let subcategoriasQuery = supabase
         .from("subcategorias_financeiras")
         .select("id, nome")
-        .eq("ativo", true);
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        subcategoriasQuery = subcategoriasQuery.eq("filial_id", filialId);
+      }
+      const { data: subcategorias } = await subcategoriasQuery;
+
+      let basesMinisteriaisQuery = supabase
+        .from("bases_ministeriais")
+        .select("id, titulo")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        basesMinisteriaisQuery = basesMinisteriaisQuery.eq("filial_id", filialId);
+      }
+      const { data: basesMinisteriais } = await basesMinisteriaisQuery;
+
+      let centrosCustoQuery = supabase
+        .from("centros_custo")
+        .select("id, nome")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        centrosCustoQuery = centrosCustoQuery.eq("filial_id", filialId);
+      }
+      const { data: centrosCusto } = await centrosCustoQuery;
 
       if (!contas || !contas.length)
         throw new Error("Nenhuma conta ativa encontrada");
@@ -589,7 +708,9 @@ export function ImportarExcelWizard({
           contas!,
           categorias || [],
           fornecedores || [],
-          subcategorias || []
+          subcategorias || [],
+          basesMinisteriais || [],
+          centrosCusto || []
         )
       );
 
@@ -903,10 +1024,14 @@ export function ImportarExcelWizard({
                           "descricao",
                           "valor",
                           "data_vencimento",
+                          "data_competencia",
+                          "data_pagamento",
                           "conta",
                           "categoria",
                           "subcategoria",
-                          "data_pagamento",
+                          "forma_pagamento",
+                          "base_ministerial",
+                          "centro_custo",
                           "status",
                           "fornecedor",
                           "observacoes",

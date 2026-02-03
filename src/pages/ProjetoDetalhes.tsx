@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft, Plus, Pencil, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -51,6 +61,8 @@ const statusBadgeVariant = (status: string) => {
       return "secondary";
     case "pausado":
       return "outline";
+    case "cancelado":
+      return "destructive";
     default:
       return "default";
   }
@@ -62,6 +74,7 @@ export default function ProjetoDetalhes() {
   const [tarefaDialogOpen, setTarefaDialogOpen] = useState(false);
   const [projetoDialogOpen, setProjetoDialogOpen] = useState(false);
   const [tarefaEditando, setTarefaEditando] = useState<Tarefa | null>(null);
+  const [showNormalizeDialog, setShowNormalizeDialog] = useState(false);
 
   const {
     data: projeto,
@@ -73,7 +86,7 @@ export default function ProjetoDetalhes() {
       const { data, error } = await supabase
         .from("projetos")
         .select(
-          `*, lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url)`
+          `*, lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url)`,
         )
         .eq("id", id)
         .single();
@@ -96,7 +109,7 @@ export default function ProjetoDetalhes() {
       const { data, error } = await supabase
         .from("tarefas")
         .select(
-          `*, responsavel:profiles!tarefas_responsavel_id_fkey(id, nome, avatar_url)`
+          `*, responsavel:profiles!tarefas_responsavel_id_fkey(id, nome, avatar_url)`,
         )
         .eq("projeto_id", id)
         .order("created_at", { ascending: true });
@@ -111,10 +124,14 @@ export default function ProjetoDetalhes() {
     if (!over || active.id === over.id) return;
 
     const tarefaId = active.id as string;
-    const novoStatus = over.id as string;
+    const colunaIds = COLUNAS.map((coluna) => coluna.id);
+    const overId = over.id as string;
+    const novoStatus = colunaIds.includes(overId)
+      ? overId
+      : tarefas?.find((t) => t.id === overId)?.status;
 
     const tarefa = tarefas?.find((t) => t.id === tarefaId);
-    if (!tarefa || tarefa.status === novoStatus) return;
+    if (!tarefa || !novoStatus || tarefa.status === novoStatus) return;
 
     try {
       const { error } = await supabase
@@ -140,6 +157,47 @@ export default function ProjetoDetalhes() {
     setTarefaDialogOpen(true);
   };
 
+  const tarefasSemColuna =
+    tarefas?.filter((t) => !COLUNAS.some((c) => c.id === t.status)) || [];
+
+  useEffect(() => {
+    if (tarefasSemColuna.length === 0 || !id) return;
+    const storageKey = `normalizePrompted:${id}`;
+    if (sessionStorage.getItem(storageKey) === "true") return;
+    setShowNormalizeDialog(true);
+    sessionStorage.setItem(storageKey, "true");
+  }, [tarefasSemColuna.length, id]);
+
+  const handleMoverParaColuna = async (tarefaId: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("tarefas")
+        .update({ status })
+        .eq("id", tarefaId);
+      if (error) throw error;
+      toast.success("Tarefa movida para o kanban");
+      refetchTarefas();
+    } catch (error) {
+      toast.error("Erro ao mover tarefa");
+    }
+  };
+
+  const handleNormalizarStatus = async () => {
+    if (tarefasSemColuna.length === 0) return;
+    try {
+      const ids = tarefasSemColuna.map((tarefa) => tarefa.id);
+      const { error } = await supabase
+        .from("tarefas")
+        .update({ status: "todo" })
+        .in("id", ids);
+      if (error) throw error;
+      toast.success("Status normalizados para 'Não Iniciado'");
+      refetchTarefas();
+    } catch (error) {
+      toast.error("Erro ao normalizar status");
+    }
+  };
+
   const totalTarefas = tarefas?.length || 0;
   const tarefasConcluidas =
     tarefas?.filter((t) => t.status === "done").length || 0;
@@ -148,7 +206,7 @@ export default function ProjetoDetalhes() {
       (t) =>
         t.data_vencimento &&
         new Date(t.data_vencimento) < new Date() &&
-        t.status !== "done"
+        t.status !== "done",
     ).length || 0;
   const taxaConclusao =
     totalTarefas > 0 ? (tarefasConcluidas / totalTarefas) * 100 : 0;
@@ -262,7 +320,7 @@ export default function ProjetoDetalhes() {
       </div>
 
       {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto bg-muted/30 p-4">
+      <div className="flex-1 overflow-x-auto bg-muted/30 p-4 space-y-4">
         {loadingTarefas ? (
           <div className="flex gap-4 min-w-max">
             {COLUNAS.map((col) => (
@@ -270,23 +328,131 @@ export default function ProjetoDetalhes() {
             ))}
           </div>
         ) : (
-          <DndContext
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 min-w-max">
-              {COLUNAS.map((coluna) => (
-                <KanbanTarefasColumn
-                  key={coluna.id}
-                  id={coluna.id}
-                  titulo={coluna.titulo}
-                  cor={coluna.cor}
-                  tarefas={tarefas?.filter((t) => t.status === coluna.id) || []}
-                  onEditarTarefa={handleEditarTarefa}
-                />
-              ))}
-            </div>
-          </DndContext>
+          <>
+            <DndContext
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-4 min-w-max">
+                {COLUNAS.map((coluna) => (
+                  <KanbanTarefasColumn
+                    key={coluna.id}
+                    id={coluna.id}
+                    titulo={coluna.titulo}
+                    cor={coluna.cor}
+                    tarefas={
+                      tarefas?.filter((t) => t.status === coluna.id) || []
+                    }
+                    onEditarTarefa={handleEditarTarefa}
+                  />
+                ))}
+              </div>
+            </DndContext>
+
+            {tarefasSemColuna.length > 0 && (
+              <div className="rounded-lg border bg-amber-50/60 dark:bg-amber-950/20 p-4">
+                <div>
+                  <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                    Tarefas fora do Kanban
+                  </h3>
+                  <p className="text-sm text-amber-700/80 dark:text-amber-300/80">
+                    Encontramos {tarefasSemColuna.length} tarefa(s) com status
+                    não mapeado. Você pode movê-las para uma coluna.
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <Button variant="outline" onClick={handleNormalizarStatus}>
+                    Normalizar tudo para Não Iniciado
+                  </Button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {tarefasSemColuna.map((tarefa) => (
+                    <div
+                      key={tarefa.id}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md bg-white/80 dark:bg-background/40 p-3"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{tarefa.titulo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Status atual: {tarefa.status || "(vazio)"}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleMoverParaColuna(tarefa.id, "todo")
+                          }
+                        >
+                          Mover para Não Iniciado
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditarTarefa(tarefa)}
+                        >
+                          Editar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tarefasSemColuna.length > 0 && (
+              <div className="rounded-lg border bg-amber-50/60 dark:bg-amber-950/20 p-4">
+                <div>
+                  <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                    Tarefas fora do Kanban
+                  </h3>
+                  <p className="text-sm text-amber-700/80 dark:text-amber-300/80">
+                    Encontramos {tarefasSemColuna.length} tarefa(s) com status
+                    não mapeado. Você pode movê-las para uma coluna.
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <Button variant="outline" onClick={handleNormalizarStatus}>
+                    Normalizar tudo para Não Iniciado
+                  </Button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {tarefasSemColuna.map((tarefa) => (
+                    <div
+                      key={tarefa.id}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md bg-white/80 dark:bg-background/40 p-3"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{tarefa.titulo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Status atual: {tarefa.status || "(vazio)"}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            handleMoverParaColuna(tarefa.id, "todo")
+                          }
+                        >
+                          Mover para Não Iniciado
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditarTarefa(tarefa)}
+                        >
+                          Editar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -311,6 +477,27 @@ export default function ProjetoDetalhes() {
           setProjetoDialogOpen(false);
         }}
       />
+
+      <AlertDialog
+        open={showNormalizeDialog}
+        onOpenChange={setShowNormalizeDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Normalizar tarefas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Encontramos {tarefasSemColuna.length} tarefa(s) com status fora do
+              Kanban. Deseja mover todas para "Não Iniciado" agora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Agora não</AlertDialogCancel>
+            <AlertDialogAction onClick={handleNormalizarStatus}>
+              Normalizar tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

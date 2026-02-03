@@ -5,16 +5,49 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Download, FileSpreadsheet, Calendar, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FileSpreadsheet,
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { exportToExcel } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MESES = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
 
 const SECOES_ORDER = [
   "Receitas Operacionais",
@@ -52,13 +85,17 @@ export default function DRE() {
   const { igrejaId, loading: authLoading } = useAuthContext();
   const currentYear = new Date().getFullYear();
   const [anoSelecionado, setAnoSelecionado] = useState(currentYear);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(),
+  );
 
   const { data: dreData, isLoading } = useQuery({
     queryKey: ["dre-anual", anoSelecionado, igrejaId],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase.rpc("get_dre_anual", { p_ano: anoSelecionado });
+      const { data, error } = await supabase.rpc("get_dre_anual", {
+        p_ano: anoSelecionado,
+      });
       if (error) throw error;
       return data as DreItem[];
     },
@@ -96,16 +133,26 @@ export default function DRE() {
     }
 
     const exportData: Array<Record<string, string | number>> = [];
-    
+
     dadosAgrupados.forEach((secao) => {
       // Header da seção
       exportData.push({
         Categoria: `=== ${secao.secao} ===`,
-        Jan: "", Fev: "", Mar: "", Abr: "", Mai: "", Jun: "",
-        Jul: "", Ago: "", Set: "", Out: "", Nov: "", Dez: "",
+        Jan: "",
+        Fev: "",
+        Mar: "",
+        Abr: "",
+        Mai: "",
+        Jun: "",
+        Jul: "",
+        Ago: "",
+        Set: "",
+        Out: "",
+        Nov: "",
+        Dez: "",
         "Total Ano": "",
       });
-      
+
       secao.categorias.forEach((cat) => {
         exportData.push({
           Categoria: cat.categoria_nome,
@@ -153,23 +200,37 @@ export default function DRE() {
   };
 
   const anos = Array.from({ length: 5 }, (_, i) => currentYear - i);
-  const totalResultado = Object.values(resultadoLiquido).reduce((a, b) => a + b, 0);
+  const totalResultado = Object.values(resultadoLiquido).reduce(
+    (a, b) => a + b,
+    0,
+  );
 
   return (
     <div className="space-y-4 md:space-y-6 p-2 sm:p-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/financas")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/financas")}
+          >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">DRE Gerencial</h1>
-            <p className="text-sm text-muted-foreground">Demonstrativo de Resultado do Exercício</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              DRE Gerencial
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Demonstrativo de Resultado do Exercício
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Select value={anoSelecionado.toString()} onValueChange={(v) => setAnoSelecionado(Number(v))}>
+          <Select
+            value={anoSelecionado.toString()}
+            onValueChange={(v) => setAnoSelecionado(Number(v))}
+          >
             <SelectTrigger className="w-[120px]">
               <SelectValue />
             </SelectTrigger>
@@ -181,7 +242,10 @@ export default function DRE() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleExport} disabled={isLoading || !dreData?.length}>
+          <Button
+            onClick={handleExport}
+            disabled={isLoading || !dreData?.length}
+          >
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
@@ -215,13 +279,20 @@ export default function DRE() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="min-w-[200px] font-semibold">Categoria</TableHead>
+                  <TableHead className="min-w-[200px] font-semibold">
+                    Categoria
+                  </TableHead>
                   {MESES.map((mes) => (
-                    <TableHead key={mes} className="text-right min-w-[80px] font-semibold">
+                    <TableHead
+                      key={mes}
+                      className="text-right min-w-[80px] font-semibold"
+                    >
                       {mes}
                     </TableHead>
                   ))}
-                  <TableHead className="text-right min-w-[100px] font-bold bg-muted">Total</TableHead>
+                  <TableHead className="text-right min-w-[100px] font-bold bg-muted">
+                    Total
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -252,7 +323,7 @@ export default function DRE() {
                                 "text-right font-semibold text-sm tabular-nums",
                                 valor === 0 && "text-muted-foreground/40",
                                 valor < 0 && "text-destructive",
-                                valor > 0 && "text-green-600"
+                                valor > 0 && "text-green-600",
                               )}
                             >
                               {formatCurrency(valor)}
@@ -263,7 +334,7 @@ export default function DRE() {
                           className={cn(
                             "text-right font-bold tabular-nums bg-muted/50",
                             secao.totalAno < 0 && "text-destructive",
-                            secao.totalAno > 0 && "text-green-600"
+                            secao.totalAno > 0 && "text-green-600",
                           )}
                         >
                           {formatCurrency(secao.totalAno)}
@@ -272,7 +343,10 @@ export default function DRE() {
                       {/* Categorias detalhadas - Mostradas quando expandida */}
                       {isExpanded &&
                         secao.categorias.map((cat) => (
-                          <TableRow key={cat.categoria_id} className="hover:bg-muted/30 bg-muted/10">
+                          <TableRow
+                            key={cat.categoria_id}
+                            className="hover:bg-muted/30 bg-muted/10"
+                          >
                             <TableCell className="pl-10 text-sm text-muted-foreground">
                               {cat.categoria_nome}
                             </TableCell>
@@ -285,7 +359,7 @@ export default function DRE() {
                                     "text-right text-xs tabular-nums",
                                     valor === 0 && "text-muted-foreground/40",
                                     valor < 0 && "text-destructive",
-                                    valor > 0 && "text-green-600"
+                                    valor > 0 && "text-green-600",
                                   )}
                                 >
                                   {formatCurrency(valor)}
@@ -296,7 +370,7 @@ export default function DRE() {
                               className={cn(
                                 "text-right text-xs font-medium tabular-nums",
                                 cat.totalAno < 0 && "text-destructive",
-                                cat.totalAno > 0 && "text-green-600"
+                                cat.totalAno > 0 && "text-green-600",
                               )}
                             >
                               {formatCurrency(cat.totalAno)}
@@ -308,7 +382,9 @@ export default function DRE() {
                 })}
                 {/* Resultado Líquido */}
                 <TableRow className="bg-card border-t-4 border-primary">
-                  <TableCell className="font-bold text-lg py-4">RESULTADO LÍQUIDO</TableCell>
+                  <TableCell className="font-bold text-lg py-4">
+                    RESULTADO LÍQUIDO
+                  </TableCell>
                   {MESES.map((_, idx) => {
                     const valor = resultadoLiquido[idx + 1] || 0;
                     return (
@@ -318,7 +394,7 @@ export default function DRE() {
                           "text-right font-bold text-lg tabular-nums py-4",
                           valor === 0 && "text-muted-foreground/40",
                           valor < 0 && "text-destructive",
-                          valor > 0 && "text-green-600"
+                          valor > 0 && "text-green-600",
                         )}
                       >
                         {formatCurrency(valor)}
@@ -329,7 +405,7 @@ export default function DRE() {
                     className={cn(
                       "text-right font-bold text-lg tabular-nums bg-muted py-4",
                       totalResultado < 0 && "text-destructive",
-                      totalResultado > 0 && "text-green-600"
+                      totalResultado > 0 && "text-green-600",
                     )}
                   >
                     {formatCurrency(totalResultado)}
@@ -349,7 +425,7 @@ function processarDados(data: DreItem[]): SecaoAgrupada[] {
 
   data.forEach((item) => {
     const secaoKey = item.secao_dre || "Outros";
-    
+
     if (!secoesMap.has(secaoKey)) {
       secoesMap.set(secaoKey, {
         secao: secaoKey,
@@ -360,9 +436,11 @@ function processarDados(data: DreItem[]): SecaoAgrupada[] {
     }
 
     const secao = secoesMap.get(secaoKey)!;
-    
+
     // Encontrar ou criar categoria
-    let categoria = secao.categorias.find((c) => c.categoria_id === item.categoria_id);
+    let categoria = secao.categorias.find(
+      (c) => c.categoria_id === item.categoria_id,
+    );
     if (!categoria) {
       categoria = {
         categoria_nome: item.categoria_nome,
@@ -374,11 +452,13 @@ function processarDados(data: DreItem[]): SecaoAgrupada[] {
     }
 
     // Adicionar valor ao mês
-    categoria.valores[item.mes] = (categoria.valores[item.mes] || 0) + Number(item.total);
+    categoria.valores[item.mes] =
+      (categoria.valores[item.mes] || 0) + Number(item.total);
     categoria.totalAno += Number(item.total);
 
     // Atualizar totais da seção
-    secao.totaisMes[item.mes] = (secao.totaisMes[item.mes] || 0) + Number(item.total);
+    secao.totaisMes[item.mes] =
+      (secao.totaisMes[item.mes] || 0) + Number(item.total);
     secao.totalAno += Number(item.total);
   });
 
@@ -395,22 +475,29 @@ function processarDados(data: DreItem[]): SecaoAgrupada[] {
 
   // Ordenar categorias dentro de cada seção
   resultado.forEach((secao) => {
-    secao.categorias.sort((a, b) => a.categoria_nome.localeCompare(b.categoria_nome));
+    secao.categorias.sort((a, b) =>
+      a.categoria_nome.localeCompare(b.categoria_nome),
+    );
   });
 
   return resultado;
 }
 
-function calcularResultadoLiquido(secoes: SecaoAgrupada[]): { [mes: number]: number } {
+function calcularResultadoLiquido(secoes: SecaoAgrupada[]): {
+  [mes: number]: number;
+} {
   const resultado: { [mes: number]: number } = {};
-  
+
   for (let mes = 1; mes <= 12; mes++) {
     resultado[mes] = 0;
   }
 
   secoes.forEach((secao) => {
-    for (let mes = 1; mes <= 12; mes++) {
-      resultado[mes] += secao.totaisMes[mes] || 0;
+    // Excluir seção "Não faz parte do DRE" do cálculo do resultado líquido
+    if (secao.secao !== "Não faz parte do DRE") {
+      for (let mes = 1; mes <= 12; mes++) {
+        resultado[mes] += secao.totaisMes[mes] || 0;
+      }
     }
   });
 

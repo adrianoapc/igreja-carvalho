@@ -174,7 +174,7 @@ export default function GabinetePastoral() {
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-7xl mx-auto">
+    <div className="space-y-4 md:space-y-6">
       {/* Header Compacto */}
       <div className="flex items-center justify-between">
         <div>

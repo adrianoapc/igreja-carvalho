@@ -49,6 +49,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/utils/dateUtils";
 import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 import { TransacaoVinculadaDialog } from "./TransacaoVinculadaDialog";
 import { anonymizePixDescription } from "@/utils/anonymization";
@@ -154,11 +155,11 @@ export function HistoricoExtratos() {
       }
 
       if (dataInicio) {
-        query = query.gte("data_transacao", format(dataInicio, "yyyy-MM-dd"));
+        query = query.gte("data_transacao", formatLocalDate(dataInicio));
       }
 
       if (dataFim) {
-        query = query.lte("data_transacao", format(dataFim, "yyyy-MM-dd"));
+        query = query.lte("data_transacao", formatLocalDate(dataFim));
       }
 
       const { data, error } = await query;

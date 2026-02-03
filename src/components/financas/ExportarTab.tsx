@@ -37,6 +37,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/utils/dateUtils";
 
 type TipoExportacao =
   | "entradas"
@@ -86,18 +87,17 @@ export function ExportarTab() {
   const tipoParam = searchParams.get("tipo");
   const tipoInicial: TipoExportacao =
     tipoParam === "saidas" || tipoParam === "saida" ? "saidas" : "entradas";
-  const [tipoExportacao, setTipoExportacao] = useState<TipoExportacao>(
-    tipoInicial
-  );
+  const [tipoExportacao, setTipoExportacao] =
+    useState<TipoExportacao>(tipoInicial);
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
   const [dataInicio, setDataInicio] = useState<Date | undefined>(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
   const [dataFim, setDataFim] = useState<Date | undefined>(new Date());
   const [contaFiltro, setContaFiltro] = useState<string>("todas");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
   const [colunasSelecionadas, setColunasSelecionadas] = useState<string[]>(
-    COLUNAS_DISPONIVEIS.map((c) => c.id)
+    COLUNAS_DISPONIVEIS.map((c) => c.id),
   );
 
   const {
@@ -188,7 +188,7 @@ export function ExportarTab() {
           fornecedor:fornecedor_id(nome),
           base_ministerial:base_ministerial_id(titulo),
           centro_custo:centro_custo_id(nome)
-        `
+        `,
         )
         .eq("tipo", tipo)
         .eq("igreja_id", igrejaId);
@@ -198,10 +198,10 @@ export function ExportarTab() {
       }
 
       if (dataInicio) {
-        query = query.gte("data_competencia", format(dataInicio, "yyyy-MM-dd"));
+        query = query.gte("data_competencia", formatLocalDate(dataInicio));
       }
       if (dataFim) {
-        query = query.lte("data_competencia", format(dataFim, "yyyy-MM-dd"));
+        query = query.lte("data_competencia", formatLocalDate(dataFim));
       }
 
       if (statusFiltro !== "todos") {
@@ -212,7 +212,7 @@ export function ExportarTab() {
         } else if (statusFiltro === "atrasado") {
           query = query
             .eq("status", "pendente")
-            .lt("data_vencimento", new Date().toISOString().split("T")[0]);
+            .lt("data_vencimento", formatLocalDate(new Date()));
         }
       }
 
@@ -281,12 +281,12 @@ export function ExportarTab() {
 
       const nomeArquivo = `${tipoExportacao}_${format(
         new Date(),
-        "yyyyMMdd_HHmmss"
+        "yyyyMMdd_HHmmss",
       )}`;
       exportToExcel(
         dadosExportacao,
         nomeArquivo,
-        tipoExportacao === "entradas" ? "Entradas" : "Saídas"
+        tipoExportacao === "entradas" ? "Entradas" : "Saídas",
       );
       toast.success(`${transacoes.length} registros exportados com sucesso!`);
     } catch (error) {
@@ -299,7 +299,7 @@ export function ExportarTab() {
     setColunasSelecionadas((prev) =>
       prev.includes(colunaId)
         ? prev.filter((id) => id !== colunaId)
-        : [...prev, colunaId]
+        : [...prev, colunaId],
     );
   };
 
@@ -379,7 +379,7 @@ export function ExportarTab() {
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dataInicio && "text-muted-foreground"
+                      !dataInicio && "text-muted-foreground",
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -408,7 +408,7 @@ export function ExportarTab() {
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dataFim && "text-muted-foreground"
+                      !dataFim && "text-muted-foreground",
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />

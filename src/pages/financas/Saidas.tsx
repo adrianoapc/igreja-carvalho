@@ -26,12 +26,14 @@ import {
   exportToExcel,
   formatDateForExport,
   formatCurrencyForExport,
+  formatBooleanForExport,
 } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
+import { formatLocalDate, startOfMonthLocal, endOfMonthLocal, startOfDayLocal, endOfDayLocal } from "@/utils/dateUtils";
 // import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
@@ -79,23 +81,25 @@ export default function Saidas() {
   const [categoriaFilter, setCategoriaFilter] = useState("all");
   const [fornecedorFilter, setFornecedorFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  
+
   // Estados para agrupamento por data
   const [agruparPorData, setAgruparPorData] = useState(false);
-  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set());
+  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
     if (customRange) {
       return {
-        inicio: startOfDay(customRange.from),
-        fim: endOfDay(customRange.to),
+        inicio: formatLocalDate(startOfDayLocal(customRange.from)),
+        fim: formatLocalDate(endOfDayLocal(customRange.to)),
       };
     }
 
     return {
-      inicio: startOfMonth(selectedMonth),
-      fim: endOfMonth(selectedMonth),
+      inicio: formatLocalDate(startOfMonthLocal(selectedMonth)),
+      fim: formatLocalDate(endOfMonthLocal(selectedMonth)),
     };
   };
 
@@ -129,12 +133,12 @@ export default function Saidas() {
           centro_custo:centro_custo_id(nome),
           fornecedor:fornecedor_id(nome, id),
           solicitacao_reembolso:solicitacao_reembolso_id(status)
-        `
+        `,
         )
         .eq("tipo", "saida")
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", dateRange.inicio.toISOString().split("T")[0])
-        .lte("data_vencimento", dateRange.fim.toISOString().split("T")[0])
+        .gte("data_vencimento", dateRange.inicio)
+        .lte("data_vencimento", dateRange.fim)
         .order("data_vencimento", { ascending: false });
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
@@ -148,7 +152,7 @@ export default function Saidas() {
         data?.filter(
           (t) =>
             !t.solicitacao_reembolso_id ||
-            t.solicitacao_reembolso?.status === "pago"
+            t.solicitacao_reembolso?.status === "pago",
         ) || []
       );
     },
@@ -247,7 +251,7 @@ export default function Saidas() {
         return false;
       }
 
-    return true;
+      return true;
     });
   }, [
     transacoes,
@@ -258,30 +262,73 @@ export default function Saidas() {
     statusFilter,
   ]);
 
+  const transacaoIds = useMemo(
+    () => transacoesFiltradas.map((transacao) => transacao.id),
+    [transacoesFiltradas],
+  );
+
+  const { data: extratosConciliados = [] } = useQuery({
+    queryKey: [
+      "extratos-vinculados-saidas",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      transacaoIds,
+    ],
+    queryFn: async () => {
+      if (!igrejaId || transacaoIds.length === 0) return [];
+      let query = supabase
+        .from("extratos_bancarios")
+        .select("transacao_vinculada_id, reconciliado")
+        .in("transacao_vinculada_id", transacaoIds)
+        .eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !loading && !!igrejaId && transacaoIds.length > 0,
+  });
+
+  const conciliacaoMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    extratosConciliados.forEach((extrato) => {
+      if (extrato.transacao_vinculada_id) {
+        map.set(extrato.transacao_vinculada_id, !!extrato.reconciliado);
+      }
+    });
+    return map;
+  }, [extratosConciliados]);
+
   // Agrupar transações por data
   const transacoesAgrupadas = useMemo(() => {
     if (!agruparPorData || !transacoesFiltradas) return {};
-    
+
     const grupos: Record<string, typeof transacoesFiltradas> = {};
-    
-    transacoesFiltradas.forEach(transacao => {
-      const dataKey = format(new Date(transacao.data_vencimento + "T00:00:00"), "yyyy-MM-dd");
+
+    transacoesFiltradas.forEach((transacao) => {
+      const dataKey = format(
+        new Date(transacao.data_vencimento + "T00:00:00"),
+        "yyyy-MM-dd",
+      );
       if (!grupos[dataKey]) {
         grupos[dataKey] = [];
       }
       grupos[dataKey].push(transacao);
     });
-    
+
     return grupos;
   }, [transacoesFiltradas, agruparPorData]);
-  
+
   // Ordenar as datas dos grupos (mais recente primeiro)
   const datasOrdenadas = useMemo(() => {
-    return Object.keys(transacoesAgrupadas).sort((a, b) => 
-      new Date(b).getTime() - new Date(a).getTime()
+    return Object.keys(transacoesAgrupadas).sort(
+      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
     );
   }, [transacoesAgrupadas]);
-  
+
   // Toggle de grupo expandido
   const toggleGrupo = (dataKey: string) => {
     const novosExpandidos = new Set(gruposExpandidos);
@@ -309,22 +356,39 @@ export default function Saidas() {
   // Reset pagination when filters change
   useEffect(() => {
     goToPage(1);
-  }, [busca, contaFilter, categoriaFilter, fornecedorFilter, statusFilter, selectedMonth, customRange]);
+  }, [
+    busca,
+    contaFilter,
+    categoriaFilter,
+    fornecedorFilter,
+    statusFilter,
+    selectedMonth,
+    customRange,
+  ]);
 
   const formatCurrency = (value: number) => {
     return formatValue(value);
   };
 
+  const isPagamentoDinheiro = (forma?: string | null) =>
+    (forma || "").toLowerCase().includes("dinheiro");
+
+  // Separar transferências das transações normais
+  const transacoesNormais = transacoesFiltradas?.filter((t) => !t.transferencia_id) || [];
+  const transferencias = transacoesFiltradas?.filter((t) => t.transferencia_id) || [];
+
   const totalSaidas =
-    transacoesFiltradas?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+    transacoesNormais?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const totalPago =
-    transacoesFiltradas
+    transacoesNormais
       ?.filter((t) => t.status === "pago")
       .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const totalPendente =
-    transacoesFiltradas
+    transacoesNormais
       ?.filter((t) => t.status === "pendente")
       .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+  const totalTransferencias =
+    transferencias?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -345,7 +409,7 @@ export default function Saidas() {
     if (transacao.status === "pago") return "Pago";
     if (transacao.status === "pendente") {
       const hoje = new Date();
-      const vencimento = new Date(transacao.data_vencimento);
+      const vencimento = new Date(transacao.data_vencimento + "T00:00:00");
       if (vencimento < hoje) {
         return "Atrasado";
       }
@@ -360,7 +424,7 @@ export default function Saidas() {
     }
     if (transacao.status === "pendente") {
       const hoje = new Date();
-      const vencimento = new Date(transacao.data_vencimento);
+      const vencimento = new Date(transacao.data_vencimento + "T00:00:00");
       if (vencimento < hoje) {
         return "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400";
       }
@@ -380,6 +444,8 @@ export default function Saidas() {
         Descrição: t.descricao,
         Valor: formatCurrencyForExport(t.valor),
         Status: getStatusDisplay(t),
+        Conciliado: formatBooleanForExport(!!conciliacaoMap.get(t.id)),
+        "Conferido Manual": formatBooleanForExport(!!t.conferido_manual),
         "Data Vencimento": formatDateForExport(t.data_vencimento),
         "Data Pagamento": formatDateForExport(t.data_pagamento),
         Conta: t.conta?.nome || "",
@@ -497,7 +563,7 @@ export default function Saidas() {
             {customRange
               ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
                   customRange.to,
-                  "dd/MM/yyyy"
+                  "dd/MM/yyyy",
                 )}`
               : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
           </Badge>
@@ -564,8 +630,8 @@ export default function Saidas() {
               {statusFilter === "pendente"
                 ? "Pendente"
                 : statusFilter === "pago"
-                ? "Pago"
-                : "Atrasado"}
+                  ? "Pago"
+                  : "Atrasado"}
               <button
                 onClick={() => setStatusFilter("all")}
                 className="ml-1 hover:bg-background/50 rounded-sm p-0.5"
@@ -578,7 +644,7 @@ export default function Saidas() {
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card className="shadow-soft">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -622,13 +688,30 @@ export default function Saidas() {
             </div>
           </CardContent>
         </Card>
+        <Card className="shadow-soft">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+                <ArrowLeft className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Transferências</p>
+                <p className="text-lg font-bold">
+                  {formatCurrency(totalTransferencias)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Lista de Transações */}
       <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg md:text-xl">Lista de Saídas</CardTitle>
+            <CardTitle className="text-lg md:text-xl">
+              Lista de Saídas
+            </CardTitle>
             <Button
               variant="outline"
               size="sm"
@@ -636,7 +719,9 @@ export default function Saidas() {
                 setAgruparPorData(!agruparPorData);
                 if (!agruparPorData) {
                   // Ao ativar agrupamento, expandir todos os grupos
-                  setGruposExpandidos(new Set(Object.keys(transacoesAgrupadas)));
+                  setGruposExpandidos(
+                    new Set(Object.keys(transacoesAgrupadas)),
+                  );
                 }
               }}
             >
@@ -656,11 +741,17 @@ export default function Saidas() {
                 <div className="space-y-3">
                   {datasOrdenadas.map((dataKey) => {
                     const grupo = transacoesAgrupadas[dataKey];
-                    const totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+                    const totalGrupo = grupo.reduce(
+                      (sum, t) => sum + Number(t.valor),
+                      0,
+                    );
                     const isExpandido = gruposExpandidos.has(dataKey);
-                    
+
                     return (
-                      <div key={dataKey} className="border rounded-lg overflow-hidden">
+                      <div
+                        key={dataKey}
+                        className="border rounded-lg overflow-hidden"
+                      >
                         {/* Header do grupo */}
                         <button
                           onClick={() => toggleGrupo(dataKey)}
@@ -674,10 +765,17 @@ export default function Saidas() {
                             )}
                             <div className="text-left">
                               <div className="font-semibold text-sm">
-                                {format(new Date(dataKey + "T00:00:00"), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                {format(
+                                  new Date(dataKey + "T00:00:00"),
+                                  "dd 'de' MMMM 'de' yyyy",
+                                  { locale: ptBR },
+                                )}
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                {grupo.length} {grupo.length === 1 ? 'transação' : 'transações'}
+                                {grupo.length}{" "}
+                                {grupo.length === 1
+                                  ? "transação"
+                                  : "transações"}
                               </div>
                             </div>
                           </div>
@@ -687,121 +785,184 @@ export default function Saidas() {
                             </div>
                           </div>
                         </button>
-                        
+
                         {/* Lista de transações do grupo */}
                         {isExpandido && (
                           <div className="divide-y">
-                            {grupo.map((transacao) => (
-                              <div
-                                key={transacao.id}
-                                className="flex items-center gap-3 p-3 bg-card hover:bg-accent/50 transition-colors"
-                                onDoubleClick={() => {
-                                  setEditingTransacao(transacao as any);
-                                  setDialogOpen(true);
-                                }}
-                              >
-                                {/* Data Compact - Mobile */}
-                                <div className="flex-shrink-0 text-center w-12 md:w-14">
-                                  <div className="text-xs md:text-sm font-bold text-foreground">
-                                    {format(new Date(transacao.data_vencimento + "T00:00:00"), "dd", {
-                                      locale: ptBR,
-                                    })}
-                                  </div>
-                                  <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
-                                    {format(new Date(transacao.data_vencimento + "T00:00:00"), "MMM", {
-                                      locale: ptBR,
-                                    })}
-                                  </div>
-                                </div>
+                            {grupo.map((transacao) => {
+                              const isConciliado = conciliacaoMap.get(
+                                transacao.id,
+                              );
+                              const isDinheiro = isPagamentoDinheiro(
+                                transacao.forma_pagamento,
+                              );
+                              const isConferidoManual =
+                                !isConciliado &&
+                                isDinheiro &&
+                                !!transacao.conferido_manual;
 
-                                {/* Divider */}
-                                <div className="h-10 w-px bg-border" />
-
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="font-semibold text-sm md:text-base truncate">
-                                    {transacao.descricao}
-                                  </h3>
-                                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                                    {transacao.fornecedor && (
-                                      <>
-                                        <span className="truncate">
-                                          {transacao.fornecedor.nome}
-                                        </span>
-                                        {transacao.categoria && <span>•</span>}
-                                      </>
-                                    )}
-                                    {transacao.categoria && (
-                                      <>
-                                        <span
-                                          className="w-2 h-2 rounded-full flex-shrink-0"
-                                          style={{
-                                            backgroundColor:
-                                              transacao.categoria.cor || "#666",
-                                          }}
-                                        />
-                                        <span className="truncate">
-                                          {transacao.categoria.nome}
-                                        </span>
-                                      </>
-                                    )}
-                                    {transacao.conta && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="truncate">
-                                          {transacao.conta.nome}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Value & Actions */}
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <div className="text-right">
-                                    <div className="flex items-center gap-1.5 justify-end">
-                                      <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
-                                        {formatCurrency(Number(transacao.valor))}
-                                      </p>
-                                      {transacao.solicitacao_reembolso_id && (
-                                        <TooltipProvider>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Badge
-                                                variant="outline"
-                                                className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400"
-                                              >
-                                                <ReceiptText className="w-2.5 h-2.5" />
-                                              </Badge>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              <p>Reembolso</p>
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
+                              return (
+                                <div
+                                  key={transacao.id}
+                                  className="flex items-center gap-3 p-3 bg-card hover:bg-accent/50 transition-colors"
+                                  onDoubleClick={() => {
+                                    setEditingTransacao(transacao as any);
+                                    setDialogOpen(true);
+                                  }}
+                                >
+                                  {/* Data Compact - Mobile */}
+                                  <div className="flex-shrink-0 text-center w-12 md:w-14">
+                                    <div className="text-xs md:text-sm font-bold text-foreground">
+                                      {format(
+                                        new Date(
+                                          transacao.data_vencimento +
+                                            "T00:00:00",
+                                        ),
+                                        "dd",
+                                        {
+                                          locale: ptBR,
+                                        },
                                       )}
                                     </div>
-                                    <Badge
-                                      className={`text-[10px] md:text-xs ${getStatusColorDynamic(
-                                        transacao
-                                      )}`}
-                                    >
-                                      {getStatusDisplay(transacao)}
-                                    </Badge>
+                                    <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
+                                      {format(
+                                        new Date(
+                                          transacao.data_vencimento +
+                                            "T00:00:00",
+                                        ),
+                                        "MMM",
+                                        {
+                                          locale: ptBR,
+                                        },
+                                      )}
+                                    </div>
                                   </div>
-                                  <TransacaoActionsMenu
-                                    transacaoId={transacao.id}
-                                    status={transacao.status}
-                                    tipo="saida"
-                                    isReembolso={!!transacao.solicitacao_reembolso_id}
-                                    onEdit={() => {
-                                      setEditingTransacao(transacao);
-                                      setDialogOpen(true);
-                                    }}
-                                  />
+
+                                  {/* Divider */}
+                                  <div className="h-10 w-px bg-border" />
+
+                                  {/* Content */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <h3 className="font-semibold text-sm md:text-base truncate flex-1">
+                                        {transacao.descricao}
+                                      </h3>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigator.clipboard.writeText(transacao.id);
+                                          toast.success("ID copiado!");
+                                        }}
+                                        className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                                        title="Copiar ID"
+                                      >
+                                        {transacao.id.substring(0, 6)}
+                                      </button>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                      {transacao.fornecedor && (
+                                        <>
+                                          <span className="truncate">
+                                            {transacao.fornecedor.nome}
+                                          </span>
+                                          {transacao.categoria && (
+                                            <span>•</span>
+                                          )}
+                                        </>
+                                      )}
+                                      {transacao.categoria && (
+                                        <>
+                                          <span
+                                            className="w-2 h-2 rounded-full flex-shrink-0"
+                                            style={{
+                                              backgroundColor:
+                                                transacao.categoria.cor ||
+                                                "#666",
+                                            }}
+                                          />
+                                          <span className="truncate">
+                                            {transacao.categoria.nome}
+                                          </span>
+                                        </>
+                                      )}
+                                      {transacao.conta && (
+                                        <>
+                                          <span>•</span>
+                                          <span className="truncate">
+                                            {transacao.conta.nome}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Value & Actions */}
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="text-right">
+                                      <div className="flex items-center gap-1.5 justify-end">
+                                        <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
+                                          {formatCurrency(
+                                            Number(transacao.valor),
+                                          )}
+                                        </p>
+                                        {transacao.solicitacao_reembolso_id && (
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Badge
+                                                  variant="outline"
+                                                  className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400"
+                                                >
+                                                  <ReceiptText className="w-2.5 h-2.5" />
+                                                </Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p>Reembolso</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap items-center justify-end gap-1 mt-1">
+                                        <Badge
+                                          className={`text-[10px] md:text-xs ${getStatusColorDynamic(
+                                            transacao,
+                                          )}`}
+                                        >
+                                          {getStatusDisplay(transacao)}
+                                        </Badge>
+                                        {isConciliado ? (
+                                          <Badge className="text-[10px] md:text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                            Conciliado
+                                          </Badge>
+                                        ) : isConferidoManual ? (
+                                          <Badge className="text-[10px] md:text-xs bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
+                                            Conferido
+                                          </Badge>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                    <TransacaoActionsMenu
+                                      transacaoId={transacao.id}
+                                      status={transacao.status}
+                                      tipo="saida"
+                                      isReembolso={
+                                        !!transacao.solicitacao_reembolso_id
+                                      }
+                                      isDinheiro={isDinheiro}
+                                      conferidoManual={
+                                        !!transacao.conferido_manual
+                                      }
+                                      onEdit={() => {
+                                        setEditingTransacao(transacao);
+                                        setDialogOpen(true);
+                                      }}
+                                    />
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -810,132 +971,178 @@ export default function Saidas() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {transacoesPaginadas.map((transacao) => (
-                  <div
-                    key={transacao.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                    onDoubleClick={() => {
-                      setEditingTransacao(transacao as any);
-                      setDialogOpen(true);
-                    }}
-                  >
-                    {/* Data Compact - Mobile */}
-                    <div className="flex-shrink-0 text-center w-12 md:w-14">
-                      <div className="text-xs md:text-sm font-bold text-foreground">
-                        {format(new Date(transacao.data_vencimento + "T00:00:00"), "dd", {
-                          locale: ptBR,
-                        })}
-                      </div>
-                      <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
-                        {format(new Date(transacao.data_vencimento + "T00:00:00"), "MMM", {
-                          locale: ptBR,
-                        })}
-                      </div>
-                    </div>
+                  {transacoesPaginadas.map((transacao) => {
+                    const isConciliado = conciliacaoMap.get(transacao.id);
+                    const isDinheiro = isPagamentoDinheiro(
+                      transacao.forma_pagamento,
+                    );
+                    const isConferidoManual =
+                      !isConciliado &&
+                      isDinheiro &&
+                      !!transacao.conferido_manual;
 
-                    {/* Divider */}
-                    <div className="h-10 w-px bg-border" />
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm md:text-base truncate">
-                        {transacao.descricao}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                        {transacao.fornecedor && (
-                          <>
-                            <span className="truncate">
-                              {transacao.fornecedor.nome}
-                            </span>
-                            {transacao.categoria && <span>•</span>}
-                          </>
-                        )}
-                        {transacao.categoria && (
-                          <>
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{
-                                backgroundColor:
-                                  transacao.categoria.cor || "#666",
-                              }}
-                            />
-                            <span className="truncate">
-                              {transacao.categoria.nome}
-                            </span>
-                          </>
-                        )}
-                        {transacao.conta && (
-                          <>
-                            <span>•</span>
-                            <span className="truncate">
-                              {transacao.conta.nome}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Value & Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <div className="text-right">
-                        <div className="flex items-center gap-1.5 justify-end">
-                          <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
-                            {formatCurrency(Number(transacao.valor))}
-                          </p>
-                          {transacao.solicitacao_reembolso_id && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400"
-                                  >
-                                    <ReceiptText className="w-2.5 h-2.5" />
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Reembolso</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                        <Badge
-                          className={`text-[10px] md:text-xs ${getStatusColorDynamic(
-                            transacao
-                          )}`}
-                        >
-                          {getStatusDisplay(transacao)}
-                        </Badge>
-                      </div>
-                      <TransacaoActionsMenu
-                        transacaoId={transacao.id}
-                        status={transacao.status}
-                        tipo="saida"
-                        isReembolso={!!transacao.solicitacao_reembolso_id}
-                        onEdit={() => {
-                          setEditingTransacao(transacao);
+                    return (
+                      <div
+                        key={transacao.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                        onDoubleClick={() => {
+                          setEditingTransacao(transacao as any);
                           setDialogOpen(true);
                         }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                      >
+                        {/* Data Compact - Mobile */}
+                        <div className="flex-shrink-0 text-center w-12 md:w-14">
+                          <div className="text-xs md:text-sm font-bold text-foreground">
+                            {format(
+                              new Date(transacao.data_vencimento + "T00:00:00"),
+                              "dd",
+                              {
+                                locale: ptBR,
+                              },
+                            )}
+                          </div>
+                          <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
+                            {format(
+                              new Date(transacao.data_vencimento + "T00:00:00"),
+                              "MMM",
+                              {
+                                locale: ptBR,
+                              },
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="h-10 w-px bg-border" />
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-semibold text-sm md:text-base truncate flex-1">
+                              {transacao.descricao}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(transacao.id);
+                                toast.success("ID copiado!");
+                              }}
+                              className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                              title="Copiar ID"
+                            >
+                              {transacao.id.substring(0, 6)}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                            {transacao.fornecedor && (
+                              <>
+                                <span className="truncate">
+                                  {transacao.fornecedor.nome}
+                                </span>
+                                {transacao.categoria && <span>•</span>}
+                              </>
+                            )}
+                            {transacao.categoria && (
+                              <>
+                                <span
+                                  className="w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{
+                                    backgroundColor:
+                                      transacao.categoria.cor || "#666",
+                                  }}
+                                />
+                                <span className="truncate">
+                                  {transacao.categoria.nome}
+                                </span>
+                              </>
+                            )}
+                            {transacao.conta && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate">
+                                  {transacao.conta.nome}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Value & Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="text-right">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <p className="text-base md:text-lg font-bold text-red-600 whitespace-nowrap">
+                                {formatCurrency(Number(transacao.valor))}
+                              </p>
+                              {transacao.solicitacao_reembolso_id && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] gap-1 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-400"
+                                      >
+                                        <ReceiptText className="w-2.5 h-2.5" />
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Reembolso</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center justify-end gap-1 mt-1">
+                              <Badge
+                                className={`text-[10px] md:text-xs ${getStatusColorDynamic(
+                                  transacao,
+                                )}`}
+                              >
+                                {getStatusDisplay(transacao)}
+                              </Badge>
+                              {isConciliado ? (
+                                <Badge className="text-[10px] md:text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                  Conciliado
+                                </Badge>
+                              ) : isConferidoManual ? (
+                                <Badge className="text-[10px] md:text-xs bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
+                                  Conferido
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                          <TransacaoActionsMenu
+                            transacaoId={transacao.id}
+                            status={transacao.status}
+                            tipo="saida"
+                            isReembolso={!!transacao.solicitacao_reembolso_id}
+                            isDinheiro={isDinheiro}
+                            conferidoManual={!!transacao.conferido_manual}
+                            onEdit={() => {
+                              setEditingTransacao(transacao);
+                              setDialogOpen(true);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
               {/* Pagination - apenas na visão lista */}
               {!agruparPorData && (
                 <TablePagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={goToPage}
-                startIndex={startIndex}
-                endIndex={endIndex}
-                totalItems={totalItems}
-                hasNextPage={hasNextPage}
-                hasPrevPage={hasPrevPage}
-              />
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalItems={totalItems}
+                  hasNextPage={hasNextPage}
+                  hasPrevPage={hasPrevPage}
+                />
               )}
             </>
           ) : (

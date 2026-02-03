@@ -1,6 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Plus,
   ArrowLeft,
   Building2,
@@ -17,6 +24,8 @@ import {
   Loader2,
   FileText,
   ArrowRightLeft,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +42,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import { formatLocalDate, startOfMonthLocal, endOfMonthLocal } from "@/utils/dateUtils";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
@@ -55,6 +65,11 @@ export default function Contas() {
     from: Date;
     to: Date;
   } | null>(null);
+  const [agruparPorData, setAgruparPorData] = useState(false);
+  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
+    new Set(),
+  );
+  const [statusFilter, setStatusFilter] = useState<"all" | "pago" | "pendente">("all");
   const [testingContaId, setTestingContaId] = useState<string | null>(null);
   const [extratoDialogOpen, setExtratoDialogOpen] = useState(false);
   const [transferenciaDialogOpen, setTransferenciaDialogOpen] = useState(false);
@@ -175,11 +190,11 @@ export default function Contas() {
   };
 
   const startDate = customRange
-    ? format(customRange.from, "yyyy-MM-dd")
-    : format(startOfMonth(selectedMonth), "yyyy-MM-dd");
+    ? formatLocalDate(customRange.from)
+    : formatLocalDate(startOfMonthLocal(selectedMonth));
   const endDate = customRange
-    ? format(customRange.to, "yyyy-MM-dd")
-    : format(endOfMonth(selectedMonth), "yyyy-MM-dd");
+    ? formatLocalDate(customRange.to)
+    : formatLocalDate(endOfMonthLocal(selectedMonth));
 
   const { data: transacoes, isLoading: isLoadingTransacoes } = useQuery({
     queryKey: [
@@ -204,10 +219,9 @@ export default function Contas() {
         `
         )
         .eq("igreja_id", igrejaId)
-        .eq("status", "pago")
-        .gte("data_pagamento", startDate)
-        .lte("data_pagamento", endDate)
-        .order("data_pagamento", { ascending: false });
+        .gte("data_vencimento", startDate)
+        .lte("data_vencimento", endDate)
+        .order("data_vencimento", { ascending: false });
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -237,11 +251,10 @@ export default function Contas() {
       if (!igrejaId) return [];
       let query = supabase
         .from("transacoes_financeiras")
-        .select("conta_id, tipo, valor")
+        .select("conta_id, tipo, valor, status")
         .eq("igreja_id", igrejaId)
-        .eq("status", "pago")
-        .gte("data_pagamento", startDate)
-        .lte("data_pagamento", endDate);
+        .gte("data_vencimento", startDate)
+        .lte("data_vencimento", endDate);
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -300,6 +313,42 @@ export default function Contas() {
     return formatValue(value);
   };
 
+  const getStatusDisplay = (transacao: { status?: string; data_vencimento?: string | Date | null; tipo?: string }) => {
+    if (transacao.status === "pago") {
+      return transacao.tipo === "entrada" ? "Recebido" : "Pago";
+    }
+    if (transacao.status === "pendente") {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      if (transacao.data_vencimento) {
+        const vencimento = new Date(transacao.data_vencimento + "T00:00:00");
+        if (vencimento < hoje) {
+          return "Atrasado";
+        }
+      }
+      return "Pendente";
+    }
+    return transacao.status || "Pendente";
+  };
+
+  const getStatusColor = (transacao: { status?: string; data_vencimento?: string | Date | null; tipo?: string }) => {
+    if (transacao.status === "pago") {
+      return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400";
+    }
+    if (transacao.status === "pendente") {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      if (transacao.data_vencimento) {
+        const vencimento = new Date(transacao.data_vencimento + "T00:00:00");
+        if (vencimento < hoje) {
+          return "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400";
+        }
+      }
+      return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400";
+    }
+    return "bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400";
+  };
+
   const toggleContaSelection = (contaId: string) => {
     setSelectedContaIds((prev) =>
       prev.includes(contaId)
@@ -312,12 +361,64 @@ export default function Contas() {
     setSelectedContaIds([]);
   };
 
+  // Filtrar transações por status
+  const filterByStatus = (transacoes: typeof transacoes) => {
+    if (!transacoes) return [];
+    if (statusFilter === "all") return transacoes;
+    if (statusFilter === "pago") {
+      return transacoes.filter(t => t.status === "pago");
+    }
+    if (statusFilter === "pendente") {
+      return transacoes.filter(t => t.status === "pendente");
+    }
+    return transacoes;
+  };
+
+  // Aplicar filtro de status
+  const transacoesFiltradas = useMemo(() => {
+    return filterByStatus(transacoes);
+  }, [transacoes, statusFilter]);
+
+  const toggleGrupo = (dataKey: string) => {
+    setGruposExpandidos((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(dataKey)) {
+        newSet.delete(dataKey);
+      } else {
+        newSet.add(dataKey);
+      }
+      return newSet;
+    });
+  };
+
+  // Agrupar transações por data de vencimento
+  const transacoesAgrupadas = useMemo(() => {
+    if (!transacoes) return {};
+    return transacoes.reduce((acc, t) => {
+      const data = t.data_vencimento || "sem-data";
+      if (!acc[data]) {
+        acc[data] = [];
+      }
+      acc[data].push(t);
+      return acc;
+    }, {} as Record<string, typeof transacoes>);
+  }, [transacoes]);
+
+  // Ordenar datas (mais recentes primeiro)
+  const datasOrdenadas = useMemo(() => {
+    return Object.keys(transacoesAgrupadas).sort((a, b) => {
+      if (a === "sem-data") return 1;
+      if (b === "sem-data") return -1;
+      return b.localeCompare(a);
+    });
+  }, [transacoesAgrupadas]);
+
   const totalEntradas =
-    transacoes
+    transacoesFiltradas
       ?.filter((t) => t.tipo === "entrada")
       .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const totalSaidas =
-    transacoes
+    transacoesFiltradas
       ?.filter((t) => t.tipo === "saida")
       .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const saldoPeriodo = totalEntradas - totalSaidas;
@@ -327,6 +428,8 @@ export default function Contas() {
     tipo: string;
     descricao: string;
     valor: number | string;
+    status?: string;
+    data_vencimento?: string | Date | null;
     data_pagamento?: string | Date | null;
     contas?: { nome?: string } | null;
     categorias_financeiras?: { nome?: string } | null;
@@ -350,14 +453,35 @@ export default function Contas() {
             )}
           >
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{t.descricao}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium truncate flex-1">{t.descricao}</p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(t.id);
+                    toast.success("ID copiado!");
+                  }}
+                  className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                  title="Copiar ID"
+                >
+                  {t.id.substring(0, 6)}
+                </button>
+              </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <p className="text-xs text-muted-foreground">
-                  {t.data_pagamento &&
-                    format(new Date(t.data_pagamento), "dd/MM/yyyy", {
-                      locale: ptBR,
-                    })}
+                  {t.data_vencimento &&
+                    format(
+                      new Date(t.data_vencimento + "T00:00:00"),
+                      "dd/MM/yyyy",
+                      { locale: ptBR }
+                    )}
                 </p>
+                {t.status && (
+                  <Badge className={cn("text-xs", getStatusColor(t))}>
+                    {getStatusDisplay(t)}
+                  </Badge>
+                )}
                 {(selectedContaIds.length === 0 ||
                   selectedContaIds.length > 1) &&
                   t.contas && (
@@ -391,6 +515,172 @@ export default function Contas() {
       )}
     </div>
   );
+
+  const renderTransactionListGrouped = (filteredTransacoes: TransacaoLista[]) => {
+    // Agrupar transações filtradas por data de vencimento
+    const gruposFiltrados = filteredTransacoes.reduce((acc, t) => {
+      const data = t.data_vencimento || "sem-data";
+      if (!acc[data]) {
+        acc[data] = [];
+      }
+      acc[data].push(t);
+      return acc;
+    }, {} as Record<string, TransacaoLista[]>);
+
+    const datasFiltradas = Object.keys(gruposFiltrados).sort((a, b) => {
+      if (a === "sem-data") return 1;
+      if (b === "sem-data") return -1;
+      return b.localeCompare(a);
+    });
+
+    return (
+      <div className="space-y-3">
+        {datasFiltradas.map((dataKey) => {
+          const grupo = gruposFiltrados[dataKey];
+          // Calcular total 
+          // Se tem apenas um tipo (entrada ou saída), mostra o valor absoluto
+          // Se tem ambos, mostra o saldo líquido
+          const temEntradas = grupo.some(t => t.tipo === "entrada");
+          const temSaidas = grupo.some(t => t.tipo === "saida");
+          
+          let totalGrupo: number;
+          let corTotal: string;
+          let prefixo: string = "";
+          
+          if (temEntradas && !temSaidas) {
+            // Só entradas - mostrar total positivo em verde
+            totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+            corTotal = "text-green-600";
+            prefixo = "+";
+          } else if (temSaidas && !temEntradas) {
+            // Só saídas - mostrar total positivo em vermelho (o contexto já indica que é saída)
+            totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+            corTotal = "text-red-600";
+            prefixo = "-";
+          } else {
+            // Misto - mostrar saldo líquido com cor apropriada
+            totalGrupo = grupo.reduce(
+              (sum, t) => sum + (t.tipo === "entrada" ? Number(t.valor) : -Number(t.valor)),
+              0,
+            );
+            corTotal = totalGrupo >= 0 ? "text-green-600" : "text-red-600";
+            prefixo = totalGrupo >= 0 ? "+" : "";
+          }
+          
+          const isExpandido = gruposExpandidos.has(dataKey);
+
+          return (
+            <div
+              key={dataKey}
+              className="border rounded-lg overflow-hidden"
+            >
+              {/* Header do grupo */}
+              <button
+                onClick={() => toggleGrupo(dataKey)}
+                className="w-full flex items-center justify-between p-3 bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {isExpandido ? (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  )}
+                  <div className="text-left">
+                    <div className="font-semibold text-sm">
+                      {dataKey === "sem-data"
+                        ? "Sem data"
+                        : format(
+                            new Date(dataKey + "T00:00:00"),
+                            "dd 'de' MMMM 'de' yyyy",
+                            { locale: ptBR },
+                          )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {grupo.length}{" "}
+                      {grupo.length === 1 ? "transação" : "transações"}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={cn("text-base font-bold", corTotal)}>
+                    {prefixo}{formatCurrency(Math.abs(totalGrupo))}
+                  </div>
+                </div>
+              </button>
+
+              {/* Lista de transações do grupo */}
+              {isExpandido && (
+                <div className="divide-y">
+                  {grupo.map((t) => (
+                    <div
+                      key={t.id}
+                      className={cn(
+                        "flex items-center justify-between p-3",
+                        t.tipo === "entrada"
+                          ? "bg-green-50/50 dark:bg-green-950/10"
+                          : "bg-red-50/50 dark:bg-red-950/10"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium truncate flex-1">
+                            {t.descricao}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(t.id);
+                              toast.success("ID copiado!");
+                            }}
+                            className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                            title="Copiar ID"
+                          >
+                            {t.id.substring(0, 6)}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {t.status && (
+                            <Badge className={cn("text-xs", getStatusColor(t))}>
+                              {getStatusDisplay(t)}
+                            </Badge>
+                          )}
+                          {(selectedContaIds.length === 0 ||
+                            selectedContaIds.length > 1) &&
+                            t.contas && (
+                              <Badge variant="secondary" className="text-xs">
+                                {t.contas.nome}
+                              </Badge>
+                            )}
+                          {t.categorias_financeiras && (
+                            <Badge variant="outline" className="text-xs">
+                              {t.categorias_financeiras.nome}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right ml-2">
+                        <p
+                          className={`text-sm font-bold ${
+                            t.tipo === "entrada"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {t.tipo === "entrada" ? "+" : "-"}{" "}
+                          {formatCurrency(Number(t.valor))}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -729,46 +1019,85 @@ export default function Contas() {
             </div>
           )}
 
-          {/* Tabs de Lançamentos */}
+          {/* Botão de Agrupamento, Filtro de Status e Tabs */}
           <Tabs defaultValue="todos" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="todos" className="text-xs">
-                <List className="w-3 h-3 mr-1" />
-                Todos
-              </TabsTrigger>
-              <TabsTrigger value="entradas" className="text-xs">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                Entradas
-              </TabsTrigger>
-              <TabsTrigger value="saidas" className="text-xs">
-                <TrendingDown className="w-3 h-3 mr-1" />
-                Saídas
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
+              <TabsList className="grid w-full grid-cols-3 flex-1 md:w-auto">
+                <TabsTrigger value="todos" className="text-xs">
+                  <List className="w-3 h-3 mr-1" />
+                  Todos
+                </TabsTrigger>
+                <TabsTrigger value="entradas" className="text-xs">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  Entradas
+                </TabsTrigger>
+                <TabsTrigger value="saidas" className="text-xs">
+                  <TrendingDown className="w-3 h-3 mr-1" />
+                  Saídas
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex items-center gap-2">
+                <Select value={statusFilter} onValueChange={(value: "all" | "pago" | "pendente") => setStatusFilter(value)}>
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pago">✅ Pago</SelectItem>
+                    <SelectItem value="pendente">⏳ Pendente</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAgruparPorData(!agruparPorData);
+                    if (!agruparPorData) {
+                      setGruposExpandidos(
+                        new Set(Object.keys(transacoesAgrupadas)),
+                      );
+                    }
+                  }}
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  {agruparPorData ? "Visão Lista" : "Agrupar por Data"}
+                </Button>
+              </div>
+            </div>
 
             <TabsContent
               value="todos"
               className="max-h-[500px] overflow-y-auto"
             >
-              {renderTransactionList(transacoes || [])}
+              {agruparPorData
+                ? renderTransactionListGrouped(transacoesFiltradas || [])
+                : renderTransactionList(transacoesFiltradas || [])}
             </TabsContent>
 
             <TabsContent
               value="entradas"
               className="max-h-[500px] overflow-y-auto"
             >
-              {renderTransactionList(
-                transacoes?.filter((t) => t.tipo === "entrada") || []
-              )}
+              {agruparPorData
+                ? renderTransactionListGrouped(
+                    transacoesFiltradas?.filter((t) => t.tipo === "entrada") || []
+                  )
+                : renderTransactionList(
+                    transacoesFiltradas?.filter((t) => t.tipo === "entrada") || []
+                  )}
             </TabsContent>
 
             <TabsContent
               value="saidas"
               className="max-h-[500px] overflow-y-auto"
             >
-              {renderTransactionList(
-                transacoes?.filter((t) => t.tipo === "saida") || []
-              )}
+              {agruparPorData
+                ? renderTransactionListGrouped(
+                    transacoesFiltradas?.filter((t) => t.tipo === "saida") || []
+                  )
+                : renderTransactionList(
+                    transacoesFiltradas?.filter((t) => t.tipo === "saida") || []
+                  )}
             </TabsContent>
           </Tabs>
         </CardContent>

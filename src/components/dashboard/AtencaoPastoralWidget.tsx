@@ -55,7 +55,7 @@ export default function AtencaoPastoralWidget() {
           {
             p_filial_id: isAllFiliais ? null : filialId,
             p_is_all: !!isAllFiliais,
-          }
+          },
         );
 
         if (!rpcError && rpcData) {
@@ -66,7 +66,7 @@ export default function AtencaoPastoralWidget() {
       } catch (rpcErr) {
         console.warn(
           "RPC get_ovelhas_em_risco falhou, usando fallback:",
-          rpcErr
+          rpcErr,
         );
       }
 
@@ -86,7 +86,7 @@ export default function AtencaoPastoralWidget() {
           .order("created_at", { ascending: false })
           .gt(
             "created_at",
-            new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+            new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
           );
         if (!isAllFiliais && filialId)
           sentimentosQuery = sentimentosQuery.eq("filial_id", filialId);
@@ -108,14 +108,14 @@ export default function AtencaoPastoralWidget() {
           .eq("igreja_id", igrejaId)
           .gt(
             "created_at",
-            new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString()
+            new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
           );
         if (!isAllFiliais && filialId)
           checkinsQuery = checkinsQuery.eq("filial_id", filialId);
         const { data: checkinsRecentes } = await checkinsQuery;
 
         const presentesSet = new Set(
-          (checkinsRecentes || []).map((c) => c.pessoa_id).filter(Boolean)
+          (checkinsRecentes || []).map((c) => c.pessoa_id).filter(Boolean),
         );
 
         const ausentes = (perfisBase || [])
@@ -123,7 +123,7 @@ export default function AtencaoPastoralWidget() {
           .filter(
             (p) =>
               new Date(p.created_at).getTime() <
-              Date.now() - 21 * 24 * 60 * 60 * 1000
+              Date.now() - 21 * 24 * 60 * 60 * 1000,
           )
           .map((p) => ({
             id: p.id,
@@ -154,7 +154,7 @@ export default function AtencaoPastoralWidget() {
       } catch (err) {
         console.error(
           "Erro inesperado ao montar ovelhas em risco (fallback):",
-          err
+          err,
         );
         return [];
       }
@@ -166,7 +166,7 @@ export default function AtencaoPastoralWidget() {
   const openWhatsApp = (
     telefone: string | null,
     nome: string,
-    tipoRisco: string
+    tipoRisco: string,
   ) => {
     if (!telefone) return;
     const cleanPhone = telefone.replace(/\D/g, "");
@@ -179,7 +179,7 @@ export default function AtencaoPastoralWidget() {
 
     window.open(
       `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`,
-      "_blank"
+      "_blank",
     );
   };
 
@@ -245,7 +245,7 @@ export default function AtencaoPastoralWidget() {
             <div className="max-h-[350px] overflow-y-auto space-y-3 pr-1">
               {alerts.map((alert) => (
                 <div
-                  key={alert.id}
+                  key={`${alert.tipo_risco}-${alert.id}`}
                   className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
                   <Avatar className="w-10 h-10 flex-shrink-0">
@@ -284,7 +284,7 @@ export default function AtencaoPastoralWidget() {
                         openWhatsApp(
                           alert.telefone,
                           alert.nome,
-                          alert.tipo_risco
+                          alert.tipo_risco,
                         )
                       }
                       title="Enviar mensagem no WhatsApp"

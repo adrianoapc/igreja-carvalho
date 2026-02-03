@@ -31,10 +31,28 @@ import {
   FileText,
   Download,
   ImageIcon,
+  Copy,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+
+// Helper para converter string ISO (YYYY-MM-DD) para Date no timezone local
+const parseLocalDate = (dateString: string | null | undefined): Date | undefined => {
+  if (!dateString) return undefined;
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+// Helper para converter Date para string ISO (YYYY-MM-DD) sem offset de timezone
+const formatLocalDate = (date: Date | undefined): string | null => {
+  if (!date) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -101,6 +119,7 @@ export function TransacaoDialog({
   const [loading, setLoading] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiStep, setAiStep] = useState<AIProcessingStep>("idle");
+  const [copiedId, setCopiedId] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
@@ -154,14 +173,10 @@ export function TransacaoDialog({
       setValor(formatarValorBR(transacao.valor));
       setValorLiquido(formatarValorBR(transacao.valor_liquido));
       setDataVencimento(
-        transacao.data_vencimento
-          ? new Date(transacao.data_vencimento)
-          : new Date()
+        parseLocalDate(transacao.data_vencimento) || new Date()
       );
       setDataCompetencia(
-        transacao.data_competencia
-          ? new Date(transacao.data_competencia)
-          : new Date()
+        parseLocalDate(transacao.data_competencia) || new Date()
       );
       setContaId(transacao.conta_id || "");
       setCategoriaId(transacao.categoria_id || "none");
@@ -191,11 +206,7 @@ export function TransacaoDialog({
       }
 
       setFoiPago(transacao.status === "pago");
-      setDataPagamento(
-        transacao.data_pagamento
-          ? new Date(transacao.data_pagamento)
-          : undefined
-      );
+      setDataPagamento(parseLocalDate(transacao.data_pagamento));
       setJuros(transacao.juros ? String(transacao.juros) : "");
       setMultas(transacao.multas ? String(transacao.multas) : "");
       setDesconto(transacao.desconto ? String(transacao.desconto) : "");
@@ -208,7 +219,7 @@ export function TransacaoDialog({
         setTotalParcelas(String(transacao.total_parcelas));
       if (transacao.recorrencia) setRecorrencia(transacao.recorrencia);
       if (transacao.data_fim_recorrencia)
-        setDataFimRecorrencia(new Date(transacao.data_fim_recorrencia));
+        setDataFimRecorrencia(parseLocalDate(transacao.data_fim_recorrencia));
     } else if (!open) {
       resetForm();
     }
@@ -280,8 +291,8 @@ export function TransacaoDialog({
     },
   });
 
-  const { data: subcategorias } = useQuery({
-    queryKey: ["subcategorias-select", categoriaId],
+  const { data: subcategorias, isLoading: subcategoriasLoading } = useQuery({
+    queryKey: ["subcategorias-select", categoriaId, open],
     queryFn: async () => {
       if (!categoriaId || categoriaId === "none") return [];
       const { data, error } = await supabase
@@ -293,7 +304,8 @@ export function TransacaoDialog({
       if (error) throw error;
       return data;
     },
-    enabled: !!categoriaId && categoriaId !== "none",
+    enabled: open && !!categoriaId && categoriaId !== "none",
+    staleTime: 0,
   });
 
   const { data: centros } = useQuery({
@@ -875,10 +887,10 @@ export function TransacaoDialog({
         descricao,
         valor: valorNumerico,
         valor_liquido: valorLiquidoFinal,
-        data_vencimento: format(dataVencimento, "yyyy-MM-dd"),
-        data_competencia: format(dataCompetencia, "yyyy-MM-dd"),
+        data_vencimento: formatLocalDate(dataVencimento),
+        data_competencia: formatLocalDate(dataCompetencia),
         data_pagamento:
-          foiPago && dataPagamento ? format(dataPagamento, "yyyy-MM-dd") : null,
+          foiPago && dataPagamento ? formatLocalDate(dataPagamento) : null,
         conta_id: contaId,
         categoria_id:
           categoriaId && categoriaId !== "none" ? categoriaId : null,
@@ -900,7 +912,7 @@ export function TransacaoDialog({
         recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
         data_fim_recorrencia:
           tipoLancamento === "recorrente" && dataFimRecorrencia
-            ? format(dataFimRecorrencia, "yyyy-MM-dd")
+            ? formatLocalDate(dataFimRecorrencia)
             : null,
         observacoes: observacoes || null,
         anexo_url: anexoPath || null,
@@ -1333,12 +1345,18 @@ export function TransacaoDialog({
           <div>
             <Label>Subcategoria</Label>
             <Select
-              value={subcategoriaId}
+              value={subcategoriaId || "none"}
               onValueChange={setSubcategoriaId}
-              disabled={!categoriaId || categoriaId === "none"}
+              disabled={!categoriaId || categoriaId === "none" || subcategoriasLoading}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
+                {subcategoriasLoading && subcategoriaId && subcategoriaId !== "none" ? (
+                  <span className="text-muted-foreground">Carregando...</span>
+                ) : subcategoriaId && subcategoriaId !== "none" ? (
+                  <span>{subcategorias?.find((s) => s.id === subcategoriaId)?.nome || "Carregando..."}</span>
+                ) : (
+                  <SelectValue placeholder="Selecione" />
+                )}
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhuma</SelectItem>
@@ -1548,9 +1566,32 @@ export function TransacaoDialog({
             Formulário de {tipo === "entrada" ? "entrada" : "saída"} financeira
           </DialogDescription>
           <div className="border-b pb-3 px-4 pt-4 md:px-6 md:pt-4">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">
-              {title}
-            </h2>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold leading-none tracking-tight">
+                  {title}
+                </h2>
+                {transacao?.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(String(transacao.id));
+                      setCopiedId(true);
+                      setTimeout(() => setCopiedId(false), 2000);
+                      toast.success("ID copiado!");
+                    }}
+                    className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <span className="font-mono">ID: {String(transacao.id).substring(0, 8)}...</span>
+                    {copiedId ? (
+                      <Check className="w-3 h-3 text-green-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
             <form

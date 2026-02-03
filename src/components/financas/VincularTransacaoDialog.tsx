@@ -84,18 +84,20 @@ export function VincularTransacaoDialog({
 
         // Correspondência de data (20 pontos)
         try {
-          const dataExtrato = parseISO(extrato.data_transacao);
-          const dataTransacao = parseISO(t.data_pagamento);
-          const diffDias = Math.abs(differenceInDays(dataExtrato, dataTransacao));
+          if (t.data_pagamento) {
+            const dataExtrato = parseISO(extrato.data_transacao);
+            const dataTransacao = parseISO(t.data_pagamento);
+            const diffDias = Math.abs(differenceInDays(dataExtrato, dataTransacao));
 
-          if (diffDias === 0) {
-            score += 20;
-          } else if (diffDias <= 1) {
-            score += 15;
-          } else if (diffDias <= 3) {
-            score += 10;
-          } else if (diffDias <= 7) {
-            score += 5;
+            if (diffDias === 0) {
+              score += 20;
+            } else if (diffDias <= 1) {
+              score += 15;
+            } else if (diffDias <= 3) {
+              score += 10;
+            } else if (diffDias <= 7) {
+              score += 5;
+            }
           }
         } catch {
           // Data inválida
@@ -249,11 +251,13 @@ export function VincularTransacaoDialog({
                       {getScoreBadge(t.score)}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {format(parseISO(t.data_pagamento), "dd/MM/yyyy", {
-                          locale: ptBR,
-                        })}
-                      </span>
+                      {t.data_pagamento && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(parseISO(t.data_pagamento), "dd/MM/yyyy", {
+                            locale: ptBR,
+                          })}
+                        </span>
+                      )}
                       {t.categorias_financeiras && (
                         <Badge variant="outline" className="text-xs">
                           {t.categorias_financeiras.nome}

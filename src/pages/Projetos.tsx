@@ -24,19 +24,30 @@ interface Projeto {
 export default function Projetos() {
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { igrejaId, filialId, isAllFiliais, loading: filialLoading } = useFilialId();
+  const {
+    igrejaId,
+    filialId,
+    isAllFiliais,
+    loading: filialLoading,
+  } = useFilialId();
 
-  const { data: projetos, isLoading, refetch } = useQuery({
+  const {
+    data: projetos,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["projetos", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
         .from("projetos")
-        .select(`
+        .select(
+          `
           *,
           lider:profiles!projetos_lider_id_fkey(id, nome, avatar_url),
           tarefas(status)
-        `)
+        `,
+        )
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
       if (!isAllFiliais && filialId) {
@@ -56,38 +67,50 @@ export default function Projetos() {
 
   const calcularProgresso = (tarefas: { status: string }[] | undefined) => {
     if (!tarefas || tarefas.length === 0) return 0;
-    const concluidas = tarefas.filter(t => t.status === "done").length;
+    const concluidas = tarefas.filter((t) => t.status === "done").length;
     return Math.round((concluidas / tarefas.length) * 100);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Projetos</h1>
-          <p className="text-muted-foreground text-sm">Gerencie seus projetos e tarefas</p>
+          <p className="text-muted-foreground text-sm">
+            Gerencie seus projetos e tarefas
+          </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Projeto
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/projetos/backlog")}
+          >
+            Backlog Global
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Projeto
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-48" />
           ))}
         </div>
       ) : projetos && projetos.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projetos.map(projeto => (
+          {projetos.map((projeto) => (
             <ProjetoCard
               key={projeto.id}
               projeto={projeto}
               progresso={calcularProgresso(projeto.tarefas)}
               totalTarefas={projeto.tarefas?.length || 0}
-              tarefasConcluidas={projeto.tarefas?.filter(t => t.status === "done").length || 0}
+              tarefasConcluidas={
+                projeto.tarefas?.filter((t) => t.status === "done").length || 0
+              }
               onClick={() => navigate(`/projetos/${projeto.id}`)}
             />
           ))}
@@ -95,8 +118,12 @@ export default function Projetos() {
       ) : (
         <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed">
           <FolderKanban className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="font-medium text-foreground mb-2">Nenhum projeto encontrado</h3>
-          <p className="text-sm text-muted-foreground mb-4">Crie seu primeiro projeto para começar</p>
+          <h3 className="font-medium text-foreground mb-2">
+            Nenhum projeto encontrado
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Crie seu primeiro projeto para começar
+          </p>
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Novo Projeto

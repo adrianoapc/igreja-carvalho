@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,8 @@ type Lancamento = {
   data_vencimento: string | null;
   data_pagamento: string | null;
   origem_registro: string | null;
+  forma_pagamento?: string | null;
+  conferido_manual?: boolean | null;
   categoria: { nome: string } | null;
   forma: { nome: string } | null;
   conta: { nome: string } | null;
@@ -65,9 +68,10 @@ export default function SessaoLancamentos() {
         .from("transacoes_financeiras")
         .select(
           `id, valor, data_vencimento, data_pagamento, origem_registro,
+           forma_pagamento, conferido_manual,
            categoria:categoria_id(nome),
            forma:forma_pagamento_id(nome),
-           conta:conta_id(nome)`
+           conta:conta_id(nome)`,
         )
         .eq("sessao_id", id)
         .order("created_at", { ascending: false });
@@ -76,6 +80,38 @@ export default function SessaoLancamentos() {
     },
     enabled: !!id,
   });
+
+  const transacaoIds = useMemo(
+    () => lancamentos.map((lancamento) => lancamento.id),
+    [lancamentos],
+  );
+
+  const { data: extratosConciliados = [] } = useQuery({
+    queryKey: ["extratos-vinculados-sessao", id, transacaoIds],
+    queryFn: async () => {
+      if (transacaoIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("extratos_bancarios")
+        .select("transacao_vinculada_id, reconciliado")
+        .in("transacao_vinculada_id", transacaoIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: transacaoIds.length > 0,
+  });
+
+  const conciliacaoMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    extratosConciliados.forEach((extrato) => {
+      if (extrato.transacao_vinculada_id) {
+        map.set(extrato.transacao_vinculada_id, !!extrato.reconciliado);
+      }
+    });
+    return map;
+  }, [extratosConciliados]);
+
+  const isPagamentoDinheiro = (forma?: string | null) =>
+    (forma || "").toLowerCase().includes("dinheiro");
 
   return (
     <div className="p-4 md:p-6">
@@ -120,37 +156,65 @@ export default function SessaoLancamentos() {
                     <th className="py-2 pr-4">Forma</th>
                     <th className="py-2 pr-4">Conta</th>
                     <th className="py-2 pr-4">Origem</th>
+                    <th className="py-2 pr-4">Conferência</th>
                     <th className="py-2 pr-4">Valor</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lancamentos.map((l) => (
-                    <tr key={l.id} className="border-t">
-                      <td className="py-2 pr-4">
-                        {l.data_pagamento
-                          ? format(new Date(l.data_pagamento), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })
-                          : l.data_vencimento
-                          ? format(new Date(l.data_vencimento), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })
-                          : "-"}
-                      </td>
-                      <td className="py-2 pr-4">{l.categoria?.nome || "-"}</td>
-                      <td className="py-2 pr-4">{l.forma?.nome || "-"}</td>
-                      <td className="py-2 pr-4">{l.conta?.nome || "-"}</td>
-                      <td className="py-2 pr-4 capitalize">
-                        {l.origem_registro || "-"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {new Intl.NumberFormat("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        }).format(Number(l.valor || 0))}
-                      </td>
-                    </tr>
-                  ))}
+                  {lancamentos.map((l) => {
+                    const isConciliado = conciliacaoMap.get(l.id);
+                    const isConferidoManual =
+                      !isConciliado &&
+                      isPagamentoDinheiro(l.forma_pagamento) &&
+                      !!l.conferido_manual;
+
+                    return (
+                      <tr key={l.id} className="border-t">
+                        <td className="py-2 pr-4">
+                          {l.data_pagamento
+                            ? format(new Date(l.data_pagamento), "dd/MM/yyyy", {
+                                locale: ptBR,
+                              })
+                            : l.data_vencimento
+                              ? format(
+                                  new Date(l.data_vencimento),
+                                  "dd/MM/yyyy",
+                                  {
+                                    locale: ptBR,
+                                  },
+                                )
+                              : "-"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {l.categoria?.nome || "-"}
+                        </td>
+                        <td className="py-2 pr-4">{l.forma?.nome || "-"}</td>
+                        <td className="py-2 pr-4">{l.conta?.nome || "-"}</td>
+                        <td className="py-2 pr-4 capitalize">
+                          {l.origem_registro || "-"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {isConciliado ? (
+                            <Badge className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                              Conciliado
+                            </Badge>
+                          ) : isConferidoManual ? (
+                            <Badge className="text-[10px] bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
+                              Conferido
+                            </Badge>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {new Intl.NumberFormat("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          }).format(Number(l.valor || 0))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

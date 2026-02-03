@@ -42,12 +42,12 @@ interface EscalaCulto {
     id: string;
     nome: string;
     cor: string;
-  };
+  } | null;
   pessoa: {
     id: string;
     nome: string;
     telefone: string | null;
-  };
+  } | null;
 }
 
 interface TimeSummary {
@@ -105,7 +105,7 @@ export default function EscalasPendentesWidget() {
             nome,
             telefone
           )
-        `
+        `,
         )
         .gte("culto.data_evento", hoje.toISOString())
         .lte("culto.data_evento", proximos7Dias.toISOString())
@@ -128,12 +128,12 @@ export default function EscalasPendentesWidget() {
   const stats = {
     total: escalas.length,
     confirmados: escalas.filter(
-      (e) => e.confirmado || e.status_confirmacao === "aceito"
+      (e) => e.confirmado || e.status_confirmacao === "aceito",
     ).length,
     pendentes: escalas.filter(
       (e) =>
         !e.confirmado &&
-        (!e.status_confirmacao || e.status_confirmacao === "pendente")
+        (!e.status_confirmacao || e.status_confirmacao === "pendente"),
     ).length,
     recusados: escalas.filter((e) => e.status_confirmacao === "recusado")
       .length,
@@ -141,6 +141,7 @@ export default function EscalasPendentesWidget() {
 
   const timesSummary: Map<string, TimeSummary> = new Map();
   escalas.forEach((escala) => {
+    if (!escala.time) return;
     const timeId = escala.time.id;
     if (!timesSummary.has(timeId)) {
       timesSummary.set(timeId, {
@@ -171,7 +172,7 @@ export default function EscalasPendentesWidget() {
     }))
     .sort((a, b) => b.percentualPendente - a.percentualPendente);
   const timesEmAlerta = timesArray.filter(
-    (t) => t.percentualPendente > 30 && t.pendentes > 0
+    (t) => t.percentualPendente > 30 && t.pendentes > 0,
   );
   const chartData = [
     {
@@ -188,7 +189,7 @@ export default function EscalasPendentesWidget() {
       (e) =>
         !e.confirmado &&
         (!e.status_confirmacao || e.status_confirmacao === "pendente") &&
-        e.pessoa.telefone
+        e.pessoa?.telefone,
     );
     if (pendentes.length === 0) {
       toast.info("Não há voluntários pendentes com telefone cadastrado");
@@ -310,7 +311,7 @@ export default function EscalasPendentesWidget() {
                   height={36}
                   formatter={(
                     value: string,
-                    entry: { payload?: { value?: number } }
+                    entry: { payload?: { value?: number } },
                   ) => (
                     <span className="text-xs">
                       {value}: {entry.payload?.value ?? 0}
@@ -369,7 +370,7 @@ export default function EscalasPendentesWidget() {
 
         {/* Times OK */}
         {timesArray.filter(
-          (t) => t.percentualPendente <= 30 || t.pendentes === 0
+          (t) => t.percentualPendente <= 30 || t.pendentes === 0,
         ).length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium text-green-600">

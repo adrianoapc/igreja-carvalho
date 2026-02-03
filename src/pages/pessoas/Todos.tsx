@@ -33,6 +33,7 @@ import {
   Download,
   Filter,
   PhoneCall,
+  Trash2,
 } from "lucide-react";
 import { AgendarContatoDialog } from "@/components/visitantes/AgendarContatoDialog";
 import { toast } from "@/hooks/use-toast";
@@ -53,6 +54,7 @@ import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { formatarTelefone } from "@/lib/validators";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { usePermissions } from "@/hooks/usePermissions";
 interface Pessoa {
   id: string;
   nome: string;
@@ -77,7 +79,9 @@ export default function TodosPessoas() {
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [filterHasEmail, setFilterHasEmail] = useState(false);
   const [agendarDialogOpen, setAgendarDialogOpen] = useState(false);
-  const [pessoaSelecionada, setPessoaSelecionada] = useState<Pessoa | null>(null);
+  const [pessoaSelecionada, setPessoaSelecionada] = useState<Pessoa | null>(
+    null,
+  );
   const { toast } = useToast();
   const navigate = useNavigate();
   const {
@@ -86,6 +90,7 @@ export default function TodosPessoas() {
     isAllFiliais,
     loading: authLoading,
   } = useAuthContext();
+  const { isAdmin } = usePermissions();
 
   const fetchPessoas = async () => {
     try {
@@ -94,7 +99,7 @@ export default function TodosPessoas() {
       let query = supabase
         .from("profiles")
         .select(
-          "id, nome, telefone, email, status, avatar_url, data_primeira_visita, numero_visitas, user_id"
+          "id, nome, telefone, email, status, avatar_url, data_primeira_visita, numero_visitas, user_id",
         )
         .eq("igreja_id", igrejaId)
         .order("nome");
@@ -204,6 +209,36 @@ export default function TodosPessoas() {
       toast({
         title: "Erro",
         description: "Erro ao exportar dados",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeletePessoa = async (pessoa: Pessoa) => {
+    if (!isAdmin) return;
+    const confirmDelete = window.confirm(
+      `Excluir ${pessoa.nome}? Esta ação não pode ser desfeita.`,
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", pessoa.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pessoa excluída",
+        description: `${pessoa.nome} foi removido com sucesso.`,
+      });
+      fetchPessoas();
+    } catch (error) {
+      console.error("Erro ao excluir pessoa:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a pessoa.",
         variant: "destructive",
       });
     }
@@ -346,7 +381,7 @@ export default function TodosPessoas() {
                             {format(
                               new Date(pessoa.data_primeira_visita),
                               "dd/MM/yyyy",
-                              { locale: ptBR }
+                              { locale: ptBR },
                             )}
                           </span>
                         )}
@@ -382,6 +417,17 @@ export default function TodosPessoas() {
                       >
                         Agendar
                       </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="min-h-[44px]"
+                          onClick={() => handleDeletePessoa(pessoa)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Excluir
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -455,7 +501,7 @@ export default function TodosPessoas() {
                           {format(
                             new Date(pessoa.data_primeira_visita),
                             "dd/MM/yyyy",
-                            { locale: ptBR }
+                            { locale: ptBR },
                           )}
                         </span>
                       )}
@@ -493,6 +539,16 @@ export default function TodosPessoas() {
                   >
                     Agendar
                   </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="destructive"
+                      className="flex-1 min-h-[44px]"
+                      onClick={() => handleDeletePessoa(pessoa)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Excluir
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -543,7 +599,7 @@ export default function TodosPessoas() {
                         {page}
                       </PaginationLink>
                     </PaginationItem>
-                  )
+                  ),
                 )}
 
                 <PaginationItem>

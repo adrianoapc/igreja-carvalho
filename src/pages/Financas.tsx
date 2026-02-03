@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useFilialId } from "@/hooks/useFilialId";
+import { formatLocalDate, startOfMonthLocal, endOfMonthLocal } from "@/utils/dateUtils";
 
 export default function Financas() {
   const navigate = useNavigate();
@@ -60,16 +61,16 @@ export default function Financas() {
     queryFn: async () => {
       if (!igrejaId) return [];
       const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const firstDay = startOfMonthLocal(now);
+      const lastDay = endOfMonthLocal(now);
 
       let query = supabase
         .from("transacoes_financeiras")
         .select("valor")
         .eq("tipo", "entrada")
         .eq("status", "pago")
-        .gte("data_pagamento", firstDay.toISOString().split("T")[0])
-        .lte("data_pagamento", lastDay.toISOString().split("T")[0])
+        .gte("data_pagamento", formatLocalDate(firstDay))
+        .lte("data_pagamento", formatLocalDate(lastDay))
         .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
 
@@ -86,16 +87,16 @@ export default function Financas() {
     queryFn: async () => {
       if (!igrejaId) return [];
       const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const firstDay = startOfMonthLocal(now);
+      const lastDay = endOfMonthLocal(now);
 
       let query = supabase
         .from("transacoes_financeiras")
         .select("valor")
         .eq("tipo", "saida")
         .eq("status", "pago")
-        .gte("data_pagamento", firstDay.toISOString().split("T")[0])
-        .lte("data_pagamento", lastDay.toISOString().split("T")[0])
+        .gte("data_pagamento", formatLocalDate(firstDay))
+        .lte("data_pagamento", formatLocalDate(lastDay))
         .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
 
@@ -166,7 +167,7 @@ export default function Financas() {
         .eq("tipo", "saida")
         .eq("status", "pendente")
         .eq("igreja_id", igrejaId)
-        .lte("data_vencimento", end.toISOString().split("T")[0]);
+        .lte("data_vencimento", formatLocalDate(end));
 
       if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
 
@@ -179,12 +180,12 @@ export default function Financas() {
 
   const contasSemanaTotal = contasSemana.reduce(
     (sum, c) => sum + Number(c.valor || 0),
-    0
+    0,
   );
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const contasVencidas = contasSemana.filter(
-    (c) => new Date(c.data_vencimento) < hoje
+    (c) => new Date(c.data_vencimento) < hoje,
   );
 
   // Query para reembolsos pendentes
@@ -338,7 +339,7 @@ export default function Financas() {
   const [showConfigs, setShowConfigs] = useState(true);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 p-2 sm:p-0">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">

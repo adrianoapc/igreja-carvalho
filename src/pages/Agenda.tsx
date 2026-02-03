@@ -157,7 +157,7 @@ export default function Agenda() {
       let query = supabase
         .from("eventos")
         .select(
-          "id, titulo, tipo, data_evento, local, endereco, tema, descricao, pregador, exibir_preletor"
+          "id, titulo, tipo, data_evento, local, endereco, tema, descricao, pregador, exibir_preletor",
         )
         .eq("igreja_id", igrejaId)
         .gte("data_evento", today.toISOString())
@@ -181,59 +181,105 @@ export default function Agenda() {
   };
 
   const getTipoColor = (tipo: string) => {
-    switch (tipo.toLowerCase()) {
-      case "culto de celebração":
-      case "culto_domingo":
+    switch (tipo) {
+      case "CULTO":
         return "bg-primary text-primary-foreground";
-      case "culto de oração":
-      case "culto_oracao":
-        return "bg-amber-500 text-white";
-      case "culto de ensino":
-      case "culto_ensino":
+      case "RELOGIO":
+        return "bg-blue-500 text-white";
+      case "TAREFA":
+        return "bg-slate-500 text-white";
+      case "EVENTO":
         return "bg-emerald-500 text-white";
-      case "culto de jovens":
-      case "culto_jovens":
-        return "bg-violet-500 text-white";
-      case "santa ceia":
-        return "bg-rose-500 text-white";
-      case "batismo":
-        return "bg-sky-500 text-white";
-      case "evento especial":
-        return "bg-orange-500 text-white";
-      default:
+      case "OUTRO":
         return "bg-muted text-muted-foreground";
+      default: {
+        const normalized = tipo.toLowerCase();
+        switch (normalized) {
+          case "culto de celebração":
+          case "culto_domingo":
+            return "bg-primary text-primary-foreground";
+          case "culto de oração":
+          case "culto_oracao":
+            return "bg-amber-500 text-white";
+          case "culto de ensino":
+          case "culto_ensino":
+            return "bg-emerald-500 text-white";
+          case "culto de jovens":
+          case "culto_jovens":
+            return "bg-violet-500 text-white";
+          case "santa ceia":
+            return "bg-rose-500 text-white";
+          case "batismo":
+            return "bg-sky-500 text-white";
+          case "evento especial":
+            return "bg-orange-500 text-white";
+          default:
+            return "bg-muted text-muted-foreground";
+        }
+      }
     }
   };
 
   const getBorderColor = (tipo: string) => {
-    switch (tipo.toLowerCase()) {
-      case "culto de celebração":
-      case "culto_domingo":
+    switch (tipo) {
+      case "CULTO":
         return "border-l-primary";
-      case "culto de oração":
-      case "culto_oracao":
-        return "border-l-amber-500";
-      case "culto de ensino":
-      case "culto_ensino":
+      case "RELOGIO":
+        return "border-l-blue-500";
+      case "TAREFA":
+        return "border-l-slate-500";
+      case "EVENTO":
         return "border-l-emerald-500";
-      case "culto de jovens":
-      case "culto_jovens":
-        return "border-l-violet-500";
-      case "santa ceia":
-        return "border-l-rose-500";
-      case "batismo":
-        return "border-l-sky-500";
-      case "evento especial":
-        return "border-l-orange-500";
-      default:
+      case "OUTRO":
         return "border-l-muted-foreground";
+      default: {
+        const normalized = tipo.toLowerCase();
+        switch (normalized) {
+          case "culto de celebração":
+          case "culto_domingo":
+            return "border-l-primary";
+          case "culto de oração":
+          case "culto_oracao":
+            return "border-l-amber-500";
+          case "culto de ensino":
+          case "culto_ensino":
+            return "border-l-emerald-500";
+          case "culto de jovens":
+          case "culto_jovens":
+            return "border-l-violet-500";
+          case "santa ceia":
+            return "border-l-rose-500";
+          case "batismo":
+            return "border-l-sky-500";
+          case "evento especial":
+            return "border-l-orange-500";
+          default:
+            return "border-l-muted-foreground";
+        }
+      }
+    }
+  };
+
+  const getTipoLabel = (tipo: Evento["tipo"]) => {
+    switch (tipo) {
+      case "CULTO":
+        return "Culto";
+      case "RELOGIO":
+        return "Relógio de Oração";
+      case "TAREFA":
+        return "Tarefa";
+      case "EVENTO":
+        return "Evento";
+      case "OUTRO":
+      default:
+        return "Outro";
     }
   };
 
   const getGoogleMapsUrl = (endereco: string | null, local: string | null) => {
     const searchQuery = endereco || local || "";
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      searchQuery
+      searchQuery,
     )}`;
   };
 
@@ -242,7 +288,7 @@ export default function Agenda() {
     (acc: CultosGrouped[], culto) => {
       const cultoDate = parseISO(culto.data_evento);
       const existingGroup = acc.find((group) =>
-        isSameMonth(group.month, cultoDate)
+        isSameMonth(group.month, cultoDate),
       );
 
       if (existingGroup) {
@@ -256,294 +302,307 @@ export default function Agenda() {
       }
       return acc;
     },
-    []
+    [],
   );
 
   if (loading) {
     return (
-      <div className="space-y-4 px-4 py-8">
-        <main className="container max-w-2xl mx-auto px-0">
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <div className="h-6 bg-muted rounded w-48 mb-4 animate-pulse"></div>
-                <div className="flex gap-4">
-                  <div className="w-14 h-14 bg-muted rounded-full animate-pulse"></div>
-                  <div className="flex-1 h-24 bg-muted rounded-lg animate-pulse"></div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </main>
+      <div className="space-y-4 md:space-y-6">
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+            >
+              <div className="h-6 bg-muted rounded w-48 mb-4 animate-pulse"></div>
+              <div className="flex gap-4">
+                <div className="w-14 h-14 bg-muted rounded-full animate-pulse"></div>
+                <div className="flex-1 h-24 bg-muted rounded-lg animate-pulse"></div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 px-4 py-8">
-      <main className="container max-w-2xl mx-auto px-0">
-        {/* Back Button */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
+    <div className="space-y-4 md:space-y-6">
+      {/* Back Button */}
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/")}
+          className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
         >
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/")}
-            className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-        </motion.div>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
+        </Button>
+      </motion.div>
 
-        {/* Header */}
-        <motion.div
-          className="mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        >
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-            Agenda de Eventos
-          </h1>
-          <p className="text-muted-foreground flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            Próximos eventos dos próximos 3 meses
-          </p>
-        </motion.div>
+      {/* Header */}
+      <motion.div
+        className="mb-4"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+          Agenda de Eventos
+        </h1>
+        <p className="text-muted-foreground flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          Próximos eventos dos próximos 3 meses
+        </p>
+      </motion.div>
 
-        <AnimatePresence mode="wait">
-          {cultos.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-                  >
-                    <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
-                  </motion.div>
-                  <h3 className="text-lg font-semibold mb-2">
-                    Nenhum evento agendado
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    Não há eventos confirmados para os próximos dias.
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ) : (
-            <motion.div
-              className="space-y-8"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              {groupedCultos.map((group, groupIndex) => (
-                <motion.div
-                  key={group.monthLabel}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: groupIndex * 0.2 }}
-                >
-                  {/* Month Header */}
-                  <motion.div
-                    className="flex items-center gap-3 mb-6"
-                    variants={monthHeaderVariants}
-                  >
-                    <motion.div
-                      className="h-px flex-1 bg-border"
-                      initial={{ scaleX: 0 }}
-                      animate={{ scaleX: 1 }}
-                      transition={{ duration: 0.5, delay: groupIndex * 0.2 }}
-                    />
-                    <motion.h2
-                      className="text-sm font-semibold uppercase tracking-wider text-primary px-3 py-1 bg-primary/10 rounded-full"
-                      whileHover={{ scale: 1.05 }}
-                    >
-                      {group.monthLabel}
-                    </motion.h2>
-                    <motion.div
-                      className="h-px flex-1 bg-border"
-                      initial={{ scaleX: 0 }}
-                      animate={{ scaleX: 1 }}
-                      transition={{ duration: 0.5, delay: groupIndex * 0.2 }}
-                    />
-                  </motion.div>
-
-                  {/* Events Timeline */}
-                  <div className="space-y-4">
-                    {group.cultos.map((culto, index) => {
-                      const cultoDate = parseISO(culto.data_evento);
-                      const day = format(cultoDate, "d");
-                      const weekDay = format(cultoDate, "EEEE", {
-                        locale: ptBR,
-                      });
-                      const time = format(cultoDate, "HH:mm");
-
-                      return (
-                        <motion.div
-                          key={culto.id}
-                          className="flex gap-4 group"
-                          custom={index}
-                          variants={eventVariants}
-                          whileHover="hover"
-                        >
-                          {/* Date Circle */}
-                          <div className="flex flex-col items-center">
-                            <motion.div
-                              className={cn(
-                                "w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl",
-                                "bg-primary/10 text-primary border-2 border-primary/20"
-                              )}
-                              custom={index}
-                              variants={dateCircleVariants}
-                              whileHover="hover"
-                            >
-                              {day}
-                            </motion.div>
-                            {/* Timeline connector */}
-                            {index < group.cultos.length - 1 && (
-                              <motion.div
-                                className="w-0.5 h-full min-h-[1rem] bg-border mt-2"
-                                variants={timelineVariants}
-                              />
-                            )}
-                          </div>
-
-                          {/* Event Card */}
-                          <Card
-                            className={cn(
-                              "flex-1 overflow-hidden cursor-pointer relative",
-                              "border-l-4",
-                              getBorderColor(culto.tipo)
-                            )}
-                            onClick={() => setSelectedEvento(culto)}
-                          >
-                            <CardContent className="p-4">
-                              {/* Event Title */}
-                              <motion.h3
-                                className="font-bold text-lg text-primary mb-1 uppercase tracking-wide"
-                                layoutId={`title-${culto.id}`}
-                              >
-                                {culto.titulo}
-                              </motion.h3>
-
-                              {/* Date and Time */}
-                              <p className="text-sm text-muted-foreground mb-3 capitalize">
-                                {weekDay},{" "}
-                                {format(cultoDate, "d 'de' MMMM 'de' yyyy", {
-                                  locale: ptBR,
-                                })}
-                                <span className="mx-2">•</span>
-                                <Clock className="w-3 h-3 inline-block mr-1" />
-                                {time}
-                              </p>
-
-                              {/* Location */}
-                              {(culto.local || culto.endereco) && (
-                                <motion.a
-                                  href={getGoogleMapsUrl(
-                                    culto.endereco,
-                                    culto.local
-                                  )}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-2 text-sm font-medium text-foreground/80 hover:text-primary transition-colors group/link"
-                                  whileHover={{ x: 4 }}
-                                  whileTap={{ scale: 0.98 }}
-                                >
-                                  <MapPin className="w-4 h-4 text-primary" />
-                                  <span className="flex flex-col">
-                                    {culto.local && (
-                                      <span className="font-semibold">
-                                        {culto.local}
-                                      </span>
-                                    )}
-                                    {culto.endereco && (
-                                      <span className="text-xs text-muted-foreground group-hover/link:text-primary transition-colors">
-                                        {culto.endereco}
-                                      </span>
-                                    )}
-                                  </span>
-                                  <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                                </motion.a>
-                              )}
-
-                              {/* Theme badge if exists */}
-                              {culto.tema && (
-                                <motion.div
-                                  className="mt-3 pt-3 border-t border-border"
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  transition={{ delay: 0.3 }}
-                                >
-                                  <span className="text-xs text-muted-foreground">
-                                    Tema:{" "}
-                                  </span>
-                                  <span className="text-sm font-medium">
-                                    {culto.tema}
-                                  </span>
-                                </motion.div>
-                              )}
-
-                              {/* Arrow indicator */}
-                              <motion.div
-                                className="absolute right-4 top-1/2 -translate-y-1/2"
-                                initial={{ opacity: 0, x: -10 }}
-                                whileHover={{ opacity: 1, x: 0 }}
-                              >
-                                <ChevronRight className="w-5 h-5 text-primary" />
-                              </motion.div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Footer info */}
-        {cultos.length > 0 && (
+      <AnimatePresence mode="wait">
+        {cultos.length === 0 ? (
           <motion.div
-            className="mt-12 text-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
           >
-            <p className="text-sm text-muted-foreground">
-              {cultos.length} evento{cultos.length !== 1 ? "s" : ""} nos
-              próximos 3 meses
-            </p>
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+                >
+                  <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
+                </motion.div>
+                <h3 className="text-lg font-semibold mb-2">
+                  Nenhum evento agendado
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Não há eventos confirmados para os próximos dias.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div
+            className="space-y-8"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {groupedCultos.map((group, groupIndex) => (
+              <motion.div
+                key={group.monthLabel}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: groupIndex * 0.2 }}
+              >
+                {/* Month Header */}
+                <motion.div
+                  className="flex items-center gap-3 mb-6"
+                  variants={monthHeaderVariants}
+                >
+                  <motion.div
+                    className="h-px flex-1 bg-border"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: 0.5, delay: groupIndex * 0.2 }}
+                  />
+                  <motion.h2
+                    className="text-sm font-semibold uppercase tracking-wider text-primary px-3 py-1 bg-primary/10 rounded-full"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {group.monthLabel}
+                  </motion.h2>
+                  <motion.div
+                    className="h-px flex-1 bg-border"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: 0.5, delay: groupIndex * 0.2 }}
+                  />
+                </motion.div>
+
+                {/* Events Timeline */}
+                <div className="space-y-4">
+                  {group.cultos.map((culto, index) => {
+                    const cultoDate = parseISO(culto.data_evento);
+                    const day = format(cultoDate, "d");
+                    const weekDay = format(cultoDate, "EEEE", {
+                      locale: ptBR,
+                    });
+                    const time = format(cultoDate, "HH:mm");
+
+                    return (
+                      <motion.div
+                        key={culto.id}
+                        className="flex gap-4 group"
+                        custom={index}
+                        variants={eventVariants}
+                        whileHover="hover"
+                      >
+                        {/* Date Circle */}
+                        <div className="flex flex-col items-center">
+                          <motion.div
+                            className={cn(
+                              "w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl",
+                              "bg-primary/10 text-primary border-2 border-primary/20",
+                            )}
+                            custom={index}
+                            variants={dateCircleVariants}
+                            whileHover="hover"
+                          >
+                            {day}
+                          </motion.div>
+                          {/* Timeline connector */}
+                          {index < group.cultos.length - 1 && (
+                            <motion.div
+                              className="w-0.5 h-full min-h-[1rem] bg-border mt-2"
+                              variants={timelineVariants}
+                            />
+                          )}
+                        </div>
+
+                        {/* Event Card */}
+                        <Card
+                          className={cn(
+                            "flex-1 overflow-hidden cursor-pointer relative",
+                            "border-l-4",
+                            getBorderColor(culto.tipo),
+                          )}
+                          onClick={() => setSelectedEvento(culto)}
+                        >
+                          <CardContent className="p-4">
+                            {/* Event Title */}
+                            <motion.h3
+                              className="font-bold text-lg text-primary mb-1 uppercase tracking-wide"
+                              layoutId={`title-${culto.id}`}
+                            >
+                              {culto.titulo}
+                            </motion.h3>
+
+                            {/* Date and Time */}
+                            <p className="text-sm text-muted-foreground mb-3 capitalize">
+                              {weekDay},{" "}
+                              {format(cultoDate, "d 'de' MMMM 'de' yyyy", {
+                                locale: ptBR,
+                              })}
+                              <span className="mx-2">•</span>
+                              <Clock className="w-3 h-3 inline-block mr-1" />
+                              {time}
+                            </p>
+
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              <span
+                                className={cn(
+                                  "text-xs font-semibold px-2 py-1 rounded-full",
+                                  getTipoColor(culto.tipo),
+                                )}
+                              >
+                                {getTipoLabel(culto.tipo)}
+                              </span>
+                              {(culto.local || culto.endereco) && (
+                                <span className="text-xs font-medium text-muted-foreground inline-flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  {culto.local || culto.endereco}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Location */}
+                            {(culto.local || culto.endereco) && (
+                              <motion.a
+                                href={getGoogleMapsUrl(
+                                  culto.endereco,
+                                  culto.local,
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-2 text-sm font-medium text-foreground/80 hover:text-primary transition-colors group/link"
+                                whileHover={{ x: 4 }}
+                                whileTap={{ scale: 0.98 }}
+                              >
+                                <MapPin className="w-4 h-4 text-primary" />
+                                <span className="flex flex-col">
+                                  {culto.local && (
+                                    <span className="font-semibold">
+                                      {culto.local}
+                                    </span>
+                                  )}
+                                  {culto.endereco && (
+                                    <span className="text-xs text-muted-foreground group-hover/link:text-primary transition-colors">
+                                      {culto.endereco}
+                                    </span>
+                                  )}
+                                </span>
+                                <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                              </motion.a>
+                            )}
+
+                            {/* Theme badge if exists */}
+                            {culto.tema && (
+                              <motion.div
+                                className="mt-3 pt-3 border-t border-border"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.3 }}
+                              >
+                                <span className="text-xs text-muted-foreground">
+                                  Tema:{" "}
+                                </span>
+                                <span className="text-sm font-medium">
+                                  {culto.tema}
+                                </span>
+                              </motion.div>
+                            )}
+
+                            {/* Arrow indicator */}
+                            <motion.div
+                              className="absolute right-4 top-1/2 -translate-y-1/2"
+                              initial={{ opacity: 0, x: -10 }}
+                              whileHover={{ opacity: 1, x: 0 }}
+                            >
+                              <ChevronRight className="w-5 h-5 text-primary" />
+                            </motion.div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            ))}
           </motion.div>
         )}
+      </AnimatePresence>
 
-        {/* Event Details Dialog */}
-        <EventoDetailsDialog
-          evento={selectedEvento}
-          open={!!selectedEvento}
-          onOpenChange={(open) => !open && setSelectedEvento(null)}
-        />
-      </main>
+      {/* Footer info */}
+      {cultos.length > 0 && (
+        <motion.div
+          className="mt-12 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <p className="text-sm text-muted-foreground">
+            {cultos.length} evento{cultos.length !== 1 ? "s" : ""} nos próximos
+            3 meses
+          </p>
+        </motion.div>
+      )}
+
+      {/* Event Details Dialog */}
+      <EventoDetailsDialog
+        evento={selectedEvento}
+        open={!!selectedEvento}
+        onOpenChange={(open) => !open && setSelectedEvento(null)}
+      />
     </div>
   );
 }

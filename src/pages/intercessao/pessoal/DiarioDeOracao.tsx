@@ -42,7 +42,7 @@ export default function DiarioDeOracao() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"pedidos" | "testemunhos">(
-    "pedidos"
+    "pedidos",
   );
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [testemunhos, setTestemunhos] = useState<Testemunho[]>([]);
@@ -198,33 +198,29 @@ export default function DiarioDeOracao() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="border-b bg-card shadow-soft">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="p-0 h-auto w-auto"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">
-                Diário de Oração
-              </h1>
-              <p className="text-sm md:text-base text-muted-foreground mt-1">
-                Compartilhe pedidos de oração e testemunhos
-              </p>
-            </div>
+      <div className="border-b bg-card shadow-soft p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="p-0 h-auto w-auto"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Diário de Oração</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Compartilhe pedidos de oração e testemunhos
+            </p>
           </div>
         </div>
       </div>
 
       {/* Conteúdo */}
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div>
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as "pedidos" | "testemunhos")}
@@ -366,7 +362,7 @@ export default function DiarioDeOracao() {
                                 </Badge>
                                 <Badge
                                   className={`text-xs ${getStatusColor(
-                                    pedido.status
+                                    pedido.status,
                                   )}`}
                                 >
                                   {getStatusLabel(pedido.status)}
@@ -374,7 +370,7 @@ export default function DiarioDeOracao() {
                                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
                                   {new Date(
-                                    pedido.data_criacao
+                                    pedido.data_criacao,
                                   ).toLocaleDateString("pt-BR")}
                                 </span>
                               </div>
@@ -518,7 +514,7 @@ export default function DiarioDeOracao() {
                                 ) : (
                                   <Badge
                                     className={`text-xs ${getStatusColor(
-                                      "pendente"
+                                      "pendente",
                                     )}`}
                                   >
                                     Pendente
@@ -527,7 +523,7 @@ export default function DiarioDeOracao() {
                                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
                                   {new Date(
-                                    testemunho.created_at
+                                    testemunho.created_at,
                                   ).toLocaleDateString("pt-BR")}
                                 </span>
                               </div>

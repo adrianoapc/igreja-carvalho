@@ -94,7 +94,7 @@ export default function RelatorioOferta() {
   const [confrontoLoading, setConfrontoLoading] = useState(false);
   const [confrontoStatus, setConfrontoStatus] = useState<string | null>(null);
   const [confrontoVariance, setConfrontoVariance] = useState<number | null>(
-    null
+    null,
   );
   const [confrontoPorTipo, setConfrontoPorTipo] = useState<Record<
     string,
@@ -143,7 +143,7 @@ export default function RelatorioOferta() {
       let query = supabase
         .from("formas_pagamento")
         .select(
-          "id, nome, taxa_administrativa, taxa_administrativa_fixa, gera_pago, is_digital"
+          "id, nome, taxa_administrativa, taxa_administrativa_fixa, gera_pago, is_digital",
         )
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
@@ -191,7 +191,7 @@ export default function RelatorioOferta() {
           conta_id,
           prioridade,
           contas(id, nome)
-        `
+        `,
         )
         .eq("igreja_id", igrejaId)
         .order("prioridade", { ascending: true });
@@ -250,7 +250,7 @@ export default function RelatorioOferta() {
     }
     const nomes = ["oferta", "dizimo", "miss" /* cobre missões */];
     return todas.filter((c) =>
-      nomes.some((n) => (c.nome || "").toLowerCase().includes(n))
+      nomes.some((n) => (c.nome || "").toLowerCase().includes(n)),
     );
   }, [financeiroConfig?.tipos_permitidos_fisico, categoriasEntrada]);
 
@@ -260,8 +260,8 @@ export default function RelatorioOferta() {
     return n.includes("diz")
       ? "dizimo"
       : n.includes("miss")
-      ? "missoes"
-      : "oferta";
+        ? "missoes"
+        : "oferta";
   };
 
   // Categorias permitidas (digital) derivadas de config ou fallback de nomes
@@ -275,7 +275,7 @@ export default function RelatorioOferta() {
     }
     const nomes = ["oferta", "dizimo", "miss"]; // fallback por nome
     return todas.filter((c) =>
-      nomes.some((n) => (c.nome || "").toLowerCase().includes(n))
+      nomes.some((n) => (c.nome || "").toLowerCase().includes(n)),
     );
   }, [financeiroConfig?.tipos_permitidos_digital, categoriasEntrada]);
 
@@ -288,7 +288,7 @@ export default function RelatorioOferta() {
         let q = supabase
           .from("financeiro_config")
           .select(
-            "periodos, formas_fisicas_ids, formas_digitais_ids, tipos_permitidos_fisico, tipos_permitidos_digital"
+            "periodos, formas_fisicas_ids, formas_digitais_ids, tipos_permitidos_fisico, tipos_permitidos_digital",
           )
           .eq("igreja_id", igrejaId)
           .limit(1);
@@ -324,10 +324,10 @@ export default function RelatorioOferta() {
             .includes("diz")
             ? "dizimo"
             : (tiposFisicosPermitidos[0]?.nome || "")
-                .toLowerCase()
-                .includes("miss")
-            ? "missoes"
-            : "oferta",
+                  .toLowerCase()
+                  .includes("miss")
+              ? "missoes"
+              : "oferta",
         },
       ]);
       return;
@@ -390,7 +390,7 @@ export default function RelatorioOferta() {
 
   const atualizarLinha = (id: string, dados: Partial<LinhaLancamento>) => {
     setLinhas((prev) =>
-      prev.map((linha) => (linha.id === id ? { ...linha, ...dados } : linha))
+      prev.map((linha) => (linha.id === id ? { ...linha, ...dados } : linha)),
     );
   };
 
@@ -468,17 +468,17 @@ export default function RelatorioOferta() {
           .includes("diz")
           ? "dizimo"
           : (tiposFisicosPermitidos[0]?.nome || "")
-              .toLowerCase()
-              .includes("miss")
-          ? "missoes"
-          : "oferta",
+                .toLowerCase()
+                .includes("miss")
+            ? "missoes"
+            : "oferta",
       },
     ]);
   };
 
   const removerLinha = (id: string) => {
     setLinhas((prev) =>
-      prev.length > 1 ? prev.filter((l) => l.id !== id) : prev
+      prev.length > 1 ? prev.filter((l) => l.id !== id) : prev,
     );
   };
 
@@ -530,7 +530,7 @@ export default function RelatorioOferta() {
 
     // Validação das linhas preenchidas
     const linhasValidas = linhas.filter(
-      (linha) => parseFloat(linha.valor.replace(",", ".")) > 0
+      (linha) => parseFloat(linha.valor.replace(",", ".")) > 0,
     );
     const totalFisico = calcularTotal();
 
@@ -557,7 +557,7 @@ export default function RelatorioOferta() {
       const listaMap = mapeamentosPorForma[linha.formaId];
       if (!listaMap || listaMap.length === 0) {
         toast.error(
-          "Forma sem mapeamento de conta. Configure antes de lançar."
+          "Forma sem mapeamento de conta. Configure antes de lançar.",
         );
         return;
       }
@@ -600,7 +600,7 @@ export default function RelatorioOferta() {
           categoria_id: l.categoriaId || null,
           valor: parseFloat((l.valor || "0").replace(",", ".")) || 0,
           descricao: `${(l.tipo || "oferta").replace(/^./, (c) =>
-            c.toUpperCase()
+            c.toUpperCase(),
           )} - Culto ${format(dataCulto, "dd/MM/yyyy")}`,
           read_only: false,
           created_by: profile?.id || null,
@@ -622,7 +622,7 @@ export default function RelatorioOferta() {
           valor: parseFloat((d.valor || "0").replace(",", ".")) || 0,
           descricao: `Digital (${d.origem}) - Culto ${format(
             dataCulto,
-            "dd/MM/yyyy"
+            "dd/MM/yyyy",
           )}`,
           read_only: !!d.readOnly,
           created_by: profile?.id || null,
@@ -671,7 +671,7 @@ export default function RelatorioOferta() {
           pessoaId: x.pessoa_id || null,
           tipo: undefined,
           categoriaId: x.categoria_id || null,
-        }))
+        })),
       );
       setLinhasDigitaisEx(
         digitais.map((x: any) => ({
@@ -685,7 +685,7 @@ export default function RelatorioOferta() {
             .replace(".", ","),
           origem: x.origem_registro || "manual",
           readOnly: !!x.read_only,
-        }))
+        })),
       );
     } catch (e) {
       console.warn("Falha ao carregar rascunho da sessão", e);
@@ -701,7 +701,7 @@ export default function RelatorioOferta() {
 
   const enviarRelatorio = async () => {
     const linhasValidas = linhas.filter(
-      (linha) => parseFloat(linha.valor.replace(",", ".")) > 0
+      (linha) => parseFloat(linha.valor.replace(",", ".")) > 0,
     );
 
     if (linhasValidas.length === 0) return;
@@ -715,7 +715,7 @@ export default function RelatorioOferta() {
         const forma = formasPagamento?.find((f) => f.id === linha.formaId);
         const contaNome =
           mapeamentosPorForma[linha.formaId]?.find(
-            (m) => m.contaId === linha.contaId
+            (m) => m.contaId === linha.contaId,
           )?.contaNome || "Conta não mapeada";
         const valorNum = parseFloat(linha.valor.replace(",", ".")) || 0;
         if (forma) {
@@ -735,8 +735,8 @@ export default function RelatorioOferta() {
         .map(
           (l) =>
             `${l.formaNome || "Forma"} → ${l.contaNome}: R$ ${l.valor.toFixed(
-              2
-            )}`
+              2,
+            )}`,
         )
         .join(", ");
 
@@ -750,7 +750,7 @@ export default function RelatorioOferta() {
             profile?.nome
           } criou um relatório de oferta do culto de ${format(
             dataCulto,
-            "dd/MM/yyyy"
+            "dd/MM/yyyy",
           )} aguardando sua validação. Total: ${formatCurrency(total)}`,
           type: "conferencia_oferta",
           igreja_id: igrejaId,
@@ -768,7 +768,7 @@ export default function RelatorioOferta() {
               Object.entries(valoresAgrupados).map(([k, v]) => [
                 k,
                 v.toFixed(2),
-              ])
+              ]),
             ),
           },
         });
@@ -817,7 +817,7 @@ export default function RelatorioOferta() {
 
   const handleConfirmarOferta = async (
     notificationId: string,
-    metadata: OfertaMetadata
+    metadata: OfertaMetadata,
   ) => {
     setLoading(true);
 
@@ -836,7 +836,7 @@ export default function RelatorioOferta() {
           ? metadata.linhas
           : Object.entries(valoresMetadata).map(([formaId, valorStr]) => {
               const valorNumerico = parseFloat(
-                String(valorStr).replace(",", ".")
+                String(valorStr).replace(",", "."),
               );
               const contaFallback =
                 contaPorFormaSelecionada[formaId] ||
@@ -877,7 +877,7 @@ export default function RelatorioOferta() {
         if (!contaId) {
           toast.error(
             `Forma "${forma.nome}" não está mapeada para uma conta. ` +
-              `Configure em Financas → Formas de Pagamento`
+              `Configure em Financas → Formas de Pagamento`,
           );
           setLoading(false);
           return;
@@ -906,7 +906,7 @@ export default function RelatorioOferta() {
           tipo_lancamento: "unico",
           descricao: `${forma.is_digital ? "Digital" : "Físico"} (${forma.nome}) - Oferta - Culto ${format(
             new Date(metadata.data_evento),
-            "dd/MM/yyyy"
+            "dd/MM/yyyy",
           )}`,
           valor: valorNumerico,
           data_vencimento: dataFormatada,
@@ -945,7 +945,7 @@ export default function RelatorioOferta() {
       await notificationQuery;
 
       toast.success(
-        `${transacoes.length} lançamento(s) criado(s) com sucesso!`
+        `${transacoes.length} lançamento(s) criado(s) com sucesso!`,
       );
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["contas-resumo"] });
@@ -962,7 +962,7 @@ export default function RelatorioOferta() {
 
   const findOrOpenSessao = async (
     dataEventoISO: string,
-    periodoSessao: string = periodo
+    periodoSessao: string = periodo,
   ): Promise<SessaoContagem | null> => {
     if (!igrejaId) return null;
     // 1) Tenta localizar sessão existente (igreja/data/periodo) ignorando filial
@@ -999,7 +999,7 @@ export default function RelatorioOferta() {
         igrejaId,
         !isAllFiliais ? filialId || null : null,
         new Date(dataEventoISO),
-        periodoSessao
+        periodoSessao,
       );
       return criada;
     } catch (e: any) {
@@ -1036,7 +1036,7 @@ export default function RelatorioOferta() {
 
   const handleSalvarMinhaContagem = async (
     valores: { oferta: number; dizimo: number; missoes: number },
-    metadata?: OfertaMetadata
+    metadata?: OfertaMetadata,
   ) => {
     if (!igrejaId || !profile?.id) return;
     setMinhaContagemLoading(true);
@@ -1074,7 +1074,7 @@ export default function RelatorioOferta() {
             `Divergência de ${new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
-            }).format(variance)}`
+            }).format(variance)}`,
           );
         } else {
           toast.info(`Status da sessão: ${status}`);
@@ -1097,7 +1097,7 @@ export default function RelatorioOferta() {
 
   const handleRejeitarOferta = async (
     notificationId: string,
-    metadata: OfertaMetadata
+    metadata: OfertaMetadata,
   ) => {
     try {
       if (!igrejaId) {
@@ -1128,7 +1128,7 @@ export default function RelatorioOferta() {
           profile?.nome
         } rejeitou o relatório de oferta do culto de ${format(
           new Date(metadata.data_evento),
-          "dd/MM/yyyy"
+          "dd/MM/yyyy",
         )}. Total: ${formatCurrency(metadata.total)}`,
         type: "rejeicao_oferta",
         igreja_id: igrejaId,
@@ -1225,7 +1225,7 @@ export default function RelatorioOferta() {
           <div
             className={cn(
               "flex items-center gap-2",
-              step === 1 ? "font-semibold text-foreground" : ""
+              step === 1 ? "font-semibold text-foreground" : "",
             )}
           >
             1. Abertura
@@ -1234,7 +1234,7 @@ export default function RelatorioOferta() {
           <div
             className={cn(
               "flex items-center gap-2",
-              step === 2 ? "font-semibold text-foreground" : ""
+              step === 2 ? "font-semibold text-foreground" : "",
             )}
           >
             2. Cofre (Físico)
@@ -1243,7 +1243,7 @@ export default function RelatorioOferta() {
           <div
             className={cn(
               "flex items-center gap-2",
-              step === 3 ? "font-semibold text-foreground" : ""
+              step === 3 ? "font-semibold text-foreground" : "",
             )}
           >
             3. Digital (Pix/Cartão)
@@ -1252,7 +1252,7 @@ export default function RelatorioOferta() {
           <div
             className={cn(
               "flex items-center gap-2",
-              step === 4 ? "font-semibold text-foreground" : ""
+              step === 4 ? "font-semibold text-foreground" : "",
             )}
           >
             4. Fechamento
@@ -1276,7 +1276,7 @@ export default function RelatorioOferta() {
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !dataCulto && "text-muted-foreground"
+                          !dataCulto && "text-muted-foreground",
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1380,7 +1380,7 @@ export default function RelatorioOferta() {
                 <div className="space-y-3">
                   {linhas.map((linha) => {
                     const formaSelecionada = formasPagamento?.find(
-                      (f) => f.id === linha.formaId
+                      (f) => f.id === linha.formaId,
                     );
                     const mapeamentos = linha.formaId
                       ? mapeamentosPorForma[linha.formaId] || []
@@ -1390,10 +1390,10 @@ export default function RelatorioOferta() {
                       Number(formaSelecionada?.taxa_administrativa_fixa ?? 0) >
                         0;
                     const taxaPercentual = Number(
-                      formaSelecionada?.taxa_administrativa ?? 0
+                      formaSelecionada?.taxa_administrativa ?? 0,
                     );
                     const taxaFixa = Number(
-                      formaSelecionada?.taxa_administrativa_fixa ?? 0
+                      formaSelecionada?.taxa_administrativa_fixa ?? 0,
                     );
 
                     return (
@@ -1644,11 +1644,11 @@ export default function RelatorioOferta() {
                               origem: "api",
                               readOnly: true,
                             };
-                          }
+                          },
                         );
                         setLinhasDigitaisEx((prev) => {
                           const filtrados = prev.filter(
-                            (p) => p.origem !== "api"
+                            (p) => p.origem !== "api",
                           );
                           return [...novos, ...filtrados];
                         });
@@ -1709,8 +1709,8 @@ export default function RelatorioOferta() {
                         onChange={(v) =>
                           setLinhasDigitaisEx((prev) =>
                             prev.map((it) =>
-                              it.id === l.id ? { ...it, pessoaId: v } : it
-                            )
+                              it.id === l.id ? { ...it, pessoaId: v } : it,
+                            ),
                           )
                         }
                         placeholder="Pessoa (opcional)"
@@ -1728,8 +1728,8 @@ export default function RelatorioOferta() {
                             prev.map((it) =>
                               it.id === l.id
                                 ? { ...it, formaId: v, contaId: contaDefault }
-                                : it
-                            )
+                                : it,
+                            ),
                           );
                         }}
                       >
@@ -1754,8 +1754,8 @@ export default function RelatorioOferta() {
                         onValueChange={(v) =>
                           setLinhasDigitaisEx((prev) =>
                             prev.map((it) =>
-                              it.id === l.id ? { ...it, categoriaId: v } : it
-                            )
+                              it.id === l.id ? { ...it, categoriaId: v } : it,
+                            ),
                           )
                         }
                       >
@@ -1790,8 +1790,8 @@ export default function RelatorioOferta() {
                             onValueChange={(v) =>
                               setLinhasDigitaisEx((prev) =>
                                 prev.map((it) =>
-                                  it.id === l.id ? { ...it, contaId: v } : it
-                                )
+                                  it.id === l.id ? { ...it, contaId: v } : it,
+                                ),
                               )
                             }
                           >
@@ -1827,8 +1827,8 @@ export default function RelatorioOferta() {
                                     ...it,
                                     valor: sanitizeMoneyInput(e.target.value),
                                   }
-                                : it
-                            )
+                                : it,
+                            ),
                           )
                         }
                       />
@@ -1848,8 +1848,8 @@ export default function RelatorioOferta() {
                         (sum, l) =>
                           sum +
                           (parseFloat((l.valor || "0").replace(",", ".")) || 0),
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </p>
                 </div>
@@ -1926,8 +1926,8 @@ export default function RelatorioOferta() {
                       {confrontoLoading
                         ? "Carregando..."
                         : confrontoStatus
-                        ? `Status: ${confrontoStatus}`
-                        : "-"}
+                          ? `Status: ${confrontoStatus}`
+                          : "-"}
                     </span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1971,8 +1971,8 @@ export default function RelatorioOferta() {
                               ok === undefined
                                 ? ""
                                 : ok
-                                ? "border-green-300 bg-green-50"
-                                : "border-amber-300 bg-amber-50"
+                                  ? "border-green-300 bg-green-50"
+                                  : "border-amber-300 bg-amber-50"
                             }`}
                           >
                             <div className="flex items-center justify-between text-xs">
@@ -2038,15 +2038,15 @@ export default function RelatorioOferta() {
                       // Prefere IDs das categorias carregadas (permitidas), se disponíveis
                       const idOfertaCfg =
                         tiposFisicosPermitidos.find((c: any) =>
-                          (c.nome || "").toLowerCase().includes("oferta")
+                          (c.nome || "").toLowerCase().includes("oferta"),
                         )?.id || catOferta;
                       const idDizimoCfg =
                         tiposFisicosPermitidos.find((c: any) =>
-                          (c.nome || "").toLowerCase().includes("diz")
+                          (c.nome || "").toLowerCase().includes("diz"),
                         )?.id || catDizimo;
                       const idMissoesCfg =
                         tiposFisicosPermitidos.find((c: any) =>
-                          (c.nome || "").toLowerCase().includes("miss")
+                          (c.nome || "").toLowerCase().includes("miss"),
                         )?.id || catMissoes;
 
                       const fisicoTransacoes: any[] = [];
@@ -2055,7 +2055,7 @@ export default function RelatorioOferta() {
                           parseFloat(l.valor.replace(",", ".")) || 0;
                         if (valorNumerico <= 0) continue;
                         const forma = formasPagamento?.find(
-                          (f) => f.id === l.formaId
+                          (f) => f.id === l.formaId,
                         );
                         if (!forma) continue;
                         const contaMap = mapeamentosPorForma[l.formaId];
@@ -2066,13 +2066,13 @@ export default function RelatorioOferta() {
                           (l.tipo === "dizimo"
                             ? idDizimoCfg
                             : l.tipo === "missoes"
-                            ? idMissoesCfg
-                            : idOfertaCfg);
+                              ? idMissoesCfg
+                              : idOfertaCfg);
                         const taxaPercent = Number(
-                          forma.taxa_administrativa || 0
+                          forma.taxa_administrativa || 0,
                         );
                         const taxaFixa = Number(
-                          forma.taxa_administrativa_fixa || 0
+                          forma.taxa_administrativa_fixa || 0,
                         );
                         let taxasAdministrativas: number | null = null;
                         if (taxaPercent > 0)
@@ -2109,7 +2109,7 @@ export default function RelatorioOferta() {
                       // Categoria digital preferida via config (tipos_permitidos_digital)
                       const idDigitalCfg =
                         Array.isArray(
-                          (financeiroConfig as any)?.tipos_permitidos_digital
+                          (financeiroConfig as any)?.tipos_permitidos_digital,
                         ) &&
                         (financeiroConfig as any).tipos_permitidos_digital
                           .length > 0
@@ -2123,7 +2123,7 @@ export default function RelatorioOferta() {
                           parseFloat(d.valor.replace(",", ".")) || 0;
                         if (valorNumerico <= 0) continue;
                         const forma = formasPagamento?.find(
-                          (f) => f.id === d.formaId
+                          (f) => f.id === d.formaId,
                         );
                         const contaMap = d.formaId
                           ? mapeamentosPorForma[d.formaId]
@@ -2135,7 +2135,7 @@ export default function RelatorioOferta() {
                           tipo_lancamento: "unico",
                           descricao: `Digital (${forma?.nome || "N/A"}) - Culto ${format(
                             dataCulto,
-                            "dd/MM/yyyy"
+                            "dd/MM/yyyy",
                           )}`,
                           valor: valorNumerico,
                           data_vencimento: format(dataCulto, "yyyy-MM-dd"),
@@ -2243,7 +2243,7 @@ export default function RelatorioOferta() {
               <div className="divide-y">
                 {linhas
                   .filter(
-                    (linha) => parseFloat(linha.valor.replace(",", ".")) > 0
+                    (linha) => parseFloat(linha.valor.replace(",", ".")) > 0,
                   )
                   .map((linha) => {
                     const formaNome =
@@ -2251,7 +2251,7 @@ export default function RelatorioOferta() {
                         ?.nome || "Forma";
                     const contaNome =
                       mapeamentosPorForma[linha.formaId]?.find(
-                        (m) => m.contaId === linha.contaId
+                        (m) => m.contaId === linha.contaId,
                       )?.contaNome || "Conta";
                     const pessoaNome =
                       (pessoas || []).find((p) => p.id === linha.pessoaId)
@@ -2270,7 +2270,7 @@ export default function RelatorioOferta() {
                         </span>
                         <span className="text-right font-medium">
                           {formatCurrency(
-                            parseFloat(linha.valor.replace(",", ".")) || 0
+                            parseFloat(linha.valor.replace(",", ".")) || 0,
                           )}
                         </span>
                       </div>
@@ -2325,32 +2325,35 @@ export default function RelatorioOferta() {
 
               const valoresAgrupados =
                 metadata.linhas && metadata.linhas.length > 0
-                  ? metadata.linhas.reduce((acc, linha) => {
-                      const valorNum = Number(linha.valor) || 0;
-                      if (valorNum <= 0) return acc;
-                      const formaNome =
-                        linha.formaNome ||
-                        formasPagamento?.find((f) => f.id === linha.formaId)
-                          ?.nome ||
-                        "Forma";
-                      const atual = acc[linha.formaId] || {
-                        nome: formaNome,
-                        valor: 0,
-                      };
-                      acc[linha.formaId] = {
-                        nome: atual.nome,
-                        valor: atual.valor + valorNum,
-                      };
-                      return acc;
-                    }, {} as Record<string, { nome: string; valor: number }>)
+                  ? metadata.linhas.reduce(
+                      (acc, linha) => {
+                        const valorNum = Number(linha.valor) || 0;
+                        if (valorNum <= 0) return acc;
+                        const formaNome =
+                          linha.formaNome ||
+                          formasPagamento?.find((f) => f.id === linha.formaId)
+                            ?.nome ||
+                          "Forma";
+                        const atual = acc[linha.formaId] || {
+                          nome: formaNome,
+                          valor: 0,
+                        };
+                        acc[linha.formaId] = {
+                          nome: atual.nome,
+                          valor: atual.valor + valorNum,
+                        };
+                        return acc;
+                      },
+                      {} as Record<string, { nome: string; valor: number }>,
+                    )
                   : Object.entries(valoresObj).reduce(
                       (acc, [id, valorStr]: [string, string]) => {
                         const valorNumerico = parseFloat(
-                          String(valorStr).replace(",", ".")
+                          String(valorStr).replace(",", "."),
                         );
                         if (valorNumerico > 0) {
                           const forma = formasPagamento?.find(
-                            (f) => f.id === id
+                            (f) => f.id === id,
                           );
                           if (forma) {
                             acc[id] = {
@@ -2361,7 +2364,7 @@ export default function RelatorioOferta() {
                         }
                         return acc;
                       },
-                      {} as Record<string, { nome: string; valor: number }>
+                      {} as Record<string, { nome: string; valor: number }>,
                     );
 
               const dadosConferencia = {
@@ -2371,7 +2374,7 @@ export default function RelatorioOferta() {
                   total ||
                   Object.values(valoresAgrupados).reduce(
                     (s, v) => s + v.valor,
-                    0
+                    0,
                   ),
                 lancadoPor: metadata.lancado_por || "Não identificado",
                 conferente: profile?.nome || "Você",
