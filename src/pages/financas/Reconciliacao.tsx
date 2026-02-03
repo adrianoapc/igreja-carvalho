@@ -1,6 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { ReconciliacaoBancaria } from "@/components/financas/ReconciliacaoBancaria";
+import { DashboardConciliacao } from "@/components/financas/DashboardConciliacao";
 import { ConciliacaoManual } from "@/components/financas/ConciliacaoManual";
 import { HistoricoExtratos } from "@/components/financas/HistoricoExtratos";
 import { RelatorioCobertura } from "@/components/financas/RelatorioCobertura";
@@ -33,17 +33,17 @@ export default function Reconciliacao() {
         </div>
       </div>
 
-      <Tabs defaultValue="saldos" className="w-full">
+      <Tabs defaultValue="dashboard" className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-4">
-          <TabsTrigger value="saldos">Saldos</TabsTrigger>
-          <TabsTrigger value="extratos">Conciliação Manual</TabsTrigger>
-          <TabsTrigger value="historico">Histórico de Extratos</TabsTrigger>
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="manual">Avançado</TabsTrigger>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="relatorio">Relatório</TabsTrigger>
         </TabsList>
-        <TabsContent value="saldos">
-          <ReconciliacaoBancaria />
+        <TabsContent value="dashboard">
+          <DashboardConciliacao />
         </TabsContent>
-        <TabsContent value="extratos">
+        <TabsContent value="manual">
           <ConciliacaoManual />
         </TabsContent>
         <TabsContent value="historico">

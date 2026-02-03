@@ -1566,6 +1566,123 @@ export type Database = {
           },
         ]
       }
+      conciliacoes_divisao: {
+        Row: {
+          conta_id: string | null
+          created_at: string
+          created_by: string | null
+          extrato_id: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          observacoes: string | null
+          status: string
+          updated_at: string
+          valor_extrato: number
+        }
+        Insert: {
+          conta_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          extrato_id: string
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          valor_extrato: number
+        }
+        Update: {
+          conta_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          extrato_id?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          valor_extrato?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacoes_divisao_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "extratos_bancarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conciliacoes_divisao_transacoes: {
+        Row: {
+          conciliacao_divisao_id: string
+          created_at: string
+          id: string
+          transacao_id: string
+          valor: number
+        }
+        Insert: {
+          conciliacao_divisao_id: string
+          created_at?: string
+          id?: string
+          transacao_id: string
+          valor: number
+        }
+        Update: {
+          conciliacao_divisao_id?: string
+          created_at?: string
+          id?: string
+          transacao_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacoes_divisao_transacoes_conciliacao_divisao_id_fkey"
+            columns: ["conciliacao_divisao_id"]
+            isOneToOne: false
+            referencedRelation: "conciliacoes_divisao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
+      }
       conciliacoes_lote: {
         Row: {
           conta_id: string | null
