@@ -80,7 +80,10 @@ export function HistoricoExtratos() {
   const [tipoFiltro, setTipoFiltro] = useState<string>("all");
   const [origemFiltro, setOrigemFiltro] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [customRange, setCustomRange] = useState<{
+    from: Date;
+    to: Date;
+  } | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,8 +92,11 @@ export function HistoricoExtratos() {
   const [groupBy, setGroupBy] = useState<GroupByOption>("none");
 
   // Dialogs
-  const [extratoParaVincular, setExtratoParaVincular] = useState<ExtratoItem | null>(null);
-  const [transacaoParaVisualizar, setTransacaoParaVisualizar] = useState<string | null>(null);
+  const [extratoParaVincular, setExtratoParaVincular] =
+    useState<ExtratoItem | null>(null);
+  const [transacaoParaVisualizar, setTransacaoParaVisualizar] = useState<
+    string | null
+  >(null);
 
   // Loading states
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -120,24 +126,44 @@ export function HistoricoExtratos() {
 
   // Fetch all extratos
   const { data: extratos = [], isLoading } = useQuery({
-    queryKey: ["extratos-historico", igrejaId, filialId, contaSelecionada, selectedMonth, customRange],
+    queryKey: [
+      "extratos-historico",
+      igrejaId,
+      filialId,
+      contaSelecionada,
+      selectedMonth,
+      customRange,
+    ],
     queryFn: async () => {
       // Calcular datas baseado no MonthPicker
       let dataInicio: Date;
       let dataFim: Date;
-      
+
       if (customRange) {
         dataInicio = customRange.from;
         dataFim = customRange.to;
       } else {
         // Mês selecionado: primeiro e último dia
-        dataInicio = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
-        dataFim = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+        dataInicio = new Date(
+          selectedMonth.getFullYear(),
+          selectedMonth.getMonth(),
+          1,
+        );
+        dataFim = new Date(
+          selectedMonth.getFullYear(),
+          selectedMonth.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999,
+        );
       }
-      
+
       let query = supabase
         .from("extratos_bancarios")
-        .select(`
+        .select(
+          `
           id,
           conta_id,
           data_transacao,
@@ -149,7 +175,8 @@ export function HistoricoExtratos() {
           origem,
           external_id,
           conta:contas(nome, banco)
-        `)
+        `,
+        )
         .eq("igreja_id", igrejaId)
         .order("data_transacao", { ascending: false });
 
@@ -177,14 +204,16 @@ export function HistoricoExtratos() {
     queryFn: async () => {
       const query = supabase
         .from("transacoes_financeiras")
-        .select(`
+        .select(
+          `
           id,
           descricao,
           valor,
           tipo,
           data_pagamento,
           categoria:categorias_financeiras(nome)
-        `)
+        `,
+        )
         .order("data_pagamento", { ascending: false })
         .limit(500);
 
@@ -220,11 +249,13 @@ export function HistoricoExtratos() {
       // Status filter
       if (statusFiltro !== "all") {
         if (statusFiltro === "pendente") {
-          if (extrato.reconciliado || extrato.transacao_vinculada_id) return false;
+          if (extrato.reconciliado || extrato.transacao_vinculada_id)
+            return false;
         } else if (statusFiltro === "conciliado") {
           if (!extrato.transacao_vinculada_id) return false;
         } else if (statusFiltro === "ignorado") {
-          if (!extrato.reconciliado || extrato.transacao_vinculada_id) return false;
+          if (!extrato.reconciliado || extrato.transacao_vinculada_id)
+            return false;
         }
       }
 
@@ -245,7 +276,15 @@ export function HistoricoExtratos() {
   // Reset page when filters change
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFiltro, tipoFiltro, origemFiltro, contaSelecionada, selectedMonth, customRange]);
+  }, [
+    searchTerm,
+    statusFiltro,
+    tipoFiltro,
+    origemFiltro,
+    contaSelecionada,
+    selectedMonth,
+    customRange,
+  ]);
 
   // Pagination
   const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
@@ -265,7 +304,7 @@ export function HistoricoExtratos() {
     if (groupBy === "none") return null;
 
     const groups: Record<string, ExtratoItem[]> = {};
-    
+
     paginatedExtratos.forEach((extrato) => {
       let key = "";
       switch (groupBy) {
@@ -292,11 +331,25 @@ export function HistoricoExtratos() {
   const getGroupLabel = (key: string) => {
     switch (groupBy) {
       case "status":
-        return key === "conciliado" ? "Conciliados" : key === "ignorado" ? "Ignorados" : "Pendentes";
+        return key === "conciliado"
+          ? "Conciliados"
+          : key === "ignorado"
+            ? "Ignorados"
+            : "Pendentes";
       case "tipo":
-        return key === "credito" ? "Crédito" : key === "debito" ? "Débito" : key;
+        return key === "credito"
+          ? "Crédito"
+          : key === "debito"
+            ? "Débito"
+            : key;
       case "origem":
-        return key === "api_santander" ? "API Santander" : key === "manual" ? "Manual" : key === "sem_origem" ? "Sem Origem" : key;
+        return key === "api_santander"
+          ? "API Santander"
+          : key === "manual"
+            ? "Manual"
+            : key === "sem_origem"
+              ? "Sem Origem"
+              : key;
       case "conta":
         return key === "sem_conta" ? "Sem Conta" : key;
       default:
@@ -307,12 +360,21 @@ export function HistoricoExtratos() {
   // Get status info
   const getStatusInfo = (extrato: ExtratoItem) => {
     if (extrato.transacao_vinculada_id) {
-      return { label: "Conciliado", color: "bg-green-500/10 text-green-600 border-green-200" };
+      return {
+        label: "Conciliado",
+        color: "bg-green-500/10 text-green-600 border-green-200",
+      };
     }
     if (extrato.reconciliado) {
-      return { label: "Ignorado", color: "bg-muted text-muted-foreground border-muted" };
+      return {
+        label: "Ignorado",
+        color: "bg-muted text-muted-foreground border-muted",
+      };
     }
-    return { label: "Pendente", color: "bg-yellow-500/10 text-yellow-600 border-yellow-200" };
+    return {
+      label: "Pendente",
+      color: "bg-yellow-500/10 text-yellow-600 border-yellow-200",
+    };
   };
 
   // Actions
@@ -384,9 +446,15 @@ export function HistoricoExtratos() {
   // Stats
   const stats = useMemo(() => {
     const total = extratos.length;
-    const pendentes = extratos.filter(e => !e.reconciliado && !e.transacao_vinculada_id).length;
-    const conciliados = extratos.filter(e => !!e.transacao_vinculada_id).length;
-    const ignorados = extratos.filter(e => e.reconciliado && !e.transacao_vinculada_id).length;
+    const pendentes = extratos.filter(
+      (e) => !e.reconciliado && !e.transacao_vinculada_id,
+    ).length;
+    const conciliados = extratos.filter(
+      (e) => !!e.transacao_vinculada_id,
+    ).length;
+    const ignorados = extratos.filter(
+      (e) => e.reconciliado && !e.transacao_vinculada_id,
+    ).length;
     return { total, pendentes, conciliados, ignorados };
   }, [extratos]);
 
@@ -402,23 +470,31 @@ export function HistoricoExtratos() {
           "flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-lg border transition-colors",
           extrato.tipo === "credito" || extrato.tipo === "CREDIT"
             ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-950/30"
-            : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/30"
+            : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/30",
         )}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium truncate">{anonymizePixDescription(extrato.descricao)}</span>
+            <span className="font-medium truncate">
+              {anonymizePixDescription(extrato.descricao)}
+            </span>
             <Badge variant="outline" className={cn("text-xs", status.color)}>
               {status.label}
             </Badge>
             {extrato.origem && (
               <Badge variant="secondary" className="text-xs">
-                {extrato.origem === "api_santander" ? "API Santander" : "Manual"}
+                {extrato.origem === "api_santander"
+                  ? "API Santander"
+                  : "Manual"}
               </Badge>
             )}
           </div>
           <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-            <span>{format(parseISO(extrato.data_transacao), "dd/MM/yyyy", { locale: ptBR })}</span>
+            <span>
+              {format(parseISO(extrato.data_transacao), "dd/MM/yyyy", {
+                locale: ptBR,
+              })}
+            </span>
             <span>•</span>
             <span>{extrato.conta?.nome || "Conta não identificada"}</span>
             {extrato.conta?.banco && (
@@ -434,10 +510,14 @@ export function HistoricoExtratos() {
           <span
             className={cn(
               "font-semibold whitespace-nowrap",
-              extrato.tipo === "credito" || extrato.tipo === "CREDIT" ? "text-green-600" : "text-red-600"
+              extrato.tipo === "credito" || extrato.tipo === "CREDIT"
+                ? "text-green-600"
+                : "text-red-600",
             )}
           >
-            {extrato.tipo === "credito" || extrato.tipo === "CREDIT" ? "+" : "-"}
+            {extrato.tipo === "credito" || extrato.tipo === "CREDIT"
+              ? "+"
+              : "-"}
             {new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -478,7 +558,9 @@ export function HistoricoExtratos() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setTransacaoParaVisualizar(extrato.transacao_vinculada_id)}
+                  onClick={() =>
+                    setTransacaoParaVisualizar(extrato.transacao_vinculada_id)
+                  }
                 >
                   <Eye className="w-4 h-4 mr-1" />
                   Ver
@@ -532,15 +614,21 @@ export function HistoricoExtratos() {
         </Card>
         <Card className="p-3">
           <div className="text-sm text-yellow-600">Pendentes</div>
-          <div className="text-2xl font-bold text-yellow-600">{stats.pendentes}</div>
+          <div className="text-2xl font-bold text-yellow-600">
+            {stats.pendentes}
+          </div>
         </Card>
         <Card className="p-3">
           <div className="text-sm text-green-600">Conciliados</div>
-          <div className="text-2xl font-bold text-green-600">{stats.conciliados}</div>
+          <div className="text-2xl font-bold text-green-600">
+            {stats.conciliados}
+          </div>
         </Card>
         <Card className="p-3">
           <div className="text-sm text-muted-foreground">Ignorados</div>
-          <div className="text-2xl font-bold text-muted-foreground">{stats.ignorados}</div>
+          <div className="text-2xl font-bold text-muted-foreground">
+            {stats.ignorados}
+          </div>
         </Card>
       </div>
 
@@ -564,7 +652,10 @@ export function HistoricoExtratos() {
               />
             </div>
 
-            <Select value={contaSelecionada} onValueChange={setContaSelecionada}>
+            <Select
+              value={contaSelecionada}
+              onValueChange={setContaSelecionada}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Conta" />
               </SelectTrigger>
@@ -620,7 +711,10 @@ export function HistoricoExtratos() {
             />
 
             {/* Grouping selector */}
-            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByOption)}>
+            <Select
+              value={groupBy}
+              onValueChange={(v) => setGroupBy(v as GroupByOption)}
+            >
               <SelectTrigger className="w-[160px]">
                 <Layers className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Agrupar por" />
@@ -644,7 +738,9 @@ export function HistoricoExtratos() {
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>Nenhum extrato encontrado</p>
-              <p className="text-sm">Importe extratos via integração bancária ou manualmente</p>
+              <p className="text-sm">
+                Importe extratos via integração bancária ou manualmente
+              </p>
             </div>
           ) : groupBy !== "none" && groupedExtratos ? (
             // Grouped view
@@ -653,7 +749,9 @@ export function HistoricoExtratos() {
                 <Collapsible key={groupKey} defaultOpen>
                   <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                     <ChevronDown className="w-4 h-4 transition-transform [&[data-state=open]]:rotate-180" />
-                    <span className="font-medium">{getGroupLabel(groupKey)}</span>
+                    <span className="font-medium">
+                      {getGroupLabel(groupKey)}
+                    </span>
                     <Badge variant="secondary" className="ml-auto">
                       {items.length}
                     </Badge>
@@ -675,13 +773,20 @@ export function HistoricoExtratos() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, extratosFiltrados.length)} de {extratosFiltrados.length}
+                Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{" "}
+                {Math.min(
+                  currentPage * ITEMS_PER_PAGE,
+                  extratosFiltrados.length,
+                )}{" "}
+                de {extratosFiltrados.length}
               </p>
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
                       disabled={currentPage === 1}
                     />
                   </PaginationItem>
@@ -709,7 +814,9 @@ export function HistoricoExtratos() {
                   })}
                   <PaginationItem>
                     <PaginationNext
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
                       disabled={currentPage === totalPages}
                     />
                   </PaginationItem>

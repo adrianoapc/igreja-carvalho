@@ -51,7 +51,13 @@ import {
 
 interface Integracao {
   id: string;
-  status: "entrevista" | "trilha" | "mentoria" | "teste" | "ativo" | "rejeitado";
+  status:
+    | "entrevista"
+    | "trilha"
+    | "mentoria"
+    | "teste"
+    | "ativo"
+    | "rejeitado";
   percentual_jornada: number;
   data_jornada_iniciada: string | null;
   data_conclusao_esperada: string | null;
@@ -86,7 +92,8 @@ export default function IntegracaoDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [ministerioFilter, setMinisterioFilter] = useState<string>("all");
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [selectedIntegracao, setSelectedIntegracao] = useState<Integracao | null>(null);
+  const [selectedIntegracao, setSelectedIntegracao] =
+    useState<Integracao | null>(null);
   const [assignMentorOpen, setAssignMentorOpen] = useState(false);
   const [selectedMentorId, setSelectedMentorId] = useState<string>("");
 
@@ -95,7 +102,6 @@ export default function IntegracaoDashboard() {
     queryKey: ["integracao-stats", igrejaId, filialId],
     queryFn: async () => {
       if (!igrejaId) return null;
-
 
       let query = supabase
         .from("integracao_voluntario")
@@ -126,7 +132,11 @@ export default function IntegracaoDashboard() {
       return {
         total: count || 0,
         ...byStatus,
-        emProcesso: byStatus.entrevista + byStatus.trilha + byStatus.mentoria + byStatus.teste,
+        emProcesso:
+          byStatus.entrevista +
+          byStatus.trilha +
+          byStatus.mentoria +
+          byStatus.teste,
       };
     },
     enabled: !!igrejaId,
@@ -134,10 +144,15 @@ export default function IntegracaoDashboard() {
 
   // Query para listar integrações
   const { data: integracoes, isLoading } = useQuery({
-    queryKey: ["integracoes", igrejaId, filialId, statusFilter, ministerioFilter],
+    queryKey: [
+      "integracoes",
+      igrejaId,
+      filialId,
+      statusFilter,
+      ministerioFilter,
+    ],
     queryFn: async () => {
       if (!igrejaId) return [];
-
 
       let query = supabase
         .from("integracao_voluntario")
@@ -156,7 +171,7 @@ export default function IntegracaoDashboard() {
           ),
           mentor:profiles!integracao_voluntario_mentor_id_fkey (nome),
           jornada:jornadas!integracao_voluntario_jornada_id_fkey (titulo)
-        `
+        `,
         )
         .eq("igreja_id", igrejaId)
         .order("created_at", { ascending: false });
@@ -176,7 +191,7 @@ export default function IntegracaoDashboard() {
 
       if (ministerioFilter !== "all") {
         filtered = filtered.filter(
-          (i) => i.candidato?.ministerio === ministerioFilter
+          (i) => i.candidato?.ministerio === ministerioFilter,
         );
       }
 
@@ -200,10 +215,13 @@ export default function IntegracaoDashboard() {
         .order("nome");
 
       if (error) throw error;
-      
+
       let filtered = (data || []) as Mentor[];
       if (!isAllFiliais && filialId) {
-        filtered = filtered.filter(m => (m as unknown as Record<string, string>).filial_id === filialId);
+        filtered = filtered.filter(
+          (m) =>
+            (m as unknown as Record<string, string>).filial_id === filialId,
+        );
       }
       return filtered;
     },
@@ -212,8 +230,13 @@ export default function IntegracaoDashboard() {
 
   // Mutation para atribuir mentor
   const assignMentorMutation = useMutation({
-    mutationFn: async ({ integracaoId, mentorId }: { integracaoId: string; mentorId: string }) => {
-
+    mutationFn: async ({
+      integracaoId,
+      mentorId,
+    }: {
+      integracaoId: string;
+      mentorId: string;
+    }) => {
       const { error } = await supabase
         .from("integracao_voluntario")
         .update({ mentor_id: mentorId })
@@ -237,8 +260,13 @@ export default function IntegracaoDashboard() {
 
   // Mutation para avançar status
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ integracaoId, newStatus }: { integracaoId: string; newStatus: string }) => {
-
+    mutationFn: async ({
+      integracaoId,
+      newStatus,
+    }: {
+      integracaoId: string;
+      newStatus: string;
+    }) => {
       const { error } = await supabase
         .from("integracao_voluntario")
         .update({ status: newStatus })
@@ -306,7 +334,9 @@ export default function IntegracaoDashboard() {
   };
 
   const ministerios = Array.from(
-    new Set(integracoes?.map((i) => i.candidato?.ministerio).filter(Boolean) || [])
+    new Set(
+      integracoes?.map((i) => i.candidato?.ministerio).filter(Boolean) || [],
+    ),
   );
 
   return (
@@ -409,7 +439,10 @@ export default function IntegracaoDashboard() {
 
           <div className="flex-1">
             <Label>Ministério</Label>
-            <Select value={ministerioFilter} onValueChange={setMinisterioFilter}>
+            <Select
+              value={ministerioFilter}
+              onValueChange={setMinisterioFilter}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -494,7 +527,7 @@ export default function IntegracaoDashboard() {
                           <div className="flex items-center gap-1 text-xs">
                             <Calendar className="h-3 w-3" />
                             {new Date(
-                              integracao.data_conclusao_esperada
+                              integracao.data_conclusao_esperada,
                             ).toLocaleDateString("pt-BR")}
                           </div>
                         ) : (
@@ -521,7 +554,7 @@ export default function IntegracaoDashboard() {
                                   onClick={() =>
                                     handleAdvanceStatus(
                                       integracao.id,
-                                      integracao.status
+                                      integracao.status,
                                     )
                                   }
                                 >
@@ -566,7 +599,10 @@ export default function IntegracaoDashboard() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Mentor</Label>
-              <Select value={selectedMentorId} onValueChange={setSelectedMentorId}>
+              <Select
+                value={selectedMentorId}
+                onValueChange={setSelectedMentorId}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um mentor" />
                 </SelectTrigger>
@@ -580,7 +616,10 @@ export default function IntegracaoDashboard() {
               </Select>
             </div>
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setAssignMentorOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setAssignMentorOpen(false)}
+              >
                 Cancelar
               </Button>
               <Button

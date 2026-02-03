@@ -25,7 +25,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useFilialId } from "@/hooks/useFilialId";
-import { formatLocalDate, startOfMonthLocal, endOfMonthLocal } from "@/utils/dateUtils";
+import {
+  formatLocalDate,
+  startOfMonthLocal,
+  endOfMonthLocal,
+} from "@/utils/dateUtils";
 
 export default function Financas() {
   const navigate = useNavigate();

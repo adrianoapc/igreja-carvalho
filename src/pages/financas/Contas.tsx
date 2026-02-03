@@ -42,7 +42,11 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
-import { formatLocalDate, startOfMonthLocal, endOfMonthLocal } from "@/utils/dateUtils";
+import {
+  formatLocalDate,
+  startOfMonthLocal,
+  endOfMonthLocal,
+} from "@/utils/dateUtils";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
@@ -69,7 +73,9 @@ export default function Contas() {
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
   );
-  const [statusFilter, setStatusFilter] = useState<"all" | "pago" | "pendente">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pago" | "pendente">(
+    "all",
+  );
   const [testingContaId, setTestingContaId] = useState<string | null>(null);
   const [extratoDialogOpen, setExtratoDialogOpen] = useState(false);
   const [transferenciaDialogOpen, setTransferenciaDialogOpen] = useState(false);
@@ -127,30 +133,37 @@ export default function Contas() {
   }) => {
     if (!conta.cnpj_banco) {
       toast.error("CNPJ do banco não configurado", {
-        description: "Edite a conta e preencha o CNPJ do banco para testar a integração.",
+        description:
+          "Edite a conta e preencha o CNPJ do banco para testar a integração.",
       });
       return;
     }
 
     // Verificar se existe integração Santander ativa
-    const santanderIntegracao = integracoes?.find((i) => i.provedor === "santander" && i.status === "ativo");
+    const santanderIntegracao = integracoes?.find(
+      (i) => i.provedor === "santander" && i.status === "ativo",
+    );
     if (!santanderIntegracao) {
       toast.error("Nenhuma integração Santander ativa", {
-        description: "Configure uma integração Santander na página de integrações.",
+        description:
+          "Configure uma integração Santander na página de integrações.",
       });
       return;
     }
 
     setTestingContaId(conta.id);
     try {
-      const { data, error } = await supabase.functions.invoke("test-santander", {
-        body: {
-          integracao_id: santanderIntegracao.id,
-          banco_id: conta.cnpj_banco,
-          agencia: conta.agencia || "",
-          conta: conta.conta_numero?.replace(/\D/g, "") || "",
+      const { data, error } = await supabase.functions.invoke(
+        "test-santander",
+        {
+          body: {
+            integracao_id: santanderIntegracao.id,
+            banco_id: conta.cnpj_banco,
+            agencia: conta.agencia || "",
+            conta: conta.conta_numero?.replace(/\D/g, "") || "",
+          },
         },
-      });
+      );
 
       if (error) {
         console.error("Test error:", error);
@@ -166,11 +179,13 @@ export default function Contas() {
         });
       } else if (data.token?.obtained) {
         toast.warning("Token obtido, mas saldo falhou", {
-          description: data.balance?.error?.detail || "Verifique os dados da conta",
+          description:
+            data.balance?.error?.detail || "Verifique os dados da conta",
         });
       } else {
         toast.error("Falha na conexão", {
-          description: data.tokenError || "Verifique as credenciais da integração",
+          description:
+            data.tokenError || "Verifique as credenciais da integração",
         });
       }
     } catch (err) {
@@ -186,7 +201,12 @@ export default function Contas() {
     if (!cnpjBanco || !integracoes) return false;
     // Por enquanto, só Santander está implementado
     const santanderCnpj = "90400888000142";
-    return cnpjBanco === santanderCnpj && integracoes.some((i) => i.provedor === "santander" && i.status === "ativo");
+    return (
+      cnpjBanco === santanderCnpj &&
+      integracoes.some(
+        (i) => i.provedor === "santander" && i.status === "ativo",
+      )
+    );
   };
 
   const startDate = customRange
@@ -216,7 +236,7 @@ export default function Contas() {
           categorias_financeiras(nome, cor),
           fornecedores(nome),
           contas(nome)
-        `
+        `,
         )
         .eq("igreja_id", igrejaId)
         .gte("data_vencimento", startDate)
@@ -270,17 +290,20 @@ export default function Contas() {
   const totaisPorConta = useMemo(() => {
     if (!allTransacoesPeriodo) return {};
 
-    return allTransacoesPeriodo.reduce((acc, t) => {
-      if (!acc[t.conta_id]) {
-        acc[t.conta_id] = { entradas: 0, saidas: 0 };
-      }
-      if (t.tipo === "entrada") {
-        acc[t.conta_id].entradas += Number(t.valor);
-      } else {
-        acc[t.conta_id].saidas += Number(t.valor);
-      }
-      return acc;
-    }, {} as Record<string, { entradas: number; saidas: number }>);
+    return allTransacoesPeriodo.reduce(
+      (acc, t) => {
+        if (!acc[t.conta_id]) {
+          acc[t.conta_id] = { entradas: 0, saidas: 0 };
+        }
+        if (t.tipo === "entrada") {
+          acc[t.conta_id].entradas += Number(t.valor);
+        } else {
+          acc[t.conta_id].saidas += Number(t.valor);
+        }
+        return acc;
+      },
+      {} as Record<string, { entradas: number; saidas: number }>,
+    );
   }, [allTransacoesPeriodo]);
 
   const getTipoIcon = (tipo: string) => {
@@ -313,7 +336,11 @@ export default function Contas() {
     return formatValue(value);
   };
 
-  const getStatusDisplay = (transacao: { status?: string; data_vencimento?: string | Date | null; tipo?: string }) => {
+  const getStatusDisplay = (transacao: {
+    status?: string;
+    data_vencimento?: string | Date | null;
+    tipo?: string;
+  }) => {
     if (transacao.status === "pago") {
       return transacao.tipo === "entrada" ? "Recebido" : "Pago";
     }
@@ -331,7 +358,11 @@ export default function Contas() {
     return transacao.status || "Pendente";
   };
 
-  const getStatusColor = (transacao: { status?: string; data_vencimento?: string | Date | null; tipo?: string }) => {
+  const getStatusColor = (transacao: {
+    status?: string;
+    data_vencimento?: string | Date | null;
+    tipo?: string;
+  }) => {
     if (transacao.status === "pago") {
       return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400";
     }
@@ -353,7 +384,7 @@ export default function Contas() {
     setSelectedContaIds((prev) =>
       prev.includes(contaId)
         ? prev.filter((id) => id !== contaId)
-        : [...prev, contaId]
+        : [...prev, contaId],
     );
   };
 
@@ -366,10 +397,10 @@ export default function Contas() {
     if (!items) return [];
     if (statusFilter === "all") return items;
     if (statusFilter === "pago") {
-      return items.filter(t => t.status === "pago");
+      return items.filter((t) => t.status === "pago");
     }
     if (statusFilter === "pendente") {
-      return items.filter(t => t.status === "pendente");
+      return items.filter((t) => t.status === "pendente");
     }
     return items;
   };
@@ -394,14 +425,17 @@ export default function Contas() {
   // Agrupar transações por data de vencimento
   const transacoesAgrupadas = useMemo(() => {
     if (!transacoes) return {};
-    return transacoes.reduce((acc, t) => {
-      const data = t.data_vencimento || "sem-data";
-      if (!acc[data]) {
-        acc[data] = [];
-      }
-      acc[data].push(t);
-      return acc;
-    }, {} as Record<string, typeof transacoes>);
+    return transacoes.reduce(
+      (acc, t) => {
+        const data = t.data_vencimento || "sem-data";
+        if (!acc[data]) {
+          acc[data] = [];
+        }
+        acc[data].push(t);
+        return acc;
+      },
+      {} as Record<string, typeof transacoes>,
+    );
   }, [transacoes]);
 
   // Ordenar datas (mais recentes primeiro)
@@ -449,12 +483,14 @@ export default function Contas() {
               "flex items-center justify-between p-3 rounded-lg",
               t.tipo === "entrada"
                 ? "bg-green-50 dark:bg-green-950/20"
-                : "bg-red-50 dark:bg-red-950/20"
+                : "bg-red-50 dark:bg-red-950/20",
             )}
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium truncate flex-1">{t.descricao}</p>
+                <p className="text-sm font-medium truncate flex-1">
+                  {t.descricao}
+                </p>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -474,7 +510,7 @@ export default function Contas() {
                     format(
                       new Date(t.data_vencimento + "T00:00:00"),
                       "dd/MM/yyyy",
-                      { locale: ptBR }
+                      { locale: ptBR },
                     )}
                 </p>
                 {t.status && (
@@ -516,20 +552,26 @@ export default function Contas() {
     </div>
   );
 
-  const renderTransactionListGrouped = (filteredTransacoes: TransacaoLista[]) => {
+  const renderTransactionListGrouped = (
+    filteredTransacoes: TransacaoLista[],
+  ) => {
     // Agrupar transações filtradas por data de vencimento
-    const gruposFiltrados = filteredTransacoes.reduce((acc, t) => {
-      const data = typeof t.data_vencimento === 'string' 
-        ? t.data_vencimento 
-        : t.data_vencimento 
-          ? t.data_vencimento.toISOString().split('T')[0] 
-          : "sem-data";
-      if (!acc[data]) {
-        acc[data] = [];
-      }
-      acc[data].push(t);
-      return acc;
-    }, {} as Record<string, TransacaoLista[]>);
+    const gruposFiltrados = filteredTransacoes.reduce(
+      (acc, t) => {
+        const data =
+          typeof t.data_vencimento === "string"
+            ? t.data_vencimento
+            : t.data_vencimento
+              ? t.data_vencimento.toISOString().split("T")[0]
+              : "sem-data";
+        if (!acc[data]) {
+          acc[data] = [];
+        }
+        acc[data].push(t);
+        return acc;
+      },
+      {} as Record<string, TransacaoLista[]>,
+    );
 
     const datasFiltradas = Object.keys(gruposFiltrados).sort((a, b) => {
       if (a === "sem-data") return 1;
@@ -541,16 +583,16 @@ export default function Contas() {
       <div className="space-y-3">
         {datasFiltradas.map((dataKey) => {
           const grupo = gruposFiltrados[dataKey];
-          // Calcular total 
+          // Calcular total
           // Se tem apenas um tipo (entrada ou saída), mostra o valor absoluto
           // Se tem ambos, mostra o saldo líquido
-          const temEntradas = grupo.some(t => t.tipo === "entrada");
-          const temSaidas = grupo.some(t => t.tipo === "saida");
-          
+          const temEntradas = grupo.some((t) => t.tipo === "entrada");
+          const temSaidas = grupo.some((t) => t.tipo === "saida");
+
           let totalGrupo: number;
           let corTotal: string;
           let prefixo: string = "";
-          
+
           if (temEntradas && !temSaidas) {
             // Só entradas - mostrar total positivo em verde
             totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
@@ -564,20 +606,19 @@ export default function Contas() {
           } else {
             // Misto - mostrar saldo líquido com cor apropriada
             totalGrupo = grupo.reduce(
-              (sum, t) => sum + (t.tipo === "entrada" ? Number(t.valor) : -Number(t.valor)),
+              (sum, t) =>
+                sum +
+                (t.tipo === "entrada" ? Number(t.valor) : -Number(t.valor)),
               0,
             );
             corTotal = totalGrupo >= 0 ? "text-green-600" : "text-red-600";
             prefixo = totalGrupo >= 0 ? "+" : "";
           }
-          
+
           const isExpandido = gruposExpandidos.has(dataKey);
 
           return (
-            <div
-              key={dataKey}
-              className="border rounded-lg overflow-hidden"
-            >
+            <div key={dataKey} className="border rounded-lg overflow-hidden">
               {/* Header do grupo */}
               <button
                 onClick={() => toggleGrupo(dataKey)}
@@ -607,7 +648,8 @@ export default function Contas() {
                 </div>
                 <div className="text-right">
                   <div className={cn("text-base font-bold", corTotal)}>
-                    {prefixo}{formatCurrency(Math.abs(totalGrupo))}
+                    {prefixo}
+                    {formatCurrency(Math.abs(totalGrupo))}
                   </div>
                 </div>
               </button>
@@ -622,7 +664,7 @@ export default function Contas() {
                         "flex items-center justify-between p-3",
                         t.tipo === "entrada"
                           ? "bg-green-50/50 dark:bg-green-950/10"
-                          : "bg-red-50/50 dark:bg-red-950/10"
+                          : "bg-red-50/50 dark:bg-red-950/10",
                       )}
                     >
                       <div className="flex-1 min-w-0">
@@ -755,7 +797,7 @@ export default function Contas() {
           {customRange
             ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
                 customRange.to,
-                "dd/MM/yyyy"
+                "dd/MM/yyyy",
               )}`
             : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
         </Badge>
@@ -791,7 +833,7 @@ export default function Contas() {
                 key={conta.id}
                 className={cn(
                   "shadow-soft cursor-pointer transition-all hover:shadow-md relative",
-                  isSelected && "ring-2 ring-primary bg-primary/5"
+                  isSelected && "ring-2 ring-primary bg-primary/5",
                 )}
                 onClick={() => toggleContaSelection(conta.id)}
               >
@@ -810,19 +852,23 @@ export default function Contas() {
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {/* Botão de teste de conexão - só aparece se tiver integração */}
-                      {hasIntegration((conta as { cnpj_banco?: string | null }).cnpj_banco) && (
+                      {hasIntegration(
+                        (conta as { cnpj_banco?: string | null }).cnpj_banco,
+                      ) && (
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleTestConnection(conta as {
-                              id: string;
-                              cnpj_banco?: string | null;
-                              agencia?: string | null;
-                              conta_numero?: string | null;
-                            });
+                            handleTestConnection(
+                              conta as {
+                                id: string;
+                                cnpj_banco?: string | null;
+                                agencia?: string | null;
+                                conta_numero?: string | null;
+                              },
+                            );
                           }}
                           disabled={testingContaId === conta.id}
                           title="Testar conexão bancária"
@@ -833,47 +879,55 @@ export default function Contas() {
                             <TestTube2 className="w-3.5 h-3.5 text-blue-500" />
                           )}
                         </Button>
-                        )}
-                        {/* Botão Ver Extrato */}
-                        {hasIntegration((conta as { cnpj_banco?: string | null }).cnpj_banco) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const santanderIntegracao = integracoes?.find(
-                                (i) => i.provedor === "santander" && i.status === "ativo"
-                              );
-                              if (santanderIntegracao) {
-                                setExtratoContaData({
-                                  id: conta.id,
-                                  nome: conta.nome,
-                                  integracaoId: santanderIntegracao.id,
-                                  agencia: (conta as { agencia?: string }).agencia,
-                                  contaNumero: (conta as { conta_numero?: string }).conta_numero,
-                                  cnpjBanco: (conta as { cnpj_banco?: string }).cnpj_banco,
-                                });
-                                setExtratoDialogOpen(true);
-                              }
-                            }}
-                            title="Ver extrato bancário"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                          </Button>
-                        )}
+                      )}
+                      {/* Botão Ver Extrato */}
+                      {hasIntegration(
+                        (conta as { cnpj_banco?: string | null }).cnpj_banco,
+                      ) && (
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedConta(conta);
-                            setAjusteSaldoDialogOpen(true);
+                            const santanderIntegracao = integracoes?.find(
+                              (i) =>
+                                i.provedor === "santander" &&
+                                i.status === "ativo",
+                            );
+                            if (santanderIntegracao) {
+                              setExtratoContaData({
+                                id: conta.id,
+                                nome: conta.nome,
+                                integracaoId: santanderIntegracao.id,
+                                agencia: (conta as { agencia?: string })
+                                  .agencia,
+                                contaNumero: (
+                                  conta as { conta_numero?: string }
+                                ).conta_numero,
+                                cnpjBanco: (conta as { cnpj_banco?: string })
+                                  .cnpj_banco,
+                              });
+                              setExtratoDialogOpen(true);
+                            }
                           }}
+                          title="Ver extrato bancário"
                         >
-                          <Settings className="w-3.5 h-3.5" />
+                          <FileText className="w-3.5 h-3.5 text-emerald-500" />
                         </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedConta(conta);
+                          setAjusteSaldoDialogOpen(true);
+                        }}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -900,7 +954,7 @@ export default function Contas() {
                             "text-lg font-bold",
                             conta.saldo_atual >= 0
                               ? "text-foreground"
-                              : "text-destructive"
+                              : "text-destructive",
                           )}
                         >
                           {formatCurrency(conta.saldo_atual)}
@@ -938,7 +992,7 @@ export default function Contas() {
                             "text-xs font-semibold",
                             saldoContaPeriodo >= 0
                               ? "text-green-600"
-                              : "text-red-600"
+                              : "text-red-600",
                           )}
                         >
                           {formatCurrency(saldoContaPeriodo)}
@@ -1014,7 +1068,7 @@ export default function Contas() {
                 <p
                   className={cn(
                     "text-sm font-bold",
-                    saldoPeriodo >= 0 ? "text-green-600" : "text-red-600"
+                    saldoPeriodo >= 0 ? "text-green-600" : "text-red-600",
                   )}
                 >
                   {formatCurrency(saldoPeriodo)}
@@ -1041,7 +1095,12 @@ export default function Contas() {
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
-                <Select value={statusFilter} onValueChange={(value: "all" | "pago" | "pendente") => setStatusFilter(value)}>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value: "all" | "pago" | "pendente") =>
+                    setStatusFilter(value)
+                  }
+                >
                   <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -1084,10 +1143,12 @@ export default function Contas() {
             >
               {agruparPorData
                 ? renderTransactionListGrouped(
-                    transacoesFiltradas?.filter((t) => t.tipo === "entrada") || []
+                    transacoesFiltradas?.filter((t) => t.tipo === "entrada") ||
+                      [],
                   )
                 : renderTransactionList(
-                    transacoesFiltradas?.filter((t) => t.tipo === "entrada") || []
+                    transacoesFiltradas?.filter((t) => t.tipo === "entrada") ||
+                      [],
                   )}
             </TabsContent>
 
@@ -1097,10 +1158,12 @@ export default function Contas() {
             >
               {agruparPorData
                 ? renderTransactionListGrouped(
-                    transacoesFiltradas?.filter((t) => t.tipo === "saida") || []
+                    transacoesFiltradas?.filter((t) => t.tipo === "saida") ||
+                      [],
                   )
                 : renderTransactionList(
-                    transacoesFiltradas?.filter((t) => t.tipo === "saida") || []
+                    transacoesFiltradas?.filter((t) => t.tipo === "saida") ||
+                      [],
                   )}
             </TabsContent>
           </Tabs>

@@ -109,7 +109,6 @@ export default function TestesCrud() {
     queryFn: async () => {
       if (!igrejaId) return [];
 
-
       let query = supabase
         .from("testes_ministerio")
         .select(
@@ -122,7 +121,7 @@ export default function TestesCrud() {
           ativo,
           time_id,
           time:times!testes_ministerio_time_id_fkey (nome)
-        `
+        `,
         )
         .eq("igreja_id", igrejaId)
         .order("titulo");
@@ -160,7 +159,9 @@ export default function TestesCrud() {
       } else {
         // Insert
 
-        const { error } = await supabase.from("testes_ministerio").insert(payload);
+        const { error } = await supabase
+          .from("testes_ministerio")
+          .insert(payload);
         if (error) throw error;
       }
     },
@@ -181,7 +182,6 @@ export default function TestesCrud() {
   // Mutation para deletar teste
   const deleteMutation = useMutation({
     mutationFn: async (testeId: string) => {
-
       const { error } = await supabase
         .from("testes_ministerio")
         .delete()
@@ -253,7 +253,7 @@ export default function TestesCrud() {
   const handleDelete = (testeId: string) => {
     if (
       confirm(
-        "Tem certeza que deseja remover este teste? Esta ação não pode ser desfeita."
+        "Tem certeza que deseja remover este teste? Esta ação não pode ser desfeita.",
       )
     ) {
       deleteMutation.mutate(testeId);
@@ -360,9 +360,9 @@ export default function TestesCrud() {
                 <Label htmlFor="tipo">Tipo de Teste *</Label>
                 <Select
                   value={formData.tipo}
-                  onValueChange={(value: "pratico" | "escrito" | "entrevista" | "hibrido") =>
-                    setFormData({ ...formData, tipo: value })
-                  }
+                  onValueChange={(
+                    value: "pratico" | "escrito" | "entrevista" | "hibrido",
+                  ) => setFormData({ ...formData, tipo: value })}
                 >
                   <SelectTrigger id="tipo">
                     <SelectValue />

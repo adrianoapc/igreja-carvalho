@@ -33,7 +33,13 @@ import { useState, useMemo, useEffect } from "react";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
-import { formatLocalDate, startOfMonthLocal, endOfMonthLocal, startOfDayLocal, endOfDayLocal } from "@/utils/dateUtils";
+import {
+  formatLocalDate,
+  startOfMonthLocal,
+  endOfMonthLocal,
+  startOfDayLocal,
+  endOfDayLocal,
+} from "@/utils/dateUtils";
 // import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
@@ -331,8 +337,10 @@ export default function Entradas() {
     (forma || "").toLowerCase().includes("dinheiro");
 
   // Separar transferências das transações normais
-  const transacoesNormais = transacoesFiltradas?.filter((t) => !t.transferencia_id) || [];
-  const transferencias = transacoesFiltradas?.filter((t) => t.transferencia_id) || [];
+  const transacoesNormais =
+    transacoesFiltradas?.filter((t) => !t.transferencia_id) || [];
+  const transferencias =
+    transacoesFiltradas?.filter((t) => t.transferencia_id) || [];
 
   const totalEntradas =
     transacoesNormais?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
@@ -794,7 +802,9 @@ export default function Entradas() {
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          navigator.clipboard.writeText(transacao.id);
+                                          navigator.clipboard.writeText(
+                                            transacao.id,
+                                          );
                                           toast.success("ID copiado!");
                                         }}
                                         className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"

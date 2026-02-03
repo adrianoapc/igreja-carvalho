@@ -39,9 +39,11 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 
 // Helper para converter string ISO (YYYY-MM-DD) para Date no timezone local
-const parseLocalDate = (dateString: string | null | undefined): Date | undefined => {
+const parseLocalDate = (
+  dateString: string | null | undefined,
+): Date | undefined => {
   if (!dateString) return undefined;
-  const [year, month, day] = dateString.split('-').map(Number);
+  const [year, month, day] = dateString.split("-").map(Number);
   return new Date(year, month - 1, day);
 };
 
@@ -49,8 +51,8 @@ const parseLocalDate = (dateString: string | null | undefined): Date | undefined
 const formatLocalDate = (date: Date | undefined): string | null => {
   if (!date) return null;
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -168,15 +170,18 @@ export function TransacaoDialog({
       // Formatar valor como moeda BR (ex: 1234.50 -> "1.234,50")
       const formatarValorBR = (num: number | null | undefined) => {
         if (num == null) return "";
-        return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return num.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
       };
       setValor(formatarValorBR(transacao.valor));
       setValorLiquido(formatarValorBR(transacao.valor_liquido));
       setDataVencimento(
-        parseLocalDate(transacao.data_vencimento) || new Date()
+        parseLocalDate(transacao.data_vencimento) || new Date(),
       );
       setDataCompetencia(
-        parseLocalDate(transacao.data_competencia) || new Date()
+        parseLocalDate(transacao.data_competencia) || new Date(),
       );
       setContaId(transacao.conta_id || "");
       setCategoriaId(transacao.categoria_id || "none");
@@ -213,7 +218,7 @@ export function TransacaoDialog({
       setTaxasAdministrativas(
         transacao.taxas_administrativas
           ? String(transacao.taxas_administrativas)
-          : ""
+          : "",
       );
       if (transacao.total_parcelas)
         setTotalParcelas(String(transacao.total_parcelas));
@@ -363,7 +368,7 @@ export function TransacaoDialog({
   // Buscar sugestões baseadas em transações anteriores do fornecedor
   const buscarSugestoesFornecedor = async (
     fornecedorIdParam: string,
-    forceApply: boolean = false
+    forceApply: boolean = false,
   ) => {
     if (!fornecedorIdParam || fornecedorIdParam === "none") return;
 
@@ -372,13 +377,13 @@ export function TransacaoDialog({
         "Buscando sugestões para fornecedor:",
         fornecedorIdParam,
         "forceApply:",
-        forceApply
+        forceApply,
       );
 
       const { data: transacoes, error } = await supabase
         .from("transacoes_financeiras")
         .select(
-          "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento"
+          "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento",
         )
         .eq("fornecedor_id", fornecedorIdParam)
         .not("categoria_id", "is", null)
@@ -489,7 +494,7 @@ export function TransacaoDialog({
       if (sugestoesAplicadas.length > 0) {
         toast.success("💡 Sugestões aplicadas", {
           description: `Baseado em transações anteriores: ${sugestoesAplicadas.join(
-            ", "
+            ", ",
           )}`,
         });
       }
@@ -548,12 +553,12 @@ export function TransacaoDialog({
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
         throw new Error(
-          "Sessão inválida. Refaça login antes de processar a nota."
+          "Sessão inválida. Refaça login antes de processar a nota.",
         );
       }
       if (!igrejaId) {
         throw new Error(
-          "Contexto da igreja não identificado. Recarregue a página e tente novamente."
+          "Contexto da igreja não identificado. Recarregue a página e tente novamente.",
         );
       }
 
@@ -581,7 +586,7 @@ export function TransacaoDialog({
             Authorization: `Bearer ${sessionData.session.access_token}`,
             apikey: supabaseAnonKey,
           },
-        }
+        },
       );
 
       if (error) throw error;
@@ -748,7 +753,7 @@ export function TransacaoDialog({
         if (fornecedorEncontrado) {
           console.log(
             "Fornecedor encontrado, buscando sugestões:",
-            fornecedorEncontrado.id
+            fornecedorEncontrado.id,
           );
           setFornecedorId(fornecedorEncontrado.id);
           // Só buscar sugestões históricas se algum campo-chave estiver vazio
@@ -778,8 +783,8 @@ export function TransacaoDialog({
                   cnpjCpfLimpo?.length === 14
                     ? "juridica"
                     : cnpjCpfLimpo?.length === 11
-                    ? "fisica"
-                    : "juridica",
+                      ? "fisica"
+                      : "juridica",
                 ativo: true,
               })
               .select("id")
@@ -828,7 +833,7 @@ export function TransacaoDialog({
 
     if (!igrejaId) {
       toast.error(
-        "Contexto da igreja não identificado. Recarregue e tente novamente."
+        "Contexto da igreja não identificado. Recarregue e tente novamente.",
       );
       return;
     }
@@ -869,16 +874,23 @@ export function TransacaoDialog({
       // Desconto e taxas podem existir antes do pagamento (previsíveis)
       // Juros e multas só existem após pagamento (atraso)
       const descontoNum = desconto ? parseFloat(desconto.replace(",", ".")) : 0;
-      const taxasAdmNum = taxasAdministrativas ? parseFloat(taxasAdministrativas.replace(",", ".")) : 0;
-      const jurosNum = foiPago && juros ? parseFloat(juros.replace(",", ".")) : 0;
-      const multasNum = foiPago && multas ? parseFloat(multas.replace(",", ".")) : 0;
-      
+      const taxasAdmNum = taxasAdministrativas
+        ? parseFloat(taxasAdministrativas.replace(",", "."))
+        : 0;
+      const jurosNum =
+        foiPago && juros ? parseFloat(juros.replace(",", ".")) : 0;
+      const multasNum =
+        foiPago && multas ? parseFloat(multas.replace(",", ".")) : 0;
+
       let valorLiquidoFinal: number;
       if (valorLiquido && valorLiquido.trim() !== "") {
-        valorLiquidoFinal = parseFloat(valorLiquido.replace(/\./g, "").replace(",", "."));
+        valorLiquidoFinal = parseFloat(
+          valorLiquido.replace(/\./g, "").replace(",", "."),
+        );
       } else {
         // Calcular automaticamente: valor + juros + multas + taxas - desconto
-        valorLiquidoFinal = valorNumerico + jurosNum + multasNum + taxasAdmNum - descontoNum;
+        valorLiquidoFinal =
+          valorNumerico + jurosNum + multasNum + taxasAdmNum - descontoNum;
       }
 
       const transacaoData = {
@@ -971,7 +983,7 @@ export function TransacaoDialog({
       toast.success(
         `${tipo === "entrada" ? "Entrada" : "Saída"} ${
           transacao ? "atualizada" : "cadastrada"
-        }!`
+        }!`,
       );
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
@@ -982,7 +994,7 @@ export function TransacaoDialog({
         error instanceof Error
           ? error.message
           : String(error) ||
-              `Erro ao ${transacao ? "atualizar" : "cadastrar"} transação`
+              `Erro ao ${transacao ? "atualizar" : "cadastrar"} transação`,
       );
     } finally {
       setLoading(false);
@@ -1018,7 +1030,7 @@ export function TransacaoDialog({
 
       setValor(inputValue);
     },
-    []
+    [],
   );
 
   // Handler para formatar valores de juros/multas/desconto/taxas
@@ -1037,7 +1049,7 @@ export function TransacaoDialog({
         setter(inputValue);
       };
     },
-    []
+    [],
   );
 
   // Formulário principal - JSX inline para evitar re-render
@@ -1106,7 +1118,7 @@ export function TransacaoDialog({
                   | "semanal"
                   | "quinzenal"
                   | "mensal"
-                  | "bimestral"
+                  | "bimestral",
               ) => setRecorrencia(value)}
             >
               <SelectTrigger>
@@ -1130,7 +1142,7 @@ export function TransacaoDialog({
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal",
-                    !dataFimRecorrencia && "text-muted-foreground"
+                    !dataFimRecorrencia && "text-muted-foreground",
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1190,7 +1202,9 @@ export function TransacaoDialog({
           <div>
             <Label htmlFor="valor">Valor (Bruto) *</Label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                R$
+              </span>
               <Input
                 id="valor"
                 type="text"
@@ -1207,7 +1221,9 @@ export function TransacaoDialog({
           <div>
             <Label htmlFor="valor-liquido">Valor Pago (Líquido)</Label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                R$
+              </span>
               <Input
                 id="valor-liquido"
                 type="text"
@@ -1347,13 +1363,20 @@ export function TransacaoDialog({
             <Select
               value={subcategoriaId || "none"}
               onValueChange={setSubcategoriaId}
-              disabled={!categoriaId || categoriaId === "none" || subcategoriasLoading}
+              disabled={
+                !categoriaId || categoriaId === "none" || subcategoriasLoading
+              }
             >
               <SelectTrigger>
-                {subcategoriasLoading && subcategoriaId && subcategoriaId !== "none" ? (
+                {subcategoriasLoading &&
+                subcategoriaId &&
+                subcategoriaId !== "none" ? (
                   <span className="text-muted-foreground">Carregando...</span>
                 ) : subcategoriaId && subcategoriaId !== "none" ? (
-                  <span>{subcategorias?.find((s) => s.id === subcategoriaId)?.nome || "Carregando..."}</span>
+                  <span>
+                    {subcategorias?.find((s) => s.id === subcategoriaId)
+                      ?.nome || "Carregando..."}
+                  </span>
                 ) : (
                   <SelectValue placeholder="Selecione" />
                 )}
@@ -1420,7 +1443,8 @@ export function TransacaoDialog({
       <div className="border-t pt-3 space-y-3">
         <h4 className="font-medium text-sm">Ajustes de Valor (Previstos)</h4>
         <p className="text-xs text-muted-foreground">
-          Desconto e taxas conhecidos. O valor líquido será calculado automaticamente.
+          Desconto e taxas conhecidos. O valor líquido será calculado
+          automaticamente.
         </p>
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -1473,7 +1497,7 @@ export function TransacaoDialog({
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dataPagamento && "text-muted-foreground"
+                      !dataPagamento && "text-muted-foreground",
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1543,8 +1567,8 @@ export function TransacaoDialog({
   const title = transacao
     ? "Editar"
     : tipo === "entrada"
-    ? "Nova Entrada"
-    : "Nova Saída";
+      ? "Nova Entrada"
+      : "Nova Saída";
 
   return (
     <>
@@ -1582,7 +1606,9 @@ export function TransacaoDialog({
                     }}
                     className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <span className="font-mono">ID: {String(transacao.id).substring(0, 8)}...</span>
+                    <span className="font-mono">
+                      ID: {String(transacao.id).substring(0, 8)}...
+                    </span>
                     {copiedId ? (
                       <Check className="w-3 h-3 text-green-600" />
                     ) : (
@@ -1657,7 +1683,7 @@ export function TransacaoDialog({
               <div
                 className={cn(
                   "flex gap-2 pt-4 border-t bg-background shrink-0",
-                  isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg"
+                  isMobile && "fixed bottom-0 left-0 right-0 p-4 shadow-lg",
                 )}
               >
                 <Button

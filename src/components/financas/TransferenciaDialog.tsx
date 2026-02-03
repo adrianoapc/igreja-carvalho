@@ -36,7 +36,7 @@ export function TransferenciaDialog({
   const [contaDestino, setContaDestino] = useState("");
   const [valor, setValor] = useState("");
   const [dataTransferencia, setDataTransferencia] = useState(
-    format(new Date(), "yyyy-MM-dd")
+    format(new Date(), "yyyy-MM-dd"),
   );
   const [observacoes, setObservacoes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,7 @@ export function TransferenciaDialog({
     queryKey: ["categoria-transferencia", igrejaId],
     queryFn: async () => {
       if (!igrejaId) return null;
-      
+
       // Buscar categoria de SAÍDA
       const { data: catSaida } = await supabase
         .from("categorias_financeiras")
@@ -91,7 +91,7 @@ export function TransferenciaDialog({
         .limit(1)
         .single();
 
-      // Buscar categoria de ENTRADA  
+      // Buscar categoria de ENTRADA
       const { data: catEntrada } = await supabase
         .from("categorias_financeiras")
         .select("id, nome")
@@ -103,7 +103,7 @@ export function TransferenciaDialog({
 
       return {
         saida: catSaida,
-        entrada: catEntrada
+        entrada: catEntrada,
       };
     },
     enabled: open && !!igrejaId,
@@ -111,10 +111,14 @@ export function TransferenciaDialog({
 
   // Buscar subcategoria "Depósito Caixa" para SAÍDA
   const { data: subcategoriaDepositoSaida } = useQuery({
-    queryKey: ["subcategoria-deposito-saida", igrejaId, categoriaTransferencia?.saida?.id],
+    queryKey: [
+      "subcategoria-deposito-saida",
+      igrejaId,
+      categoriaTransferencia?.saida?.id,
+    ],
     queryFn: async () => {
       if (!igrejaId || !categoriaTransferencia?.saida?.id) return null;
-      
+
       const { data } = await supabase
         .from("subcategorias_financeiras")
         .select("id")
@@ -133,7 +137,7 @@ export function TransferenciaDialog({
     queryKey: ["base-ministerial-admin", igrejaId],
     queryFn: async () => {
       if (!igrejaId) return null;
-      
+
       const { data } = await supabase
         .from("bases_ministeriais")
         .select("id")
@@ -152,7 +156,7 @@ export function TransferenciaDialog({
     queryKey: ["centro-custo-admin", igrejaId],
     queryFn: async () => {
       if (!igrejaId) return null;
-      
+
       const { data } = await supabase
         .from("centros_custo")
         .select("id")
@@ -190,7 +194,7 @@ export function TransferenciaDialog({
 
     if (!categoriaTransferencia?.saida || !categoriaTransferencia?.entrada) {
       toast.error(
-        "Categorias de transferência não encontradas. Crie categorias 'Transferência' para entrada e saída."
+        "Categorias de transferência não encontradas. Crie categorias 'Transferência' para entrada e saída.",
       );
       return;
     }
@@ -291,7 +295,9 @@ export function TransferenciaDialog({
     } catch (error) {
       console.error("Erro na transferência:", error);
       toast.error(
-        error instanceof Error ? error.message : "Erro ao realizar transferência"
+        error instanceof Error
+          ? error.message
+          : "Erro ao realizar transferência",
       );
     } finally {
       setLoading(false);
@@ -414,13 +420,15 @@ export function TransferenciaDialog({
                 <div className="space-y-1 text-muted-foreground">
                   <p>
                     <span className="text-destructive">
-                      - {formatCurrency(parseFloat(valor.replace(",", ".")) || 0)}
+                      -{" "}
+                      {formatCurrency(parseFloat(valor.replace(",", ".")) || 0)}
                     </span>{" "}
                     de <strong>{contaOrigemData?.nome}</strong>
                   </p>
                   <p>
                     <span className="text-green-600">
-                      + {formatCurrency(parseFloat(valor.replace(",", ".")) || 0)}
+                      +{" "}
+                      {formatCurrency(parseFloat(valor.replace(",", ".")) || 0)}
                     </span>{" "}
                     para <strong>{contaDestinoData?.nome}</strong>
                   </p>

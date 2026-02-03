@@ -70,7 +70,7 @@ export function ImportarExcelWizard({
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>(
-    []
+    [],
   );
   const [excluded, setExcluded] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -125,7 +125,7 @@ export function ImportarExcelWizard({
   const COL_MIN_WIDTH_PX = 140;
   const gridTemplate = useMemo(
     () => `repeat(${columns.length}, minmax(${COL_MIN_WIDTH_PX}px, 1fr))`,
-    [columns.length]
+    [columns.length],
   );
 
   const resetAll = () => {
@@ -172,7 +172,10 @@ export function ImportarExcelWizard({
     try {
       const worksheet = wb.Sheets[sheetName];
       // Forçar leitura como texto para evitar conversão automática de datas
-      const jsonData = utils.sheet_to_json(worksheet, { raw: false, dateNF: "dd/mm/yyyy" });
+      const jsonData = utils.sheet_to_json(worksheet, {
+        raw: false,
+        dateNF: "dd/mm/yyyy",
+      });
       const firstRow = (jsonData[0] || {}) as Record<string, unknown>;
       const columnNames = Object.keys(firstRow);
       setColumns(columnNames);
@@ -248,23 +251,23 @@ export function ImportarExcelWizard({
 
   const parseValor = (valor: unknown): number => {
     if (valor === undefined || valor === null) return 0;
-    
+
     // Se já é número, retorna direto
     if (typeof valor === "number") return valor;
-    
+
     let str = String(valor).trim();
-    
+
     // Remove símbolos de moeda e espaços
     str = str.replace(/[¤$\u20AC£¥R\s]/g, "");
-    
+
     // Auto-detectar formato pelo último separador
     const lastComma = str.lastIndexOf(",");
     const lastDot = str.lastIndexOf(".");
-    
+
     // Determina se vírgula é o separador decimal (formato BR: 1.234,56)
     // ou se ponto é o separador decimal (formato US: 1,234.56)
     const isCommaDecimal = lastComma > lastDot;
-    
+
     if (isCommaDecimal) {
       // Formato BR: 1.234,56 → remove pontos (milhares), troca vírgula por ponto
       str = str.replace(/\./g, "").replace(",", ".");
@@ -272,14 +275,14 @@ export function ImportarExcelWizard({
       // Formato US: 1,234.56 → remove vírgulas (milhares)
       str = str.replace(/,/g, "");
     }
-    
+
     const n = parseFloat(str);
     return isNaN(n) ? 0 : n;
   };
 
   const parseData = (data: unknown): string | null => {
     if (!data) return null;
-    
+
     // Handle Excel serial dates (numbers between 1 and 100000 are likely dates)
     if (typeof data === "number" && data > 1 && data < 100000) {
       // Excel epoch: 1899-12-30 (using UTC to avoid timezone issues)
@@ -298,9 +301,9 @@ export function ImportarExcelWizard({
       }
       return null;
     }
-    
+
     const s = String(data).trim();
-    
+
     // Check if it's a numeric string that could be Excel serial date
     if (/^\d+$/.test(s)) {
       const num = parseInt(s, 10);
@@ -319,7 +322,7 @@ export function ImportarExcelWizard({
       }
       return null;
     }
-    
+
     // dd/MM/yyyy format
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
       const [d, m, y] = s.split("/");
@@ -329,7 +332,7 @@ export function ImportarExcelWizard({
       }
       return null;
     }
-    
+
     // yyyy-MM-dd format
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       const year = parseInt(s.substring(0, 4), 10);
@@ -338,7 +341,7 @@ export function ImportarExcelWizard({
       }
       return null;
     }
-    
+
     // Try native Date parsing as fallback
     const dt = new Date(s);
     if (!isNaN(dt.getTime())) {
@@ -347,7 +350,7 @@ export function ImportarExcelWizard({
         return dt.toISOString().split("T")[0];
       }
     }
-    
+
     return null;
   };
 
@@ -439,7 +442,7 @@ export function ImportarExcelWizard({
             c.nome.toLowerCase() ===
             String(nomeConta || "")
               .toLowerCase()
-              .trim()
+              .trim(),
         );
         if (!contaOk) msgs.push("Conta não encontrada");
       }
@@ -452,7 +455,7 @@ export function ImportarExcelWizard({
             c.nome.toLowerCase() ===
             String(nomeCategoria || "")
               .toLowerCase()
-              .trim()
+              .trim(),
         );
         if (!categoriaOk) msgs.push("Categoria não encontrada");
         else if (categoriaOk.tipo !== tipo)
@@ -466,7 +469,7 @@ export function ImportarExcelWizard({
         const nomeSubStr = String(nomeSub || "").trim();
         if (nomeSubStr) {
           const subOk = subcategorias.find(
-            (s) => s.nome.toLowerCase() === nomeSubStr.toLowerCase()
+            (s) => s.nome.toLowerCase() === nomeSubStr.toLowerCase(),
           );
           if (!subOk) msgs.push("Subcategoria não encontrada");
         }
@@ -492,7 +495,7 @@ export function ImportarExcelWizard({
     fornecedores?: Array<{ id: string; nome: string }>,
     subcategorias?: Array<{ id: string; nome: string }>,
     basesMinisteriais?: Array<{ id: string; titulo: string }>,
-    centrosCusto?: Array<{ id: string; nome: string }>
+    centrosCusto?: Array<{ id: string; nome: string }>,
   ) => {
     const descricao = mapping.descricao ? row[mapping.descricao] : null;
     const valor = mapping.valor ? parseValor(row[mapping.valor]) : 0;
@@ -507,7 +510,7 @@ export function ImportarExcelWizard({
           c.nome.toLowerCase() ===
           String(nomeConta || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (contaEncontrada) contaId = contaEncontrada.id;
     }
@@ -519,7 +522,7 @@ export function ImportarExcelWizard({
           c.nome.toLowerCase() ===
           String(nomeCategoria || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (categoriaEncontrada) categoriaId = categoriaEncontrada.id;
     }
@@ -531,7 +534,7 @@ export function ImportarExcelWizard({
           f.nome.toLowerCase() ===
           String(nomeFornecedor || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (fornecedorEncontrado) fornecedorId = fornecedorEncontrado.id;
     }
@@ -543,7 +546,7 @@ export function ImportarExcelWizard({
           s.nome.toLowerCase() ===
           String(nomeSub || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (subEncontrada) subcategoriaId = subEncontrada.id;
     }
@@ -551,7 +554,7 @@ export function ImportarExcelWizard({
     const dataPagamento = mapping.data_pagamento
       ? parseData(row[mapping.data_pagamento])
       : null;
-    
+
     // Data de competência (se não houver, usar data_vencimento)
     const dataCompetencia = mapping.data_competencia
       ? parseData(row[mapping.data_competencia])
@@ -571,7 +574,7 @@ export function ImportarExcelWizard({
           b.titulo.toLowerCase() ===
           String(nomeBase || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (baseEncontrada) baseMinisterialId = baseEncontrada.id;
     }
@@ -585,7 +588,7 @@ export function ImportarExcelWizard({
           c.nome.toLowerCase() ===
           String(nomeCentro || "")
             .toLowerCase()
-            .trim()
+            .trim(),
       );
       if (centroEncontrado) centroCustoId = centroEncontrado.id;
     }
@@ -683,7 +686,10 @@ export function ImportarExcelWizard({
         .eq("ativo", true)
         .eq("igreja_id", igrejaId);
       if (!isAllFiliais && filialId) {
-        basesMinisteriaisQuery = basesMinisteriaisQuery.eq("filial_id", filialId);
+        basesMinisteriaisQuery = basesMinisteriaisQuery.eq(
+          "filial_id",
+          filialId,
+        );
       }
       const { data: basesMinisteriais } = await basesMinisteriaisQuery;
 
@@ -710,8 +716,8 @@ export function ImportarExcelWizard({
           fornecedores || [],
           subcategorias || [],
           basesMinisteriais || [],
-          centrosCusto || []
-        )
+          centrosCusto || [],
+        ),
       );
 
       const total = transacoes.length;
@@ -731,7 +737,7 @@ export function ImportarExcelWizard({
             errs.push({
               index: start + idx,
               reason: String(error.message || error),
-            })
+            }),
           );
         }
         setChunkProgress((p) => ({
@@ -743,7 +749,7 @@ export function ImportarExcelWizard({
       setRejected(errs);
       if (errs.length) {
         toast.warning(
-          `${total - errs.length} importadas, ${errs.length} rejeitadas`
+          `${total - errs.length} importadas, ${errs.length} rejeitadas`,
         );
       } else {
         toast.success(`${total} transações importadas`);
@@ -796,7 +802,7 @@ export function ImportarExcelWizard({
     if (!rejected.length) return;
     const content = ["index,reason"]
       .concat(
-        rejected.map((r) => `${r.index},"${r.reason.replace(/"/g, '"')}"`)
+        rejected.map((r) => `${r.index},"${r.reason.replace(/"/g, '"')}"`),
       )
       .join("\n");
     const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
@@ -1182,20 +1188,23 @@ export function ImportarExcelWizard({
             {step === 2 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h3 className="font-semibold text-sm">Resumo de Validação ({validationIssues.length} problemas)</h3>
+                  <h3 className="font-semibold text-sm">
+                    Resumo de Validação ({validationIssues.length} problemas)
+                  </h3>
                   {validationIssues.length > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
                         const csvContent = validationIssues
-                          .map((issue) => 
-                            `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`
+                          .map(
+                            (issue) =>
+                              `${issue.index + 2},"${issue.messages.join("; ").replace(/"/g, '""')}"`,
                           )
                           .join("\n");
                         const blob = new Blob(
                           [`Linha,Problemas\n${csvContent}`],
-                          { type: "text/csv;charset=utf-8;" }
+                          { type: "text/csv;charset=utf-8;" },
                         );
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement("a");
@@ -1324,7 +1333,7 @@ export function ImportarExcelWizard({
                         width: chunkProgress.total
                           ? `${Math.round(
                               (chunkProgress.processed / chunkProgress.total) *
-                                100
+                                100,
                             )}%`
                           : "0%",
                       }}

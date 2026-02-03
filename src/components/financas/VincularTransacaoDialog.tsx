@@ -14,7 +14,14 @@ import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
-import { Loader2, Search, Link2, CheckCircle2, AlertCircle, Calendar } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  Link2,
+  CheckCircle2,
+  AlertCircle,
+  Calendar,
+} from "lucide-react";
 
 interface Transacao {
   id: string;
@@ -52,7 +59,9 @@ export function VincularTransacaoDialog({
   const { igrejaId } = useIgrejaId();
   const { filialId, isAllFiliais } = useFilialId();
   const [loading, setLoading] = useState(false);
-  const [selectedTransacaoId, setSelectedTransacaoId] = useState<string | null>(null);
+  const [selectedTransacaoId, setSelectedTransacaoId] = useState<string | null>(
+    null,
+  );
   const [searchTerm, setSearchTerm] = useState("");
 
   // Calculate date window (±60 days from extrato date)
@@ -61,57 +70,76 @@ export function VincularTransacaoDialog({
     return {
       inicio: format(subDays(dataExtrato, 60), "yyyy-MM-dd"),
       fim: format(addDays(dataExtrato, 60), "yyyy-MM-dd"),
-      inicioFormatado: format(subDays(dataExtrato, 60), "dd/MM", { locale: ptBR }),
-      fimFormatado: format(addDays(dataExtrato, 60), "dd/MM/yyyy", { locale: ptBR }),
+      inicioFormatado: format(subDays(dataExtrato, 60), "dd/MM", {
+        locale: ptBR,
+      }),
+      fimFormatado: format(addDays(dataExtrato, 60), "dd/MM/yyyy", {
+        locale: ptBR,
+      }),
     };
   }, [extrato.data_transacao]);
 
   // Fetch available transactions with flexible date window
-  const { data: transacoesDisponiveis = [], isLoading: loadingTransacoes } = useQuery({
-    queryKey: ["transacoes-para-vincular", extrato.id, igrejaId, filialId, isAllFiliais, dateWindow.inicio, dateWindow.fim],
-    queryFn: async () => {
-      if (!igrejaId) return [];
+  const { data: transacoesDisponiveis = [], isLoading: loadingTransacoes } =
+    useQuery({
+      queryKey: [
+        "transacoes-para-vincular",
+        extrato.id,
+        igrejaId,
+        filialId,
+        isAllFiliais,
+        dateWindow.inicio,
+        dateWindow.fim,
+      ],
+      queryFn: async () => {
+        if (!igrejaId) return [];
 
-      // Build transaction query
-      let transacaoQuery = supabase
-        .from("transacoes_financeiras")
-        .select("id, descricao, valor, tipo, data_pagamento, categorias_financeiras(nome)")
-        .eq("igreja_id", igrejaId)
-        .eq("status", "pago")
-        .gte("data_pagamento", dateWindow.inicio)
-        .lte("data_pagamento", dateWindow.fim)
-        .order("data_pagamento", { ascending: false });
+        // Build transaction query
+        let transacaoQuery = supabase
+          .from("transacoes_financeiras")
+          .select(
+            "id, descricao, valor, tipo, data_pagamento, categorias_financeiras(nome)",
+          )
+          .eq("igreja_id", igrejaId)
+          .eq("status", "pago")
+          .gte("data_pagamento", dateWindow.inicio)
+          .lte("data_pagamento", dateWindow.fim)
+          .order("data_pagamento", { ascending: false });
 
-      if (!isAllFiliais && filialId) {
-        transacaoQuery = transacaoQuery.eq("filial_id", filialId);
-      }
+        if (!isAllFiliais && filialId) {
+          transacaoQuery = transacaoQuery.eq("filial_id", filialId);
+        }
 
-      const { data: transacoes, error: transacoesError } = await transacaoQuery;
+        const { data: transacoes, error: transacoesError } =
+          await transacaoQuery;
 
-      if (transacoesError) {
-        console.error("Erro ao buscar transações:", transacoesError);
-        return [];
-      }
+        if (transacoesError) {
+          console.error("Erro ao buscar transações:", transacoesError);
+          return [];
+        }
 
-      // Fetch already linked transaction IDs
-      const { data: vinculados, error: vinculadosError } = await supabase
-        .from("extratos_bancarios")
-        .select("transacao_vinculada_id")
-        .not("transacao_vinculada_id", "is", null);
+        // Fetch already linked transaction IDs
+        const { data: vinculados, error: vinculadosError } = await supabase
+          .from("extratos_bancarios")
+          .select("transacao_vinculada_id")
+          .not("transacao_vinculada_id", "is", null);
 
-      if (vinculadosError) {
-        console.error("Erro ao buscar vinculados:", vinculadosError);
-      }
+        if (vinculadosError) {
+          console.error("Erro ao buscar vinculados:", vinculadosError);
+        }
 
-      const idsVinculados = new Set(
-        vinculados?.map((e) => e.transacao_vinculada_id).filter(Boolean) || []
-      );
+        const idsVinculados = new Set(
+          vinculados?.map((e) => e.transacao_vinculada_id).filter(Boolean) ||
+            [],
+        );
 
-      // Filter out already linked transactions
-      return (transacoes || []).filter((t) => !idsVinculados.has(t.id)) as Transacao[];
-    },
-    enabled: open && !!igrejaId,
-  });
+        // Filter out already linked transactions
+        return (transacoes || []).filter(
+          (t) => !idsVinculados.has(t.id),
+        ) as Transacao[];
+      },
+      enabled: open && !!igrejaId,
+    });
 
   // Calculate matching score for each transaction
   const transacoesComScore = useMemo(() => {
@@ -146,7 +174,9 @@ export function VincularTransacaoDialog({
           if (t.data_pagamento) {
             const dataExtrato = parseISO(extrato.data_transacao);
             const dataTransacao = parseISO(t.data_pagamento);
-            const diffDias = Math.abs(differenceInDays(dataExtrato, dataTransacao));
+            const diffDias = Math.abs(
+              differenceInDays(dataExtrato, dataTransacao),
+            );
 
             if (diffDias === 0) {
               score += 20;
@@ -211,9 +241,7 @@ export function VincularTransacaoDialog({
 
   const getScoreBadge = (score: number) => {
     if (score >= 80) {
-      return (
-        <Badge className="bg-green-500 text-white">Alta ({score}%)</Badge>
-      );
+      return <Badge className="bg-green-500 text-white">Alta ({score}%)</Badge>;
     } else if (score >= 50) {
       return (
         <Badge className="bg-yellow-500 text-white">Média ({score}%)</Badge>
@@ -228,7 +256,9 @@ export function VincularTransacaoDialog({
       open={open}
       onOpenChange={onOpenChange}
       trigger={null}
-      dialogContentProps={{ className: "max-w-xl max-h-[85vh] overflow-hidden flex flex-col" }}
+      dialogContentProps={{
+        className: "max-w-xl max-h-[85vh] overflow-hidden flex flex-col",
+      }}
     >
       <div className="space-y-4 flex flex-col min-h-0 overflow-hidden">
         {/* Header */}
@@ -275,9 +305,7 @@ export function VincularTransacaoDialog({
             <Calendar className="w-3 h-3" />
             Buscando: {dateWindow.inicioFormatado} a {dateWindow.fimFormatado}
           </Badge>
-          <span className="text-xs text-muted-foreground">
-            (±60 dias)
-          </span>
+          <span className="text-xs text-muted-foreground">(±60 dias)</span>
         </div>
 
         {/* Search */}

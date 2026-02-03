@@ -24,7 +24,11 @@ import {
   parseISO,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatLocalDate, startOfMonthLocal, endOfMonthLocal } from "@/utils/dateUtils";
+import {
+  formatLocalDate,
+  startOfMonthLocal,
+  endOfMonthLocal,
+} from "@/utils/dateUtils";
 import {
   BarChart,
   Bar,
@@ -144,7 +148,7 @@ export default function Dashboard() {
           *,
           categoria:categoria_id(nome, cor),
           solicitacao_reembolso:solicitacao_reembolso_id(status)
-        `
+        `,
         )
         .eq("igreja_id", igrejaId)
         .gte("data_vencimento", dateRange.inicio)
@@ -171,7 +175,7 @@ export default function Dashboard() {
         data?.filter(
           (t) =>
             !t.solicitacao_reembolso_id ||
-            t.solicitacao_reembolso?.status === "pago"
+            t.solicitacao_reembolso?.status === "pago",
         ) || []
       );
     },
@@ -189,17 +193,11 @@ export default function Dashboard() {
           `
           *,
           solicitacao_reembolso:solicitacao_reembolso_id(status)
-        `
+        `,
         )
         .eq("igreja_id", igrejaId)
-        .gte(
-          "data_vencimento",
-          formatLocalDate(startOfMonthLocal(mesAnterior))
-        )
-        .lte(
-          "data_vencimento",
-          formatLocalDate(endOfMonthLocal(mesAnterior))
-        );
+        .gte("data_vencimento", formatLocalDate(startOfMonthLocal(mesAnterior)))
+        .lte("data_vencimento", formatLocalDate(endOfMonthLocal(mesAnterior)));
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -212,7 +210,7 @@ export default function Dashboard() {
         data?.filter(
           (t) =>
             !t.solicitacao_reembolso_id ||
-            t.solicitacao_reembolso?.status === "pago"
+            t.solicitacao_reembolso?.status === "pago",
         ) || []
       );
     },
@@ -233,7 +231,7 @@ export default function Dashboard() {
           `
           id, valor, data_vencimento, solicitacao_reembolso_id,
           solicitacao_reembolso:solicitacao_reembolso_id(status)
-        `
+        `,
         )
         .eq("tipo", "saida")
         .eq("status", "pendente")
@@ -250,18 +248,18 @@ export default function Dashboard() {
       return (data || []).filter(
         (t) =>
           !t.solicitacao_reembolso_id ||
-          t.solicitacao_reembolso?.status === "pago"
+          t.solicitacao_reembolso?.status === "pago",
       );
     },
     enabled: !loading && !!igrejaId,
   });
 
   const vencidasSemana = pendenciasSemana.filter(
-    (item) => parseISO(item.data_vencimento) < hoje
+    (item) => parseISO(item.data_vencimento) < hoje,
   );
   const totalSemana = pendenciasSemana.reduce(
     (sum, item) => sum + Number(item.valor || 0),
-    0
+    0,
   );
   const mostrarAlertaSemana = pendenciasSemana.length > 0;
 
@@ -364,13 +362,13 @@ export default function Dashboard() {
   });
 
   const totalAbertas = sessoesRecentes.filter((s) =>
-    ["aberta", "em_contagem"].includes(s.status)
+    ["aberta", "em_contagem"].includes(s.status),
   ).length;
   const totalDivergentes = sessoesRecentes.filter(
-    (s) => s.status === "divergente"
+    (s) => s.status === "divergente",
   ).length;
   const totalValidadas = sessoesRecentes.filter(
-    (s) => s.status === "validada"
+    (s) => s.status === "validada",
   ).length;
 
   // Cálculos do mês atual
@@ -498,7 +496,7 @@ export default function Dashboard() {
             {customRange
               ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
                   customRange.to,
-                  "dd/MM/yyyy"
+                  "dd/MM/yyyy",
                 )}`
               : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
           </Badge>
@@ -702,8 +700,8 @@ export default function Dashboard() {
                       }).format(
                         reembolsosAbertos.reduce(
                           (sum, r) => sum + (r.valor_total || 0),
-                          0
-                        )
+                          0,
+                        ),
                       )}
                     </p>
                   </div>

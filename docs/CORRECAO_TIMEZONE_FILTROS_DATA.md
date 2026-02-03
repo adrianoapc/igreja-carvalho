@@ -11,7 +11,7 @@
 O sistema apresentava inconsistências graves nos filtros de data e na **visualização de datas** em todas as telas financeiras:
 
 - **Contas**: Filtro de agosto incluía movimentações de 31/07; transações mostravam dia errado
-- **Saídas**: Filtro de agosto incluía movimentações de setembro; transação do dia 30/01 aparecia como 29/01  
+- **Saídas**: Filtro de agosto incluía movimentações de setembro; transação do dia 30/01 aparecia como 29/01
 - **Entradas**: Mesmo problema de inclusão de datas fora do range e visualização incorreta
 - **Dashboard**: Cálculos incorretos devido a datas com offset
 
@@ -20,6 +20,7 @@ O sistema apresentava inconsistências graves nos filtros de data e na **visuali
 **Problema descoberto**: Contas usava `data_pagamento` enquanto Saídas/Entradas usavam `data_vencimento`
 
 **Impacto real**:
+
 ```
 Exemplo: 06/01/2025
 - Saídas: 5 lançamentos, R$ 904,00 (por data_vencimento)
@@ -28,6 +29,7 @@ Exemplo: 06/01/2025
 ```
 
 **Por que isso acontecia**:
+
 - Transação vence em 06/01, mas foi paga em 10/01
 - Saídas mostra no dia 06/01 (vencimento)
 - Contas mostrava no dia 10/01 (pagamento)
@@ -40,6 +42,7 @@ Exemplo: 06/01/2025
 **Decisão**: Todas as telas agora filtram e agrupam por `data_vencimento`
 
 **Justificativa**:
+
 1. ✅ **Gestão Financeira**: Planejamento baseado em vencimentos, não pagamentos
 2. ✅ **Fluxo de Caixa**: DRE e projeções usam competência/vencimento
 3. ✅ **Consistência**: Entradas e Saídas já usavam vencimento
@@ -47,6 +50,7 @@ Exemplo: 06/01/2025
 5. ✅ **Realidade Operacional**: Você precisa saber o que vence em cada mês
 
 **Comportamento**:
+
 - Filtro de janeiro mostra tudo que **vence** em janeiro
 - Independente de estar pago ou pendente
 - Badge de status indica: Pago / Pendente / Atrasado
@@ -60,15 +64,16 @@ Exemplo: 06/01/2025
 ```typescript
 // ❌ ANTES (FILTROS)
 const lastDay = new Date(2025, 7, 31, 23, 59, 59); // 31 ago 23:59:59 BRT
-lastDay.toISOString() // "2025-09-01T02:59:59.000Z" - vira 01/SET em UTC!
-  .split("T")[0]      // "2025-09-01" ❌ INCLUI SETEMBRO
+lastDay
+  .toISOString() // "2025-09-01T02:59:59.000Z" - vira 01/SET em UTC!
+  .split("T")[0]; // "2025-09-01" ❌ INCLUI SETEMBRO
 
 // ❌ ANTES (VISUALIZAÇÃO)
 const data_vencimento = "2025-01-30"; // String do banco (DATE sem timezone)
-new Date(data_vencimento) // 2025-01-30T00:00:00Z (interpreta como UTC!)
+new Date(data_vencimento); // 2025-01-30T00:00:00Z (interpreta como UTC!)
 // No Brasil (UTC-3), exibe como 29/01/2025 21:00:00 ❌
 
-format(new Date("2025-01-30"), "dd/MM/yyyy") // "29/01/2025" ❌ DIA ERRADO!
+format(new Date("2025-01-30"), "dd/MM/yyyy"); // "29/01/2025" ❌ DIA ERRADO!
 ```
 
 ## Solução Implementada
@@ -83,8 +88,8 @@ format(new Date("2025-01-30"), "dd/MM/yyyy") // "29/01/2025" ❌ DIA ERRADO!
  */
 export function formatLocalDate(date: Date): string {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -110,15 +115,16 @@ export function endOfMonthLocal(date: Date): Date {
 ```typescript
 // ✅ DEPOIS (CORRETO)
 const data_vencimento = "2025-01-30";
-new Date(data_vencimento + "T00:00:00") // 2025-01-30T00:00:00 (LOCAL!)
+new Date(data_vencimento + "T00:00:00"); // 2025-01-30T00:00:00 (LOCAL!)
 // Sempre exibe 30/01/2025 ✅
 
-format(new Date("2025-01-30T00:00:00"), "dd/MM/yyyy") // "30/01/2025" ✅
+format(new Date("2025-01-30T00:00:00"), "dd/MM/yyyy"); // "30/01/2025" ✅
 ```
 
 ### 3. Arquivos Corrigidos
 
 #### Páginas Principais
+
 - ✅ `src/pages/financas/Contas.tsx` (filtros + visualização + agrupamento + **UNIFICADO para data_vencimento**)
 - ✅ `src/pages/financas/Saidas.tsx` (filtros + visualização + agrupamento)
 - ✅ `src/pages/financas/Entradas.tsx` (filtros + visualização + agrupamento)
@@ -126,12 +132,14 @@ format(new Date("2025-01-30T00:00:00"), "dd/MM/yyyy") // "30/01/2025" ✅
 - ✅ `src/pages/Financas.tsx` (página legacy - filtros)
 
 #### Componentes
+
 - ✅ `src/components/financas/ExportarTab.tsx` (filtros)
 - ✅ `src/components/financas/HistoricoExtratos.tsx` (filtros)
 
 ### 4. Mudanças em Contas.tsx
 
 #### Antes (Inconsistente)
+
 ```typescript
 // ❌ Filtrava por data_pagamento
 .gte("data_pagamento", startDate)
@@ -143,6 +151,7 @@ const data = t.data_pagamento || "sem-data";
 ```
 
 #### Depois (Unificado)
+
 ```typescript
 // ✅ Filtra por data_vencimento (igual Saídas/Entradas)
 .gte("data_vencimento", startDate)
@@ -161,6 +170,7 @@ const data = t.data_vencimento || "sem-data";
 ### 5. Nova Funcionalidade: Status Visual em Contas
 
 Adicionado badges de status (igual Saídas/Entradas):
+
 - 🟢 **Pago**: Verde
 - 🟡 **Pendente**: Amarelo (vencimento futuro)
 - 🔴 **Atrasado**: Vermelho (vencimento passado + pendente)
@@ -181,7 +191,9 @@ const getStatusDisplay = (transacao) => {
 ### 6. Novas Funcionalidades
 
 #### Agrupamento por Data em Contas
+
 Implementado o mesmo agrupamento por data que existe em Saídas/Entradas:
+
 - Botão "Agrupar por Data" / "Visão Lista"
 - Transações agrupadas por `data_pagamento`
 - Headers expansíveis com totais por dia
@@ -193,10 +205,10 @@ Implementado o mesmo agrupamento por data que existe em Saídas/Entradas:
 
 ```typescript
 // ANTES
-format(new Date(t.data_pagamento), "dd/MM/yyyy")
+format(new Date(t.data_pagamento), "dd/MM/yyyy");
 
 // DEPOIS
-format(new Date(t.data_pagamento + "T00:00:00"), "dd/MM/yyyy")
+format(new Date(t.data_pagamento + "T00:00:00"), "dd/MM/yyyy");
 ```
 
 ### Saidas.tsx - Status de Atraso
@@ -223,33 +235,38 @@ if (vencimento < hoje) return "Atrasado"; // Agora compara corretamente!
 ## Validação
 
 ### Cenário de Teste 1: Consistência entre Telas
+
 - **Setup**: 5 transações com vencimento em 06/01/2025, total R$ 904,00
-- **Antes**: 
+- **Antes**:
   - Saídas: 5 lançamentos ✅
   - Contas: 4 lançamentos ❌ (pegava por data_pagamento)
-- **Depois**: 
+- **Depois**:
   - Saídas: 5 lançamentos ✅
   - Contas: 5 lançamentos ✅
   - **NÚMEROS IGUAIS!** 🎉
 
 ### Cenário de Teste 2: Transação do dia 30/01
+
 - **Banco**: `data_vencimento = "2025-01-30"`
 - **Antes**: Tela Saídas mostrava "301" (bug de visualização), Contas mostrava "29/1" ❌
 - **Depois**: Ambas as telas mostram "30/01/2025" corretamente ✅
 
 ### Cenário de Teste 3: Filtro de Agosto
+
 - **Input**: Seleção de agosto/2025
 - **Esperado**: Transações de 01/08 a 31/08
 - **Antes**: Incluía 31/07 e/ou 01/09 ❌
 - **Depois**: Inclui apenas agosto ✅
 
 ### Cenário de Teste 4: Status "Atrasado"
+
 - **Transação**: vencimento = "2025-02-01", status = "pendente"
 - **Hoje**: 03/02/2026
 - **Antes**: Podia considerar atrasada ou não dependendo do offset ❌
 - **Depois**: Sempre calcula corretamente (atrasada) ✅
 
 ### Cenário de Teste 5: Transação Pendente
+
 - **Transação**: vence em 15/02/2026, status = "pendente"
 - **Filtro**: Fevereiro 2026
 - **Antes (Contas)**: NÃO APARECIA (só mostrava pagas) ❌
@@ -258,16 +275,18 @@ if (vencimento < hoje) return "Atrasado"; // Agora compara corretamente!
 ## Impacto
 
 ### Antes (Bugs)
+
 - ❌ Filtros incluíam dias errados
 - ❌ Visualização mostrava dia anterior (30/01 virava 29/01)
 - ❌ Status de atraso inconsistente
 - ❌ **Contas e Saídas mostravam números diferentes para o mesmo período**
 - ❌ **Transações pendentes não apareciam em Contas**
-- ❌ Saldos calculados incorretamente  
+- ❌ Saldos calculados incorretamente
 - ❌ Relatórios com dados imprecisos
 - ❌ Usuário confuso vendo datas diferentes em telas diferentes
 
 ### Depois (Corrigido)
+
 - ✅ Filtros respeitam exatamente o período selecionado
 - ✅ Visualização sempre mostra o dia correto
 - ✅ Status de atraso consistente
@@ -305,24 +324,26 @@ new Date(data) // Interpreta como UTC!
 
 **REGRA UNIVERSAL**: Todas as telas financeiras usam `data_vencimento`
 
-| Tela | Campo para Filtro | Campo para Agrupamento | Mostra Pendentes? |
-|------|-------------------|------------------------|-------------------|
-| Contas | `data_vencimento` | `data_vencimento` | ✅ Sim (com badge) |
-| Saídas | `data_vencimento` | `data_vencimento` | ✅ Sim (com badge) |
-| Entradas | `data_vencimento` | `data_vencimento` | ✅ Sim (com badge) |
-| Dashboard | `data_vencimento` | - | ✅ Sim |
+| Tela      | Campo para Filtro | Campo para Agrupamento | Mostra Pendentes?  |
+| --------- | ----------------- | ---------------------- | ------------------ |
+| Contas    | `data_vencimento` | `data_vencimento`      | ✅ Sim (com badge) |
+| Saídas    | `data_vencimento` | `data_vencimento`      | ✅ Sim (com badge) |
+| Entradas  | `data_vencimento` | `data_vencimento`      | ✅ Sim (com badge) |
+| Dashboard | `data_vencimento` | -                      | ✅ Sim             |
 
 **Benefício**: Números consistentes entre todas as telas!
 
 ## Próximos Passos
 
 ### Verificar Outros Módulos
+
 - [ ] Verificar módulo de Intercessão (orações por data)
 - [ ] Verificar módulo Kids (check-ins por data)
 - [ ] Verificar módulo Chamada (presenças por data)
 - [ ] Verificar agendamentos de eventos
 
 ### Testes Recomendados
+
 1. ✅ Compilação TypeScript sem erros
 2. ✅ Visualização de datas consistente entre telas
 3. ⏳ Teste E2E: Criar transação dia 31 e validar que aparece corretamente
@@ -339,13 +360,13 @@ new Date(data) // Interpreta como UTC!
 // ✅ DEPOIS (CORRETO)
 const dateRange = {
   inicio: formatLocalDate(startOfMonthLocal(selectedMonth)),
-  fim: formatLocalDate(endOfMonthLocal(selectedMonth))
+  fim: formatLocalDate(endOfMonthLocal(selectedMonth)),
 };
 
 // Query Supabase
 query
   .gte("data_vencimento", dateRange.inicio) // "2025-08-01"
-  .lte("data_vencimento", dateRange.fim)     // "2025-08-31"
+  .lte("data_vencimento", dateRange.fim); // "2025-08-31"
 ```
 
 ## Exemplos de Correções
@@ -399,17 +420,20 @@ fim: formatLocalDate(endOfMonthLocal(mesAnterior)),
 ## Validação
 
 ### Cenário de Teste 1: Filtro de Agosto
+
 - **Input**: Seleção de agosto/2025
 - **Esperado**: Transações de 01/08 a 31/08
 - **Antes**: Incluía 31/07 e/ou 01/09 ❌
 - **Depois**: Inclui apenas agosto ✅
 
 ### Cenário de Teste 2: Último Dia do Mês
+
 - **Input**: `endOfMonthLocal(agosto)`
 - **Result**: `new Date(2025, 8, 0, 23, 59, 59, 999)` = 31/08/2025 23:59:59.999 BRT
 - **String**: `"2025-08-31"` ✅ (sem offset UTC)
 
 ### Cenário de Teste 3: Custom Range
+
 - **Input**: Range de 15/08 a 20/08
 - **Esperado**: Apenas transações desse período
 - **Resultado**: ✅ Funciona corretamente
@@ -417,13 +441,15 @@ fim: formatLocalDate(endOfMonthLocal(mesAnterior)),
 ## Impacto
 
 ### Antes (Bugs)
+
 - ❌ Filtros incluíam dias errados
-- ❌ Saldos calculados incorretamente  
+- ❌ Saldos calculados incorretamente
 - ❌ Relatórios com dados imprecisos
 - ❌ Reconciliação bancária falhando
 - ❌ DRE com valores fora do período
 
 ### Depois (Corrigido)
+
 - ✅ Filtros respeitam exatamente o período selecionado
 - ✅ Saldos calculados corretamente
 - ✅ Relatórios precisos
@@ -433,12 +459,14 @@ fim: formatLocalDate(endOfMonthLocal(mesAnterior)),
 ## Próximos Passos
 
 ### Verificar Outros Módulos
+
 - [ ] Verificar módulo de Intercessão (orações por data)
 - [ ] Verificar módulo Kids (check-ins por data)
 - [ ] Verificar módulo Chamada (presenças por data)
 - [ ] Verificar agendamentos de eventos
 
 ### Testes Recomendados
+
 1. ✅ Compilação TypeScript sem erros
 2. ⏳ Teste E2E: Filtrar agosto e validar que não aparecem transações de julho/setembro
 3. ⏳ Teste E2E: Criar transação dia 31 e validar que aparece no filtro do mês
@@ -458,6 +486,7 @@ fim: formatLocalDate(endOfMonthLocal(mesAnterior)),
 O date-fns tem funções como `startOfMonth()` e `endOfMonth()`, mas quando convertidas para string usando `.toISOString()` ou `format(date, "yyyy-MM-dd")`, **ainda sofrem conversão UTC**.
 
 A solução foi criar wrappers que:
+
 1. Constroem as datas usando construtores locais (`new Date(year, month, day)`)
 2. Extraem YYYY-MM-DD usando getters locais (`.getFullYear()`, `.getMonth()`, `.getDate()`)
 3. Retornam strings que representam o timezone local do servidor/usuário
@@ -465,11 +494,13 @@ A solução foi criar wrappers que:
 ### Timezone do Servidor vs Cliente
 
 O Brasil tem múltiplos timezones (BRT -3, AMT -4, etc). O código assume que:
+
 - O servidor Supabase armazena datas em formato `DATE` (sem timezone)
 - O cliente constrói datas no timezone local do navegador
 - As strings YYYY-MM-DD são interpretadas como "local" pelo PostgreSQL
 
 Isso funciona porque:
+
 - PostgreSQL `DATE` não tem timezone (é apenas YYYY-MM-DD)
 - Filtros `.gte()` e `.lte()` comparam strings lexicograficamente
 - "2025-08-31" é sempre menor que "2025-09-01" independente de timezone
