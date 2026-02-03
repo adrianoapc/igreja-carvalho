@@ -362,16 +362,16 @@ export default function Contas() {
   };
 
   // Filtrar transações por status
-  const filterByStatus = (transacoes: typeof transacoes) => {
-    if (!transacoes) return [];
-    if (statusFilter === "all") return transacoes;
+  const filterByStatus = (items: TransacaoLista[] | undefined) => {
+    if (!items) return [];
+    if (statusFilter === "all") return items;
     if (statusFilter === "pago") {
-      return transacoes.filter(t => t.status === "pago");
+      return items.filter(t => t.status === "pago");
     }
     if (statusFilter === "pendente") {
-      return transacoes.filter(t => t.status === "pendente");
+      return items.filter(t => t.status === "pendente");
     }
-    return transacoes;
+    return items;
   };
 
   // Aplicar filtro de status
@@ -519,7 +519,11 @@ export default function Contas() {
   const renderTransactionListGrouped = (filteredTransacoes: TransacaoLista[]) => {
     // Agrupar transações filtradas por data de vencimento
     const gruposFiltrados = filteredTransacoes.reduce((acc, t) => {
-      const data = t.data_vencimento || "sem-data";
+      const data = typeof t.data_vencimento === 'string' 
+        ? t.data_vencimento 
+        : t.data_vencimento 
+          ? t.data_vencimento.toISOString().split('T')[0] 
+          : "sem-data";
       if (!acc[data]) {
         acc[data] = [];
       }

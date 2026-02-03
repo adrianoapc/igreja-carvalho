@@ -259,7 +259,7 @@ export function TransferenciaDialog({
           forma_pagamento: "Transferência Bancária",
           conta_id: contaDestino,
           categoria_id: categoriaTransferencia.entrada.id,
-          subcategoria_id: subcategoriaDepositoEntrada?.id || null,
+          subcategoria_id: null, // Entrada não precisa de subcategoria específica
           base_ministerial_id: baseMinisterial?.id || null,
           centro_custo_id: centroCusto?.id || null,
           transferencia_id: transferencia.id,
