@@ -7,11 +7,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInDays, subDays, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
-import { Loader2, Search, Link2, CheckCircle2, AlertCircle } from "lucide-react";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useFilialId } from "@/hooks/useFilialId";
+import { Loader2, Search, Link2, CheckCircle2, AlertCircle, Calendar } from "lucide-react";
 
 interface Transacao {
   id: string;
@@ -36,7 +39,6 @@ interface VincularTransacaoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   extrato: ExtratoItem;
-  transacoesDisponiveis: Transacao[];
   onVinculado: () => void;
 }
 
@@ -44,17 +46,74 @@ export function VincularTransacaoDialog({
   open,
   onOpenChange,
   extrato,
-  transacoesDisponiveis,
   onVinculado,
 }: VincularTransacaoDialogProps) {
   const { formatValue } = useHideValues();
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
   const [loading, setLoading] = useState(false);
-  const [selectedTransacaoId, setSelectedTransacaoId] = useState<string | null>(
-    null
-  );
+  const [selectedTransacaoId, setSelectedTransacaoId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Calcular score de correspondência para cada transação
+  // Calculate date window (±60 days from extrato date)
+  const dateWindow = useMemo(() => {
+    const dataExtrato = parseISO(extrato.data_transacao);
+    return {
+      inicio: format(subDays(dataExtrato, 60), "yyyy-MM-dd"),
+      fim: format(addDays(dataExtrato, 60), "yyyy-MM-dd"),
+      inicioFormatado: format(subDays(dataExtrato, 60), "dd/MM", { locale: ptBR }),
+      fimFormatado: format(addDays(dataExtrato, 60), "dd/MM/yyyy", { locale: ptBR }),
+    };
+  }, [extrato.data_transacao]);
+
+  // Fetch available transactions with flexible date window
+  const { data: transacoesDisponiveis = [], isLoading: loadingTransacoes } = useQuery({
+    queryKey: ["transacoes-para-vincular", extrato.id, igrejaId, filialId, isAllFiliais, dateWindow.inicio, dateWindow.fim],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+
+      // Build transaction query
+      let transacaoQuery = supabase
+        .from("transacoes_financeiras")
+        .select("id, descricao, valor, tipo, data_pagamento, categorias_financeiras(nome)")
+        .eq("igreja_id", igrejaId)
+        .eq("status", "pago")
+        .gte("data_pagamento", dateWindow.inicio)
+        .lte("data_pagamento", dateWindow.fim)
+        .order("data_pagamento", { ascending: false });
+
+      if (!isAllFiliais && filialId) {
+        transacaoQuery = transacaoQuery.eq("filial_id", filialId);
+      }
+
+      const { data: transacoes, error: transacoesError } = await transacaoQuery;
+
+      if (transacoesError) {
+        console.error("Erro ao buscar transações:", transacoesError);
+        return [];
+      }
+
+      // Fetch already linked transaction IDs
+      const { data: vinculados, error: vinculadosError } = await supabase
+        .from("extratos_bancarios")
+        .select("transacao_vinculada_id")
+        .not("transacao_vinculada_id", "is", null);
+
+      if (vinculadosError) {
+        console.error("Erro ao buscar vinculados:", vinculadosError);
+      }
+
+      const idsVinculados = new Set(
+        vinculados?.map((e) => e.transacao_vinculada_id).filter(Boolean) || []
+      );
+
+      // Filter out already linked transactions
+      return (transacoes || []).filter((t) => !idsVinculados.has(t.id)) as Transacao[];
+    },
+    enabled: open && !!igrejaId,
+  });
+
+  // Calculate matching score for each transaction
   const transacoesComScore = useMemo(() => {
     const tipoExtrato =
       extrato.tipo === "credito" || extrato.tipo === "CREDIT"
@@ -65,12 +124,12 @@ export function VincularTransacaoDialog({
       .map((t) => {
         let score = 0;
 
-        // Correspondência de tipo (40 pontos)
+        // Type match (40 points)
         if (t.tipo === tipoExtrato) {
           score += 40;
         }
 
-        // Correspondência de valor (40 pontos)
+        // Value match (40 points)
         const diferencaValor = Math.abs(Number(t.valor) - extrato.valor);
         if (diferencaValor === 0) {
           score += 40;
@@ -82,7 +141,7 @@ export function VincularTransacaoDialog({
           score += 10;
         }
 
-        // Correspondência de data (20 pontos)
+        // Date match (20 points)
         try {
           if (t.data_pagamento) {
             const dataExtrato = parseISO(extrato.data_transacao);
@@ -100,13 +159,13 @@ export function VincularTransacaoDialog({
             }
           }
         } catch {
-          // Data inválida
+          // Invalid date
         }
 
         return { ...t, score };
       })
       .filter((t) => {
-        // Filtrar por termo de busca
+        // Filter by search term
         if (!searchTerm) return true;
         const search = searchTerm.toLowerCase();
         return (
@@ -178,7 +237,7 @@ export function VincularTransacaoDialog({
           <h2 className="text-lg font-semibold">Vincular Transação</h2>
         </div>
 
-        {/* Dados do Extrato */}
+        {/* Extrato Data */}
         <div
           className={`p-3 rounded-lg border ${
             extrato.tipo === "credito" || extrato.tipo === "CREDIT"
@@ -210,7 +269,18 @@ export function VincularTransacaoDialog({
           </div>
         </div>
 
-        {/* Busca */}
+        {/* Date Range Indicator */}
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            Buscando: {dateWindow.inicioFormatado} a {dateWindow.fimFormatado}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            (±60 dias)
+          </span>
+        </div>
+
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -221,9 +291,13 @@ export function VincularTransacaoDialog({
           />
         </div>
 
-        {/* Lista de Transações */}
+        {/* Transaction List */}
         <ScrollArea className="flex-1 min-h-0 max-h-[280px] border rounded-lg">
-          {transacoesComScore.length > 0 ? (
+          {loadingTransacoes ? (
+            <div className="flex items-center justify-center h-full p-6">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : transacoesComScore.length > 0 ? (
             <RadioGroup
               value={selectedTransacaoId || ""}
               onValueChange={setSelectedTransacaoId}
@@ -280,6 +354,9 @@ export function VincularTransacaoDialog({
               <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
                 Nenhuma transação candidata encontrada
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Verifique se há transações pagas no período
               </p>
             </div>
           )}

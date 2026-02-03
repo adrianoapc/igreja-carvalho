@@ -852,7 +852,6 @@ export function ConciliacaoManual() {
           open={vincularDialogOpen}
           onOpenChange={setVincularDialogOpen}
           extrato={selectedExtrato}
-          transacoesDisponiveis={transacoes || []}
           onVinculado={handleVinculado}
         />
       )}

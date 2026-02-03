@@ -772,14 +772,6 @@ export function HistoricoExtratos() {
             reconciliado: extratoParaVincular.reconciliado,
             transacao_vinculada_id: extratoParaVincular.transacao_vinculada_id,
           }}
-          transacoesDisponiveis={(transacoes || []).map((t: any) => ({
-            id: t.id,
-            descricao: t.descricao,
-            valor: t.valor,
-            tipo: t.tipo,
-            data_pagamento: t.data_pagamento,
-            categorias_financeiras: t.categoria ? { nome: t.categoria.nome } : null,
-          }))}
           onVinculado={handleVinculado}
         />
       )}
