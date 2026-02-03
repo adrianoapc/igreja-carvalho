@@ -30,6 +30,7 @@ import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 import { ConciliacaoLoteDialog } from "./ConciliacaoLoteDialog";
+import { ResultadoReconciliacaoDialog, MatchResult } from "./ResultadoReconciliacaoDialog";
 import { anonymizePixDescription } from "@/utils/anonymization";
 import {
   Search,
@@ -92,6 +93,12 @@ export function ConciliacaoManual() {
   const [selectedTransacao, setSelectedTransacao] = useState<Transacao | null>(null);
   const [loteDialogOpen, setLoteDialogOpen] = useState(false);
   const [transacaoPage, setTransacaoPage] = useState(1);
+
+  // Reconciliação automática state
+  const [reconciliacaoLoading, setReconciliacaoLoading] = useState(false);
+  const [resultadoDialogOpen, setResultadoDialogOpen] = useState(false);
+  const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
+  const [totalPendentesAtReconciliacao, setTotalPendentesAtReconciliacao] = useState(0);
 
   // Fetch accounts
   const { data: contas } = useQuery({
@@ -272,10 +279,19 @@ export function ConciliacaoManual() {
       return;
     }
 
+    setReconciliacaoLoading(true);
+    setTotalPendentesAtReconciliacao(extratos.length);
     const contaIds = [...new Set(extratos.map((e) => e.conta_id))];
-    let totalReconciliados = 0;
+    const allResults: MatchResult[] = [];
 
     try {
+      // Step 1: Get all matches from all accounts
+      const allMatches: Array<{
+        extrato_id: string;
+        transacao_id: string;
+        score: number;
+      }> = [];
+
       for (const contaId of contaIds) {
         const { data, error } = await supabase.rpc("reconciliar_transacoes", {
           p_conta_id: contaId,
@@ -285,22 +301,80 @@ export function ConciliacaoManual() {
           console.error("Erro na reconciliação automática:", error);
           continue;
         }
-        totalReconciliados += data?.length || 0;
+        if (data) {
+          allMatches.push(...data);
+        }
       }
 
-      if (totalReconciliados === 0) {
+      if (allMatches.length === 0) {
         toast.info("Nenhuma correspondência encontrada automaticamente");
+        setReconciliacaoLoading(false);
         return;
       }
 
-      toast.success(`Reconciliação automática concluída`, {
-        description: `${totalReconciliados} transação(ões) reconciliada(s)`,
-      });
+      // Step 2: Deduplicate - one extrato can only match one transacao
+      const processedExtratos = new Set<string>();
+      const uniqueMatches = allMatches
+        .sort((a, b) => b.score - a.score)
+        .filter((match) => {
+          if (processedExtratos.has(match.extrato_id)) {
+            return false;
+          }
+          processedExtratos.add(match.extrato_id);
+          return true;
+        });
+
+      // Step 3: Apply each match using aplicar_conciliacao RPC
+      for (const match of uniqueMatches) {
+        try {
+          const { data: applied, error: applyError } = await supabase.rpc(
+            "aplicar_conciliacao",
+            {
+              p_extrato_id: match.extrato_id,
+              p_transacao_id: match.transacao_id,
+            }
+          );
+
+          // Fetch details for the result
+          const extratoData = extratos.find((e) => e.id === match.extrato_id);
+          const transacaoData = transacoes?.find((t) => t.id === match.transacao_id);
+
+          allResults.push({
+            extratoId: match.extrato_id,
+            transacaoId: match.transacao_id,
+            score: match.score,
+            extratoDescricao: extratoData?.descricao || "Extrato",
+            extratoValor: extratoData?.valor || 0,
+            transacaoDescricao: transacaoData?.descricao || "Transação",
+            transacaoValor: Number(transacaoData?.valor) || 0,
+            applied: applied && !applyError,
+            error: applyError?.message,
+          });
+        } catch (err) {
+          console.error("Erro ao aplicar match:", err);
+        }
+      }
+
+      const successCount = allResults.filter((r) => r.applied).length;
+
+      if (successCount === 0) {
+        toast.info("Nenhuma correspondência pôde ser aplicada");
+      } else {
+        toast.success(`${successCount} extrato(s) reconciliado(s) automaticamente`);
+      }
+
+      // Show results dialog
+      setMatchResults(allResults);
+      setResultadoDialogOpen(true);
+
+      // Refresh data
       refetchExtratos();
       queryClient.invalidateQueries({ queryKey: ["transacoes-conciliacao"] });
     } catch (err) {
       console.error("Exceção na reconciliação:", err);
       toast.error("Erro na reconciliação automática");
+    } finally {
+      setReconciliacaoLoading(false);
     }
   };
 
@@ -336,9 +410,13 @@ export function ConciliacaoManual() {
               <Badge variant="secondary">{pendentes} pendente(s)</Badge>
             )}
           </div>
-          <Button onClick={handleReconciliarAutomatico} size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Reconciliar Automático
+          <Button 
+            onClick={handleReconciliarAutomatico} 
+            size="sm"
+            disabled={reconciliacaoLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${reconciliacaoLoading ? "animate-spin" : ""}`} />
+            {reconciliacaoLoading ? "Reconciliando..." : "Reconciliar Automático"}
           </Button>
         </div>
       </CardHeader>
@@ -756,6 +834,14 @@ export function ConciliacaoManual() {
           onConciliado={handleLoteConciliado}
         />
       )}
+
+      {/* Dialog de Resultado da Reconciliação Automática */}
+      <ResultadoReconciliacaoDialog
+        open={resultadoDialogOpen}
+        onOpenChange={setResultadoDialogOpen}
+        results={matchResults}
+        totalPendentes={totalPendentesAtReconciliacao}
+      />
     </Card>
   );
 }
