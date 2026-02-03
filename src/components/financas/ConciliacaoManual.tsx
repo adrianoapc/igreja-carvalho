@@ -23,7 +23,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, parseISO, subDays } from "date-fns";
+import { format, parseISO, subDays, subMonths } from "date-fns";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
+import { MonthPicker } from "./MonthPicker";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
@@ -79,6 +81,10 @@ export function ConciliacaoManual() {
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("extrato");
 
+  // Date filter state
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
+
   // Extrato tab state
   const [selectedContaId, setSelectedContaId] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -99,6 +105,22 @@ export function ConciliacaoManual() {
   const [resultadoDialogOpen, setResultadoDialogOpen] = useState(false);
   const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
   const [totalPendentesAtReconciliacao, setTotalPendentesAtReconciliacao] = useState(0);
+
+  // Compute date range from selected month or custom range
+  const { dataInicio, dataFim } = useMemo(() => {
+    if (customRange) {
+      return {
+        dataInicio: formatLocalDate(customRange.from),
+        dataFim: formatLocalDate(customRange.to),
+      };
+    }
+    const startOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+    const endOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+    return {
+      dataInicio: formatLocalDate(startOfMonth),
+      dataFim: formatLocalDate(endOfMonth),
+    };
+  }, [selectedMonth, customRange]);
 
   // Fetch accounts
   const { data: contas } = useQuery({
@@ -132,6 +154,8 @@ export function ConciliacaoManual() {
       filialId,
       isAllFiliais,
       selectedContaId,
+      dataInicio,
+      dataFim,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
@@ -141,8 +165,10 @@ export function ConciliacaoManual() {
         .eq("igreja_id", igrejaId)
         .eq("reconciliado", false)
         .is("transacao_vinculada_id", null)
+        .gte("data_transacao", dataInicio)
+        .lte("data_transacao", dataFim)
         .order("data_transacao", { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
@@ -159,16 +185,16 @@ export function ConciliacaoManual() {
 
   // Fetch transactions for linking
   const { data: transacoes, isLoading: loadingTransacoes } = useQuery({
-    queryKey: ["transacoes-conciliacao", igrejaId, filialId, isAllFiliais],
+    queryKey: ["transacoes-conciliacao", igrejaId, filialId, isAllFiliais, dataInicio, dataFim],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const dataInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
       let query = supabase
         .from("transacoes_financeiras")
         .select("id, descricao, valor, tipo, data_pagamento, conta_id, categorias_financeiras(nome)")
         .eq("igreja_id", igrejaId)
         .eq("status", "pago")
         .gte("data_pagamento", dataInicio)
+        .lte("data_pagamento", dataFim)
         .order("data_pagamento", { ascending: false })
         .limit(500);
 
@@ -436,7 +462,13 @@ export function ConciliacaoManual() {
           {/* Tab: Por Extrato */}
           <TabsContent value="extrato" className="space-y-4 mt-4">
             {/* Filters */}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
+              <MonthPicker
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                customRange={customRange}
+                onCustomRangeChange={setCustomRange}
+              />
               <div className="flex-1 min-w-[200px] relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
