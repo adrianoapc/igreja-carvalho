@@ -232,25 +232,25 @@ export function VincularTransacaoDialog({
               {transacoesComScore.map((t) => (
                 <div
                   key={t.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                     selectedTransacaoId === t.id
                       ? "border-primary bg-primary/5"
                       : "border-border hover:bg-muted/50"
                   }`}
                   onClick={() => setSelectedTransacaoId(t.id)}
                 >
-                  <RadioGroupItem value={t.id} id={t.id} />
+                  <RadioGroupItem value={t.id} id={t.id} className="mt-1" />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-start gap-2 mb-1 flex-wrap">
                       <Label
                         htmlFor={t.id}
-                        className="font-medium text-sm cursor-pointer truncate"
+                        className="font-medium text-sm cursor-pointer break-words"
                       >
                         {t.descricao}
                       </Label>
                       {getScoreBadge(t.score)}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {t.data_pagamento && (
                         <span className="text-xs text-muted-foreground">
                           {format(parseISO(t.data_pagamento), "dd/MM/yyyy", {
@@ -266,7 +266,7 @@ export function VincularTransacaoDialog({
                     </div>
                   </div>
                   <p
-                    className={`font-bold text-sm ${
+                    className={`font-bold text-sm whitespace-nowrap shrink-0 ${
                       t.tipo === "entrada" ? "text-green-600" : "text-red-600"
                     }`}
                   >
