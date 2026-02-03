@@ -1,60 +1,112 @@
 
-# Plano: Melhorar Sugestões de Transações no Vincular
+# Plano: Corrigir Conciliação Manual - Filtrar Transações Já Conciliadas + Adicionar Botão "Dividir"
 
 ## Problemas Identificados
 
-### 1. Transações Já Vinculadas Aparecendo como Sugestão
-Atualmente, a lista `transacoesDisponiveis` passada para o `VincularTransacaoDialog` inclui todas as transações do período, mesmo aquelas que já estão vinculadas a outros extratos. Isso polui a lista e pode causar confusão.
+### 1. Aba "Por Transação" mostra transações já conciliadas
+A aba "Por Transação" lista **todas** as transações pagas do período, incluindo aquelas que já foram vinculadas a extratos. Isso polui a lista e confunde o usuário.
 
-### 2. Filtro de Mês Rígido
-Se o usuário está com o MonthPicker em janeiro, mas a despesa (reembolso) foi lançada em dezembro, essa transação não aparecerá como opção. O sistema precisa de uma janela mais flexível ou indicar claramente o período atual.
+Uma transação pode estar conciliada de 3 formas:
+- **1:1** - `extratos_bancarios.transacao_vinculada_id` aponta para ela
+- **N:1 (Lote)** - Vinculada em `conciliacoes_lote`
+- **1:N (Divisão)** - Vinculada em `conciliacoes_divisao_transacoes`
+
+### 2. Funcionalidade "Dividir Extrato" (1:N) não está acessível
+O botão "Dividir" que permite vincular 1 extrato a N transações existe no Dashboard, mas **não está presente na tela de Conciliação Manual**. Você precisa ir para `/financas/conciliacao` (dashboard) para usar essa funcionalidade.
 
 ---
 
-## Soluções Propostas
+## Soluções
 
-### Solução 1: Excluir Transações Já Vinculadas
+### Solução 1: Filtrar Transações Já Conciliadas na Aba "Por Transação"
 
-**Alteração em `ConciliacaoManual.tsx` e `DashboardConciliacao.tsx`:**
+**Arquivo:** `src/components/financas/ConciliacaoManual.tsx`
 
-Antes de passar `transacoesDisponiveis` para o dialog, filtrar as transações que já possuem vínculo com algum extrato:
+Buscar os IDs de transações já conciliadas (nas 3 formas) e excluí-las da lista:
 
 ```typescript
-// Buscar IDs de transações já vinculadas
-const { data: vinculadas } = useQuery({
+// Nova query para buscar transações já vinculadas
+const { data: transacoesJaVinculadas } = useQuery({
   queryKey: ["transacoes-vinculadas", igrejaId],
   queryFn: async () => {
-    const { data } = await supabase
+    // 1:1 - extratos com transacao_vinculada_id
+    const { data: vinculadas1to1 } = await supabase
       .from("extratos_bancarios")
       .select("transacao_vinculada_id")
       .not("transacao_vinculada_id", "is", null);
-    return new Set(data?.map(e => e.transacao_vinculada_id) || []);
+    
+    // N:1 - lotes
+    const { data: lotes } = await supabase
+      .from("conciliacoes_lote")
+      .select("transacao_id");
+    
+    // 1:N - divisões
+    const { data: divisoes } = await supabase
+      .from("conciliacoes_divisao_transacoes")
+      .select("transacao_id");
+    
+    const ids = new Set<string>();
+    vinculadas1to1?.forEach(e => e.transacao_vinculada_id && ids.add(e.transacao_vinculada_id));
+    lotes?.forEach(l => l.transacao_id && ids.add(l.transacao_id));
+    divisoes?.forEach(d => d.transacao_id && ids.add(d.transacao_id));
+    
+    return ids;
   },
+  enabled: !!igrejaId,
 });
 
-// Ao passar para o dialog:
-transacoesDisponiveis={(transacoes || []).filter(t => !vinculadas?.has(t.id))}
+// Filtrar no useMemo transacoesPendentes
+const transacoesPendentes = useMemo(() => {
+  if (!transacoes) return [];
+  
+  return transacoes.filter((t) => {
+    // Excluir já vinculadas
+    if (transacoesJaVinculadas?.has(t.id)) return false;
+    
+    // Filtro de busca existente
+    if (transacaoSearchTerm) { ... }
+    return true;
+  });
+}, [transacoes, transacaoSearchTerm, transacoesJaVinculadas]);
 ```
 
-### Solução 2: Expandir Janela de Busca no VincularTransacaoDialog
+### Solução 2: Adicionar Botão "Dividir" na Aba "Por Extrato"
 
-**Modificar `VincularTransacaoDialog.tsx`:**
+**Arquivo:** `src/components/financas/ConciliacaoManual.tsx`
 
-Adicionar um indicador visual do período filtrado e uma opção para buscar em período mais amplo:
+Adicionar o botão "Dividir" junto aos botões "Vincular" e "Ignorar" na aba "Por Extrato":
 
-1. Mostrar badge com o período atual: `"Jan 2026"`
-2. Adicionar botão "Buscar em todos os períodos" que amplia a janela de busca
-3. Ou: Buscar automaticamente ±30 dias da data do extrato sendo vinculado
+```tsx
+// Importar componente e ícone
+import { DividirExtratoDialog } from "./DividirExtratoDialog";
+import { Split } from "lucide-react";
 
-### Alternativa Mais Simples (Recomendada)
+// Adicionar estado
+const [dividirDialogOpen, setDividirDialogOpen] = useState(false);
 
-O dialog `VincularTransacaoDialog` pode buscar suas próprias transações com uma janela flexível baseada na data do extrato:
+// Adicionar handler
+const handleDividir = (extrato: ExtratoItem) => {
+  setSelectedExtrato(extrato);
+  setDividirDialogOpen(true);
+};
 
-```typescript
-// Dentro do VincularTransacaoDialog, buscar transações ±60 dias do extrato
-const dataExtrato = parseISO(extrato.data_transacao);
-const inicio = format(subDays(dataExtrato, 60), "yyyy-MM-dd");
-const fim = format(addDays(dataExtrato, 60), "yyyy-MM-dd");
+// Adicionar botão na UI (após "Vincular")
+<Button
+  size="sm"
+  variant="outline"
+  onClick={() => handleDividir(extrato)}
+>
+  <Split className="w-3 h-3 mr-1" />
+  Dividir
+</Button>
+
+// Adicionar dialog no final
+<DividirExtratoDialog
+  open={dividirDialogOpen}
+  onOpenChange={setDividirDialogOpen}
+  extrato={selectedExtrato}
+  onSuccess={handleVinculado}
+/>
 ```
 
 ---
@@ -63,66 +115,12 @@ const fim = format(addDays(dataExtrato, 60), "yyyy-MM-dd");
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `VincularTransacaoDialog.tsx` | Buscar transações próprias com janela flexível (+/- 60 dias) e excluir já vinculadas |
-| `ConciliacaoManual.tsx` | Remover passagem de `transacoesDisponiveis` (agora buscado internamente) |
-| `DashboardConciliacao.tsx` | Remover passagem de `transacoesDisponiveis` (agora buscado internamente) |
-
----
-
-## Detalhes Técnicos
-
-### Query Interna no VincularTransacaoDialog
-
-```typescript
-const { data: transacoesDisponiveis, isLoading } = useQuery({
-  queryKey: ["transacoes-para-vincular", extrato.id, igrejaId],
-  queryFn: async () => {
-    // Janela de ±60 dias baseada no extrato
-    const dataExtrato = parseISO(extrato.data_transacao);
-    const dataInicio = format(subDays(dataExtrato, 60), "yyyy-MM-dd");
-    const dataFim = format(addDays(dataExtrato, 60), "yyyy-MM-dd");
-
-    // Buscar transações não vinculadas no período
-    const { data: transacoes } = await supabase
-      .from("transacoes_financeiras")
-      .select(`id, descricao, valor, tipo, data_pagamento, 
-               categorias_financeiras(nome)`)
-      .eq("igreja_id", igrejaId)
-      .eq("status", "pago")
-      .gte("data_pagamento", dataInicio)
-      .lte("data_pagamento", dataFim);
-
-    // Buscar IDs já vinculados
-    const { data: vinculados } = await supabase
-      .from("extratos_bancarios")
-      .select("transacao_vinculada_id")
-      .not("transacao_vinculada_id", "is", null);
-
-    const idsVinculados = new Set(
-      vinculados?.map(e => e.transacao_vinculada_id) || []
-    );
-
-    // Filtrar transações disponíveis
-    return transacoes?.filter(t => !idsVinculados.has(t.id)) || [];
-  },
-  enabled: open && !!igrejaId,
-});
-```
-
-### Indicador Visual do Período
-
-```tsx
-<Badge variant="outline" className="text-xs">
-  Buscando: {format(subDays(parseISO(extrato.data_transacao), 60), "dd/MM")} 
-  a {format(addDays(parseISO(extrato.data_transacao), 60), "dd/MM/yyyy")}
-</Badge>
-```
+| `ConciliacaoManual.tsx` | Adicionar query de transações vinculadas, filtro no useMemo, botão Dividir e dialog |
 
 ---
 
 ## Resultado Esperado
 
-1. **Sem duplicatas**: Transações já vinculadas a outros extratos não aparecem como sugestão
-2. **Janela flexível**: Mesmo se o extrato for de janeiro, transações de dezembro/fevereiro aparecem
-3. **Transparência**: Usuário vê claramente qual período está sendo buscado
-4. **Independência**: O dialog não depende mais do período selecionado no MonthPicker da tela pai
+1. **Aba "Por Transação"**: Mostra apenas transações que ainda não foram conciliadas
+2. **Aba "Por Extrato"**: Novo botão "Dividir" para dividir 1 extrato em N transações
+3. **Cache invalidation**: Após qualquer conciliação, as listas são atualizadas automaticamente
