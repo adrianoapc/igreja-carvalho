@@ -145,19 +145,28 @@ Deno.serve(async (req) => {
     }
 
     // Inserir novos candidatos
-    const sugestoes = candidatos.map((c: any) => ({
-      igreja_id,
-      filial_id: filialId,
-      conta_id: conta_id || null,
-      tipo_match: c.tipo_match,
-      extrato_ids: c.extrato_ids,
-      transacao_ids: c.transacao_ids,
-      score: c.score,
-      features: c.features || {},
-      origem: 'regra',
-      modelo_versao: 'v1',
-      status: 'pendente',
-    }))
+    // Nota: RPC retorna extrato_id (singular) e transacao_ids (array), precisamos normalizar
+    const sugestoes = candidatos
+      .filter((c: any) => {
+        // Filtrar candidatos inválidos (sem extrato_id ou transacao_ids)
+        const hasExtrato = c.extrato_id || (c.extrato_ids && c.extrato_ids.length > 0)
+        const hasTransacao = c.transacao_ids && c.transacao_ids.length > 0
+        return hasExtrato && hasTransacao
+      })
+      .map((c: any) => ({
+        igreja_id,
+        filial_id: filialId,
+        conta_id: conta_id || null,
+        tipo_match: c.tipo_match,
+        // RPC retorna extrato_id (singular) - converter para array
+        extrato_ids: c.extrato_ids || [c.extrato_id],
+        transacao_ids: c.transacao_ids,
+        score: c.score,
+        features: c.features || {},
+        origem: 'regra',
+        modelo_versao: 'v1',
+        status: 'pendente',
+      }))
 
     const { data: inserted, error: insertError } = await supabase
       .from('conciliacao_ml_sugestoes')

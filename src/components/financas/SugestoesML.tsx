@@ -16,13 +16,14 @@ import { ptBR } from 'date-fns/locale'
 
 interface SugestaoML {
   id: string
-  tipo_match: '1:1' | '1:N' | 'N:1'
+  tipo_match: string
   extrato_ids: string[]
   transacao_ids: string[]
   score: number
-  features: any
+  features: Record<string, unknown> | null
   status: string
   created_at: string
+  igreja_id?: string
 }
 
 interface SugestoesMLProps {
@@ -40,9 +41,9 @@ export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: Sugestoes
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // Fetch sugestões pendentes
-  const { data: sugestoes, isLoading } = useQuery<SugestaoML[]>({
+  const { data: sugestoes, isLoading } = useQuery({
     queryKey: ['sugestoes-ml', igrejaId, contaId, mesInicio, mesFim],
-    queryFn: async () => {
+    queryFn: async (): Promise<SugestaoML[]> => {
       if (!igrejaId) return []
 
       let query = supabase
@@ -64,7 +65,7 @@ export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: Sugestoes
 
       const { data, error } = await query
       if (error) throw error
-      return data || []
+      return (data || []) as SugestaoML[]
     },
     enabled: !!igrejaId,
   })
@@ -295,14 +296,14 @@ export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: Sugestoes
 
                 {sugestao.features && (
                   <div className="text-[10px] text-muted-foreground space-y-0.5">
-                    {sugestao.features.extrato_valor && (
-                      <div>Valor: {formatValue(sugestao.features.extrato_valor)}</div>
+                    {(sugestao.features as Record<string, unknown>).extrato_valor !== undefined && (
+                      <div>Valor: {formatValue((sugestao.features as Record<string, unknown>).extrato_valor as number)}</div>
                     )}
-                    {sugestao.features.diferenca_dias !== undefined && (
-                      <div>Diferença: {sugestao.features.diferenca_dias} dia(s)</div>
+                    {(sugestao.features as Record<string, unknown>).diferenca_dias !== undefined && (
+                      <div>Diferença: {String((sugestao.features as Record<string, unknown>).diferenca_dias)} dia(s)</div>
                     )}
-                    {sugestao.features.match_tipo !== undefined && (
-                      <div>Tipo: {sugestao.features.match_tipo ? 'Compatível' : 'Diferente'}</div>
+                    {(sugestao.features as Record<string, unknown>).match_tipo !== undefined && (
+                      <div>Tipo: {(sugestao.features as Record<string, unknown>).match_tipo ? 'Compatível' : 'Diferente'}</div>
                     )}
                   </div>
                 )}

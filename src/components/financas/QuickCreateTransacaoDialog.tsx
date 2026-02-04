@@ -49,7 +49,7 @@ interface ExtratoItem {
   data_transacao: string;
   descricao: string;
   valor: number;
-  tipo: "credit" | "debit";
+  tipo: string;
   conta_id: string;
 }
 
