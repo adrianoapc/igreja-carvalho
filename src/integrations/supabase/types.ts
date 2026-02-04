@@ -10416,6 +10416,10 @@ export type Database = {
         }[]
       }
       refresh_conciliacao_dataset: { Args: never; Returns: undefined }
+      rejeitar_sugestao_conciliacao: {
+        Args: { p_sugestao_id: string; p_usuario_id?: string }
+        Returns: boolean
+      }
       resetar_senha_usuario_membro: {
         Args: { p_profile_id: string; p_senha_temporaria: string }
         Returns: {
