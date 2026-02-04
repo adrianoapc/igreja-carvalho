@@ -9917,6 +9917,10 @@ export type Database = {
             }
             Returns: boolean
           }
+      aplicar_sugestao_conciliacao: {
+        Args: { p_sugestao_id: string; p_usuario_id?: string }
+        Returns: boolean
+      }
       aprovar_onboarding: { Args: { p_request_id: string }; Returns: Json }
       buscar_pessoa_por_contato: {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
@@ -9987,6 +9991,22 @@ export type Database = {
       generate_filial_slug: {
         Args: { p_igreja_id: string; p_nome: string }
         Returns: string
+      }
+      gerar_candidatos_conciliacao: {
+        Args: {
+          p_conta_id?: string
+          p_igreja_id: string
+          p_mes_fim?: string
+          p_mes_inicio?: string
+          p_score_minimo?: number
+        }
+        Returns: {
+          extrato_id: string
+          features: Json
+          score: number
+          tipo_match: string
+          transacao_ids: string[]
+        }[]
       }
       get_current_user_filial_id: { Args: never; Returns: string }
       get_current_user_igreja_id: { Args: never; Returns: string }
