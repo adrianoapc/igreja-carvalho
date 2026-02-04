@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DashboardConciliacao } from "@/components/financas/DashboardConciliacao";
 import { ConciliacaoManual } from "@/components/financas/ConciliacaoManual";
+import { ConciliacaoInteligente } from "@/components/financas/ConciliacaoInteligente";
 import { HistoricoExtratos } from "@/components/financas/HistoricoExtratos";
 import { RelatorioCobertura } from "@/components/financas/RelatorioCobertura";
 import { Button } from "@/components/ui/button";
@@ -33,15 +34,19 @@ export default function Reconciliacao() {
         </div>
       </div>
 
-      <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4">
+      <Tabs defaultValue="inteligente" className="w-full">
+        <TabsList className="grid w-full grid-cols-5 mb-4">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="manual">Avançado</TabsTrigger>
+          <TabsTrigger value="inteligente">Modo Inteligente</TabsTrigger>
+          <TabsTrigger value="manual">Modo Clássico</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="relatorio">Relatório</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">
           <DashboardConciliacao />
+        </TabsContent>
+        <TabsContent value="inteligente">
+          <ConciliacaoInteligente />
         </TabsContent>
         <TabsContent value="manual">
           <ConciliacaoManual />

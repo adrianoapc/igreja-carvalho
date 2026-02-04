@@ -1102,21 +1102,39 @@ Deno.serve(async (req) => {
         statementResult.data
       )
 
-      // Call reconciliation RPC if any records were inserted
-      let reconciliados = 0
+      // Generate ML suggestions if any records were inserted
+      let sugestoesGeradas = 0
       if (syncResult.inseridos > 0) {
         try {
-          const { data: reconcData, error: reconcError } = await supabaseAdmin
-            .rpc('reconciliar_transacoes', { p_conta_id: conta_id })
+          // Call gerar-sugestoes-ml edge function
+          const edgeFunctionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/gerar-sugestoes-ml`
+          const edgeFunctionKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+          
+          const suggestoesResponse = await fetch(edgeFunctionUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${edgeFunctionKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              igreja_id: integracao.igreja_id,
+              conta_id: conta_id,
+              // Use last 3 months for suggestions
+              mes_inicio: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              mes_fim: new Date().toISOString().split('T')[0],
+              score_minimo: 0.7,
+            }),
+          })
 
-          if (reconcError) {
-            console.warn('[santander-api] Reconciliation RPC failed:', reconcError)
+          if (!suggestoesResponse.ok) {
+            console.warn('[santander-api] ML suggestions failed:', await suggestoesResponse.text())
           } else {
-            reconciliados = Array.isArray(reconcData) ? reconcData.length : 0
-            console.log('[santander-api] Reconciled', reconciliados, 'transactions')
+            const result = await suggestoesResponse.json()
+            sugestoesGeradas = result.sugestoes_criadas || 0
+            console.log('[santander-api] Generated', sugestoesGeradas, 'ML suggestions')
           }
         } catch (err) {
-          console.warn('[santander-api] Reconciliation error:', err)
+          console.warn('[santander-api] ML suggestions error:', err)
         }
       }
 
@@ -1126,7 +1144,7 @@ Deno.serve(async (req) => {
         periodo: { inicio: dataInicioFinal, fim: dataFimFinal },
         resultado: {
           ...syncResult,
-          reconciliados
+          sugestoes_ml: sugestoesGeradas
         },
         conta: {
           id: conta_id,

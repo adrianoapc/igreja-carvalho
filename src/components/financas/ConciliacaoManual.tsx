@@ -72,6 +72,8 @@ interface Transacao {
   data_pagamento: string;
   categorias_financeiras?: { nome: string } | null;
   conta_id?: string | null;
+  origem_registro?: string | null;
+  contas?: { nome: string } | null;
 }
 
 export function ConciliacaoManual() {
@@ -106,6 +108,9 @@ export function ConciliacaoManual() {
   const [selectedTransacao, setSelectedTransacao] = useState<Transacao | null>(null);
   const [loteDialogOpen, setLoteDialogOpen] = useState(false);
   const [transacaoPage, setTransacaoPage] = useState(1);
+  const [transacaoContaFilter, setTransacaoContaFilter] = useState<string>("all");
+  const [transacaoTipoFilter, setTransacaoTipoFilter] = useState<string>("all");
+  const [transacaoOrigemFilter, setTransacaoOrigemFilter] = useState<string>("all");
 
   // Reconciliação automática state
   const [reconciliacaoLoading, setReconciliacaoLoading] = useState(false);
@@ -197,7 +202,9 @@ export function ConciliacaoManual() {
       if (!igrejaId) return [];
       let query = supabase
         .from("transacoes_financeiras")
-        .select("id, descricao, valor, tipo, data_pagamento, conta_id, categorias_financeiras(nome)")
+        .select(
+          "id, descricao, valor, tipo, data_pagamento, conta_id, origem_registro, contas:conta_id(nome), categorias_financeiras(nome)"
+        )
         .eq("igreja_id", igrejaId)
         .eq("status", "pago")
         .gte("data_pagamento", dataInicio)
@@ -297,9 +304,31 @@ export function ConciliacaoManual() {
           return false;
         }
       }
+
+      if (transacaoContaFilter !== "all" && t.conta_id !== transacaoContaFilter) {
+        return false;
+      }
+
+      if (transacaoTipoFilter !== "all" && t.tipo !== transacaoTipoFilter) {
+        return false;
+      }
+
+      if (transacaoOrigemFilter !== "all") {
+        const origem = (t.origem_registro || "manual").toLowerCase();
+        if (origem !== transacaoOrigemFilter) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [transacoes, transacaoSearchTerm, transacoesJaVinculadas]);
+  }, [
+    transacoes,
+    transacaoSearchTerm,
+    transacoesJaVinculadas,
+    transacaoContaFilter,
+    transacaoTipoFilter,
+    transacaoOrigemFilter,
+  ]);
 
   // Reset pages on filter change
   useMemo(() => {
@@ -308,7 +337,7 @@ export function ConciliacaoManual() {
 
   useMemo(() => {
     setTransacaoPage(1);
-  }, [transacaoSearchTerm]);
+  }, [transacaoSearchTerm, transacaoContaFilter, transacaoTipoFilter, transacaoOrigemFilter]);
 
   // Pagination
   const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
@@ -744,16 +773,57 @@ export function ConciliacaoManual() {
               </div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar transação por descrição ou categoria..."
-                value={transacaoSearchTerm}
-                onChange={(e) => setTransacaoSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+              {/* Filtros */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <MonthPicker
+                  selectedMonth={selectedMonth}
+                  onMonthChange={setSelectedMonth}
+                  customRange={customRange}
+                  onCustomRangeChange={setCustomRange}
+                />
+                <div className="flex-1 min-w-[200px] relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar transação por descrição ou categoria..."
+                    value={transacaoSearchTerm}
+                    onChange={(e) => setTransacaoSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={transacaoContaFilter} onValueChange={setTransacaoContaFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Todas as contas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as contas</SelectItem>
+                    {contas?.map((conta) => (
+                      <SelectItem key={conta.id} value={conta.id}>
+                        {conta.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={transacaoTipoFilter} onValueChange={setTransacaoTipoFilter}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="entrada">Entrada</SelectItem>
+                    <SelectItem value="saida">Saída</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={transacaoOrigemFilter} onValueChange={setTransacaoOrigemFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Origem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="api_santander">API Santander</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
             {/* Transactions List */}
             {loadingTransacoes ? (

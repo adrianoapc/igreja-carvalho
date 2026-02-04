@@ -23,7 +23,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   try {
@@ -78,6 +78,14 @@ Deno.serve(async (req) => {
     })
 
     // Chamar RPC para gerar candidatos
+    console.log('[gerar-sugestoes-ml] Chamando RPC com params:', {
+      p_igreja_id: igreja_id,
+      p_conta_id: conta_id || null,
+      p_mes_inicio: dataInicio,
+      p_mes_fim: dataFim,
+      p_score_minimo: score_minimo,
+    })
+
     const { data: candidatos, error: rpcError } = await supabase.rpc('gerar_candidatos_conciliacao', {
       p_igreja_id: igreja_id,
       p_conta_id: conta_id || null,
@@ -87,8 +95,12 @@ Deno.serve(async (req) => {
     })
 
     if (rpcError) {
-      console.error('[gerar-sugestoes-ml] RPC error:', rpcError)
-      throw rpcError
+      console.error('[gerar-sugestoes-ml] RPC error:', {
+        message: rpcError.message,
+        details: rpcError.details,
+        hint: (rpcError as any).hint,
+      })
+      throw new Error(`RPC failed: ${rpcError.message} - ${rpcError.details}`)
     }
 
     if (!candidatos || candidatos.length === 0) {
@@ -113,6 +125,8 @@ Deno.serve(async (req) => {
     const filialId = profile?.filial_id || null
 
     // Limpar sugestões antigas pendentes dessa igreja/conta
+    console.log('[gerar-sugestoes-ml] Limpando sugestões antigas...')
+    
     const deleteQuery = supabase
       .from('conciliacao_ml_sugestoes')
       .delete()
@@ -123,7 +137,12 @@ Deno.serve(async (req) => {
       deleteQuery.eq('conta_id', conta_id)
     }
 
-    await deleteQuery
+    const { error: deleteError } = await deleteQuery
+
+    if (deleteError) {
+      console.error('[gerar-sugestoes-ml] Delete error:', deleteError)
+      throw new Error(`Delete failed: ${deleteError.message}`)
+    }
 
     // Inserir novos candidatos
     const sugestoes = candidatos.map((c: any) => ({
