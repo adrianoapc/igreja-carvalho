@@ -1817,6 +1817,13 @@ export type Database = {
             referencedColumns: ["extrato_id"]
           },
           {
+            foreignKeyName: "conciliacoes_divisao_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["extrato_id"]
+          },
+          {
             foreignKeyName: "conciliacoes_divisao_filial_id_fkey"
             columns: ["filial_id"]
             isOneToOne: false
@@ -1888,6 +1895,13 @@ export type Database = {
             columns: ["transacao_id"]
             isOneToOne: false
             referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["transacao_id"]
           },
           {
@@ -1999,6 +2013,13 @@ export type Database = {
             foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "view_movimento_contabil"
             referencedColumns: ["transacao_id"]
           },
@@ -2057,6 +2078,13 @@ export type Database = {
             columns: ["extrato_id"]
             isOneToOne: true
             referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: true
+            referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["extrato_id"]
           },
         ]
@@ -3689,6 +3717,13 @@ export type Database = {
             foreignKeyName: "import_job_items_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "import_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "view_movimento_contabil"
             referencedColumns: ["transacao_id"]
           },
@@ -3981,6 +4016,13 @@ export type Database = {
             foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "view_movimento_contabil"
             referencedColumns: ["transacao_id"]
           },
@@ -4132,6 +4174,13 @@ export type Database = {
             columns: ["transacao_id"]
             isOneToOne: false
             referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["transacao_id"]
           },
           {
@@ -6057,6 +6106,13 @@ export type Database = {
             referencedColumns: ["extrato_id"]
           },
           {
+            foreignKeyName: "pix_recebimentos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["extrato_id"]
+          },
+          {
             foreignKeyName: "pix_recebimentos_filial_id_fkey"
             columns: ["filial_id"]
             isOneToOne: false
@@ -6103,6 +6159,13 @@ export type Database = {
             columns: ["transacao_id"]
             isOneToOne: false
             referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["transacao_id"]
           },
           {
@@ -6209,6 +6272,13 @@ export type Database = {
             columns: ["transacao_id"]
             isOneToOne: false
             referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["transacao_id"]
           },
           {
@@ -6733,6 +6803,13 @@ export type Database = {
             foreignKeyName: "reclass_job_items_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "reclass_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "view_movimento_contabil"
             referencedColumns: ["transacao_id"]
           },
@@ -6894,6 +6971,13 @@ export type Database = {
             referencedColumns: ["extrato_id"]
           },
           {
+            foreignKeyName: "reconciliacao_audit_logs_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["extrato_id"]
+          },
+          {
             foreignKeyName: "reconciliacao_audit_logs_filial_id_fkey"
             columns: ["filial_id"]
             isOneToOne: false
@@ -6933,6 +7017,13 @@ export type Database = {
             columns: ["transacao_id"]
             isOneToOne: false
             referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["transacao_id"]
           },
           {
@@ -8744,6 +8835,13 @@ export type Database = {
             foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
             columns: ["transacao_entrada_id"]
             isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
+            columns: ["transacao_entrada_id"]
+            isOneToOne: false
             referencedRelation: "view_movimento_contabil"
             referencedColumns: ["transacao_id"]
           },
@@ -8773,6 +8871,13 @@ export type Database = {
             columns: ["transacao_saida_id"]
             isOneToOne: false
             referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
+            columns: ["transacao_saida_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["transacao_id"]
           },
           {
@@ -9414,6 +9519,124 @@ export type Database = {
             columns: ["subcategoria_id"]
             isOneToOne: false
             referencedRelation: "subcategorias_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_conciliacao_ml_dashboard: {
+        Row: {
+          conta_id: string | null
+          conta_nome: string | null
+          extratos_nao_conciliados: number | null
+          feedback_30dias: number | null
+          feedback_7dias: number | null
+          filial_id: string | null
+          igreja_id: string | null
+          percentual_alta_confianca: number | null
+          score_medio_aceitas_30d: number | null
+          sugestoes_alto_score: number | null
+          sugestoes_baixo_score: number | null
+          sugestoes_medio_score: number | null
+          sugestoes_pendentes: number | null
+          valor_pendente: number | null
+        }
+        Relationships: []
+      }
+      view_conciliacao_ml_export_dataset: {
+        Row: {
+          categoria_nome: string | null
+          conta_id: string | null
+          diferenca_dias: number | null
+          diferenca_valor: number | null
+          extrato_id: string | null
+          extrato_tipo: string | null
+          extrato_valor: number | null
+          igreja_id: string | null
+          label: number | null
+          match_tipo: number | null
+          similaridade_data: number | null
+          similaridade_descricao: number | null
+          similaridade_valor: number | null
+          subcategoria_nome: string | null
+          transacao_id: string | null
+          transacao_tipo: string | null
+          transacao_valor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extratos_bancarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_conciliacao_ml_features_stats: {
+        Row: {
+          acao: string | null
+          diferenca_dias_media: number | null
+          diferenca_valor_media: number | null
+          igreja_id: string | null
+          match_tipo_count: number | null
+          quantidade: number | null
+          score_medio: number | null
+          tipo_match: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacao_ml_feedback_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_conciliacao_ml_metricas: {
+        Row: {
+          aceitas: number | null
+          ajustadas: number | null
+          conta_id: string | null
+          filial_id: string | null
+          igreja_id: string | null
+          modelo_versao: string | null
+          periodo: string | null
+          rejeitadas: number | null
+          score_medio_aceitas: number | null
+          score_medio_geral: number | null
+          score_medio_rejeitadas: number | null
+          taxa_aceitacao: number | null
+          total_sugestoes: number | null
+          usuarios_ativos: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacao_ml_feedback_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
             referencedColumns: ["id"]
           },
         ]
