@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.gerar-qrcode-inscricao]
 verify_jwt = false
+
+[functions.gerar-sugestoes-ml]
+verify_jwt = false
