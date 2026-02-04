@@ -1796,6 +1796,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conciliacoes_divisao_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
             foreignKeyName: "conciliacoes_divisao_filial_id_fkey"
             columns: ["filial_id"]
             isOneToOne: false
@@ -1845,8 +1866,29 @@ export type Database = {
             foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "conciliacoes_divisao_transacoes_transacao_id_fkey"
@@ -1929,8 +1971,29 @@ export type Database = {
             foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "conciliacoes_lote_transacao_id_fkey"
@@ -1974,6 +2037,27 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "extratos_bancarios"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: true
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: true
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: true
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["extrato_id"]
           },
         ]
       }
@@ -3577,8 +3661,29 @@ export type Database = {
             foreignKeyName: "import_job_items_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "import_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "import_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "import_job_items_transacao_id_fkey"
@@ -3848,8 +3953,29 @@ export type Database = {
             foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "inscricoes_eventos_transacao_id_fkey"
@@ -3984,8 +4110,29 @@ export type Database = {
             foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "inscricoes_jornada_transacao_id_fkey"
@@ -5889,6 +6036,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pix_recebimentos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
             foreignKeyName: "pix_recebimentos_filial_id_fkey"
             columns: ["filial_id"]
             isOneToOne: false
@@ -5913,8 +6081,29 @@ export type Database = {
             foreignKeyName: "pix_recebimentos_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "pix_recebimentos_transacao_id_fkey"
@@ -5998,8 +6187,29 @@ export type Database = {
             foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "pix_webhook_temp_transacao_id_fkey"
@@ -6495,8 +6705,29 @@ export type Database = {
             foreignKeyName: "reclass_job_items_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "reclass_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclass_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "reclass_job_items_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "reclass_job_items_transacao_id_fkey"
@@ -6642,6 +6873,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "reconciliacao_audit_logs_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["extrato_id"]
+          },
+          {
             foreignKeyName: "reconciliacao_audit_logs_filial_id_fkey"
             columns: ["filial_id"]
             isOneToOne: false
@@ -6659,8 +6911,29 @@ export type Database = {
             foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
             columns: ["transacao_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "reconciliacao_audit_logs_transacao_id_fkey"
@@ -8443,8 +8716,29 @@ export type Database = {
             foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
             columns: ["transacao_entrada_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
+            columns: ["transacao_entrada_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
+            columns: ["transacao_entrada_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
+            columns: ["transacao_entrada_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "transferencias_contas_transacao_entrada_id_fkey"
@@ -8457,8 +8751,29 @@ export type Database = {
             foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
             columns: ["transacao_saida_id"]
             isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
+            columns: ["transacao_saida_id"]
+            isOneToOne: false
             referencedRelation: "transacoes_financeiras"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
+            columns: ["transacao_saida_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
+            columns: ["transacao_saida_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
           },
           {
             foreignKeyName: "transferencias_contas_transacao_saida_id_fkey"
@@ -8837,6 +9152,110 @@ export type Database = {
       }
     }
     Views: {
+      mv_conciliacao_dataset: {
+        Row: {
+          categoria_id: string | null
+          centro_custo_id: string | null
+          conta_id: string | null
+          diferenca_dias: number | null
+          diferenca_valor: number | null
+          extrato_created_at: string | null
+          extrato_data: string | null
+          extrato_descricao: string | null
+          extrato_id: string | null
+          extrato_tipo: string | null
+          extrato_valor: number | null
+          filial_id: string | null
+          fornecedor_id: string | null
+          igreja_id: string | null
+          label: number | null
+          match_tipo: number | null
+          pessoa_id: string | null
+          reconciliado: boolean | null
+          similaridade_data: number | null
+          similaridade_descricao: number | null
+          similaridade_valor: number | null
+          subcategoria_id: string | null
+          transacao_created_at: string | null
+          transacao_data: string | null
+          transacao_descricao: string | null
+          transacao_id: string | null
+          transacao_tipo: string | null
+          transacao_valor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extratos_bancarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_centro_custo_id_fkey"
+            columns: ["centro_custo_id"]
+            isOneToOne: false
+            referencedRelation: "centros_custo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       view_absent_kids: {
         Row: {
           alergias: string | null
@@ -8883,6 +9302,119 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_health_score"
             referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
+      view_conciliacao_candidatos: {
+        Row: {
+          categoria_id: string | null
+          conta_id: string | null
+          diferenca_dias: number | null
+          diferenca_valor: number | null
+          extrato_id: string | null
+          extrato_valor: number | null
+          filial_id: string | null
+          igreja_id: string | null
+          match_tipo: number | null
+          score_heuristico: number | null
+          similaridade_data: number | null
+          similaridade_descricao: number | null
+          similaridade_valor: number | null
+          subcategoria_id: string | null
+          transacao_id: string | null
+          transacao_valor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extratos_bancarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_conciliacao_exemplos_positivos: {
+        Row: {
+          categoria_id: string | null
+          conta_id: string | null
+          diferenca_dias: number | null
+          diferenca_valor: number | null
+          extrato_id: string | null
+          extrato_valor: number | null
+          filial_id: string | null
+          igreja_id: string | null
+          match_tipo: number | null
+          similaridade_data: number | null
+          similaridade_descricao: number | null
+          similaridade_valor: number | null
+          subcategoria_id: string | null
+          transacao_id: string | null
+          transacao_valor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extratos_bancarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias_financeiras"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -9640,6 +10172,7 @@ export type Database = {
           transacao_id: string
         }[]
       }
+      refresh_conciliacao_dataset: { Args: never; Returns: undefined }
       resetar_senha_usuario_membro: {
         Args: { p_profile_id: string; p_senha_temporaria: string }
         Returns: {
