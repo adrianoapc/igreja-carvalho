@@ -30,7 +30,7 @@ interface ExtratoItem {
   data_transacao: string
   descricao: string
   valor: number
-  tipo: 'credito' | 'debito'
+  tipo: string
   conta_id: string
 }
 
@@ -39,7 +39,8 @@ interface TransacaoItem {
   data_pagamento: string
   descricao: string
   valor: number
-  tipo: 'entrada' | 'saida'
+  tipo: string
+  conta_id: string
 }
 
 interface Conta {
@@ -98,9 +99,9 @@ export function ConciliacaoInteligente() {
   })
 
   // Fetch pending statements
-  const { data: extratos, isLoading: loadingExtratos } = useQuery<ExtratoItem[]>({
+  const { data: extratos, isLoading: loadingExtratos } = useQuery({
     queryKey: ['extratos-pendentes-inteligente', igrejaId, filialId, isAllFiliais, mesExtratos],
-    queryFn: async () => {
+    queryFn: async (): Promise<ExtratoItem[]> => {
       if (!igrejaId) return []
       
       const inicio = startOfMonth(mesExtratos)
@@ -126,15 +127,15 @@ export function ConciliacaoInteligente() {
       
       const { data, error } = await query
       if (error) throw error
-      return data
+      return (data || []) as ExtratoItem[]
     },
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   })
 
   // Fetch unreconciled transactions
-  const { data: transacoes, isLoading: loadingTransacoes } = useQuery<TransacaoItem[]>({
+  const { data: transacoes, isLoading: loadingTransacoes } = useQuery({
     queryKey: ['transacoes-pendentes-inteligente', igrejaId, filialId, isAllFiliais, mesTransacoes, contaFiltro],
-    queryFn: async () => {
+    queryFn: async (): Promise<TransacaoItem[]> => {
       if (!igrejaId) return []
       
       const inicio = startOfMonth(mesTransacoes)
@@ -177,7 +178,7 @@ export function ConciliacaoInteligente() {
       if (error) throw error
       
       // Filtrar transações já conciliadas
-      return (data || []).filter(t => !idsJaConciliados.has(t.id))
+      return ((data || []) as TransacaoItem[]).filter(t => !idsJaConciliados.has(t.id))
     },
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   })
@@ -288,17 +289,24 @@ export function ConciliacaoInteligente() {
       } else {
         if (selectedExtratos.length === 1) {
           const extratoId = selectedExtratos[0]
+          const extrato = extratosFiltrados?.find(e => e.id === extratoId)
+          const valorExtrato = extrato?.valor || 0
 
           await supabase
             .from('extratos_bancarios')
             .update({ reconciliado: true })
             .eq('id', extratoId)
 
-          const lotes = selectedTransacoes.map((transacaoId) => ({
-            extrato_id: extratoId,
-            transacao_id: transacaoId,
-            igreja_id: igrejaId,
-          }))
+          const lotes = selectedTransacoes.map((transacaoId) => {
+            const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
+            return {
+              extrato_id: extratoId,
+              transacao_id: transacaoId,
+              igreja_id: igrejaId,
+              valor_transacao: transacao?.valor || 0,
+              valor_extratos: valorExtrato,
+            }
+          })
 
           const { error } = await supabase.from('conciliacoes_lote').insert(lotes)
           if (error) throw error
