@@ -145,28 +145,41 @@ Deno.serve(async (req) => {
     }
 
     // Inserir novos candidatos
-    // Nota: RPC retorna extrato_id (singular) e transacao_ids (array), precisamos normalizar
+    // Nota: RPC pode retornar extrato_id (singular) ou extrato_ids (array)
     const sugestoes = candidatos
-      .filter((c: any) => {
-        // Filtrar candidatos inválidos (sem extrato_id ou transacao_ids)
-        const hasExtrato = c.extrato_id || (c.extrato_ids && c.extrato_ids.length > 0)
-        const hasTransacao = c.transacao_ids && c.transacao_ids.length > 0
-        return hasExtrato && hasTransacao
+      .map((c: any) => {
+        // Normalizar extrato_ids para array não-vazio
+        let extratoIds: string[] = []
+        if (Array.isArray(c.extrato_ids) && c.extrato_ids.length > 0) {
+          extratoIds = c.extrato_ids.filter((id: unknown) => id != null)
+        } else if (c.extrato_id) {
+          extratoIds = [c.extrato_id]
+        }
+
+        // Normalizar transacao_ids para array não-vazio
+        let transacaoIds: string[] = []
+        if (Array.isArray(c.transacao_ids) && c.transacao_ids.length > 0) {
+          transacaoIds = c.transacao_ids.filter((id: unknown) => id != null)
+        } else if (c.transacao_id) {
+          transacaoIds = [c.transacao_id]
+        }
+
+        return {
+          igreja_id,
+          filial_id: filialId,
+          conta_id: conta_id || null,
+          tipo_match: c.tipo_match || '1:1',
+          extrato_ids: extratoIds,
+          transacao_ids: transacaoIds,
+          score: c.score || 0,
+          features: c.features || {},
+          origem: 'regra',
+          modelo_versao: 'v1',
+          status: 'pendente',
+        }
       })
-      .map((c: any) => ({
-        igreja_id,
-        filial_id: filialId,
-        conta_id: conta_id || null,
-        tipo_match: c.tipo_match,
-        // RPC retorna extrato_id (singular) - converter para array
-        extrato_ids: c.extrato_ids || [c.extrato_id],
-        transacao_ids: c.transacao_ids,
-        score: c.score,
-        features: c.features || {},
-        origem: 'regra',
-        modelo_versao: 'v1',
-        status: 'pendente',
-      }))
+      // Filtrar candidatos que ainda não têm IDs válidos
+      .filter((s: { extrato_ids: string[]; transacao_ids: string[] }) => s.extrato_ids.length > 0 && s.transacao_ids.length > 0)
 
     const { data: inserted, error: insertError } = await supabase
       .from('conciliacao_ml_sugestoes')
