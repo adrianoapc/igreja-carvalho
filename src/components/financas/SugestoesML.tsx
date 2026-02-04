@@ -98,29 +98,23 @@ export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: Sugestoes
       const sugestao = sugestoes?.find((s) => s.id === sugestaoId)
       if (!sugestao) throw new Error('Sugestão não encontrada')
 
-      // Atualizar status
-      const { error: updateError } = await supabase
-        .from('conciliacao_ml_sugestoes')
-        .update({ status: 'rejeitada' })
-        .eq('id', sugestaoId)
+      // Buscar profile id do usuário autenticado
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuário não autenticado')
 
-      if (updateError) throw updateError
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
 
-      // Inserir feedback
-      const { error: feedbackError } = await supabase.from('conciliacao_ml_feedback').insert({
-        sugestao_id: sugestaoId,
-        igreja_id: sugestao.igreja_id || igrejaId,
-        tipo_match: sugestao.tipo_match,
-        extrato_ids: sugestao.extrato_ids,
-        transacao_ids: sugestao.transacao_ids,
-        acao: 'rejeitada',
-        score: sugestao.score,
-        modelo_versao: 'v1',
-        ajustes: {},
-        usuario_id: (await supabase.auth.getUser()).data.user?.id,
+      // Chamar RPC para rejeitar
+      const { error } = await supabase.rpc('rejeitar_sugestao_conciliacao', {
+        p_sugestao_id: sugestaoId,
+        p_usuario_id: profile?.id || null,
       })
 
-      if (feedbackError) throw feedbackError
+      if (error) throw error
     },
     onSuccess: () => {
       toast.info('Sugestão rejeitada')
