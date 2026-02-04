@@ -1566,6 +1566,180 @@ export type Database = {
           },
         ]
       }
+      conciliacao_ml_feedback: {
+        Row: {
+          acao: string
+          ajustes: Json
+          conta_id: string | null
+          created_at: string
+          extrato_ids: string[]
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          modelo_versao: string | null
+          score: number | null
+          sugestao_id: string | null
+          tipo_match: string
+          transacao_ids: string[]
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          ajustes?: Json
+          conta_id?: string | null
+          created_at?: string
+          extrato_ids?: string[]
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          modelo_versao?: string | null
+          score?: number | null
+          sugestao_id?: string | null
+          tipo_match: string
+          transacao_ids?: string[]
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          ajustes?: Json
+          conta_id?: string | null
+          created_at?: string
+          extrato_ids?: string[]
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          modelo_versao?: string | null
+          score?: number | null
+          sugestao_id?: string | null
+          tipo_match?: string
+          transacao_ids?: string[]
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacao_ml_feedback_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_sugestao_id_fkey"
+            columns: ["sugestao_id"]
+            isOneToOne: false
+            referencedRelation: "conciliacao_ml_sugestoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
+      conciliacao_ml_sugestoes: {
+        Row: {
+          conta_id: string | null
+          created_at: string
+          extrato_ids: string[]
+          features: Json
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          modelo_versao: string | null
+          origem: string
+          score: number
+          status: string
+          tipo_match: string
+          transacao_ids: string[]
+          updated_at: string
+        }
+        Insert: {
+          conta_id?: string | null
+          created_at?: string
+          extrato_ids?: string[]
+          features?: Json
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          modelo_versao?: string | null
+          origem?: string
+          score: number
+          status?: string
+          tipo_match: string
+          transacao_ids?: string[]
+          updated_at?: string
+        }
+        Update: {
+          conta_id?: string | null
+          created_at?: string
+          extrato_ids?: string[]
+          features?: Json
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          modelo_versao?: string | null
+          origem?: string
+          score?: number
+          status?: string
+          tipo_match?: string
+          transacao_ids?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacao_ml_sugestoes_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_sugestoes_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_sugestoes_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conciliacoes_divisao: {
         Row: {
           conta_id: string | null
@@ -5647,6 +5821,107 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "visitantes_leads"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      pix_recebimentos: {
+        Row: {
+          conta_id: string | null
+          created_at: string
+          data_pix: string
+          descricao: string | null
+          extrato_id: string | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          payload: Json
+          pix_id: string
+          sessao_item_id: string | null
+          status: string
+          transacao_id: string | null
+          valor: number
+        }
+        Insert: {
+          conta_id?: string | null
+          created_at?: string
+          data_pix: string
+          descricao?: string | null
+          extrato_id?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          payload?: Json
+          pix_id: string
+          sessao_item_id?: string | null
+          status?: string
+          transacao_id?: string | null
+          valor: number
+        }
+        Update: {
+          conta_id?: string | null
+          created_at?: string
+          data_pix?: string
+          descricao?: string | null
+          extrato_id?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          payload?: Json
+          pix_id?: string
+          sessao_item_id?: string | null
+          status?: string
+          transacao_id?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pix_recebimentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "extratos_bancarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_sessao_item_id_fkey"
+            columns: ["sessao_item_id"]
+            isOneToOne: false
+            referencedRelation: "sessoes_itens_draft"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pix_recebimentos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
           },
         ]
       }
