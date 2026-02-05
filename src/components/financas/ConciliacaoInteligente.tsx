@@ -325,14 +325,31 @@ export function ConciliacaoInteligente() {
         throw new Error('Selecione pelo menos um item de cada lado')
       }
 
-      const { data } = await supabase.auth.getUser()
-      const usuarioId = data?.user?.id
-      console.log('👤 Usuário ID:', usuarioId)
+       const { data } = await supabase.auth.getUser()
+       const authUserId = data?.user?.id
+       console.log('👤 Auth user ID:', authUserId)
 
-      if (selectedTransacoes.length === 1) {
-        // Caso 1:1 - Um extrato para uma transação
-        const transacaoId = selectedTransacoes[0]
-        const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
+       // `conciliacao_ml_feedback.usuario_id` referencia `profiles.id` (não auth.users.id)
+       let usuarioProfileId: string | null = null
+       if (authUserId) {
+         const { data: profile, error: profileError } = await supabase
+           .from('profiles')
+           .select('id')
+           .eq('user_id', authUserId)
+           .maybeSingle()
+
+         if (profileError) {
+           console.warn('⚠️ Não foi possível carregar profile do usuário:', profileError)
+         }
+         usuarioProfileId = profile?.id ?? null
+       }
+
+       console.log('👤 Profile ID (para feedback):', usuarioProfileId)
+
+       if (selectedTransacoes.length === 1) {
+         // Caso 1:1 - Um extrato para uma transação
+         const transacaoId = selectedTransacoes[0]
+         const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
         
         for (const extratoId of selectedExtratos) {
           const extrato = extratosFiltrados?.find(e => e.id === extratoId)
@@ -361,35 +378,35 @@ export function ConciliacaoInteligente() {
             if (erroTransacao) throw erroTransacao
           }
 
-          // Gravar feedback da reconciliação manual para ML aprender
-          if (extrato && transacao) {
-            // Apenas gravar feedback se usuarioId for válido
-            if (usuarioId) {
-              const { error: erroFeedback } = await supabase
-                .from('conciliacao_ml_feedback')
-                .insert({
-                  igreja_id: igrejaId,
-                  filial_id: filialId,
-                  conta_id: extrato.conta_id,
-                  tipo_match: '1:1',
-                  extrato_ids: [extratoId],
-                  transacao_ids: [transacaoId],
-                  acao: 'ajustada',
-                  score: 1.0,
-                  modelo_versao: 'v1',
-                  usuario_id: usuarioId,
-                  ajustes: {
-                    valor_extrato: extrato.valor,
-                    valor_transacao: transacao.valor,
-                    valor_liquido: transacao.valor_liquido,
-                  }
-                })
-              
-              if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
-            } else {
-              console.warn('⚠️ usuarioId não disponível, feedback não gravado')
-            }
-          }
+           // Gravar feedback da reconciliação manual para ML aprender
+           if (extrato && transacao) {
+             // Apenas gravar feedback se o Profile ID existir
+             if (usuarioProfileId) {
+               const { error: erroFeedback } = await supabase
+                 .from('conciliacao_ml_feedback')
+                 .insert({
+                   igreja_id: igrejaId,
+                   filial_id: filialId,
+                   conta_id: extrato.conta_id,
+                   tipo_match: '1:1',
+                   extrato_ids: [extratoId],
+                   transacao_ids: [transacaoId],
+                   acao: 'ajustada',
+                   score: 1.0,
+                   modelo_versao: 'v1',
+                   usuario_id: usuarioProfileId,
+                   ajustes: {
+                     valor_extrato: extrato.valor,
+                     valor_transacao: transacao.valor,
+                     valor_liquido: transacao.valor_liquido,
+                   },
+                 })
+
+               if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
+             } else {
+               console.warn('⚠️ profile.id não disponível, feedback não gravado')
+             }
+           }
         }
       } else {
         // Caso 1:N - Um extrato para múltiplas transações (lote)
@@ -438,34 +455,33 @@ export function ConciliacaoInteligente() {
             }
           }
 
-          // Gravar feedback da reconciliação manual em lote para ML aprender
-          if (extrato) {
-            // Apenas gravar feedback se usuarioId for válido
-            if (usuarioId) {
-              const { error: erroFeedback } = await supabase
-                .from('conciliacao_ml_feedback')
-                .insert({
-                  igreja_id: igrejaId,
-                  filial_id: filialId,
-                  conta_id: extrato.conta_id,
-                  tipo_match: 'N:1',
-                  extrato_ids: [extratoId],
-                  transacao_ids: selectedTransacoes,
-                  acao: 'ajustada',
-                  score: 1.0,
-                  modelo_versao: 'v1',
-                  usuario_id: usuarioId,
-                  ajustes: {
-                    valor_extrato: extrato.valor,
-                    num_transacoes: selectedTransacoes.length,
-                  }
-                })
-              
-              if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
-            } else {
-              console.warn('⚠️ usuarioId não disponível, feedback em lote não gravado')
-            }
-          }
+           // Gravar feedback da reconciliação manual em lote para ML aprender
+           if (extrato) {
+             if (usuarioProfileId) {
+               const { error: erroFeedback } = await supabase
+                 .from('conciliacao_ml_feedback')
+                 .insert({
+                   igreja_id: igrejaId,
+                   filial_id: filialId,
+                   conta_id: extrato.conta_id,
+                   tipo_match: 'N:1',
+                   extrato_ids: [extratoId],
+                   transacao_ids: selectedTransacoes,
+                   acao: 'ajustada',
+                   score: 1.0,
+                   modelo_versao: 'v1',
+                   usuario_id: usuarioProfileId,
+                   ajustes: {
+                     valor_extrato: extrato.valor,
+                     num_transacoes: selectedTransacoes.length,
+                   },
+                 })
+
+               if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
+             } else {
+               console.warn('⚠️ profile.id não disponível, feedback em lote não gravado')
+             }
+           }
         } else {
           throw new Error('Múltiplos extratos com múltiplas transações não é suportado')
         }
@@ -486,15 +502,27 @@ export function ConciliacaoInteligente() {
   })
 
   // Mutation para rejeitar sugestão
-  const rejeitarSugestao = useMutation({
-    mutationFn: async (sugestaoId: string) => {
-      const { data } = await supabase.auth.getUser()
-      const { error } = await supabase.rpc('rejeitar_sugestao_conciliacao', {
-        p_sugestao_id: sugestaoId,
-        p_usuario_id: data?.user?.id
-      })
-      if (error) throw error
-    },
+   const rejeitarSugestao = useMutation({
+     mutationFn: async (sugestaoId: string) => {
+       const { data } = await supabase.auth.getUser()
+       const authUserId = data?.user?.id
+
+       let usuarioProfileId: string | null = null
+       if (authUserId) {
+         const { data: profile } = await supabase
+           .from('profiles')
+           .select('id')
+           .eq('user_id', authUserId)
+           .maybeSingle()
+         usuarioProfileId = profile?.id ?? null
+       }
+
+       const { error } = await supabase.rpc('rejeitar_sugestao_conciliacao', {
+         p_sugestao_id: sugestaoId,
+         p_usuario_id: usuarioProfileId,
+       })
+       if (error) throw error
+     },
     onSuccess: async () => {
       // Refetch suggestions para remover a sugestão rejeitada da UI
       await queryClient.invalidateQueries({ queryKey: ['sugestoes-ml-mapeadas'] })
