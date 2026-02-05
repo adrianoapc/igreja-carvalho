@@ -46,7 +46,7 @@ export function ExtratoSugestaoMLB({ extratoId, valor, data, descricao, sugestao
             Diferença: {sugestao.diferencaDias} dia(s)
           </div>
           <div className="flex gap-2 mt-1">
-            <Button size="sm" variant="success" onClick={sugestao.onAceitar}>
+            <Button size="sm" variant="default" onClick={sugestao.onAceitar}>
               <Check className="w-4 h-4" /> Aceitar
             </Button>
             <Button size="sm" variant="destructive" onClick={sugestao.onRejeitar}>
