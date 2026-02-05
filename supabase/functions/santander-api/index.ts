@@ -719,6 +719,20 @@ async function syncExtrato(
         continue
       }
 
+      // Verificar se o registro já existe
+      const { data: existente } = await supabaseAdmin
+        .from('extratos_bancarios')
+        .select('id, reconciliado, transacao_vinculada_id')
+        .eq('conta_id', contaId)
+        .eq('external_id', externalId)
+        .maybeSingle()
+
+      // Se já existe e está reconciliado, não sobrescrever
+      if (existente && existente.reconciliado) {
+        result.ignorados++
+        continue
+      }
+
       // Upsert com dedupe por external_id
       const { error: upsertError } = await supabaseAdmin
         .from('extratos_bancarios')
@@ -735,7 +749,9 @@ async function syncExtrato(
             saldo,
             numero_documento: numeroDocumento,
             origem: 'api_santander',
-            reconciliado: false
+            // Preservar reconciliação se já existe
+            reconciliado: existente?.reconciliado ?? false,
+            transacao_vinculada_id: existente?.transacao_vinculada_id ?? null
           },
           {
             onConflict: 'conta_id,external_id',
@@ -751,7 +767,12 @@ async function syncExtrato(
           result.erros.push(`Erro ao inserir transação ${externalId}: ${upsertError.message}`)
         }
       } else {
-        result.inseridos++
+        // Contar como atualizado se já existia, inserido se novo
+        if (existente) {
+          result.atualizados++
+        } else {
+          result.inseridos++
+        }
       }
     } catch (err) {
       result.erros.push(`Erro processando transação: ${err instanceof Error ? err.message : String(err)}`)
