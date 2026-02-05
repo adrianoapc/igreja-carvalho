@@ -28,12 +28,10 @@ interface SugestaoML {
 
 interface SugestoesMLProps {
   contaId?: string
-  mesInicio: Date
-  mesFim: Date
   onAplicar?: () => void
 }
 
-export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: SugestoesMLProps) {
+export function SugestoesML({ contaId, onAplicar }: SugestoesMLProps) {
   const { igrejaId } = useIgrejaId()
   const { filialId, isAllFiliais } = useFilialId()
   const { formatValue } = useHideValues()
@@ -42,7 +40,7 @@ export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: Sugestoes
 
   // Fetch sugestões pendentes
   const { data: sugestoes, isLoading } = useQuery({
-    queryKey: ['sugestoes-ml', igrejaId, contaId, mesInicio, mesFim],
+    queryKey: ['sugestoes-ml', igrejaId, contaId],
     queryFn: async (): Promise<SugestaoML[]> => {
       if (!igrejaId) return []
 
@@ -51,8 +49,6 @@ export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: Sugestoes
         .select('*')
         .eq('igreja_id', igrejaId)
         .eq('status', 'pendente')
-        .gte('created_at', format(mesInicio, 'yyyy-MM-dd'))
-        .lte('created_at', format(mesFim, 'yyyy-MM-dd'))
         .order('score', { ascending: false })
 
       if (contaId && contaId !== 'all') {
@@ -243,67 +239,94 @@ export function SugestoesML({ contaId, mesInicio, mesFim, onAplicar }: Sugestoes
               <div
                 key={sugestao.id}
                 className={cn(
-                  'p-3 rounded-lg border transition-all',
-                  sugestao.score >= 0.9 ? 'border-green-200 bg-green-50/50' : 'border-border bg-card',
+                  'p-4 rounded-lg border-2 transition-all',
+                  sugestao.score >= 0.9 ? 'border-green-300 bg-green-50' : 'border-yellow-200 bg-yellow-50/30',
                   expandedId === sugestao.id && 'ring-2 ring-blue-400'
                 )}
               >
-                <div className="flex items-start justify-between gap-2 mb-2">
+                {/* Cabeçalho: Score + Tipo de Match */}
+                <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {sugestao.tipo_match}
-                      </Badge>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold text-gray-700">
+                        {sugestao.tipo_match === '1:1' && '1 Extrato ↔ 1 Transação'}
+                        {sugestao.tipo_match === '1:N' && '1 Extrato ↔ N Transações'}
+                        {sugestao.tipo_match === 'N:1' && 'N Extratos ↔ 1 Transação'}
+                      </span>
                       {getScoreBadge(sugestao.score)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {sugestao.extrato_ids.length} extrato(s) • {sugestao.transacao_ids.length} transação(ões)
-                    </p>
                   </div>
                   <div className="flex gap-1">
                     <Button
                       size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
+                      className="h-8 w-8 bg-green-600 hover:bg-green-700"
                       onClick={() => aceitarSugestao.mutate(sugestao.id)}
                       disabled={aceitarSugestao.isPending}
                       title="Aceitar sugestão"
                     >
                       {aceitarSugestao.isPending ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Check className="w-3 h-3 text-green-600" />
+                        <Check className="w-4 h-4" />
                       )}
                     </Button>
                     <Button
                       size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
+                      className="h-8 w-8 bg-red-600 hover:bg-red-700"
                       onClick={() => rejeitarSugestao.mutate(sugestao.id)}
                       disabled={rejeitarSugestao.isPending}
                       title="Rejeitar sugestão"
                     >
-                      <X className="w-3 h-3 text-red-600" />
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
 
+                {/* Detalhes de IDs */}
+                <div className="bg-white bg-opacity-60 rounded p-2 mb-3 border border-gray-200 text-xs space-y-1">
+                  <div className="font-mono">
+                    <span className="font-bold text-gray-700">Extrato IDs:</span>
+                    <span className="ml-2 text-blue-700">{sugestao.extrato_ids.join(', ').substring(0, 50)}</span>
+                  </div>
+                  <div className="font-mono">
+                    <span className="font-bold text-gray-700">Transação IDs:</span>
+                    <span className="ml-2 text-purple-700">{sugestao.transacao_ids.join(', ').substring(0, 50)}</span>
+                  </div>
+                </div>
+
+                {/* Features em Grid */}
                 {sugestao.features && (
-                  <div className="text-[10px] text-muted-foreground space-y-0.5">
+                  <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                     {(sugestao.features as Record<string, unknown>).extrato_valor !== undefined && (
-                      <div>Valor: {formatValue((sugestao.features as Record<string, unknown>).extrato_valor as number)}</div>
+                      <div className="bg-white bg-opacity-60 p-2 rounded border border-green-200">
+                        <span className="font-bold text-gray-600">Valor:</span>
+                        <div className="text-green-700 font-mono">
+                          {formatValue((sugestao.features as Record<string, unknown>).extrato_valor as number)}
+                        </div>
+                      </div>
                     )}
                     {(sugestao.features as Record<string, unknown>).diferenca_dias !== undefined && (
-                      <div>Diferença: {String((sugestao.features as Record<string, unknown>).diferenca_dias)} dia(s)</div>
+                      <div className="bg-white bg-opacity-60 p-2 rounded border border-blue-200">
+                        <span className="font-bold text-gray-600">Diferença:</span>
+                        <div className="text-blue-700 font-mono">
+                          {String((sugestao.features as Record<string, unknown>).diferenca_dias)} dia(s)
+                        </div>
+                      </div>
                     )}
                     {(sugestao.features as Record<string, unknown>).match_tipo !== undefined && (
-                      <div>Tipo: {(sugestao.features as Record<string, unknown>).match_tipo ? 'Compatível' : 'Diferente'}</div>
+                      <div className="bg-white bg-opacity-60 p-2 rounded border border-purple-200">
+                        <span className="font-bold text-gray-600">Tipo:</span>
+                        <div className="text-purple-700 font-mono">
+                          {(sugestao.features as Record<string, unknown>).match_tipo ? '✓ Compatível' : '✗ Diferente'}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
 
-                <div className="text-[9px] text-muted-foreground mt-1">
-                  {format(parseISO(sugestao.created_at), "dd/MMM 'às' HH:mm", { locale: ptBR })}
+                {/* Rodapé: Timestamp */}
+                <div className="text-[10px] text-gray-500 border-t border-gray-200 pt-2">
+                  Criada em: {format(parseISO(sugestao.created_at), "dd/MMM/yy 'às' HH:mm", { locale: ptBR })}
                 </div>
               </div>
             ))}
