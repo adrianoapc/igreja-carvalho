@@ -147,6 +147,8 @@ export function ConciliacaoInteligente() {
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
     staleTime: 0,
     gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 
   // Fetch unreconciled transactions
@@ -221,6 +223,8 @@ export function ConciliacaoInteligente() {
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
     staleTime: 0,
     gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 
   // Filter extratos

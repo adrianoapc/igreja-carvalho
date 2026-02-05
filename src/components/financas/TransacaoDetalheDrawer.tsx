@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -47,6 +47,16 @@ export function TransacaoDetalheDrawer({
     (transacao.valor_liquido || transacao.valor).toFixed(2).replace('.', ',')
   )
   const [saving, setSaving] = useState(false)
+
+  // Atualizar valores quando a transação mudar
+  useEffect(() => {
+    setValorBruto(transacao.valor.toFixed(2).replace('.', ','))
+    setTaxas((transacao.taxas_administrativas || 0).toFixed(2).replace('.', ','))
+    setJuros((transacao.juros || 0).toFixed(2).replace('.', ','))
+    setMultas((transacao.multas || 0).toFixed(2).replace('.', ','))
+    setDesconto((transacao.desconto || 0).toFixed(2).replace('.', ','))
+    setValorLiquido((transacao.valor_liquido || transacao.valor).toFixed(2).replace('.', ','))
+  }, [transacao.id, transacao.valor, transacao.valor_liquido, transacao.taxas_administrativas, transacao.juros, transacao.multas, transacao.desconto])
 
   const parseDecimal = (value: string): number => {
     return parseFloat(value.replace(/\./g, '').replace(',', '.')) || 0
