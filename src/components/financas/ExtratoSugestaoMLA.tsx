@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { parseLocalDate } from '@/utils/dateUtils'
@@ -21,6 +21,7 @@ interface ExtratoSugestaoMLAProps {
     sugestaoId: string
     onAceitar: () => void
     onRejeitar: () => void
+    isRejecting?: boolean
   }
 }
 
@@ -73,9 +74,14 @@ export function ExtratoSugestaoMLA({ extratoId, valor, data, descricao, tipo, su
                 e.stopPropagation()
                 sugestao.onRejeitar()
               }}
+              disabled={sugestao.isRejecting}
               title="Rejeitar sugestão"
             >
-              <X className="w-3 h-3 text-red-600" />
+              {sugestao.isRejecting ? (
+                <Loader2 className="w-3 h-3 text-red-600 animate-spin" />
+              ) : (
+                <X className="w-3 h-3 text-red-600" />
+              )}
             </Button>
           </div>
         </div>

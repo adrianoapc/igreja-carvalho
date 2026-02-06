@@ -82,9 +82,6 @@ export function ConciliacaoInteligente() {
   const [mesExtratos, setMesExtratos] = useState(new Date())
   const [mesTransacoes, setMesTransacoes] = useState(new Date())
 
-  // Hook para sugestões ML mapeadas por extrato
-  const { sugestoesMap, refetch: refetchSugestoes } = useSuggestoesMLMapeadas(igrejaId, contaFiltro !== 'all' ? contaFiltro : undefined)
-
   // Gerar sugestões ao abrir a tela
   useEffect(() => {
     if (igrejaId) {
@@ -250,6 +247,17 @@ export function ConciliacaoInteligente() {
     })
   }, [extratos, searchExtrato, tipoFiltro, mesExtratos])
 
+  const extratoIds = useMemo(() => {
+    return extratosFiltrados.map((extrato) => extrato.id)
+  }, [extratosFiltrados])
+
+  // Hook para sugestões ML mapeadas por extrato
+  const { sugestoesMap, refetch: refetchSugestoes } = useSuggestoesMLMapeadas(
+    igrejaId,
+    contaFiltro !== 'all' ? contaFiltro : undefined,
+    extratoIds
+  )
+
   // Filter transacoes
   const transacoesFiltradas = useMemo(() => {
     if (!transacoes) return []
@@ -323,7 +331,7 @@ export function ConciliacaoInteligente() {
 
   const confirmarConciliacao = useMutation({
     mutationFn: async () => {
-      console.log('🔄 Iniciando conciliação...', { selectedExtratos, selectedTransacoes })
+
       
       if (selectedExtratos.length === 0 || selectedTransacoes.length === 0) {
         throw new Error('Selecione pelo menos um item de cada lado')
@@ -331,7 +339,7 @@ export function ConciliacaoInteligente() {
 
        const { data } = await supabase.auth.getUser()
        const authUserId = data?.user?.id
-       console.log('👤 Auth user ID:', authUserId)
+
 
        // `conciliacao_ml_feedback.usuario_id` referencia `profiles.id` (não auth.users.id)
        let usuarioProfileId: string | null = null
@@ -348,7 +356,7 @@ export function ConciliacaoInteligente() {
          usuarioProfileId = profile?.id ?? null
        }
 
-       console.log('👤 Profile ID (para feedback):', usuarioProfileId)
+
 
        if (selectedTransacoes.length === 1) {
          // Caso 1:1 - Um extrato para uma transação
@@ -492,7 +500,7 @@ export function ConciliacaoInteligente() {
       }
     },
     onSuccess: () => {
-      console.log('✅ Conciliação bem-sucedida!')
+
       toast.success(`${selectedExtratos.length} extrato(s) conciliado(s) com sucesso!`)
       setSelectedExtratos([])
       setSelectedTransacoes([])
@@ -525,12 +533,21 @@ export function ConciliacaoInteligente() {
          p_sugestao_id: sugestaoId,
          p_usuario_id: usuarioProfileId,
        })
-       if (error) throw error
+       if (error) {
+         throw error
+       }
+       return sugestaoId
      },
     onSuccess: async () => {
-      // Refetch suggestions para remover a sugestão rejeitada da UI
-      await queryClient.invalidateQueries({ queryKey: ['sugestoes-ml-mapeadas'] })
-      await refetchSugestoes()
+      // Pequeno delay para garantir que o Postgres commitou a transação
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Invalidar todas as queries de sugestões ML (diferentes keys por extratoIds)
+      await queryClient.invalidateQueries({ 
+        queryKey: ['sugestoes-ml-mapeadas'],
+        refetchType: 'active'
+      })
+      
       toast.info('Sugestão rejeitada')
     },
     onError: (error) => {
@@ -725,6 +742,7 @@ export function ConciliacaoInteligente() {
                                   // Chamar mutation de rejeição que atualiza DB e refetch
                                   rejeitarSugestao.mutate(sugestao.sugestaoId)
                                 },
+                                isRejecting: rejeitarSugestao.isPending,
                               }
                             : undefined
                         }

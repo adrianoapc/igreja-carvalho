@@ -15,9 +15,15 @@ interface SugestaoMLMapeada {
   transacao_ids: string[]
 }
 
-export function useSuggestoesMLMapeadas(igrejaId?: string, contaId?: string) {
+export function useSuggestoesMLMapeadas(
+  igrejaId?: string,
+  contaId?: string,
+  extratoIds?: string[]
+) {
+  const extratoIdsKey = extratoIds?.slice().sort().join(',') || 'all'
+
   const { data: sugestoesMap, isLoading, refetch } = useQuery({
-    queryKey: ['sugestoes-ml-mapeadas', igrejaId, contaId],
+    queryKey: ['sugestoes-ml-mapeadas', igrejaId, contaId, extratoIdsKey],
     queryFn: async (): Promise<Record<string, SugestaoMLMapeada>> => {
       if (!igrejaId) return {}
 
@@ -32,39 +38,39 @@ export function useSuggestoesMLMapeadas(igrejaId?: string, contaId?: string) {
         query = query.eq('conta_id', contaId)
       }
 
+      if (extratoIds && extratoIds.length > 0) {
+        query = query.overlaps('extrato_ids', extratoIds)
+      }
+
       const { data: sugestoes, error } = await query
       if (error) throw error
+
+      // Filtro adicional no lado do cliente para garantir que apenas pendentes sejam processadas
+      const sugestoesPendentes = (sugestoes || []).filter(s => s.status === 'pendente')
 
       // Mapear sugestões por extrato_id
       const mapa: Record<string, SugestaoMLMapeada> = {}
       
-      if (sugestoes && sugestoes.length > 0) {
-        console.log('[useSuggestoesMLMapeadas] Sugestões brutes:', sugestoes)
-        
+      if (sugestoesPendentes && sugestoesPendentes.length > 0) {
         // Buscar dados das transações da tabela correta (transacoes_financeiras)
-        const todasTransacaoIds = sugestoes.flatMap(s => s.transacao_ids)
-        console.log('[useSuggestoesMLMapeadas] Todos transaction IDs:', todasTransacaoIds)
+        const todasTransacaoIds = sugestoesPendentes.flatMap(s => s.transacao_ids)
         
         const { data: transacoes } = await supabase
           .from('transacoes_financeiras')
           .select('id, descricao, valor, data_pagamento')
           .in('id', todasTransacaoIds)
 
-        console.log('[useSuggestoesMLMapeadas] Transações encontradas:', transacoes)
-
         const transacoesMap = (transacoes || []).reduce((acc: Record<string, any>, t: any) => {
           acc[t.id] = t
           return acc
         }, {})
 
-        sugestoes.forEach((sugestao: any) => {
+        sugestoesPendentes.forEach((sugestao: any) => {
           // A sugestão é 1:1 - um extrato para uma transação
           // extrato_ids[0] para transacao_ids[0]
           const extratoId = sugestao.extrato_ids[0]
           const transacaoId = sugestao.transacao_ids[0]
           const transacao = transacoesMap[transacaoId]
-          
-          console.log(`[useSuggestoesMLMapeadas] Processando: extratoId=${extratoId}, transacaoId=${transacaoId}, encontrou transacao?`, !!transacao)
           
           if (extratoId && transacaoId) {
             mapa[extratoId] = {
@@ -82,13 +88,14 @@ export function useSuggestoesMLMapeadas(igrejaId?: string, contaId?: string) {
             }
           }
         })
-        
-        console.log('[useSuggestoesMLMapeadas] Mapa final:', mapa)
       }
 
       return mapa
     },
-    enabled: !!igrejaId,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 
   return { sugestoesMap: sugestoesMap || {}, isLoading, refetch }
