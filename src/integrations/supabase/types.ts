@@ -7538,6 +7538,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_culto: string
+          data_fechamento: string | null
+          evento_id: string | null
           filial_id: string | null
           id: string
           igreja_id: string
@@ -7567,6 +7569,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_culto: string
+          data_fechamento?: string | null
+          evento_id?: string | null
           filial_id?: string | null
           id?: string
           igreja_id: string
@@ -7596,6 +7600,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_culto?: string
+          data_fechamento?: string | null
+          evento_id?: string | null
           filial_id?: string | null
           id?: string
           igreja_id?: string
@@ -7627,6 +7633,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "sessoes_contagem_filial_id_fkey"
@@ -10490,6 +10503,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_culto: string
+          data_fechamento: string | null
+          evento_id: string | null
           filial_id: string | null
           id: string
           igreja_id: string
