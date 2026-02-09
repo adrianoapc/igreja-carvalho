@@ -8,16 +8,25 @@
  * - sync: Sincroniza extrato para extratos_bancarios (Open Banking)
  * - registrar_webhook: Registra webhook PIX no Santander (API PIX)
  * - consultar_webhook: Consulta webhook PIX registrado (API PIX)
+ * - criar_cobranca: Cria cobrança PIX com QR Code (API PIX)
+ * - buscar_pix: Busca PIX recebidos por polling (API PIX)
  * 
  * POST /functions/v1/santander-api
  * Body: {
- *   action: 'saldo' | 'extrato' | 'sync' | 'registrar_webhook' | 'consultar_webhook'
+ *   action: 'saldo' | 'extrato' | 'sync' | 'registrar_webhook' | 'consultar_webhook' | 'criar_cobranca' | 'buscar_pix'
  *   integracao_id: string
  *   conta_id?: string          // ID da conta no sistema (obrigatório para saldo/extrato/sync)
- *   data_inicio?: string       // YYYY-MM-DD
- *   data_fim?: string          // YYYY-MM-DD
+ *   data_inicio?: string       // YYYY-MM-DD ou ISO 8601
+ *   data_fim?: string          // YYYY-MM-DD ou ISO 8601
  *   chave_pix?: string         // Chave PIX (CNPJ) para registrar_webhook/consultar_webhook
  *   webhook_url?: string       // URL do webhook para registrar_webhook
+ *   igreja_id?: string         // UUID da igreja (obrigatório para criar_cobranca)
+ *   valor?: number             // Valor em reais (obrigatório para criar_cobranca)
+ *   descricao?: string         // Descrição da cobrança
+ *   expiracao?: number         // Segundos (default: 3600)
+ *   filial_id?: string
+ *   sessao_item_id?: string
+ *   info_adicionais?: Array<{nome: string, valor: string}>
  * }
  */
 
@@ -815,15 +824,15 @@ Deno.serve(async (req) => {
 
     // Parse payload
     const payload = await req.json()
-    const { action, integracao_id, conta_id, data_inicio, data_fim, chave_pix, webhook_url } = payload
+    const { action, integracao_id, conta_id, data_inicio, data_fim, chave_pix, webhook_url, igreja_id, filial_id, sessao_item_id, valor, descricao, expiracao, info_adicionais } = payload
 
-    const validActions = ['saldo', 'extrato', 'sync', 'registrar_webhook', 'consultar_webhook']
+    const validActions = ['saldo', 'extrato', 'sync', 'registrar_webhook', 'consultar_webhook', 'criar_cobranca', 'buscar_pix']
     if (!action || !validActions.includes(action)) {
       return jsonResponse({ error: `Ação inválida. Use: ${validActions.join(', ')}` }, 400)
     }
 
     // Validação de campos obrigatórios varia por action
-    const isPixAction = ['registrar_webhook', 'consultar_webhook'].includes(action)
+    const isPixAction = ['registrar_webhook', 'consultar_webhook', 'criar_cobranca', 'buscar_pix'].includes(action)
     
     if (!integracao_id) {
       return jsonResponse({ error: 'Campo obrigatório: integracao_id' }, 400)
@@ -839,6 +848,10 @@ Deno.serve(async (req) => {
 
     if (action === 'consultar_webhook' && !chave_pix) {
       return jsonResponse({ error: 'Campos obrigatórios: integracao_id, chave_pix' }, 400)
+    }
+
+    if (action === 'criar_cobranca' && (!igreja_id || !valor || valor <= 0)) {
+      return jsonResponse({ error: 'Campos obrigatórios: integracao_id, igreja_id, valor (> 0)' }, 400)
     }
 
     console.log(`[santander-api] Action: ${action}, Integração: ${integracao_id}${conta_id ? `, Conta: ${conta_id}` : ''}${chave_pix ? `, ChavePix: ${chave_pix}` : ''}`)
@@ -1015,6 +1028,239 @@ Deno.serve(async (req) => {
         action: 'consultar_webhook',
         chavePix: chave_pix,
         webhook: result.data
+      })
+    }
+
+    // ==================== PIX COBRANÇA & BUSCA ====================
+
+    if (action === 'criar_cobranca') {
+      // Buscar CNPJ da igreja como chave PIX
+      const { data: igrejaData, error: igrejaError } = await supabaseAdmin
+        .from('igrejas')
+        .select('cnpj')
+        .eq('id', igreja_id)
+        .single()
+
+      if (igrejaError || !igrejaData?.cnpj) {
+        return jsonResponse({ error: 'CNPJ da igreja não encontrado' }, 404)
+      }
+
+      const chavePix = igrejaData.cnpj.replace(/[^\d]/g, '')
+
+      // Obter token PIX (mTLS)
+      const pixCreds: SantanderCredentials = { clientId, clientSecret, applicationKey, httpClient }
+      const pixTokenResult = await getSantanderPixToken(pixCreds)
+      if ('error' in pixTokenResult) {
+        return jsonResponse({ success: false, error: pixTokenResult.error }, 500)
+      }
+
+      // Gerar txid (35 chars alfanuméricos)
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      let txid = ''
+      for (let i = 0; i < 35; i++) txid += chars.charAt(Math.floor(Math.random() * chars.length))
+
+      const expiracaoFinal = expiracao || 3600
+      const infoAdicionaisFinal = info_adicionais || []
+      if (sessao_item_id) {
+        infoAdicionaisFinal.push({ nome: 'sessao_item_id', valor: sessao_item_id })
+      }
+
+      const cobPayload = {
+        calendario: { expiracao: expiracaoFinal.toString() },
+        valor: { original: valor.toFixed(2) },
+        chave: chavePix,
+        solicitacaoPagador: descricao || 'Pagamento via PIX',
+        infoAdicionais: infoAdicionaisFinal,
+      }
+
+      console.log('[santander-api] PUT cob payload:', JSON.stringify(cobPayload))
+
+      const cobUrl = `${SANTANDER_PIX_BASE_URL}/cob/${txid}`
+      const cobFetchOptions: RequestInit & { client?: Deno.HttpClient } = {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${pixTokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cobPayload),
+      }
+      if (httpClient) cobFetchOptions.client = httpClient
+
+      const cobResponse = await fetch(cobUrl, cobFetchOptions)
+
+      if (!cobResponse.ok) {
+        const errorText = await cobResponse.text()
+        console.error('[santander-api] Santander cob error:', cobResponse.status, errorText)
+        return jsonResponse({ success: false, error: `Santander API error: ${cobResponse.status}`, detail: errorText }, 500)
+      }
+
+      const resposta = await cobResponse.json()
+      console.log('[santander-api] Resposta Santander cob:', JSON.stringify(resposta))
+
+      // Calcular data de expiração
+      const dataExpiracao = new Date()
+      dataExpiracao.setSeconds(dataExpiracao.getSeconds() + expiracaoFinal)
+
+      // Salvar cobrança no banco
+      const { data: cobPix, error: dbError } = await supabaseAdmin
+        .from('cob_pix')
+        .insert({
+          txid,
+          igreja_id,
+          filial_id: filial_id || null,
+          sessao_item_id: sessao_item_id || null,
+          conta_id: conta_id || null,
+          valor_original: valor,
+          chave_pix: chavePix,
+          descricao,
+          qr_location: resposta.location,
+          status: resposta.status || 'ATIVA',
+          expiracao: expiracaoFinal,
+          info_adicionais: infoAdicionaisFinal,
+          payload_resposta: resposta,
+          data_criacao: new Date(resposta.calendario?.criacao || Date.now()).toISOString(),
+          data_expiracao: dataExpiracao.toISOString(),
+        })
+        .select()
+        .single()
+
+      if (dbError) {
+        console.error('[santander-api] DB error saving cob:', dbError)
+        return jsonResponse({ success: false, error: 'Erro ao salvar cobrança', detail: dbError.message }, 500)
+      }
+
+      return jsonResponse({
+        success: true,
+        action: 'criar_cobranca',
+        cobranca: {
+          id: cobPix.id,
+          txid: cobPix.txid,
+          qr_location: cobPix.qr_location,
+          valor: cobPix.valor_original,
+          status: cobPix.status,
+          expira_em: cobPix.data_expiracao,
+        },
+      })
+    }
+
+    if (action === 'buscar_pix') {
+      // Obter token PIX (mTLS)
+      const pixCreds: SantanderCredentials = { clientId, clientSecret, applicationKey, httpClient }
+      const pixTokenResult = await getSantanderPixToken(pixCreds)
+      if ('error' in pixTokenResult) {
+        return jsonResponse({ success: false, error: pixTokenResult.error }, 500)
+      }
+
+      const fim = data_fim || new Date().toISOString()
+      const inicio = data_inicio || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+      const pixUrl = `${SANTANDER_PIX_BASE_URL}/pix?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`
+      console.log(`[santander-api] GET ${pixUrl}`)
+
+      const pixFetchOptions: RequestInit & { client?: Deno.HttpClient } = {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${pixTokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+      if (httpClient) pixFetchOptions.client = httpClient
+
+      const pixResponse = await fetch(pixUrl, pixFetchOptions)
+
+      if (!pixResponse.ok) {
+        const errorText = await pixResponse.text()
+        console.error('[santander-api] Santander pix error:', pixResponse.status, errorText)
+        return jsonResponse({ success: false, error: `Santander API error: ${pixResponse.status}`, detail: errorText }, 500)
+      }
+
+      const resposta = await pixResponse.json()
+      console.log(`[santander-api] PIX encontrados: ${resposta.pix?.length || 0}`)
+
+      if (!resposta.pix || resposta.pix.length === 0) {
+        return jsonResponse({
+          success: true,
+          action: 'buscar_pix',
+          message: 'Nenhum PIX encontrado no período',
+          importados: 0,
+          duplicados: 0,
+        })
+      }
+
+      // Buscar igreja_id da integração
+      const igrejaIdFinal = igreja_id || integracao.igreja_id || null
+
+      let importados = 0
+      let duplicados = 0
+      const erros: Array<{ endToEndId: string; erro: string }> = []
+
+      for (const pixItem of resposta.pix) {
+        try {
+          const endToEndId = pixItem.endToEndId
+          const valorPix = parseFloat(pixItem.valor)
+
+          const { data: existente } = await supabaseAdmin
+            .from('pix_webhook_temp')
+            .select('id')
+            .eq('pix_id', endToEndId)
+            .maybeSingle()
+
+          if (existente) {
+            duplicados++
+            continue
+          }
+
+          let cobPixId: string | null = null
+          if (pixItem.txid) {
+            const { data: cobranca } = await supabaseAdmin
+              .from('cob_pix')
+              .select('id')
+              .eq('txid', pixItem.txid)
+              .maybeSingle()
+            if (cobranca) cobPixId = cobranca.id
+          }
+
+          const { error: insertError } = await supabaseAdmin
+            .from('pix_webhook_temp')
+            .insert({
+              pix_id: endToEndId,
+              txid: pixItem.txid || null,
+              cob_pix_id: cobPixId,
+              valor: valorPix,
+              data_pix: new Date(pixItem.horario).toISOString(),
+              descricao: 'PIX Recebido (polling)',
+              banco_id: '90400888000142',
+              igreja_id: igrejaIdFinal,
+              webhook_payload: pixItem,
+              status: 'recebido',
+            })
+
+          if (insertError) {
+            erros.push({ endToEndId, erro: insertError.message })
+          } else {
+            importados++
+            if (cobPixId) {
+              await supabaseAdmin
+                .from('cob_pix')
+                .update({ status: 'CONCLUIDA', data_conclusao: new Date(pixItem.horario).toISOString() })
+                .eq('id', cobPixId)
+            }
+          }
+        } catch (itemError) {
+          erros.push({
+            endToEndId: pixItem.endToEndId || 'unknown',
+            erro: itemError instanceof Error ? itemError.message : String(itemError),
+          })
+        }
+      }
+
+      return jsonResponse({
+        success: true,
+        action: 'buscar_pix',
+        message: `${importados} PIX importados, ${duplicados} já existiam`,
+        importados,
+        duplicados,
+        erros: erros.length > 0 ? erros : undefined,
       })
     }
 
