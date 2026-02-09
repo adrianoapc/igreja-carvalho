@@ -2961,6 +2961,7 @@ export type Database = {
           requer_pagamento: boolean | null
           status: string
           subtipo_id: string | null
+          tem_oferta: boolean
           tema: string | null
           tipo: string
           titulo: string
@@ -2991,6 +2992,7 @@ export type Database = {
           requer_pagamento?: boolean | null
           status?: string
           subtipo_id?: string | null
+          tem_oferta?: boolean
           tema?: string | null
           tipo: string
           titulo: string
@@ -3021,6 +3023,7 @@ export type Database = {
           requer_pagamento?: boolean | null
           status?: string
           subtipo_id?: string | null
+          tem_oferta?: boolean
           tema?: string | null
           tipo?: string
           titulo?: string
