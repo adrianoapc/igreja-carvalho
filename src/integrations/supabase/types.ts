@@ -1456,6 +1456,104 @@ export type Database = {
           },
         ]
       }
+      cob_pix: {
+        Row: {
+          chave_pix: string
+          conta_id: string | null
+          created_at: string
+          data_conclusao: string | null
+          data_criacao: string
+          data_expiracao: string | null
+          descricao: string | null
+          expiracao: number | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          info_adicionais: Json | null
+          payload_resposta: Json | null
+          qr_brcode: string | null
+          qr_location: string | null
+          sessao_item_id: string | null
+          status: string
+          txid: string
+          updated_at: string
+          valor_original: number
+        }
+        Insert: {
+          chave_pix: string
+          conta_id?: string | null
+          created_at?: string
+          data_conclusao?: string | null
+          data_criacao?: string
+          data_expiracao?: string | null
+          descricao?: string | null
+          expiracao?: number | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          info_adicionais?: Json | null
+          payload_resposta?: Json | null
+          qr_brcode?: string | null
+          qr_location?: string | null
+          sessao_item_id?: string | null
+          status?: string
+          txid: string
+          updated_at?: string
+          valor_original: number
+        }
+        Update: {
+          chave_pix?: string
+          conta_id?: string | null
+          created_at?: string
+          data_conclusao?: string | null
+          data_criacao?: string
+          data_expiracao?: string | null
+          descricao?: string | null
+          expiracao?: number | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          info_adicionais?: Json | null
+          payload_resposta?: Json | null
+          qr_brcode?: string | null
+          qr_location?: string | null
+          sessao_item_id?: string | null
+          status?: string
+          txid?: string
+          updated_at?: string
+          valor_original?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cob_pix_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cob_pix_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cob_pix_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cob_pix_sessao_item_id_fkey"
+            columns: ["sessao_item_id"]
+            isOneToOne: false
+            referencedRelation: "sessoes_itens_draft"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comunicados: {
         Row: {
           ativo: boolean | null
@@ -6180,6 +6278,7 @@ export type Database = {
       pix_webhook_temp: {
         Row: {
           banco_id: string | null
+          cob_pix_id: string | null
           created_at: string
           data_pix: string
           data_recebimento: string
@@ -6194,12 +6293,14 @@ export type Database = {
           processado_em: string | null
           status: string
           transacao_id: string | null
+          txid: string | null
           updated_at: string
           valor: number
           webhook_payload: Json | null
         }
         Insert: {
           banco_id?: string | null
+          cob_pix_id?: string | null
           created_at?: string
           data_pix: string
           data_recebimento?: string
@@ -6214,12 +6315,14 @@ export type Database = {
           processado_em?: string | null
           status?: string
           transacao_id?: string | null
+          txid?: string | null
           updated_at?: string
           valor: number
           webhook_payload?: Json | null
         }
         Update: {
           banco_id?: string | null
+          cob_pix_id?: string | null
           created_at?: string
           data_pix?: string
           data_recebimento?: string
@@ -6234,11 +6337,19 @@ export type Database = {
           processado_em?: string | null
           status?: string
           transacao_id?: string | null
+          txid?: string | null
           updated_at?: string
           valor?: number
           webhook_payload?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pix_webhook_temp_cob_pix_id_fkey"
+            columns: ["cob_pix_id"]
+            isOneToOne: false
+            referencedRelation: "cob_pix"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pix_webhook_temp_igreja_id_fkey"
             columns: ["igreja_id"]
