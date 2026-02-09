@@ -155,9 +155,35 @@ serve(async (req) => {
           // Continua processando mas registra sem igreja_id
         }
 
+        // Tentar vincular com cobrança (se txid presente)
+        let cobPixId: string | null = null;
+        if (pixItem.txid) {
+          const { data: cobranca } = await supabase
+            .from('cob_pix')
+            .select('id, sessao_item_id')
+            .eq('txid', pixItem.txid)
+            .maybeSingle();
+
+          if (cobranca) {
+            cobPixId = cobranca.id;
+            console.log(`[pix-webhook] PIX ${pixId} vinculado à cobrança ${pixItem.txid}`);
+            
+            // Atualizar status da cobrança para CONCLUIDA
+            await supabase
+              .from('cob_pix')
+              .update({
+                status: 'CONCLUIDA',
+                data_conclusao: new Date(pixItem.horario).toISOString(),
+              })
+              .eq('id', cobPixId);
+          }
+        }
+
         // Montar dados para inserção
         const dadosInserir = {
           pix_id: pixId,
+          txid: pixItem.txid || null,
+          cob_pix_id: cobPixId,
           valor: valor,
           pagador_cpf_cnpj: pixItem.pagador?.cpf || pixItem.pagador?.cnpj || null,
           pagador_nome: pixItem.pagador?.nome || null,
