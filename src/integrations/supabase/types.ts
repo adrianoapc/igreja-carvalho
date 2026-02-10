@@ -2187,6 +2187,78 @@ export type Database = {
           },
         ]
       }
+      configuracoes_financeiro: {
+        Row: {
+          blind_compare_level: string
+          blind_count_mode: string
+          blind_lock_totals: boolean
+          blind_min_counters: number
+          blind_tolerance_value: number
+          created_at: string
+          created_by: string | null
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          provider_tipo: string | null
+          secret_hint: string | null
+          sync_strategy: string | null
+          updated_at: string
+          updated_by: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          blind_compare_level?: string
+          blind_count_mode?: string
+          blind_lock_totals?: boolean
+          blind_min_counters?: number
+          blind_tolerance_value?: number
+          created_at?: string
+          created_by?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          provider_tipo?: string | null
+          secret_hint?: string | null
+          sync_strategy?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          blind_compare_level?: string
+          blind_count_mode?: string
+          blind_lock_totals?: boolean
+          blind_min_counters?: number
+          blind_tolerance_value?: number
+          created_at?: string
+          created_by?: string | null
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          provider_tipo?: string | null
+          secret_hint?: string | null
+          sync_strategy?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_financeiro_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "configuracoes_financeiro_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_igreja: {
         Row: {
           created_at: string | null
