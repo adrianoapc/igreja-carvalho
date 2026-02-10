@@ -2194,6 +2194,7 @@ export type Database = {
           blind_lock_totals: boolean
           blind_min_counters: number
           blind_tolerance_value: number
+          controla_dizimistas: boolean
           created_at: string
           created_by: string | null
           filial_id: string | null
@@ -2219,6 +2220,7 @@ export type Database = {
           blind_lock_totals?: boolean
           blind_min_counters?: number
           blind_tolerance_value?: number
+          controla_dizimistas?: boolean
           created_at?: string
           created_by?: string | null
           filial_id?: string | null
@@ -2244,6 +2246,7 @@ export type Database = {
           blind_lock_totals?: boolean
           blind_min_counters?: number
           blind_tolerance_value?: number
+          controla_dizimistas?: boolean
           created_at?: string
           created_by?: string | null
           filial_id?: string | null
