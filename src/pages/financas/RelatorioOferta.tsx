@@ -1537,8 +1537,16 @@ export default function RelatorioOferta() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0 space-y-4">
-                <div className={financeiroConfig?.controla_dizimistas !== false ? "grid grid-cols-6 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2" : "grid grid-cols-5 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2"}>
-                  {financeiroConfig?.controla_dizimistas !== false && <span>Pessoa</span>}
+                <div
+                  className={
+                    financeiroConfig?.controla_dizimistas !== false
+                      ? "grid grid-cols-6 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2"
+                      : "grid grid-cols-5 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2"
+                  }
+                >
+                  {financeiroConfig?.controla_dizimistas !== false && (
+                    <span>Pessoa</span>
+                  )}
                   <span>Forma</span>
                   <span>Categoria</span>
                   <span>Conta</span>
@@ -1567,7 +1575,11 @@ export default function RelatorioOferta() {
                     return (
                       <div
                         key={linha.id}
-                        className={financeiroConfig?.controla_dizimistas !== false ? "grid grid-cols-1 md:grid-cols-6 gap-3 items-center p-3 border rounded-lg" : "grid grid-cols-1 md:grid-cols-5 gap-3 items-center p-3 border rounded-lg"}
+                        className={
+                          financeiroConfig?.controla_dizimistas !== false
+                            ? "grid grid-cols-1 md:grid-cols-6 gap-3 items-center p-3 border rounded-lg"
+                            : "grid grid-cols-1 md:grid-cols-5 gap-3 items-center p-3 border rounded-lg"
+                        }
                       >
                         {financeiroConfig?.controla_dizimistas !== false && (
                           <div>
@@ -1822,8 +1834,16 @@ export default function RelatorioOferta() {
                 </Button>
               </div>
 
-              <div className={financeiroConfig?.controla_dizimistas !== false ? "grid grid-cols-6 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2" : "grid grid-cols-5 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2"}>
-                {financeiroConfig?.controla_dizimistas !== false && <span>Pessoa</span>}
+              <div
+                className={
+                  financeiroConfig?.controla_dizimistas !== false
+                    ? "grid grid-cols-6 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2"
+                    : "grid grid-cols-5 gap-3 text-xs font-semibold text-muted-foreground px-1 mt-2"
+                }
+              >
+                {financeiroConfig?.controla_dizimistas !== false && (
+                  <span>Pessoa</span>
+                )}
                 <span>Forma</span>
                 <span>Categoria</span>
                 <span>Conta</span>
@@ -1834,7 +1854,11 @@ export default function RelatorioOferta() {
                 {linhasDigitaisEx.map((l) => (
                   <div
                     key={l.id}
-                    className={financeiroConfig?.controla_dizimistas !== false ? "grid grid-cols-1 md:grid-cols-6 gap-3 items-center p-3 border rounded-lg" : "grid grid-cols-1 md:grid-cols-5 gap-3 items-center p-3 border rounded-lg"}
+                    className={
+                      financeiroConfig?.controla_dizimistas !== false
+                        ? "grid grid-cols-1 md:grid-cols-6 gap-3 items-center p-3 border rounded-lg"
+                        : "grid grid-cols-1 md:grid-cols-5 gap-3 items-center p-3 border rounded-lg"
+                    }
                   >
                     {financeiroConfig?.controla_dizimistas !== false && (
                       <div>
@@ -2374,10 +2398,18 @@ export default function RelatorioOferta() {
             </div>
 
             <div className="border rounded-lg">
-              <div className={financeiroConfig?.controla_dizimistas !== false ? "grid grid-cols-4 gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground" : "grid grid-cols-3 gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"}>
+              <div
+                className={
+                  financeiroConfig?.controla_dizimistas !== false
+                    ? "grid grid-cols-4 gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"
+                    : "grid grid-cols-3 gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"
+                }
+              >
                 <span>Forma</span>
                 <span>Conta</span>
-                {financeiroConfig?.controla_dizimistas !== false && <span>Membro</span>}
+                {financeiroConfig?.controla_dizimistas !== false && (
+                  <span>Membro</span>
+                )}
                 <span className="text-right">Valor</span>
               </div>
               <div className="divide-y">
@@ -2399,7 +2431,11 @@ export default function RelatorioOferta() {
                     return (
                       <div
                         key={linha.id}
-                        className={financeiroConfig?.controla_dizimistas !== false ? "grid grid-cols-4 gap-2 px-3 py-2 text-sm items-center" : "grid grid-cols-3 gap-2 px-3 py-2 text-sm items-center"}
+                        className={
+                          financeiroConfig?.controla_dizimistas !== false
+                            ? "grid grid-cols-4 gap-2 px-3 py-2 text-sm items-center"
+                            : "grid grid-cols-3 gap-2 px-3 py-2 text-sm items-center"
+                        }
                       >
                         <span>{formaNome}</span>
                         <span className="truncate" title={contaNome}>
