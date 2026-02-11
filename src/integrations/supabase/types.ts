@@ -6217,6 +6217,197 @@ export type Database = {
           },
         ]
       }
+      pessoas_duplicatas_suspeitas: {
+        Row: {
+          campos_conflitantes: Json | null
+          criado_em: string | null
+          id: number
+          pessoa_id_1: string
+          pessoa_id_2: string
+          revisado_em: string | null
+          revisado_por: string | null
+          score_similaridade: number
+          status: string
+        }
+        Insert: {
+          campos_conflitantes?: Json | null
+          criado_em?: string | null
+          id?: number
+          pessoa_id_1: string
+          pessoa_id_2: string
+          revisado_em?: string | null
+          revisado_por?: string | null
+          score_similaridade: number
+          status?: string
+        }
+        Update: {
+          campos_conflitantes?: Json | null
+          criado_em?: string | null
+          id?: number
+          pessoa_id_1?: string
+          pessoa_id_2?: string
+          revisado_em?: string | null
+          revisado_por?: string | null
+          score_similaridade?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_1_fkey"
+            columns: ["pessoa_id_1"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_1_fkey"
+            columns: ["pessoa_id_1"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_1_fkey"
+            columns: ["pessoa_id_1"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_2_fkey"
+            columns: ["pessoa_id_2"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_2_fkey"
+            columns: ["pessoa_id_2"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_2_fkey"
+            columns: ["pessoa_id_2"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
+      pessoas_mesclagens_historico: {
+        Row: {
+          campos_mesclados: Json | null
+          id: number
+          pessoa_destino_id: string
+          pessoa_origem_id: string
+          realizado_em: string | null
+          realizado_por: string | null
+        }
+        Insert: {
+          campos_mesclados?: Json | null
+          id?: number
+          pessoa_destino_id: string
+          pessoa_origem_id: string
+          realizado_em?: string | null
+          realizado_por?: string | null
+        }
+        Update: {
+          campos_mesclados?: Json | null
+          id?: number
+          pessoa_destino_id?: string
+          pessoa_origem_id?: string
+          realizado_em?: string | null
+          realizado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_destino_id_fkey"
+            columns: ["pessoa_destino_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_destino_id_fkey"
+            columns: ["pessoa_destino_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_destino_id_fkey"
+            columns: ["pessoa_destino_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_origem_id_fkey"
+            columns: ["pessoa_origem_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_origem_id_fkey"
+            columns: ["pessoa_origem_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_origem_id_fkey"
+            columns: ["pessoa_origem_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       pix_recebimentos: {
         Row: {
           conta_id: string | null
@@ -6714,6 +6905,8 @@ export type Database = {
           filial_id: string | null
           id: string
           igreja_id: string | null
+          is_merged: boolean | null
+          merged_into_id: string | null
           nacionalidade: string | null
           naturalidade: string | null
           necessidades_especiais: string | null
@@ -6768,6 +6961,8 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
+          is_merged?: boolean | null
+          merged_into_id?: string | null
           nacionalidade?: string | null
           naturalidade?: string | null
           necessidades_especiais?: string | null
@@ -6822,6 +7017,8 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
+          is_merged?: boolean | null
+          merged_into_id?: string | null
           nacionalidade?: string | null
           naturalidade?: string | null
           necessidades_especiais?: string | null
@@ -6861,6 +7058,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "igrejas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "profiles_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
           },
         ]
       }
