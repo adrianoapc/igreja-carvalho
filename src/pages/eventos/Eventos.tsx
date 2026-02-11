@@ -199,16 +199,42 @@ export default function Eventos() {
         .limit(1)
         .single();
 
-      // Escalas pendentes (simplificado - eventos sem escalas completas)
-      const { count: escalasPendentes } = await supabase
+      // Escalas pendentes - eventos futuros (próximos 60 dias) sem escalas
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 60);
+
+      // Buscar eventos futuros que requerem escalas (CULTO, EVENTO, RELOGIO)
+      const { data: eventosFuturos, error: eventosError } = await supabase
         .from("eventos")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "planejado");
+        .select("id")
+        .gte("data_evento", now.toISOString())
+        .lte("data_evento", futureDate.toISOString())
+        .in("tipo", ["CULTO", "EVENTO", "RELOGIO"])
+        .in("status", ["planejado", "confirmado"]);
+
+      if (eventosError) throw eventosError;
+
+      let escalasPendentesCount = 0;
+
+      if (eventosFuturos && eventosFuturos.length > 0) {
+        // Para cada evento, verificar se tem escalas
+        for (const evento of eventosFuturos) {
+          const { count } = await supabase
+            .from("escalas")
+            .select("*", { count: "exact", head: true })
+            .eq("evento_id", evento.id);
+
+          // Se não tem escalas, conta como pendente
+          if (!count || count === 0) {
+            escalasPendentesCount++;
+          }
+        }
+      }
 
       setKpis({
         eventosMes: eventosMes || 0,
         proximoEvento: proximoEvento ? { ...proximoEvento, tipo: proximoEvento.tipo as Evento["tipo"] } as Evento : null,
-        escalasPendentes: escalasPendentes || 0,
+        escalasPendentes: escalasPendentesCount,
       });
     } catch (error) {
       console.error("Erro ao carregar KPIs:", error);

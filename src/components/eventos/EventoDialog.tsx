@@ -51,6 +51,13 @@ import { TemplatePreviewDialog } from "./TemplatePreviewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  gerarDatasRecorrentes, 
+  formatarDescricaoRecorrencia,
+  type TipoRecorrencia,
+  type FimRecorrencia
+} from "@/lib/eventos-recorrentes";
 
 // --- Interfaces e Tipos ---
 
@@ -223,6 +230,16 @@ export default function EventoDialog({
   const [loteEditando, setLoteEditando] = useState<number | null>(null);
   const [mostrarLotes, setMostrarLotes] = useState(false);
 
+  // Estado para recorrência
+  const [criarMultiplos, setCriarMultiplos] = useState(false);
+  const [tipoRecorrencia, setTipoRecorrencia] = useState<TipoRecorrencia>("semanal");
+  const [intervaloRecorrencia, setIntervaloRecorrencia] = useState(1);
+  const [fimTipoRecorrencia, setFimTipoRecorrencia] = useState<FimRecorrencia>("ocorrencias");
+  const [numOcorrencias, setNumOcorrencias] = useState(4);
+  const [dataFimRecorrencia, setDataFimRecorrencia] = useState<Date | undefined>();
+  const [diasSemanaSelecionados, setDiasSemanaSelecionados] = useState<number[]>([]);
+  const [eventosGerados, setEventosGerados] = useState<Date[]>([]);
+
   const isEditing = !!evento;
 
   const form = useForm<EventoFormData>({
@@ -245,6 +262,8 @@ export default function EventoDialog({
   const usarDataFim = form.watch("usar_data_fim");
   const requerInscricao = form.watch("requer_inscricao");
   const requerPagamento = form.watch("requer_pagamento");
+  const dataEventoWatch = form.watch("data_evento");
+  const horaInicioWatch = form.watch("hora_inicio");
 
   useEffect(() => {
     if (tipoSelecionado) {
@@ -276,6 +295,46 @@ export default function EventoDialog({
       setLotes([]);
     }
   }, [open, isEditing, evento?.id]);
+
+  // Atualizar preview de datas geradas quando configuração de recorrência mudar
+  useEffect(() => {
+    if (!criarMultiplos) {
+      setEventosGerados([]);
+      return;
+    }
+
+    if (!dataEventoWatch || !horaInicioWatch) {
+      setEventosGerados([]);
+      return;
+    }
+
+    try {
+      const datas = gerarDatasRecorrentes({
+        dataInicial: dataEventoWatch,
+        horaInicio: horaInicioWatch,
+        tipo: tipoRecorrencia,
+        intervalo: intervaloRecorrencia,
+        fimTipo: fimTipoRecorrencia,
+        numOcorrencias: numOcorrencias,
+        dataFim: dataFimRecorrencia,
+        diasSemana: diasSemanaSelecionados.length > 0 ? diasSemanaSelecionados : undefined,
+      });
+      setEventosGerados(datas);
+    } catch (error) {
+      console.error("Erro ao gerar datas:", error);
+      setEventosGerados([]);
+    }
+  }, [
+    criarMultiplos,
+    tipoRecorrencia,
+    intervaloRecorrencia,
+    fimTipoRecorrencia,
+    numOcorrencias,
+    dataFimRecorrencia,
+    diasSemanaSelecionados,
+    dataEventoWatch,
+    horaInicioWatch,
+  ]);
 
   const loadLotesExistentes = async (eventoId: string) => {
     try {
@@ -583,21 +642,49 @@ export default function EventoDialog({
         }
         toast.success("Atualizado!");
       } else {
-        const { data: novoEvento } = await supabase
-          .from("eventos")
-          .insert([payload])
-          .select()
-          .single();
-        // Salvar lotes se evento requer pagamento
-        if (
-          novoEvento &&
-          data.tipo === "EVENTO" &&
-          data.requer_pagamento &&
-          lotes.length > 0
-        ) {
-          await salvarLotes(novoEvento.id);
+        // Criar múltiplos eventos se recorrência está ativada
+        if (criarMultiplos && eventosGerados.length > 0) {
+          // Criar array de eventos com as datas geradas
+          const eventosParaCriar = eventosGerados.map((dataEvento) => ({
+            ...payload,
+            data_evento: dataEvento.toISOString(),
+            igreja_id: igrejaId,
+            filial_id: isAllFiliais ? null : filialId,
+          }));
+
+          // Inserir todos os eventos em batch
+          const { error: batchError } = await supabase
+            .from("eventos")
+            .insert(eventosParaCriar);
+
+          if (batchError) throw batchError;
+
+          toast.success(`${eventosGerados.length} ${eventosGerados.length === 1 ? 'evento criado' : 'eventos criados'} com sucesso!`);
+        } else {
+          // Criar apenas um evento (comportamento normal)
+          const { data: novoEvento, error: singleError } = await supabase
+            .from("eventos")
+            .insert([{
+              ...payload,
+              igreja_id: igrejaId,
+              filial_id: isAllFiliais ? null : filialId,
+            }])
+            .select()
+            .single();
+
+          if (singleError) throw singleError;
+
+          // Salvar lotes se evento requer pagamento
+          if (
+            novoEvento &&
+            data.tipo === "EVENTO" &&
+            data.requer_pagamento &&
+            lotes.length > 0
+          ) {
+            await salvarLotes(novoEvento.id);
+          }
+          toast.success("Criado!");
         }
-        toast.success("Criado!");
       }
       onSuccess();
       onOpenChange(false);
@@ -1059,6 +1146,192 @@ export default function EventoDialog({
                   </FormItem>
                 )}
               />
+
+              {/* SEÇÃO DE RECORRÊNCIA - Apenas para novos eventos */}
+              {!isEditing && (
+                <div className="bg-purple-50/50 border border-purple-200 p-5 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Switch 
+                        checked={criarMultiplos} 
+                        onCheckedChange={setCriarMultiplos}
+                        id="criar-multiplos"
+                      />
+                      <Label htmlFor="criar-multiplos" className="text-sm font-semibold cursor-pointer">
+                        🔄 Criar múltiplas ocorrências deste evento
+                      </Label>
+                    </div>
+                  </div>
+
+                  {criarMultiplos && (
+                    <div className="space-y-4 pl-4 border-l-2 border-purple-300">
+                      {/* Tipo de Recorrência */}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-muted-foreground">
+                          Repetir
+                        </Label>
+                        <Select value={tipoRecorrencia} onValueChange={(v) => setTipoRecorrencia(v as TipoRecorrencia)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="diaria">Diariamente</SelectItem>
+                            <SelectItem value="semanal">Semanalmente</SelectItem>
+                            <SelectItem value="mensal">Mensalmente</SelectItem>
+                            <SelectItem value="anual">Anualmente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Intervalo */}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm shrink-0">A cada</Label>
+                        <Input 
+                          type="number" 
+                          min={1} 
+                          max={52}
+                          value={intervaloRecorrencia} 
+                          onChange={(e) => setIntervaloRecorrencia(Number(e.target.value))}
+                          className="w-20" 
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {tipoRecorrencia === "diaria" && (intervaloRecorrencia === 1 ? "dia" : "dias")}
+                          {tipoRecorrencia === "semanal" && (intervaloRecorrencia === 1 ? "semana" : "semanas")}
+                          {tipoRecorrencia === "mensal" && (intervaloRecorrencia === 1 ? "mês" : "meses")}
+                          {tipoRecorrencia === "anual" && (intervaloRecorrencia === 1 ? "ano" : "anos")}
+                        </span>
+                      </div>
+
+                      {/* Dias da semana (apenas para semanal) */}
+                      {tipoRecorrencia === "semanal" && (
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold text-muted-foreground">
+                            Dias da semana (opcional)
+                          </Label>
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              { value: 0, label: "Dom" },
+                              { value: 1, label: "Seg" },
+                              { value: 2, label: "Ter" },
+                              { value: 3, label: "Qua" },
+                              { value: 4, label: "Qui" },
+                              { value: 5, label: "Sex" },
+                              { value: 6, label: "Sáb" },
+                            ].map((dia) => (
+                              <div key={dia.value} className="flex items-center gap-1.5">
+                                <Checkbox
+                                  id={`dia-${dia.value}`}
+                                  checked={diasSemanaSelecionados.includes(dia.value)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setDiasSemanaSelecionados([...diasSemanaSelecionados, dia.value]);
+                                    } else {
+                                      setDiasSemanaSelecionados(diasSemanaSelecionados.filter(d => d !== dia.value));
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor={`dia-${dia.value}`} className="text-xs cursor-pointer">
+                                  {dia.label}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Deixe vazio para repetir no mesmo dia da semana do evento inicial
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Termina */}
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-muted-foreground">
+                          Termina
+                        </Label>
+                        <RadioGroup value={fimTipoRecorrencia} onValueChange={(v) => setFimTipoRecorrencia(v as FimRecorrencia)}>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="ocorrencias" id="fim-ocorrencias" />
+                            <Label htmlFor="fim-ocorrencias" className="text-sm cursor-pointer">
+                              Após
+                            </Label>
+                            <Input 
+                              type="number" 
+                              min={1} 
+                              max={365}
+                              value={numOcorrencias} 
+                              onChange={(e) => setNumOcorrencias(Number(e.target.value))}
+                              disabled={fimTipoRecorrencia !== "ocorrencias"}
+                              className="w-20" 
+                            />
+                            <Label htmlFor="fim-ocorrencias" className="text-sm cursor-pointer">
+                              {numOcorrencias === 1 ? "evento" : "eventos"}
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="ate_data" id="fim-data" />
+                            <Label htmlFor="fim-data" className="text-sm cursor-pointer">
+                              Até
+                            </Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  disabled={fimTipoRecorrencia !== "ate_data"}
+                                  className={cn(
+                                    "w-[200px] pl-3 text-left font-normal",
+                                    !dataFimRecorrencia && "text-muted-foreground"
+                                  )}
+                                >
+                                  {dataFimRecorrencia ? (
+                                    format(dataFimRecorrencia, "dd/MM/yyyy", { locale: ptBR })
+                                  ) : (
+                                    <span>Selecione a data</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={dataFimRecorrencia}
+                                  onSelect={setDataFimRecorrencia}
+                                  disabled={(date) => date < (form.getValues("data_evento") || new Date())}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </RadioGroup>
+                      </div>
+
+                      {/* Preview das Datas */}
+                      {eventosGerados.length > 0 && (
+                        <div className="bg-background/50 p-3 rounded-lg border border-purple-200">
+                          <p className="text-xs font-semibold mb-2 text-purple-900">
+                            📅 Serão criados {eventosGerados.length} {eventosGerados.length === 1 ? "evento" : "eventos"}:
+                          </p>
+                          <div className="max-h-32 overflow-y-auto space-y-1">
+                            {eventosGerados.slice(0, 15).map((data, i) => (
+                              <div key={i} className="text-xs text-muted-foreground">
+                                • {format(data, "dd/MM/yyyy (eeee) 'às' HH:mm", { locale: ptBR })}
+                              </div>
+                            ))}
+                            {eventosGerados.length > 15 && (
+                              <p className="text-xs text-muted-foreground italic pt-1">
+                                ... e mais {eventosGerados.length - 15} eventos
+                              </p>
+                            )}
+                          </div>
+                          {eventosGerados.length > 100 && (
+                            <p className="text-xs text-amber-600 mt-2">
+                              ⚠️ Atenção: Muitos eventos serão criados. Considere reduzir o período.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* SEÇÃO DE INSCRIÇÕES - Apenas para EVENTO */}
               {isEventoGeral && (

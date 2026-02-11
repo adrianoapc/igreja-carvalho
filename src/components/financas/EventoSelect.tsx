@@ -70,7 +70,7 @@ export function EventoSelect({
         .in("status", ["confirmado", "realizado"])
         .in("tipo", ["CULTO", "EVENTO"])
         .eq("tem_oferta", true)
-        .order("data_evento", { ascending: false })
+        .order("data_evento", { ascending: true })
         .limit(50);
 
       if (!isAllFiliais && filialId) {
