@@ -23,6 +23,7 @@ import {
   Trophy,
   Sparkles,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import QuizPlayer from "@/components/ensino/QuizPlayer";
 import { gerarCertificado } from "@/components/ensino/CertificadoGenerator";
 import { format } from "date-fns";
@@ -117,6 +118,16 @@ export default function CursoPlayer() {
   const [bloqueadoPagamento, setBloqueadoPagamento] = useState(false);
   const [valorCurso, setValorCurso] = useState<number | null>(null);
   const [inscricaoId, setInscricaoId] = useState<string | null>(null);
+  const [pixCobranca, setPixCobranca] = useState<{
+    id: string;
+    txid: string;
+    qr_location: string | null;
+    qr_brcode: string | null;
+    valor_original: number;
+    status: string;
+    data_expiracao: string | null;
+  } | null>(null);
+  const [pixLoading, setPixLoading] = useState(false);
 
   // Verificar se jornada está 100% concluída
   const jornadaConcluida =
@@ -135,6 +146,33 @@ export default function CursoPlayer() {
       setAulaVinculada(null);
     }
   }, [etapaSelecionada]);
+
+  useEffect(() => {
+    const carregarCobrancaPix = async () => {
+      if (!bloqueadoPagamento || !inscricaoId || !igrejaId) return;
+      setPixLoading(true);
+      try {
+        const { data } = await supabase
+          .from("cob_pix")
+          .select("id, txid, qr_location, qr_brcode, valor_original, status, data_expiracao")
+          .eq("igreja_id", igrejaId)
+          .contains("info_adicionais", [
+            { nome: "inscricao_jornada_id", valor: inscricaoId },
+          ])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        setPixCobranca(data || null);
+      } catch (error) {
+        console.error("Erro ao buscar cobrança PIX:", error);
+      } finally {
+        setPixLoading(false);
+      }
+    };
+
+    carregarCobrancaPix();
+  }, [bloqueadoPagamento, inscricaoId, igrejaId]);
 
   const fetchDados = async () => {
     if (!id || !profile?.id || !igrejaId) return;
@@ -239,6 +277,37 @@ export default function CursoPlayer() {
               {valorCurso ? ` (R$ ${valorCurso.toFixed(2)})` : ""}. Aguarde
               confirmação da tesouraria.
             </p>
+            {pixLoading && (
+              <p className="text-xs text-muted-foreground">Carregando cobrança PIX...</p>
+            )}
+            {pixCobranca && (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-lg border p-3 bg-muted/40 text-left">
+                  <p className="text-sm font-medium">Pague com PIX</p>
+                  <p className="text-xs text-muted-foreground">
+                    Escaneie o QR code para liberar o acesso.
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <div className="bg-white p-4 rounded-xl shadow-sm">
+                    <QRCodeSVG
+                      value={pixCobranca.qr_brcode || pixCobranca.qr_location || pixCobranca.txid}
+                      size={180}
+                      level="M"
+                      includeMargin
+                    />
+                  </div>
+                </div>
+                {pixCobranca.qr_location && (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(pixCobranca.qr_location || "", "_blank")}
+                  >
+                    Abrir QR Code
+                  </Button>
+                )}
+              </div>
+            )}
             <Button variant="link" onClick={() => navigate(-1)}>
               Voltar
             </Button>

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { User, FileEdit } from 'lucide-react';
-import { AprovarAlteracaoDialog } from './AprovarAlteracaoDialog';
+import { useNavigate } from 'react-router-dom';
 import { useIgrejaId } from '@/hooks/useIgrejaId';
 import { useFilialId } from '@/hooks/useFilialId';
 
@@ -25,10 +25,9 @@ interface AlteracaoPendente {
 }
 
 export function PerfisPendentes() {
+  const navigate = useNavigate();
   const [alteracoes, setAlteracoes] = useState<AlteracaoPendente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAlteracao, setSelectedAlteracao] = useState<AlteracaoPendente | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('membro');
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
@@ -37,9 +36,12 @@ export function PerfisPendentes() {
     setLoading(true);
     try {
       if (!igrejaId) {
+        console.log('[PerfisPendentes] igrejaId não definido');
         setAlteracoes([]);
         return;
       }
+      console.log('[PerfisPendentes] Buscando alterações:', { igrejaId, filialId, isAllFiliais });
+      
       let query = supabase
         .from('alteracoes_perfil_pendentes')
         .select(`
@@ -48,7 +50,9 @@ export function PerfisPendentes() {
           dados_novos,
           dados_antigos,
           status,
-          created_at
+          created_at,
+          igreja_id,
+          filial_id
         `)
         .eq('status', 'pendente')
         .eq('igreja_id', igrejaId)
@@ -57,6 +61,8 @@ export function PerfisPendentes() {
         query = query.eq('filial_id', filialId);
       }
       const { data, error } = await query;
+      
+      console.log('[PerfisPendentes] Resultado:', { data, error });
 
       if (error) throw error;
 
@@ -98,8 +104,7 @@ export function PerfisPendentes() {
   }, [igrejaLoading, filialLoading, igrejaId, filialId, isAllFiliais]);
 
   const handleOpenAlteracao = (alteracao: AlteracaoPendente) => {
-    setSelectedAlteracao(alteracao);
-    setDialogOpen(true);
+    navigate(`/pessoas/alteracoes/${alteracao.id}`);
   };
 
   const filteredAlteracoes = alteracoes.filter(alt => {
@@ -176,13 +181,6 @@ export function PerfisPendentes() {
           )}
         </div>
       </div>
-
-      <AprovarAlteracaoDialog
-        alteracao={selectedAlteracao}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSuccess={loadAlteracoes}
-      />
     </>
   );
 }

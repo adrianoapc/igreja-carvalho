@@ -10,6 +10,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, UserPlus, Ticket } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
+import {
+  criarCobrancaPix,
+  getSantanderIntegracaoId,
+  PixCobrancaResponse,
+} from "@/hooks/useSantanderPix";
 
 interface Evento {
   id: string;
@@ -62,12 +69,16 @@ export function AdicionarInscricaoDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inscritosIds, setInscritosIds] = useState<string[]>([]);
+  const [pixCobranca, setPixCobranca] = useState<PixCobrancaResponse | null>(null);
+  const [pixLoading, setPixLoading] = useState(false);
+  const { igrejaId, filialId, isAllFiliais } = useAuthContext();
 
   useEffect(() => {
     if (open) {
       loadPessoas();
       loadInscritos();
       loadLotes();
+      setPixCobranca(null);
     }
   }, [open, eventoId]);
 
@@ -186,7 +197,7 @@ export function AdicionarInscricaoDialog({
         transacaoId = transacao.id;
       }
 
-      const { error } = await supabase
+      const { data: inscricaoCriada, error } = await supabase
         .from("inscricoes_eventos")
         .insert({
           evento_id: eventoId,
@@ -195,16 +206,59 @@ export function AdicionarInscricaoDialog({
           transacao_id: transacaoId,
           lote_id: selectedLoteId,
           valor_pago: statusPagamento === "pago" ? valorFinal : 0,
-        });
+        })
+        .select("id")
+        .single();
 
       if (error) throw error;
 
-      toast.success("Inscrição adicionada!");
-      onOpenChange(false);
-      setSelectedPessoaId(null);
-      setSelectedLoteId(null);
-      setSearchTerm("");
-      setStatusPagamento("pendente");
+      const deveGerarPix =
+        statusPagamento === "pendente" &&
+        evento?.requer_pagamento &&
+        valorFinal > 0;
+
+      if (deveGerarPix) {
+        try {
+          if (!igrejaId) {
+            toast.error("Igreja não encontrada para gerar cobrança PIX");
+          } else {
+            setPixLoading(true);
+            const integracaoId = await getSantanderIntegracaoId(igrejaId);
+            if (!integracaoId) {
+              toast.error("Integração Santander não encontrada");
+            } else {
+              const cobranca = await criarCobrancaPix({
+                integracaoId,
+                igrejaId,
+                filialId: isAllFiliais ? null : filialId,
+                valor: valorFinal,
+                descricao: `Inscrição Evento: ${evento?.titulo || "Evento"}`,
+                infoAdicionais: [
+                  { nome: "inscricao_evento_id", valor: inscricaoCriada.id },
+                  { nome: "evento_id", valor: eventoId },
+                  { nome: "pessoa_id", valor: selectedPessoaId },
+                ],
+              });
+              setPixCobranca(cobranca);
+              toast.success("Inscrição criada! Cobrança PIX gerada.");
+            }
+          }
+        } catch (pixError) {
+          console.error("Erro ao gerar cobrança PIX:", pixError);
+          toast.error("Inscrição criada, mas falhou ao gerar cobrança PIX");
+        } finally {
+          setPixLoading(false);
+        }
+      } else {
+        toast.success("Inscrição adicionada!");
+        onOpenChange(false);
+        setSelectedPessoaId(null);
+        setSelectedLoteId(null);
+        setSearchTerm("");
+        setStatusPagamento("pendente");
+      }
+
+      onSuccess();
     } catch (error: unknown) {
       toast.error("Erro ao adicionar inscrição", {
         description: error instanceof Error ? error.message : String(error),
@@ -363,15 +417,45 @@ export function AdicionarInscricaoDialog({
           )}
         </div>
 
+        {pixCobranca && (
+          <div className="px-6 pb-4 space-y-3">
+            <div className="rounded-lg border p-3 bg-muted/40">
+              <p className="text-sm font-medium">Cobrança PIX gerada</p>
+              <p className="text-xs text-muted-foreground">
+                Use o QR Code abaixo para pagamento.
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <div className="bg-white p-4 rounded-xl shadow-sm">
+                <QRCodeSVG
+                  value={pixCobranca.qr_brcode || pixCobranca.qr_location || pixCobranca.txid}
+                  size={180}
+                  level="M"
+                  includeMargin
+                />
+              </div>
+            </div>
+            {pixCobranca.qr_location && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => window.open(pixCobranca.qr_location || "", "_blank")}
+              >
+                Abrir QR Code
+              </Button>
+            )}
+          </div>
+        )}
+
         <div className="border-t p-4 flex justify-end gap-3">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={saving || !selectedPessoaId || (hasLotes && !selectedLoteId)}
+            disabled={saving || pixLoading || !selectedPessoaId || (hasLotes && !selectedLoteId)}
           >
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            {saving || pixLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Adicionar
           </Button>
         </div>

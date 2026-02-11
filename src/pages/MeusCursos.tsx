@@ -15,10 +15,16 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { BookOpen, Play, ChevronRight, Sparkles } from "lucide-react";
+import { BookOpen, Play, ChevronRight, Sparkles, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useConfiguracaoFinanceiraEnsino } from "@/hooks/useConfiguracaoFinanceiraEnsino";
 import { useFilialId } from "@/hooks/useFilialId";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  criarCobrancaPix,
+  getSantanderIntegracaoId,
+  PixCobrancaResponse,
+} from "@/hooks/useSantanderPix";
 
 interface InscricaoComProgresso {
   id: string;
@@ -75,6 +81,8 @@ export default function MeusCursos() {
     useConfiguracaoFinanceiraEnsino();
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [pagamentoMensagem, setPagamentoMensagem] = useState("");
+  const [pixCobranca, setPixCobranca] = useState<PixCobrancaResponse | null>(null);
+  const [pixLoading, setPixLoading] = useState(false);
 
   // Buscar nomes das filiais
   const fetchFiliais = useCallback(async () => {
@@ -226,6 +234,7 @@ export default function MeusCursos() {
   const handleInscrever = async (jornada: JornadaDisponivel) => {
     if (!profile?.id) return;
     setEnrollingId(jornada.id);
+    setPixCobranca(null);
 
     try {
       if (!jornada.requer_pagamento) {
@@ -272,7 +281,7 @@ export default function MeusCursos() {
         .single();
       if (txError) throw txError;
 
-      const { error: inscError } = await supabase
+      const { data: inscricaoCriada, error: inscError } = await supabase
         .from("inscricoes_jornada")
         .insert({
           jornada_id: jornada.id,
@@ -280,8 +289,40 @@ export default function MeusCursos() {
           responsavel_id: profile.id,
           status_pagamento: "pendente",
           transacao_id: transacaoCriada.id,
-        });
+        })
+        .select("id")
+        .single();
       if (inscError) throw inscError;
+
+      if (igrejaId) {
+        try {
+          setPixLoading(true);
+          const integracaoId = await getSantanderIntegracaoId(igrejaId);
+          if (!integracaoId) {
+            toast.error("Integração Santander não encontrada");
+          } else {
+            const cobranca = await criarCobrancaPix({
+              integracaoId,
+              igrejaId,
+              filialId: isAllFiliais ? null : filialId,
+              contaId,
+              valor: Number(jornada.valor || 0),
+              descricao: `Inscrição Jornada: ${jornada.titulo}`,
+              infoAdicionais: [
+                { nome: "inscricao_jornada_id", valor: inscricaoCriada.id },
+                { nome: "jornada_id", valor: jornada.id },
+                { nome: "pessoa_id", valor: profile.id },
+              ],
+            });
+            setPixCobranca(cobranca);
+          }
+        } catch (pixError) {
+          console.error("Erro ao gerar cobrança PIX:", pixError);
+          toast.error("Inscrição criada, mas falhou ao gerar cobrança PIX");
+        } finally {
+          setPixLoading(false);
+        }
+      }
 
       setPagamentoMensagem(
         `Inscrição realizada! Para liberar o acesso, realize o pagamento de R$ ${Number(jornada.valor || 0).toFixed(2)}.`,
@@ -527,6 +568,40 @@ export default function MeusCursos() {
             <DialogTitle>Inscrição realizada</DialogTitle>
             <DialogDescription>{pagamentoMensagem}</DialogDescription>
           </DialogHeader>
+          {pixLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Gerando cobrança PIX...
+            </div>
+          )}
+          {pixCobranca && (
+            <div className="space-y-3">
+              <div className="rounded-lg border p-3 bg-muted/40">
+                <p className="text-sm font-medium">Pague com PIX</p>
+                <p className="text-xs text-muted-foreground">
+                  Escaneie o QR code para liberar o acesso.
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <div className="bg-white p-4 rounded-xl shadow-sm">
+                  <QRCodeSVG
+                    value={pixCobranca.qr_brcode || pixCobranca.qr_location || pixCobranca.txid}
+                    size={180}
+                    level="M"
+                    includeMargin
+                  />
+                </div>
+              </div>
+              {pixCobranca.qr_location && (
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(pixCobranca.qr_location || "", "_blank")}
+                >
+                  Abrir QR Code
+                </Button>
+              )}
+            </div>
+          )}
           <div className="flex justify-end">
             <Button
               variant="outline"

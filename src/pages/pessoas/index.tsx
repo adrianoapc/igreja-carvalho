@@ -133,6 +133,7 @@ export default function Pessoas() {
         setContatosCount(count || 0);
 
         // Buscar alterações pendentes (filtradas)
+        console.log('[Dashboard Pessoas] Buscando pendentes:', { igrejaId, filialId, isAllFiliais });
         let pendentesQuery = supabase
           .from("alteracoes_perfil_pendentes")
           .select("*", { count: "exact", head: true })
@@ -141,7 +142,8 @@ export default function Pessoas() {
         if (!isAllFiliais && filialId) {
           pendentesQuery = pendentesQuery.eq("filial_id", filialId);
         }
-        const { count: pendentes } = await pendentesQuery;
+        const { count: pendentes, error: pendentesError } = await pendentesQuery;
+        console.log('[Dashboard Pessoas] Resultado pendentes:', { pendentes, pendentesError });
 
         setPendentesCount(pendentes || 0);
 
@@ -149,7 +151,7 @@ export default function Pessoas() {
         let aceitaramQuery = supabase
           .from("profiles")
           .select(
-            "id, nome, avatar_url, telefone, email, sexo, data_conversao, status"
+            "id, nome, avatar_url, telefone, email, sexo, data_conversao, status",
           )
           .eq("aceitou_jesus", true)
           .not("data_conversao", "is", null)
@@ -230,7 +232,7 @@ export default function Pessoas() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && searchTerm.trim()) {
                     navigate(
-                      `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`
+                      `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`,
                     );
                   }
                 }}
@@ -243,7 +245,7 @@ export default function Pessoas() {
                   onClick={() => {
                     if (searchTerm.trim()) {
                       navigate(
-                        `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`
+                        `/pessoas/todos?buscar=${encodeURIComponent(searchTerm)}`,
                       );
                     }
                   }}
@@ -252,10 +254,7 @@ export default function Pessoas() {
                 </Button>
               )}
             </div>
-            <Button
-              onClick={() => setCadastrarOpen(true)}
-              className="shrink-0"
-            >
+            <Button onClick={() => setCadastrarOpen(true)} className="shrink-0">
               <Plus className="w-4 h-4 mr-2" />
               Cadastrar Pessoa
             </Button>
@@ -422,7 +421,7 @@ export default function Pessoas() {
                       {pessoa.data_conversao && (
                         <span className="text-xs text-muted-foreground">
                           {new Date(pessoa.data_conversao).toLocaleDateString(
-                            "pt-BR"
+                            "pt-BR",
                           )}
                         </span>
                       )}

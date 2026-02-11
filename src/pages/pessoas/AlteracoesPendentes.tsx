@@ -3,14 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { User, FileEdit, ArrowLeft, Clock, CheckCircle, XCircle, Filter } from 'lucide-react';
-import { AprovarAlteracaoDialog } from '@/components/pessoas/AprovarAlteracaoDialog';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useIgrejaId } from '@/hooks/useIgrejaId';
+import { useFilialId } from '@/hooks/useFilialId';
 
 interface AlteracaoPendente {
   id: string;
@@ -36,16 +36,19 @@ interface AlteracaoPendente {
 
 export default function AlteracoesPendentes() {
   const navigate = useNavigate();
+  const { igrejaId, isAllFiliais } = useIgrejaId();
+  const { filialId } = useFilialId();
+  
   const [alteracoes, setAlteracoes] = useState<AlteracaoPendente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAlteracao, setSelectedAlteracao] = useState<AlteracaoPendente | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('pendente');
   const [profileStatusFilter, setProfileStatusFilter] = useState<string>('todos');
 
   const loadAlteracoes = async () => {
     setLoading(true);
     try {
+      if (!igrejaId) return;
+      
       let query = supabase
         .from('alteracoes_perfil_pendentes')
         .select(`
@@ -59,7 +62,12 @@ export default function AlteracoesPendentes() {
           aprovado_por,
           observacoes
         `)
+        .eq('igreja_id', igrejaId)
         .order('created_at', { ascending: false });
+
+      if (!isAllFiliais && filialId) {
+        query = query.eq('filial_id', filialId);
+      }
 
       if (statusFilter !== 'todos') {
         query = query.eq('status', statusFilter);
@@ -108,11 +116,10 @@ export default function AlteracoesPendentes() {
 
   useEffect(() => {
     loadAlteracoes();
-  }, [statusFilter]);
+  }, [statusFilter, igrejaId, filialId, isAllFiliais]);
 
   const handleOpenAlteracao = (alteracao: AlteracaoPendente) => {
-    setSelectedAlteracao(alteracao);
-    setDialogOpen(true);
+    navigate(`/pessoas/alteracoes/${alteracao.id}`);
   };
 
   const filteredAlteracoes = alteracoes.filter(alt => {
@@ -274,7 +281,7 @@ export default function AlteracoesPendentes() {
               {filteredAlteracoes.map(alteracao => (
                 <div 
                   key={alteracao.id} 
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex flex-col gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-4">
                     <Avatar className="h-12 w-12">
@@ -298,11 +305,12 @@ export default function AlteracoesPendentes() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
                     {getStatusBadge(alteracao.status)}
                     <Button 
                       variant={alteracao.status === 'pendente' ? 'default' : 'outline'}
                       size="sm"
+                      className="w-full sm:w-auto"
                       onClick={() => handleOpenAlteracao(alteracao)}
                     >
                       {alteracao.status === 'pendente' ? 'Analisar' : 'Ver detalhes'}
@@ -314,13 +322,6 @@ export default function AlteracoesPendentes() {
           )}
         </CardContent>
       </Card>
-
-      <AprovarAlteracaoDialog
-        alteracao={selectedAlteracao}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSuccess={loadAlteracoes}
-      />
     </div>
   );
 }

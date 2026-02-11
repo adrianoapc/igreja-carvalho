@@ -2198,20 +2198,20 @@ export type Database = {
           created_at: string
           created_by: string | null
           filial_id: string | null
-          formas_digitais_ids: string[] | null
-          formas_fisicas_ids: string[] | null
           id: string
           igreja_id: string
-          mapeamentos_transferencia: Json | null
-          periodos: string[] | null
           provider_tipo: string | null
           secret_hint: string | null
           sync_strategy: string | null
-          tipos_permitidos_digital: string[] | null
+          periodos: string[] | null
+          formas_fisicas_ids: string[] | null
+          formas_digitais_ids: string[] | null
           tipos_permitidos_fisico: string[] | null
+          tipos_permitidos_digital: string[] | null
+          valor_zero_policy: string | null
+          mapeamentos_transferencia: Json | null
           updated_at: string
           updated_by: string | null
-          valor_zero_policy: string | null
           webhook_url: string | null
         }
         Insert: {
@@ -2224,20 +2224,20 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           filial_id?: string | null
-          formas_digitais_ids?: string[] | null
-          formas_fisicas_ids?: string[] | null
           id?: string
           igreja_id: string
-          mapeamentos_transferencia?: Json | null
-          periodos?: string[] | null
           provider_tipo?: string | null
           secret_hint?: string | null
           sync_strategy?: string | null
-          tipos_permitidos_digital?: string[] | null
+          periodos?: string[] | null
+          formas_fisicas_ids?: string[] | null
+          formas_digitais_ids?: string[] | null
           tipos_permitidos_fisico?: string[] | null
+          tipos_permitidos_digital?: string[] | null
+          valor_zero_policy?: string | null
+          mapeamentos_transferencia?: Json | null
           updated_at?: string
           updated_by?: string | null
-          valor_zero_policy?: string | null
           webhook_url?: string | null
         }
         Update: {
@@ -2250,20 +2250,20 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           filial_id?: string | null
-          formas_digitais_ids?: string[] | null
-          formas_fisicas_ids?: string[] | null
           id?: string
           igreja_id?: string
-          mapeamentos_transferencia?: Json | null
-          periodos?: string[] | null
           provider_tipo?: string | null
           secret_hint?: string | null
           sync_strategy?: string | null
-          tipos_permitidos_digital?: string[] | null
+          periodos?: string[] | null
+          formas_fisicas_ids?: string[] | null
+          formas_digitais_ids?: string[] | null
           tipos_permitidos_fisico?: string[] | null
+          tipos_permitidos_digital?: string[] | null
+          valor_zero_policy?: string | null
+          mapeamentos_transferencia?: Json | null
           updated_at?: string
           updated_by?: string | null
-          valor_zero_policy?: string | null
           webhook_url?: string | null
         }
         Relationships: [

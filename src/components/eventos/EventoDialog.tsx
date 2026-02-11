@@ -75,6 +75,8 @@ interface Evento {
   inscricoes_abertas_ate?: string | null;
   categoria_financeira_id?: string | null;
   conta_financeira_id?: string | null;
+  // Campos financeiros
+  tem_oferta?: boolean | null;
 }
 
 interface EventoDialogProps {
@@ -143,6 +145,8 @@ const eventoSchema = z.object({
   categoria_financeira_id: z.string().optional().nullable(),
   conta_financeira_id: z.string().optional().nullable(),
   exigir_documento_checkin: z.boolean().default(false),
+  // Campos financeiros
+  tem_oferta: z.boolean().default(false),
 });
 
 type EventoFormData = z.infer<typeof eventoSchema>;
@@ -233,6 +237,7 @@ export default function EventoDialog({
       usar_data_fim: false,
       requer_inscricao: false,
       requer_pagamento: false,
+      tem_oferta: true,
     },
   });
 
@@ -244,6 +249,13 @@ export default function EventoDialog({
   useEffect(() => {
     if (tipoSelecionado) {
       loadSubtipos(tipoSelecionado);
+      // Ajustar tem_oferta baseado no tipo
+      if (tipoSelecionado === "CULTO" || tipoSelecionado === "CONFERENCIA") {
+        form.setValue("tem_oferta", true);
+      } else {
+        form.setValue("tem_oferta", false);
+      }
+      
       if (tipoSelecionado === "RELOGIO") {
         form.setValue("usar_data_fim", true);
         if (!form.getValues("titulo"))
@@ -335,6 +347,7 @@ export default function EventoDialog({
             : null,
           categoria_financeira_id: evento.categoria_financeira_id ?? null,
           conta_financeira_id: evento.conta_financeira_id ?? null,
+          tem_oferta: evento.tem_oferta || false,
         });
       } else {
         const defaultDate = initialDate || new Date();
@@ -348,6 +361,7 @@ export default function EventoDialog({
           data_evento: defaultDate,
           data_fim: defaultDate,
           hora_fim: "21:00",
+          tem_oferta: true,
         });
       }
     }
@@ -554,6 +568,7 @@ export default function EventoDialog({
           data.tipo === "EVENTO" && data.requer_inscricao
             ? data.exigir_documento_checkin || false
             : false,
+        tem_oferta: data.tem_oferta || false,
       };
 
       if (isEditing) {
@@ -1022,6 +1037,28 @@ export default function EventoDialog({
                   )}
                 />
               )}
+
+              {/* OFERTAS - Independente de Inscrição */}
+              <FormField
+                control={form.control}
+                name="tem_oferta"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3 space-y-0 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-0.5 flex-1">
+                      <FormLabel className="font-medium cursor-pointer">🙏 Ofertas disponíveis</FormLabel>
+                      <p className="text-xs text-muted-foreground">
+                        Permite que membros contribuam com oferta durante o evento
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
 
               {/* SEÇÃO DE INSCRIÇÕES - Apenas para EVENTO */}
               {isEventoGeral && (

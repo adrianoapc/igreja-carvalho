@@ -44,6 +44,7 @@ type FinanceiroConfig = {
   tipos_permitidos_digital?: string[] | null;
   valor_zero_policy?: string | null;
   mapeamentos_transferencia?: MapeamentoTransferencia[] | null;
+  controla_dizimistas?: boolean;
 };
 
 export default function ConfigFinanceiro() {
@@ -70,7 +71,7 @@ export default function ConfigFinanceiro() {
     queryFn: async () => {
       if (!igrejaId) return null;
       let q = supabase
-        .from("financeiro_config")
+        .from("configuracoes_financeiro")
         .select("*")
         .eq("igreja_id", igrejaId)
         .limit(1);
@@ -146,16 +147,22 @@ export default function ConfigFinanceiro() {
   useEffect(() => {
     if (!igrejaId) return;
     if (cfg) {
-      const allowedBlindModes = ["off", "optional", "required"];
-      const allowedCompareLevels = ["tipo", "total"];
+      const allowedBlindModes = ["disabled", "optional", "required"];
+      const allowedCompareLevels = [
+        "tipo",
+        "total",
+        "forma_pagamento",
+        "denominacao",
+      ];
+      const rawBlindMode = String(cfg.blind_count_mode ?? "disabled");
+      const normalizedBlindMode =
+        rawBlindMode === "off" ? "disabled" : rawBlindMode;
       setForm({
         id: cfg.id,
         igreja_id: cfg.igreja_id,
         filial_id: cfg.filial_id,
-        blind_count_mode: allowedBlindModes.includes(
-          String(cfg.blind_count_mode)
-        )
-          ? String(cfg.blind_count_mode)
+        blind_count_mode: allowedBlindModes.includes(normalizedBlindMode)
+          ? normalizedBlindMode
           : "optional",
         blind_min_counters: Number(cfg.blind_min_counters ?? 2),
         blind_tolerance_value: Number(cfg.blind_tolerance_value ?? 0),
@@ -176,6 +183,7 @@ export default function ConfigFinanceiro() {
         tipos_permitidos_digital: cfg.tipos_permitidos_digital || null,
         valor_zero_policy:
           cfg.valor_zero_policy || "allow-zero-with-confirmation",
+        controla_dizimistas: (cfg as any).controla_dizimistas ?? true,
       });
       setPeriodosText((cfg.periodos || []).join(","));
       setSelFormasFisicas(cfg.formas_fisicas_ids || []);
@@ -212,6 +220,7 @@ export default function ConfigFinanceiro() {
         tipos_permitidos_digital: [],
         valor_zero_policy: "allow-zero-with-confirmation",
         mapeamentos_transferencia: [],
+        controla_dizimistas: true,
       });
       setPeriodosText("Manhã,Noite");
       setSelFormasFisicas([]);
@@ -241,7 +250,7 @@ export default function ConfigFinanceiro() {
 
       if (form.id) {
         const { error } = await supabase
-          .from("financeiro_config")
+          .from("configuracoes_financeiro")
           .update({
             blind_count_mode: form.blind_count_mode,
             blind_min_counters: form.blind_min_counters,
@@ -255,12 +264,13 @@ export default function ConfigFinanceiro() {
             tipos_permitidos_digital: selTiposDigital,
             valor_zero_policy: valorZeroPolicy,
             mapeamentos_transferencia: mapeamentos,
+            controla_dizimistas: form.controla_dizimistas,
           })
           .eq("id", form.id)
           .eq("igreja_id", igrejaId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("financeiro_config").upsert(
+        const { error } = await supabase.from("configuracoes_financeiro").upsert(
           {
             igreja_id: igrejaId,
             filial_id: form.filial_id,
@@ -276,6 +286,7 @@ export default function ConfigFinanceiro() {
             tipos_permitidos_digital: selTiposDigital,
             valor_zero_policy: valorZeroPolicy,
             mapeamentos_transferencia: mapeamentos,
+            controla_dizimistas: form.controla_dizimistas,
           },
           { onConflict: "igreja_id,filial_id" }
         );
@@ -321,7 +332,7 @@ export default function ConfigFinanceiro() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="off">Sem conferência</SelectItem>
+                  <SelectItem value="disabled">Sem conferência</SelectItem>
                   <SelectItem value="optional">Opcional</SelectItem>
                   <SelectItem value="required">Obrigatória</SelectItem>
                 </SelectContent>
@@ -455,6 +466,20 @@ export default function ConfigFinanceiro() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Controle de Dízimistas</Label>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.controla_dizimistas}
+                onCheckedChange={(v) => setField("controla_dizimistas", v)}
+              />
+              <span className="text-sm text-muted-foreground">
+                Exibir campo "Pessoa" para identificar dizimistas nos
+                lançamentos.
+              </span>
             </div>
           </div>
 

@@ -77,6 +77,9 @@ const PessoasContatos = lazy(() => import("./pages/pessoas/Contatos"));
 const PessoasAlteracoes = lazy(
   () => import("./pages/pessoas/AlteracoesPendentes"),
 );
+const AprovarAlteracao = lazy(
+  () => import("./pages/pessoas/AprovarAlteracao"),
+);
 const PessoaDetalhes = lazy(() => import("./pages/PessoaDetalhes"));
 const EditarPessoa = lazy(() => import("./pages/pessoas/EditarPessoa"));
 
@@ -493,6 +496,22 @@ const App = () => (
                     element={
                       <AuthGate>
                         <PessoasAlteracoes />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/pessoas/alteracoes-pendentes"
+                    element={
+                      <AuthGate>
+                        <PessoasAlteracoes />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/pessoas/alteracoes/:id"
+                    element={
+                      <AuthGate>
+                        <AprovarAlteracao />
                       </AuthGate>
                     }
                   />
