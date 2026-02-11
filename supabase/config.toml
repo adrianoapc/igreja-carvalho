@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.gerar-sugestoes-ml]
 verify_jwt = false
+
+[functions.detectar-duplicatas]
+verify_jwt = false
