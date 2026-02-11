@@ -43,7 +43,10 @@ export function EventoSelect({
 
       // Buscar eventos dos últimos 30 dias até 90 dias no futuro
       const dataInicio = format(subDays(new Date(), 30), "yyyy-MM-dd");
-      const dataFim = format(new Date(new Date().getTime() + 90 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+      const dataFim = format(
+        new Date(new Date().getTime() + 90 * 24 * 60 * 60 * 1000),
+        "yyyy-MM-dd",
+      );
       console.log("[EventoSelect] filtros", {
         igrejaId,
         filialId,
@@ -59,7 +62,9 @@ export function EventoSelect({
         .eq("igreja_id", igrejaId)
         .eq("status", "finalizado");
       if (erroSessoes) throw erroSessoes;
-      const eventosLancados = new Set((sessoesFinalizadas || []).map((s: any) => s.evento_id).filter(Boolean));
+      const eventosLancados = new Set(
+        (sessoesFinalizadas || []).map((s: any) => s.evento_id).filter(Boolean),
+      );
 
       let query = supabase
         .from("eventos")
@@ -87,7 +92,8 @@ export function EventoSelect({
       const eventosFiltrados = (data || []).filter((ev: any) => {
         if (!ev.data_evento) return false;
         const dataEv = new Date(ev.data_evento);
-        const diffDias = (agora.getTime() - dataEv.getTime()) / (1000 * 60 * 60 * 24);
+        const diffDias =
+          (agora.getTime() - dataEv.getTime()) / (1000 * 60 * 60 * 24);
         // Permite selecionar até 2 dias após o evento
         if (diffDias > 2) return false;
         if (eventosLancados.has(ev.id)) return false;

@@ -29,7 +29,7 @@ export function gerarDatasRecorrentes(config: ConfigRecorrencia): Date[] {
 
   // Extrair hora e minuto da string hora_inicio
   const [hora, minuto] = config.horaInicio.split(":").map(Number);
-  
+
   // Garantir que a data inicial tem o horário correto
   dataAtual.setHours(hora, minuto, 0, 0);
 
@@ -39,7 +39,10 @@ export function gerarDatasRecorrentes(config: ConfigRecorrencia): Date[] {
     contador++;
 
     // Verificar condição de parada
-    if (config.fimTipo === "ocorrencias" && contador >= (config.numOcorrencias || 1)) {
+    if (
+      config.fimTipo === "ocorrencias" &&
+      contador >= (config.numOcorrencias || 1)
+    ) {
       break;
     }
 
@@ -110,7 +113,9 @@ function proximoDiaSemana(dataAtual: Date, diasPermitidos: number[]): Date {
  * @param config Configuração de recorrência
  * @returns String descritiva da recorrência
  */
-export function formatarDescricaoRecorrencia(config: ConfigRecorrencia): string {
+export function formatarDescricaoRecorrencia(
+  config: ConfigRecorrencia,
+): string {
   const { tipo, intervalo, fimTipo, numOcorrencias, dataFim } = config;
 
   let descricao = "";
@@ -118,7 +123,8 @@ export function formatarDescricaoRecorrencia(config: ConfigRecorrencia): string 
   // Tipo de recorrência
   switch (tipo) {
     case "diaria":
-      descricao = intervalo === 1 ? "Todos os dias" : `A cada ${intervalo} dias`;
+      descricao =
+        intervalo === 1 ? "Todos os dias" : `A cada ${intervalo} dias`;
       break;
     case "semanal":
       if (config.diasSemana && config.diasSemana.length > 0) {
@@ -126,7 +132,8 @@ export function formatarDescricaoRecorrencia(config: ConfigRecorrencia): string 
         const diasTexto = config.diasSemana.map((d) => nomesDias[d]).join(", ");
         descricao = `Toda semana: ${diasTexto}`;
       } else {
-        descricao = intervalo === 1 ? "Toda semana" : `A cada ${intervalo} semanas`;
+        descricao =
+          intervalo === 1 ? "Toda semana" : `A cada ${intervalo} semanas`;
       }
       break;
     case "mensal":

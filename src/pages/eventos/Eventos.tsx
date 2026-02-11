@@ -167,7 +167,12 @@ export default function Eventos() {
 
       if (error) throw error;
 
-      setEventos((data || []).map(e => ({ ...e, tipo: e.tipo as Evento["tipo"] })) as Evento[]);
+      setEventos(
+        (data || []).map((e) => ({
+          ...e,
+          tipo: e.tipo as Evento["tipo"],
+        })) as Evento[],
+      );
     } catch (error: unknown) {
       toast.error("Erro ao carregar eventos", {
         description: error instanceof Error ? error.message : String(error),
@@ -233,7 +238,12 @@ export default function Eventos() {
 
       setKpis({
         eventosMes: eventosMes || 0,
-        proximoEvento: proximoEvento ? { ...proximoEvento, tipo: proximoEvento.tipo as Evento["tipo"] } as Evento : null,
+        proximoEvento: proximoEvento
+          ? ({
+              ...proximoEvento,
+              tipo: proximoEvento.tipo as Evento["tipo"],
+            } as Evento)
+          : null,
         escalasPendentes: escalasPendentesCount,
       });
     } catch (error) {
@@ -370,7 +380,7 @@ export default function Eventos() {
                   {format(
                     new Date(kpis.proximoEvento.data_evento),
                     "dd/MM/yyyy",
-                    { locale: ptBR }
+                    { locale: ptBR },
                   )}
                 </p>
               </div>
@@ -468,7 +478,7 @@ export default function Eventos() {
                     selected={dateRange}
                     onSelect={(range) =>
                       setDateRange(
-                        range as { from: Date; to: Date } | undefined
+                        range as { from: Date; to: Date } | undefined,
                       )
                     }
                     numberOfMonths={2}
