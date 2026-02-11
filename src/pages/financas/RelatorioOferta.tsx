@@ -37,12 +37,19 @@ import {
   openSessaoContagem,
   confrontarContagens,
   SessaoContagem,
+  calcularJanelaSincronizacao,
+  finalizarSessao,
 } from "@/hooks/useFinanceiroSessao";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import {
+  buscarPixRecebidos,
+  getSantanderIntegracaoId,
+} from "@/hooks/useSantanderPix";
 import { ConferirOfertaDialog } from "@/components/financas/ConferirOfertaDialog";
 import { PessoaCombobox } from "@/components/pessoas/PessoaCombobox";
 import { MinhaContagemDialog } from "@/components/financas/MinhaContagemDialog";
+import { EventoSelect } from "@/components/financas/EventoSelect";
 
 type LinhaLancamento = {
   id: string;
@@ -79,6 +86,10 @@ export default function RelatorioOferta() {
   const [showMinhaContagem, setShowMinhaContagem] = useState(false);
   const [minhaContagemLoading, setMinhaContagemLoading] = useState(false);
   const [sessaoAtual, setSessaoAtual] = useState<SessaoContagem | null>(null);
+  const [eventoSelecionado, setEventoSelecionado] = useState<string | null>(
+    null,
+  );
+  const [eventoInfo, setEventoInfo] = useState<any | null>(null);
   // Extensão para suportar conta em linhas digitais
   type LinhaDigital = {
     id: string;
@@ -91,6 +102,7 @@ export default function RelatorioOferta() {
     readOnly?: boolean;
   };
   const [linhasDigitaisEx, setLinhasDigitaisEx] = useState<LinhaDigital[]>([]);
+  const [syncPixLoading, setSyncPixLoading] = useState(false);
   const [confrontoLoading, setConfrontoLoading] = useState(false);
   const [confrontoStatus, setConfrontoStatus] = useState<string | null>(null);
   const [confrontoVariance, setConfrontoVariance] = useState<number | null>(
@@ -106,6 +118,138 @@ export default function RelatorioOferta() {
   >(null);
   const [confirmZeroFisico, setConfirmZeroFisico] = useState(false);
   const [financeiroConfig, setFinanceiroConfig] = useState<any | null>(null);
+
+  const handleSincronizarPix = async () => {
+    if (!igrejaId) return;
+
+    setSyncPixLoading(true);
+    try {
+      // 1. Calcular janela de tempo baseada na última sessão finalizada
+      const { inicio, fim } = await calcularJanelaSincronizacao(
+        igrejaId,
+        filialId,
+      );
+
+      console.log("Janela de sincronização:", {
+        inicio: inicio.toISOString(),
+        fim: fim.toISOString(),
+      });
+
+      // 2. Garantir que a sessão existe
+      const dataISO = format(dataCulto, "yyyy-MM-dd");
+      const sessao =
+        sessaoAtual ||
+        (await findOrOpenSessao(dataISO, periodo, eventoSelecionado));
+      if (!sessao) throw new Error("Sessão não encontrada/aberta");
+
+      // 3. Buscar IDs de PIX já vinculados a outras sessões para evitar duplicidade
+      const { data: pixVinculados } = await supabase
+        .from("sessoes_itens_draft")
+        .select("id")
+        .eq("igreja_id", igrejaId)
+        .eq("is_digital", true)
+        .eq("origem_registro", "api")
+        .neq("sessao_id", sessao.id);
+
+      const idsVinculados = new Set(
+        (pixVinculados || []).map((item: any) =>
+          item.id.replace("api-pix-", ""),
+        ),
+      );
+
+      // 4. Verificar se há PIX no período na tabela temporária
+      const { data: pixNoPeriodo } = await supabase
+        .from("pix_webhook_temp")
+        .select("id")
+        .eq("igreja_id", igrejaId)
+        .gte("data_pix", inicio.toISOString())
+        .lte("data_pix", fim.toISOString())
+        .limit(1);
+
+      // 5. Se não há PIX no período, buscar da API
+      if (!pixNoPeriodo || pixNoPeriodo.length === 0) {
+        const integracaoId = await getSantanderIntegracaoId(igrejaId);
+        if (!integracaoId) {
+          toast.error("Integração Santander não encontrada");
+          return;
+        }
+
+        const resultado = await buscarPixRecebidos({
+          integracaoId,
+          igrejaId,
+          dataInicio: inicio.toISOString(),
+          dataFim: fim.toISOString(),
+        });
+
+        toast.info(
+          `PIX: ${resultado.importados || 0} importados, ${resultado.duplicados || 0} duplicados`,
+        );
+      }
+
+      // 6. Buscar PIX do período que não estão vinculados
+      const { data: pixRows } = await supabase
+        .from("pix_webhook_temp")
+        .select("id, pix_id, valor, data_pix")
+        .eq("igreja_id", igrejaId)
+        .gte("data_pix", inicio.toISOString())
+        .lte("data_pix", fim.toISOString())
+        .order("data_pix", { ascending: false })
+        .limit(200);
+
+      if (pixRows && pixRows.length > 0) {
+        // Procura especificamente pela forma de pagamento PIX
+        const formaPix = (formasDigitais || formasPagamento)?.find((f) =>
+          f.nome.toLowerCase().includes("pix"),
+        );
+
+        // Usa o ID do PIX se encontrado, senão usa a primeira forma digital como fallback
+        const formaId =
+          formaPix?.id ||
+          formasDigitais?.[0]?.id ||
+          formasPagamento?.[0]?.id ||
+          undefined;
+
+        const contaDefault = formaId
+          ? mapeamentosPorForma[formaId]?.[0]?.contaId
+          : undefined;
+
+        const existentes = new Set(
+          linhasDigitaisEx
+            .filter((p) => p.origem === "api")
+            .map((p) => p.id.replace("api-pix-", "")),
+        );
+
+        const novos: LinhaDigital[] = (pixRows as any[])
+          .filter((it) => {
+            const pixId = it.pix_id || it.id;
+            return !existentes.has(pixId) && !idsVinculados.has(pixId);
+          })
+          .map((it) => ({
+            id: `api-pix-${it.pix_id || it.id}`,
+            pessoaId: null,
+            formaId,
+            contaId: contaDefault,
+            valor: String(it.valor ?? ""),
+            origem: "api",
+            readOnly: true,
+          }));
+
+        if (novos.length === 0) {
+          toast.info("Nenhum PIX novo encontrado no período.");
+        } else {
+          setLinhasDigitaisEx((prev) => [...novos, ...prev]);
+          toast.success(`${novos.length} PIX(s) adicionado(s) à contagem.`);
+        }
+      } else {
+        toast.info("Nenhum PIX encontrado no período especificado.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao sincronizar PIX");
+    } finally {
+      setSyncPixLoading(false);
+    }
+  };
   const { data: categoriasEntrada } = useQuery({
     queryKey: ["categorias-entrada", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
@@ -281,12 +425,12 @@ export default function RelatorioOferta() {
 
   // Cria uma linha inicial e garante conta padrão por forma quando mapeamentos chegarem
   useEffect(() => {
-    // Carregar períodos configurados de financeiro_config (fallback para padrão)
+    // Carregar períodos configurados de configuracoes_financeiro (fallback para padrão)
     const carregarPeriodos = async () => {
       try {
         if (!igrejaId) return;
         let q = supabase
-          .from("financeiro_config")
+          .from("configuracoes_financeiro")
           .select(
             "periodos, formas_fisicas_ids, formas_digitais_ids, tipos_permitidos_fisico, tipos_permitidos_digital",
           )
@@ -963,6 +1107,7 @@ export default function RelatorioOferta() {
   const findOrOpenSessao = async (
     dataEventoISO: string,
     periodoSessao: string = periodo,
+    eventoId: string | null = null,
   ): Promise<SessaoContagem | null> => {
     if (!igrejaId) return null;
     // 1) Tenta localizar sessão existente (igreja/data/periodo) ignorando filial
@@ -1000,6 +1145,7 @@ export default function RelatorioOferta() {
         !isAllFiliais ? filialId || null : null,
         new Date(dataEventoISO),
         periodoSessao,
+        eventoId,
       );
       return criada;
     } catch (e: any) {
@@ -1268,53 +1414,75 @@ export default function RelatorioOferta() {
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="data-culto">Data do Culto *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dataCulto && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dataCulto
-                          ? format(dataCulto, "PPP", { locale: ptBR })
-                          : "Selecione a data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dataCulto}
-                        onSelect={(date) => date && setDataCulto(date)}
-                        locale={ptBR}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <div className="md:col-span-2">
+                  <EventoSelect
+                    igrejaId={igrejaId!}
+                    filialId={filialId}
+                    isAllFiliais={isAllFiliais}
+                    value={eventoSelecionado}
+                    onValueChange={setEventoSelecionado}
+                    onEventoSelect={(evento) => {
+                      setEventoInfo(evento);
+                      if (evento) {
+                        setDataCulto(new Date(evento.data_evento));
+                        const hora = new Date(evento.data_evento).getHours();
+                        setPeriodo(hora < 12 ? "manha" : "noite");
+                      }
+                    }}
+                  />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="periodo">Período *</Label>
-                  <Select
-                    value={periodo}
-                    onValueChange={(v) => setPeriodo(v as any)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o período" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {periodosDisponiveis.map((p) => (
-                        <SelectItem key={p} value={p.toLowerCase()}>
-                          {p}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!eventoSelecionado && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="data-culto">Data do Culto *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !dataCulto && "text-muted-foreground",
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {dataCulto
+                              ? format(dataCulto, "PPP", { locale: ptBR })
+                              : "Selecione a data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={dataCulto}
+                            onSelect={(date) => date && setDataCulto(date)}
+                            locale={ptBR}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="periodo">Período *</Label>
+                      <Select
+                        value={periodo}
+                        onValueChange={(v) => setPeriodo(v as any)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o período" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {periodosDisponiveis.map((p) => (
+                            <SelectItem key={p} value={p.toLowerCase()}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="lancado-por">Lançado por</Label>
@@ -1618,46 +1786,9 @@ export default function RelatorioOferta() {
                   type="button"
                   variant="outline"
                   onClick={async () => {
-                    try {
-                      const url = `${
-                        import.meta.env.VITE_SUPABASE_URL
-                      }/functions/v1/finance-sync?provider=pix&op=pull`;
-                      const resp = await fetch(url, { method: "GET" });
-                      const data = await resp.json();
-                      toast.info(`Sync: ${data.ok ? "ok" : "falhou"}`);
-                      if (data.ok && Array.isArray(data.items)) {
-                        const novos: LinhaDigital[] = data.items.map(
-                          (it: any) => {
-                            const formaId =
-                              it.forma_pagamento_id ||
-                              formasDigitais?.[0]?.id ||
-                              formasPagamento?.[0]?.id;
-                            const contaDefault = formaId
-                              ? mapeamentosPorForma[formaId]?.[0]?.contaId
-                              : undefined;
-                            return {
-                              id: `api-${it.id || crypto.randomUUID()}`,
-                              pessoaId: it.pessoa_id || null,
-                              formaId,
-                              contaId: contaDefault,
-                              valor: String(it.valor ?? ""),
-                              origem: "api",
-                              readOnly: true,
-                            };
-                          },
-                        );
-                        setLinhasDigitaisEx((prev) => {
-                          const filtrados = prev.filter(
-                            (p) => p.origem !== "api",
-                          );
-                          return [...novos, ...filtrados];
-                        });
-                      }
-                    } catch (e) {
-                      console.error(e);
-                      toast.error("Erro ao sincronizar API");
-                    }
+                    await handleSincronizarPix();
                   }}
+                  disabled={syncPixLoading}
                 >
                   🔄 Sincronizar API
                 </Button>
@@ -1750,7 +1881,6 @@ export default function RelatorioOferta() {
                         value={
                           l.categoriaId || categoriasDigitaisPermitidas?.[0]?.id
                         }
-                        disabled={!!l.readOnly}
                         onValueChange={(v) =>
                           setLinhasDigitaisEx((prev) =>
                             prev.map((it) =>
@@ -2187,8 +2317,14 @@ export default function RelatorioOferta() {
                           .from("sessoes_itens_draft")
                           .delete()
                           .eq("sessao_id", sessao.id);
+
+                        // Marca sessão como finalizada
+                        await finalizarSessao(sessao.id);
                       }
                       toast.success(`${todas.length} lançamento(s) criado(s)!`);
+                      queryClient.invalidateQueries({
+                        queryKey: ["sessoes-contagem"],
+                      });
                       setStep(1);
                       setLinhas([]);
                       setLinhasDigitaisEx([]);
