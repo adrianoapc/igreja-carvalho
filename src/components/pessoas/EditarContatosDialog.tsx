@@ -30,9 +30,20 @@ interface EditarContatosDialogProps {
     bairro: string | null;
     estado: string | null;
     endereco: string | null;
-    // email e telefone antigos ignorados
+    numero: string | null;
+    complemento: string | null;
   };
   onSuccess: () => void;
+}
+
+function maskTelefone(value: string, tipo: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, tipo === "celular" ? 11 : 10);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (tipo === "celular") {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
 }
 
 export function EditarContatosDialog({
@@ -49,6 +60,8 @@ export function EditarContatosDialog({
     bairro: dadosAtuais.bairro || "",
     estado: dadosAtuais.estado || "",
     endereco: dadosAtuais.endereco || "",
+    numero: dadosAtuais.numero || "",
+    complemento: dadosAtuais.complemento || "",
   });
   const [contatos, setContatos] = useState<
     Array<{
@@ -77,6 +90,8 @@ export function EditarContatosDialog({
         bairro: dadosAtuais.bairro || "",
         estado: dadosAtuais.estado || "",
         endereco: dadosAtuais.endereco || "",
+        numero: dadosAtuais.numero || "",
+        complemento: dadosAtuais.complemento || "",
       });
       supabase
         .from("profile_contatos")
@@ -207,8 +222,6 @@ export function EditarContatosDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Editar Contatos"
-      className="max-w-[98vw] md:max-w-[900px] w-full"
-      style={{ minWidth: "340px", width: "100%", maxWidth: 900 }}
     >
       <div className="flex flex-col h-full">
         <form

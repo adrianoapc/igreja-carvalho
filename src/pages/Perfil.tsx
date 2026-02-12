@@ -776,7 +776,15 @@ export default function Perfil() {
             open={editContatosOpen}
             onOpenChange={setEditContatosOpen}
             pessoaId={profileData.id}
-            dadosAtuais={profileData}
+            dadosAtuais={{
+              cep: profileData.cep,
+              cidade: profileData.cidade,
+              bairro: profileData.bairro,
+              estado: profileData.estado,
+              endereco: profileData.endereco,
+              numero: (profileData as any).numero ?? null,
+              complemento: (profileData as any).complemento ?? null,
+            }}
             onSuccess={handleDataUpdated}
           />
           <EditarDadosEclesiasticosDialog
