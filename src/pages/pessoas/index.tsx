@@ -22,6 +22,7 @@ import { LinksExternosCard } from "@/components/pessoas/LinksExternosCard";
 import { PerfisPendentes } from "@/components/pessoas/PerfisPendentes";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { CadastrarPessoaDialog } from "@/components/pessoas/CadastrarPessoaDialog";
+import { AtividadeRecenteSummary } from "@/components/pessoas/AtividadeRecemSummary";
 
 export default function Pessoas() {
   const navigate = useNavigate();
@@ -443,22 +444,8 @@ export default function Pessoas() {
       {/* Aniversários Dashboard */}
       <AniversariosDashboard />
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">
-            Atividade Recente
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 md:p-6">
-          <div className="text-center py-6 md:py-8 text-muted-foreground">
-            <p className="text-sm md:text-base">Nenhuma atividade recente</p>
-            <p className="text-xs md:text-sm mt-1">
-              As últimas interações com pessoas aparecerão aqui
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Recent Activity Summary */}
+      <AtividadeRecenteSummary />
 
       {/* Dialog de Cadastro */}
       <CadastrarPessoaDialog

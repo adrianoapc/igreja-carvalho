@@ -77,6 +77,7 @@ export function AtividadeRecente({ profileId }: AtividadeRecenteProps) {
     const fetchAuditLogs = async () => {
       try {
         setLoading(true);
+        console.log("🔍 Buscando audit logs para profileId:", profileId);
         const { data, error } = await supabase
           .from("profile_audit_log")
           .select("*")
@@ -84,11 +85,16 @@ export function AtividadeRecente({ profileId }: AtividadeRecenteProps) {
           .order("created_at", { ascending: false })
           .limit(10);
 
-        if (error) throw error;
+        console.log("✅ Resultado da query:", { dataLength: data?.length, data, error });
+
+        if (error) {
+          console.error("❌ Erro na query:", error);
+          throw error;
+        }
 
         setLogs((data || []) as AuditLog[]);
       } catch (err) {
-        console.error("Erro ao carregar auditoria:", err);
+        console.error("❌ Erro ao carregar auditoria:", err);
         setError("Não foi possível carregar o histórico de atividades");
       } finally {
         setLoading(false);
@@ -172,6 +178,14 @@ export function AtividadeRecente({ profileId }: AtividadeRecenteProps) {
     );
   }
 
+  const summary = {
+    total: logs.length,
+    created: logs.filter((l) => l.action === "CREATE").length,
+    updated: logs.filter((l) => l.action === "UPDATE").length,
+    deleted: logs.filter((l) => l.action === "DELETE").length,
+    lastActivity: logs[0]?.created_at,
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -179,8 +193,35 @@ export function AtividadeRecente({ profileId }: AtividadeRecenteProps) {
           <ActivitySquare className="w-5 h-5" />
           Atividade Recente
         </CardTitle>
+        {/* Resumo das alterações */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-lg bg-green-50 p-3 border border-green-200">
+            <p className="text-xs font-semibold text-green-600 uppercase">Criados</p>
+            <p className="mt-1 text-xl font-bold text-green-700">{summary.created}</p>
+          </div>
+          <div className="rounded-lg bg-blue-50 p-3 border border-blue-200">
+            <p className="text-xs font-semibold text-blue-600 uppercase">Alterados</p>
+            <p className="mt-1 text-xl font-bold text-blue-700">{summary.updated}</p>
+          </div>
+          <div className="rounded-lg bg-red-50 p-3 border border-red-200">
+            <p className="text-xs font-semibold text-red-600 uppercase">Removidos</p>
+            <p className="mt-1 text-xl font-bold text-red-700">{summary.deleted}</p>
+          </div>
+          <div className="rounded-lg bg-gray-50 p-3 border border-gray-200">
+            <p className="text-xs font-semibold text-gray-600 uppercase">Total</p>
+            <p className="mt-1 text-xl font-bold text-gray-700">{summary.total}</p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
+        {summary.lastActivity && (
+          <p className="text-xs text-muted-foreground mb-4">
+            Última atividade: {formatDistanceToNow(new Date(summary.lastActivity), {
+              addSuffix: true,
+              locale: ptBR,
+            })}
+          </p>
+        )}
         <div className="space-y-4">
           {logs.map((log) => (
             <div

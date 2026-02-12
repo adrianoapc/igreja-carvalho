@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { maskTelefone } from "@/components/pessoas/maskTelefone";
-import { Star, Zap, Key, Trash2 } from "lucide-react";
+import { Star, Zap, Key, Trash2, Search, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useCepAutocomplete } from "@/hooks/useCepAutocomplete";
 
 interface Contato {
   tipo: string;
@@ -26,6 +27,13 @@ const TIPOS = [
   { value: "instagram", label: "Instagram" },
 ];
 
+// Ícone WhatsApp SVG - Verde oficial
+const WhatsAppIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+  </svg>
+);
+
 const initialFormData = {
   cep: "",
   cidade: "",
@@ -39,6 +47,7 @@ const initialFormData = {
 export default function EditarContatosPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { buscarCep, loading: cepLoading, error: cepError, clearError: clearCepError } = useCepAutocomplete();
   const [formData, setFormData] = useState(initialFormData);
   const [contatos, setContatos] = useState<Contato[]>([
     { tipo: "celular", valor: "", rotulo: "Pessoal", is_primary: true, is_whatsapp: false, is_login: false },
@@ -83,7 +92,7 @@ export default function EditarContatosPage() {
 
         if (contatosData && contatosData.length > 0) {
           const contatosCarregados = contatosData.map((c) => ({
-            tipo: c.tipo || "celular",
+            tipo: (c.tipo || "celular").trim().toLowerCase(),
             valor: c.valor || "",
             rotulo: c.rotulo || "Pessoal",
             is_primary: c.is_primary || false,
@@ -118,6 +127,19 @@ export default function EditarContatosPage() {
   };
 
   const handleTogglePrimary = (idx: number) => {
+    const contato = contatos[idx];
+    const contatosDeTipo = contatos.filter(c => c.tipo === contato.tipo);
+    
+    // Se é o único do tipo, não pode desmarcar
+    if (contatosDeTipo.length === 1) {
+      toast({ 
+        title: "Aviso", 
+        description: "Deve haver sempre um contato principal de cada tipo!", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     const updated = contatos.map((c, i) => ({
       ...c,
       is_primary: i === idx ? !c.is_primary : false,
@@ -125,15 +147,124 @@ export default function EditarContatosPage() {
     setContatos(updated);
   };
 
+  const handleToggleWhatsApp = (idx: number) => {
+    const updated = [...contatos];
+    updated[idx] = { ...updated[idx], is_whatsapp: !updated[idx].is_whatsapp };
+    setContatos(updated);
+  };
+
+  const handleSetLogin = (idx: number) => {
+    // Apenas permite MARCAR como login, nunca desmarcar
+    // E não permite ter mais de um login
+    const temLoginJa = contatos.some((c, i) => c.is_login && i !== idx);
+    
+    if (temLoginJa) {
+      toast({
+        title: "Aviso",
+        description: "Já existe um contato como login. Remova o outro antes.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const updated = contatos.map((c, i) => ({
+      ...c,
+      is_login: i === idx ? true : false,
+    }));
+    setContatos(updated);
+  };
+
+  const handleBuscarCep = async () => {
+    clearCepError();
+    const cepData = await buscarCep(formData.cep);
+    if (cepData && !cepData.erro) {
+      setFormData({
+        ...formData,
+        endereco: cepData.logradouro,
+        bairro: cepData.bairro,
+        cidade: cepData.localidade,
+        estado: cepData.uf,
+      });
+      toast({ title: "Sucesso", description: "CEP encontrado!" });
+    } else {
+      toast({ title: "Erro", description: cepError || "CEP não encontrado", variant: "destructive" });
+    }
+  };
+
+  const handleCepKeyDown = (e: React.KeyboardEvent) => {
+    // Não permite Enter no campo de CEP para evitar submit
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleBuscarCep();
+    }
+  };
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    // TODO: Salvar dados (API call com supabase)
-    setTimeout(() => {
-      setLoading(false);
-      toast({ title: "Sucesso", description: "Dados salvos com sucesso!" });
-      navigate(-1);
-    }, 1200);
+    
+    const salvarDados = async () => {
+      try {
+        if (!id) throw new Error("ID da pessoa não encontrado");
+
+        // 1. Salvar dados de endereço em profiles
+        const { error: perfilError } = await supabase
+          .from("profiles")
+          .update({
+            cep: formData.cep,
+            cidade: formData.cidade,
+            bairro: formData.bairro,
+            estado: formData.estado,
+            endereco: formData.endereco,
+            numero: formData.numero,
+            complemento: formData.complemento,
+          })
+          .eq("id", id);
+
+        if (perfilError) throw perfilError;
+
+        // 2. Deletar contatos antigos
+        const { error: deleteError } = await supabase
+          .from("profile_contatos")
+          .delete()
+          .eq("profile_id", id);
+
+        if (deleteError) throw deleteError;
+
+        // 3. Inserir novos contatos
+        if (contatos.length > 0) {
+          const contatosParaInserir = contatos.map(c => ({
+            profile_id: id,
+            tipo: c.tipo,
+            valor: c.valor,
+            rotulo: c.rotulo,
+            is_primary: c.is_primary,
+            is_whatsapp: c.is_whatsapp,
+            is_login: c.is_login,
+          }));
+
+          const { error: contatosError } = await supabase
+            .from("profile_contatos")
+            .insert(contatosParaInserir);
+
+          if (contatosError) throw contatosError;
+        }
+
+        setLoading(false);
+        toast({ title: "Sucesso", description: "Dados salvos com sucesso!" });
+        navigate(-1);
+      } catch (error) {
+        console.error("Erro ao salvar:", error);
+        setLoading(false);
+        toast({ 
+          title: "Erro", 
+          description: "Falha ao salvar dados. Tente novamente.", 
+          variant: "destructive" 
+        });
+      }
+    };
+
+    salvarDados();
   }
 
   if (loadingData) {
@@ -156,18 +287,32 @@ export default function EditarContatosPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="cep">CEP</Label>
-              <Input
-                id="cep"
-                value={formData.cep}
-                onChange={e => setFormData({
-                  ...formData,
-                  cep: e.target.value
-                    .replace(/\D/g, '')
-                    .replace(/(\d{5})(\d{0,3})/, (m, d1, d2) => { return d2 ? `${d1}-${d2}` : d1; })
-                })}
-                placeholder="00000-000"
-                maxLength={9}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="cep"
+                  value={formData.cep}
+                  onChange={e => setFormData({
+                    ...formData,
+                    cep: e.target.value
+                      .replace(/\D/g, '')
+                      .replace(/(\d{5})(\d{0,3})/, (m, d1, d2) => { return d2 ? `${d1}-${d2}` : d1; })
+                  })}
+                  onKeyDown={handleCepKeyDown}
+                  placeholder="00000-000"
+                  maxLength={9}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleBuscarCep}
+                  disabled={cepLoading || formData.cep.replace(/\D/g, '').length !== 8}
+                  title="Buscar CEP"
+                >
+                  <Search className="w-4 h-4" />
+                </Button>
+              </div>
+              {cepError && <p className="text-sm text-destructive mt-1">{cepError}</p>}
             </div>
             <div>
               <Label htmlFor="cidade">Cidade</Label>
@@ -250,47 +395,55 @@ export default function EditarContatosPage() {
                     </select>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 mt-1">
+                <div className="flex flex-wrap gap-2 mt-3 items-center">
                   <Button
                     type="button"
                     variant={contato.is_primary ? "default" : "outline"}
-                    size="icon"
+                    size="sm"
                     onClick={() => handleTogglePrimary(idx)}
-                    title="Principal"
+                    title="Marcar como principal"
+                    className="gap-2"
                   >
-                    <Star className={cn("w-4 h-4", contato.is_primary ? "text-yellow-500" : "text-muted-foreground")} />
+                    <Star className={cn("w-4 h-4", contato.is_primary ? "text-yellow-400" : "")} />
+                    Principal
                   </Button>
-                  {(contato.tipo === "celular" || contato.tipo === "fixo") && (
+                  {(contato.tipo === "celular" || contato.tipo === "fixo" || contato.tipo === "telefone") && (
                     <Button
                       type="button"
                       variant={contato.is_whatsapp ? "default" : "outline"}
-                      size="icon"
-                      onClick={() => handleContatoChange(idx, "is_whatsapp", !contato.is_whatsapp)}
-                      title="WhatsApp"
+                      size="sm"
+                      onClick={() => handleToggleWhatsApp(idx)}
+                      title="Marcar como WhatsApp"
+                      className={cn("gap-2", contato.is_whatsapp && "bg-green-600 hover:bg-green-700 text-white")}
                     >
-                      <Zap className={cn("w-4 h-4", contato.is_whatsapp ? "text-green-500" : "text-muted-foreground")} />
+                      <WhatsAppIcon />
+                      <span>WhatsApp</span>
                     </Button>
                   )}
                   {(contato.tipo === "email" || contato.tipo === "celular") && (
                     <Button
                       type="button"
                       variant={contato.is_login ? "default" : "outline"}
-                      size="icon"
-                      onClick={() => handleContatoChange(idx, "is_login", !contato.is_login)}
-                      title="Login"
+                      size="sm"
+                      onClick={() => handleSetLogin(idx)}
+                      disabled={contato.is_login || contatos.some((c, i) => c.is_login && i !== idx)}
+                      title={contato.is_login ? "Este contato é o login" : contatos.some((c, i) => c.is_login && i !== idx) ? "Já existe um login" : "Usar como login"}
+                      className="gap-2"
                     >
-                      <Key className={cn("w-4 h-4", contato.is_login ? "text-blue-500" : "text-muted-foreground")} />
+                      <Key className={cn("w-4 h-4", contato.is_login ? "text-blue-500" : "")} />
+                      Login
                     </Button>
                   )}
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => handleRemoveContato(idx)}
-                    title="Remover"
-                    className="text-destructive"
+                    title="Remover contato"
+                    className="text-destructive ml-auto"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Remover
                   </Button>
                 </div>
               </div>
