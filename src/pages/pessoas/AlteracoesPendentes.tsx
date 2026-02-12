@@ -36,8 +36,8 @@ interface AlteracaoPendente {
 
 export default function AlteracoesPendentes() {
   const navigate = useNavigate();
-  const { igrejaId, isAllFiliais } = useIgrejaId();
-  const { filialId } = useFilialId();
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
   
   const [alteracoes, setAlteracoes] = useState<AlteracaoPendente[]>([]);
   const [loading, setLoading] = useState(true);

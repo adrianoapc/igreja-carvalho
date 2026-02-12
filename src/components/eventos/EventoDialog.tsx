@@ -275,7 +275,7 @@ export default function EventoDialog({
     if (tipoSelecionado) {
       loadSubtipos(tipoSelecionado);
       // Ajustar tem_oferta baseado no tipo
-      if (tipoSelecionado === "CULTO" || tipoSelecionado === "CONFERENCIA") {
+      if (tipoSelecionado === "CULTO") {
         form.setValue("tem_oferta", true);
       } else {
         form.setValue("tem_oferta", false);

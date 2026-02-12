@@ -45,8 +45,8 @@ const fieldLabels: Record<string, string> = {
 export default function AprovarAlteracao() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { igrejaId, isAllFiliais } = useIgrejaId();
-  const { filialId } = useFilialId();
+  const { igrejaId } = useIgrejaId();
+  const { filialId, isAllFiliais } = useFilialId();
 
   const [alteracao, setAlteracao] = useState<AlteracaoPendente | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,11 +89,16 @@ export default function AprovarAlteracao() {
 
         setAlteracao({
           ...data,
+          dados_novos: (data.dados_novos ?? {}) as Record<string, any>,
+          dados_antigos: (data.dados_antigos ?? {}) as Record<string, any>,
           profile: profile || undefined,
         });
 
         // Inicializar campos aprovados como true por padrão
-        const campos = getChangedFields(data.dados_novos, data.dados_antigos);
+        const campos = getChangedFields(
+          (data.dados_novos ?? {}) as Record<string, any>,
+          (data.dados_antigos ?? {}) as Record<string, any>
+        );
         const inicial: Record<string, boolean> = {};
         campos.forEach((campo) => {
           inicial[campo] = true;

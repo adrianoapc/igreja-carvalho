@@ -59,7 +59,8 @@ export function AdicionarInscricaoDialog({
   onOpenChange,
   eventoId,
   evento,
-}: AdicionarInscricaoDialogProps & { onSuccess: () => void }) {
+  onSuccess,
+}: AdicionarInscricaoDialogProps) {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
