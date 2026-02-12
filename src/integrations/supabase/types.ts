@@ -10828,6 +10828,7 @@ export type Database = {
         Args: { p_sugestao_id: string; p_usuario_id?: string }
         Returns: boolean
       }
+      relatorio_duplicidade_pessoas: { Args: never; Returns: Json }
       resetar_senha_usuario_membro: {
         Args: { p_profile_id: string; p_senha_temporaria: string }
         Returns: {
