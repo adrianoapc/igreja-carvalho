@@ -493,8 +493,8 @@ export default function EditarPessoa() {
           bairro: pessoa.bairro,
           estado: pessoa.estado,
           endereco: pessoa.endereco,
-          email: pessoa.email,
-          telefone: pessoa.telefone,
+          numero: (pessoa as any).numero ?? null,
+          complemento: (pessoa as any).complemento ?? null,
         }}
         onSuccess={fetchPessoa}
       />

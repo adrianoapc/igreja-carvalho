@@ -6868,6 +6868,67 @@ export type Database = {
           },
         ]
       }
+      profile_audit_log: {
+        Row: {
+          action: string
+          column_name: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          profile_id: string
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          column_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          profile_id: string
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          column_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          profile_id?: string
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_audit_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_audit_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "profile_audit_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       profile_contatos: {
         Row: {
           created_at: string | null
