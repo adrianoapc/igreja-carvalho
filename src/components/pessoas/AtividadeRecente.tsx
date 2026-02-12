@@ -86,7 +86,7 @@ export function AtividadeRecente({ profileId }: AtividadeRecenteProps) {
 
         if (error) throw error;
 
-        setLogs(data || []);
+        setLogs((data || []) as AuditLog[]);
       } catch (err) {
         console.error("Erro ao carregar auditoria:", err);
         setError("Não foi possível carregar o histórico de atividades");

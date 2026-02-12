@@ -6874,7 +6874,9 @@ export type Database = {
           column_name: string | null
           created_at: string | null
           description: string | null
+          filial_id: string | null
           id: string
+          igreja_id: string | null
           new_value: string | null
           old_value: string | null
           profile_id: string
@@ -6886,7 +6888,9 @@ export type Database = {
           column_name?: string | null
           created_at?: string | null
           description?: string | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           new_value?: string | null
           old_value?: string | null
           profile_id: string
@@ -6898,7 +6902,9 @@ export type Database = {
           column_name?: string | null
           created_at?: string | null
           description?: string | null
+          filial_id?: string | null
           id?: string
+          igreja_id?: string | null
           new_value?: string | null
           old_value?: string | null
           profile_id?: string
@@ -6906,6 +6912,20 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profile_audit_log_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_audit_log_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profile_audit_log_profile_id_fkey"
             columns: ["profile_id"]
