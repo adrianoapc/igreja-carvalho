@@ -198,6 +198,7 @@ const AdminPermissions = lazy(() => import("./pages/AdminPermissions"));
 const AdminWebhooks = lazy(() => import("./pages/admin/Webhooks"));
 const AdminNotificacoes = lazy(() => import("./pages/admin/Notificacoes"));
 const AdminChatbots = lazy(() => import("./pages/admin/Chatbots"));
+const RevisaoDuplicatas = lazy(() => import("./pages/admin/RevisaoDuplicatas"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const ConfiguracoesIgreja = lazy(() => import("./pages/ConfiguracoesIgreja"));
 
@@ -1170,6 +1171,14 @@ const App = () => (
                     element={
                       <AuthGate>
                         <AdminChatbots />
+                      </AuthGate>
+                    }
+                  />
+                  <Route
+                    path="/admin/revisao-duplicatas"
+                    element={
+                      <AuthGate>
+                        <RevisaoDuplicatas />
                       </AuthGate>
                     }
                   />
