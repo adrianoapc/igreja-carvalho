@@ -40,7 +40,7 @@ export default function Pessoas() {
       value: "0",
       icon: Users,
       description: "Todas as pessoas cadastradas",
-      color: "bg-primary/10 text-primary",
+      color: "bg-blue-50 text-blue-700 border-blue-100",
       action: () => navigate("/pessoas/todos"),
     },
     {
@@ -48,7 +48,7 @@ export default function Pessoas() {
       value: "0",
       icon: UserPlus,
       description: "Aguardando conversão",
-      color: "bg-accent/10 text-accent-foreground",
+      color: "bg-amber-50 text-amber-700 border-amber-100",
       action: () => navigate("/pessoas/visitantes"),
     },
     {
@@ -56,7 +56,7 @@ export default function Pessoas() {
       value: "0",
       icon: UserCheck,
       description: "Com acesso ao app",
-      color: "bg-secondary/10 text-secondary-foreground",
+      color: "bg-purple-50 text-purple-700 border-purple-100",
       action: () => navigate("/pessoas/frequentadores"),
     },
     {
@@ -64,8 +64,7 @@ export default function Pessoas() {
       value: "0",
       icon: Users,
       description: "Membros ativos",
-      color:
-        "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
+      color: "bg-green-50 text-green-700 border-green-100",
       action: () => navigate("/pessoas/membros"),
     },
   ]);
@@ -269,27 +268,25 @@ export default function Pessoas() {
           return (
             <Card
               key={stat.title}
-              className={`cursor-pointer transition-all hover:shadow-md ${
+              className={`cursor-pointer transition-all hover:shadow-lg border ${
                 stat.action ? "hover:scale-105" : ""
-              }`}
+              } ${stat.color}`}
               onClick={stat.action}
             >
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs md:text-sm text-muted-foreground truncate">
+                    <p className="text-xs md:text-sm font-semibold opacity-75 truncate">
                       {stat.title}
                     </p>
-                    <h3 className="text-xl md:text-2xl font-bold mt-1">
+                    <h3 className="text-2xl md:text-3xl font-bold mt-1">
                       {stat.value}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                    <p className="text-xs opacity-75 mt-1 truncate">
                       {stat.description}
                     </p>
                   </div>
-                  <div
-                    className={`p-2 md:p-3 rounded-full ${stat.color} flex-shrink-0`}
-                  >
+                  <div className="p-2 md:p-3 rounded-full bg-white/30 flex-shrink-0">
                     <Icon className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                 </div>
@@ -300,29 +297,51 @@ export default function Pessoas() {
       </div>
 
       {/* Quick Actions */}
-      <Card>
+      <Card className="border-0 bg-slate-50">
         <CardHeader className="p-4 md:p-6">
           <CardTitle className="text-lg md:text-xl">Acesso Rápido</CardTitle>
         </CardHeader>
         <CardContent className="p-3 md:p-6">
           <div className="grid grid-cols-1 gap-3 md:gap-4">
-            {quickActions.map((action) => {
+            {quickActions.map((action, index) => {
               const Icon = action.icon;
+              const colors = [
+                "bg-blue-50 border-blue-100 hover:shadow-md",
+                "bg-green-50 border-green-100 hover:shadow-md",
+                "bg-orange-50 border-orange-100 hover:shadow-md",
+                "bg-purple-50 border-purple-100 hover:shadow-md",
+              ];
+              const iconColors = [
+                "text-blue-600",
+                "text-green-600",
+                "text-orange-600",
+                "text-purple-600",
+              ];
+              const bgColors = [
+                "bg-blue-100",
+                "bg-green-100",
+                "bg-orange-100",
+                "bg-purple-100",
+              ];
               return (
                 <div
                   key={action.title}
-                  className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                  className={`flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    colors[index]
+                  }`}
                   onClick={() => action.path !== "#" && navigate(action.path)}
                 >
-                  <div className="p-2 md:p-3 rounded-full bg-primary/10 flex-shrink-0">
-                    <Icon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                  <div
+                    className={`p-2 md:p-3 rounded-full bg-white/60 flex-shrink-0`}
+                  >
+                    <Icon className={`w-5 h-5 md:w-6 md:h-6 ${iconColors[index]} opacity-70`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <h3 className="font-semibold text-sm md:text-base truncate">
                         {action.title}
                       </h3>
-                      <Badge variant="secondary" className="text-xs w-fit">
+                      <Badge variant="secondary" className="text-xs w-fit font-bold">
                         {action.count} {action.label}
                       </Badge>
                     </div>
@@ -330,7 +349,7 @@ export default function Pessoas() {
                       {action.description}
                     </p>
                   </div>
-                  <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground flex-shrink-0" />
+                  <ArrowRight className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 opacity-60" />
                 </div>
               );
             })}
@@ -339,18 +358,21 @@ export default function Pessoas() {
       </Card>
 
       {/* Perfis Pendentes de Aprovação */}
-      <Card>
+      <Card className="border border-orange-100 bg-orange-50">
         <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between">
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
-            <FileEdit className="h-5 w-5 text-primary" />
-            Alterações Pendentes
+            <FileEdit className="h-5 w-5 text-orange-600" />
+            <span className="text-orange-800">Alterações Pendentes</span>
             {pendentesCount > 0 && (
-              <Badge variant="destructive">{pendentesCount}</Badge>
+              <Badge variant="destructive" className="animate-pulse">
+                {pendentesCount}
+              </Badge>
             )}
           </CardTitle>
           <Button
             variant="outline"
             size="sm"
+            className="border-orange-100 hover:bg-orange-100 text-orange-800"
             onClick={() => navigate("/pessoas/alteracoes-pendentes")}
           >
             Ver histórico
@@ -361,9 +383,9 @@ export default function Pessoas() {
           {pendentesCount > 0 ? (
             <PerfisPendentes />
           ) : (
-            <div className="text-center py-4 text-muted-foreground">
-              <p className="text-sm">Nenhuma alteração pendente de aprovação</p>
-              <p className="text-xs mt-1">
+            <div className="text-center py-4 text-orange-700">
+              <p className="text-sm">✓ Nenhuma alteração pendente de aprovação</p>
+              <p className="text-xs mt-1 text-orange-600">
                 Alterações externas de perfis aparecerão aqui
               </p>
             </div>
@@ -376,16 +398,19 @@ export default function Pessoas() {
 
       {/* Pessoas que Aceitaram Jesus */}
       {aceitaramJesus.length > 0 && (
-        <Card>
+        <Card className="border border-red-100 bg-red-50">
           <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between">
             <CardTitle className="text-lg md:text-xl flex items-center gap-2">
-              <Heart className="h-5 w-5 text-red-500" />
-              Aceitaram Jesus
-              <Badge variant="secondary">{aceitaramJesus.length}</Badge>
+              <Heart className="h-5 w-5 text-red-600 fill-red-600" />
+              <span className="text-red-800">Aceitaram Jesus</span>
+              <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-100">
+                {aceitaramJesus.length}
+              </Badge>
             </CardTitle>
             <Button
               variant="outline"
               size="sm"
+              className="border-red-100 hover:bg-red-100 text-red-800"
               onClick={() => navigate("/pessoas/todos?aceitou_jesus=true")}
             >
               Ver todos
@@ -397,12 +422,12 @@ export default function Pessoas() {
               {aceitaramJesus.map((pessoa) => (
                 <div
                   key={pessoa.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-red-100 bg-white hover:shadow-md hover:bg-red-50/30 cursor-pointer transition-all"
                   onClick={() => navigate(`/pessoas/${pessoa.id}`)}
                 >
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-10 w-10 ring-2 ring-red-100">
                     <AvatarImage src={pessoa.avatar_url || undefined} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                    <AvatarFallback className="bg-red-100 text-red-700 text-sm">
                       {pessoa.nome?.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -430,7 +455,7 @@ export default function Pessoas() {
                   </div>
                   <Badge
                     variant="outline"
-                    className="text-xs capitalize shrink-0"
+                    className="text-xs capitalize shrink-0 border-red-100 text-red-700"
                   >
                     {pessoa.status}
                   </Badge>
