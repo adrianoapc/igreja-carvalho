@@ -77,9 +77,7 @@ const PessoasContatos = lazy(() => import("./pages/pessoas/Contatos"));
 const PessoasAlteracoes = lazy(
   () => import("./pages/pessoas/AlteracoesPendentes"),
 );
-const AprovarAlteracao = lazy(
-  () => import("./pages/pessoas/AprovarAlteracao"),
-);
+const AprovarAlteracao = lazy(() => import("./pages/pessoas/AprovarAlteracao"));
 const PessoaDetalhes = lazy(() => import("./pages/PessoaDetalhes"));
 const EditarPessoa = lazy(() => import("./pages/pessoas/EditarPessoa"));
 
@@ -182,7 +180,9 @@ const FinancasDashboardOfertas = lazy(
 const FinancasProjecao = lazy(() => import("./pages/financas/Projecao"));
 const FinancasInsights = lazy(() => import("./pages/financas/Insights"));
 const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
-const FinancasTransferencias = lazy(() => import("./pages/financas/Transferencias"));
+const FinancasTransferencias = lazy(
+  () => import("./pages/financas/Transferencias"),
+);
 
 // Projetos
 const Projetos = lazy(() => import("./pages/Projetos"));

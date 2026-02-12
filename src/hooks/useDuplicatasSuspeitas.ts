@@ -11,6 +11,6 @@ export function useDuplicatasSuspeitas() {
         .eq("status", "pendente");
       if (error) throw error;
       return data;
-    }
+    },
   });
 }

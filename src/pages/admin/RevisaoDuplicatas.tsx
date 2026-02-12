@@ -15,7 +15,8 @@ export default function RevisaoDuplicatas() {
         {data?.map((item) => (
           <li key={item.id}>
             <button onClick={() => setSelecionada(item)}>
-              {item.pessoa_id_1.nome} x {item.pessoa_id_2.nome} (score: {item.score_similaridade.toFixed(2)})
+              {item.pessoa_id_1.nome} x {item.pessoa_id_2.nome} (score:{" "}
+              {item.score_similaridade.toFixed(2)})
             </button>
           </li>
         ))}
@@ -32,18 +33,20 @@ export default function RevisaoDuplicatas() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(selecionada.campos_conflitantes).map(([campo, valores]) => (
-                <tr key={campo}>
-                  <td>{campo}</td>
-                  <td>{valores[0]}</td>
-                  <td>{valores[1]}</td>
-                </tr>
-              ))}
+              {Object.entries(selecionada.campos_conflitantes).map(
+                ([campo, valores]) => (
+                  <tr key={campo}>
+                    <td>{campo}</td>
+                    <td>{valores[0]}</td>
+                    <td>{valores[1]}</td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
           {/* Botões de ação: Aprovar, Descartar, Mesclar */}
-          <button style={{marginRight:8}}>Aprovar Duplicidade</button>
-          <button style={{marginRight:8}}>Descartar</button>
+          <button style={{ marginRight: 8 }}>Aprovar Duplicidade</button>
+          <button style={{ marginRight: 8 }}>Descartar</button>
           <button>Mesclar</button>
         </div>
       )}
