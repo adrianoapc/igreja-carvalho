@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Star, Trash2, Zap, Key } from "lucide-react";
-import InputMask from "react-input-mask";
 import { removerFormatacao } from "@/lib/validators";
 import { useCepAutocomplete } from "@/hooks/useCepAutocomplete";
 import { cn } from "@/lib/utils";
@@ -51,17 +50,23 @@ export function EditarContatosDialog({
     estado: dadosAtuais.estado || "",
     endereco: dadosAtuais.endereco || "",
   });
-  const [contatos, setContatos] = useState<Array<{
-    id?: string;
-    tipo: string;
-    valor: string;
-    rotulo: string;
-    is_primary: boolean;
-    is_whatsapp: boolean;
-    is_login: boolean;
-  }>>([]);
+  const [contatos, setContatos] = useState<
+    Array<{
+      id?: string;
+      tipo: string;
+      valor: string;
+      rotulo: string;
+      is_primary: boolean;
+      is_whatsapp: boolean;
+      is_login: boolean;
+    }>
+  >([]);
   const { toast } = useToast();
-  const { buscarCep, loading: cepLoading, error: cepError } = useCepAutocomplete();
+  const {
+    buscarCep,
+    loading: cepLoading,
+    error: cepError,
+  } = useCepAutocomplete();
 
   // Carregar contatos ao abrir
   useEffect(() => {
@@ -87,7 +92,7 @@ export function EditarContatosDialog({
               is_primary: !!c.is_primary,
               is_whatsapp: !!c.is_whatsapp,
               is_login: !!c.is_login,
-            }))
+            })),
           );
         });
     }
@@ -114,9 +119,13 @@ export function EditarContatosDialog({
   };
 
   // Atualizar campo
-  const handleContatoChange = (idx: number, field: string, value: any) => {
+  const handleContatoChange = (
+    idx: number,
+    field: string,
+    value: string | boolean,
+  ) => {
     setContatos((prev) =>
-      prev.map((c, i) => (i === idx ? { ...c, [field]: value } : c))
+      prev.map((c, i) => (i === idx ? { ...c, [field]: value } : c)),
     );
   };
 
@@ -125,8 +134,8 @@ export function EditarContatosDialog({
     const tipo = contatos[idx].tipo;
     setContatos((prev) =>
       prev.map((c, i) =>
-        c.tipo === tipo ? { ...c, is_primary: i === idx } : c
-      )
+        c.tipo === tipo ? { ...c, is_primary: i === idx } : c,
+      ),
     );
   };
 
@@ -136,7 +145,10 @@ export function EditarContatosDialog({
     setLoading(true);
     try {
       // Remove todos os contatos antigos e insere os novos
-      await supabase.from("profile_contatos").delete().eq("profile_id", pessoaId);
+      await supabase
+        .from("profile_contatos")
+        .delete()
+        .eq("profile_id", pessoaId);
       const contatosInsert = contatos
         .filter((c) => c.valor.trim())
         .map((c) => ({
@@ -149,7 +161,9 @@ export function EditarContatosDialog({
           is_login: !!c.is_login,
         }));
       if (contatosInsert.length > 0) {
-        const { error } = await supabase.from("profile_contatos").insert(contatosInsert);
+        const { error } = await supabase
+          .from("profile_contatos")
+          .insert(contatosInsert);
         if (error) throw error;
       }
       toast({ title: "Sucesso", description: "Contatos atualizados!" });
@@ -194,42 +208,44 @@ export function EditarContatosDialog({
       onOpenChange={onOpenChange}
       title="Editar Contatos"
       className="max-w-[98vw] md:max-w-[900px] w-full"
-      style={{ minWidth: '340px', width: '100%', maxWidth: 900 }}
+      style={{ minWidth: "340px", width: "100%", maxWidth: 900 }}
     >
       <div className="flex flex-col h-full">
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col flex-1 overflow-hidden"
+        >
           <div className="flex-1 overflow-y-auto px-2 py-4 md:px-12 md:py-8">
             {/* Campos de endereço e dados pessoais */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="cep">CEP</Label>
                 <div className="relative">
-                  <InputMask
-                    mask="99999-999"
+                  <Input
+                    id="cep"
                     value={formData.cep}
-                    onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        cep: e.target.value
+                          .replace(/\D/g, "")
+                          .replace(/(\d{5})(\d{0,3})/, (m, d1, d2) => {
+                            return d2 ? `${d1}-${d2}` : d1;
+                          }),
+                      })
+                    }
                     onBlur={handleCepBlur}
-                  >
-                    {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                      <Input
-                        {...inputProps}
-                        id="cep"
-                        placeholder="00000-000"
-                        className={cn(cepLoading && "pr-10")}
-                      />
-                    )}
-                  </InputMask>
-                  {cepLoading && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-                  )}
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
                 </div>
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="cidade">Cidade</Label>
                 <Input
                   id="cidade"
                   value={formData.cidade}
-                  onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cidade: e.target.value })
+                  }
                   maxLength={100}
                 />
               </div>
@@ -238,7 +254,9 @@ export function EditarContatosDialog({
                 <Input
                   id="bairro"
                   value={formData.bairro}
-                  onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, bairro: e.target.value })
+                  }
                   maxLength={100}
                 />
               </div>
@@ -247,62 +265,123 @@ export function EditarContatosDialog({
                 <Input
                   id="estado"
                   value={formData.estado}
-                  onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, estado: e.target.value })
+                  }
                   maxLength={2}
                   placeholder="SP"
                 />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="endereco">Endereço</Label>
-                <Input
-                  id="endereco"
-                  value={formData.endereco}
-                  onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
-                  maxLength={255}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                  <div className="md:col-span-4 col-span-1">
+                    <Input
+                      id="endereco"
+                      value={formData.endereco}
+                      onChange={(e) =>
+                        setFormData({ ...formData, endereco: e.target.value })
+                      }
+                      maxLength={255}
+                      placeholder="Rua, avenida, etc."
+                    />
+                  </div>
+                  <div className="md:col-span-1 col-span-1">
+                    <Input
+                      id="numero"
+                      value={formData.numero || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, numero: e.target.value })
+                      }
+                      maxLength={10}
+                      placeholder="Nº"
+                    />
+                  </div>
+                  <div className="md:col-span-1 col-span-1">
+                    <Input
+                      id="complemento"
+                      value={formData.complemento || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          complemento: e.target.value,
+                        })
+                      }
+                      maxLength={50}
+                      placeholder="Compl."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             {/* Lista dinâmica de contatos */}
             <div className="mt-8">
               <div className="flex items-center justify-between mb-2">
                 <Label>Contatos</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddContato}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddContato}
+                >
                   + Adicionar Contato
                 </Button>
               </div>
               <div className="space-y-6 max-h-[340px] md:max-h-[420px] overflow-y-auto pr-1">
                 {contatos.map((contato, idx) => (
-                  <div key={idx} className="border rounded-xl p-4 bg-muted/50 shadow-sm flex flex-col gap-3">
+                  <div
+                    key={idx}
+                    className="border rounded-xl p-4 bg-muted/50 shadow-sm flex flex-col gap-3"
+                  >
                     <div className="grid grid-cols-1 gap-3 items-end">
                       {/* Tipo */}
                       <div>
                         <select
                           className="w-full border rounded px-2 py-1"
                           value={contato.tipo}
-                          onChange={e => handleContatoChange(idx, "tipo", e.target.value)}
+                          onChange={(e) =>
+                            handleContatoChange(idx, "tipo", e.target.value)
+                          }
                         >
-                          {TIPOS.map(t => (
-                            <option key={t.value} value={t.value}>{t.label}</option>
+                          {TIPOS.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
                           ))}
                         </select>
                       </div>
                       {/* Valor */}
                       <div>
-                        {contato.tipo === "celular" || contato.tipo === "fixo" ? (
-                          <InputMask
-                            mask={contato.tipo === "celular" ? "(99) 99999-9999" : "(99) 9999-9999"}
+                        {contato.tipo === "celular" ||
+                        contato.tipo === "fixo" ? (
+                          <Input
                             value={contato.valor}
-                            onChange={e => handleContatoChange(idx, "valor", e.target.value)}
-                          >
-                            {(inputProps) => (
-                              <Input {...inputProps} placeholder={contato.tipo === "celular" ? "Celular" : "Fixo"} />
-                            )}
-                          </InputMask>
+                            onChange={(e) => {
+                              // Só aplica máscara se o valor realmente mudou
+                              const raw = e.target.value;
+                              // Se já está formatado, não re-mascarar
+                              if (raw === contato.valor) return;
+                              handleContatoChange(
+                                idx,
+                                "valor",
+                                maskTelefone(raw, contato.tipo),
+                              );
+                            }}
+                            placeholder={
+                              contato.tipo === "celular" ? "Celular" : "Fixo"
+                            }
+                            inputMode="tel"
+                            maxLength={contato.tipo === "celular" ? 15 : 14}
+                          />
                         ) : (
                           <Input
                             value={contato.valor}
-                            onChange={e => handleContatoChange(idx, "valor", e.target.value)}
-                            placeholder={contato.tipo === "email" ? "E-mail" : "Instagram"}
+                            onChange={(e) =>
+                              handleContatoChange(idx, "valor", e.target.value)
+                            }
+                            placeholder={
+                              contato.tipo === "email" ? "E-mail" : "Instagram"
+                            }
                           />
                         )}
                       </div>
@@ -311,7 +390,9 @@ export function EditarContatosDialog({
                         <select
                           className="w-full border rounded px-2 py-1"
                           value={contato.rotulo}
-                          onChange={e => handleContatoChange(idx, "rotulo", e.target.value)}
+                          onChange={(e) =>
+                            handleContatoChange(idx, "rotulo", e.target.value)
+                          }
                         >
                           <option value="Pessoal">Pessoal</option>
                           <option value="Trabalho">Trabalho</option>
@@ -329,30 +410,65 @@ export function EditarContatosDialog({
                         onClick={() => handleTogglePrimary(idx)}
                         title="Principal"
                       >
-                        <Star className={cn("w-4 h-4", contato.is_primary ? "text-yellow-500" : "text-muted-foreground")} />
+                        <Star
+                          className={cn(
+                            "w-4 h-4",
+                            contato.is_primary
+                              ? "text-yellow-500"
+                              : "text-muted-foreground",
+                          )}
+                        />
                       </Button>
                       {/* Whatsapp */}
-                      {(contato.tipo === "celular" || contato.tipo === "fixo") && (
+                      {(contato.tipo === "celular" ||
+                        contato.tipo === "fixo") && (
                         <Button
                           type="button"
                           variant={contato.is_whatsapp ? "default" : "outline"}
                           size="icon"
-                          onClick={() => handleContatoChange(idx, "is_whatsapp", !contato.is_whatsapp)}
+                          onClick={() =>
+                            handleContatoChange(
+                              idx,
+                              "is_whatsapp",
+                              !contato.is_whatsapp,
+                            )
+                          }
                           title="WhatsApp"
                         >
-                          <Zap className={cn("w-4 h-4", contato.is_whatsapp ? "text-green-500" : "text-muted-foreground")} />
+                          <Zap
+                            className={cn(
+                              "w-4 h-4",
+                              contato.is_whatsapp
+                                ? "text-green-500"
+                                : "text-muted-foreground",
+                            )}
+                          />
                         </Button>
                       )}
                       {/* Login */}
-                      {(contato.tipo === "email" || contato.tipo === "celular") && (
+                      {(contato.tipo === "email" ||
+                        contato.tipo === "celular") && (
                         <Button
                           type="button"
                           variant={contato.is_login ? "default" : "outline"}
                           size="icon"
-                          onClick={() => handleContatoChange(idx, "is_login", !contato.is_login)}
+                          onClick={() =>
+                            handleContatoChange(
+                              idx,
+                              "is_login",
+                              !contato.is_login,
+                            )
+                          }
                           title="Login"
                         >
-                          <Key className={cn("w-4 h-4", contato.is_login ? "text-blue-500" : "text-muted-foreground")} />
+                          <Key
+                            className={cn(
+                              "w-4 h-4",
+                              contato.is_login
+                                ? "text-blue-500"
+                                : "text-muted-foreground",
+                            )}
+                          />
                         </Button>
                       )}
                       {/* Remover */}

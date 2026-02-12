@@ -58,7 +58,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { EditarDadosPessoaisDialog } from "@/components/pessoas/EditarDadosPessoaisDialog";
-import { EditarContatosDialog } from "@/components/pessoas/EditarContatosDialog";
 import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDadosEclesiasticosDialog";
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
@@ -138,7 +137,6 @@ export default function PessoaDetalhes() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("perfil");
   const [editarPessoaisOpen, setEditarPessoaisOpen] = useState(false);
-  const [editarContatosOpen, setEditarContatosOpen] = useState(false);
   const [editarEclesiasticosOpen, setEditarEclesiasticosOpen] = useState(false);
   const [editarAdicionaisOpen, setEditarAdicionaisOpen] = useState(false);
   const [editarStatusOpen, setEditarStatusOpen] = useState(false);
@@ -663,7 +661,7 @@ export default function PessoaDetalhes() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setEditarContatosOpen(true);
+                            navigate(`/pessoas/${pessoa.id}/editar-contatos`);
                           }}
                           className="h-8 w-8 p-0"
                         >
@@ -1068,21 +1066,7 @@ export default function PessoaDetalhes() {
             onSuccess={fetchPessoa}
           />
 
-          <EditarContatosDialog
-            open={editarContatosOpen}
-            onOpenChange={setEditarContatosOpen}
-            pessoaId={pessoa.id}
-            dadosAtuais={{
-              cep: pessoa.cep,
-              cidade: pessoa.cidade,
-              bairro: pessoa.bairro,
-              estado: pessoa.estado,
-              endereco: pessoa.endereco,
-              email: pessoa.email,
-              telefone: pessoa.telefone,
-            }}
-            onSuccess={fetchPessoa}
-          />
+          {/* EditarContatosDialog removido - navigation para page implementada via botão Editar */}
 
           <EditarDadosEclesiasticosDialog
             open={editarEclesiasticosOpen}
