@@ -6868,6 +6868,67 @@ export type Database = {
           },
         ]
       }
+      profile_contatos: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_login: boolean
+          is_primary: boolean
+          is_whatsapp: boolean
+          profile_id: string
+          rotulo: string | null
+          tipo: string
+          updated_at: string | null
+          valor: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_login?: boolean
+          is_primary?: boolean
+          is_whatsapp?: boolean
+          profile_id: string
+          rotulo?: string | null
+          tipo: string
+          updated_at?: string | null
+          valor: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_login?: boolean
+          is_primary?: boolean
+          is_whatsapp?: boolean
+          profile_id?: string
+          rotulo?: string | null
+          tipo?: string
+          updated_at?: string | null
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_contatos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_contatos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "profile_contatos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           aceitou_jesus: boolean | null
