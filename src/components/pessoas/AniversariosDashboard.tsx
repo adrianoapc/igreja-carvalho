@@ -231,45 +231,73 @@ export function AniversariosDashboard() {
     );
     const idade = now.getFullYear() - aniv.data.getFullYear();
 
+    const getTipoBgColor = (tipo: string) => {
+      switch (tipo) {
+        case "nascimento":
+          return "bg-pink-50 border-pink-200";
+        case "casamento":
+          return "bg-red-50 border-red-200";
+        case "batismo":
+          return "bg-blue-50 border-blue-200";
+        default:
+          return "bg-gray-50 border-gray-200";
+      }
+    };
+
+    const getTipoTextColor = (tipo: string) => {
+      switch (tipo) {
+        case "nascimento":
+          return "text-pink-700";
+        case "casamento":
+          return "text-red-700";
+        case "batismo":
+          return "text-blue-700";
+        default:
+          return "text-gray-700";
+      }
+    };
+
     return (
       <div
         key={`${aniv.id}-${aniv.tipo}`}
-        className="flex flex-col gap-2 p-3 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors cursor-pointer"
+        className={cn(
+          "flex flex-col gap-2 p-3 rounded-lg border-2 transition-all hover:shadow-md cursor-pointer",
+          getTipoBgColor(aniv.tipo)
+        )}
         onClick={() => navigate(`/pessoas/${aniv.id}`)}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2">
+          <div className={cn("flex-shrink-0 mt-0.5", getTipoTextColor(aniv.tipo))}>
+            {getIcon(aniv.tipo)}
+          </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm truncate">{aniv.nome}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="text-xs">
-                {getIcon(aniv.tipo)}
-                <span className="ml-1">{getTipoLabel(aniv.tipo)}</span>
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                {format(aniverDate, "dd/MMM", { locale: ptBR })}
-              </span>
-              {aniv.tipo === "nascimento" && (
-                <span className="text-xs text-muted-foreground">
-                  ({idade} anos)
-                </span>
-              )}
-            </div>
+            <p className={cn("text-xs font-semibold mt-0.5", getTipoTextColor(aniv.tipo))}>
+              {format(aniverDate, "dd 'de' MMM", { locale: ptBR })}
+            </p>
           </div>
         </div>
-        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {aniv.telefone && (
-            <span className="flex items-center gap-1">
-              <Phone className="w-3 h-3" />
-              {formatarTelefone(aniv.telefone)}
-            </span>
-          )}
-          {aniv.email && (
-            <span className="flex items-center gap-1 truncate">
-              <Mail className="w-3 h-3" />
-              <span className="truncate">{aniv.email}</span>
-            </span>
-          )}
-        </div>
+        {aniv.tipo === "nascimento" && (
+          <p className="text-xs text-muted-foreground">
+            {idade} anos
+          </p>
+        )}
+        {(aniv.telefone || aniv.email) && (
+          <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            {aniv.telefone && (
+              <span className="flex items-center gap-1 truncate">
+                <Phone className="w-3 h-3 flex-shrink-0" />
+                {formatarTelefone(aniv.telefone)}
+              </span>
+            )}
+            {aniv.email && (
+              <span className="flex items-center gap-1 truncate">
+                <Mail className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{aniv.email}</span>
+              </span>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -282,43 +310,33 @@ export function AniversariosDashboard() {
             <Cake className="w-5 h-5" />
             Aniversários
           </CardTitle>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Select
-              value={tipoFilter}
-              onValueChange={(v) => setTipoFilter(v as typeof tipoFilter)}
-            >
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="nascimento">
-                  <div className="flex items-center gap-2">
-                    <Cake className="w-3 h-3" />
-                    Nascimento
-                  </div>
-                </SelectItem>
-                <SelectItem value="casamento">
-                  <div className="flex items-center gap-2">
-                    <Heart className="w-3 h-3" />
-                    Casamento
-                  </div>
-                </SelectItem>
-                <SelectItem value="batismo">
-                  <div className="flex items-center gap-2">
-                    <Droplets className="w-3 h-3" />
-                    Batismo
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-3">
+            {/* Filtro Visual de Tipos */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: "todos", label: "Todos", icon: Cake, color: "bg-gray-100 text-gray-800 hover:bg-gray-200" },
+                { value: "nascimento", label: "Aniversário", icon: Cake, color: "bg-pink-100 text-pink-800 hover:bg-pink-200" },
+                { value: "casamento", label: "Casamento", icon: Heart, color: "bg-red-100 text-red-800 hover:bg-red-200" },
+                { value: "batismo", label: "Batismo", icon: Droplets, color: "bg-blue-100 text-blue-800 hover:bg-blue-200" },
+              ].map(({ value, label, icon: Icon, color }) => (
+                <button
+                  key={value}
+                  onClick={() => setTipoFilter(value as typeof tipoFilter)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-full transition-colors font-medium text-sm",
+                    tipoFilter === value ? color : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtro de Data */}
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full sm:w-auto"
-                >
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                   <CalendarIcon className="w-4 h-4 mr-2" />
                   {selectedDate
                     ? format(selectedDate, "dd/MM/yyyy")
@@ -358,7 +376,7 @@ export function AniversariosDashboard() {
                 Aniversários em {format(selectedDate, "dd/MM/yyyy")}
               </h3>
               {filteredAniversarios.length > 0 ? (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredAniversarios.map((aniv) =>
                     renderAniversarioCard(aniv)
                   )}
@@ -375,10 +393,10 @@ export function AniversariosDashboard() {
               {hoje.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm flex items-center gap-2">
-                    Hoje
+                    🎂 Hoje
                     <Badge variant="default">{hoje.length}</Badge>
                   </h3>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {hoje.map((aniv) => renderAniversarioCard(aniv))}
                   </div>
                 </div>
@@ -388,10 +406,10 @@ export function AniversariosDashboard() {
               {estaSemana.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm flex items-center gap-2">
-                    Esta Semana
+                    📅 Esta Semana
                     <Badge variant="secondary">{estaSemana.length}</Badge>
                   </h3>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {estaSemana.map((aniv) => renderAniversarioCard(aniv))}
                   </div>
                 </div>
@@ -401,10 +419,10 @@ export function AniversariosDashboard() {
               {esteMes.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm flex items-center gap-2">
-                    Este Mês
+                    📆 Este Mês
                     <Badge variant="outline">{esteMes.length}</Badge>
                   </h3>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {esteMes.map((aniv) => renderAniversarioCard(aniv))}
                   </div>
                 </div>
