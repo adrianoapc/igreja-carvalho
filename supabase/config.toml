@@ -78,5 +78,5 @@ verify_jwt = false
 [functions.detectar-duplicatas]
 verify_jwt = false
 
-[functions.automacao-duplicatas]
+[functions.automacao-duplicidade-pessoas]
 verify_jwt = false
