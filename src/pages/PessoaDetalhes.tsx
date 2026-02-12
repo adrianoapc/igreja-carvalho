@@ -51,6 +51,7 @@ import {
   Activity,
   ChevronDown,
   ChevronUp,
+  History,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -69,6 +70,7 @@ import { FamiliaresSection } from "@/components/pessoas/FamiliaresSection";
 import { VidaIgrejaFrequencia } from "@/components/pessoas/VidaIgrejaFrequencia";
 import { VidaIgrejaIntercessao } from "@/components/pessoas/VidaIgrejaIntercessao";
 import { VidaIgrejaEnvolvimento } from "@/components/pessoas/VidaIgrejaEnvolvimento";
+import { AtividadeRecente } from "@/components/pessoas/AtividadeRecente";
 import { formatarCPF, formatarTelefone, formatarCEP } from "@/lib/validators";
 
 interface PessoaDetalhesData {
@@ -474,7 +476,7 @@ export default function PessoaDetalhes() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="hidden md:grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
+        <TabsList className="hidden md:grid w-full grid-cols-3 sm:grid-cols-6 h-auto gap-1">
           <TabsTrigger
             value="perfil"
             className="flex-col gap-1 py-2 px-1 text-xs"
@@ -510,6 +512,13 @@ export default function PessoaDetalhes() {
             <MessageCircle className="w-4 h-4" />
             <span className="hidden sm:inline">Sentimentos</span>
           </TabsTrigger>
+          <TabsTrigger
+            value="atividade"
+            className="flex-col gap-1 py-2 px-1 text-xs"
+          >
+            <History className="w-4 h-4" />
+            <span className="hidden sm:inline">Atividade</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Mobile Navigation - Select */}
@@ -524,6 +533,7 @@ export default function PessoaDetalhes() {
               <SelectItem value="envolvimento">Envolvimento</SelectItem>
               <SelectItem value="frequencia">Frequência</SelectItem>
               <SelectItem value="intercessao">Sentimentos</SelectItem>
+              <SelectItem value="atividade">Atividade</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1044,6 +1054,11 @@ export default function PessoaDetalhes() {
               </Card>
             </Collapsible>
           </div>
+        </TabsContent>
+
+        {/* Tab: Atividade Recente */}
+        <TabsContent value="atividade" className="space-y-4">
+          <AtividadeRecente profileId={pessoa.id} />
         </TabsContent>
       </Tabs>
 
