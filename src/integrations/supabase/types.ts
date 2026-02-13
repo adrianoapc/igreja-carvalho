@@ -9068,6 +9068,7 @@ export type Database = {
           base_ministerial_id: string | null
           categoria_id: string | null
           centro_custo_id: string | null
+          conciliacao_status: string
           conferido_manual: boolean
           conta_id: string
           created_at: string
@@ -9108,6 +9109,7 @@ export type Database = {
           base_ministerial_id?: string | null
           categoria_id?: string | null
           centro_custo_id?: string | null
+          conciliacao_status?: string
           conferido_manual?: boolean
           conta_id: string
           created_at?: string
@@ -9148,6 +9150,7 @@ export type Database = {
           base_ministerial_id?: string | null
           categoria_id?: string | null
           centro_custo_id?: string | null
+          conciliacao_status?: string
           conferido_manual?: boolean
           conta_id?: string
           created_at?: string
