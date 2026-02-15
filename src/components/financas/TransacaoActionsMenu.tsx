@@ -38,6 +38,7 @@ interface TransacaoActionsMenuProps {
   isReembolso?: boolean;
   isDinheiro?: boolean;
   conferidoManual?: boolean;
+  conciliacaoStatus?: string | null;
   onEdit: () => void;
 }
 
@@ -48,6 +49,7 @@ export function TransacaoActionsMenu({
   isReembolso = false,
   isDinheiro = false,
   conferidoManual = false,
+  conciliacaoStatus = null,
   onEdit,
 }: TransacaoActionsMenuProps) {
   const queryClient = useQueryClient();
@@ -114,15 +116,42 @@ export function TransacaoActionsMenu({
 
   const handleToggleConferidoManual = async () => {
     try {
+      // Atualiza a transação atual
+      const { data: entradaAtual, error: fetchError } = await supabase
+        .from("transacoes_financeiras")
+        .select("id, transferencia_id, tipo")
+        .eq("id", transacaoId)
+        .single();
+      if (fetchError) throw fetchError;
+
+      const novoStatus = conferidoManual ? "nao_conciliado" : "conciliado_manual";
+
+      // Atualiza a entrada
       const { error } = await supabase
         .from("transacoes_financeiras")
-        .update({ conferido_manual: !conferidoManual })
+        .update({
+          conferido_manual: !conferidoManual,
+          conciliacao_status: novoStatus,
+        })
         .eq("id", transacaoId);
-
       if (error) throw error;
 
+      // Se for uma transferência (entrada com transferencia_id), concilia a saída correspondente
+      if (entradaAtual && entradaAtual.transferencia_id && entradaAtual.tipo === "entrada") {
+        await supabase
+          .from("transacoes_financeiras")
+          .update({
+            conciliacao_status: novoStatus,
+            conferido_manual: !conferidoManual,
+          })
+          .eq("transferencia_id", entradaAtual.transferencia_id)
+          .eq("tipo", "saida");
+      }
+
       toast.success(
-        conferidoManual ? "Conferência removida" : "Marcado como conferido",
+        conferidoManual
+          ? "Conciliação manual removida"
+          : "Marcado como conciliado manual",
       );
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
@@ -174,14 +203,16 @@ export function TransacaoActionsMenu({
               Marcar como Pendente
             </DropdownMenuItem>
           )}
-          {isDinheiro && (
+          {(conciliacaoStatus === "nao_conciliado" ||
+            conciliacaoStatus === "conciliado_manual" ||
+            !conciliacaoStatus) && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleToggleConferidoManual}>
                 <CheckCircle2 className="mr-2 h-4 w-4" />
                 {conferidoManual
-                  ? "Remover Conferido"
-                  : "Marcar como Conferido"}
+                  ? "Remover Conciliação Manual"
+                  : "Conciliar Manualmente"}
               </DropdownMenuItem>
             </>
           )}

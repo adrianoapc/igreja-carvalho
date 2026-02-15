@@ -228,6 +228,38 @@ export function VincularTransacaoDialog({
         return;
       }
 
+      const { data: transacao, error: transacaoFetchError } = await supabase
+        .from("transacoes_financeiras")
+        .select("*")
+        .eq("id", selectedTransacaoId)
+        .single();
+
+      if (transacaoFetchError) {
+        console.error("Erro ao buscar transação:", transacaoFetchError);
+        toast.error("Erro ao atualizar conciliação da transação");
+        return;
+      }
+
+      const { error: transacaoError } = await supabase
+        .from("transacoes_financeiras")
+        .update({ conciliacao_status: "conciliado_extrato" })
+        .eq("id", selectedTransacaoId);
+
+      if (transacaoError) {
+        console.error("Erro ao marcar conciliação:", transacaoError);
+        toast.error("Erro ao atualizar conciliação da transação");
+        return;
+      }
+
+      // Sincronizar transferência: se entrada com transferencia_id, conciliar saída correspondente
+      if (transacao?.transferencia_id && transacao?.tipo === "entrada") {
+        await supabase
+          .from("transacoes_financeiras")
+          .update({ conciliacao_status: "conciliado_extrato" })
+          .eq("transferencia_id", transacao.transferencia_id)
+          .eq("tipo", "saida");
+      }
+
       toast.success("Transação vinculada com sucesso!");
       onVinculado();
       onOpenChange(false);

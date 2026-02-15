@@ -208,6 +208,49 @@ export function DividirExtratoDialog({
         throw linksError;
       }
 
+      const { error: extratoError } = await supabase
+        .from("extratos_bancarios")
+        .update({ reconciliado: true })
+        .eq("id", extrato.id);
+
+      if (extratoError) {
+        console.error("Erro ao marcar extrato conciliado:", extratoError);
+        throw extratoError;
+      }
+
+      const transacaoIds = Array.from(selectedTransacoes.keys());
+      if (transacaoIds.length > 0) {
+        const { error: transacoesError } = await supabase
+          .from("transacoes_financeiras")
+          .update({ conciliacao_status: "conciliado_extrato" })
+          .in("id", transacaoIds);
+
+        if (transacoesError) {
+          console.error("Erro ao marcar transações conciliadas:", transacoesError);
+          throw transacoesError;
+        }
+
+        // Sincronizar transferências: para cada entrada conciliada, sincronizar saída
+        const { data: transacoesConciliadas } = await supabase
+          .from("transacoes_financeiras")
+          .select("id, tipo, transferencia_id")
+          .in("id", transacaoIds);
+
+        if (transacoesConciliadas && transacoesConciliadas.length > 0) {
+          const transferenciasIds = transacoesConciliadas
+            .filter((t: any) => t.tipo === "entrada" && t.transferencia_id)
+            .map((t: any) => t.transferencia_id);
+
+          if (transferenciasIds.length > 0) {
+            await supabase
+              .from("transacoes_financeiras")
+              .update({ conciliacao_status: "conciliado_extrato" })
+              .in("transferencia_id", transferenciasIds)
+              .eq("tipo", "saida");
+          }
+        }
+      }
+
       toast.success(
         `Extrato dividido em ${selectedTransacoes.size} transações`
       );

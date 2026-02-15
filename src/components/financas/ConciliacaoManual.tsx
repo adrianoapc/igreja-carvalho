@@ -70,6 +70,7 @@ interface Transacao {
   valor: number;
   tipo: string;
   data_pagamento: string;
+  conciliacao_status?: string | null;
   categorias_financeiras?: { nome: string } | null;
   conta_id?: string | null;
   origem_registro?: string | null;
@@ -203,7 +204,7 @@ export function ConciliacaoManual() {
       let query = supabase
         .from("transacoes_financeiras")
         .select(
-          "id, descricao, valor, tipo, data_pagamento, conta_id, origem_registro, contas:conta_id(nome), categorias_financeiras(nome)"
+          "id, descricao, valor, tipo, data_pagamento, conciliacao_status, conta_id, origem_registro, contas:conta_id(nome), categorias_financeiras(nome)"
         )
         .eq("igreja_id", igrejaId)
         .eq("status", "pago")
@@ -293,6 +294,7 @@ export function ConciliacaoManual() {
     return transacoes.filter((t) => {
       // Exclude transactions already reconciled
       if (transacoesJaVinculadas?.has(t.id)) return false;
+      if (t.conciliacao_status && t.conciliacao_status !== "nao_conciliado") return false;
 
       // Search filter
       if (transacaoSearchTerm) {

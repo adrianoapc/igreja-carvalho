@@ -239,6 +239,19 @@ export function useConciliacaoLote({
 
       if (updateError) throw updateError;
 
+      // Sincronizar transferência se aplicável
+      if (transacao.transferencia_id && transacao.tipo === "entrada") {
+        await supabase
+          .from("transacoes_financeiras")
+          .update({
+            conciliacao_status: "conciliado_extrato",
+            status: "pago",
+            data_pagamento: new Date().toISOString().split('T')[0],
+          })
+          .eq("transferencia_id", transacao.transferencia_id)
+          .eq("tipo", "saida");
+      }
+
       // Insert audit logs for batch reconciliation
       const extratosParaLog = extratosFiltrados.filter(e => selectedExtratos.has(e.id));
       const auditLogs = extratosParaLog.map(extrato => ({

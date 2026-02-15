@@ -8,6 +8,7 @@ import { useGerarSuggestoesConciliacao } from '@/hooks/useGerarSuggestoesConcili
 import { useSuggestoesMLMapeadas } from '@/hooks/useSuggestoesMLMapeadas'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { MonthPicker } from './MonthPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,7 +22,7 @@ import { format, differenceInDays, isWithinInterval } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { parseLocalDate, formatLocalDate, startOfMonthLocal, endOfMonthLocal } from '@/utils/dateUtils'
 import { cn } from '@/lib/utils'
-import { Plus, Loader2, Search, Eye, EyeOff, ChevronLeft, ChevronRight, RotateCcw, Sparkles, Settings } from 'lucide-react'
+import { Plus, Loader2, Search, Eye, EyeOff, ChevronLeft, ChevronRight, RotateCcw, Sparkles, Settings, CheckCircle2 } from 'lucide-react'
 import { QuickCreateTransacaoDialog } from './QuickCreateTransacaoDialog'
 import { TransacaoDetalheDrawer } from './TransacaoDetalheDrawer'
 import { ExtratoSugestaoMLA } from './ExtratoSugestaoMLA'
@@ -51,6 +52,7 @@ interface TransacaoItem {
   tipo: string
   conta_id: string
   status?: string
+  conciliacao_status?: string
 }
 
 interface Conta {
@@ -81,6 +83,8 @@ export function ConciliacaoInteligente() {
   // Month pickers independentes
   const [mesExtratos, setMesExtratos] = useState(new Date())
   const [mesTransacoes, setMesTransacoes] = useState(new Date())
+  const [extratosCustomRange, setExtratosCustomRange] = useState<{ from: Date; to: Date } | null>(null)
+  const [transacoesCustomRange, setTransacoesCustomRange] = useState<{ from: Date; to: Date } | null>(null)
 
   // Gerar sugestões ao abrir a tela
   useEffect(() => {
@@ -88,12 +92,16 @@ export function ConciliacaoInteligente() {
       gerarSugestoes({
         igreja_id: igrejaId,
         conta_id: contaFiltro !== 'all' ? contaFiltro : undefined,
-        mes_inicio: formatLocalDate(startOfMonthLocal(mesExtratos)),
-        mes_fim: formatLocalDate(endOfMonthLocal(mesExtratos)),
+        mes_inicio: formatLocalDate(
+          extratosCustomRange?.from ? extratosCustomRange.from : startOfMonthLocal(mesExtratos)
+        ),
+        mes_fim: formatLocalDate(
+          extratosCustomRange?.to ? extratosCustomRange.to : endOfMonthLocal(mesExtratos)
+        ),
         score_minimo: 0.7,
       })
     }
-  }, [igrejaId, contaFiltro, mesExtratos])
+  }, [igrejaId, contaFiltro, mesExtratos, extratosCustomRange])
 
   // Fetch accounts
   const { data: contas } = useQuery<Conta[]>({
@@ -112,18 +120,16 @@ export function ConciliacaoInteligente() {
 
   // Fetch pending statements
   const { data: extratos, isLoading: loadingExtratos } = useQuery({
-    queryKey: ['extratos-pendentes-inteligente', igrejaId, filialId, isAllFiliais, mesExtratos],
+    queryKey: ['extratos-pendentes-inteligente', igrejaId, filialId, isAllFiliais, mesExtratos, extratosCustomRange],
     queryFn: async (): Promise<ExtratoItem[]> => {
       if (!igrejaId) return []
       
-      const inicio = startOfMonthLocal(mesExtratos)
-      const fim = endOfMonthLocal(mesExtratos)
-
-      // Buscar IDs de extratos já vinculados em lotes
-      const { data: extratosEmLote } = await supabase
-        .from('conciliacoes_lote_extratos')
-        .select('extrato_id')
-      const idsEmLote = new Set((extratosEmLote || []).map(e => e.extrato_id))
+      const inicio = extratosCustomRange?.from
+        ? extratosCustomRange.from
+        : startOfMonthLocal(mesExtratos)
+      const fim = extratosCustomRange?.to
+        ? extratosCustomRange.to
+        : endOfMonthLocal(mesExtratos)
       
       let query = supabase
         .from('extratos_bancarios')
@@ -145,8 +151,7 @@ export function ConciliacaoInteligente() {
       
       const { data, error } = await query
       if (error) throw error
-      // Filtrar extratos já vinculados em lotes
-      return ((data || []) as ExtratoItem[]).filter(e => !idsEmLote.has(e.id))
+      return (data || []) as ExtratoItem[]
     },
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
     staleTime: 0,
@@ -157,7 +162,7 @@ export function ConciliacaoInteligente() {
 
   // Fetch unreconciled transactions
   const { data: transacoes, isLoading: loadingTransacoes } = useQuery({
-    queryKey: ['transacoes-pendentes-inteligente', igrejaId, filialId, isAllFiliais, mesTransacoes, contaFiltro],
+    queryKey: ['transacoes-pendentes-inteligente', igrejaId, filialId, isAllFiliais, mesTransacoes, transacoesCustomRange, contaFiltro],
     queryFn: async (): Promise<TransacaoItem[]> => {
       if (!igrejaId) return []
       
@@ -183,7 +188,7 @@ export function ConciliacaoInteligente() {
       
       let query = supabase
         .from('transacoes_financeiras')
-        .select('id, data_pagamento, data_vencimento, descricao, valor, valor_liquido, taxas_administrativas, juros, multas, desconto, tipo, conta_id, status')
+        .select('id, data_pagamento, data_vencimento, descricao, valor, valor_liquido, taxas_administrativas, juros, multas, desconto, tipo, conta_id, status, conciliacao_status')
         .eq('igreja_id', igrejaId)
         .in('status', ['pendente', 'pago'])
         .order('data_pagamento', { ascending: false })
@@ -205,9 +210,14 @@ export function ConciliacaoInteligente() {
       const transacoesFiltradas = ((data || []) as TransacaoItem[]).filter(t => {
         // Ja esta sendo filtrado antes (idsJaConciliados), agora filtrar por data
         if (idsJaConciliados.has(t.id)) return false
+        if (t.conciliacao_status && t.conciliacao_status !== 'nao_conciliado') return false
         
-        const inicio = startOfMonthLocal(mesTransacoes)
-        const fim = endOfMonthLocal(mesTransacoes)
+        const inicio = transacoesCustomRange?.from
+          ? transacoesCustomRange.from
+          : startOfMonthLocal(mesTransacoes)
+        const fim = transacoesCustomRange?.to
+          ? transacoesCustomRange.to
+          : endOfMonthLocal(mesTransacoes)
         
         if (t.status === 'pendente') {
           // Pendentes: filtrar por data_vencimento
@@ -235,8 +245,12 @@ export function ConciliacaoInteligente() {
   const extratosFiltrados = useMemo(() => {
     if (!extratos) return []
     
-    const inicio = startOfMonthLocal(mesExtratos)
-    const fim = endOfMonthLocal(mesExtratos)
+    const inicio = extratosCustomRange?.from
+      ? extratosCustomRange.from
+      : startOfMonthLocal(mesExtratos)
+    const fim = extratosCustomRange?.to
+      ? extratosCustomRange.to
+      : endOfMonthLocal(mesExtratos)
     
     return extratos.filter((e) => {
       if (searchExtrato && !e.descricao.toLowerCase().includes(searchExtrato.toLowerCase())) {
@@ -252,7 +266,7 @@ export function ConciliacaoInteligente() {
       if (!dataExtrato) return false
       return isWithinInterval(dataExtrato, { start: inicio, end: fim })
     })
-  }, [extratos, searchExtrato, tipoFiltro, mesExtratos])
+  }, [extratos, searchExtrato, tipoFiltro, mesExtratos, extratosCustomRange])
 
   const extratoIds = useMemo(() => {
     return extratosFiltrados.map((extrato) => extrato.id)
@@ -384,17 +398,40 @@ export function ConciliacaoInteligente() {
           
           if (erroExtrato) throw erroExtrato
           
-          // Se transação está pendente, marcar como pago com data do extrato
-          if (transacao && transacao.status === 'pendente' && extrato) {
+          // Atualizar transação: conciliação via extrato (e pagamento se pendente)
+          if (transacao && extrato) {
+            const updateTransacao: {
+              conciliacao_status: string
+              status?: string
+              data_pagamento?: string
+            } = {
+              conciliacao_status: 'conciliado_extrato',
+            }
+
+            if (transacao.status === 'pendente') {
+              updateTransacao.status = 'pago'
+              updateTransacao.data_pagamento = extrato.data_transacao
+            }
+
             const { error: erroTransacao } = await supabase
               .from('transacoes_financeiras')
-              .update({
-                status: 'pago',
-                data_pagamento: extrato.data_transacao,
-              })
+              .update(updateTransacao)
               .eq('id', transacaoId)
-            
+
             if (erroTransacao) throw erroTransacao
+
+            // Se for transferência (entrada com transferencia_id), concilia a saída correspondente
+            if (transacao.transferencia_id && transacao.tipo === 'entrada') {
+              await supabase
+                .from('transacoes_financeiras')
+                .update({
+                  conciliacao_status: 'conciliado_extrato',
+                  status: updateTransacao.status,
+                  data_pagamento: updateTransacao.data_pagamento,
+                })
+                .eq('transferencia_id', transacao.transferencia_id)
+                .eq('tipo', 'saida')
+            }
           }
 
            // Gravar feedback da reconciliação manual para ML aprender
@@ -428,94 +465,105 @@ export function ConciliacaoInteligente() {
            }
         }
       } else {
-        // Caso 1:N - Um extrato para múltiplas transações
-        // Usa conciliacoes_divisao (split) - 1 extrato → N transações
+        // Caso 1:N - Um extrato para múltiplas transações (lote)
         if (selectedExtratos.length === 1) {
           const extratoId = selectedExtratos[0]
           const extrato = extratosFiltrados?.find(e => e.id === extratoId)
           
           if (!extrato) throw new Error('Extrato não encontrado')
 
-          // Verificar se extrato já está vinculado em algum lote
-          const { data: jaVinculado } = await supabase
-            .from('conciliacoes_lote_extratos')
-            .select('id')
-            .eq('extrato_id', extratoId)
-            .maybeSingle()
+          // Marcar extrato como reconciliado
+          const { error: erroExtrato } = await supabase
+            .from('extratos_bancarios')
+            .update({ reconciliado: true })
+            .eq('id', extratoId)
           
-          if (jaVinculado) {
-            throw new Error('Este extrato já está vinculado a uma conciliação em lote')
-          }
+          if (erroExtrato) throw erroExtrato
 
-          // Para cada transação, criar um lote individual e vincular o extrato
+          // Criar lotes para cada transação
           for (const transacaoId of selectedTransacoes) {
             const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
             
-            // Usar aplicar_conciliacao RPC para manter consistência
-            const { error: erroAplicar } = await supabase.rpc('aplicar_conciliacao', {
-              p_extrato_id: extratoId,
-              p_transacao_id: transacaoId,
-              p_igreja_id: igrejaId,
-              p_usuario_id: usuarioProfileId,
-            })
-
-            if (erroAplicar) {
-              console.warn('aplicar_conciliacao falhou, fazendo vínculo manual:', erroAplicar)
-              
-              // Fallback: vínculo direto 1:1 via update no extrato
-              const { error: erroExtrato } = await supabase
-                .from('extratos_bancarios')
-                .update({
-                  reconciliado: true,
-                  transacao_vinculada_id: transacaoId,
-                })
-                .eq('id', extratoId)
-              
-              if (erroExtrato) throw erroExtrato
-            }
+            // 1. Inserir registro principal na conciliacoes_lote
+            const { data: loteData, error: erroLote } = await supabase
+              .from('conciliacoes_lote')
+              .insert({
+                transacao_id: transacaoId,
+                igreja_id: igrejaId,
+                filial_id: filialId,
+                conta_id: extrato.conta_id,
+                valor_transacao: transacao?.valor || 0,
+                valor_extratos: 0, // Será atualizado pelo trigger
+                created_by: authUserId,
+              })
+              .select('id')
+              .single()
             
-            // Marcar transação pendente como paga
-            if (transacao && transacao.status === 'pendente') {
+            if (erroLote) throw erroLote
+
+            // 2. Inserir relacionamento na conciliacoes_lote_extratos
+            const { error: erroLoteExtrato } = await supabase
+              .from('conciliacoes_lote_extratos')
+              .insert({
+                conciliacao_lote_id: loteData.id,
+                extrato_id: extratoId,
+              })
+            
+            if (erroLoteExtrato) throw erroLoteExtrato
+          }
+          
+          // Atualizar transações: conciliação via extrato (e pagamento se pendente)
+          for (const transacaoId of selectedTransacoes) {
+            const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
+            if (transacao) {
+              const updateTransacao: {
+                conciliacao_status: string
+                status?: string
+                data_pagamento?: string
+              } = {
+                conciliacao_status: 'conciliado_extrato',
+              }
+
+              if (transacao.status === 'pendente') {
+                updateTransacao.status = 'pago'
+                updateTransacao.data_pagamento = extrato.data_transacao
+              }
+
               const { error: erroTransacao } = await supabase
                 .from('transacoes_financeiras')
-                .update({
-                  status: 'pago',
-                  data_pagamento: extrato.data_transacao,
-                })
+                .update(updateTransacao)
                 .eq('id', transacaoId)
-              
+
               if (erroTransacao) throw erroTransacao
             }
           }
 
-          // Marcar extrato como reconciliado (caso não tenha sido pelo RPC)
-          await supabase
-            .from('extratos_bancarios')
-            .update({ reconciliado: true })
-            .eq('id', extratoId)
-
            // Gravar feedback da reconciliação manual em lote para ML aprender
-           if (extrato && usuarioProfileId) {
-             const { error: erroFeedback } = await supabase
-               .from('conciliacao_ml_feedback')
-               .insert({
-                 igreja_id: igrejaId,
-                 filial_id: filialId,
-                 conta_id: extrato.conta_id,
-                 tipo_match: '1:N',
-                 extrato_ids: [extratoId],
-                 transacao_ids: selectedTransacoes,
-                 acao: 'ajustada',
-                 score: 1.0,
-                 modelo_versao: 'v1',
-                 usuario_id: usuarioProfileId,
-                 ajustes: {
-                   valor_extrato: extrato.valor,
-                   num_transacoes: selectedTransacoes.length,
-                 },
-               })
+           if (extrato) {
+             if (usuarioProfileId) {
+               const { error: erroFeedback } = await supabase
+                 .from('conciliacao_ml_feedback')
+                 .insert({
+                   igreja_id: igrejaId,
+                   filial_id: filialId,
+                   conta_id: extrato.conta_id,
+                   tipo_match: 'N:1',
+                   extrato_ids: [extratoId],
+                   transacao_ids: selectedTransacoes,
+                   acao: 'ajustada',
+                   score: 1.0,
+                   modelo_versao: 'v1',
+                   usuario_id: usuarioProfileId,
+                   ajustes: {
+                     valor_extrato: extrato.valor,
+                     num_transacoes: selectedTransacoes.length,
+                   },
+                 })
 
-             if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
+               if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
+             } else {
+               console.warn('⚠️ profile.id não disponível, feedback em lote não gravado')
+             }
            }
         } else {
           throw new Error('Múltiplos extratos com múltiplas transações não é suportado')
@@ -639,8 +687,12 @@ export function ConciliacaoInteligente() {
           onClick={() => gerarSugestoes({
             igreja_id: igrejaId!,
             conta_id: contaFiltro !== 'all' ? contaFiltro : undefined,
-            mes_inicio: formatLocalDate(startOfMonthLocal(mesExtratos)),
-            mes_fim: formatLocalDate(endOfMonthLocal(mesExtratos)),
+            mes_inicio: formatLocalDate(
+              extratosCustomRange?.from ? extratosCustomRange.from : startOfMonthLocal(mesExtratos)
+            ),
+            mes_fim: formatLocalDate(
+              extratosCustomRange?.to ? extratosCustomRange.to : endOfMonthLocal(mesExtratos)
+            ),
             score_minimo: 0.7,
           })}
           disabled={gerando}
@@ -659,25 +711,13 @@ export function ConciliacaoInteligente() {
             <div className="flex items-center justify-between mb-0.5">
               <h3 className="font-semibold text-sm">Banco</h3>
               <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => setMesExtratos(new Date(mesExtratos.getFullYear(), mesExtratos.getMonth() - 1, 1))}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-xs font-medium w-20 text-center">
-                  {format(mesExtratos, 'MMM/yy', { locale: ptBR })}
-                </span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => setMesExtratos(new Date(mesExtratos.getFullYear(), mesExtratos.getMonth() + 1, 1))}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+                <MonthPicker
+                  selectedMonth={mesExtratos}
+                  onMonthChange={setMesExtratos}
+                  customRange={extratosCustomRange}
+                  onCustomRangeChange={setExtratosCustomRange}
+                  className="text-xs"
+                />
                 <Button
                   size="icon"
                   variant="ghost"
@@ -837,25 +877,13 @@ export function ConciliacaoInteligente() {
             <div className="flex items-center justify-between mb-0.5">
               <h3 className="font-semibold text-sm">Sistema</h3>
               <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => setMesTransacoes(new Date(mesTransacoes.getFullYear(), mesTransacoes.getMonth() - 1, 1))}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-xs font-medium w-20 text-center">
-                  {format(mesTransacoes, 'MMM/yy', { locale: ptBR })}
-                </span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => setMesTransacoes(new Date(mesTransacoes.getFullYear(), mesTransacoes.getMonth() + 1, 1))}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+                <MonthPicker
+                  selectedMonth={mesTransacoes}
+                  onMonthChange={setMesTransacoes}
+                  customRange={transacoesCustomRange}
+                  onCustomRangeChange={setTransacoesCustomRange}
+                  className="text-xs"
+                />
                 <Button
                   size="icon"
                   variant="ghost"
@@ -918,7 +946,7 @@ export function ConciliacaoInteligente() {
                       </p>
                     </div>
                   </div>
-                  {/* Botão de ajuste */}
+                  {/* Botões de ação */}
                   <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       size="icon"
@@ -932,6 +960,31 @@ export function ConciliacaoInteligente() {
                       title="Ajustar valores (taxas, juros, etc.)"
                     >
                       <Settings className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-5 w-5"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        try {
+                          const { error } = await supabase
+                            .from('transacoes_financeiras')
+                            .update({ conciliacao_status: 'conciliado_manual' })
+                            .eq('id', item.id)
+                          
+                          if (error) throw error
+                          
+                          toast.success('Transação marcada como conciliada manualmente')
+                          queryClient.invalidateQueries({ queryKey: ['transacoes-conciliacao'] })
+                        } catch (error) {
+                          console.error('Erro ao marcar conciliação manual:', error)
+                          toast.error('Erro ao marcar conciliação manual')
+                        }
+                      }}
+                      title="Marcar como conciliado manualmente"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
@@ -956,6 +1009,11 @@ export function ConciliacaoInteligente() {
             id: transacaoSelecionada.id,
             descricao: transacaoSelecionada.descricao,
             valor: transacaoSelecionada.valor,
+            valor_liquido: transacaoSelecionada.valor_liquido,
+            taxas_administrativas: transacaoSelecionada.taxas_administrativas,
+            juros: transacaoSelecionada.juros,
+            multas: transacaoSelecionada.multas,
+            desconto: transacaoSelecionada.desconto,
             data_pagamento: transacaoSelecionada.data_pagamento,
           }}
           onUpdated={() => {

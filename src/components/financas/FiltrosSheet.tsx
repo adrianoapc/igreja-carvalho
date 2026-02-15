@@ -27,6 +27,8 @@ interface FiltrosSheetProps {
   setFornecedorId?: (value: string) => void;
   status: string;
   setStatus: (value: string) => void;
+  conciliacaoStatus: string;
+  setConciliacaoStatus: (value: string) => void;
   
   // Dados
   contas: Array<{ id: string; nome: string }>;
@@ -62,6 +64,8 @@ export function FiltrosSheet({
   tipoTransacao = 'saida',
   onLimpar,
   onAplicar,
+  conciliacaoStatus,
+  setConciliacaoStatus,
 }: FiltrosSheetProps) {
   const [open, setOpen] = useState(false);
 
@@ -90,17 +94,7 @@ export function FiltrosSheet({
         </SheetHeader>
 
         <div className="space-y-6 py-6">
-          {/* Período com MonthPicker */}
-          <div className="space-y-3">
-            <Label className="text-sm font-semibold">Período</Label>
-            <MonthPicker
-              selectedMonth={selectedMonth}
-              onMonthChange={onMonthChange}
-              customRange={customRange}
-              onCustomRangeChange={onCustomRangeChange}
-              className="w-full"
-            />
-          </div>
+          {/* Período removido: controle fora da drawer */}
 
           {/* Busca por Descrição */}
           <div className="space-y-2">
@@ -153,7 +147,7 @@ export function FiltrosSheet({
             </Select>
           </div>
 
-          {/* Fornecedor (apenas para saídas) */}
+          {/* Fornecedor (disponível para entradas e saídas) */}
           {fornecedores && setFornecedorId && fornecedorId !== undefined && (
             <div className="space-y-2">
               <Label htmlFor="fornecedor" className="text-sm font-semibold">Fornecedor</Label>
@@ -185,6 +179,24 @@ export function FiltrosSheet({
                 <SelectItem value="pendente">Pendente</SelectItem>
                 <SelectItem value="pago">{statusPagoLabel}</SelectItem>
                 <SelectItem value="atrasado">Atrasado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status de Conciliação */}
+          <div className="space-y-2">
+            <Label htmlFor="conciliacaoStatus" className="text-sm font-semibold">Conciliação</Label>
+            <Select value={conciliacaoStatus} onValueChange={setConciliacaoStatus}>
+              <SelectTrigger id="conciliacaoStatus">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="conciliado_extrato">Conciliado (Extrato)</SelectItem>
+                <SelectItem value="conciliado_manual">Conciliado Manual</SelectItem>
+                <SelectItem value="conciliado_bot">Conciliado Bot</SelectItem>
+                <SelectItem value="nao_conciliado">Não Conciliado</SelectItem>
+                <SelectItem value="conferido_manual">Conferido Manual</SelectItem>
               </SelectContent>
             </Select>
           </div>

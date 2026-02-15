@@ -12,7 +12,7 @@ export default function Reconciliacao() {
   const navigate = useNavigate();
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 p-2 sm:p-0">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-2">
           <Button

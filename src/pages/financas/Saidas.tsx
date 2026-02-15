@@ -40,6 +40,7 @@ import {
   startOfDayLocal,
   endOfDayLocal,
 } from "@/utils/dateUtils";
+import { useTransacoesFiltro } from "@/hooks/useTransacoesFiltro";
 // import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
@@ -65,7 +66,6 @@ export default function Saidas() {
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  // const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<{
     id: string;
     descricao: string;
@@ -87,6 +87,7 @@ export default function Saidas() {
   const [categoriaFilter, setCategoriaFilter] = useState("all");
   const [fornecedorFilter, setFornecedorFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [conciliacaoStatusFilter, setConciliacaoStatusFilter] = useState("all");
 
   // Estados para agrupamento por data
   const [agruparPorData, setAgruparPorData] = useState(false);
@@ -227,46 +228,24 @@ export default function Saidas() {
     enabled: !loading && !!igrejaId,
   });
 
-  // Aplicar filtros
-  const transacoesFiltradas = useMemo(() => {
-    if (!transacoes) return [];
+  // Inicializar mapa de conciliação vazio (será atualizado depois)
+  const [conciliacaoMap, setConciliacaoMap] = useState<
+    Map<string, boolean>
+  >(new Map());
 
-    return transacoes.filter((t) => {
-      // Filtro de busca por descrição
-      if (busca && !t.descricao.toLowerCase().includes(busca.toLowerCase())) {
-        return false;
-      }
-
-      // Filtro de conta
-      if (contaFilter !== "all" && t.conta_id !== contaFilter) {
-        return false;
-      }
-
-      // Filtro de categoria
-      if (categoriaFilter !== "all" && t.categoria_id !== categoriaFilter) {
-        return false;
-      }
-
-      // Filtro de fornecedor
-      if (fornecedorFilter !== "all" && t.fornecedor_id !== fornecedorFilter) {
-        return false;
-      }
-
-      // Filtro de status
-      if (statusFilter !== "all" && t.status !== statusFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [
+  // Aplicar filtros centralizados
+  const transacoesFiltradas = useTransacoesFiltro(
     transacoes,
-    busca,
-    contaFilter,
-    categoriaFilter,
-    fornecedorFilter,
-    statusFilter,
-  ]);
+    {
+      busca,
+      contaId: contaFilter,
+      categoriaId: categoriaFilter,
+      fornecedorId: fornecedorFilter,
+      status: statusFilter,
+      conciliacaoStatus: conciliacaoStatusFilter,
+    },
+    conciliacaoMap
+  );
 
   const transacaoIds = useMemo(
     () => transacoesFiltradas.map((transacao) => transacao.id),
@@ -298,14 +277,15 @@ export default function Saidas() {
     enabled: !loading && !!igrejaId && transacaoIds.length > 0,
   });
 
-  const conciliacaoMap = useMemo(() => {
+  // Atualizar mapa de conciliação quando extratos mudam
+  useEffect(() => {
     const map = new Map<string, boolean>();
     extratosConciliados.forEach((extrato) => {
       if (extrato.transacao_vinculada_id) {
         map.set(extrato.transacao_vinculada_id, !!extrato.reconciliado);
       }
     });
-    return map;
+    setConciliacaoMap(map);
   }, [extratosConciliados]);
 
   // Agrupar transações por data
@@ -524,6 +504,8 @@ export default function Saidas() {
             setFornecedorId={setFornecedorFilter}
             status={statusFilter}
             setStatus={setStatusFilter}
+            conciliacaoStatus={conciliacaoStatusFilter}
+            setConciliacaoStatus={setConciliacaoStatusFilter}
             contas={contas || []}
             categorias={categorias || []}
             fornecedores={fornecedores || []}
@@ -533,6 +515,7 @@ export default function Saidas() {
               setCategoriaFilter("all");
               setFornecedorFilter("all");
               setStatusFilter("all");
+              setConciliacaoStatusFilter("all");
               setSelectedMonth(new Date());
               setCustomRange(null);
             }}
@@ -798,14 +781,16 @@ export default function Saidas() {
                         {isExpandido && (
                           <div className="divide-y">
                             {grupo.map((transacao) => {
-                              const isConciliado = conciliacaoMap.get(
-                                transacao.id,
-                              );
+                              const conciliacaoStatus =
+                                transacao.conciliacao_status ||
+                                (conciliacaoMap.get(transacao.id)
+                                  ? "conciliado_extrato"
+                                  : "nao_conciliado");
                               const isDinheiro = isPagamentoDinheiro(
                                 transacao.forma_pagamento,
                               );
                               const isConferidoManual =
-                                !isConciliado &&
+                                conciliacaoStatus === "nao_conciliado" &&
                                 isDinheiro &&
                                 !!transacao.conferido_manual;
 
@@ -942,9 +927,20 @@ export default function Saidas() {
                                         >
                                           {getStatusDisplay(transacao)}
                                         </Badge>
-                                        {isConciliado ? (
+                                        {conciliacaoStatus ===
+                                        "conciliado_extrato" ? (
                                           <Badge className="text-[10px] md:text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-                                            Conciliado
+                                            Conciliado (Extrato)
+                                          </Badge>
+                                        ) : conciliacaoStatus ===
+                                          "conciliado_manual" ? (
+                                          <Badge className="text-[10px] md:text-xs bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
+                                            Conciliado Manual
+                                          </Badge>
+                                        ) : conciliacaoStatus ===
+                                          "conciliado_bot" ? (
+                                          <Badge className="text-[10px] md:text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                                            Conciliado Bot
                                           </Badge>
                                         ) : isConferidoManual ? (
                                           <Badge className="text-[10px] md:text-xs bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
@@ -964,6 +960,7 @@ export default function Saidas() {
                                       conferidoManual={
                                         !!transacao.conferido_manual
                                       }
+                                      conciliacaoStatus={conciliacaoStatus}
                                       onEdit={() => {
                                         setEditingTransacao(transacao);
                                         setDialogOpen(true);
@@ -982,12 +979,16 @@ export default function Saidas() {
               ) : (
                 <div className="space-y-2">
                   {transacoesPaginadas.map((transacao) => {
-                    const isConciliado = conciliacaoMap.get(transacao.id);
+                    const conciliacaoStatus =
+                      transacao.conciliacao_status ||
+                      (conciliacaoMap.get(transacao.id)
+                        ? "conciliado_extrato"
+                        : "nao_conciliado");
                     const isDinheiro = isPagamentoDinheiro(
                       transacao.forma_pagamento,
                     );
                     const isConferidoManual =
-                      !isConciliado &&
+                      conciliacaoStatus === "nao_conciliado" &&
                       isDinheiro &&
                       !!transacao.conferido_manual;
 
@@ -1111,9 +1112,19 @@ export default function Saidas() {
                               >
                                 {getStatusDisplay(transacao)}
                               </Badge>
-                              {isConciliado ? (
+                              {conciliacaoStatus ===
+                              "conciliado_extrato" ? (
                                 <Badge className="text-[10px] md:text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-                                  Conciliado
+                                  Conciliado (Extrato)
+                                </Badge>
+                              ) : conciliacaoStatus ===
+                                "conciliado_manual" ? (
+                                <Badge className="text-[10px] md:text-xs bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
+                                  Conciliado Manual
+                                </Badge>
+                              ) : conciliacaoStatus === "conciliado_bot" ? (
+                                <Badge className="text-[10px] md:text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                                  Conciliado Bot
                                 </Badge>
                               ) : isConferidoManual ? (
                                 <Badge className="text-[10px] md:text-xs bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
@@ -1129,6 +1140,7 @@ export default function Saidas() {
                             isReembolso={!!transacao.solicitacao_reembolso_id}
                             isDinheiro={isDinheiro}
                             conferidoManual={!!transacao.conferido_manual}
+                            conciliacaoStatus={conciliacaoStatus}
                             onEdit={() => {
                               setEditingTransacao(transacao);
                               setDialogOpen(true);
