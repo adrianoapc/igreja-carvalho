@@ -10859,6 +10859,10 @@ export type Database = {
           variance_value: number
         }[]
       }
+      contar_transferencias_dessincronizadas: {
+        Args: { p_filial_id?: string; p_igreja_id: string }
+        Returns: number
+      }
       create_filial_short_links: {
         Args: {
           p_filial_id: string
@@ -10877,6 +10881,14 @@ export type Database = {
           message: string
           success: boolean
           user_id: string
+        }[]
+      }
+      estatisticas_sincronizacao: {
+        Args: { p_dias?: number; p_igreja_id: string }
+        Returns: {
+          data: string
+          transacoes_sincronizadas: number
+          usuarios_envolvidos: number
         }[]
       }
       generate_filial_slug: {
@@ -10998,6 +11010,20 @@ export type Database = {
         Args: { p_ativo: boolean; p_expires_at: string; p_scheduled_at: string }
         Returns: boolean
       }
+      listar_transferencias_dessincronizadas: {
+        Args: { p_filial_id?: string; p_igreja_id: string; p_limite?: number }
+        Returns: {
+          data_transferencia: string
+          descricao: string
+          dias_pendente: number
+          entrada_id: string
+          entrada_status: string
+          saida_id: string
+          saida_status: string
+          transferencia_id: string
+          valor: number
+        }[]
+      }
       log_edge_function_execution: {
         Args: { p_details?: string; p_function_name: string; p_status: string }
         Returns: undefined
@@ -11101,6 +11127,14 @@ export type Database = {
       sincronizar_transferencias_reconciliacao: {
         Args: { p_limite?: number }
         Returns: Json
+      }
+      validar_integridade_transferencias: {
+        Args: { p_igreja_id: string }
+        Returns: {
+          exemplo: string
+          problema_tipo: string
+          quantidade: number
+        }[]
       }
     }
     Enums: {
