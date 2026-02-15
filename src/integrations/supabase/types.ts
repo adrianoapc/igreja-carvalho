@@ -11145,6 +11145,13 @@ export type Database = {
           quantidade: number
         }[]
       }
+      verificar_integridade_extrato: {
+        Args: { p_extrato_id: string }
+        Returns: {
+          mensagem: string
+          status: string
+        }[]
+      }
     }
     Enums: {
       access_level:
