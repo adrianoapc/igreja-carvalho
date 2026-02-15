@@ -2229,35 +2229,35 @@ export type Database = {
           {
             foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
             columns: ["extrato_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "extratos_bancarios"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
             columns: ["extrato_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "mv_conciliacao_dataset"
             referencedColumns: ["extrato_id"]
           },
           {
             foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
             columns: ["extrato_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "view_conciliacao_candidatos"
             referencedColumns: ["extrato_id"]
           },
           {
             foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
             columns: ["extrato_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "view_conciliacao_exemplos_positivos"
             referencedColumns: ["extrato_id"]
           },
           {
             foreignKeyName: "conciliacoes_lote_extratos_extrato_id_fkey"
             columns: ["extrato_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "view_conciliacao_ml_export_dataset"
             referencedColumns: ["extrato_id"]
           },
