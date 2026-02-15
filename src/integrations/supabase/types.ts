@@ -10883,6 +10883,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      diagnosticar_extrato: {
+        Args: { p_extrato_id: string }
+        Returns: {
+          campo: string
+          categoria: string
+          observacao: string
+          valor: string
+        }[]
+      }
       estatisticas_sincronizacao: {
         Args: { p_dias?: number; p_igreja_id: string }
         Returns: {
