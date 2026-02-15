@@ -536,6 +536,82 @@ export type Database = {
         }
         Relationships: []
       }
+      auditoria_conciliacoes: {
+        Row: {
+          created_at: string
+          filial_id: string | null
+          id: string
+          igreja_id: string
+          observacoes: string | null
+          tipo_reconciliacao: string
+          transacao_id: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id: string
+          observacoes?: string | null
+          tipo_reconciliacao: string
+          transacao_id?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          filial_id?: string | null
+          id?: string
+          igreja_id?: string
+          observacoes?: string | null
+          tipo_reconciliacao?: string
+          transacao_id?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auditoria_conciliacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "mv_conciliacao_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "auditoria_conciliacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes_financeiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditoria_conciliacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_candidatos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "auditoria_conciliacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_exemplos_positivos"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "auditoria_conciliacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_conciliacao_ml_export_dataset"
+            referencedColumns: ["transacao_id"]
+          },
+          {
+            foreignKeyName: "auditoria_conciliacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "view_movimento_contabil"
+            referencedColumns: ["transacao_id"]
+          },
+        ]
+      }
       aulas: {
         Row: {
           created_at: string | null
@@ -11007,6 +11083,24 @@ export type Database = {
           p_tipo: string
         }
         Returns: undefined
+      }
+      sincronizar_conciliacao_transferencias: {
+        Args: {
+          p_filial_id?: string
+          p_igreja_id: string
+          p_usuario_id?: string
+        }
+        Returns: {
+          conciliacao_status: string
+          descricao: string
+          sucesso: boolean
+          transacao_entrada_id: string
+          transacao_saida_id: string
+        }[]
+      }
+      sincronizar_transferencias_reconciliacao: {
+        Args: { p_limite?: number }
+        Returns: Json
       }
     }
     Enums: {
