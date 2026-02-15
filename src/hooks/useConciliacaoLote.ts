@@ -202,8 +202,25 @@ export function useConciliacaoLote({
 
       if (loteError) throw loteError;
 
-      // Link all selected statements to the batch
-      const vinculos = Array.from(selectedExtratos).map(extratoId => ({
+      // Filtrar extratos já vinculados em lotes para evitar duplicate key
+      const { data: jaVinculados } = await supabase
+        .from("conciliacoes_lote_extratos")
+        .select("extrato_id")
+        .in("extrato_id", Array.from(selectedExtratos));
+      
+      const idsJaVinculados = new Set((jaVinculados || []).map(v => v.extrato_id));
+      const extratosNovos = Array.from(selectedExtratos).filter(id => !idsJaVinculados.has(id));
+      
+      if (extratosNovos.length === 0) {
+        throw new Error("Todos os extratos selecionados já estão vinculados a outros lotes");
+      }
+
+      if (idsJaVinculados.size > 0) {
+        console.warn(`${idsJaVinculados.size} extrato(s) já vinculados foram ignorados`);
+      }
+
+      // Link new statements to the batch
+      const vinculos = extratosNovos.map(extratoId => ({
         conciliacao_lote_id: lote.id,
         extrato_id: extratoId,
       }));

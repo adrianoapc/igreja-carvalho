@@ -118,6 +118,12 @@ export function ConciliacaoInteligente() {
       
       const inicio = startOfMonthLocal(mesExtratos)
       const fim = endOfMonthLocal(mesExtratos)
+
+      // Buscar IDs de extratos já vinculados em lotes
+      const { data: extratosEmLote } = await supabase
+        .from('conciliacoes_lote_extratos')
+        .select('extrato_id')
+      const idsEmLote = new Set((extratosEmLote || []).map(e => e.extrato_id))
       
       let query = supabase
         .from('extratos_bancarios')
@@ -139,7 +145,8 @@ export function ConciliacaoInteligente() {
       
       const { data, error } = await query
       if (error) throw error
-      return (data || []) as ExtratoItem[]
+      // Filtrar extratos já vinculados em lotes
+      return ((data || []) as ExtratoItem[]).filter(e => !idsEmLote.has(e.id))
     },
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
     staleTime: 0,
@@ -421,39 +428,53 @@ export function ConciliacaoInteligente() {
            }
         }
       } else {
-        // Caso 1:N - Um extrato para múltiplas transações (lote)
+        // Caso 1:N - Um extrato para múltiplas transações
+        // Usa conciliacoes_divisao (split) - 1 extrato → N transações
         if (selectedExtratos.length === 1) {
           const extratoId = selectedExtratos[0]
           const extrato = extratosFiltrados?.find(e => e.id === extratoId)
           
           if (!extrato) throw new Error('Extrato não encontrado')
 
-          // Marcar extrato como reconciliado
-          const { error: erroExtrato } = await supabase
-            .from('extratos_bancarios')
-            .update({ reconciliado: true })
-            .eq('id', extratoId)
+          // Verificar se extrato já está vinculado em algum lote
+          const { data: jaVinculado } = await supabase
+            .from('conciliacoes_lote_extratos')
+            .select('id')
+            .eq('extrato_id', extratoId)
+            .maybeSingle()
           
-          if (erroExtrato) throw erroExtrato
+          if (jaVinculado) {
+            throw new Error('Este extrato já está vinculado a uma conciliação em lote')
+          }
 
-          // Criar lote
-          const lotes = selectedTransacoes.map((transacaoId) => {
-            const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
-            return {
-              extrato_id: extratoId,
-              transacao_id: transacaoId,
-              igreja_id: igrejaId,
-              valor_transacao: transacao?.valor || 0,
-              valor_extratos: extrato.valor,
-            }
-          })
-
-          const { error: erroLote } = await supabase.from('conciliacoes_lote').insert(lotes)
-          if (erroLote) throw erroLote
-          
-          // Marcar transações pendentes como pagas
+          // Para cada transação, criar um lote individual e vincular o extrato
           for (const transacaoId of selectedTransacoes) {
             const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
+            
+            // Usar aplicar_conciliacao RPC para manter consistência
+            const { error: erroAplicar } = await supabase.rpc('aplicar_conciliacao', {
+              p_extrato_id: extratoId,
+              p_transacao_id: transacaoId,
+              p_igreja_id: igrejaId,
+              p_usuario_id: usuarioProfileId,
+            })
+
+            if (erroAplicar) {
+              console.warn('aplicar_conciliacao falhou, fazendo vínculo manual:', erroAplicar)
+              
+              // Fallback: vínculo direto 1:1 via update no extrato
+              const { error: erroExtrato } = await supabase
+                .from('extratos_bancarios')
+                .update({
+                  reconciliado: true,
+                  transacao_vinculada_id: transacaoId,
+                })
+                .eq('id', extratoId)
+              
+              if (erroExtrato) throw erroExtrato
+            }
+            
+            // Marcar transação pendente como paga
             if (transacao && transacao.status === 'pendente') {
               const { error: erroTransacao } = await supabase
                 .from('transacoes_financeiras')
@@ -467,32 +488,34 @@ export function ConciliacaoInteligente() {
             }
           }
 
-           // Gravar feedback da reconciliação manual em lote para ML aprender
-           if (extrato) {
-             if (usuarioProfileId) {
-               const { error: erroFeedback } = await supabase
-                 .from('conciliacao_ml_feedback')
-                 .insert({
-                   igreja_id: igrejaId,
-                   filial_id: filialId,
-                   conta_id: extrato.conta_id,
-                   tipo_match: 'N:1',
-                   extrato_ids: [extratoId],
-                   transacao_ids: selectedTransacoes,
-                   acao: 'ajustada',
-                   score: 1.0,
-                   modelo_versao: 'v1',
-                   usuario_id: usuarioProfileId,
-                   ajustes: {
-                     valor_extrato: extrato.valor,
-                     num_transacoes: selectedTransacoes.length,
-                   },
-                 })
+          // Marcar extrato como reconciliado (caso não tenha sido pelo RPC)
+          await supabase
+            .from('extratos_bancarios')
+            .update({ reconciliado: true })
+            .eq('id', extratoId)
 
-               if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
-             } else {
-               console.warn('⚠️ profile.id não disponível, feedback em lote não gravado')
-             }
+           // Gravar feedback da reconciliação manual em lote para ML aprender
+           if (extrato && usuarioProfileId) {
+             const { error: erroFeedback } = await supabase
+               .from('conciliacao_ml_feedback')
+               .insert({
+                 igreja_id: igrejaId,
+                 filial_id: filialId,
+                 conta_id: extrato.conta_id,
+                 tipo_match: '1:N',
+                 extrato_ids: [extratoId],
+                 transacao_ids: selectedTransacoes,
+                 acao: 'ajustada',
+                 score: 1.0,
+                 modelo_versao: 'v1',
+                 usuario_id: usuarioProfileId,
+                 ajustes: {
+                   valor_extrato: extrato.valor,
+                   num_transacoes: selectedTransacoes.length,
+                 },
+               })
+
+             if (erroFeedback) console.error('Erro ao gravar feedback ML:', erroFeedback)
            }
         } else {
           throw new Error('Múltiplos extratos com múltiplas transações não é suportado')
