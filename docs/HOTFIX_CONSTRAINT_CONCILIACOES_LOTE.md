@@ -17,6 +17,7 @@
 ## Causa Raiz
 
 A constraint `UNIQUE(extrato_id)` na tabela `conciliacoes_lote_extratos` foi criada com a premissa incorreta de que "um extrato só pode estar em um lote". Isso funciona para:
+
 - ✅ Caso 1:1 (1 extrato : 1 transação via `transacao_vinculada_id`)
 - ❌ Caso 1:N (1 extrato : N transações via lotes)
 
@@ -26,16 +27,17 @@ A constraint `UNIQUE(extrato_id)` na tabela `conciliacoes_lote_extratos` foi cri
 
 ```sql
 -- Remover constraint antiga
-ALTER TABLE public.conciliacoes_lote_extratos 
+ALTER TABLE public.conciliacoes_lote_extratos
 DROP CONSTRAINT IF EXISTS conciliacoes_lote_extratos_extrato_id_key;
 
 -- Adicionar constraint composta
-ALTER TABLE public.conciliacoes_lote_extratos 
-ADD CONSTRAINT conciliacoes_lote_extratos_lote_extrato_key 
+ALTER TABLE public.conciliacoes_lote_extratos
+ADD CONSTRAINT conciliacoes_lote_extratos_lote_extrato_key
 UNIQUE (conciliacao_lote_id, extrato_id);
 ```
 
 **Nova semântica:**
+
 - ✅ Um extrato pode aparecer em múltiplos lotes
 - ✅ Previne duplicação: mesmo lote não pode ter o mesmo extrato 2x
 - ✅ Suporta caso 1:N corretamente
@@ -51,16 +53,17 @@ UNIQUE (conciliacao_lote_id, extrato_id);
    - ✅ Atualizar transações
 
 2. **Rollback em caso de erro:**
+
    ```typescript
    try {
      // ... operações de conciliação
    } catch (error) {
      // Rollback: desmarcar extrato
      await supabase
-       .from('extratos_bancarios')
+       .from("extratos_bancarios")
        .update({ reconciliado: false })
-       .eq('id', extratoId)
-     throw error
+       .eq("id", extratoId);
+     throw error;
    }
    ```
 
@@ -71,16 +74,19 @@ UNIQUE (conciliacao_lote_id, extrato_id);
 ## Casos de Uso Suportados
 
 ### Caso 1:1 (Direto)
+
 - Extrato → `transacao_vinculada_id` → Transação
 - Tabela: `extratos_bancarios`
 - Constraint: OK
 
 ### Caso 1:N (Lote)
+
 - 1 Extrato → N Lotes → N Transações
 - Tabelas: `conciliacoes_lote` + `conciliacoes_lote_extratos`
 - Constraint: ✅ Corrigida
 
 ### Caso N:1 (Lote)
+
 - N Extratos → 1 Lote → 1 Transação
 - Tabelas: `conciliacoes_lote` + `conciliacoes_lote_extratos`
 - Constraint: ✅ OK (já funcionava)

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { useHideValues } from "@/hooks/useHideValues";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +72,7 @@ type GroupByOption = "none" | "status" | "tipo" | "origem" | "conta";
 
 export function HistoricoExtratos() {
   const { igrejaId, filialId } = useAuthContext();
+  const { formatValue } = useHideValues();
   const queryClient = useQueryClient();
 
   // Filters
@@ -518,10 +520,7 @@ export function HistoricoExtratos() {
             {extrato.tipo === "credito" || extrato.tipo === "CREDIT"
               ? "+"
               : "-"}
-            {new Intl.NumberFormat("pt-BR", {
-              style: "currency",
-              currency: "BRL",
-            }).format(Math.abs(extrato.valor))}
+            {formatValue(Math.abs(extrato.valor))}
           </span>
 
           <div className="flex items-center gap-1">

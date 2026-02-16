@@ -9,9 +9,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Calculator, Save } from 'lucide-react'
+import { Calculator, Save, ExternalLink, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 
@@ -24,6 +25,7 @@ interface TransacaoDetalheDrawerProps {
     valor: number
     valor_liquido?: number
     data_pagamento: string
+    tipo?: string
     taxas_administrativas?: number
     juros?: number
     multas?: number
@@ -47,6 +49,7 @@ export function TransacaoDetalheDrawer({
     (transacao.valor_liquido || transacao.valor).toFixed(2).replace('.', ',')
   )
   const [saving, setSaving] = useState(false)
+  const [copiedId, setCopiedId] = useState(false)
 
   // Atualizar valores quando a transação mudar
   useEffect(() => {
@@ -116,10 +119,55 @@ export function TransacaoDetalheDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-[400px] sm:w-[540px]">
         <SheetHeader>
-          <SheetTitle>Ajustar Valores da Transação</SheetTitle>
-          <SheetDescription>
-            Corrija taxas, juros ou descontos para bater com o extrato bancário
-          </SheetDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <SheetTitle>Ajustar Valores da Transação</SheetTitle>
+              <SheetDescription>
+                Corrija taxas, juros ou descontos para bater com o extrato bancário
+              </SheetDescription>
+            </div>
+          </div>
+          
+          {/* ID e tipo da transação */}
+          <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground mb-1">ID da Transação</p>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(String(transacao.id))
+                  setCopiedId(true)
+                  setTimeout(() => setCopiedId(false), 2000)
+                  toast.success('ID copiado!')
+                }}
+                className="flex items-center gap-1.5 font-mono text-xs truncate text-foreground hover:text-muted-foreground transition-colors"
+              >
+                <span>{String(transacao.id).substring(0, 8)}...</span>
+                {copiedId ? (
+                  <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
+                ) : (
+                  <Copy className="h-3 w-3 flex-shrink-0" />
+                )}
+              </button>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const tipo = transacao.tipo === 'saida' ? 'saidas' : 'entradas'
+                window.open(`/${tipo}`, '_blank')
+                toast.info('Abrindo lista de ' + tipo + ' em nova aba')
+              }}
+              title="Abrir página de entrada/saída"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+          {transacao.tipo && (
+            <Badge variant="outline" className="mt-2">
+              {transacao.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+            </Badge>
+          )}
         </SheetHeader>
 
         <div className="mt-6 space-y-4">

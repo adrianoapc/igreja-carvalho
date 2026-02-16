@@ -43,6 +43,7 @@ import {
 import { useTransacoesFiltro } from "@/hooks/useTransacoesFiltro";
 // import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
+import { ExtratoDetalheDrawer } from "@/components/financas/ExtratoDetalheDrawer";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,6 +95,12 @@ export default function Saidas() {
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
   );
+
+  // Estado para drawer de extrato
+  const [extratoSelecionado, setExtratoSelecionado] = useState<string | null>(
+    null
+  );
+  const [extratoDrawerOpen, setExtratoDrawerOpen] = useState(false);
 
   // Calcular datas de início e fim baseado no período selecionado
   const getDateRange = () => {
@@ -965,6 +972,10 @@ export default function Saidas() {
                                         setEditingTransacao(transacao);
                                         setDialogOpen(true);
                                       }}
+                                      onVerExtrato={(extratoId) => {
+                                        setExtratoSelecionado(extratoId);
+                                        setExtratoDrawerOpen(true);
+                                      }}
                                     />
                                   </div>
                                 </div>
@@ -1145,6 +1156,10 @@ export default function Saidas() {
                               setEditingTransacao(transacao);
                               setDialogOpen(true);
                             }}
+                            onVerExtrato={(extratoId) => {
+                              setExtratoSelecionado(extratoId);
+                              setExtratoDrawerOpen(true);
+                            }}
                           />
                         </div>
                       </div>
@@ -1183,6 +1198,12 @@ export default function Saidas() {
         }}
         tipo="saida"
         transacao={editingTransacao}
+      />
+
+      <ExtratoDetalheDrawer
+        extratoId={extratoSelecionado}
+        open={extratoDrawerOpen}
+        onOpenChange={setExtratoDrawerOpen}
       />
 
       {/** Import via página dedicada; wizard modal desativado */}

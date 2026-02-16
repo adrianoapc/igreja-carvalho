@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  Eye,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ interface TransacaoActionsMenuProps {
   conferidoManual?: boolean;
   conciliacaoStatus?: string | null;
   onEdit: () => void;
+  onVerExtrato?: (extratoId: string) => void;
 }
 
 export function TransacaoActionsMenu({
@@ -51,12 +53,61 @@ export function TransacaoActionsMenu({
   conferidoManual = false,
   conciliacaoStatus = null,
   onEdit,
+  onVerExtrato,
 }: TransacaoActionsMenuProps) {
   const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditWarningDialog, setShowEditWarningDialog] = useState(false);
   const [showConfirmarPagamentoDialog, setShowConfirmarPagamentoDialog] =
     useState(false);
+
+  const handleVerExtrato = async () => {
+    try {
+      const { data: transacao, error } = await supabase
+        .from("transacoes_financeiras")
+        .select("id")
+        .eq("id", transacaoId)
+        .single();
+
+      if (error) throw error;
+
+      // Buscar extratos vinculados (1:1)
+      const { data: extrato1a1 } = await supabase
+        .from("extratos_bancarios")
+        .select("id")
+        .eq("transacao_vinculada_id", transacaoId)
+        .maybeSingle();
+
+      if (extrato1a1) {
+        onVerExtrato?.(extrato1a1.id);
+        return;
+      }
+
+      // Buscar extratos vinculados em lotes (N:1)
+      const { data: lotesData } = await supabase
+        .from("conciliacoes_lote")
+        .select("id")
+        .eq("transacao_id", transacaoId);
+
+      if (lotesData && lotesData.length > 0) {
+        const { data: extratoEmLote } = await supabase
+          .from("conciliacoes_lote_extratos")
+          .select("extrato_id")
+          .eq("conciliacao_lote_id", lotesData[0].id)
+          .maybeSingle();
+
+        if (extratoEmLote) {
+          onVerExtrato?.(extratoEmLote.extrato_id);
+          return;
+        }
+      }
+
+      toast.info("Nenhum extrato vinculado a esta transação");
+    } catch (error) {
+      console.error("Erro ao buscar extrato:", error);
+      toast.error("Erro ao buscar extrato");
+    }
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     try {
@@ -213,6 +264,17 @@ export function TransacaoActionsMenu({
                 {conferidoManual
                   ? "Remover Conciliação Manual"
                   : "Conciliar Manualmente"}
+              </DropdownMenuItem>
+            </>
+          )}
+          {(conciliacaoStatus === "conciliado_extrato" ||
+            conciliacaoStatus === "conciliado_bot" ||
+            conciliacaoStatus === "conferido_manual") && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleVerExtrato}>
+                <Eye className="mr-2 h-4 w-4" />
+                Ver Extrato
               </DropdownMenuItem>
             </>
           )}

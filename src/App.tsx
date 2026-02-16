@@ -15,6 +15,7 @@ import { SuperAdminLayout } from "./components/layout/SuperAdminLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "next-themes";
 import { AuthContextProvider } from "./contexts/AuthContextProvider";
+import { HideValuesProvider } from "./hooks/useHideValues";
 
 // Pages Imports
 const Index = lazy(() => import("./pages/Index"));
@@ -229,18 +230,19 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthContextProvider>
-            <ScrollToTop />
-            <Suspense
-              fallback={
-                <div className="p-6 text-center text-muted-foreground">
-                  Carregando...
-                </div>
-              }
-            >
+        <HideValuesProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthContextProvider>
+              <ScrollToTop />
+              <Suspense
+                fallback={
+                  <div className="p-6 text-center text-muted-foreground">
+                    Carregando...
+                  </div>
+                }
+              >
               <Routes>
                 {/* Rotas de Autenticação (públicas) */}
                 <Route path="/auth" element={<Auth />} />
@@ -1232,6 +1234,7 @@ const App = () => (
             </Suspense>
           </AuthContextProvider>
         </BrowserRouter>
+        </HideValuesProvider>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
