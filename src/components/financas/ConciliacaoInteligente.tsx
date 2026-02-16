@@ -472,22 +472,11 @@ export function ConciliacaoInteligente() {
           
           if (!extrato) throw new Error('Extrato não encontrado')
 
-          // Marcar extrato como reconciliado
-          const { error: erroExtrato } = await supabase
-            .from('extratos_bancarios')
-            .update({ reconciliado: true })
-            .eq('id', extratoId)
-          
-          if (erroExtrato) throw erroExtrato
-
-          // Criar lotes para cada transação
-          for (const transacaoId of selectedTransacoes) {
-            const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
-            
-            // 1. Inserir registro principal na conciliacoes_lote
-            const { data: loteData, error: erroLote } = await supabase
-              .from('conciliacoes_lote')
-              .insert({
+          try {
+            // 1. Criar registros de lote para cada transação (em batch)
+            const lotesData = selectedTransacoes.map(transacaoId => {
+              const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
+              return {
                 transacao_id: transacaoId,
                 igreja_id: igrejaId,
                 filial_id: filialId,
@@ -495,47 +484,70 @@ export function ConciliacaoInteligente() {
                 valor_transacao: transacao?.valor || 0,
                 valor_extratos: 0, // Será atualizado pelo trigger
                 created_by: authUserId,
-              })
+              }
+            })
+
+            const { data: lotesCriados, error: erroLote } = await supabase
+              .from('conciliacoes_lote')
+              .insert(lotesData)
               .select('id')
-              .single()
             
             if (erroLote) throw erroLote
+            if (!lotesCriados || lotesCriados.length === 0) throw new Error('Nenhum lote criado')
 
-            // 2. Inserir relacionamento na conciliacoes_lote_extratos
-            const { error: erroLoteExtrato } = await supabase
+            // 2. Vincular todos os lotes ao mesmo extrato (em batch)
+            const vinculos = lotesCriados.map(lote => ({
+              conciliacao_lote_id: lote.id,
+              extrato_id: extratoId,
+            }))
+
+            const { error: erroVinculos } = await supabase
               .from('conciliacoes_lote_extratos')
-              .insert({
-                conciliacao_lote_id: loteData.id,
-                extrato_id: extratoId,
-              })
+              .insert(vinculos)
             
-            if (erroLoteExtrato) throw erroLoteExtrato
-          }
-          
-          // Atualizar transações: conciliação via extrato (e pagamento se pendente)
-          for (const transacaoId of selectedTransacoes) {
-            const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
-            if (transacao) {
-              const updateTransacao: {
-                conciliacao_status: string
-                status?: string
-                data_pagamento?: string
-              } = {
-                conciliacao_status: 'conciliado_extrato',
+            if (erroVinculos) throw erroVinculos
+
+            // 3. Marcar extrato como reconciliado
+            const { error: erroExtrato } = await supabase
+              .from('extratos_bancarios')
+              .update({ reconciliado: true })
+              .eq('id', extratoId)
+            
+            if (erroExtrato) throw erroExtrato
+
+            // 4. Atualizar transações: conciliação via extrato (e pagamento se pendente)
+            for (const transacaoId of selectedTransacoes) {
+              const transacao = transacoesFiltradas?.find(t => t.id === transacaoId)
+              if (transacao) {
+                const updateTransacao: {
+                  conciliacao_status: string
+                  status?: string
+                  data_pagamento?: string
+                } = {
+                  conciliacao_status: 'conciliado_extrato',
+                }
+
+                if (transacao.status === 'pendente') {
+                  updateTransacao.status = 'pago'
+                  updateTransacao.data_pagamento = extrato.data_transacao
+                }
+
+                const { error: erroTransacao } = await supabase
+                  .from('transacoes_financeiras')
+                  .update(updateTransacao)
+                  .eq('id', transacaoId)
+
+                if (erroTransacao) throw erroTransacao
               }
-
-              if (transacao.status === 'pendente') {
-                updateTransacao.status = 'pago'
-                updateTransacao.data_pagamento = extrato.data_transacao
-              }
-
-              const { error: erroTransacao } = await supabase
-                .from('transacoes_financeiras')
-                .update(updateTransacao)
-                .eq('id', transacaoId)
-
-              if (erroTransacao) throw erroTransacao
             }
+          } catch (error) {
+            // Rollback: desmarcar extrato como reconciliado
+            await supabase
+              .from('extratos_bancarios')
+              .update({ reconciliado: false })
+              .eq('id', extratoId)
+            
+            throw error
           }
 
            // Gravar feedback da reconciliação manual em lote para ML aprender
