@@ -29,7 +29,7 @@ import {
   formatBooleanForExport,
 } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
@@ -82,6 +82,15 @@ export default function Saidas() {
     to: Date;
   } | null>(null);
 
+  // Memoized callbacks para MonthPicker
+  const handleMonthChange = useCallback((date: Date) => {
+    setSelectedMonth(date);
+  }, []);
+  const handleCustomRangeChange = useCallback((range: { from: Date; to: Date } | null) => {
+    setCustomRange(range);
+  }, []);
+  // Debug: log quando selectedMonth muda
+
   // Estados dos filtros
   const [busca, setBusca] = useState("");
   const [contaFilter, setContaFilter] = useState("all");
@@ -97,9 +106,13 @@ export default function Saidas() {
   );
 
   // Estado para drawer de extrato
-  const [extratoSelecionado, setExtratoSelecionado] = useState<string | null>(
-    null
-  );
+  const [extratoSelecionado, setExtratoSelecionado] = useState<string | null>(null);
+  const [entradaVinculada, setEntradaVinculada] = useState<{
+    id: string;
+    descricao: string;
+    valor: number;
+    data_pagamento: string;
+  } | null>(null);
   const [extratoDrawerOpen, setExtratoDrawerOpen] = useState(false);
 
   // Calcular datas de início e fim baseado no período selecionado
@@ -292,8 +305,22 @@ export default function Saidas() {
         map.set(extrato.transacao_vinculada_id, !!extrato.reconciliado);
       }
     });
-    setConciliacaoMap(map);
-  }, [extratosConciliados]);
+    // Só atualiza se mudou de fato
+    let changed = false;
+    if (map.size !== conciliacaoMap.size) {
+      changed = true;
+    } else {
+      for (const [key, value] of map) {
+        if (conciliacaoMap.get(key) !== value) {
+          changed = true;
+          break;
+        }
+      }
+    }
+    if (changed) {
+      setConciliacaoMap(map);
+    }
+  }, [extratosConciliados, conciliacaoMap]);
 
   // Agrupar transações por data
   const transacoesAgrupadas = useMemo(() => {
@@ -348,7 +375,9 @@ export default function Saidas() {
 
   // Reset pagination when filters change
   useEffect(() => {
+    // goToPage é estável, não precisa estar nas dependências
     goToPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     busca,
     contaFilter,
@@ -492,9 +521,9 @@ export default function Saidas() {
         <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end flex-wrap">
           <MonthPicker
             selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
+            onMonthChange={handleMonthChange}
             customRange={customRange}
-            onCustomRangeChange={setCustomRange}
+            onCustomRangeChange={handleCustomRangeChange}
           />
           <FiltrosSheet
             selectedMonth={selectedMonth}
@@ -969,11 +998,14 @@ export default function Saidas() {
                                       }
                                       conciliacaoStatus={conciliacaoStatus}
                                       onEdit={() => {
+                                        console.log('[DEBUG] onEdit chamado', transacao);
                                         setEditingTransacao(transacao);
                                         setDialogOpen(true);
                                       }}
-                                      onVerExtrato={(extratoId) => {
+                                      onVerExtrato={(extratoId, entrada) => {
+                                        console.log('[DEBUG] onVerExtrato chamado', { extratoId, entrada });
                                         setExtratoSelecionado(extratoId);
+                                        setEntradaVinculada(entrada || null);
                                         setExtratoDrawerOpen(true);
                                       }}
                                     />
@@ -1156,8 +1188,9 @@ export default function Saidas() {
                               setEditingTransacao(transacao);
                               setDialogOpen(true);
                             }}
-                            onVerExtrato={(extratoId) => {
+                            onVerExtrato={(extratoId, entrada) => {
                               setExtratoSelecionado(extratoId);
+                              setEntradaVinculada(entrada || null);
                               setExtratoDrawerOpen(true);
                             }}
                           />
@@ -1203,7 +1236,11 @@ export default function Saidas() {
       <ExtratoDetalheDrawer
         extratoId={extratoSelecionado}
         open={extratoDrawerOpen}
-        onOpenChange={setExtratoDrawerOpen}
+        onOpenChange={(open) => {
+          console.log('[DEBUG] ExtratoDetalheDrawer onOpenChange', open);
+          setExtratoDrawerOpen(open);
+        }}
+        entradaVinculada={entradaVinculada}
       />
 
       {/** Import via página dedicada; wizard modal desativado */}

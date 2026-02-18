@@ -14,10 +14,19 @@ import {
   Clock,
   AlertTriangle,
   Eye,
+  Link2,
+  Copy,
+  Check,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +41,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import { ConfirmarPagamentoDialog } from "./ConfirmarPagamentoDialog";
 
+
 interface TransacaoActionsMenuProps {
   transacaoId: string;
   status: string;
@@ -41,7 +51,12 @@ interface TransacaoActionsMenuProps {
   conferidoManual?: boolean;
   conciliacaoStatus?: string | null;
   onEdit: () => void;
-  onVerExtrato?: (extratoId: string) => void;
+  onVerExtrato?: (extratoId: string, entradaVinculada?: {
+    id: string;
+    descricao: string;
+    valor: number;
+    data_pagamento: string;
+  }) => void;
 }
 
 export function TransacaoActionsMenu({
@@ -55,6 +70,46 @@ export function TransacaoActionsMenu({
   onEdit,
   onVerExtrato,
 }: TransacaoActionsMenuProps) {
+  const [showVinculadaDrawer, setShowVinculadaDrawer] = useState(false);
+  const [movVinculada, setMovVinculada] = useState<{
+    id: string;
+    descricao: string;
+    valor: number;
+    data_pagamento: string;
+    tipo: string;
+  } | null>(null);
+    // Handler para visualizar movimentação vinculada (transferência)
+    const handleVerVinculada = async () => {
+      try {
+        // Buscar dados da transação atual
+        const { data: transacao, error } = await supabase
+          .from("transacoes_financeiras")
+          .select("id, tipo, transferencia_id")
+          .eq("id", transacaoId)
+          .single();
+        if (error) throw error;
+        if (!transacao.transferencia_id) {
+          toast.info("Transação não é uma transferência entre contas.");
+          return;
+        }
+        // Se for ENTRADA, buscar SAÍDA correspondente; se for SAÍDA, buscar ENTRADA correspondente
+        const tipoOposto = transacao.tipo === "entrada" ? "saida" : "entrada";
+        const { data: vinculada } = await supabase
+          .from("transacoes_financeiras")
+          .select("id, descricao, valor, data_pagamento, tipo")
+          .eq("transferencia_id", transacao.transferencia_id)
+          .eq("tipo", tipoOposto)
+          .maybeSingle();
+        if (vinculada) {
+          setMovVinculada(vinculada);
+          setShowVinculadaDrawer(true);
+        } else {
+          toast.info("Movimentação vinculada não encontrada.");
+        }
+      } catch (err) {
+        toast.error("Erro ao buscar movimentação vinculada");
+      }
+    };
   const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditWarningDialog, setShowEditWarningDialog] = useState(false);
@@ -63,46 +118,83 @@ export function TransacaoActionsMenu({
 
   const handleVerExtrato = async () => {
     try {
+      // Buscar dados completos da transação
       const { data: transacao, error } = await supabase
         .from("transacoes_financeiras")
-        .select("id")
+        .select("id, tipo, transferencia_id")
         .eq("id", transacaoId)
         .single();
-
       if (error) throw error;
 
-      // Buscar extratos vinculados (1:1)
+      // 1. Tentar buscar extrato vinculado diretamente (1:1)
       const { data: extrato1a1 } = await supabase
         .from("extratos_bancarios")
         .select("id")
         .eq("transacao_vinculada_id", transacaoId)
         .maybeSingle();
-
       if (extrato1a1) {
         onVerExtrato?.(extrato1a1.id);
         return;
       }
 
-      // Buscar extratos vinculados em lotes (N:1)
+      // 2. Buscar extrato via lote (N:1)
       const { data: lotesData } = await supabase
         .from("conciliacoes_lote")
         .select("id")
         .eq("transacao_id", transacaoId);
-
       if (lotesData && lotesData.length > 0) {
         const { data: extratoEmLote } = await supabase
           .from("conciliacoes_lote_extratos")
           .select("extrato_id")
           .eq("conciliacao_lote_id", lotesData[0].id)
           .maybeSingle();
-
         if (extratoEmLote) {
           onVerExtrato?.(extratoEmLote.extrato_id);
           return;
         }
       }
 
-      toast.info("Nenhum extrato vinculado a esta transação");
+      // 3. Se for SAÍDA de transferência, buscar ENTRADA correspondente e o extrato vinculado a ela
+      if (transacao.tipo === "saida" && transacao.transferencia_id) {
+        // Buscar a entrada correspondente
+        const { data: entrada } = await supabase
+          .from("transacoes_financeiras")
+          .select("id, descricao, valor, data_pagamento")
+          .eq("transferencia_id", transacao.transferencia_id)
+          .eq("tipo", "entrada")
+          .maybeSingle();
+        if (entrada) {
+          // Buscar extrato vinculado à entrada (1:1)
+          const { data: extratoEntrada1a1 } = await supabase
+            .from("extratos_bancarios")
+            .select("id")
+            .eq("transacao_vinculada_id", entrada.id)
+            .maybeSingle();
+          if (extratoEntrada1a1) {
+            // Exibir extrato e mostrar info da entrada vinculada
+            onVerExtrato?.(extratoEntrada1a1.id, entrada);
+            return;
+          }
+          // Buscar extrato via lote (N:1) da entrada
+          const { data: lotesEntrada } = await supabase
+            .from("conciliacoes_lote")
+            .select("id")
+            .eq("transacao_id", entrada.id);
+          if (lotesEntrada && lotesEntrada.length > 0) {
+            const { data: extratoLoteEntrada } = await supabase
+              .from("conciliacoes_lote_extratos")
+              .select("extrato_id")
+              .eq("conciliacao_lote_id", lotesEntrada[0].id)
+              .maybeSingle();
+            if (extratoLoteEntrada) {
+              onVerExtrato?.(extratoLoteEntrada.extrato_id, entrada);
+              return;
+            }
+          }
+        }
+      }
+
+      toast.info("Nenhum extrato vinculado a esta transação ou à entrada correspondente");
     } catch (error) {
       console.error("Erro ao buscar extrato:", error);
       toast.error("Erro ao buscar extrato");
@@ -278,6 +370,69 @@ export function TransacaoActionsMenu({
               </DropdownMenuItem>
             </>
           )}
+          {/* Ação para ver movimentação vinculada (transferência) */}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleVerVinculada}>
+            <Link2 className="mr-2 h-4 w-4" />
+            Ver Movimentação Vinculada
+          </DropdownMenuItem>
+                {/* Drawer para mostrar movimentação vinculada */}
+                {showVinculadaDrawer && movVinculada && (
+                  <Sheet open={showVinculadaDrawer} onOpenChange={setShowVinculadaDrawer}>
+                    <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle>Movimentação Vinculada</SheetTitle>
+                      </SheetHeader>
+                      <div className="space-y-6 mt-6">
+                        <div className="space-y-3">
+                          <h3 className="font-semibold text-sm">Informações Básicas</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="text-sm text-muted-foreground">Descrição</span>
+                              <span className="text-sm font-medium text-right max-w-[250px] break-words">{movVinculada.descricao}</span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Valor</span>
+                              <span className={movVinculada.tipo === 'entrada' ? 'text-green-600 font-bold text-sm' : 'text-red-600 font-bold text-sm'}>
+                                R$ {movVinculada.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Data</span>
+                              <span className="text-sm font-medium">
+                                {movVinculada.data_pagamento ? new Date(movVinculada.data_pagamento).toLocaleDateString('pt-BR') : '-'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Tipo</span>
+                              <span>
+                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${movVinculada.tipo === 'entrada' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}>
+                                  {movVinculada.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                                </span>
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="text-sm text-muted-foreground">ID</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(String(movVinculada.id))
+                                  toast.success('ID copiado!')
+                                }}
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <span className="font-mono">
+                                  {String(movVinculada.id).substring(0, 8)}...
+                                </span>
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setShowDeleteDialog(true)}

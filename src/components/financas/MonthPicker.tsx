@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -35,6 +35,28 @@ export function MonthPicker({
     customRange ? { from: customRange.from, to: customRange.to } : undefined
   );
   const [viewYear, setViewYear] = useState(selectedMonth.getFullYear());
+
+  // Sincronizar estados internos com as props
+
+  // Sempre sincroniza o ano exibido ao abrir o picker ou ao mudar o mês selecionado
+  useEffect(() => {
+    if (open) {
+      setViewYear(selectedMonth.getFullYear());
+    }
+  }, [open, selectedMonth]);
+
+  // Sincroniza modo e range temporário com as props
+  useEffect(() => {
+    if (customRange) {
+      if (mode !== 'custom') setMode('custom');
+      if (!tempRange || tempRange.from !== customRange.from || tempRange.to !== customRange.to) {
+        setTempRange({ from: customRange.from, to: customRange.to });
+      }
+    } else {
+      if (mode !== 'month') setMode('month');
+      if (tempRange !== undefined) setTempRange(undefined);
+    }
+  }, [customRange, selectedMonth]);
 
   const rangePresets = [
     { label: 'Últimos 7 dias', getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }) },

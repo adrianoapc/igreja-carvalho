@@ -20,12 +20,19 @@ interface ExtratoDetalheDrawerProps {
   extratoId: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  entradaVinculada?: {
+    id: string;
+    descricao: string;
+    valor: number;
+    data_pagamento: string;
+  } | null
 }
 
 export function ExtratoDetalheDrawer({
   extratoId,
   open,
   onOpenChange,
+  entradaVinculada,
 }: ExtratoDetalheDrawerProps) {
   const { formatValue } = useHideValues()
   const [copiedExtratoId, setCopiedExtratoId] = useState(false)
@@ -46,7 +53,16 @@ export function ExtratoDetalheDrawer({
       if (extratoError) throw extratoError
 
       // Buscar transações vinculadas (1:1)
-      let transacoes = []
+      const transacoes: Array<{
+        id: string;
+        descricao: string;
+        valor: number;
+        status?: string;
+        tipo?: string;
+        data_pagamento?: string;
+        data_vencimento?: string;
+        tipo_vinculo: string;
+      }> = []
       if (extratoData.transacao_vinculada_id) {
         const { data: transacao } = await supabase
           .from('transacoes_financeiras')
@@ -111,6 +127,21 @@ export function ExtratoDetalheDrawer({
           <SheetTitle>Detalhes do Extrato</SheetTitle>
         </SheetHeader>
 
+        {/* Se houver entrada vinculada, exibir bloco especial */}
+        {entradaVinculada && (
+          <div className="mb-6 p-3 border-l-4 border-green-500 bg-green-50 dark:bg-green-950 rounded">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-semibold text-green-700 dark:text-green-300">Movimentação de Entrada Vinculada</span>
+              <span className="text-xs text-muted-foreground">(transferência entre contas)</span>
+            </div>
+            <div className="flex flex-col gap-1 text-sm">
+              <span><b>Descrição:</b> {entradaVinculada.descricao}</span>
+              <span><b>Valor:</b> {formatValue(entradaVinculada.valor)}</span>
+              <span><b>Data:</b> {format(parseLocalDate(entradaVinculada.data_pagamento) || new Date(), 'dd/MM/yyyy', { locale: ptBR })}</span>
+              <span><b>ID:</b> <span className="font-mono text-xs">{entradaVinculada.id}</span></span>
+            </div>
+          </div>
+        )}
         {isLoading ? (
           <div className="space-y-4 mt-6">
             <Skeleton className="h-8 w-full" />
@@ -197,16 +228,7 @@ export function ExtratoDetalheDrawer({
                   </div>
                 )}
 
-                {extrato.observacao && (
-                  <div className="flex justify-between items-start gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      Observação
-                    </span>
-                    <span className="text-sm max-w-[250px] break-words">
-                      {extrato.observacao}
-                    </span>
-                  </div>
-                )}
+
               </div>
             </div>
 
@@ -221,7 +243,7 @@ export function ExtratoDetalheDrawer({
 
                   <div className="space-y-2">
                     {extrato.transacoes_vinculadas.map(
-                      (transacao: any, idx: number) => (
+                      (transacao, idx) => (
                         <div
                           key={`${transacao.id}-${idx}`}
                           className="p-3 border rounded-lg bg-muted/30"
@@ -346,7 +368,6 @@ export function ExtratoDetalheDrawer({
             {/* Metadados */}
             <div className="space-y-3 border-t pt-4">
               <h3 className="font-semibold text-sm">Metadados</h3>
-
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center gap-2">
                   <span className="text-muted-foreground">ID</span>
@@ -354,7 +375,6 @@ export function ExtratoDetalheDrawer({
                     {extrato.id}
                   </span>
                 </div>
-
                 <div className="flex justify-between items-center gap-2">
                   <span className="text-muted-foreground">Criado em</span>
                   <span>
@@ -365,19 +385,6 @@ export function ExtratoDetalheDrawer({
                     )}
                   </span>
                 </div>
-
-                {extrato.updated_at && (
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-muted-foreground">Atualizado em</span>
-                    <span>
-                      {format(
-                        new Date(extrato.updated_at),
-                        'dd/MM/yyyy HH:mm',
-                        { locale: ptBR }
-                      )}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
           </div>

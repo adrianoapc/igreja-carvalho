@@ -72,6 +72,7 @@ interface TransacaoItem {
   desconto?: number;
   tipo: string;
   conta_id: string;
+  transferencia_id?: string | null;
   status?: string;
   conciliacao_status?: string;
 }
@@ -237,7 +238,7 @@ export function ConciliacaoInteligente() {
       let query = supabase
         .from("transacoes_financeiras")
         .select(
-          "id, data_pagamento, data_vencimento, descricao, valor, valor_liquido, taxas_administrativas, juros, multas, desconto, tipo, conta_id, status, conciliacao_status",
+          "id, data_pagamento, data_vencimento, descricao, valor, valor_liquido, taxas_administrativas, juros, multas, desconto, tipo, conta_id, transferencia_id, status, conciliacao_status",
         )
         .eq("igreja_id", igrejaId)
         .in("status", ["pendente", "pago"])
@@ -613,6 +614,19 @@ export function ConciliacaoInteligente() {
                   .eq("id", transacaoId);
 
                 if (erroTransacao) throw erroTransacao;
+
+                // Se for transferência (entrada com transferencia_id), concilia a saída correspondente
+                if (transacao.transferencia_id && transacao.tipo === "entrada") {
+                  await supabase
+                    .from("transacoes_financeiras")
+                    .update({
+                      conciliacao_status: "conciliado_extrato",
+                      status: updateTransacao.status,
+                      data_pagamento: updateTransacao.data_pagamento,
+                    })
+                    .eq("transferencia_id", transacao.transferencia_id)
+                    .eq("tipo", "saida");
+                }
               }
             }
           } catch (error) {

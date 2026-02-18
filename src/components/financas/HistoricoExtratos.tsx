@@ -46,7 +46,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/utils/dateUtils";
 import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
-import { TransacaoVinculadaDialog } from "./TransacaoVinculadaDialog";
+
 import { anonymizePixDescription } from "@/utils/anonymization";
 
 interface ExtratoItem {
@@ -845,11 +845,7 @@ export function HistoricoExtratos() {
       )}
 
       {/* Transacao Vinculada Dialog */}
-      <TransacaoVinculadaDialog
-        open={!!transacaoParaVisualizar}
-        onOpenChange={(open) => !open && setTransacaoParaVisualizar(null)}
-        transacaoId={transacaoParaVisualizar}
-      />
+
     </div>
   );
 }
