@@ -1,9 +1,26 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ChevronLeft, ChevronRight, X, ArrowRight } from "lucide-react";
-import { format, subMonths, addMonths, setMonth, setYear, subDays } from "date-fns";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ArrowRight,
+} from "lucide-react";
+import {
+  format,
+  subMonths,
+  addMonths,
+  setMonth,
+  setYear,
+  subDays,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
@@ -18,21 +35,33 @@ interface MonthPickerProps {
 }
 
 const MONTHS = [
-  'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-  'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
 ];
 
-export function MonthPicker({ 
-  selectedMonth, 
-  onMonthChange, 
+export function MonthPicker({
+  selectedMonth,
+  onMonthChange,
   customRange,
   onCustomRangeChange,
-  className 
+  className,
 }: MonthPickerProps) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<'month' | 'custom'>(customRange ? 'custom' : 'month');
+  const [mode, setMode] = useState<"month" | "custom">(
+    customRange ? "custom" : "month",
+  );
   const [tempRange, setTempRange] = useState<DateRange | undefined>(
-    customRange ? { from: customRange.from, to: customRange.to } : undefined
+    customRange ? { from: customRange.from, to: customRange.to } : undefined,
   );
   const [viewYear, setViewYear] = useState(selectedMonth.getFullYear());
 
@@ -48,35 +77,51 @@ export function MonthPicker({
   // Sincroniza modo e range temporário com as props
   useEffect(() => {
     if (customRange) {
-      if (mode !== 'custom') setMode('custom');
-      if (!tempRange || tempRange.from !== customRange.from || tempRange.to !== customRange.to) {
+      if (mode !== "custom") setMode("custom");
+      if (
+        !tempRange ||
+        tempRange.from !== customRange.from ||
+        tempRange.to !== customRange.to
+      ) {
         setTempRange({ from: customRange.from, to: customRange.to });
       }
     } else {
-      if (mode !== 'month') setMode('month');
+      if (mode !== "month") setMode("month");
       if (tempRange !== undefined) setTempRange(undefined);
     }
   }, [customRange, selectedMonth]);
 
   const rangePresets = [
-    { label: 'Últimos 7 dias', getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
-    { label: 'Últimos 15 dias', getValue: () => ({ from: subDays(new Date(), 15), to: new Date() }) },
-    { label: 'Últimos 30 dias', getValue: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
-    { label: 'Últimos 3 meses', getValue: () => ({ from: subMonths(new Date(), 3), to: new Date() }) },
+    {
+      label: "Últimos 7 dias",
+      getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }),
+    },
+    {
+      label: "Últimos 15 dias",
+      getValue: () => ({ from: subDays(new Date(), 15), to: new Date() }),
+    },
+    {
+      label: "Últimos 30 dias",
+      getValue: () => ({ from: subDays(new Date(), 30), to: new Date() }),
+    },
+    {
+      label: "Últimos 3 meses",
+      getValue: () => ({ from: subMonths(new Date(), 3), to: new Date() }),
+    },
   ];
 
   const monthPresets = [
-    { label: 'Este mês', getValue: () => new Date() },
-    { label: 'Mês passado', getValue: () => subMonths(new Date(), 1) },
-    { label: '2 meses atrás', getValue: () => subMonths(new Date(), 2) },
-    { label: '3 meses atrás', getValue: () => subMonths(new Date(), 3) },
+    { label: "Este mês", getValue: () => new Date() },
+    { label: "Mês passado", getValue: () => subMonths(new Date(), 1) },
+    { label: "2 meses atrás", getValue: () => subMonths(new Date(), 2) },
+    { label: "3 meses atrás", getValue: () => subMonths(new Date(), 3) },
   ];
 
-  const handleMonthPresetClick = (preset: typeof monthPresets[0]) => {
+  const handleMonthPresetClick = (preset: (typeof monthPresets)[0]) => {
     const date = preset.getValue();
     onMonthChange(date);
     onCustomRangeChange?.(null);
-    setMode('month');
+    setMode("month");
     setOpen(false);
   };
 
@@ -84,26 +129,26 @@ export function MonthPicker({
     const newDate = setMonth(setYear(new Date(), viewYear), monthIndex);
     onMonthChange(newDate);
     onCustomRangeChange?.(null);
-    setMode('month');
+    setMode("month");
     setOpen(false);
   };
 
-  const handleRangePresetClick = (preset: typeof rangePresets[0]) => {
+  const handleRangePresetClick = (preset: (typeof rangePresets)[0]) => {
     const range = preset.getValue();
     setTempRange(range);
     onCustomRangeChange?.(range);
-    setMode('custom');
+    setMode("custom");
     setOpen(false);
   };
 
   const handlePrevMonth = () => {
-    if (mode === 'month') {
+    if (mode === "month") {
       onMonthChange(subMonths(selectedMonth, 1));
     }
   };
 
   const handleNextMonth = () => {
-    if (mode === 'month') {
+    if (mode === "month") {
       onMonthChange(addMonths(selectedMonth, 1));
     }
   };
@@ -118,7 +163,7 @@ export function MonthPicker({
   const handleApplyRange = () => {
     if (tempRange?.from && tempRange?.to) {
       onCustomRangeChange?.(tempRange as { from: Date; to: Date });
-      setMode('custom');
+      setMode("custom");
       setOpen(false);
     }
   };
@@ -126,11 +171,11 @@ export function MonthPicker({
   const handleClearRange = () => {
     setTempRange(undefined);
     onCustomRangeChange?.(null);
-    setMode('month');
+    setMode("month");
   };
 
   const getDisplayText = () => {
-    if (mode === 'custom' && customRange?.from && customRange?.to) {
+    if (mode === "custom" && customRange?.from && customRange?.to) {
       return `${format(customRange.from, "dd/MM")} - ${format(customRange.to, "dd/MM")}`;
     }
     return format(selectedMonth, "MMM yyyy", { locale: ptBR });
@@ -146,7 +191,7 @@ export function MonthPicker({
         size="sm"
         className="h-8 w-8 p-0"
         onClick={handlePrevMonth}
-        disabled={mode === 'custom'}
+        disabled={mode === "custom"}
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
@@ -163,16 +208,29 @@ export function MonthPicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as 'month' | 'custom')} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 m-3 mb-0" style={{ width: 'calc(100% - 24px)' }}>
-              <TabsTrigger value="month" className="text-xs">Mensal</TabsTrigger>
-              <TabsTrigger value="custom" className="text-xs">Customizado</TabsTrigger>
+          <Tabs
+            value={mode}
+            onValueChange={(v) => setMode(v as "month" | "custom")}
+            className="w-full"
+          >
+            <TabsList
+              className="grid w-full grid-cols-2 m-3 mb-0"
+              style={{ width: "calc(100% - 24px)" }}
+            >
+              <TabsTrigger value="month" className="text-xs">
+                Mensal
+              </TabsTrigger>
+              <TabsTrigger value="custom" className="text-xs">
+                Customizado
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="month" className="p-3 pt-2 space-y-3">
               {/* Atalhos rápidos */}
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">Atalhos</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Atalhos
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {monthPresets.map((preset, index) => (
                     <Button
@@ -212,9 +270,13 @@ export function MonthPicker({
               {/* Grid de Meses */}
               <div className="grid grid-cols-4 gap-2">
                 {MONTHS.map((month, index) => {
-                  const isSelected = selectedMonth.getMonth() === index && selectedMonth.getFullYear() === viewYear;
-                  const isCurrent = new Date().getMonth() === index && new Date().getFullYear() === viewYear;
-                  
+                  const isSelected =
+                    selectedMonth.getMonth() === index &&
+                    selectedMonth.getFullYear() === viewYear;
+                  const isCurrent =
+                    new Date().getMonth() === index &&
+                    new Date().getFullYear() === viewYear;
+
                   return (
                     <Button
                       key={month}
@@ -224,7 +286,9 @@ export function MonthPicker({
                       className={cn(
                         "h-9 text-xs",
                         isSelected && "bg-gradient-primary",
-                        !isSelected && isCurrent && "border-primary text-primary"
+                        !isSelected &&
+                          isCurrent &&
+                          "border-primary text-primary",
                       )}
                     >
                       {month}
@@ -251,27 +315,43 @@ export function MonthPicker({
 
             <TabsContent value="custom" className="p-3 pt-2 space-y-3">
               {/* Período selecionado */}
-              <div className={cn(
-                "flex items-center justify-center gap-2 p-3 rounded-lg border-2 border-dashed transition-colors",
-                tempRange?.from && tempRange?.to ? "border-primary/50 bg-primary/5" : "border-muted-foreground/20"
-              )}>
+              <div
+                className={cn(
+                  "flex items-center justify-center gap-2 p-3 rounded-lg border-2 border-dashed transition-colors",
+                  tempRange?.from && tempRange?.to
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-muted-foreground/20",
+                )}
+              >
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground mb-1">De</p>
-                  <p className={cn(
-                    "font-medium text-sm",
-                    tempRange?.from ? "text-foreground" : "text-muted-foreground"
-                  )}>
-                    {tempRange?.from ? format(tempRange.from, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                  <p
+                    className={cn(
+                      "font-medium text-sm",
+                      tempRange?.from
+                        ? "text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {tempRange?.from
+                      ? format(tempRange.from, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione"}
                   </p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-muted-foreground" />
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground mb-1">Até</p>
-                  <p className={cn(
-                    "font-medium text-sm",
-                    tempRange?.to ? "text-foreground" : "text-muted-foreground"
-                  )}>
-                    {tempRange?.to ? format(tempRange.to, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                  <p
+                    className={cn(
+                      "font-medium text-sm",
+                      tempRange?.to
+                        ? "text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {tempRange?.to
+                      ? format(tempRange.to, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione"}
                   </p>
                 </div>
                 {(tempRange?.from || tempRange?.to) && (
@@ -288,7 +368,9 @@ export function MonthPicker({
 
               {/* Atalhos de range */}
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">Atalhos rápidos</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Atalhos rápidos
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {rangePresets.map((preset, index) => (
                     <Button
@@ -336,7 +418,7 @@ export function MonthPicker({
         size="sm"
         className="h-8 w-8 p-0"
         onClick={handleNextMonth}
-        disabled={mode === 'custom'}
+        disabled={mode === "custom"}
       >
         <ChevronRight className="h-4 w-4" />
       </Button>

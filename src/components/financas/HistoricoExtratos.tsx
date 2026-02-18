@@ -845,7 +845,6 @@ export function HistoricoExtratos() {
       )}
 
       {/* Transacao Vinculada Dialog */}
-
     </div>
   );
 }

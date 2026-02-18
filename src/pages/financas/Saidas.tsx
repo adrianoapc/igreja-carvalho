@@ -86,9 +86,12 @@ export default function Saidas() {
   const handleMonthChange = useCallback((date: Date) => {
     setSelectedMonth(date);
   }, []);
-  const handleCustomRangeChange = useCallback((range: { from: Date; to: Date } | null) => {
-    setCustomRange(range);
-  }, []);
+  const handleCustomRangeChange = useCallback(
+    (range: { from: Date; to: Date } | null) => {
+      setCustomRange(range);
+    },
+    [],
+  );
   // Debug: log quando selectedMonth muda
 
   // Estados dos filtros
@@ -106,7 +109,9 @@ export default function Saidas() {
   );
 
   // Estado para drawer de extrato
-  const [extratoSelecionado, setExtratoSelecionado] = useState<string | null>(null);
+  const [extratoSelecionado, setExtratoSelecionado] = useState<string | null>(
+    null,
+  );
   const [entradaVinculada, setEntradaVinculada] = useState<{
     id: string;
     descricao: string;
@@ -249,9 +254,9 @@ export default function Saidas() {
   });
 
   // Inicializar mapa de conciliação vazio (será atualizado depois)
-  const [conciliacaoMap, setConciliacaoMap] = useState<
-    Map<string, boolean>
-  >(new Map());
+  const [conciliacaoMap, setConciliacaoMap] = useState<Map<string, boolean>>(
+    new Map(),
+  );
 
   // Aplicar filtros centralizados
   const transacoesFiltradas = useTransacoesFiltro(
@@ -264,7 +269,7 @@ export default function Saidas() {
       status: statusFilter,
       conciliacaoStatus: conciliacaoStatusFilter,
     },
-    conciliacaoMap
+    conciliacaoMap,
   );
 
   const transacaoIds = useMemo(
@@ -998,12 +1003,18 @@ export default function Saidas() {
                                       }
                                       conciliacaoStatus={conciliacaoStatus}
                                       onEdit={() => {
-                                        console.log('[DEBUG] onEdit chamado', transacao);
+                                        console.log(
+                                          "[DEBUG] onEdit chamado",
+                                          transacao,
+                                        );
                                         setEditingTransacao(transacao);
                                         setDialogOpen(true);
                                       }}
                                       onVerExtrato={(extratoId, entrada) => {
-                                        console.log('[DEBUG] onVerExtrato chamado', { extratoId, entrada });
+                                        console.log(
+                                          "[DEBUG] onVerExtrato chamado",
+                                          { extratoId, entrada },
+                                        );
                                         setExtratoSelecionado(extratoId);
                                         setEntradaVinculada(entrada || null);
                                         setExtratoDrawerOpen(true);
@@ -1155,13 +1166,11 @@ export default function Saidas() {
                               >
                                 {getStatusDisplay(transacao)}
                               </Badge>
-                              {conciliacaoStatus ===
-                              "conciliado_extrato" ? (
+                              {conciliacaoStatus === "conciliado_extrato" ? (
                                 <Badge className="text-[10px] md:text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                                   Conciliado (Extrato)
                                 </Badge>
-                              ) : conciliacaoStatus ===
-                                "conciliado_manual" ? (
+                              ) : conciliacaoStatus === "conciliado_manual" ? (
                                 <Badge className="text-[10px] md:text-xs bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
                                   Conciliado Manual
                                 </Badge>
@@ -1237,7 +1246,7 @@ export default function Saidas() {
         extratoId={extratoSelecionado}
         open={extratoDrawerOpen}
         onOpenChange={(open) => {
-          console.log('[DEBUG] ExtratoDetalheDrawer onOpenChange', open);
+          console.log("[DEBUG] ExtratoDetalheDrawer onOpenChange", open);
           setExtratoDrawerOpen(open);
         }}
         entradaVinculada={entradaVinculada}

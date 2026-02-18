@@ -616,7 +616,10 @@ export function ConciliacaoInteligente() {
                 if (erroTransacao) throw erroTransacao;
 
                 // Se for transferência (entrada com transferencia_id), concilia a saída correspondente
-                if (transacao.transferencia_id && transacao.tipo === "entrada") {
+                if (
+                  transacao.transferencia_id &&
+                  transacao.tipo === "entrada"
+                ) {
                   await supabase
                     .from("transacoes_financeiras")
                     .update({

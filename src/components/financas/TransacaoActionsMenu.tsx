@@ -26,7 +26,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet';
+} from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +41,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import { ConfirmarPagamentoDialog } from "./ConfirmarPagamentoDialog";
 
-
 interface TransacaoActionsMenuProps {
   transacaoId: string;
   status: string;
@@ -51,12 +50,15 @@ interface TransacaoActionsMenuProps {
   conferidoManual?: boolean;
   conciliacaoStatus?: string | null;
   onEdit: () => void;
-  onVerExtrato?: (extratoId: string, entradaVinculada?: {
-    id: string;
-    descricao: string;
-    valor: number;
-    data_pagamento: string;
-  }) => void;
+  onVerExtrato?: (
+    extratoId: string,
+    entradaVinculada?: {
+      id: string;
+      descricao: string;
+      valor: number;
+      data_pagamento: string;
+    },
+  ) => void;
 }
 
 export function TransacaoActionsMenu({
@@ -78,38 +80,38 @@ export function TransacaoActionsMenu({
     data_pagamento: string;
     tipo: string;
   } | null>(null);
-    // Handler para visualizar movimentação vinculada (transferência)
-    const handleVerVinculada = async () => {
-      try {
-        // Buscar dados da transação atual
-        const { data: transacao, error } = await supabase
-          .from("transacoes_financeiras")
-          .select("id, tipo, transferencia_id")
-          .eq("id", transacaoId)
-          .single();
-        if (error) throw error;
-        if (!transacao.transferencia_id) {
-          toast.info("Transação não é uma transferência entre contas.");
-          return;
-        }
-        // Se for ENTRADA, buscar SAÍDA correspondente; se for SAÍDA, buscar ENTRADA correspondente
-        const tipoOposto = transacao.tipo === "entrada" ? "saida" : "entrada";
-        const { data: vinculada } = await supabase
-          .from("transacoes_financeiras")
-          .select("id, descricao, valor, data_pagamento, tipo")
-          .eq("transferencia_id", transacao.transferencia_id)
-          .eq("tipo", tipoOposto)
-          .maybeSingle();
-        if (vinculada) {
-          setMovVinculada(vinculada);
-          setShowVinculadaDrawer(true);
-        } else {
-          toast.info("Movimentação vinculada não encontrada.");
-        }
-      } catch (err) {
-        toast.error("Erro ao buscar movimentação vinculada");
+  // Handler para visualizar movimentação vinculada (transferência)
+  const handleVerVinculada = async () => {
+    try {
+      // Buscar dados da transação atual
+      const { data: transacao, error } = await supabase
+        .from("transacoes_financeiras")
+        .select("id, tipo, transferencia_id")
+        .eq("id", transacaoId)
+        .single();
+      if (error) throw error;
+      if (!transacao.transferencia_id) {
+        toast.info("Transação não é uma transferência entre contas.");
+        return;
       }
-    };
+      // Se for ENTRADA, buscar SAÍDA correspondente; se for SAÍDA, buscar ENTRADA correspondente
+      const tipoOposto = transacao.tipo === "entrada" ? "saida" : "entrada";
+      const { data: vinculada } = await supabase
+        .from("transacoes_financeiras")
+        .select("id, descricao, valor, data_pagamento, tipo")
+        .eq("transferencia_id", transacao.transferencia_id)
+        .eq("tipo", tipoOposto)
+        .maybeSingle();
+      if (vinculada) {
+        setMovVinculada(vinculada);
+        setShowVinculadaDrawer(true);
+      } else {
+        toast.info("Movimentação vinculada não encontrada.");
+      }
+    } catch (err) {
+      toast.error("Erro ao buscar movimentação vinculada");
+    }
+  };
   const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditWarningDialog, setShowEditWarningDialog] = useState(false);
@@ -194,7 +196,9 @@ export function TransacaoActionsMenu({
         }
       }
 
-      toast.info("Nenhum extrato vinculado a esta transação ou à entrada correspondente");
+      toast.info(
+        "Nenhum extrato vinculado a esta transação ou à entrada correspondente",
+      );
     } catch (error) {
       console.error("Erro ao buscar extrato:", error);
       toast.error("Erro ao buscar extrato");
@@ -267,7 +271,9 @@ export function TransacaoActionsMenu({
         .single();
       if (fetchError) throw fetchError;
 
-      const novoStatus = conferidoManual ? "nao_conciliado" : "conciliado_manual";
+      const novoStatus = conferidoManual
+        ? "nao_conciliado"
+        : "conciliado_manual";
 
       // Atualiza a entrada
       const { error } = await supabase
@@ -280,7 +286,11 @@ export function TransacaoActionsMenu({
       if (error) throw error;
 
       // Se for uma transferência (entrada com transferencia_id), concilia a saída correspondente
-      if (entradaAtual && entradaAtual.transferencia_id && entradaAtual.tipo === "entrada") {
+      if (
+        entradaAtual &&
+        entradaAtual.transferencia_id &&
+        entradaAtual.tipo === "entrada"
+      ) {
         await supabase
           .from("transacoes_financeiras")
           .update({
@@ -376,63 +386,102 @@ export function TransacaoActionsMenu({
             <Link2 className="mr-2 h-4 w-4" />
             Ver Movimentação Vinculada
           </DropdownMenuItem>
-                {/* Drawer para mostrar movimentação vinculada */}
-                {showVinculadaDrawer && movVinculada && (
-                  <Sheet open={showVinculadaDrawer} onOpenChange={setShowVinculadaDrawer}>
-                    <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto">
-                      <SheetHeader>
-                        <SheetTitle>Movimentação Vinculada</SheetTitle>
-                      </SheetHeader>
-                      <div className="space-y-6 mt-6">
-                        <div className="space-y-3">
-                          <h3 className="font-semibold text-sm">Informações Básicas</h3>
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start gap-2">
-                              <span className="text-sm text-muted-foreground">Descrição</span>
-                              <span className="text-sm font-medium text-right max-w-[250px] break-words">{movVinculada.descricao}</span>
-                            </div>
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Valor</span>
-                              <span className={movVinculada.tipo === 'entrada' ? 'text-green-600 font-bold text-sm' : 'text-red-600 font-bold text-sm'}>
-                                R$ {movVinculada.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Data</span>
-                              <span className="text-sm font-medium">
-                                {movVinculada.data_pagamento ? new Date(movVinculada.data_pagamento).toLocaleDateString('pt-BR') : '-'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Tipo</span>
-                              <span>
-                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${movVinculada.tipo === 'entrada' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}>
-                                  {movVinculada.tipo === 'entrada' ? 'Entrada' : 'Saída'}
-                                </span>
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-start gap-2">
-                              <span className="text-sm text-muted-foreground">ID</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(String(movVinculada.id))
-                                  toast.success('ID copiado!')
-                                }}
-                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                <span className="font-mono">
-                                  {String(movVinculada.id).substring(0, 8)}...
-                                </span>
-                                <Copy className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+          {/* Drawer para mostrar movimentação vinculada */}
+          {showVinculadaDrawer && movVinculada && (
+            <Sheet
+              open={showVinculadaDrawer}
+              onOpenChange={setShowVinculadaDrawer}
+            >
+              <SheetContent
+                side="right"
+                className="w-full sm:w-[500px] overflow-y-auto"
+              >
+                <SheetHeader>
+                  <SheetTitle>Movimentação Vinculada</SheetTitle>
+                </SheetHeader>
+                <div className="space-y-6 mt-6">
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-sm">
+                      Informações Básicas
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Descrição
+                        </span>
+                        <span className="text-sm font-medium text-right max-w-[250px] break-words">
+                          {movVinculada.descricao}
+                        </span>
                       </div>
-                    </SheetContent>
-                  </Sheet>
-                )}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Valor
+                        </span>
+                        <span
+                          className={
+                            movVinculada.tipo === "entrada"
+                              ? "text-green-600 font-bold text-sm"
+                              : "text-red-600 font-bold text-sm"
+                          }
+                        >
+                          R${" "}
+                          {movVinculada.valor?.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Data
+                        </span>
+                        <span className="text-sm font-medium">
+                          {movVinculada.data_pagamento
+                            ? new Date(
+                                movVinculada.data_pagamento,
+                              ).toLocaleDateString("pt-BR")
+                            : "-"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Tipo
+                        </span>
+                        <span>
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${movVinculada.tipo === "entrada" ? "bg-green-100 text-green-700 border-green-300" : "bg-red-100 text-red-700 border-red-300"}`}
+                          >
+                            {movVinculada.tipo === "entrada"
+                              ? "Entrada"
+                              : "Saída"}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          ID
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              String(movVinculada.id),
+                            );
+                            toast.success("ID copiado!");
+                          }}
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <span className="font-mono">
+                            {String(movVinculada.id).substring(0, 8)}...
+                          </span>
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setShowDeleteDialog(true)}
