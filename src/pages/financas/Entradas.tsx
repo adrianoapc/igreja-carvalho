@@ -62,6 +62,7 @@ import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { MonthPicker } from "@/components/financas/MonthPicker";
 import { EntradasCalendario } from "@/components/financas/EntradasCalendario";
+import { EntradasTimelineCalendario } from "@/components/financas/EntradasTimelineCalendario";
 
 export default function Entradas() {
   const navigate = useNavigate();
@@ -670,6 +671,7 @@ export default function Entradas() {
                       variant={visaoCalendario ? "default" : "outline"}
                       size="sm"
                       onClick={() => setVisaoCalendario(true)}
+                      className="hidden md:flex"
                     >
                       <Calendar className="w-4 h-4" />
                     </Button>
@@ -688,11 +690,19 @@ export default function Entradas() {
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
             <>
               {visaoCalendario ? (
-                <EntradasCalendario
-                  ano={selectedMonth.getFullYear()}
-                  mes={selectedMonth.getMonth()}
-                  dadosPorDia={transacoesAgrupadas}
-                />
+                customRange ? (
+                  <EntradasTimelineCalendario
+                    dataInicio={formatLocalDate(customRange.from)}
+                    dataFim={formatLocalDate(customRange.to)}
+                    dadosPorDia={transacoesAgrupadas}
+                  />
+                ) : (
+                  <EntradasCalendario
+                    ano={selectedMonth.getFullYear()}
+                    mes={selectedMonth.getMonth()}
+                    dadosPorDia={transacoesAgrupadas}
+                  />
+                )
               ) : agruparPorData ? (
                 <div className="space-y-3 p-4">
                   {datasOrdenadas.map((dataKey) => {
@@ -1074,7 +1084,7 @@ export default function Entradas() {
               )}
 
               {/* Pagination - apenas na visão lista */}
-              {!agruparPorData && (
+              {!agruparPorData && !visaoCalendario && (
                 <TablePagination
                   currentPage={currentPage}
                   totalPages={totalPages}

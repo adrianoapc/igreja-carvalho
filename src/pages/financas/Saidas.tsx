@@ -14,6 +14,7 @@ import {
   ReceiptText,
   ChevronDown,
   ChevronRight,
+  Layers,
 } from "lucide-react";
 import {
   Tooltip,
@@ -60,6 +61,8 @@ import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import { SaidasCalendario } from "@/components/financas/SaidasCalendario";
+import { SaidasTimelineCalendario } from "@/components/financas/SaidasTimelineCalendario";
 
 export default function Saidas() {
   const navigate = useNavigate();
@@ -107,6 +110,9 @@ export default function Saidas() {
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
   );
+
+  // Estado para alternar entre lista e calendário
+  const [visaoCalendario, setVisaoCalendario] = useState(false);
 
   // Estado para drawer de extrato
   const [extratoSelecionado, setExtratoSelecionado] = useState<string | null>(
@@ -329,7 +335,7 @@ export default function Saidas() {
 
   // Agrupar transações por data
   const transacoesAgrupadas = useMemo(() => {
-    if (!agruparPorData || !transacoesFiltradas) return {};
+    if (!transacoesFiltradas) return {};
 
     const grupos: Record<string, typeof transacoesFiltradas> = {};
 
@@ -345,7 +351,7 @@ export default function Saidas() {
     });
 
     return grupos;
-  }, [transacoesFiltradas, agruparPorData]);
+  }, [transacoesFiltradas]);
 
   // Ordenar as datas dos grupos (mais recente primeiro)
   const datasOrdenadas = useMemo(() => {
@@ -742,24 +748,60 @@ export default function Saidas() {
         <CardHeader className="p-4 md:p-6">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg md:text-xl">
-              Lista de Saídas
+              {visaoCalendario ? "Calendário de Saídas" : agruparPorData ? "Saídas (Agrupadas)" : "Lista de Saídas"}
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setAgruparPorData(!agruparPorData);
-                if (!agruparPorData) {
-                  // Ao ativar agrupamento, expandir todos os grupos
-                  setGruposExpandidos(
-                    new Set(Object.keys(transacoesAgrupadas)),
-                  );
-                }
-              }}
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              {agruparPorData ? "Visão Lista" : "Agrupar por Data"}
-            </Button>
+            <div className="flex gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={!visaoCalendario && !agruparPorData ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setVisaoCalendario(false);
+                        setAgruparPorData(false);
+                      }}
+                    >
+                      <FileText className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Lista</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={!visaoCalendario && agruparPorData ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setVisaoCalendario(false);
+                        setAgruparPorData(true);
+                        setGruposExpandidos(
+                          new Set(Object.keys(transacoesAgrupadas)),
+                        );
+                      }}
+                    >
+                      <Layers className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Agrupar por Data</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={visaoCalendario ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setVisaoCalendario(true)}
+                      className="hidden md:flex"
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Visão Calendário</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
@@ -769,7 +811,21 @@ export default function Saidas() {
             </p>
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
             <>
-              {agruparPorData ? (
+              {visaoCalendario ? (
+                customRange ? (
+                  <SaidasTimelineCalendario
+                    dataInicio={formatLocalDate(customRange.from)}
+                    dataFim={formatLocalDate(customRange.to)}
+                    dadosPorDia={transacoesAgrupadas}
+                  />
+                ) : (
+                  <SaidasCalendario
+                    ano={selectedMonth.getFullYear()}
+                    mes={selectedMonth.getMonth()}
+                    dadosPorDia={transacoesAgrupadas}
+                  />
+                )
+              ) : agruparPorData ? (
                 <div className="space-y-3">
                   {datasOrdenadas.map((dataKey) => {
                     const grupo = transacoesAgrupadas[dataKey];
@@ -1211,7 +1267,7 @@ export default function Saidas() {
               )}
 
               {/* Pagination - apenas na visão lista */}
-              {!agruparPorData && (
+              {!agruparPorData && !visaoCalendario && (
                 <TablePagination
                   currentPage={currentPage}
                   totalPages={totalPages}

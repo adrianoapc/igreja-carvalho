@@ -26,12 +26,16 @@ import {
   ArrowRightLeft,
   ChevronDown,
   ChevronRight,
+  Layers,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo } from "react";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { EntradasCalendario } from "@/components/financas/EntradasCalendario";
+import { EntradasTimelineCalendario } from "@/components/financas/EntradasTimelineCalendario";
 import { toast } from "sonner";
 import { ContaDialog } from "@/components/financas/ContaDialog";
 import { AjusteSaldoDialog } from "@/components/financas/AjusteSaldoDialog";
@@ -73,6 +77,7 @@ export default function Contas() {
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
   );
+  const [visaoCalendario, setVisaoCalendario] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pago" | "pendente">(
     "all",
   );
@@ -469,25 +474,26 @@ export default function Contas() {
     categorias_financeiras?: { nome?: string } | null;
   };
 
-  const renderTransactionList = (filteredTransacoes: TransacaoLista[]) => (
-    <div className="space-y-2">
-      {isLoadingTransacoes ? (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          Carregando...
-        </p>
-      ) : filteredTransacoes && filteredTransacoes.length > 0 ? (
-        filteredTransacoes.map((t) => (
-          <div
-            key={t.id}
-            className={cn(
-              "flex items-center justify-between p-3 rounded-lg",
-              t.tipo === "entrada"
-                ? "bg-green-50 dark:bg-green-950/20"
-                : "bg-red-50 dark:bg-red-950/20",
-            )}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
+  const renderTransactionList = (filteredTransacoes: TransacaoLista[]) => {
+    return (
+          <div className="space-y-2">
+            {isLoadingTransacoes ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Carregando...
+              </p>
+            ) : filteredTransacoes && filteredTransacoes.length > 0 ? (
+              filteredTransacoes.map((t) => (
+                <div
+                  key={t.id}
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg",
+                    t.tipo === "entrada"
+                      ? "bg-green-50 dark:bg-green-950/20"
+                      : "bg-red-50 dark:bg-red-950/20",
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-medium truncate flex-1">
                   {t.descricao}
                 </p>
@@ -550,7 +556,8 @@ export default function Contas() {
         </p>
       )}
     </div>
-  );
+    );
+  };
 
   const renderTransactionListGrouped = (
     filteredTransacoes: TransacaoLista[],
@@ -1110,21 +1117,54 @@ export default function Contas() {
                     <SelectItem value="pendente">⏳ Pendente</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setAgruparPorData(!agruparPorData);
-                    if (!agruparPorData) {
-                      setGruposExpandidos(
-                        new Set(Object.keys(transacoesAgrupadas)),
-                      );
-                    }
-                  }}
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  {agruparPorData ? "Visão Lista" : "Agrupar por Data"}
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={!visaoCalendario && !agruparPorData ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setVisaoCalendario(false);
+                          setAgruparPorData(false);
+                        }}
+                      >
+                        <FileText className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Lista</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={!visaoCalendario && agruparPorData ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setVisaoCalendario(false);
+                          setAgruparPorData(true);
+                          setGruposExpandidos(
+                            new Set(Object.keys(transacoesAgrupadas)),
+                          );
+                        }}
+                      >
+                        <Layers className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Agrupar por Data</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={visaoCalendario ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setVisaoCalendario(true)}
+                        className="hidden md:flex"
+                      >
+                        <Calendar className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Visão Calendário</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
 
@@ -1132,7 +1172,31 @@ export default function Contas() {
               value="todos"
               className="max-h-[500px] overflow-y-auto"
             >
-              {agruparPorData
+              {visaoCalendario ? (
+                customRange ? (
+                  <EntradasTimelineCalendario
+                    dataInicio={formatLocalDate(customRange.from)}
+                    dataFim={formatLocalDate(customRange.to)}
+                    dadosPorDia={transacoesFiltradas?.reduce((acc: Record<string, any[]>, t: any) => {
+                      const data = t.data_vencimento || "sem-data";
+                      if (!acc[data]) acc[data] = [];
+                      acc[data].push(t);
+                      return acc;
+                    }, {}) || {}}
+                  />
+                ) : (
+                  <EntradasCalendario
+                    ano={selectedMonth.getFullYear()}
+                    mes={selectedMonth.getMonth()}
+                    dadosPorDia={transacoesFiltradas?.reduce((acc: Record<string, any[]>, t: any) => {
+                      const data = t.data_vencimento || "sem-data";
+                      if (!acc[data]) acc[data] = [];
+                      acc[data].push(t);
+                      return acc;
+                    }, {}) || {}}
+                  />
+                )
+              ) : agruparPorData
                 ? renderTransactionListGrouped(transacoesFiltradas || [])
                 : renderTransactionList(transacoesFiltradas || [])}
             </TabsContent>
@@ -1141,7 +1205,31 @@ export default function Contas() {
               value="entradas"
               className="max-h-[500px] overflow-y-auto"
             >
-              {agruparPorData
+              {visaoCalendario ? (
+                customRange ? (
+                  <EntradasTimelineCalendario
+                    dataInicio={formatLocalDate(customRange.from)}
+                    dataFim={formatLocalDate(customRange.to)}
+                    dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "entrada").reduce((acc: Record<string, any[]>, t: any) => {
+                      const data = t.data_vencimento || "sem-data";
+                      if (!acc[data]) acc[data] = [];
+                      acc[data].push(t);
+                      return acc;
+                    }, {}) || {}}
+                  />
+                ) : (
+                  <EntradasCalendario
+                    ano={selectedMonth.getFullYear()}
+                    mes={selectedMonth.getMonth()}
+                    dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "entrada").reduce((acc: Record<string, any[]>, t: any) => {
+                      const data = t.data_vencimento || "sem-data";
+                      if (!acc[data]) acc[data] = [];
+                      acc[data].push(t);
+                      return acc;
+                    }, {}) || {}}
+                  />
+                )
+              ) : agruparPorData
                 ? renderTransactionListGrouped(
                     transacoesFiltradas?.filter((t) => t.tipo === "entrada") ||
                       [],
@@ -1156,7 +1244,31 @@ export default function Contas() {
               value="saidas"
               className="max-h-[500px] overflow-y-auto"
             >
-              {agruparPorData
+              {visaoCalendario ? (
+                customRange ? (
+                  <EntradasTimelineCalendario
+                    dataInicio={formatLocalDate(customRange.from)}
+                    dataFim={formatLocalDate(customRange.to)}
+                    dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "saida").reduce((acc: Record<string, any[]>, t: any) => {
+                      const data = t.data_vencimento || "sem-data";
+                      if (!acc[data]) acc[data] = [];
+                      acc[data].push(t);
+                      return acc;
+                    }, {}) || {}}
+                  />
+                ) : (
+                  <EntradasCalendario
+                    ano={selectedMonth.getFullYear()}
+                    mes={selectedMonth.getMonth()}
+                    dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "saida").reduce((acc: Record<string, any[]>, t: any) => {
+                      const data = t.data_vencimento || "sem-data";
+                      if (!acc[data]) acc[data] = [];
+                      acc[data].push(t);
+                      return acc;
+                    }, {}) || {}}
+                  />
+                )
+              ) : agruparPorData
                 ? renderTransactionListGrouped(
                     transacoesFiltradas?.filter((t) => t.tipo === "saida") ||
                       [],

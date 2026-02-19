@@ -1,7 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useState } from "react";
 import {
@@ -11,13 +10,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-interface EntradasCalendarioProps {
+interface SaidasCalendarioProps {
   ano: number;
   mes: number; // 0-11
   dadosPorDia: Record<string, Array<any>>; // yyyy-MM-dd: [transacoes]
 }
 
-export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendarioProps) {
+export function SaidasCalendario({ ano, mes, dadosPorDia }: SaidasCalendarioProps) {
   const { formatValue } = useHideValues();
   const [diaSelecionado, setDiaSelecionado] = useState<{ data: string; transacoes: any[] } | null>(null);
 
@@ -61,9 +60,7 @@ export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendario
               }
               const dataKey = format(new Date(ano, mes, dia), "yyyy-MM-dd");
               const transacoes = dadosPorDia[dataKey] || [];
-              const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0);
-              const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0);
-              const total = totalEntradas - totalSaidas;
+              const total = transacoes.reduce((sum, t) => sum + Number(t.valor), 0);
               
               return (
                 <button
@@ -74,9 +71,9 @@ export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendario
                   <Card className="h-full p-3 flex flex-col justify-between hover:shadow-md hover:border-primary/50 transition-all">
                     <div>
                       <div className="text-lg font-bold mb-2">{dia}</div>
-                      {total !== 0 && (
-                        <div className={`text-xs font-semibold ${total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {total >= 0 ? '+' : ''}{formatValue(total)}
+                      {total > 0 && (
+                        <div className="text-sm font-semibold text-red-600">
+                          {formatValue(total)}
                         </div>
                       )}
                     </div>
@@ -110,25 +107,13 @@ export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendario
               {diaSelecionado.transacoes.map((t, idx) => (
                 <div key={idx} className="flex items-center justify-between text-sm border-b pb-2">
                   <span className="text-foreground">{t.descricao}</span>
-                  <span className={`font-semibold ml-4 ${t.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                    {t.tipo === 'entrada' ? '+' : '-'}{formatValue(Number(t.valor))}
-                  </span>
+                  <span className="font-semibold text-red-600 ml-4">{formatValue(Number(t.valor))}</span>
                 </div>
               ))}
               <div className="border-t pt-3 mt-3 flex items-center justify-between font-bold">
                 <span>Total do Dia</span>
-                <span className={`text-lg ${(() => {
-                  const totalEntradas = diaSelecionado.transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0);
-                  const totalSaidas = diaSelecionado.transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0);
-                  const totalDia = totalEntradas - totalSaidas;
-                  return totalDia >= 0 ? 'text-green-600' : 'text-red-600';
-                })()}`}>
-                  {(() => {
-                    const totalEntradas = diaSelecionado.transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0);
-                    const totalSaidas = diaSelecionado.transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0);
-                    const totalDia = totalEntradas - totalSaidas;
-                    return (totalDia >= 0 ? '+' : '') + formatValue(totalDia);
-                  })()}
+                <span className="text-lg text-red-600">
+                  {formatValue(diaSelecionado.transacoes.reduce((sum, t) => sum + Number(t.valor), 0))}
                 </span>
               </div>
             </div>
