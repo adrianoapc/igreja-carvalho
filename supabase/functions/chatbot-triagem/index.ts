@@ -108,9 +108,12 @@ const isAfirmativo = (text: string): boolean =>
   );
 
 const isNegativo = (text: string): boolean =>
-  /^(nao|não|n|errado|corrigir|cancelar|cancela|mudar|incorreto|no)$/i.test(
+  /^(nao|não|n|errado|corrigir|mudar|incorreto|no)$/i.test(
     text.trim(),
   );
+
+const isCancelamento = (text: string): boolean =>
+  /^(cancelar|cancela|sair|desistir|nao quero|não quero)$/i.test(text.trim());
 
 // Função local normalizePhone substituída pelo utilitário compartilhado
 const normalizePhone = normalizarTelefone;
@@ -771,7 +774,7 @@ async function handleFluxoInscricao(
       });
 
       return respostaJson(
-        `Evento: *${eventoEscolhido.titulo}*\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
+        `Evento: *${eventoEscolhido.titulo}*\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.\n_(Digite *CANCELAR* para sair)_`,
       );
     }
     return respostaJson(
@@ -791,6 +794,16 @@ async function handleFluxoInscricao(
         filialId,
       );
     }
+    if (isCancelamento(textoNorm)) {
+      console.log(`[Inscricao] Cancelamento detectado, encerrando sessão...`);
+      await supabaseClient
+        .from("atendimentos_bot")
+        .update({ status: "CONCLUIDO", fluxo_atual: null, meta_dados: null })
+        .eq("id", sessao.id);
+      return respostaJson(
+        "Tudo bem! Inscrição cancelada. Se precisar de algo, é só chamar. 🙏",
+      );
+    }
     if (isNegativo(textoNorm)) {
       console.log(
         `[Inscricao] Resposta negativa detectada, solicitando correção...`,
@@ -804,12 +817,22 @@ async function handleFluxoInscricao(
     // Resposta ambígua - repetir pergunta
     console.log(`[Inscricao] Resposta ambígua: "${textoNorm}"`);
     return respostaJson(
-      `Nome: ${meta.nome_confirmado || nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
+      `Nome: ${meta.nome_confirmado || nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.\n_(Digite *CANCELAR* para sair)_`,
     );
   }
 
   // STEP: Correção de dados
   if (step === "correcao") {
+    if (isCancelamento(textoNorm)) {
+      console.log(`[Inscricao] Cancelamento detectado no step correcao, encerrando sessão...`);
+      await supabaseClient
+        .from("atendimentos_bot")
+        .update({ status: "CONCLUIDO", fluxo_atual: null, meta_dados: null })
+        .eq("id", sessao.id);
+      return respostaJson(
+        "Tudo bem! Inscrição cancelada. Se precisar de algo, é só chamar. 🙏",
+      );
+    }
     const nomeCorrigido = texto.trim();
     if (nomeCorrigido.length < 2) {
       return respostaJson("Por favor, envie o nome correto.");
@@ -820,7 +843,7 @@ async function handleFluxoInscricao(
       nome_confirmado: nomeCorrigido,
     });
     return respostaJson(
-      `Nome: ${nomeCorrigido}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
+      `Nome: ${nomeCorrigido}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.\n_(Digite *CANCELAR* para sair)_`,
     );
   }
 
@@ -886,7 +909,7 @@ async function iniciarFluxoInscricao(
     });
 
     return respostaJson(
-      `Encontrei o evento *${evento.titulo}*! 🎉\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.`,
+      `Encontrei o evento *${evento.titulo}*! 🎉\n\nSeus dados:\nNome: ${nomePerfil}\nTelefone: ${sessao.telefone}\n\nEstá correto? Responda *SIM* ou *NÃO*.\n_(Digite *CANCELAR* para sair)_`,
     );
   }
 
