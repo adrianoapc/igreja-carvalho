@@ -293,22 +293,22 @@ export function ExtratoDetalheDrawer({
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText(
-                                  String(transacao.id),
-                                );
+                                navigator.clipboard.writeText(String(transacao.id));
                                 const newCopied = new Set(copiedTransacaoIds);
                                 newCopied.add(transacao.id);
                                 setCopiedTransacaoIds(newCopied);
                                 setTimeout(() => {
-                                  const updated = new Set(copiedTransacaoIds);
-                                  updated.delete(transacao.id);
-                                  setCopiedTransacaoIds(updated);
+                                  setCopiedTransacaoIds((prev) => {
+                                    const updated = new Set(prev);
+                                    updated.delete(transacao.id);
+                                    return updated;
+                                  });
                                 }, 2000);
                                 toast.success("ID copiado!");
                               }}
                               className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
                             >
-                              <span className="font-mono truncate text-right max-w-[100px]">
+                              <span className="font-mono truncate text-right max-w-[60px]">
                                 {String(transacao.id).substring(0, 8)}...
                               </span>
                               {copiedTransacaoIds.has(transacao.id) ? (

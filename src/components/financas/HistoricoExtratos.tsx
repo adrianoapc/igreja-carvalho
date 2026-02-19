@@ -48,6 +48,7 @@ import { formatLocalDate } from "@/utils/dateUtils";
 import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 
 import { anonymizePixDescription } from "@/utils/anonymization";
+import { ExtratoDetalheDrawer } from "./ExtratoDetalheDrawer";
 
 interface ExtratoItem {
   id: string;
@@ -96,9 +97,7 @@ export function HistoricoExtratos() {
   // Dialogs
   const [extratoParaVincular, setExtratoParaVincular] =
     useState<ExtratoItem | null>(null);
-  const [transacaoParaVisualizar, setTransacaoParaVisualizar] = useState<
-    string | null
-  >(null);
+  const [extratoParaVisualizar, setExtratoParaVisualizar] = useState<string | null>(null);
 
   // Loading states
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -557,9 +556,7 @@ export function HistoricoExtratos() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    setTransacaoParaVisualizar(extrato.transacao_vinculada_id)
-                  }
+                  onClick={() => setExtratoParaVisualizar(extrato.id)}
                 >
                   <Eye className="w-4 h-4 mr-1" />
                   Ver
@@ -605,6 +602,14 @@ export function HistoricoExtratos() {
 
   return (
     <div className="space-y-4">
+      {/* Drawer de detalhes do extrato */}
+      <ExtratoDetalheDrawer
+        extratoId={extratoParaVisualizar}
+        open={!!extratoParaVisualizar}
+        onOpenChange={(open) => {
+          if (!open) setExtratoParaVisualizar(null);
+        }}
+      />
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-3">

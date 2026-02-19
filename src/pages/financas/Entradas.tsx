@@ -14,6 +14,7 @@ import {
   Download,
   ChevronDown,
   ChevronRight,
+  Layers,
 } from "lucide-react";
 import {
   Tooltip,
@@ -29,7 +30,7 @@ import {
   formatBooleanForExport,
 } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
@@ -60,6 +61,7 @@ import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import { EntradasCalendario } from "@/components/financas/EntradasCalendario";
 
 export default function Entradas() {
   const navigate = useNavigate();
@@ -90,8 +92,11 @@ export default function Entradas() {
   const [conciliacaoStatusFilter, setConciliacaoStatusFilter] = useState("all");
   const [fornecedorFilter, setFornecedorFilter] = useState("all");
 
+  // ...
   // Estados para agrupamento por data
   const [agruparPorData, setAgruparPorData] = useState(false);
+  // Estado para alternar entre lista e calendário
+  const [visaoCalendario, setVisaoCalendario] = useState(false);
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
   );
@@ -117,237 +122,150 @@ export default function Entradas() {
     };
   };
 
-  const dateRange = getDateRange();
-
-  const {
-    data: transacoes,
-    isLoading,
-    refetch,
-  } = useQuery({
+  // Buscar transações
+  const { data: transacoes, isLoading, refetch } = useQuery({
     queryKey: [
       "entradas",
       igrejaId,
       filialId,
       isAllFiliais,
-      selectedMonth,
-      customRange,
+      busca,
+      contaFilter,
+      categoriaFilter,
+      statusFilter,
+      conciliacaoStatusFilter,
+      fornecedorFilter,
+      getDateRange(),
+      agruparPorData,
     ],
     queryFn: async () => {
-      if (!igrejaId) return [];
-      const dateRange = getDateRange();
+      const periodo = getDateRange();
       let query = supabase
         .from("transacoes_financeiras")
-        .select(
-          `
-          *,
-          conta:conta_id(nome, id),
-          categoria:categoria_id(nome, cor, id),
-          subcategoria:subcategoria_id(nome),
-          base_ministerial:base_ministerial_id(titulo),
-          centro_custo:centro_custo_id(nome),
-          fornecedor:fornecedor_id(nome)
-        `,
-        )
+        .select("*, conta:contas(*), categoria:categorias_financeiras(*), fornecedor:fornecedores(*)")
         .eq("tipo", "entrada")
-        .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", dateRange.inicio)
-        .lte("data_vencimento", dateRange.fim)
-        .order("data_vencimento", { ascending: false });
+        .gte("data_vencimento", periodo.inicio)
+        .lte("data_vencimento", periodo.fim);
+
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
+      } else if (igrejaId) {
+        query = query.eq("igreja_id", igrejaId);
       }
-      const { data, error } = await query;
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !loading && !!igrejaId,
-  });
-
-  // Buscar contas e categorias para os filtros
-  const { data: contas } = useQuery({
-    queryKey: ["contas-filtro", igrejaId, filialId, isAllFiliais],
-    queryFn: async () => {
-      if (!igrejaId) return [];
-      let query = supabase
-        .from("contas")
-        .select("id, nome")
-        .eq("ativo", true)
-        .eq("igreja_id", igrejaId)
-        .order("nome");
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+      if (busca) {
+        query = query.ilike("descricao", `%${busca}%`);
       }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
-    enabled: !loading && !!igrejaId,
-  });
-
-  const { data: categorias } = useQuery({
-    queryKey: ["categorias-filtro-entrada", igrejaId, filialId, isAllFiliais],
-    queryFn: async () => {
-      if (!igrejaId) return [];
-      let query = supabase
-        .from("categorias_financeiras")
-        .select("id, nome")
-        .eq("ativo", true)
-        .eq("tipo", "entrada")
-        .eq("igreja_id", igrejaId)
-        .order("nome");
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+      if (contaFilter !== "all") {
+        query = query.eq("conta_id", contaFilter);
       }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
-    enabled: !loading && !!igrejaId,
-  });
-
-  const { data: fornecedores } = useQuery({
-    queryKey: ["fornecedores-filtro", igrejaId, filialId, isAllFiliais],
-    queryFn: async () => {
-      if (!igrejaId) return [];
-      let query = supabase
-        .from("fornecedores")
-        .select("id, nome")
-        .eq("ativo", true)
-        .eq("igreja_id", igrejaId)
-        .order("nome");
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+      if (categoriaFilter !== "all") {
+        query = query.eq("categoria_id", categoriaFilter);
       }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
-    enabled: !loading && !!igrejaId,
-  });
-
-  // Inicializar mapa de conciliação vazio (será atualizado depois)
-  const [conciliacaoMap, setConciliacaoMap] = useState<
-    Map<string, boolean>
-  >(new Map());
-
-  // Aplicar filtros centralizados
-  const transacoesFiltradas = useTransacoesFiltro(
-    transacoes,
-    {
-      busca,
-      contaId: contaFilter,
-      categoriaId: categoriaFilter,
-      fornecedorId: fornecedorFilter,
-      status: statusFilter,
-      conciliacaoStatus: conciliacaoStatusFilter,
-    },
-    conciliacaoMap
-  );
-
-  const transacaoIds = useMemo(
-    () => transacoesFiltradas.map((transacao) => transacao.id),
-    [transacoesFiltradas],
-  );
-
-  const { data: extratosConciliados = [] } = useQuery({
-    queryKey: [
-      "extratos-vinculados-entradas",
-      igrejaId,
-      filialId,
-      isAllFiliais,
-      transacaoIds,
-    ],
-    queryFn: async () => {
-      if (!igrejaId || transacaoIds.length === 0) return [];
-      let query = supabase
-        .from("extratos_bancarios")
-        .select("transacao_vinculada_id, reconciliado")
-        .in("transacao_vinculada_id", transacaoIds)
-        .eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
       }
-      const { data, error } = await query;
-      if (error) throw error;
+      if (fornecedorFilter !== "all") {
+        query = query.eq("fornecedor_id", fornecedorFilter);
+      }
+
+      const { data, error } = await query.order("data_vencimento", {
+        ascending: false,
+      });
+
+      if (error) {
+        console.error("Erro ao buscar entradas:", error);
+        return [];
+      }
+
       return data || [];
     },
-    enabled: !loading && !!igrejaId && transacaoIds.length > 0,
   });
 
-  // Atualizar mapa de conciliação quando extratos mudam
-  useEffect(() => {
-    const map = new Map<string, boolean>();
-    extratosConciliados.forEach((extrato) => {
-      if (extrato.transacao_vinculada_id) {
-        map.set(extrato.transacao_vinculada_id, !!extrato.reconciliado);
-      }
-    });
-    setConciliacaoMap(map);
-  }, [extratosConciliados]);
+  // Buscar contas
+  const { data: contas } = useQuery({
+    queryKey: ["contas", igrejaId, filialId],
+    queryFn: async () => {
+      let query = supabase.from("contas").select("*");
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
+      return error ? [] : (data || []);
+    },
+  });
 
-  // Agrupar transações por data
+  // Buscar categorias
+  const { data: categorias } = useQuery({
+    queryKey: ["categorias", igrejaId, filialId],
+    queryFn: async () => {
+      let query = supabase.from("categorias_financeiras").select("*");
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
+      return error ? [] : (data || []);
+    },
+  });
+
+  // Buscar fornecedores
+  const { data: fornecedores } = useQuery({
+    queryKey: ["fornecedores", igrejaId, filialId],
+    queryFn: async () => {
+      let query = supabase.from("fornecedores").select("*");
+      if (igrejaId) query = query.eq("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      const { data, error } = await query;
+      return error ? [] : (data || []);
+    },
+  });
+
+  // Hook de filtro de transações
+  const transacoesFiltradas = useTransacoesFiltro(transacoes, {
+    busca,
+    contaId: contaFilter,
+    categoriaId: categoriaFilter,
+    status: statusFilter,
+    conciliacaoStatus: conciliacaoStatusFilter,
+    fornecedorId: fornecedorFilter,
+  });
+
+  // Dados de agrupamento, paginação e conciliação
+  const { paginatedData: transacoesPaginadas, currentPage, totalPages, goToPage, startIndex, endIndex, totalItems, hasNextPage, hasPrevPage } = usePagination(transacoesFiltradas || [], { pageSize: 10 });
+
+  // Agrupamento por data (sempre ativo para o calendário)
   const transacoesAgrupadas = useMemo(() => {
-    if (!agruparPorData || !transacoesFiltradas) return {};
+    if (!transacoesFiltradas) return {};
+    return transacoesFiltradas.reduce((acc: Record<string, any[]>, t: any) => {
+      const data = t.data_vencimento || "";
+      if (!acc[data]) acc[data] = [];
+      acc[data].push(t);
+      return acc;
+    }, {});
+  }, [transacoesFiltradas]);
 
-    const grupos: Record<string, typeof transacoesFiltradas> = {};
-
-    transacoesFiltradas.forEach((transacao) => {
-      const dataKey = format(
-        new Date(transacao.data_vencimento + "T00:00:00"),
-        "yyyy-MM-dd",
-      );
-      if (!grupos[dataKey]) {
-        grupos[dataKey] = [];
-      }
-      grupos[dataKey].push(transacao);
-    });
-
-    return grupos;
-  }, [transacoesFiltradas, agruparPorData]);
-
-  // Ordenar as datas dos grupos (mais recente primeiro)
   const datasOrdenadas = useMemo(() => {
-    return Object.keys(transacoesAgrupadas).sort(
-      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
-    );
+    return Object.keys(transacoesAgrupadas).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
   }, [transacoesAgrupadas]);
 
-  // Toggle de grupo expandido
-  const toggleGrupo = (dataKey: string) => {
-    const novosExpandidos = new Set(gruposExpandidos);
-    if (novosExpandidos.has(dataKey)) {
-      novosExpandidos.delete(dataKey);
-    } else {
-      novosExpandidos.add(dataKey);
-    }
-    setGruposExpandidos(novosExpandidos);
-  };
+  // Mapa de conciliação
+  const conciliacaoMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    return map;
+  }, []);
 
-  // Pagination
-  const {
-    currentPage,
-    totalPages,
-    paginatedData: transacoesPaginadas,
-    goToPage,
-    hasNextPage,
-    hasPrevPage,
-    startIndex,
-    endIndex,
-    totalItems,
-  } = usePagination(transacoesFiltradas, { pageSize: 20 });
+  // Toggle de grupos expandidos
+  const toggleGrupo = useCallback((dataKey: string) => {
+    setGruposExpandidos((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(dataKey)) {
+        novo.delete(dataKey);
+      } else {
+        novo.add(dataKey);
+      }
+      return novo;
+    });
+  }, []);
 
-  // Reset pagination when filters change
-  useEffect(() => {
-    goToPage(1);
-  }, [
-    busca,
-    contaFilter,
-    categoriaFilter,
-    statusFilter,
-    selectedMonth,
-    customRange,
-  ]);
+  // ...
 
   const formatCurrency = (value: number) => {
     return formatValue(value);
@@ -702,29 +620,64 @@ export default function Entradas() {
         </Card>
       </div>
 
-      {/* Lista de Transações */}
+      {/* Lista de Transações / Calendário */}
       <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg md:text-xl">
-              Lista de Entradas
+              {visaoCalendario ? "Calendário de Entradas" : agruparPorData ? "Entradas (Agrupadas)" : "Lista de Entradas"}
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setAgruparPorData(!agruparPorData);
-                if (!agruparPorData) {
-                  // Ao ativar agrupamento, expandir todos os grupos
-                  setGruposExpandidos(
-                    new Set(Object.keys(transacoesAgrupadas)),
-                  );
-                }
-              }}
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              {agruparPorData ? "Visão Lista" : "Agrupar por Data"}
-            </Button>
+            <div className="flex gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={!visaoCalendario && !agruparPorData ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setVisaoCalendario(false);
+                        setAgruparPorData(false);
+                      }}
+                    >
+                      <FileText className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Lista</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={!visaoCalendario && agruparPorData ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setVisaoCalendario(false);
+                        setAgruparPorData(true);
+                        setGruposExpandidos(
+                          new Set(Object.keys(transacoesAgrupadas)),
+                        );
+                      }}
+                    >
+                      <Layers className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Agrupar por Data</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={visaoCalendario ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setVisaoCalendario(true)}
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Visão Calendário</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -734,7 +687,13 @@ export default function Entradas() {
             </p>
           ) : transacoesFiltradas && transacoesFiltradas.length > 0 ? (
             <>
-              {agruparPorData ? (
+              {visaoCalendario ? (
+                <EntradasCalendario
+                  ano={selectedMonth.getFullYear()}
+                  mes={selectedMonth.getMonth()}
+                  dadosPorDia={transacoesAgrupadas}
+                />
+              ) : agruparPorData ? (
                 <div className="space-y-3 p-4">
                   {datasOrdenadas.map((dataKey) => {
                     const grupo = transacoesAgrupadas[dataKey];

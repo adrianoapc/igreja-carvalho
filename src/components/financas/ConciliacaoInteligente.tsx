@@ -488,9 +488,9 @@ export function ConciliacaoInteligente() {
 
             if (erroTransacao) throw erroTransacao;
 
-            // Se for transferência (entrada com transferencia_id), concilia a saída correspondente
-            if (transacao.transferencia_id && transacao.tipo === "entrada") {
-              await supabase
+            // Se for transferência, concilia a transação irmã (entrada/saída)
+            if (transacao.transferencia_id) {
+              const { error: erroTransferencia } = await supabase
                 .from("transacoes_financeiras")
                 .update({
                   conciliacao_status: "conciliado_extrato",
@@ -498,7 +498,9 @@ export function ConciliacaoInteligente() {
                   data_pagamento: updateTransacao.data_pagamento,
                 })
                 .eq("transferencia_id", transacao.transferencia_id)
-                .eq("tipo", "saida");
+                .neq("id", transacaoId);
+
+              if (erroTransferencia) throw erroTransferencia;
             }
           }
 
@@ -615,12 +617,9 @@ export function ConciliacaoInteligente() {
 
                 if (erroTransacao) throw erroTransacao;
 
-                // Se for transferência (entrada com transferencia_id), concilia a saída correspondente
-                if (
-                  transacao.transferencia_id &&
-                  transacao.tipo === "entrada"
-                ) {
-                  await supabase
+                // Se for transferência, concilia a transação irmã (entrada/saída)
+                if (transacao.transferencia_id) {
+                  const { error: erroTransferencia } = await supabase
                     .from("transacoes_financeiras")
                     .update({
                       conciliacao_status: "conciliado_extrato",
@@ -628,7 +627,9 @@ export function ConciliacaoInteligente() {
                       data_pagamento: updateTransacao.data_pagamento,
                     })
                     .eq("transferencia_id", transacao.transferencia_id)
-                    .eq("tipo", "saida");
+                    .neq("id", transacaoId);
+
+                  if (erroTransferencia) throw erroTransferencia;
                 }
               }
             }
@@ -1164,6 +1165,12 @@ export function ConciliacaoInteligente() {
                           toast.success(
                             "Transação marcada como conciliada manualmente",
                           );
+                          // Remover da lista local sem esperar refetch
+                          setSelectedTransacoes((prev) => prev.filter((id) => id !== item.id));
+                          // Se estiver usando sortedTransacoes como estado, remova também:
+                          if (typeof setSortedTransacoes === "function") {
+                            setSortedTransacoes((prev: TransacaoItem[]) => prev.filter((t) => t.id !== item.id));
+                          }
                           queryClient.invalidateQueries({
                             queryKey: ["transacoes-conciliacao"],
                           });
