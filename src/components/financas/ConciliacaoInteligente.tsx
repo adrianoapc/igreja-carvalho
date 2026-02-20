@@ -1167,10 +1167,6 @@ export function ConciliacaoInteligente() {
                           );
                           // Remover da lista local sem esperar refetch
                           setSelectedTransacoes((prev) => prev.filter((id) => id !== item.id));
-                          // Se estiver usando sortedTransacoes como estado, remova também:
-                          if (typeof setSortedTransacoes === "function") {
-                            setSortedTransacoes((prev: TransacaoItem[]) => prev.filter((t) => t.id !== item.id));
-                          }
                           queryClient.invalidateQueries({
                             queryKey: ["transacoes-conciliacao"],
                           });

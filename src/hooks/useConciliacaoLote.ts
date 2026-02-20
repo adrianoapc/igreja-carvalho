@@ -26,6 +26,7 @@ interface Transacao {
   data_pagamento: string;
   categorias_financeiras?: { nome: string } | null;
   conta_id?: string | null;
+  transferencia_id?: string | null;
 }
 
 interface UseConciliacaoLoteParams {

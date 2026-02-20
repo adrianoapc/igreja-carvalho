@@ -438,7 +438,7 @@ export default function Saidas() {
     }
   };
 
-  type TransacaoResumo = { status: string; data_vencimento: string | Date };
+  type TransacaoResumo = { status: string; data_vencimento?: string | Date | null };
 
   const getStatusDisplay = (transacao: TransacaoResumo) => {
     if (transacao.status === "pago") return "Pago";
@@ -1063,7 +1063,7 @@ export default function Saidas() {
                                           "[DEBUG] onEdit chamado",
                                           transacao,
                                         );
-                                        setEditingTransacao(transacao);
+                                        setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: (transacao as any).data_vencimento ?? '' });
                                         setDialogOpen(true);
                                       }}
                                       onVerExtrato={(extratoId, entrada) => {
@@ -1249,9 +1249,9 @@ export default function Saidas() {
                             isDinheiro={isDinheiro}
                             conferidoManual={!!transacao.conferido_manual}
                             conciliacaoStatus={conciliacaoStatus}
-                            onEdit={() => {
-                              setEditingTransacao(transacao);
-                              setDialogOpen(true);
+                              onEdit={() => {
+                               setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: (transacao as any).data_vencimento ?? '' });
+                               setDialogOpen(true);
                             }}
                             onVerExtrato={(extratoId, entrada) => {
                               setExtratoSelecionado(extratoId);

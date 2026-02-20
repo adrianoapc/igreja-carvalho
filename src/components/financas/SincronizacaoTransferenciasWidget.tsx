@@ -25,8 +25,8 @@ interface SincronizacaoResultado {
  * de ENTRADA e SAÍDA que fazem parte de uma transferência.
  */
 export function SincronizacaoTransferenciasWidget() {
-  const igrejaId = useIgrejaId();
-  const filialId = useFilialId();
+  const { igrejaId } = useIgrejaId();
+  const { filialId } = useFilialId();
   const queryClient = useQueryClient();
   const [ultimaExecucao, setUltimaExecucao] = useState<string | null>(
     localStorage.getItem("ultima_sync_transferencias") || null
@@ -66,7 +66,7 @@ export function SincronizacaoTransferenciasWidget() {
       );
 
       if (error) throw error;
-      return resultado as SincronizacaoResultado;
+      return resultado as unknown as SincronizacaoResultado;
     },
     onSuccess: (resultado) => {
       if (resultado.sucesso) {
