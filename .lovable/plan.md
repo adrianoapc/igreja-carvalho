@@ -1,79 +1,75 @@
 
-# Correção dos Erros de Build
+# Diagnóstico e Correção: Transação de900f52 × Extrato 37a3adff
 
-São 6 grupos de erros independentes para corrigir, todos em arquivos frontend. Nenhuma mudança de banco ou edge function necessária.
+## O Problema
 
----
+A transação **"Aluguel - Fase 2"** (`de900f52`) está marcada como `conciliado_extrato`, mas o extrato correspondente (`37a3adff` — "PAGAMENTO DE BOLETO OUTROS BANCOS - Adelicio, R$ 7.580,59") **não aparece como conciliado** na tela de conciliação.
 
-## Resumo dos erros e correções
+## Causa Raiz: Lotes Duplicados + Status Pendente
 
-### 1. ConciliacaoInteligente.tsx — `setSortedTransacoes` não existe (linhas 1171-1172)
+O extrato `37a3adff` foi vinculado a **dois lotes** durante a mesma sessão de conciliação (provavelmente dois cliques ou duas tentativas):
 
-O código verifica `typeof setSortedTransacoes === "function"` mas essa variável nunca foi declarada no escopo. É um bloco morto que nunca seria executado de qualquer forma (a remoção da lista local já é feita via `setSelectedTransacoes` e `queryClient.invalidateQueries` na linha seguinte).
+| Lote ID | Transação Vinculada | Valor Transação | Status do Lote |
+|---|---|---|---|
+| `3cfdd7f4` | Aluguel - Fase 2 (sua transação) | R$ 7.500,00 | pendente |
+| `2baedfd2` | IPTU | R$ 302,09 | pendente |
 
-**Correção:** Remover as linhas 1171-1173 por completo.
+Fluxo do problema:
 
----
+1. Usuário tentou conciliar o extrato com "Aluguel - Fase 2" -> Lote `3cfdd7f4` criado, extrato marcado `reconciliado = true`
+2. Em seguida, o mesmo extrato foi vinculado ao "IPTU" no Lote `2baedfd2` (segunda tentativa/clique duplicado)
+3. Ambos os lotes ficaram com `status = 'pendente'` — nenhum foi confirmado
+4. Porém, as duas transações (`Aluguel` e `IPTU`) tiveram `conciliacao_status` atualizado para `conciliado_extrato` prematuramente
+5. O extrato ficou com `reconciliado = true`, mas sem nenhum lote em status `conciliada`, o que o torna invisível na tela
 
-### 2. SincronizacaoTransferenciasWidget.tsx — tipos errados nas linhas 44-45 e 69
+## Solução: Limpeza Cirúrgica via SQL
 
-O hook `useIgrejaId()` retorna `{ igrejaId, loading }` mas nas linhas 44-45 o código está passando o objeto inteiro onde deveria passar apenas as strings. Na linha 69, o cast de `resultado` para `SincronizacaoResultado` falha pois o tipo retornado pelo RPC é `Json`.
+A correção tem 4 etapas executadas em sequência:
 
-**Correção:**
-- Linhas 44-45: O hook provavelmente está sendo desestruturado corretamente (linhas 28-29 mostram `const igrejaId = useIgrejaId()` e `const filialId = useFilialId()` sem desestruturação). Verificar como os hooks retornam os dados e ajustar o tipo de `igrejaId` e `filialId` para `string`.
-- Linha 69: Trocar o cast direto por `resultado as unknown as SincronizacaoResultado`.
+### Etapa 1 — Remover os dois lotes duplicados da tabela de vínculos
+```sql
+DELETE FROM conciliacoes_lote_extratos
+WHERE extrato_id = '37a3adff-7de8-4bb2-89be-f32049659b3b';
+```
 
----
+### Etapa 2 — Remover os dois lotes em si
+```sql
+DELETE FROM conciliacoes_lote
+WHERE id IN (
+  '3cfdd7f4-a709-4c9d-a774-eadd31925641',
+  '2baedfd2-0460-4909-a498-4d306e8fef3b'
+);
+```
 
-### 3. useConciliacaoLote.ts — `transferencia_id` não existe no tipo `Transacao` (linhas 243, 251)
+### Etapa 3 — Reverter o extrato para não conciliado
+```sql
+UPDATE extratos_bancarios
+SET reconciliado = false,
+    transacao_vinculada_id = NULL
+WHERE id = '37a3adff-7de8-4bb2-89be-f32049659b3b';
+```
 
-A interface `Transacao` (definida na linha 21-29 do hook) não inclui `transferencia_id`. O campo existe na tabela mas não foi adicionado à interface local.
+### Etapa 4 — Reverter as duas transações para não conciliadas
+```sql
+UPDATE transacoes_financeiras
+SET conciliacao_status = 'nao_conciliado'
+WHERE id IN (
+  'de900f52-e1b1-4a4e-a9cb-bbc4673c2b73',  -- Aluguel - Fase 2
+  '15ddb56c-7213-4f01-96f8-978a9ce04dbd'   -- IPTU
+);
+```
 
-**Correção:** Adicionar `transferencia_id?: string | null` à interface `Transacao` do hook.
+## Resultado Esperado Após a Correção
 
----
+- O extrato "PAGAMENTO DE BOLETO OUTROS BANCOS - Adelicio" (R$ 7.580,59) voltará a aparecer na lista de extratos disponíveis para conciliação
+- A transação "Aluguel - Fase 2" (R$ 7.500,00) voltará a aparecer como disponível para conciliação
+- A transação "IPTU" (R$ 302,09) voltará a aparecer como disponível para conciliação
+- O usuário poderá refazer a conciliação corretamente, escolhendo o vínculo correto entre o extrato e a transação desejada
 
-### 4. Dashboard.tsx — `FiltrosSheet` sem `conciliacaoStatus` e `setConciliacaoStatus` (linha 465)
+## Observação sobre Valores
 
-O componente `FiltrosSheet` exige os props `conciliacaoStatus` e `setConciliacaoStatus` mas o Dashboard não os passa. O Dashboard usa o `FiltrosSheet` para filtrar apenas por mês/conta/categoria/status, sem filtro de conciliação.
+O extrato é de **R$ 7.580,59** e a transação "Aluguel" é de **R$ 7.500,00** — há uma diferença de R$ 80,59. O sistema permite esta diferença no modo de lote (N:1). Confirme se este é mesmo o extrato correto para o aluguel antes de reconcilar novamente.
 
-**Correção:** Adicionar estado local `conciliacaoStatus` e `setConciliacaoStatus` no Dashboard e passá-los ao `FiltrosSheet` (ou tornar esses props opcionais no `FiltrosSheet`). A solução mais limpa é torná-los opcionais no `FiltrosSheetProps` com valor padrão `"all"` para não afetar o comportamento do Dashboard.
+## Arquivos Afetados
 
----
-
-### 5. Entradas.tsx — `Transacao` incompatível com `TransacaoResumo` e `editingTransacao` (linhas 350, 1036, 1039, 1070)
-
-Dois sub-problemas:
-
-**5a.** `getStatusDisplay(t)` e `getStatusColorDynamic(t)` esperam `TransacaoResumo = { status, data_vencimento }`, mas `t` vem do query do Supabase que já inclui `data_vencimento`. O problema é que o tipo inferido do Supabase pode não incluir `data_vencimento` explicitamente no tipo TypeScript.
-
-**5b.** `setEditingTransacao(transacao)` — o estado `editingTransacao` tem tipo `{ id, descricao, valor, status, data_vencimento }`, mas `transacao.valor` pode ser `number | null` no tipo inferido, e `data_vencimento` pode não estar presente no tipo.
-
-**Correção:** 
-- Na linha 310, ampliar `TransacaoResumo` para aceitar `data_vencimento?: string | Date | null`.
-- No `setEditingTransacao`, fazer cast explícito: `setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: transacao.data_vencimento ?? '' })`.
-
----
-
-### 6. Saidas.tsx — Mesmos problemas de Entradas.tsx (linhas 481, 1022, 1025, 1066, 1220, 1223, 1253)
-
-Idêntico ao item 5. Mesma correção aplicada ao `Saidas.tsx`.
-
----
-
-## Arquivos afetados
-
-| Arquivo | Linhas | Ação |
-|---|---|---|
-| `ConciliacaoInteligente.tsx` | 1171-1173 | Remover bloco morto com `setSortedTransacoes` |
-| `SincronizacaoTransferenciasWidget.tsx` | 44-45, 69 | Corrigir tipos de `igrejaId`/`filialId` e cast de `resultado` |
-| `useConciliacaoLote.ts` | 21-29 | Adicionar `transferencia_id?: string \| null` à interface `Transacao` |
-| `FiltrosSheet.tsx` | 30-31 | Tornar `conciliacaoStatus` e `setConciliacaoStatus` opcionais |
-| `Entradas.tsx` | 310, 1070 | Ampliar `TransacaoResumo` e ajustar `setEditingTransacao` |
-| `Saidas.tsx` | 441, 1066, 1253 | Mesmas correções de Entradas.tsx |
-
----
-
-## Observação sobre o erro santander-api (500)
-
-O log mostra: `Authorization failed: Token inválido` — `missing sub claim`. Isso é um erro separado dos builds: a chamada ao `santander-api` está sendo feita sem um JWT de usuário autenticado válido (o token enviado é o anon key em vez do token de sessão do usuário). Isso não é um erro de código fonte mas sim de autenticação em tempo de execução — não será corrigido neste conjunto de builds.
+Nenhum arquivo de código será alterado. Esta é uma correção exclusivamente de dados via migration SQL.
