@@ -307,7 +307,7 @@ export default function Entradas() {
     }
   };
 
-  type TransacaoResumo = { status: string; data_vencimento: string | Date };
+  type TransacaoResumo = { status: string; data_vencimento?: string | Date | null };
 
   const getStatusDisplay = (transacao: TransacaoResumo) => {
     if (transacao.status === "pago") return "Recebido";
@@ -1067,7 +1067,7 @@ export default function Entradas() {
                               conferidoManual={!!transacao.conferido_manual}
                               conciliacaoStatus={conciliacaoStatus}
                               onEdit={() => {
-                                setEditingTransacao(transacao);
+                                setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: (transacao as any).data_vencimento ?? '' });
                                 setDialogOpen(true);
                               }}
                               onVerExtrato={(extratoId) => {

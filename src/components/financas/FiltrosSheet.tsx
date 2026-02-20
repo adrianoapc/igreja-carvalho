@@ -27,8 +27,8 @@ interface FiltrosSheetProps {
   setFornecedorId?: (value: string) => void;
   status: string;
   setStatus: (value: string) => void;
-  conciliacaoStatus: string;
-  setConciliacaoStatus: (value: string) => void;
+  conciliacaoStatus?: string;
+  setConciliacaoStatus?: (value: string) => void;
   
   // Dados
   contas: Array<{ id: string; nome: string }>;
