@@ -1,102 +1,79 @@
 
-# Plano de Implementação: Fluxo CANCELAR + Correção de Build
+# Correção dos Erros de Build
 
-## Resumo das mudanças
-
-Dois arquivos serão alterados nesta implementação.
+São 6 grupos de erros independentes para corrigir, todos em arquivos frontend. Nenhuma mudança de banco ou edge function necessária.
 
 ---
 
-## 1. Corrigir build error em TransacaoVinculadaDialog.tsx
+## Resumo dos erros e correções
 
-O arquivo possui o componente completo e correto até a linha 132, seguido de um bloco de código duplicado e solto (linhas 133-221) que causa o erro de TypeScript "Unterminated template literal".
+### 1. ConciliacaoInteligente.tsx — `setSortedTransacoes` não existe (linhas 1171-1172)
 
-**Ação:** Deletar tudo a partir da linha 133 até o final do arquivo.
+O código verifica `typeof setSortedTransacoes === "function"` mas essa variável nunca foi declarada no escopo. É um bloco morto que nunca seria executado de qualquer forma (a remoção da lista local já é feita via `setSelectedTransacoes` e `queryClient.invalidateQueries` na linha seguinte).
+
+**Correção:** Remover as linhas 1171-1173 por completo.
 
 ---
 
-## 2. Adicionar fluxo CANCELAR no chatbot-triagem
+### 2. SincronizacaoTransferenciasWidget.tsx — tipos errados nas linhas 44-45 e 69
 
-### 2a. Separar "cancelar" da função `isNegativo` (linha 110-113)
+O hook `useIgrejaId()` retorna `{ igrejaId, loading }` mas nas linhas 44-45 o código está passando o objeto inteiro onde deveria passar apenas as strings. Na linha 69, o cast de `resultado` para `SincronizacaoResultado` falha pois o tipo retornado pelo RPC é `Json`.
 
-Atualmente, "cancelar" e "cancela" estão dentro do regex de `isNegativo`, o que faz com que cancelar tenha o mesmo efeito de "não" (pede correção de nome). Precisamos removê-los dali.
+**Correção:**
+- Linhas 44-45: O hook provavelmente está sendo desestruturado corretamente (linhas 28-29 mostram `const igrejaId = useIgrejaId()` e `const filialId = useFilialId()` sem desestruturação). Verificar como os hooks retornam os dados e ajustar o tipo de `igrejaId` e `filialId` para `string`.
+- Linha 69: Trocar o cast direto por `resultado as unknown as SincronizacaoResultado`.
 
-**Antes:**
-```
-/^(nao|não|n|errado|corrigir|cancelar|cancela|mudar|incorreto|no)$/i
-```
+---
 
-**Depois:**
-```
-/^(nao|não|n|errado|corrigir|mudar|incorreto|no)$/i
-```
+### 3. useConciliacaoLote.ts — `transferencia_id` não existe no tipo `Transacao` (linhas 243, 251)
 
-### 2b. Criar nova função `isCancelamento` logo após `isNegativo`
+A interface `Transacao` (definida na linha 21-29 do hook) não inclui `transferencia_id`. O campo existe na tabela mas não foi adicionado à interface local.
 
-```typescript
-const isCancelamento = (text: string): boolean =>
-  /^(cancelar|cancela|sair|desistir|nao quero|não quero)$/i.test(text.trim());
-```
+**Correção:** Adicionar `transferencia_id?: string | null` à interface `Transacao` do hook.
 
-### 2c. Adicionar checagem de cancelamento no step `confirmando_dados` (antes da linha 794)
+---
 
-Antes do check de `isNegativo`, verificar se o texto é um cancelamento. Se sim:
-- Encerrar a sessão (status: "CONCLUIDO", limpar fluxo)
-- Retornar mensagem amigável
+### 4. Dashboard.tsx — `FiltrosSheet` sem `conciliacaoStatus` e `setConciliacaoStatus` (linha 465)
 
-```typescript
-if (isCancelamento(textoNorm)) {
-  await supabaseClient
-    .from("atendimentos_bot")
-    .update({ status: "CONCLUIDO", fluxo_atual: null, meta_dados: null })
-    .eq("id", sessao.id);
-  return respostaJson(
-    "Tudo bem! Inscrição cancelada. Se precisar de algo, é só chamar. 🙏"
-  );
-}
-```
+O componente `FiltrosSheet` exige os props `conciliacaoStatus` e `setConciliacaoStatus` mas o Dashboard não os passa. O Dashboard usa o `FiltrosSheet` para filtrar apenas por mês/conta/categoria/status, sem filtro de conciliação.
 
-### 2d. Adicionar checagem de cancelamento no step `correcao` (antes da linha 812)
+**Correção:** Adicionar estado local `conciliacaoStatus` e `setConciliacaoStatus` no Dashboard e passá-los ao `FiltrosSheet` (ou tornar esses props opcionais no `FiltrosSheet`). A solução mais limpa é torná-los opcionais no `FiltrosSheetProps` com valor padrão `"all"` para não afetar o comportamento do Dashboard.
 
-Mesma lógica: se a pessoa digitar "cancelar" enquanto está sendo solicitado o nome correto, encerrar a sessão.
+---
 
-### 2e. Atualizar mensagens de confirmação para informar a opção CANCELAR
+### 5. Entradas.tsx — `Transacao` incompatível com `TransacaoResumo` e `editingTransacao` (linhas 350, 1036, 1039, 1070)
 
-Nos 4 locais onde aparece "Responda *SIM* ou *NÃO*", adicionar instrução sobre cancelamento:
+Dois sub-problemas:
 
-| Linha | Local |
-|---|---|
-| 774 | Após seleção de evento na lista |
-| 807 | Resposta ambígua (repetição) |
-| 823 | Após correção de nome |
-| 889 | Evento único ou inferido |
+**5a.** `getStatusDisplay(t)` e `getStatusColorDynamic(t)` esperam `TransacaoResumo = { status, data_vencimento }`, mas `t` vem do query do Supabase que já inclui `data_vencimento`. O problema é que o tipo inferido do Supabase pode não incluir `data_vencimento` explicitamente no tipo TypeScript.
 
-**Novo texto padrão no final de cada mensagem:**
-```
-...Está correto? Responda *SIM* ou *NÃO*.
-_(Digite *CANCELAR* para sair)_
-```
+**5b.** `setEditingTransacao(transacao)` — o estado `editingTransacao` tem tipo `{ id, descricao, valor, status, data_vencimento }`, mas `transacao.valor` pode ser `number | null` no tipo inferido, e `data_vencimento` pode não estar presente no tipo.
 
-## Fluxo final
+**Correção:** 
+- Na linha 310, ampliar `TransacaoResumo` para aceitar `data_vencimento?: string | Date | null`.
+- No `setEditingTransacao`, fazer cast explícito: `setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: transacao.data_vencimento ?? '' })`.
 
-```text
-Bot: "Encontrei o evento *Compartilhe*! Vamos realizar sua inscrição.
-     Confirme seus dados:
-     Nome: Joao
-     Telefone: 11999...
+---
 
-     Está correto? Responda *SIM* ou *NÃO*.
-     _(Digite *CANCELAR* para sair)_"
+### 6. Saidas.tsx — Mesmos problemas de Entradas.tsx (linhas 481, 1022, 1025, 1066, 1220, 1223, 1253)
 
-  SIM      -> Finaliza inscrição (sem mudança)
-  NÃO      -> "Qual o nome correto para a inscrição?" (sem mudança)
-  CANCELAR -> Encerra sessão: "Tudo bem! Inscrição cancelada. Se precisar, é só chamar. 🙏"
-  Outro    -> Repete a pergunta com as opções
-```
+Idêntico ao item 5. Mesma correção aplicada ao `Saidas.tsx`.
+
+---
 
 ## Arquivos afetados
 
-| Arquivo | Ação |
-|---|---|
-| `src/components/financas/TransacaoVinculadaDialog.tsx` | Remover bloco duplicado (linhas 133-221) |
-| `supabase/functions/chatbot-triagem/index.ts` | Separar `isCancelamento` de `isNegativo`, adicionar checagem nos steps `confirmando_dados` e `correcao`, atualizar 4 textos de confirmação |
+| Arquivo | Linhas | Ação |
+|---|---|---|
+| `ConciliacaoInteligente.tsx` | 1171-1173 | Remover bloco morto com `setSortedTransacoes` |
+| `SincronizacaoTransferenciasWidget.tsx` | 44-45, 69 | Corrigir tipos de `igrejaId`/`filialId` e cast de `resultado` |
+| `useConciliacaoLote.ts` | 21-29 | Adicionar `transferencia_id?: string \| null` à interface `Transacao` |
+| `FiltrosSheet.tsx` | 30-31 | Tornar `conciliacaoStatus` e `setConciliacaoStatus` opcionais |
+| `Entradas.tsx` | 310, 1070 | Ampliar `TransacaoResumo` e ajustar `setEditingTransacao` |
+| `Saidas.tsx` | 441, 1066, 1253 | Mesmas correções de Entradas.tsx |
+
+---
+
+## Observação sobre o erro santander-api (500)
+
+O log mostra: `Authorization failed: Token inválido` — `missing sub claim`. Isso é um erro separado dos builds: a chamada ao `santander-api` está sendo feita sem um JWT de usuário autenticado válido (o token enviado é o anon key em vez do token de sessão do usuário). Isso não é um erro de código fonte mas sim de autenticação em tempo de execução — não será corrigido neste conjunto de builds.
