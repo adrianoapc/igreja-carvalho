@@ -432,7 +432,10 @@ export default function Saidas() {
     }
   };
 
-  type TransacaoResumo = { status: string; data_vencimento?: string | Date | null };
+  type TransacaoResumo = {
+    status: string;
+    data_vencimento?: string | Date | null;
+  };
 
   const getStatusDisplay = (transacao: TransacaoResumo) => {
     if (transacao.status === "pago") return "Pago";
@@ -742,14 +745,22 @@ export default function Saidas() {
         <CardHeader className="p-4 md:p-6">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg md:text-xl">
-              {visaoCalendario ? "Calendário de Saídas" : agruparPorData ? "Saídas (Agrupadas)" : "Lista de Saídas"}
+              {visaoCalendario
+                ? "Calendário de Saídas"
+                : agruparPorData
+                  ? "Saídas (Agrupadas)"
+                  : "Lista de Saídas"}
             </CardTitle>
             <div className="flex gap-2">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant={!visaoCalendario && !agruparPorData ? "default" : "outline"}
+                      variant={
+                        !visaoCalendario && !agruparPorData
+                          ? "default"
+                          : "outline"
+                      }
                       size="sm"
                       onClick={() => {
                         setVisaoCalendario(false);
@@ -765,7 +776,11 @@ export default function Saidas() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant={!visaoCalendario && agruparPorData ? "default" : "outline"}
+                      variant={
+                        !visaoCalendario && agruparPorData
+                          ? "default"
+                          : "outline"
+                      }
                       size="sm"
                       onClick={() => {
                         setVisaoCalendario(false);
@@ -1243,9 +1258,9 @@ export default function Saidas() {
                             isDinheiro={isDinheiro}
                             conferidoManual={!!transacao.conferido_manual}
                             conciliacaoStatus={conciliacaoStatus}
-                              onEdit={() => {
-                               setEditingTransacao(transacao as any);
-                               setDialogOpen(true);
+                            onEdit={() => {
+                              setEditingTransacao(transacao as any);
+                              setDialogOpen(true);
                             }}
                             onVerExtrato={(extratoId, entrada) => {
                               setExtratoSelecionado(extratoId);

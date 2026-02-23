@@ -1178,7 +1178,9 @@ export function ConciliacaoInteligente() {
                             "Transação marcada como conciliada manualmente",
                           );
                           // Remover da lista local sem esperar refetch
-                          setSelectedTransacoes((prev) => prev.filter((id) => id !== item.id));
+                          setSelectedTransacoes((prev) =>
+                            prev.filter((id) => id !== item.id),
+                          );
                           queryClient.invalidateQueries({
                             queryKey: ["transacoes-conciliacao"],
                           });

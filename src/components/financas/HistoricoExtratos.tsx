@@ -97,7 +97,9 @@ export function HistoricoExtratos() {
   // Dialogs
   const [extratoParaVincular, setExtratoParaVincular] =
     useState<ExtratoItem | null>(null);
-  const [extratoParaVisualizar, setExtratoParaVisualizar] = useState<string | null>(null);
+  const [extratoParaVisualizar, setExtratoParaVisualizar] = useState<
+    string | null
+  >(null);
 
   // Loading states
   const [actionLoading, setActionLoading] = useState<string | null>(null);
