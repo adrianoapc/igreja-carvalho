@@ -17,6 +17,7 @@ import {
   Link2,
   Copy,
   Check,
+  Unlink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import { ConfirmarPagamentoDialog } from "./ConfirmarPagamentoDialog";
+import { DesconciliarDialog } from "./DesconciliarDialog";
 
 interface TransacaoActionsMenuProps {
   transacaoId: string;
@@ -117,6 +119,7 @@ export function TransacaoActionsMenu({
   const [showEditWarningDialog, setShowEditWarningDialog] = useState(false);
   const [showConfirmarPagamentoDialog, setShowConfirmarPagamentoDialog] =
     useState(false);
+  const [showDesconciliarDialog, setShowDesconciliarDialog] = useState(false);
 
   const handleVerExtrato = async () => {
     try {
@@ -380,6 +383,15 @@ export function TransacaoActionsMenu({
               </DropdownMenuItem>
             </>
           )}
+          {(conciliacaoStatus === "conciliado_extrato" ||
+            conciliacaoStatus === "conciliado_bot") && (
+            <>
+              <DropdownMenuItem onClick={() => setShowDesconciliarDialog(true)}>
+                <Unlink className="mr-2 h-4 w-4" />
+                Desconciliar
+              </DropdownMenuItem>
+            </>
+          )}
           {/* Ação para ver movimentação vinculada (transferência) */}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleVerVinculada}>
@@ -570,6 +582,12 @@ export function TransacaoActionsMenu({
         onOpenChange={setShowConfirmarPagamentoDialog}
         transacaoId={transacaoId}
         tipo={tipo}
+      />
+
+      <DesconciliarDialog
+        open={showDesconciliarDialog}
+        onOpenChange={setShowDesconciliarDialog}
+        transacaoId={transacaoId}
       />
     </>
   );

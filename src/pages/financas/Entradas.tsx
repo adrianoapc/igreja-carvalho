@@ -76,6 +76,12 @@ export default function Entradas() {
     valor: number;
     status: string;
     data_vencimento: string;
+    categoria_id?: string;
+    subcategoria_id?: string;
+    centro_custo_id?: string;
+    base_ministerial_id?: string;
+    conta_id?: string;
+    forma_pagamento?: string;
   } | null>(null);
 
   // MonthPicker states
@@ -775,7 +781,11 @@ export default function Entradas() {
                                   className="flex items-center gap-3 p-3 bg-card hover:bg-accent/50 transition-colors"
                                   onDoubleClick={() => {
                                     setEditingTransacao({
-                                      ...transacao,
+                                      id: transacao.id,
+                                      descricao: transacao.descricao,
+                                      valor: Number(transacao.valor),
+                                      status: transacao.status,
+                                      data_vencimento: (transacao as any).data_vencimento ?? '',
                                       categoria_id: transacao.categoria_id ?? "none",
                                       subcategoria_id: transacao.subcategoria_id ?? "none",
                                       centro_custo_id: transacao.centro_custo_id ?? "none",
@@ -914,7 +924,11 @@ export default function Entradas() {
                                       conciliacaoStatus={conciliacaoStatus}
                                       onEdit={() => {
                                         setEditingTransacao({
-                                          ...transacao,
+                                          id: transacao.id,
+                                          descricao: transacao.descricao,
+                                          valor: Number(transacao.valor),
+                                          status: transacao.status,
+                                          data_vencimento: (transacao as any).data_vencimento ?? '',
                                           categoria_id: transacao.categoria_id ?? "none",
                                           subcategoria_id: transacao.subcategoria_id ?? "none",
                                           centro_custo_id: transacao.centro_custo_id ?? "none",
@@ -963,7 +977,11 @@ export default function Entradas() {
                           className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                           onDoubleClick={() => {
                             setEditingTransacao({
-                              ...transacao,
+                              id: transacao.id,
+                              descricao: transacao.descricao,
+                              valor: Number(transacao.valor),
+                              status: transacao.status,
+                              data_vencimento: (transacao as any).data_vencimento ?? '',
                               categoria_id: transacao.categoria_id ?? "none",
                               subcategoria_id: transacao.subcategoria_id ?? "none",
                               centro_custo_id: transacao.centro_custo_id ?? "none",
