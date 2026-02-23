@@ -163,6 +163,28 @@ export function TransacaoDialog({
   const [desconto, setDesconto] = useState("");
   const [taxasAdministrativas, setTaxasAdministrativas] = useState("");
 
+  useEffect(() => {
+    const parse = (v: string) =>
+      parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+
+    const valorBruto = parse(valor);
+    const taxas = parse(taxasAdministrativas);
+    const jurosNum = parse(juros);
+    const multasNum = parse(multas);
+    const descontoNum = parse(desconto);
+
+    const liquido = valorBruto + taxas + jurosNum + multasNum - descontoNum;
+
+    setValorLiquido(
+      liquido === 0
+        ? ""
+        : liquido.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+    );
+  }, [valor, taxasAdministrativas, juros, multas, desconto]);
+
   // Preencher formulário quando estiver editando
   useEffect(() => {
     if (transacao && open) {
@@ -183,9 +205,40 @@ export function TransacaoDialog({
       setDataCompetencia(
         parseLocalDate(transacao.data_competencia) || new Date(),
       );
-      setContaId(transacao.conta_id || "");
-      setCategoriaId(transacao.categoria_id || "none");
-      setSubcategoriaId(transacao.subcategoria_id || "none");
+      // Debug dos outros campos
+      console.log("🔍 Campos do banco:", {
+        conta_id: transacao.conta_id,
+        categoria_id: transacao.categoria_id,
+        subcategoria_id: transacao.subcategoria_id,
+        centro_custo_id: transacao.centro_custo_id,
+        fornecedor_id: transacao.fornecedor_id,
+        forma_pagamento: transacao.forma_pagamento,
+      });
+
+      setContaId(transacao.conta_id ? String(transacao.conta_id) : "none");
+
+      // Setar categoria primeiro, depois subcategoria (evitar race condition na query)
+      const categoriaValue = transacao.categoria_id
+        ? String(transacao.categoria_id)
+        : "none";
+      const subcategoriaValue = transacao.subcategoria_id
+        ? String(transacao.subcategoria_id)
+        : "none";
+
+      setCategoriaId(categoriaValue);
+
+      // Aguardar próximo ciclo para setar subcategoria (query precisa recarregar primeiro)
+      if (subcategoriaValue !== "none") {
+        setTimeout(() => {
+          setSubcategoriaId(subcategoriaValue);
+          // Desmarcar flag após completar o carregamento
+          setTimeout(() => 100);
+        }, 50);
+      } else {
+        setSubcategoriaId("none");
+        // Desmarcar flag imediatamente se não tem subcategoria
+        setTimeout(() => 100);
+      }
       setCentroCustoId(transacao.centro_custo_id || "none");
       setBaseMinisterialId(transacao.base_ministerial_id || "none");
       setFornecedorId(transacao.fornecedor_id || "none");
@@ -504,10 +557,16 @@ export function TransacaoDialog({
   };
 
   useEffect(() => {
-    if (fornecedorId && fornecedorId !== "none" && open) {
+    // Só sugere se for nova transação ou se mudou o fornecedor
+    if (
+      fornecedorId &&
+      fornecedorId !== "none" &&
+      open &&
+      (!transacao || fornecedorId !== (transacao.fornecedor_id || "none"))
+    ) {
       buscarSugestoesFornecedor(fornecedorId);
     }
-  }, [fornecedorId, open]);
+  }, [fornecedorId, open, transacao]);
 
   // Processar arquivo com IA
   const handleFileSelected = async (file: File) => {
@@ -1342,7 +1401,7 @@ export function TransacaoDialog({
                 setSubcategoriaId("none");
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="text-left">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
@@ -1367,7 +1426,7 @@ export function TransacaoDialog({
                 !categoriaId || categoriaId === "none" || subcategoriasLoading
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="text-left">
                 {subcategoriasLoading &&
                 subcategoriaId &&
                 subcategoriaId !== "none" ? (
@@ -1421,7 +1480,7 @@ export function TransacaoDialog({
           <div>
             <Label>Centro de Custo</Label>
             <Select value={centroCustoId} onValueChange={setCentroCustoId}>
-              <SelectTrigger>
+              <SelectTrigger className="text-left">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
