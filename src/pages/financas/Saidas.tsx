@@ -70,13 +70,7 @@ export default function Saidas() {
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingTransacao, setEditingTransacao] = useState<{
-    id: string;
-    descricao: string;
-    valor: number;
-    status: string;
-    data_vencimento: string;
-  } | null>(null);
+  const [editingTransacao, setEditingTransacao] = useState<any>(null);
 
   // MonthPicker states
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -1063,7 +1057,7 @@ export default function Saidas() {
                                           "[DEBUG] onEdit chamado",
                                           transacao,
                                         );
-                                        setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: (transacao as any).data_vencimento ?? '' });
+                                        setEditingTransacao(transacao as any);
                                         setDialogOpen(true);
                                       }}
                                       onVerExtrato={(extratoId, entrada) => {
@@ -1250,7 +1244,7 @@ export default function Saidas() {
                             conferidoManual={!!transacao.conferido_manual}
                             conciliacaoStatus={conciliacaoStatus}
                               onEdit={() => {
-                               setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: (transacao as any).data_vencimento ?? '' });
+                               setEditingTransacao(transacao as any);
                                setDialogOpen(true);
                             }}
                             onVerExtrato={(extratoId, entrada) => {

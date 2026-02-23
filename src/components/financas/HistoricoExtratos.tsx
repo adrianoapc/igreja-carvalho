@@ -504,6 +504,17 @@ export function HistoricoExtratos() {
                 <span>{extrato.conta.banco}</span>
               </>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(extrato.id);
+                toast.success("ID copiado!");
+              }}
+              className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+              title="Copiar ID do extrato"
+            >
+              {extrato.id.substring(0, 6)}
+            </button>
           </div>
         </div>
 

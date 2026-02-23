@@ -973,6 +973,18 @@ export function ConciliacaoInteligente() {
                       >
                         <Plus className="w-3 h-3" />
                       </Button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(item.id);
+                          toast.success("ID copiado!");
+                        }}
+                        className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                        title="Copiar ID do extrato"
+                      >
+                        {item.id.substring(0, 6)}
+                      </button>
                     </div>
                   </div>
                 );
