@@ -72,6 +72,13 @@ export type Database = {
             foreignKeyName: "agenda_pastoral_criado_por_fkey"
             columns: ["criado_por"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -101,6 +108,13 @@ export type Database = {
             columns: ["pastor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_pastoral_pastor_id_fkey"
+            columns: ["pastor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -182,6 +196,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alteracoes_perfil_pendentes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -350,6 +371,13 @@ export type Database = {
             foreignKeyName: "atendimentos_bot_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_bot_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -456,6 +484,13 @@ export type Database = {
             foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
             columns: ["pastor_responsavel_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -471,6 +506,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -704,6 +746,13 @@ export type Database = {
             foreignKeyName: "aulas_professor_id_fkey"
             columns: ["professor_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -853,6 +902,13 @@ export type Database = {
             foreignKeyName: "bases_ministeriais_responsavel_id_fkey"
             columns: ["responsavel_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bases_ministeriais_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -992,6 +1048,13 @@ export type Database = {
             foreignKeyName: "cancoes_culto_ministro_id_fkey"
             columns: ["ministro_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancoes_culto_ministro_id_fkey"
+            columns: ["ministro_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -1007,6 +1070,13 @@ export type Database = {
             columns: ["solista_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancoes_culto_solista_id_fkey"
+            columns: ["solista_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -1095,6 +1165,13 @@ export type Database = {
             foreignKeyName: "candidatos_voluntario_avaliado_por_fkey"
             columns: ["avaliado_por"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -1124,6 +1201,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -1213,6 +1297,13 @@ export type Database = {
             columns: ["realizado_por"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidatos_voluntario_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -1513,6 +1604,13 @@ export type Database = {
             foreignKeyName: "presencas_culto_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -1528,6 +1626,13 @@ export type Database = {
             columns: ["validado_por"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "presencas_culto_validado_por_fkey"
+            columns: ["validado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["user_id"]
           },
         ]
@@ -1823,6 +1928,13 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacao_ml_feedback_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -2437,6 +2549,13 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "contagens_contador_id_fkey"
+            columns: ["contador_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "contagens_sessao_id_fkey"
             columns: ["sessao_id"]
             isOneToOne: false
@@ -2680,6 +2799,13 @@ export type Database = {
             foreignKeyName: "escalas_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -2763,6 +2889,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_template_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -2957,6 +3090,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_lista_espera_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -3314,6 +3454,13 @@ export type Database = {
             foreignKeyName: "eventos_convites_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_convites_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -3451,6 +3598,13 @@ export type Database = {
             foreignKeyName: "familias_familiar_id_fkey"
             columns: ["familiar_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "familias_familiar_id_fkey"
+            columns: ["familiar_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -3480,6 +3634,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "familias_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -4226,6 +4387,13 @@ export type Database = {
             foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -4241,6 +4409,13 @@ export type Database = {
             columns: ["responsavel_inscricao_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_responsavel_inscricao_id_fkey"
+            columns: ["responsavel_inscricao_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -4390,6 +4565,13 @@ export type Database = {
             foreignKeyName: "inscricoes_jornada_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -4405,6 +4587,13 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_jornada_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -4553,6 +4742,13 @@ export type Database = {
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracao_voluntario_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -5042,6 +5238,13 @@ export type Database = {
             foreignKeyName: "kids_checkins_checkin_por_fkey"
             columns: ["checkin_por"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -5063,6 +5266,13 @@ export type Database = {
             foreignKeyName: "kids_checkins_checkout_por_fkey"
             columns: ["checkout_por"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkout_por_fkey"
+            columns: ["checkout_por"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -5078,6 +5288,13 @@ export type Database = {
             columns: ["crianca_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -5120,6 +5337,13 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -5196,6 +5420,13 @@ export type Database = {
             foreignKeyName: "kids_diario_crianca_id_fkey"
             columns: ["crianca_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -5232,6 +5463,13 @@ export type Database = {
             columns: ["professor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -5454,6 +5692,13 @@ export type Database = {
             foreignKeyName: "liturgias_responsavel_id_fkey"
             columns: ["responsavel_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liturgias_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -5645,6 +5890,13 @@ export type Database = {
             foreignKeyName: "membro_funcoes_membro_id_fkey"
             columns: ["membro_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membro_funcoes_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -5714,6 +5966,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membros_time_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -5982,6 +6241,13 @@ export type Database = {
             foreignKeyName: "notificacao_regras_user_id_especifico_fkey"
             columns: ["user_id_especifico"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacao_regras_user_id_especifico_fkey"
+            columns: ["user_id_especifico"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -6063,6 +6329,13 @@ export type Database = {
             columns: ["rejected_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -6264,10 +6537,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "pedidos_oracao_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "pedidos_oracao_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_oracao_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -6339,6 +6626,13 @@ export type Database = {
             foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_1_fkey"
             columns: ["pessoa_id_1"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_1_fkey"
+            columns: ["pessoa_id_1"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -6360,6 +6654,13 @@ export type Database = {
             foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_2_fkey"
             columns: ["pessoa_id_2"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_pessoa_id_2_fkey"
+            columns: ["pessoa_id_2"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -6375,6 +6676,13 @@ export type Database = {
             columns: ["revisado_por"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_duplicatas_suspeitas_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -6430,6 +6738,13 @@ export type Database = {
             foreignKeyName: "pessoas_mesclagens_historico_pessoa_destino_id_fkey"
             columns: ["pessoa_destino_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_destino_id_fkey"
+            columns: ["pessoa_destino_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -6451,6 +6766,13 @@ export type Database = {
             foreignKeyName: "pessoas_mesclagens_historico_pessoa_origem_id_fkey"
             columns: ["pessoa_origem_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_pessoa_origem_id_fkey"
+            columns: ["pessoa_origem_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -6466,6 +6788,13 @@ export type Database = {
             columns: ["realizado_por"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_mesclagens_historico_realizado_por_fkey"
+            columns: ["realizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -6883,6 +7212,13 @@ export type Database = {
             foreignKeyName: "presencas_aula_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -6926,6 +7262,13 @@ export type Database = {
             columns: ["responsavel_checkout_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aula_responsavel_checkout_id_fkey"
+            columns: ["responsavel_checkout_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -7013,6 +7356,13 @@ export type Database = {
             foreignKeyName: "profile_audit_log_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_audit_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -7068,6 +7418,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_contatos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -7294,6 +7651,13 @@ export type Database = {
             foreignKeyName: "profiles_merged_into_id_fkey"
             columns: ["merged_into_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -7366,6 +7730,13 @@ export type Database = {
             columns: ["lider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projetos_lider_id_fkey"
+            columns: ["lider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -7813,6 +8184,13 @@ export type Database = {
             foreignKeyName: "resultados_teste_avaliado_por_fkey"
             columns: ["avaliado_por"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resultados_teste_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -8054,6 +8432,13 @@ export type Database = {
             foreignKeyName: "sentimentos_membros_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sentimentos_membros_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -8169,10 +8554,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "sessoes_contagem_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "sessoes_contagem_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["user_id"]
           },
           {
@@ -8201,6 +8600,13 @@ export type Database = {
             columns: ["rejection_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sessoes_contagem_rejection_by_fkey"
+            columns: ["rejection_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["user_id"]
           },
         ]
@@ -8283,6 +8689,13 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "sessoes_itens_draft_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "sessoes_itens_draft_filial_id_fkey"
             columns: ["filial_id"]
             isOneToOne: false
@@ -8308,6 +8721,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessoes_itens_draft_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -8456,6 +8876,13 @@ export type Database = {
             columns: ["solicitante_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -8635,6 +9062,13 @@ export type Database = {
             foreignKeyName: "tarefas_criado_por_fkey"
             columns: ["criado_por"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -8671,6 +9105,13 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -8899,6 +9340,13 @@ export type Database = {
             foreignKeyName: "testemunhos_autor_id_fkey"
             columns: ["autor_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "testemunhos_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -8928,6 +9376,13 @@ export type Database = {
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "testemunhos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -8998,6 +9453,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "testes_ministerio_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -9105,6 +9567,13 @@ export type Database = {
             foreignKeyName: "times_lider_id_fkey"
             columns: ["lider_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "times_lider_id_fkey"
+            columns: ["lider_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -9120,6 +9589,13 @@ export type Database = {
             columns: ["sublider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "times_sublider_id_fkey"
+            columns: ["sublider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -9320,10 +9796,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "transacoes_financeiras_lancado_por_fkey"
+            columns: ["lancado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -9706,10 +10196,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "fk_membro_responsavel"
+            columns: ["membro_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "fk_visitante"
             columns: ["visitante_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_visitante"
+            columns: ["visitante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -10010,6 +10514,13 @@ export type Database = {
             foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transacoes_financeiras_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -10025,6 +10536,54 @@ export type Database = {
             columns: ["subcategoria_id"]
             isOneToOne: false
             referencedRelation: "subcategorias_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles_tecnico_view: {
+        Row: {
+          created_at: string | null
+          filial_id: string | null
+          id: string | null
+          igreja_id: string | null
+          nome: string | null
+          status: Database["public"]["Enums"]["user_status"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          filial_id?: string | null
+          id?: string | null
+          igreja_id?: string | null
+          nome?: string | null
+          status?: Database["public"]["Enums"]["user_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          filial_id?: string | null
+          id?: string | null
+          igreja_id?: string | null
+          nome?: string | null
+          status?: Database["public"]["Enums"]["user_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
             referencedColumns: ["id"]
           },
         ]
@@ -10060,6 +10619,13 @@ export type Database = {
             columns: ["pastor_responsavel_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_pastorais_pastor_responsavel_id_fkey"
+            columns: ["pastor_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -10362,6 +10928,13 @@ export type Database = {
             foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inscricoes_eventos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -10432,6 +11005,13 @@ export type Database = {
             foreignKeyName: "kids_checkins_checkin_por_fkey"
             columns: ["checkin_por"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_checkin_por_fkey"
+            columns: ["checkin_por"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -10447,6 +11027,13 @@ export type Database = {
             columns: ["crianca_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -10475,6 +11062,13 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_checkins_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -10525,6 +11119,13 @@ export type Database = {
             foreignKeyName: "kids_diario_crianca_id_fkey"
             columns: ["crianca_id"]
             isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_crianca_id_fkey"
+            columns: ["crianca_id"]
+            isOneToOne: false
             referencedRelation: "view_absent_kids"
             referencedColumns: ["child_id"]
           },
@@ -10547,6 +11148,13 @@ export type Database = {
             columns: ["professor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kids_diario_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {
@@ -10715,6 +11323,13 @@ export type Database = {
             columns: ["solicitante_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_reembolso_solicitante_id_fkey"
+            columns: ["solicitante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
             referencedColumns: ["id"]
           },
           {

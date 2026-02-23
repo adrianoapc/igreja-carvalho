@@ -70,31 +70,24 @@ export function AlterarSenhaDialog({ open, onOpenChange }: AlterarSenhaDialogPro
 
       setLoading(true);
 
-      // Obter email do usuário
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        toast.error("Usuário não encontrado");
-        return;
-      }
-
-      // Verificar senha atual tentando fazer login
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: senhaAtual,
+      // Alterar senha via edge function (verificação server-side)
+      const { data, error: fnError } = await supabase.functions.invoke("alterar-senha", {
+        body: { senhaAtual, novaSenha },
       });
 
-      if (signInError) {
-        setErrors({ senhaAtual: "Senha atual incorreta" });
-        toast.error("Senha atual incorreta");
-        return;
+      if (fnError) {
+        throw fnError;
       }
 
-      // Atualizar senha
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: novaSenha,
-      });
-
-      if (updateError) throw updateError;
+      if (data?.error) {
+        if (data.field === "senhaAtual") {
+          setErrors({ senhaAtual: data.error });
+          toast.error(data.error);
+        } else {
+          toast.error(data.error);
+        }
+        return;
+      }
 
       toast.success("Senha alterada com sucesso!");
       resetForm();
