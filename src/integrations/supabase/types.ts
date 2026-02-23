@@ -10883,6 +10883,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      desconciliar_transacao: {
+        Args: { p_transacao_id: string }
+        Returns: Json
+      }
       diagnosticar_extrato: {
         Args: { p_extrato_id: string }
         Returns: {
