@@ -128,6 +128,14 @@ serve(async (req) => {
       );
     }
 
+    // Limit array size to prevent abuse
+    if (payload.pix.length > 100) {
+      return new Response(
+        JSON.stringify({ error: "Payload excede limite de 100 itens" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const resultados: Array<{ pixId: string; valor: number; status: string }> = [];
     const erros: Array<{ pixId: string; erro: string }> = [];
 
@@ -137,13 +145,31 @@ serve(async (req) => {
         const pixId = pixItem.endToEndId;
         const valor = parseFloat(pixItem.valor);
         
-        if (!pixId) {
-          erros.push({ pixId: 'unknown', erro: 'endToEndId não informado' });
+        if (!pixId || typeof pixId !== 'string' || pixId.length > 100) {
+          erros.push({ pixId: 'unknown', erro: 'endToEndId ausente ou inválido' });
+          continue;
+        }
+
+        // Validate endToEndId format (BACEN E2E format: E + 8 digits ISPB + date + id)
+        if (!/^E\d{8,}/.test(pixId) && !/^[A-Za-z0-9]{20,50}$/.test(pixId)) {
+          erros.push({ pixId, erro: 'Formato de endToEndId inválido' });
           continue;
         }
         
-        if (isNaN(valor) || valor <= 0) {
+        if (isNaN(valor) || valor <= 0 || valor > 999999999) {
           erros.push({ pixId, erro: 'Valor inválido' });
+          continue;
+        }
+
+        // Validate chave (PIX key) - must be present and reasonable length
+        if (!pixItem.chave || typeof pixItem.chave !== 'string' || pixItem.chave.length > 100) {
+          erros.push({ pixId, erro: 'Chave PIX ausente ou inválida' });
+          continue;
+        }
+
+        // Validate horario
+        if (!pixItem.horario || isNaN(Date.parse(pixItem.horario))) {
+          erros.push({ pixId, erro: 'Horário ausente ou inválido' });
           continue;
         }
 

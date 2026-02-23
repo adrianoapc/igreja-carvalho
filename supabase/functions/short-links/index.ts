@@ -109,15 +109,36 @@ Deno.serve(async (req) => {
 
   const slug = slugMatch[2];
 
+  // Input validation: length limit and character set
+  if (slug.length > 100) {
+    return new Response(
+      JSON.stringify({ error: "Slug inválido" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+  if (!base58Regex.test(slug)) {
+    return new Response(
+      JSON.stringify({ error: "Slug inválido" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   // Decodificar slug
   const decoded = decodeSlug(slug);
   if (!decoded) {
     return new Response(
-      JSON.stringify({ error: "Slug inválido ou corrompido" }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: "Slug inválido" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(decoded.filialId)) {
+    return new Response(
+      JSON.stringify({ error: "Slug inválido" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
