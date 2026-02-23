@@ -268,7 +268,6 @@ async function processarNotaFiscal(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${serviceKey}`,
-          "X-Internal-Call": "true",
         },
         body: JSON.stringify({
           imageBase64: base64Data,

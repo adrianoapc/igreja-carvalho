@@ -230,44 +230,42 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
 
-    // Allow internal calls without auth (from chatbot-financeiro)
-    const isInternalCall = req.headers.get("X-Internal-Call") === "true";
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // For internal calls, skip user auth but still use service role
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.error("Auth header missing or invalid format");
+      return new Response(
+        JSON.stringify({ error: "Token de autenticação ausente" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (!token) {
+      console.error("Empty token after extraction");
+      return new Response(
+        JSON.stringify({ error: "Token de autenticação vazio" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check if the caller is using the service role key (internal call from other edge functions)
+    const isServiceRole = token === supabaseServiceKey;
+
     let userId: string | null = null;
 
-    if (!isInternalCall) {
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        console.error("Auth header missing or invalid format");
-        return new Response(
-          JSON.stringify({ error: "Token de autenticação ausente" }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      const token = authHeader.slice("Bearer ".length).trim();
-      if (!token) {
-        console.error("Empty token after extraction");
-        return new Response(
-          JSON.stringify({ error: "Token de autenticação vazio" }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
+    if (!isServiceRole) {
       console.log(`[${FUNCTION_NAME}] Token length: ${token.length}`);
-
-      // Use service role to validate JWT via getUser(token)
-      const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
       const { data: userData, error: authError } =
         await supabaseService.auth.getUser(token);
@@ -323,6 +321,8 @@ serve(async (req) => {
           }
         );
       }
+    } else {
+      console.log(`[${FUNCTION_NAME}] Internal service role call`);
     }
 
     // IMPORTANT: req.json() só pode ser consumido UMA vez (senão dá "Body already consumed")
