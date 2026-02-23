@@ -7900,6 +7900,7 @@ export type Database = {
       }
       reconciliacao_audit_logs: {
         Row: {
+          acao: string | null
           conciliacao_lote_id: string | null
           conta_id: string | null
           created_at: string
@@ -7908,6 +7909,7 @@ export type Database = {
           filial_id: string | null
           id: string
           igreja_id: string | null
+          metadata: Json | null
           observacoes: string | null
           score: number | null
           tipo_reconciliacao: string
@@ -7917,6 +7919,7 @@ export type Database = {
           valor_transacao: number | null
         }
         Insert: {
+          acao?: string | null
           conciliacao_lote_id?: string | null
           conta_id?: string | null
           created_at?: string
@@ -7925,6 +7928,7 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
+          metadata?: Json | null
           observacoes?: string | null
           score?: number | null
           tipo_reconciliacao: string
@@ -7934,6 +7938,7 @@ export type Database = {
           valor_transacao?: number | null
         }
         Update: {
+          acao?: string | null
           conciliacao_lote_id?: string | null
           conta_id?: string | null
           created_at?: string
@@ -7942,6 +7947,7 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
+          metadata?: Json | null
           observacoes?: string | null
           score?: number | null
           tipo_reconciliacao?: string
