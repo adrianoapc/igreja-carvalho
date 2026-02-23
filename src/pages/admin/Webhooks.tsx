@@ -227,11 +227,16 @@ export default function Webhooks({ onBack }: Props) {
       // Depois, salvar secrets criptografados para tokens que foram preenchidos
       const activeConfig = whatsappConfigs[whatsappProvider];
       if (activeConfig.token.trim()) {
+        const encryptionKey = import.meta.env.VITE_WEBHOOK_ENCRYPTION_KEY;
+        if (!encryptionKey) {
+          toast.error("Chave de criptografia não configurada. Configure VITE_WEBHOOK_ENCRYPTION_KEY.");
+          return;
+        }
         const { error: secretError } = await supabase.rpc("set_webhook_secret", {
           p_igreja_id: igrejaId,
           p_tipo: WHATSAPP_PROVIDER_TO_TIPO[whatsappProvider],
           p_secret: activeConfig.token.trim(),
-          p_encryption_key: import.meta.env.VITE_WEBHOOK_ENCRYPTION_KEY || "default-dev-key",
+          p_encryption_key: encryptionKey,
         });
 
         if (secretError) {
