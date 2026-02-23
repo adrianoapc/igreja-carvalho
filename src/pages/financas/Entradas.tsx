@@ -774,7 +774,15 @@ export default function Entradas() {
                                   key={transacao.id}
                                   className="flex items-center gap-3 p-3 bg-card hover:bg-accent/50 transition-colors"
                                   onDoubleClick={() => {
-                                    setEditingTransacao(transacao as any);
+                                    setEditingTransacao({
+                                      ...transacao,
+                                      categoria_id: transacao.categoria_id ?? "none",
+                                      subcategoria_id: transacao.subcategoria_id ?? "none",
+                                      centro_custo_id: transacao.centro_custo_id ?? "none",
+                                      base_ministerial_id: transacao.base_ministerial_id ?? "none",
+                                      conta_id: transacao.conta_id ?? "",
+                                      forma_pagamento: transacao.forma_pagamento ?? "",
+                                    });
                                     setDialogOpen(true);
                                   }}
                                 >
@@ -905,7 +913,15 @@ export default function Entradas() {
                                       }
                                       conciliacaoStatus={conciliacaoStatus}
                                       onEdit={() => {
-                                        setEditingTransacao(transacao);
+                                        setEditingTransacao({
+                                          ...transacao,
+                                          categoria_id: transacao.categoria_id ?? "none",
+                                          subcategoria_id: transacao.subcategoria_id ?? "none",
+                                          centro_custo_id: transacao.centro_custo_id ?? "none",
+                                          base_ministerial_id: transacao.base_ministerial_id ?? "none",
+                                          conta_id: transacao.conta_id ?? "",
+                                          forma_pagamento: transacao.forma_pagamento ?? "",
+                                        });
                                         setDialogOpen(true);
                                       }}
                                       onVerExtrato={(extratoId) => {
@@ -946,7 +962,15 @@ export default function Entradas() {
                           key={transacao.id}
                           className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                           onDoubleClick={() => {
-                            setEditingTransacao(transacao as any);
+                            setEditingTransacao({
+                              ...transacao,
+                              categoria_id: transacao.categoria_id ?? "none",
+                              subcategoria_id: transacao.subcategoria_id ?? "none",
+                              centro_custo_id: transacao.centro_custo_id ?? "none",
+                              base_ministerial_id: transacao.base_ministerial_id ?? "none",
+                              conta_id: transacao.conta_id ?? "",
+                              forma_pagamento: transacao.forma_pagamento ?? "",
+                            });
                             setDialogOpen(true);
                           }}
                         >
@@ -1067,7 +1091,20 @@ export default function Entradas() {
                               conferidoManual={!!transacao.conferido_manual}
                               conciliacaoStatus={conciliacaoStatus}
                               onEdit={() => {
-                                setEditingTransacao({ id: transacao.id, descricao: transacao.descricao, valor: Number(transacao.valor), status: transacao.status, data_vencimento: (transacao as any).data_vencimento ?? '' });
+                                setEditingTransacao({
+                                  ...transacao,
+                                  id: transacao.id,
+                                  descricao: transacao.descricao,
+                                  valor: Number(transacao.valor),
+                                  status: transacao.status,
+                                  data_vencimento: (transacao as any).data_vencimento ?? '',
+                                  categoria_id: transacao.categoria_id ?? "none",
+                                  subcategoria_id: transacao.subcategoria_id ?? "none",
+                                  centro_custo_id: transacao.centro_custo_id ?? "none",
+                                  base_ministerial_id: transacao.base_ministerial_id ?? "none",
+                                  conta_id: transacao.conta_id ?? "",
+                                  forma_pagamento: transacao.forma_pagamento ?? "",
+                                });
                                 setDialogOpen(true);
                               }}
                               onVerExtrato={(extratoId) => {
