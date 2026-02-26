@@ -35,6 +35,8 @@ import {
   Eye,
   UserPen,
   AlertCircle,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -91,6 +93,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 export default function InscricoesTabContent({ eventoId, evento }: InscricoesTabContentProps) {
   const navigate = useNavigate();
   const [inscricoes, setInscricoes] = useState<Inscricao[]>([]);
+  const [checkins, setCheckins] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -99,6 +102,7 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
 
   useEffect(() => {
     loadInscricoes();
+    loadCheckins();
   }, [eventoId]);
 
   const loadInscricoes = async () => {
@@ -125,6 +129,63 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCheckins = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("checkins")
+        .select("pessoa_id")
+        .eq("evento_id", eventoId);
+
+      if (error) throw error;
+      setCheckins(new Set((data || []).map(c => c.pessoa_id)));
+    } catch (error) {
+      console.error("Erro ao carregar checkins:", error);
+    }
+  };
+
+  const handleCheckin = async (pessoaId: string) => {
+    setProcessingId(pessoaId);
+    try {
+      const { error } = await supabase
+        .from("checkins")
+        .insert({
+          evento_id: eventoId,
+          pessoa_id: pessoaId,
+          metodo: "manual",
+          tipo_registro: "checkin",
+        });
+
+      if (error) throw error;
+      toast.success("Check-in realizado!");
+      loadCheckins();
+    } catch (error) {
+      toast.error("Erro ao realizar check-in");
+      console.error(error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleCancelCheckin = async (pessoaId: string) => {
+    setProcessingId(pessoaId);
+    try {
+      const { error } = await supabase
+        .from("checkins")
+        .delete()
+        .eq("evento_id", eventoId)
+        .eq("pessoa_id", pessoaId);
+
+      if (error) throw error;
+      toast.success("Check-in cancelado!");
+      loadCheckins();
+    } catch (error) {
+      toast.error("Erro ao cancelar check-in");
+      console.error(error);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -383,8 +444,8 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={processingId === inscricao.id}>
-                              {processingId === inscricao.id ? (
+                            <Button variant="ghost" size="icon" disabled={processingId === inscricao.id || processingId === inscricao.pessoa_id}>
+                              {(processingId === inscricao.id || processingId === inscricao.pessoa_id) ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <MoreHorizontal className="h-4 w-4" />
@@ -400,6 +461,18 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                               <UserPen className="h-4 w-4 mr-2" />
                               Completar Cadastro
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {checkins.has(inscricao.pessoa_id) ? (
+                              <DropdownMenuItem onClick={() => handleCancelCheckin(inscricao.pessoa_id)}>
+                                <LogOut className="h-4 w-4 mr-2 text-orange-500" />
+                                Cancelar Check-in
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => handleCheckin(inscricao.pessoa_id)}>
+                                <LogIn className="h-4 w-4 mr-2 text-green-500" />
+                                Fazer Check-in
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             {evento?.requer_pagamento && inscricao.status_pagamento !== "pago" && (
                               <DropdownMenuItem onClick={() => handleUpdateStatus(inscricao.id, "pago")}>
