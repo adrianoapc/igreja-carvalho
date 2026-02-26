@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, UserPlus, Ticket } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { RegistrarVisitanteDialog } from "@/components/visitantes/RegistrarVisitanteDialog";
 import {
   criarCobrancaPix,
   getSantanderIntegracaoId,
@@ -72,6 +73,7 @@ export function AdicionarInscricaoDialog({
   const [inscritosIds, setInscritosIds] = useState<string[]>([]);
   const [pixCobranca, setPixCobranca] = useState<PixCobrancaResponse | null>(null);
   const [pixLoading, setPixLoading] = useState(false);
+  const [registrarVisitanteOpen, setRegistrarVisitanteOpen] = useState(false);
   const { igrejaId, filialId, isAllFiliais } = useAuthContext();
 
   useEffect(() => {
@@ -281,6 +283,7 @@ export function AdicionarInscricaoDialog({
   const hasLotes = lotes.length > 0;
 
   return (
+    <>
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <div className="flex flex-col h-full">
         <div className="border-b pb-4 px-6 pt-6">
@@ -314,9 +317,23 @@ export function AdicionarInscricaoDialog({
             <ScrollArea className="h-[180px] border rounded-md">
               <div className="p-2 space-y-1">
                 {filteredPessoas.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">
-                    {searchTerm ? "Nenhuma pessoa encontrada" : "Digite para buscar"}
-                  </p>
+                  <div className="text-center py-4 space-y-2">
+                    <p className="text-muted-foreground">
+                      {searchTerm ? "Nenhuma pessoa encontrada" : "Digite para buscar"}
+                    </p>
+                    {searchTerm && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRegistrarVisitanteOpen(true)}
+                        className="gap-2"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Cadastrar novo visitante
+                      </Button>
+                    )}
+                  </div>
                 ) : (
                   filteredPessoas.slice(0, 20).map((pessoa) => (
                     <button
@@ -343,6 +360,18 @@ export function AdicionarInscricaoDialog({
               </div>
             </ScrollArea>
           )}
+
+          {/* Botão cadastrar visitante (sempre visível) */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setRegistrarVisitanteOpen(true)}
+            className="gap-2 w-full justify-center text-muted-foreground"
+          >
+            <UserPlus className="h-4 w-4" />
+            Cadastrar novo visitante
+          </Button>
 
           {/* Pessoa Selecionada */}
           {selectedPessoa && (
@@ -462,5 +491,16 @@ export function AdicionarInscricaoDialog({
         </div>
       </div>
     </ResponsiveDialog>
+
+    <RegistrarVisitanteDialog
+      open={registrarVisitanteOpen}
+      onOpenChange={setRegistrarVisitanteOpen}
+      onSuccess={() => {
+        loadPessoas();
+        loadInscritos();
+      }}
+    />
+  </>
   );
 }
+
