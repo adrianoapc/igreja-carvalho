@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
@@ -29,11 +31,15 @@ import {
   Clock,
   DollarSign,
   Loader2,
-  UserPlus
+  UserPlus,
+  Eye,
+  UserPen,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AdicionarInscricaoDialog } from "./AdicionarInscricaoDialog";
+import { CompletarCadastroInscritoDialog } from "./CompletarCadastroInscritoDialog";
 
 interface Evento {
   id: string;
@@ -83,11 +89,13 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 };
 
 export default function InscricoesTabContent({ eventoId, evento }: InscricoesTabContentProps) {
+  const navigate = useNavigate();
   const [inscricoes, setInscricoes] = useState<Inscricao[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingPessoaId, setEditingPessoaId] = useState<string | null>(null);
 
   useEffect(() => {
     loadInscricoes();
@@ -334,6 +342,9 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                             </AvatarFallback>
                           </Avatar>
                           <span className="font-medium">{inscricao.pessoa?.nome}</span>
+                          {!inscricao.pessoa?.email && !inscricao.pessoa?.telefone && (
+                            <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -381,6 +392,15 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => navigate(`/pessoas/${inscricao.pessoa_id}`)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver Perfil
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditingPessoaId(inscricao.pessoa_id)}>
+                              <UserPen className="h-4 w-4 mr-2" />
+                              Completar Cadastro
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             {evento?.requer_pagamento && inscricao.status_pagamento !== "pago" && (
                               <DropdownMenuItem onClick={() => handleUpdateStatus(inscricao.id, "pago")}>
                                 <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
@@ -422,6 +442,13 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
         onOpenChange={setShowAddDialog}
         eventoId={eventoId}
         evento={evento}
+        onSuccess={loadInscricoes}
+      />
+
+      <CompletarCadastroInscritoDialog
+        pessoaId={editingPessoaId}
+        open={!!editingPessoaId}
+        onOpenChange={(open) => { if (!open) setEditingPessoaId(null); }}
         onSuccess={loadInscricoes}
       />
     </div>
