@@ -61,7 +61,7 @@ All colors MUST be HSL.
     --shadow-soft: 0 2px 8px -2px hsl(217 91% 35% / 0.1);
     --shadow-medium: 0 4px 16px -4px hsl(217 91% 35% / 0.15);
 
-    --sidebar-background: 113, 28%, 22%; /* fundo verde escuro #2c4828 */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 265 4% 12.9%; /* texto quase branco */
 
     --sidebar-primary: 266 4% 20.8%; /* item ativo #39b54b */
