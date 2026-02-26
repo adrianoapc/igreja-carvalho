@@ -391,7 +391,7 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                               )}
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="z-50">
                             <DropdownMenuItem onClick={() => navigate(`/pessoas/${inscricao.pessoa_id}`)}>
                               <Eye className="h-4 w-4 mr-2" />
                               Ver Perfil
