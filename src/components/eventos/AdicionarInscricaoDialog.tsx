@@ -68,6 +68,15 @@ export function AdicionarInscricaoDialog({
   const [selectedPessoaId, setSelectedPessoaId] = useState<string | null>(null);
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
   const [statusPagamento, setStatusPagamento] = useState("pendente");
+
+  // Auto-set isento when event has no payment
+  useEffect(() => {
+    if (open && evento && !evento.requer_pagamento) {
+      setStatusPagamento("isento");
+    } else if (open && evento?.requer_pagamento) {
+      setStatusPagamento("pendente");
+    }
+  }, [open, evento]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inscritosIds, setInscritosIds] = useState<string[]>([]);
@@ -419,7 +428,11 @@ export function AdicionarInscricaoDialog({
           {/* Status de Pagamento */}
           <div className="space-y-2">
             <Label>Status de Pagamento</Label>
-            <Select value={statusPagamento} onValueChange={setStatusPagamento}>
+            <Select 
+              value={statusPagamento} 
+              onValueChange={setStatusPagamento}
+              disabled={!evento?.requer_pagamento}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -431,6 +444,9 @@ export function AdicionarInscricaoDialog({
                 <SelectItem value="isento">Isento</SelectItem>
               </SelectContent>
             </Select>
+            {!evento?.requer_pagamento && (
+              <p className="text-xs text-muted-foreground">Evento gratuito — inscrição marcada como isenta automaticamente.</p>
+            )}
           </div>
 
           {/* Valor */}
