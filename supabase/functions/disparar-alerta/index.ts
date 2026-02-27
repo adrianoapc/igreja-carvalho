@@ -718,13 +718,28 @@ serve(async (req) => {
 
         // Canal WhatsApp
         if (usarWhatsApp && destinatario.telefone) {
-          const sucesso = await dispararWhatsApp(
-            destinatario.telefone,
-            mensagem,
-            evento,
-            providerWhats,
-            templateMeta
-          );
+          let sucesso = false;
+          if (dados?.igreja_id) {
+            // Multi-tenant: resolve webhook correto via tabela webhooks
+            sucesso = await dispararWhatsAppMultiTenant(
+              supabase,
+              dados.igreja_id,
+              destinatario.telefone,
+              mensagem,
+              evento,
+              templateMeta,
+              dados.filial_id || null
+            );
+          } else {
+            // Fallback legado (env var global)
+            sucesso = await dispararWhatsApp(
+              destinatario.telefone,
+              mensagem,
+              evento,
+              providerWhats,
+              templateMeta
+            );
+          }
           if (sucesso) totalNotificacoes++;
         }
 
