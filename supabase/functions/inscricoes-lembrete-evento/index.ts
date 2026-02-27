@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     // Disparo manual: buscar apenas o evento específico
     const { data, error } = await supabase
       .from("eventos")
-      .select("id, titulo, data_inicio, local, igreja_id, requer_pagamento, status")
+      .select("id, titulo, data_evento, local, igreja_id, requer_pagamento, status")
       .eq("id", eventoIdManual)
       .neq("status", "cancelado")
       .single();
@@ -50,9 +50,9 @@ Deno.serve(async (req) => {
 
     const { data, error } = await supabase
       .from("eventos")
-      .select("id, titulo, data_inicio, local, igreja_id, requer_pagamento, status")
-      .gte("data_inicio", in24h)
-      .lte("data_inicio", in48h)
+      .select("id, titulo, data_evento, local, igreja_id, requer_pagamento, status")
+      .gte("data_evento", in24h)
+      .lte("data_evento", in48h)
       .neq("status", "cancelado");
 
     if (error) {
@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
     console.log(`Evento "${evento.titulo}": ${inscricoes.length} inscrito(s) para notificar`);
 
     // Formatar data do evento
-    const dataEvento = new Date(evento.data_inicio);
+    const dataEvento = new Date(evento.data_evento);
     const dataFormatada = dataEvento.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
