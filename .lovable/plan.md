@@ -1,81 +1,42 @@
 
-# Cron de Lembrete de Evento para Inscritos
 
-## Situacao Atual
-
-- A edge function `inscricoes-lembretes` ja existe mas trata apenas de **cobranca de pagamento pendente** (lembrete + cancelamento automatico).
-- Nao ha nenhum lembrete do tipo **"seu evento e amanha!"** para inscritos confirmados.
-- A function nao esta registrada no `config.toml`.
-- Nao ha cron agendado no banco para nenhuma das duas funcoes.
+# Botao "Enviar Lembrete" na Tela de Inscricoes
 
 ## O Que Sera Feito
 
-### 1. Nova Edge Function: `inscricoes-lembrete-evento`
+Adicionar um botao **"Enviar Lembrete"** ao lado do botao "Adicionar Inscrito" no header da lista de inscritos. Ao clicar, ele chama a edge function `inscricoes-lembrete-evento` ja criada, que envia notificacao (WhatsApp + in-app) para todos os inscritos confirmados que ainda nao receberam lembrete.
 
-Funcao dedicada que:
-- Busca eventos que acontecerao nas proximas **24 a 48 horas**
-- Filtra inscricoes com `status_pagamento = 'confirmado'` (ou eventos sem pagamento obrigatorio)
-- Envia lembrete via `disparar-alerta` (WhatsApp + in-app) com dados do evento (titulo, data, local)
-- Anti-spam: so envia se `lembrete_evento_em` for NULL (campo novo na tabela `inscricoes_eventos`)
-- Atualiza `lembrete_evento_em` apos envio bem-sucedido
-- Registra execucao via `log_edge_function_execution`
+## Comportamento
 
-### 2. Migracao no Banco
+- Botao com icone de sino (Bell) no header, ao lado de "Adicionar Inscrito"
+- Ao clicar, exibe confirmacao: "Enviar lembrete para X inscritos?"
+- Chama a edge function passando o `evento_id` especifico (ao inves de buscar por janela de 24-48h)
+- Mostra toast com resultado: "Y lembretes enviados"
+- Botao fica desabilitado durante o envio (loading spinner)
 
-- Adicionar coluna `lembrete_evento_em TIMESTAMPTZ` na tabela `inscricoes_eventos` (default NULL)
-- Esse campo controla o anti-spam: se ja tem valor, nao reenvia
+## Alteracoes
 
-### 3. Registrar no config.toml
+### 1. Edge Function `inscricoes-lembrete-evento`
+Ajustar para aceitar um parametro opcional `evento_id` no body. Quando presente, busca apenas esse evento (ignorando a janela de 24-48h). Quando ausente, mantem o comportamento atual do cron.
 
-Adicionar:
-```text
-[functions.inscricoes-lembrete-evento]
-verify_jwt = false
-```
+### 2. Componente `InscricoesTabContent.tsx`
+- Adicionar botao "Enviar Lembrete" no header
+- Funcao `handleEnviarLembrete` que invoca a edge function via `supabase.functions.invoke`
+- Estado de loading para o botao
+- Toast com feedback do resultado
 
-### 4. Agendar Cron Job
+### 3. Filtro de status
+A function ja filtra por `status_pagamento = 'confirmado'` quando o evento requer pagamento. Para eventos gratuitos, envia para todos. Tambem respeita o anti-spam (`lembrete_evento_em IS NULL`).
 
-SQL para agendar execucao diaria as 9h (horario de Brasilia = 12h UTC):
-```text
-SELECT cron.schedule(
-  'lembrete-diario-inscricoes-evento',
-  '0 12 * * *',
-  $$ SELECT net.http_post(...) $$
-);
-```
-
-### 5. Registrar na documentacao
-
-Atualizar `docs/automacoes/crons.md` com a descricao do novo cron.
-
----
-
-## Logica da Mensagem
-
-Exemplo de mensagem enviada:
-> "Lembrete: o evento **Conferencia de Jovens** acontece amanha, dia 28/02 as 19h, no Templo Central. Nos vemos la!"
-
-Os dados vem das tabelas `eventos` (titulo, data_inicio, local) e `profiles` (nome, telefone).
-
-## Fluxo Resumido
+## Fluxo
 
 ```text
-pg_cron (diario 9h BRT)
-  -> HTTP POST inscricoes-lembrete-evento
-    -> Busca eventos com data_inicio entre 24h e 48h no futuro
-    -> Filtra inscricoes confirmadas (ou sem pagamento obrigatorio)
-    -> Para cada inscrito com lembrete_evento_em = NULL:
-       -> Chama disparar-alerta (WhatsApp + in-app)
-       -> Atualiza lembrete_evento_em
-    -> Loga execucao
+Admin clica "Enviar Lembrete"
+  -> Confirmacao: "Enviar para X inscritos?"
+  -> POST inscricoes-lembrete-evento { evento_id: "..." }
+  -> Function busca inscricoes do evento sem lembrete enviado
+  -> Dispara alertas via disparar-alerta (fluxo padrao)
+  -> Retorna contagem
+  -> Toast: "5 lembretes enviados!"
 ```
 
-## Arquivos
-
-| Arquivo | Acao |
-|---|---|
-| `supabase/functions/inscricoes-lembrete-evento/index.ts` | Criar |
-| `supabase/config.toml` | Adicionar entrada da function |
-| `docs/automacoes/crons.md` | Documentar o cron |
-| Migracao SQL | Adicionar coluna `lembrete_evento_em` |
-| SQL (insert tool) | Agendar cron job com pg_cron |
