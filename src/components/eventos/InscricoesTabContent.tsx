@@ -37,6 +37,7 @@ import {
   AlertCircle,
   LogIn,
   LogOut,
+  Bell,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -99,6 +100,7 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingPessoaId, setEditingPessoaId] = useState<string | null>(null);
+  const [sendingLembrete, setSendingLembrete] = useState(false);
 
   useEffect(() => {
     loadInscricoes();
@@ -267,6 +269,30 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
     }
   };
 
+  const handleEnviarLembrete = async () => {
+    const elegíveis = inscricoes.filter(i => 
+      i.status_pagamento === "pago" || i.status_pagamento === "isento" || !evento?.requer_pagamento
+    ).length;
+
+    if (!confirm(`Enviar lembrete para ${elegíveis} inscrito(s)?`)) return;
+
+    setSendingLembrete(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("inscricoes-lembrete-evento", {
+        body: { evento_id: eventoId },
+      });
+
+      if (error) throw error;
+
+      toast.success(`${data?.lembretesEnviados || 0} lembrete(s) enviado(s)!`);
+    } catch (error) {
+      toast.error("Erro ao enviar lembretes");
+      console.error(error);
+    } finally {
+      setSendingLembrete(false);
+    }
+  };
+
   const filteredInscricoes = inscricoes.filter(i => 
     i.pessoa?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     i.pessoa?.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -353,10 +379,20 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Inscritos</CardTitle>
-          <Button onClick={() => setShowAddDialog(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Adicionar Inscrito
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleEnviarLembrete} disabled={sendingLembrete || inscricoes.length === 0}>
+              {sendingLembrete ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Bell className="h-4 w-4 mr-2" />
+              )}
+              Enviar Lembrete
+            </Button>
+            <Button onClick={() => setShowAddDialog(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Adicionar Inscrito
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="relative">
