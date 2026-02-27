@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
               evento_hora: horaFormatada,
               evento_local: evento.local || "Local a confirmar",
               mensagem,
+              igreja_id: evento.igreja_id,
             },
             user_id_alvo: inscricao.pessoa_id,
           },
