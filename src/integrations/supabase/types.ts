@@ -4296,6 +4296,7 @@ export type Database = {
           filial_id: string | null
           id: string
           igreja_id: string | null
+          lembrete_evento_em: string | null
           lembrete_pagamento_em: string | null
           lote_id: string | null
           observacoes: string | null
@@ -4316,6 +4317,7 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
+          lembrete_evento_em?: string | null
           lembrete_pagamento_em?: string | null
           lote_id?: string | null
           observacoes?: string | null
@@ -4336,6 +4338,7 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
+          lembrete_evento_em?: string | null
           lembrete_pagamento_em?: string | null
           lote_id?: string | null
           observacoes?: string | null
