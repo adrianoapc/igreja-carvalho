@@ -14,28 +14,59 @@ Deno.serve(async (req) => {
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const now = new Date();
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-  const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
-
-  // Buscar eventos que acontecem entre 24h e 48h a partir de agora
-  const { data: eventos, error: eventosError } = await supabase
-    .from("eventos")
-    .select("id, titulo, data_inicio, local, igreja_id, requer_pagamento, status")
-    .gte("data_inicio", in24h)
-    .lte("data_inicio", in48h)
-    .neq("status", "cancelado");
-
-  if (eventosError) {
-    console.error("Erro ao buscar eventos:", eventosError);
-    return new Response(
-      JSON.stringify({ success: false, error: eventosError.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+  // Aceitar evento_id opcional no body para disparo manual
+  let eventoIdManual: string | null = null;
+  try {
+    const body = await req.json();
+    eventoIdManual = body?.evento_id || null;
+  } catch {
+    // Body vazio (chamada do cron) — segue fluxo padrão
   }
 
-  if (!eventos || eventos.length === 0) {
-    console.log("Nenhum evento nas proximas 24-48h.");
+  let eventos: any[] = [];
+
+  if (eventoIdManual) {
+    // Disparo manual: buscar apenas o evento específico
+    const { data, error } = await supabase
+      .from("eventos")
+      .select("id, titulo, data_inicio, local, igreja_id, requer_pagamento, status")
+      .eq("id", eventoIdManual)
+      .neq("status", "cancelado")
+      .single();
+
+    if (error || !data) {
+      console.error("Erro ao buscar evento:", error);
+      return new Response(
+        JSON.stringify({ success: false, error: error?.message || "Evento não encontrado" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+      );
+    }
+    eventos = [data];
+  } else {
+    // Disparo automático (cron): janela 24-48h
+    const now = new Date();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+
+    const { data, error } = await supabase
+      .from("eventos")
+      .select("id, titulo, data_inicio, local, igreja_id, requer_pagamento, status")
+      .gte("data_inicio", in24h)
+      .lte("data_inicio", in48h)
+      .neq("status", "cancelado");
+
+    if (error) {
+      console.error("Erro ao buscar eventos:", error);
+      return new Response(
+        JSON.stringify({ success: false, error: error.message }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+    eventos = data || [];
+  }
+
+  if (eventos.length === 0) {
+    console.log("Nenhum evento encontrado.");
     await supabase.rpc("log_edge_function_execution", {
       p_function_name: "inscricoes-lembrete-evento",
       p_status: "success",
@@ -47,10 +78,11 @@ Deno.serve(async (req) => {
     );
   }
 
-  console.log(`Encontrados ${eventos.length} evento(s) nas proximas 24-48h`);
+  console.log(`Encontrados ${eventos.length} evento(s) para processar`);
 
   let lembretesEnviados = 0;
   let erros = 0;
+  const now = new Date();
 
   for (const evento of eventos) {
     // Buscar inscricoes confirmadas (ou sem exigência de pagamento) sem lembrete enviado
@@ -66,7 +98,7 @@ Deno.serve(async (req) => {
       .is("lembrete_evento_em", null);
 
     if (evento.requer_pagamento) {
-      query = query.eq("status_pagamento", "confirmado");
+      query = query.in("status_pagamento", ["pago", "isento"]);
     }
 
     const { data: inscricoes, error: inscError } = await query;
@@ -100,7 +132,6 @@ Deno.serve(async (req) => {
       const mensagem = `Lembrete: o evento "${evento.titulo}" acontece amanha, dia ${dataFormatada} as ${horaFormatada}${localTexto}. Nos vemos la!`;
 
       try {
-        // Disparar alerta via edge function disparar-alerta
         const { error: alertaError } = await supabase.functions.invoke("disparar-alerta", {
           body: {
             evento: "lembrete_evento_inscricao",
@@ -122,7 +153,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Marcar lembrete como enviado (anti-spam)
         await supabase
           .from("inscricoes_eventos")
           .update({ lembrete_evento_em: now.toISOString() })
@@ -143,6 +173,7 @@ Deno.serve(async (req) => {
       lembretesEnviados,
       erros,
       eventosEncontrados: eventos.length,
+      manual: !!eventoIdManual,
     }),
   });
 
