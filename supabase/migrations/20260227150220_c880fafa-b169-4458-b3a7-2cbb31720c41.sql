@@ -1,0 +1,1 @@
+ALTER TABLE public.inscricoes_eventos ADD COLUMN IF NOT EXISTS lembrete_evento_em TIMESTAMPTZ DEFAULT NULL;
