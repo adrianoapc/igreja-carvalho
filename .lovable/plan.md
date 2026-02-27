@@ -1,62 +1,81 @@
 
-# Completar Cadastro de Inscrito (com Sexo e Endereco)
+# Cron de Lembrete de Evento para Inscritos
 
-## Problema
+## Situacao Atual
 
-Na lista de inscritos do evento, nao ha como ver detalhes do perfil nem completar dados de visitantes cadastrados com informacoes incompletas (ex: nome com emoji do WhatsApp, sem telefone, sem endereco). Os campos sexo e endereco sao essenciais e precisam estar disponiveis.
+- A edge function `inscricoes-lembretes` ja existe mas trata apenas de **cobranca de pagamento pendente** (lembrete + cancelamento automatico).
+- Nao ha nenhum lembrete do tipo **"seu evento e amanha!"** para inscritos confirmados.
+- A function nao esta registrada no `config.toml`.
+- Nao ha cron agendado no banco para nenhuma das duas funcoes.
 
-## Solucao
+## O Que Sera Feito
 
-Adicionar no `InscricoesTabContent.tsx`:
+### 1. Nova Edge Function: `inscricoes-lembrete-evento`
 
-1. **"Ver Perfil"** no menu de acoes -- navega para `/pessoas/{pessoa_id}`
-2. **"Completar Cadastro"** no menu de acoes -- abre um dialog completo para preencher dados pessoais e de endereco
-3. **Indicador visual** de cadastro incompleto ao lado do nome
+Funcao dedicada que:
+- Busca eventos que acontecerao nas proximas **24 a 48 horas**
+- Filtra inscricoes com `status_pagamento = 'confirmado'` (ou eventos sem pagamento obrigatorio)
+- Envia lembrete via `disparar-alerta` (WhatsApp + in-app) com dados do evento (titulo, data, local)
+- Anti-spam: so envia se `lembrete_evento_em` for NULL (campo novo na tabela `inscricoes_eventos`)
+- Atualiza `lembrete_evento_em` apos envio bem-sucedido
+- Registra execucao via `log_edge_function_execution`
 
-## Novo componente: `CompletarCadastroInscritoDialog.tsx`
+### 2. Migracao no Banco
 
-Dialog dedicado com dois blocos de campos:
+- Adicionar coluna `lembrete_evento_em TIMESTAMPTZ` na tabela `inscricoes_eventos` (default NULL)
+- Esse campo controla o anti-spam: se ja tem valor, nao reenvia
 
-### Bloco 1 - Dados Pessoais
-- Nome (obrigatorio)
-- Telefone (com mascara)
-- Email
-- Sexo (select: Masculino/Feminino)
-- Data de Nascimento (dia/mes/ano)
+### 3. Registrar no config.toml
 
-### Bloco 2 - Endereco
-- CEP (com busca automatica via `useCepAutocomplete`)
-- Cidade (preenchido automaticamente pelo CEP)
-- Bairro (preenchido automaticamente pelo CEP)
-- UF (preenchido automaticamente pelo CEP)
-- Endereco/Logradouro (preenchido automaticamente pelo CEP)
-- Numero
-- Complemento
+Adicionar:
+```text
+[functions.inscricoes-lembrete-evento]
+verify_jwt = false
+```
 
-O dialog pre-preenche todos os campos com dados existentes da pessoa (buscados do `profiles` ao abrir). Ao salvar, faz `UPDATE` na tabela `profiles`.
+### 4. Agendar Cron Job
 
-## Alteracoes em `InscricoesTabContent.tsx`
+SQL para agendar execucao diaria as 9h (horario de Brasilia = 12h UTC):
+```text
+SELECT cron.schedule(
+  'lembrete-diario-inscricoes-evento',
+  '0 12 * * *',
+  $$ SELECT net.http_post(...) $$
+);
+```
 
-1. Importar `useNavigate`, icones `Eye`, `UserPen`, `AlertCircle`, e `DropdownMenuSeparator`
-2. Importar o novo `CompletarCadastroInscritoDialog`
-3. Adicionar estado `editingPessoaId` (string | null)
-4. No dropdown de cada inscrito, adicionar no topo:
-   - "Ver Perfil" (icone Eye) -- `navigate(/pessoas/${pessoa_id})`
-   - "Completar Cadastro" (icone UserPen) -- abre o dialog
-   - Separador visual antes das opcoes de pagamento
-5. Indicador: icone `AlertCircle` amarelo ao lado do nome quando email E telefone estao ambos vazios
-6. Ao fechar o dialog com sucesso, chamar `loadInscricoes()` para atualizar a lista
+### 5. Registrar na documentacao
+
+Atualizar `docs/automacoes/crons.md` com a descricao do novo cron.
+
+---
+
+## Logica da Mensagem
+
+Exemplo de mensagem enviada:
+> "Lembrete: o evento **Conferencia de Jovens** acontece amanha, dia 28/02 as 19h, no Templo Central. Nos vemos la!"
+
+Os dados vem das tabelas `eventos` (titulo, data_inicio, local) e `profiles` (nome, telefone).
+
+## Fluxo Resumido
+
+```text
+pg_cron (diario 9h BRT)
+  -> HTTP POST inscricoes-lembrete-evento
+    -> Busca eventos com data_inicio entre 24h e 48h no futuro
+    -> Filtra inscricoes confirmadas (ou sem pagamento obrigatorio)
+    -> Para cada inscrito com lembrete_evento_em = NULL:
+       -> Chama disparar-alerta (WhatsApp + in-app)
+       -> Atualiza lembrete_evento_em
+    -> Loga execucao
+```
 
 ## Arquivos
 
 | Arquivo | Acao |
 |---|---|
-| `src/components/eventos/CompletarCadastroInscritoDialog.tsx` | Criar (novo componente) |
-| `src/components/eventos/InscricoesTabContent.tsx` | Editar (adicionar acoes no dropdown + indicador) |
-
-## Padroes reutilizados
-
-- `useCepAutocomplete` para busca de CEP (mesmo hook usado em `EditarContatosDialog` e `CadastrarPessoaDialog`)
-- Mascara de telefone com `react-input-mask` (mesmo padrao de `RegistrarVisitanteDialog`)
-- Layout de formulario com `Label` + `Input` + `Select` (padrao existente no projeto)
-- `ResponsiveDialog` para o dialog (padrao do projeto)
+| `supabase/functions/inscricoes-lembrete-evento/index.ts` | Criar |
+| `supabase/config.toml` | Adicionar entrada da function |
+| `docs/automacoes/crons.md` | Documentar o cron |
+| Migracao SQL | Adicionar coluna `lembrete_evento_em` |
+| SQL (insert tool) | Agendar cron job com pg_cron |
