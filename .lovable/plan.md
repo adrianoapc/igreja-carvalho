@@ -1,42 +1,19 @@
 
+# Incluir `igreja_id` no Fluxo de Lembretes
 
-# Botao "Enviar Lembrete" na Tela de Inscricoes
-
-## O Que Sera Feito
-
-Adicionar um botao **"Enviar Lembrete"** ao lado do botao "Adicionar Inscrito" no header da lista de inscritos. Ao clicar, ele chama a edge function `inscricoes-lembrete-evento` ja criada, que envia notificacao (WhatsApp + in-app) para todos os inscritos confirmados que ainda nao receberam lembrete.
-
-## Comportamento
-
-- Botao com icone de sino (Bell) no header, ao lado de "Adicionar Inscrito"
-- Ao clicar, exibe confirmacao: "Enviar lembrete para X inscritos?"
-- Chama a edge function passando o `evento_id` especifico (ao inves de buscar por janela de 24-48h)
-- Mostra toast com resultado: "Y lembretes enviados"
-- Botao fica desabilitado durante o envio (loading spinner)
+## Problema
+O payload enviado para `disparar-alerta` nao inclui `igreja_id`, entao o handler padrao usa a funcao legada `dispararWhatsApp` que depende de env var global e nao resolve o webhook multi-tenant correto.
 
 ## Alteracoes
 
-### 1. Edge Function `inscricoes-lembrete-evento`
-Ajustar para aceitar um parametro opcional `evento_id` no body. Quando presente, busca apenas esse evento (ignorando a janela de 24-48h). Quando ausente, mantem o comportamento atual do cron.
+### 1. `supabase/functions/inscricoes-lembrete-evento/index.ts`
+Adicionar `igreja_id: evento.igreja_id` dentro do objeto `dados` no body enviado para `disparar-alerta` (linha 138-145).
 
-### 2. Componente `InscricoesTabContent.tsx`
-- Adicionar botao "Enviar Lembrete" no header
-- Funcao `handleEnviarLembrete` que invoca a edge function via `supabase.functions.invoke`
-- Estado de loading para o botao
-- Toast com feedback do resultado
+### 2. `supabase/functions/disparar-alerta/index.ts`
+No bloco do canal WhatsApp (linhas 720-728), verificar se `dados.igreja_id` existe. Se sim, chamar `dispararWhatsAppMultiTenant(supabase, igrejaId, telefone, mensagem, evento, templateMeta)` em vez da funcao legada. Caso contrario, manter o fallback atual.
 
-### 3. Filtro de status
-A function ja filtra por `status_pagamento = 'confirmado'` quando o evento requer pagamento. Para eventos gratuitos, envia para todos. Tambem respeita o anti-spam (`lembrete_evento_em IS NULL`).
+### 3. Corrigir provider do evento no banco
+Executar UPDATE na tabela `notificacao_eventos` para alterar `provider_preferencial` de `meta_direto` para `whatsapp_make` (ou NULL) no slug `lembrete_evento_inscricao`.
 
-## Fluxo
-
-```text
-Admin clica "Enviar Lembrete"
-  -> Confirmacao: "Enviar para X inscritos?"
-  -> POST inscricoes-lembrete-evento { evento_id: "..." }
-  -> Function busca inscricoes do evento sem lembrete enviado
-  -> Dispara alertas via disparar-alerta (fluxo padrao)
-  -> Retorna contagem
-  -> Toast: "5 lembretes enviados!"
-```
-
+## Resultado
+O lembrete vai resolver o webhook correto da igreja via tabela `webhooks`, acionando o Make e enviando o WhatsApp pelo numero certo.
