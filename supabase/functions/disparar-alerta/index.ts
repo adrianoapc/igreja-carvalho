@@ -224,8 +224,9 @@ async function dispararWhatsAppMultiTenant(
     }
 
     try {
+      const telefoneWhatsApp = formatarParaWhatsApp(telefone) || telefone;
       const payload = {
-        telefone,
+        telefone: telefoneWhatsApp,
         whatsapp_remetente: resolucao.whatsappRemetente,
         whatsapp_sender_id: resolucao.whatsappSenderId,
         mensagem,
@@ -266,7 +267,7 @@ async function dispararWhatsAppMultiTenant(
     try {
       const payload = {
         messaging_product: "whatsapp",
-        to: telefone,
+        to: formatarParaWhatsApp(telefone) || telefone,
         type: "template",
         template: {
           name: templateName,
@@ -314,7 +315,7 @@ async function dispararWhatsAppMultiTenant(
 
     try {
       const payload = {
-        number: telefone,
+        number: formatarParaWhatsApp(telefone) || telefone,
         text: mensagem,
       };
 
