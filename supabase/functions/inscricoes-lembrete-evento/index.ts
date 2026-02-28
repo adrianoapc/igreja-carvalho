@@ -125,11 +125,17 @@ Deno.serve(async (req) => {
       timeZone: "America/Sao_Paulo",
     });
 
-    const localTexto = evento.local ? `, no ${evento.local}` : "";
+    const localTexto = evento.local ? `, na ${evento.local}` : "";
+
+    // Determinar se o evento é hoje ou amanhã
+    const hoje = new Date();
+    const hojeStr = hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+    const eventoStr = dataEvento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+    const quandoTexto = hojeStr === eventoStr ? "hoje" : "amanhã";
 
     for (const inscricao of inscricoes) {
       const nome = inscricao.pessoa?.nome || "Inscrito";
-      const mensagem = `Lembrete: o evento "${evento.titulo}" acontece amanha, dia ${dataFormatada} as ${horaFormatada}${localTexto}. Nos vemos la!`;
+      const mensagem = `Lembrete: o evento "${evento.titulo}" acontece ${quandoTexto}, dia ${dataFormatada} às ${horaFormatada}${localTexto}. Nos vemos lá!`;
 
       try {
         const { error: alertaError } = await supabase.functions.invoke("disparar-alerta", {

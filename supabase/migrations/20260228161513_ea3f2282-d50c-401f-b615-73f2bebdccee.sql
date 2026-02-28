@@ -1,0 +1,1 @@
+UPDATE inscricoes_eventos SET lembrete_evento_em = NULL WHERE evento_id = '5303cfd4-3273-4015-b79b-7e59894f824c';
