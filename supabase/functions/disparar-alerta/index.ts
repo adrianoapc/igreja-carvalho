@@ -688,10 +688,10 @@ serve(async (req) => {
 
       // Formatar título e mensagem usando dados e nome do evento
       const titulo = eventoCfg?.nome || evento;
-      const mensagem = formatarTemplate(
-        `Evento: ${eventoCfg?.nome || evento}. ${JSON.stringify(dados)}`,
-        dados
-      );
+      const mensagemBase = typeof dados.mensagem === "string"
+        ? dados.mensagem
+        : `Evento: ${eventoCfg?.nome || evento}. ${JSON.stringify(dados)}`;
+      const mensagem = formatarTemplate(mensagemBase, dados);
 
       // Canais (json) com defaults
       const canais = regra.canais || {};
