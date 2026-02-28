@@ -16,9 +16,11 @@ Deno.serve(async (req) => {
 
   // Aceitar evento_id opcional no body para disparo manual
   let eventoIdManual: string | null = null;
+  let forceResend = false;
   try {
     const body = await req.json();
     eventoIdManual = body?.evento_id || null;
+    forceResend = body?.force === true;
   } catch {
     // Body vazio (chamada do cron) — segue fluxo padrão
   }
