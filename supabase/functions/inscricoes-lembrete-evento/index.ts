@@ -17,10 +17,12 @@ Deno.serve(async (req) => {
   // Aceitar evento_id opcional no body para disparo manual
   let eventoIdManual: string | null = null;
   let forceResend = false;
+  let mensagemOverride: string | null = null;
   try {
     const body = await req.json();
     eventoIdManual = body?.evento_id || null;
     forceResend = body?.force === true;
+    mensagemOverride = body?.mensagem_override || null;
   } catch {
     // Body vazio (chamada do cron) — segue fluxo padrão
   }
@@ -87,7 +89,7 @@ Deno.serve(async (req) => {
   const now = new Date();
 
   for (const evento of eventos) {
-    // Buscar inscricoes confirmadas (ou sem exigência de pagamento) sem lembrete enviado
+    // Buscar inscricoes confirmadas (ou sem exigência de pagamento)
     let query = supabase
       .from("inscricoes_eventos")
       .select(`
@@ -96,8 +98,12 @@ Deno.serve(async (req) => {
         igreja_id,
         pessoa:profiles!inscricoes_eventos_pessoa_id_fkey (nome, telefone)
       `)
-      .eq("evento_id", evento.id)
-      .is("lembrete_evento_em", null);
+      .eq("evento_id", evento.id);
+
+    // Se não for force, filtrar apenas quem ainda não recebeu
+    if (!forceResend) {
+      query = query.is("lembrete_evento_em", null);
+    }
 
     if (evento.requer_pagamento) {
       query = query.in("status_pagamento", ["pago", "isento"]);
@@ -137,7 +143,7 @@ Deno.serve(async (req) => {
 
     for (const inscricao of inscricoes) {
       const nome = inscricao.pessoa?.nome || "Inscrito";
-      const mensagem = `Lembrete: o evento "${evento.titulo}" acontece ${quandoTexto}, dia ${dataFormatada} às ${horaFormatada}${localTexto}. Nos vemos lá!`;
+      const mensagem = mensagemOverride || `Lembrete: o evento "${evento.titulo}" acontece ${quandoTexto}, dia ${dataFormatada} às ${horaFormatada}${localTexto}. Nos vemos lá!`;
 
       try {
         const { error: alertaError } = await supabase.functions.invoke("disparar-alerta", {
