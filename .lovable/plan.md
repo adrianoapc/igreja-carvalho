@@ -1,19 +1,31 @@
 
-# Incluir `igreja_id` no Fluxo de Lembretes
 
-## Problema
-O payload enviado para `disparar-alerta` nao inclui `igreja_id`, entao o handler padrao usa a funcao legada `dispararWhatsApp` que depende de env var global e nao resolve o webhook multi-tenant correto.
+# Corrigir Formatacao do Telefone para WhatsApp nos Lembretes
 
-## Alteracoes
+## Problema Identificado
+O telefone do inscrito esta sendo enviado no formato do banco de dados (apenas DDD + numero, ex: `3496322958`) em vez do formato exigido pelo WhatsApp (com codigo do pais, ex: `553496322958`).
 
-### 1. `supabase/functions/inscricoes-lembrete-evento/index.ts`
-Adicionar `igreja_id: evento.igreja_id` dentro do objeto `dados` no body enviado para `disparar-alerta` (linha 138-145).
+Na funcao `dispararWhatsAppMultiTenant` (linha 228 de `disparar-alerta/index.ts`), o campo `telefone` e passado diretamente ao payload sem passar pelo utilitario `formatarParaWhatsApp`, que ja esta importado no arquivo mas nao esta sendo utilizado nesta funcao.
 
-### 2. `supabase/functions/disparar-alerta/index.ts`
-No bloco do canal WhatsApp (linhas 720-728), verificar se `dados.igreja_id` existe. Se sim, chamar `dispararWhatsAppMultiTenant(supabase, igrejaId, telefone, mensagem, evento, templateMeta)` em vez da funcao legada. Caso contrario, manter o fallback atual.
+## Alteracao
 
-### 3. Corrigir provider do evento no banco
-Executar UPDATE na tabela `notificacao_eventos` para alterar `provider_preferencial` de `meta_direto` para `whatsapp_make` (ou NULL) no slug `lembrete_evento_inscricao`.
+### `supabase/functions/disparar-alerta/index.ts`
+Na funcao `dispararWhatsAppMultiTenant`, aplicar `formatarParaWhatsApp(telefone)` antes de montar o payload. Isso garante que o numero enviado ao Make tenha o prefixo `55` do Brasil.
+
+**Antes (linha 227-228):**
+```typescript
+const payload = {
+  telefone,
+```
+
+**Depois:**
+```typescript
+const telefoneWhatsApp = formatarParaWhatsApp(telefone) || telefone;
+const payload = {
+  telefone: telefoneWhatsApp,
+```
+
+A mesma formatacao sera aplicada nas rotas Meta Cloud API e Evolution (linhas 269 e ~300+), onde o `telefone` tambem e usado diretamente.
 
 ## Resultado
-O lembrete vai resolver o webhook correto da igreja via tabela `webhooks`, acionando o Make e enviando o WhatsApp pelo numero certo.
+O numero enviado ao Make passara de `3496322958` para `553496322958`, permitindo que o WhatsApp identifique corretamente o destinatario.
