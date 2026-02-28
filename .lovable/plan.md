@@ -1,31 +1,40 @@
 
+# Corrigir Formato da Mensagem no WhatsApp
 
-# Corrigir Formatacao do Telefone para WhatsApp nos Lembretes
-
-## Problema Identificado
-O telefone do inscrito esta sendo enviado no formato do banco de dados (apenas DDD + numero, ex: `3496322958`) em vez do formato exigido pelo WhatsApp (com codigo do pais, ex: `553496322958`).
-
-Na funcao `dispararWhatsAppMultiTenant` (linha 228 de `disparar-alerta/index.ts`), o campo `telefone` e passado diretamente ao payload sem passar pelo utilitario `formatarParaWhatsApp`, que ja esta importado no arquivo mas nao esta sendo utilizado nesta funcao.
-
-## Alteracao
-
-### `supabase/functions/disparar-alerta/index.ts`
-Na funcao `dispararWhatsAppMultiTenant`, aplicar `formatarParaWhatsApp(telefone)` antes de montar o payload. Isso garante que o numero enviado ao Make tenha o prefixo `55` do Brasil.
-
-**Antes (linha 227-228):**
+## Problema
+Na linha 691-692 do `disparar-alerta/index.ts`, a mensagem e construida assim:
 ```typescript
-const payload = {
-  telefone,
+const mensagem = formatarTemplate(
+  `Evento: ${eventoCfg?.nome || evento}. ${JSON.stringify(dados)}`,
+  dados
+);
+```
+
+Isso gera o texto feio com JSON inteiro: `Evento: Lembrete de Evento (Inscricao). {"nome":"Teste","evento_titulo":"Compartilhe",...}`
+
+## Solucao
+Quando `dados.mensagem` existir (como no caso dos lembretes de evento), usar diretamente esse campo. Caso contrario, manter um fallback legivel.
+
+### Alteracao em `supabase/functions/disparar-alerta/index.ts` (linhas 689-694)
+
+**Antes:**
+```typescript
+const titulo = eventoCfg?.nome || evento;
+const mensagem = formatarTemplate(
+  `Evento: ${eventoCfg?.nome || evento}. ${JSON.stringify(dados)}`,
+  dados
+);
 ```
 
 **Depois:**
 ```typescript
-const telefoneWhatsApp = formatarParaWhatsApp(telefone) || telefone;
-const payload = {
-  telefone: telefoneWhatsApp,
+const titulo = eventoCfg?.nome || evento;
+const mensagemBase = typeof dados.mensagem === "string"
+  ? dados.mensagem
+  : `Evento: ${eventoCfg?.nome || evento}. ${JSON.stringify(dados)}`;
+const mensagem = formatarTemplate(mensagemBase, dados);
 ```
 
-A mesma formatacao sera aplicada nas rotas Meta Cloud API e Evolution (linhas 269 e ~300+), onde o `telefone` tambem e usado diretamente.
-
 ## Resultado
-O numero enviado ao Make passara de `3496322958` para `553496322958`, permitindo que o WhatsApp identifique corretamente o destinatario.
+- Quando `dados.mensagem` estiver preenchido (lembretes, alertas com mensagem customizada): envia texto limpo como `Lembrete: o evento "Compartilhe" acontece hoje, dia 28/02 as 16:00, na Igreja Carvalho. Nos vemos la!`
+- Quando nao houver `dados.mensagem`: mantém o comportamento atual como fallback
