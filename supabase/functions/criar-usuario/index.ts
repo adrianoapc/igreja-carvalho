@@ -1,6 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { resolverWebhookComRemetente } from "../_shared/webhook-resolver.ts";
+import { formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,7 +16,7 @@ function gerarOTP(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-// Salvar OTP no banco e disparar via WhatsApp
+// Salvar OTP no banco e disparar via WhatsApp (direto ao webhook, sem disparar-alerta)
 async function criarEEnviarOTP(
   supabase: any,
   profileId: string,
@@ -44,43 +46,65 @@ async function criarEEnviarOTP(
     return { success: false, error: "Erro ao gerar código de verificação" };
   }
 
-  // Disparar via disparar-alerta
+  // Disparar direto ao webhook Make (bypass do disparar-alerta)
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const telefoneFormatado = formatarParaWhatsApp(telefoneLimpo) || telefoneLimpo;
+    const mensagem = `Olá ${nome}, seu código de verificação é: ${codigo}. Válido por 10 minutos.`;
 
-    const alertaPayload = {
-      evento: "otp_verificacao",
-      dados: {
-        igreja_id: igrejaId,
-        telefone: telefoneLimpo,
-        nome: nome,
-        mensagem: `Olá ${nome}, seu código de verificação é: ${codigo}. Válido por 10 minutos.`,
-        template: "otp_verificacao",
-      },
+    // Resolver webhook da igreja via fallback 3 níveis
+    let webhookUrl: string | null = null;
+    let whatsappRemetente: string | null = null;
+    let whatsappSenderId: string | null = null;
+    let webhookNivel = "fallback_env";
+
+    if (igrejaId) {
+      const resolucao = await resolverWebhookComRemetente(supabase, igrejaId, null, "whatsapp_make");
+      if (resolucao) {
+        webhookUrl = resolucao.webhookUrl;
+        whatsappRemetente = resolucao.whatsappRemetente;
+        whatsappSenderId = resolucao.whatsappSenderId;
+        webhookNivel = resolucao.webhookNivel;
+      }
+    }
+
+    // Fallback para env var global
+    if (!webhookUrl) {
+      webhookUrl = Deno.env.get("MAKE_WEBHOOK_URL") || null;
+      console.log("[OTP] Usando fallback MAKE_WEBHOOK_URL da env var");
+    }
+
+    if (!webhookUrl) {
+      console.warn("[OTP] Nenhum webhook encontrado para enviar OTP. OTP salvo no banco.");
+      return { success: true }; // OTP foi salvo, apenas não enviou WhatsApp
+    }
+
+    const payload = {
+      telefone: telefoneFormatado,
+      nome,
+      mensagem,
+      template: "otp_verificacao",
+      whatsapp_remetente: whatsappRemetente || "",
+      whatsapp_sender_id: whatsappSenderId || "",
+      webhook_nivel: webhookNivel,
+      timestamp: new Date().toISOString(),
     };
 
-    const alertaResponse = await fetch(
-      `${supabaseUrl}/functions/v1/disparar-alerta`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify(alertaPayload),
-      }
-    );
+    console.log(`[OTP] Enviando para webhook (nível: ${webhookNivel}):`, webhookUrl);
 
-    if (!alertaResponse.ok) {
-      const body = await alertaResponse.text();
-      console.warn("Aviso: disparar-alerta retornou erro:", body);
-      // Não falhar por causa do alerta - OTP foi salvo
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      console.warn("[OTP] Webhook retornou erro:", response.status, body);
     } else {
-      console.log("✅ OTP enviado via disparar-alerta");
+      console.log("✅ OTP enviado via webhook direto");
     }
-  } catch (alertaError) {
-    console.warn("Aviso: falha ao chamar disparar-alerta:", alertaError);
+  } catch (error) {
+    console.warn("[OTP] Falha ao enviar via webhook:", error);
   }
 
   return { success: true };
