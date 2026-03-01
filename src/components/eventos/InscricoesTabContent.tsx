@@ -439,6 +439,16 @@ export default function InscricoesTabContent({ eventoId, evento }: InscricoesTab
                             </AvatarFallback>
                           </Avatar>
                           <span className="font-medium">{inscricao.pessoa?.nome}</span>
+                          {checkins.has(inscricao.pessoa_id) ? (
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px] px-1.5 py-0">
+                              <LogIn className="h-3 w-3 mr-0.5" />
+                              Check-in
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                              Pendente
+                            </Badge>
+                          )}
                           {!inscricao.pessoa?.email && !inscricao.pessoa?.telefone && (
                             <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />
                           )}

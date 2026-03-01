@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Camera, Users, UserCheck, Clock } from "lucide-react";
 import { CheckinScanner } from "./CheckinScanner";
-import { CheckinManualSearch } from "./CheckinManualSearch";
-import { CheckinRecentList } from "./CheckinRecentList";
+import { CheckinParticipantsList, type CheckinFiltro } from "./CheckinParticipantsList";
+import { cn } from "@/lib/utils";
 
 interface CheckinTabContentProps {
   eventoId: string;
@@ -15,137 +15,101 @@ interface CheckinTabContentProps {
 
 export function CheckinTabContent({ eventoId }: CheckinTabContentProps) {
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [filtro, setFiltro] = useState<CheckinFiltro>("todos");
   const queryClient = useQueryClient();
 
-  // Estatísticas de check-in - híbrido baseado em requer_inscricao
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["checkin-stats", eventoId],
     queryFn: async () => {
       try {
-        // Buscar dados do evento
         const { data: evento, error: eventoError } = await supabase
           .from("eventos")
           .select("requer_inscricao, tipo")
           .eq("id", eventoId)
           .single();
 
-        if (eventoError) {
-          console.error("Erro ao buscar evento:", eventoError);
-          throw eventoError;
-        }
+        if (eventoError) throw eventoError;
 
         let total = 0;
 
-        // Se requer inscrição, contar inscritos
         if (evento?.requer_inscricao) {
-          const { count: inscritos, error: inscritos_error } = await supabase
+          const { count } = await supabase
             .from("inscricoes_eventos")
             .select("id", { count: "exact", head: true })
             .eq("evento_id", eventoId)
             .is("cancelado_em", null);
-
-          if (inscritos_error) {
-            console.error("Erro ao contar inscritos:", inscritos_error);
-            throw inscritos_error;
-          }
-          total = inscritos || 0;
+          total = count || 0;
         } else {
-          // Se não requer inscrição (tipo culto), contar membros
-          const { count: membros, error: membros_error } = await supabase
+          const { count } = await supabase
             .from("profiles")
             .select("id", { count: "exact", head: true })
             .eq("status", "membro");
-
-          if (membros_error) {
-            console.error("Erro ao contar membros:", membros_error);
-            throw membros_error;
-          }
-          total = membros || 0;
+          total = count || 0;
         }
 
-        // Presentes (sempre da tabela checkins - fonte de verdade)
-        const { count: presentes, error: presentesError } = await supabase
+        const { count: presentes } = await supabase
           .from("checkins")
           .select("id", { count: "exact", head: true })
           .eq("evento_id", eventoId);
 
-        if (presentesError) {
-          console.error("Erro ao contar presentes:", presentesError);
-          throw presentesError;
-        }
-
         const presentes_count = presentes || 0;
         const pendentes = Math.max(0, total - presentes_count);
-
-        console.log("Stats calculados:", { total, presentes_count, pendentes });
 
         return {
           total,
           presentes: presentes_count,
           pendentes,
-          percentual:
-            total > 0 ? Math.round((presentes_count / total) * 100) : 0,
+          percentual: total > 0 ? Math.round((presentes_count / total) * 100) : 0,
         };
       } catch (error) {
         console.error("Erro na query de stats:", error);
         throw error;
       }
     },
-    refetchInterval: 10000, // Atualiza a cada 10 segundos
+    refetchInterval: 10000,
   });
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["checkin-stats", eventoId] });
-    queryClient.invalidateQueries({
-      queryKey: ["checkins-recentes", eventoId],
-    });
+    queryClient.invalidateQueries({ queryKey: ["checkin-participants", eventoId] });
   };
+
+  const toggleFiltro = (f: CheckinFiltro) => {
+    setFiltro((prev) => (prev === f ? "todos" : f));
+  };
+
+  const statCards: { key: CheckinFiltro; label: string; icon: typeof Users; value: number | undefined; colorClass: string }[] = [
+    { key: "todos", label: "Total", icon: Users, value: stats?.total, colorClass: "" },
+    { key: "presentes", label: "Presentes", icon: UserCheck, value: stats?.presentes, colorClass: "text-green-600" },
+    { key: "pendentes", label: "Aguardando", icon: Clock, value: stats?.pendentes, colorClass: "text-orange-600" },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Cards de Estatísticas */}
+      {/* Cards de Estatísticas (filtros clicáveis) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Total Inscritos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {statsLoading ? "-" : stats?.total || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Presentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">
-              {statsLoading ? "-" : stats?.presentes || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Aguardando
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-orange-600">
-              {statsLoading ? "-" : stats?.pendentes || 0}
-            </div>
-          </CardContent>
-        </Card>
+        {statCards.map((c) => (
+          <Card
+            key={c.key}
+            className={cn(
+              "cursor-pointer transition-all hover:shadow-md",
+              filtro === c.key && "ring-2 ring-primary"
+            )}
+            onClick={() => toggleFiltro(c.key)}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <c.icon className="h-4 w-4" />
+                {c.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={cn("text-3xl font-bold", c.colorClass)}>
+                {statsLoading ? "-" : c.value ?? 0}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Barra de Progresso */}
@@ -180,14 +144,12 @@ export function CheckinTabContent({ eventoId }: CheckinTabContentProps) {
         </CardContent>
       </Card>
 
-      {/* Busca Manual */}
-      <CheckinManualSearch
+      {/* Lista Completa de Participantes (com busca integrada) */}
+      <CheckinParticipantsList
         eventoId={eventoId}
+        filtro={filtro}
         onCheckinSuccess={handleRefresh}
       />
-
-      {/* Lista de Check-ins Recentes */}
-      <CheckinRecentList eventoId={eventoId} />
 
       {/* Modal do Scanner */}
       <CheckinScanner
