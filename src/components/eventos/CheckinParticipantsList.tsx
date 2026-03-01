@@ -269,12 +269,15 @@ export function CheckinParticipantsList({
 
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate text-sm">{p.nome}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                       {p.telefone && (
                         <span className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />
                           {p.telefone}
                         </span>
+                      )}
+                      {p.email && (
+                        <span className="truncate">{p.email}</span>
                       )}
                       {isPresent && p.checkin_at && (
                         <span>
