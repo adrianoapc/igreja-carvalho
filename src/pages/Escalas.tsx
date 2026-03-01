@@ -22,9 +22,12 @@ import {
   CheckCircle2,
   AlertTriangle,
   MessageCircle,
+  Shield,
+  Eye,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTimePermission } from "@/hooks/useTimePermission";
 
 interface Time {
   id: string;
@@ -66,6 +69,7 @@ export default function Escalas() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
   const queryClient = useQueryClient();
+  const { isAdmin, visibleTimeIds, canEdit, getTimeRole, loading: permLoading } = useTimePermission();
 
   const mesAtual = format(currentDate, "MMMM yyyy", { locale: ptBR });
   const inicioMes = startOfMonth(currentDate);
@@ -73,10 +77,10 @@ export default function Escalas() {
 
   // Carregamento inicial de times
   useEffect(() => {
-    if (!loading && igrejaId) {
+    if (!loading && !permLoading && igrejaId) {
       loadTimes();
     }
-  }, [loading, igrejaId]);
+  }, [loading, permLoading, igrejaId, visibleTimeIds]);
 
   // Carregamento de membros quando time muda
   useEffect(() => {
@@ -111,9 +115,14 @@ export default function Escalas() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setTimes(data || []);
-      if (data && data.length > 0) {
-        setTimeSelecionado(data[0].id);
+      // Filtrar times pelo vínculo do usuário (admin vê todos)
+      const allTimes = data || [];
+      const filtered = isAdmin
+        ? allTimes
+        : allTimes.filter((t) => visibleTimeIds.includes(t.id));
+      setTimes(filtered);
+      if (filtered.length > 0) {
+        setTimeSelecionado(filtered[0].id);
       }
     } catch (error: unknown) {
       toast.error("Erro ao carregar times", {
@@ -230,6 +239,8 @@ export default function Escalas() {
   };
 
   const timeAtual = times.find((t) => t.id === timeSelecionado);
+  const canEditCurrentTime = timeSelecionado === "todos" ? isAdmin : canEdit(timeSelecionado);
+  const currentTimeRole = timeSelecionado === "todos" ? (isAdmin ? "admin" : null) : getTimeRole(timeSelecionado);
 
   const handleToggleEscala = async (
     pessoaId: string,
@@ -296,14 +307,16 @@ export default function Escalas() {
             Monte as escalas do mês inteiro
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleNotificarPendentes}
-          className="gap-2 w-full md:w-auto justify-center md:justify-start"
-        >
-          <MessageCircle className="h-4 w-4 flex-shrink-0" />
-          <span className="truncate">Notificar Pendentes</span>
-        </Button>
+        {canEditCurrentTime && (
+          <Button
+            variant="outline"
+            onClick={handleNotificarPendentes}
+            className="gap-2 w-full md:w-auto justify-center md:justify-start"
+          >
+            <MessageCircle className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Notificar Pendentes</span>
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -336,12 +349,14 @@ export default function Escalas() {
             <SelectValue placeholder="Selecione o time" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Todos os Times
-              </div>
-            </SelectItem>
+            {isAdmin && (
+              <SelectItem value="todos">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Todos os Times
+                </div>
+              </SelectItem>
+            )}
             {times.map((time) => (
               <SelectItem key={time.id} value={time.id}>
                 <div className="flex items-center gap-2">
@@ -399,6 +414,14 @@ export default function Escalas() {
                 />
               )}
               <span className="truncate">{timeAtual?.nome}</span>
+              {currentTimeRole && currentTimeRole !== "admin" && (
+                <Badge variant="outline" className="text-xs whitespace-nowrap gap-1">
+                  {currentTimeRole === "lider" && <Shield className="h-3 w-3" />}
+                  {currentTimeRole === "sublider" && <Shield className="h-3 w-3" />}
+                  {currentTimeRole === "membro" && <Eye className="h-3 w-3" />}
+                  {currentTimeRole === "lider" ? "Líder" : currentTimeRole === "sublider" ? "Sublíder" : "Membro"}
+                </Badge>
+              )}
               <Badge
                 variant="secondary"
                 className="text-xs whitespace-nowrap ml-auto"
@@ -479,6 +502,7 @@ export default function Escalas() {
                               <div className="flex items-center justify-center gap-1">
                                 <Checkbox
                                   checked={escalado}
+                                  disabled={!canEditCurrentTime}
                                   onCheckedChange={() =>
                                     handleToggleEscala(
                                       membro.pessoa_id,
