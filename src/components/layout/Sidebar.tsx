@@ -125,13 +125,13 @@ const MENU_GROUPS: MenuGroup[] = [
         title: "Eventos › Gestão",
         url: "/eventos",
         icon: CalendarDays,
-        permission: "ministerio.view",
+        permission: "eventos.view",
       },
       {
         title: "Eventos › Chamada",
         url: "/chamada",
         icon: ClipboardCheck,
-        permission: "ministerio.view",
+        permission: "eventos.view",
       },
       {
         title: "Ensino & Discipulado",

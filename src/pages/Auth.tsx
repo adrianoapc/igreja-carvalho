@@ -21,6 +21,7 @@ import { checkIsSuperAdmin, getPreferredContext } from "@/utils/checkSuperAdminR
 
 type AuthView = "login" | "forgot-password" | "signup" | "phone-otp";
 type LoginMethod = "email" | "phone";
+type RecoveryMethod = "email" | "whatsapp";
 
 // Validação de email simples
 const isValidEmail = (email: string): boolean => {
@@ -45,6 +46,8 @@ export default function Auth() {
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [authView, setAuthView] = useState<AuthView>("login");
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
+  const [recoveryMethod, setRecoveryMethod] = useState<RecoveryMethod>("email");
+  const [recoveryPhone, setRecoveryPhone] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [phoneForOtp, setPhoneForOtp] = useState("");
   
@@ -384,7 +387,7 @@ export default function Auth() {
         .single();
 
       if (profile?.deve_trocar_senha) {
-        navigate("/trocar-senha", { replace: true });
+        navigate("/forced-password-change", { replace: true });
         return;
       }
 
@@ -575,7 +578,7 @@ export default function Auth() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
-        redirectTo: `${window.location.origin}/auth/reset`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) throw error;
@@ -595,6 +598,51 @@ export default function Auth() {
         description: authError.description,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleWhatsAppRecovery = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const phone = recoveryPhone.replace(/\D/g, "");
+    if (!phone || phone.length < 10) {
+      toast({ title: "Telefone inválido", description: "Digite um telefone válido.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/criar-usuario`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "recovery_otp", telefone: phone }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Erro ao enviar código");
+      }
+
+      toast({
+        title: "Código enviado!",
+        description: "Se o telefone estiver cadastrado, um código será enviado via WhatsApp.",
+      });
+
+      // Redirecionar para definir-senha
+      window.location.href = "/definir-senha";
+    } catch (error: unknown) {
+      toast({
+        title: "Código enviado!",
+        description: "Se o telefone estiver cadastrado, um código será enviado via WhatsApp.",
+      });
+      window.location.href = "/definir-senha";
     } finally {
       setIsLoading(false);
     }
@@ -868,41 +916,109 @@ export default function Auth() {
               </CardTitle>
             </div>
             <CardDescription>
-              Digite seu email para receber o link de recuperação
+              Escolha como deseja recuperar sua senha
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleForgotPassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="recovery-email">Email</Label>
-                <Input
-                  id="recovery-email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={recoveryEmail}
-                  onChange={(e) => setRecoveryEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </div>
+            {/* Tabs de método de recuperação */}
+            <div className="flex gap-2 mb-4">
               <Button
-                type="submit"
-                className="w-full bg-gradient-primary"
-                disabled={isLoading}
+                type="button"
+                variant={recoveryMethod === "email" ? "default" : "outline"}
+                size="sm"
+                className="flex-1"
+                onClick={() => setRecoveryMethod("email")}
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="w-4 h-4 mr-2" />
-                    Enviar link de recuperação
-                  </>
-                )}
+                <Mail className="w-4 h-4 mr-1" />
+                Email
               </Button>
-            </form>
+              <Button
+                type="button"
+                variant={recoveryMethod === "whatsapp" ? "default" : "outline"}
+                size="sm"
+                className="flex-1"
+                onClick={() => setRecoveryMethod("whatsapp")}
+              >
+                <MessageSquare className="w-4 h-4 mr-1" />
+                WhatsApp
+              </Button>
+            </div>
+
+            {recoveryMethod === "email" ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="recovery-email">Email</Label>
+                  <Input
+                    id="recovery-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={recoveryEmail}
+                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-primary"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Enviar link de recuperação
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleWhatsAppRecovery} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="recovery-phone">Telefone cadastrado</Label>
+                  <InputMask
+                    mask="(99) 99999-9999"
+                    value={recoveryPhone}
+                    onChange={(e) => setRecoveryPhone(e.target.value)}
+                    disabled={isLoading}
+                  >
+                    {(inputProps: React.InputHTMLAttributes<HTMLInputElement>) => (
+                      <Input
+                        {...inputProps}
+                        id="recovery-phone"
+                        type="tel"
+                        placeholder="(11) 99999-9999"
+                        required
+                      />
+                    )}
+                  </InputMask>
+                  <p className="text-xs text-muted-foreground">
+                    Um código será enviado para o WhatsApp deste número.
+                  </p>
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-primary"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Enviar código via WhatsApp
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>

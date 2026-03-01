@@ -27,6 +27,7 @@ const Install = lazy(() => import("./pages/Install"));
 const BiometricLogin = lazy(() => import("./pages/BiometricLogin"));
 const ContextSelect = lazy(() => import("./pages/ContextSelect"));
 const ForcedPasswordChange = lazy(() => import("./pages/ForcedPasswordChange"));
+const DefinirSenha = lazy(() => import("./pages/DefinirSenha"));
 const ReviewPage = lazy(() => import("./pages/ReviewPage"));
 
 // Módulos
@@ -253,6 +254,7 @@ const App = () => (
                   path="/forced-password-change"
                   element={<ForcedPasswordChange />}
                 />
+                <Route path="/definir-senha" element={<DefinirSenha />} />
                 <Route path="/maintenance" element={<Maintenance />} />
                 {/* Rota removida: /financas/config-formas-pagamento (unificada em FormasPagamento) */}
                 <Route path="/install" element={<Install />} />

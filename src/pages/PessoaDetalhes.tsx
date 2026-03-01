@@ -1143,6 +1143,8 @@ export default function PessoaDetalhes() {
             pessoaId={pessoa.id}
             pessoaNome={pessoa.nome}
             pessoaEmail={pessoa.email}
+            pessoaTelefone={pessoa.telefone}
+            pessoaIgrejaId={(pessoa as any).igreja_id}
             onSuccess={fetchPessoa}
           />
 
@@ -1152,6 +1154,8 @@ export default function PessoaDetalhes() {
             pessoaId={pessoa.id}
             pessoaNome={pessoa.nome}
             pessoaEmail={pessoa.email}
+            pessoaTelefone={pessoa.telefone}
+            pessoaIgrejaId={(pessoa as any).igreja_id}
             onSuccess={fetchPessoa}
           />
         </>

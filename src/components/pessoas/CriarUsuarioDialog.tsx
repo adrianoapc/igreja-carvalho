@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertCircle, CheckCircle, Copy } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle, Copy, MessageSquare } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
@@ -28,6 +28,8 @@ interface CriarUsuarioDialogProps {
   pessoaId: string;
   pessoaNome: string;
   pessoaEmail: string | null;
+  pessoaTelefone?: string | null;
+  pessoaIgrejaId?: string | null;
   onSuccess?: () => void;
 }
 
@@ -37,6 +39,8 @@ export function CriarUsuarioDialog({
   pessoaId,
   pessoaNome,
   pessoaEmail,
+  pessoaTelefone,
+  pessoaIgrejaId,
   onSuccess,
 }: CriarUsuarioDialogProps) {
   const { toast } = useToast();
@@ -46,6 +50,7 @@ export function CriarUsuarioDialog({
     sucesso: boolean;
     mensagem: string;
     detalhes?: string;
+    otpEnviado?: boolean;
   } | null>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -66,20 +71,12 @@ export function CriarUsuarioDialog({
 
   const handleCriarUsuario = async () => {
     if (!email.trim()) {
-      toast({
-        title: "Email obrigatório",
-        description: "Por favor, preencha o email da pessoa.",
-        variant: "destructive",
-      });
+      toast({ title: "Email obrigatório", description: "Por favor, preencha o email da pessoa.", variant: "destructive" });
       return;
     }
 
     if (!validarEmail(email)) {
-      toast({
-        title: "Email inválido",
-        description: "Por favor, insira um email válido.",
-        variant: "destructive",
-      });
+      toast({ title: "Email inválido", description: "Por favor, insira um email válido.", variant: "destructive" });
       return;
     }
 
@@ -87,23 +84,22 @@ export function CriarUsuarioDialog({
     try {
       const senhaTemporaria = gerarSenhaTemporaria();
 
-      // Chamar Edge Function para criar usuário (método recomendado pelo Supabase)
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/criar-usuario`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${
-              (await supabase.auth.getSession()).data.session?.access_token ||
-              ""
-            }`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ""}`,
           },
           body: JSON.stringify({
             action: "create_user",
             profile_id: pessoaId,
             email: email,
             password: senhaTemporaria,
+            telefone: pessoaTelefone,
+            nome: pessoaNome,
+            igreja_id: pessoaIgrejaId,
           }),
         }
       );
@@ -114,29 +110,32 @@ export function CriarUsuarioDialog({
         throw new Error(result.error || "Erro ao criar usuário");
       }
 
-      setResultado({
-        sucesso: true,
-        mensagem: `Usuário criado com sucesso para ${pessoaNome}!`,
-        detalhes: `Email: ${email}\nSenha temporária: ${senhaTemporaria}\n\nA pessoa será solicitada a mudar a senha no primeiro acesso.`,
-      });
+      if (result.otp_enviado) {
+        // OTP enviado via WhatsApp
+        setResultado({
+          sucesso: true,
+          otpEnviado: true,
+          mensagem: `Usuário criado para ${pessoaNome}!`,
+          detalhes: `Um código de verificação foi enviado para o WhatsApp de ${pessoaNome}. A pessoa deve acessar a tela "Definir Senha" para criar sua senha.`,
+        });
+      } else {
+        // Fallback sem telefone - mostrar senha temporária
+        setResultado({
+          sucesso: true,
+          otpEnviado: false,
+          mensagem: `Usuário criado com sucesso para ${pessoaNome}!`,
+          detalhes: `Email: ${email}\nSenha temporária: ${senhaTemporaria}\n\nA pessoa será solicitada a mudar a senha no primeiro acesso.`,
+        });
+      }
 
-      toast({
-        title: "Usuário criado",
-        description: `Acesso criado para ${pessoaNome}. Copie os dados acima.`,
-      });
+      toast({ title: "Usuário criado", description: `Acesso criado para ${pessoaNome}.` });
 
       if (onSuccess) {
         onSuccess();
       }
-
-      // Fechar diálogo automaticamente após 3 segundos
-      setTimeout(() => {
-        handleFechar();
-      }, 3000);
     } catch (error) {
       console.error("Erro ao criar usuário:", error);
-      const mensagem =
-        error instanceof Error ? error.message : "Erro desconhecido";
+      const mensagem = error instanceof Error ? error.message : "Erro desconhecido";
 
       setResultado({
         sucesso: false,
@@ -144,11 +143,7 @@ export function CriarUsuarioDialog({
         detalhes: mensagem,
       });
 
-      toast({
-        title: "Erro",
-        description: mensagem,
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: mensagem, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -156,10 +151,7 @@ export function CriarUsuarioDialog({
 
   const copiarParaClipboard = (texto: string) => {
     navigator.clipboard.writeText(texto);
-    toast({
-      title: "Copiado!",
-      description: "Credenciais copiadas para a área de transferência.",
-    });
+    toast({ title: "Copiado!", description: "Credenciais copiadas para a área de transferência." });
   };
 
   const handleFechar = () => {
@@ -181,18 +173,16 @@ export function CriarUsuarioDialog({
           >
             <div className="flex items-start gap-3">
               {resultado.sucesso ? (
-                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                resultado.otpEnviado ? (
+                  <MessageSquare className="h-5 w-5 text-green-600 mt-0.5" />
+                ) : (
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                )
               ) : (
                 <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
               )}
               <div>
-                <p
-                  className={
-                    resultado.sucesso
-                      ? "font-semibold text-green-900"
-                      : "font-semibold text-red-900"
-                  }
-                >
+                <p className={resultado.sucesso ? "font-semibold text-green-900" : "font-semibold text-red-900"}>
                   {resultado.mensagem}
                 </p>
                 {resultado.detalhes && (
@@ -204,32 +194,17 @@ export function CriarUsuarioDialog({
             </div>
           </Alert>
 
-          {resultado.sucesso && resultado.detalhes && (
-            <Button
-              onClick={() => copiarParaClipboard(resultado.detalhes!)}
-              variant="outline"
-              className="w-full"
-            >
+          {resultado.sucesso && !resultado.otpEnviado && resultado.detalhes && (
+            <Button onClick={() => copiarParaClipboard(resultado.detalhes!)} variant="outline" className="w-full">
               <Copy className="w-4 h-4 mr-2" />
               Copiar Credenciais
             </Button>
           )}
 
           <div className="flex gap-2 pt-4">
-            <Button variant="ghost" onClick={handleFechar} className="flex-1">
+            <Button onClick={handleFechar} className="flex-1">
               Fechar
             </Button>
-            {resultado.sucesso && (
-              <Button
-                onClick={() => {
-                  setResultado(null);
-                  setEmail(pessoaEmail || "");
-                }}
-                className="flex-1"
-              >
-                Criar Outro
-              </Button>
-            )}
           </div>
         </div>
       ) : (
@@ -252,28 +227,27 @@ export function CriarUsuarioDialog({
             )}
           </div>
 
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Uma senha temporária será gerada. O usuário será obrigado a criar
-              uma nova senha no primeiro acesso.
-            </AlertDescription>
-          </Alert>
+          {pessoaTelefone ? (
+            <Alert className="border-blue-500 bg-blue-50">
+              <MessageSquare className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-900">
+                Um código de verificação será enviado via WhatsApp para que a pessoa defina sua própria senha.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Sem telefone cadastrado. Uma senha temporária será gerada e o usuário deverá trocá-la no primeiro acesso.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="flex gap-2 pt-4">
-            <Button
-              variant="ghost"
-              onClick={handleFechar}
-              disabled={isLoading}
-              className="flex-1"
-            >
+            <Button variant="ghost" onClick={handleFechar} disabled={isLoading} className="flex-1">
               Cancelar
             </Button>
-            <Button
-              onClick={handleCriarUsuario}
-              disabled={isLoading || !email.trim()}
-              className="flex-1"
-            >
+            <Button onClick={handleCriarUsuario} disabled={isLoading || !email.trim()} className="flex-1">
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

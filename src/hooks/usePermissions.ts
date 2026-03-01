@@ -13,7 +13,11 @@ export type Permission =
   | "configuracoes.view"
   | "ensino.view"
   | "filiais.view"
-  | "filiais.manage";
+  | "filiais.manage"
+  | "eventos.view"
+  | "eventos.admin"
+  | "cultos.view"
+  | "cultos.admin";
 
 /**
  * Hook simplificado que consome dados do AuthContext
@@ -52,6 +56,20 @@ export function usePermissions() {
         case "filiais.view":
         case "filiais.manage":
           return roles.includes("admin");
+        case "eventos.view":
+        case "eventos.admin":
+          return (
+            roles.includes("admin") ||
+            roles.includes("pastor") ||
+            roles.includes("lider")
+          );
+        case "cultos.view":
+        case "cultos.admin":
+          return (
+            roles.includes("admin") ||
+            roles.includes("pastor") ||
+            roles.includes("lider")
+          );
         default:
           return false;
       }

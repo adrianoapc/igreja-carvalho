@@ -6422,6 +6422,74 @@ export type Database = {
           },
         ]
       }
+      otp_verificacao: {
+        Row: {
+          codigo: string
+          created_at: string | null
+          expira_em: string
+          id: string
+          igreja_id: string | null
+          profile_id: string | null
+          telefone: string | null
+          tentativas: number | null
+          tipo: string
+          usado: boolean | null
+        }
+        Insert: {
+          codigo: string
+          created_at?: string | null
+          expira_em: string
+          id?: string
+          igreja_id?: string | null
+          profile_id?: string | null
+          telefone?: string | null
+          tentativas?: number | null
+          tipo: string
+          usado?: boolean | null
+        }
+        Update: {
+          codigo?: string
+          created_at?: string | null
+          expira_em?: string
+          id?: string
+          igreja_id?: string | null
+          profile_id?: string | null
+          telefone?: string | null
+          tentativas?: number | null
+          tipo?: string
+          usado?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "otp_verificacao_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_verificacao_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_tecnico_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_verificacao_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "view_absent_kids"
+            referencedColumns: ["child_id"]
+          },
+          {
+            foreignKeyName: "otp_verificacao_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "view_health_score"
+            referencedColumns: ["pessoa_id"]
+          },
+        ]
+      }
       pedidos_oracao: {
         Row: {
           analise_ia_gravidade: string | null
