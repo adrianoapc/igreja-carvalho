@@ -11674,6 +11674,17 @@ export type Database = {
         Args: { _module_name: string; _user_id: string }
         Returns: Database["public"]["Enums"]["access_level"]
       }
+      get_user_time_role: {
+        Args: { p_pessoa_id: string; p_time_id: string }
+        Returns: string
+      }
+      get_user_times: {
+        Args: { p_pessoa_id: string }
+        Returns: {
+          role: string
+          time_id: string
+        }[]
+      }
       get_webhook_secret: {
         Args: { p_encryption_key: string; p_igreja_id: string; p_tipo: string }
         Returns: string
