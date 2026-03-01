@@ -198,7 +198,8 @@ async function dispararWhatsAppMultiTenant(
   mensagem: string,
   evento: string,
   templateMeta?: string | null,
-  filialId?: string | null
+  filialId?: string | null,
+  nome?: string | null
 ): Promise<boolean> {
   if (!telefone) {
     console.warn("Telefone não disponível, pulando WhatsApp");
@@ -225,8 +226,9 @@ async function dispararWhatsAppMultiTenant(
 
     try {
       const telefoneWhatsApp = formatarParaWhatsApp(telefone) || telefone;
-      const payload = {
+      const payload: Record<string, unknown> = {
         telefone: telefoneWhatsApp,
+        nome: nome || null,
         whatsapp_remetente: resolucao.whatsappRemetente,
         whatsapp_sender_id: resolucao.whatsappSenderId,
         mensagem,
@@ -729,7 +731,8 @@ serve(async (req) => {
               mensagem,
               evento,
               templateMeta,
-              dados.filial_id || null
+              dados.filial_id || null,
+              dados.nome || destinatario.nome || null
             );
           } else {
             // Fallback legado (env var global)

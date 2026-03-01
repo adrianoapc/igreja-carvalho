@@ -48,7 +48,7 @@ export function useAuth() {
     if (type === "recovery" && accessToken) {
       // Se estamos no domínio errado (Lovable), redirecionar para o domínio de produção
       if (isOnWrongDomain) {
-        const redirectUrl = `https://${productionDomain}/auth/reset${window.location.hash}`;
+        const redirectUrl = `https://${productionDomain}/reset-password${window.location.hash}`;
         window.location.href = redirectUrl;
         return;
       }
@@ -66,7 +66,7 @@ export function useAuth() {
       // Detectar evento de recuperação de senha
       if (event === "PASSWORD_RECOVERY") {
         // Redirecionar para a página de reset de senha
-        window.location.href = "/auth/reset";
+        window.location.href = "/reset-password";
         return;
       }
 
