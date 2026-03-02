@@ -12,6 +12,7 @@ import {
   X,
   Trash2,
   Crown,
+  Star,
 } from "lucide-react";
 import {
   Collapsible,
@@ -37,6 +38,7 @@ import TimeDialog from "@/components/eventos/TimeDialog";
 import GerenciarTimeDialog from "@/components/eventos/GerenciarTimeDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useTimePermission } from "@/hooks/useTimePermission";
 
 interface Membro {
   id: string;
@@ -91,6 +93,8 @@ export default function Times() {
   );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timeDeletando, setTimeDeletando] = useState<Time | null>(null);
+
+  const { isAdmin, userTimes, canEdit: canEditTime, getTimeRole, loading: permLoading } = useTimePermission();
 
   useEffect(() => {
     loadTimes();
@@ -185,7 +189,15 @@ export default function Times() {
 
   const normalizedSearch = useMemo(() => normalize(searchTerm), [searchTerm]);
 
+  // Filtrar times por vínculo do usuário (Camada 2)
+  const visibleTimeIds = useMemo(() => new Set(userTimes.map(t => t.time_id)), [userTimes]);
+
   const timesFiltrados = times
+    .filter((t) => {
+      // Camada 2: admin vê tudo, outros veem apenas times vinculados
+      if (!isAdmin && !permLoading && !visibleTimeIds.has(t.id)) return false;
+      return true;
+    })
     .filter(
       (t) => categoriaFiltro === "todos" || t.categoria === categoriaFiltro
     )
@@ -305,14 +317,16 @@ export default function Times() {
             Gerencie as equipes e departamentos
           </p>
         </div>
-        <Button
-          className="bg-gradient-primary shadow-soft w-full sm:w-auto"
-          onClick={handleNovoTime}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          <span className="hidden sm:inline">Novo Time</span>
-          <span className="sm:hidden">Adicionar</span>
-        </Button>
+        {isAdmin && (
+          <Button
+            className="bg-gradient-primary shadow-soft w-full sm:w-auto"
+            onClick={handleNovoTime}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Novo Time</span>
+            <span className="sm:hidden">Adicionar</span>
+          </Button>
+        )}
       </div>
 
       {/* Campo de Busca */}
@@ -429,6 +443,28 @@ export default function Times() {
                                 }
                               </Badge>
                             )}
+                            {/* Badges contextuais */}
+                            {(() => {
+                              const role = getTimeRole(time.id);
+                              if (role === "lider") return (
+                                <Badge className="text-xs bg-amber-500 hover:bg-amber-600">
+                                  <Crown className="w-3 h-3 mr-1" />
+                                  Líder
+                                </Badge>
+                              );
+                              if (role === "sublider") return (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Star className="w-3 h-3 mr-1" />
+                                  Sub-líder
+                                </Badge>
+                              );
+                              if (role === "membro") return (
+                                <Badge variant="outline" className="text-xs">
+                                  Meu Time
+                                </Badge>
+                              );
+                              return null;
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -439,41 +475,47 @@ export default function Times() {
                         >
                           {time.ativo ? "Ativo" : "Inativo"}
                         </Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs md:text-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditarTime(time);
-                          }}
-                        >
-                          <Edit className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
-                          <span className="hidden md:inline">Editar</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs md:text-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGerenciarTime(time);
-                          }}
-                        >
-                          <Settings className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
-                          <span className="hidden md:inline">Gerenciar</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs md:text-sm text-destructive hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExcluirTime(time);
-                          }}
-                        >
-                          <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
-                        </Button>
+                        {(isAdmin || canEditTime(time.id)) && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs md:text-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditarTime(time);
+                              }}
+                            >
+                              <Edit className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
+                              <span className="hidden md:inline">Editar</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs md:text-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGerenciarTime(time);
+                              }}
+                            >
+                              <Settings className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
+                              <span className="hidden md:inline">Gerenciar</span>
+                            </Button>
+                          </>
+                        )}
+                        {isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs md:text-sm text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExcluirTime(time);
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 

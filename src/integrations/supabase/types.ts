@@ -11726,6 +11726,10 @@ export type Database = {
         Args: { p_ativo: boolean; p_expires_at: string; p_scheduled_at: string }
         Returns: boolean
       }
+      is_time_leader: {
+        Args: { p_time_id: string; p_user_id: string }
+        Returns: boolean
+      }
       listar_transferencias_dessincronizadas: {
         Args: { p_filial_id?: string; p_igreja_id: string; p_limite?: number }
         Returns: {
