@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useTimePermission } from "@/hooks/useTimePermission";
 
 interface Props {
   pessoaId: string;
@@ -55,6 +56,22 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
   const [timesOpen, setTimesOpen] = useState(true);
   const [escalasOpen, setEscalasOpen] = useState(true);
   const { toast } = useToast();
+  const { isAdmin, visibleTimeIds, loading: permLoading } = useTimePermission();
+
+  // Filtra times e escalas pelo vínculo do usuário logado (Camada 2)
+  const visibleSet = useMemo(() => new Set(visibleTimeIds), [visibleTimeIds]);
+  const filteredTimes = useMemo(() => 
+    isAdmin ? times : times.filter(t => visibleSet.has(t.id)), 
+    [isAdmin, times, visibleSet]
+  );
+  const filteredEscalas = useMemo(() => 
+    isAdmin ? escalas : escalas.filter(e => {
+      // Filtra escalas cujo time o usuário tem acesso
+      const timeMatch = times.find(t => t.nome === e.time_nome);
+      return timeMatch ? visibleSet.has(timeMatch.id) : false;
+    }),
+    [isAdmin, escalas, times, visibleSet]
+  );
 
   useEffect(() => {
     loadData();
@@ -260,7 +277,7 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
                 </div>
                 <div className="min-w-0">
                   <CardTitle className="text-base md:text-lg truncate">Times</CardTitle>
-                  <p className="text-xs text-muted-foreground">{times.length} time{times.length !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-muted-foreground">{filteredTimes.length} time{filteredTimes.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
               <CollapsibleTrigger asChild>
@@ -272,13 +289,13 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="p-4 md:p-5">
-              {times.length === 0 ? (
+              {filteredTimes.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  Não participa de nenhum time
+                  {times.length > 0 ? "Sem permissão para visualizar os times deste membro" : "Não participa de nenhum time"}
                 </p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {times.map((time) => (
+                  {filteredTimes.map((time) => (
                     <div
                       key={time.id}
                       className="flex items-center gap-3 p-3 sm:p-4 rounded-lg bg-muted/50 border transition-colors hover:bg-muted"
@@ -333,7 +350,7 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
                 </div>
                 <div className="min-w-0">
                   <CardTitle className="text-base md:text-lg truncate">Escalas Futuras</CardTitle>
-                  <p className="text-xs text-muted-foreground">{escalas.length} escalada{escalas.length !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-muted-foreground">{filteredEscalas.length} escalada{filteredEscalas.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
               <CollapsibleTrigger asChild>
@@ -345,13 +362,13 @@ export function VidaIgrejaEnvolvimento({ pessoaId }: Props) {
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="p-4 md:p-5">
-              {escalas.length === 0 ? (
+              {filteredEscalas.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Nenhuma escala futura agendada
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {escalas.map((escala) => (
+                  {filteredEscalas.map((escala) => (
                     <div
                       key={escala.id}
                       className="flex flex-col sm:flex-row sm:items-start gap-3 p-3 sm:p-4 rounded-lg bg-muted/50 border hover:bg-muted/70 transition-colors"
