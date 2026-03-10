@@ -60,7 +60,7 @@ export default function Auth() {
   
   // Estado para cooldown de reenvio OTP
   const [otpCooldown, setOtpCooldown] = useState(0);
-  const cooldownRef = useRef<NodeJS.Timeout | null>(null);
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const { 
     isSupported, 
