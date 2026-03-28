@@ -424,8 +424,7 @@ Deno.serve(async (req) => {
         .select(
           "id, nome, telefone, email, sexo, data_nascimento, estado_civil, necessidades_especiais, cep, cidade, bairro, estado, endereco, profissao, status, igreja_id, filial_id, user_id",
         )
-        .in("status", ["membro", "visitante", "frequentador"])
-        .single();
+        .in("status", ["membro", "visitante", "frequentador"]);
 
       profileQuery = applyTenantFilters(profileQuery, buscaData);
       if (emailBusca) {
@@ -434,7 +433,7 @@ Deno.serve(async (req) => {
         profileQuery = profileQuery.eq("telefone", telefoneBusca);
       }
 
-      const { data: profile, error } = await profileQuery;
+      const { data: profile, error } = await profileQuery.maybeSingle();
 
       if (error || !profile) {
         // Security: Log failed lookup attempts for audit
