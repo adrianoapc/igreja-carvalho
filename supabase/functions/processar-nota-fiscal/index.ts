@@ -415,7 +415,7 @@ serve(async (req) => {
     }
 
     // Use service role client to fetch config and financial options
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseService2 = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log(`[${FUNCTION_NAME}] Igreja ID: ${igrejaId}`);
 
