@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, QrCode, Link2, Heart, Users, UserPlus } from "lucide-react";
+import { Copy, QrCode, Link2, Heart, Users, UserPlus, Coffee, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
-import { generateShortUrl } from "@/lib/shortLinkUtils";
 
 export function LinksExternosCard() {
   const { toast } = useToast();
@@ -25,24 +24,18 @@ export function LinksExternosCard() {
     title: string;
     url: string;
   } | null>(null);
-  const [shortLinks, setShortLinks] = useState<Record<string, string>>({});
-  const { igrejaId, filialId, isAllFiliais } = useAuthContext();
+  const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
 
   const baseUrl = window.location.origin;
 
-  const buildContextParams = () => {
+  const withContext = useCallback((
+    path: string,
+    extra?: Record<string, string | boolean>
+  ) => {
     const params = new URLSearchParams();
     if (igrejaId) params.set("igreja_id", igrejaId);
     if (!isAllFiliais && filialId) params.set("filial_id", filialId);
     if (isAllFiliais) params.set("todas_filiais", "true");
-    return params.toString();
-  };
-
-  const withContext = (
-    path: string,
-    extra?: Record<string, string | boolean>
-  ) => {
-    const params = new URLSearchParams(buildContextParams());
     if (extra) {
       Object.entries(extra).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -55,7 +48,7 @@ export function LinksExternosCard() {
     return query
       ? `${baseUrl}${path}${separator}${query}`
       : `${baseUrl}${path}`;
-  };
+  }, [baseUrl, igrejaId, filialId, isAllFiliais]);
 
   const links = useMemo(
     () => [
@@ -93,22 +86,27 @@ export function LinksExternosCard() {
           "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
         linkType: "membro" as const,
       },
+      {
+        title: "Link Café V&P",
+        description: "Cadastro guiado de recepção para novos membros",
+        url: withContext("/cadastro/cafe-vp"),
+        icon: Coffee,
+        color:
+          "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400",
+        linkType: "cafe_vp" as const,
+      },
+      {
+        title: "Link QR Café V&P (Recepção)",
+        description: "Versão ideal para pôster/TV no dia do encontro",
+        url: withContext("/cadastro/cafe-vp", { origem: "qr" }),
+        icon: Sparkles,
+        color:
+          "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/20 dark:text-fuchsia-300",
+        linkType: "cafe_vp_qr" as const,
+      },
     ],
-    [baseUrl, igrejaId, filialId, isAllFiliais]
+    [withContext]
   );
-
-  useEffect(() => {
-    if (!igrejaId || isAllFiliais || !filialId) return;
-
-    // Gerar slugs curtos localmente (determinísticos)
-    links.forEach((link) => {
-      const shortUrl = generateShortUrl(baseUrl, filialId, link.linkType);
-      setShortLinks((prev) => ({
-        ...prev,
-        [link.url]: shortUrl,
-      }));
-    });
-  }, [links, igrejaId, filialId, isAllFiliais, baseUrl]);
 
   const copyToClipboard = async (url: string, title: string) => {
     try {
@@ -171,7 +169,13 @@ export function LinksExternosCard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
-          {isAllFiliais ? (
+          {loading ? (
+            <div className="p-4 bg-muted/50 border border-border rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                Carregando contexto da igreja para gerar links externos...
+              </p>
+            </div>
+          ) : isAllFiliais || !igrejaId || !filialId ? (
             <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 <strong>⚠️ Selecione uma filial</strong> para gerar links de
@@ -184,7 +188,7 @@ export function LinksExternosCard() {
             <div className="space-y-3">
               {links.map((link) => {
                 const Icon = link.icon;
-                const finalUrl = shortLinks[link.url] ?? link.url;
+                const finalUrl = link.url;
                 return (
                   <div
                     key={link.title}
@@ -200,9 +204,14 @@ export function LinksExternosCard() {
                       <p className="text-xs text-muted-foreground">
                         {link.description}
                       </p>
-                      <p className="text-xs text-primary truncate mt-1">
+                      <a
+                        href={finalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary truncate mt-1 block underline"
+                      >
                         {finalUrl}
-                      </p>
+                      </a>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
                       <Button

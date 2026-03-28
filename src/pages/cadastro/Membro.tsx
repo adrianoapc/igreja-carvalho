@@ -9,13 +9,29 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CheckCircle, Search, ArrowLeft, UserPlus, AlertCircle } from "lucide-react";
 import InputMask from "react-input-mask";
+import { useSearchParams } from "react-router-dom";
 
 type Step = "search" | "form" | "success" | "pending" | "not_found" | "new_register";
 
 export default function CadastroMembro() {
+  const [searchParams] = useSearchParams();
+  const igrejaIdParam = searchParams.get("igreja_id");
+  const filialIdParam = searchParams.get("filial_id");
+  const todasFiliaisParam = searchParams.get("todas_filiais") === "true";
+
+  const buildCadastroBackLink = () => {
+    const params = new URLSearchParams();
+    if (igrejaIdParam) params.set("igreja_id", igrejaIdParam);
+    if (filialIdParam) params.set("filial_id", filialIdParam);
+    if (todasFiliaisParam) params.set("todas_filiais", "true");
+    const query = params.toString();
+    return query ? `/cadastro?${query}` : "/cadastro";
+  };
+  const cadastroBackLink = buildCadastroBackLink();
+
   const [step, setStep] = useState<Step>("search");
   const [loading, setLoading] = useState(false);
-  const [searchEmail, setSearchEmail] = useState("");
+  const [searchContato, setSearchContato] = useState("");
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [formData, setFormData] = useState({
     nome: "",
@@ -58,10 +74,10 @@ export default function CadastroMembro() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!searchEmail.trim()) {
+    if (!searchContato.trim()) {
       toast({
         title: "Erro",
-        description: "Digite seu email para buscar seu cadastro",
+        description: "Digite seu telefone ou email para buscar seu cadastro",
         variant: "destructive"
       });
       return;
@@ -74,14 +90,24 @@ export default function CadastroMembro() {
       const { data: result, error } = await supabase.functions.invoke('cadastro-publico', {
         body: {
           action: 'buscar_membro',
-          data: { email: searchEmail.trim() }
+          data: {
+            contato: searchContato.trim(),
+            igreja_id: igrejaIdParam,
+            filial_id: filialIdParam,
+            todas_filiais: todasFiliaisParam,
+          }
         }
       });
 
       if (error) throw error;
       
       if (result?.error || !result?.data) {
-        setFormData(prev => ({ ...prev, email: searchEmail.trim() }));
+        const contato = searchContato.trim();
+        setFormData(prev => ({
+          ...prev,
+          email: contato.includes("@") ? contato : prev.email,
+          telefone: !contato.includes("@") ? contato : prev.telefone,
+        }));
         setStep("not_found");
         setLoading(false);
         return;
@@ -174,6 +200,9 @@ export default function CadastroMembro() {
             estado: formData.estado || null,
             endereco: formData.endereco.trim() || null,
             profissao: formData.profissao.trim() || null,
+            igreja_id: igrejaIdParam,
+            filial_id: filialIdParam,
+            todas_filiais: todasFiliaisParam,
           }
         }
       });
@@ -256,6 +285,9 @@ export default function CadastroMembro() {
             profissao: formData.profissao.trim() || null,
             tipo: 'frequentador',
             deseja_contato: true,
+            igreja_id: igrejaIdParam,
+            filial_id: filialIdParam,
+            todas_filiais: todasFiliaisParam,
           }
         }
       });
@@ -283,7 +315,7 @@ export default function CadastroMembro() {
   if (step === "not_found") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo="/cadastro" />
+        <PublicHeader showBackButton backTo={cadastroBackLink} />
         
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
@@ -293,7 +325,7 @@ export default function CadastroMembro() {
                 Cadastro não encontrado
               </h2>
               <p className="text-muted-foreground mb-6">
-                Não encontramos um cadastro com o email <strong>{searchEmail}</strong>. 
+                Não encontramos um cadastro para <strong>{searchContato}</strong>. 
                 Deseja criar um novo cadastro?
               </p>
               <div className="flex flex-col gap-3">
@@ -316,7 +348,7 @@ export default function CadastroMembro() {
   if (step === "new_register") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo="/cadastro" />
+        <PublicHeader showBackButton backTo={cadastroBackLink} />
         
         <div className="flex-1 p-4 py-8">
           <Card className="w-full max-w-lg mx-auto shadow-soft">
@@ -382,7 +414,7 @@ export default function CadastroMembro() {
                   </InputMask>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="sexo_new">Sexo *</Label>
                     <Select
@@ -422,7 +454,7 @@ export default function CadastroMembro() {
 
                 <div className="space-y-2">
                   <Label>Data de nascimento</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Select
                       value={formData.dia_nascimento}
                       onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
@@ -512,7 +544,7 @@ export default function CadastroMembro() {
                       </InputMask>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor="cidade_new">Cidade</Label>
                         <Input
@@ -590,7 +622,7 @@ export default function CadastroMembro() {
   if (step === "pending") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo="/cadastro" />
+        <PublicHeader showBackButton backTo={cadastroBackLink} />
         
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
@@ -616,7 +648,7 @@ export default function CadastroMembro() {
   if (step === "success") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo="/cadastro" />
+        <PublicHeader showBackButton backTo={cadastroBackLink} />
         
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
@@ -641,7 +673,7 @@ export default function CadastroMembro() {
   if (step === "search") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo="/cadastro" />
+        <PublicHeader showBackButton backTo={cadastroBackLink} />
         
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft">
@@ -650,20 +682,20 @@ export default function CadastroMembro() {
                 Atualizar Cadastro de Membro
               </CardTitle>
               <CardDescription>
-                Digite seu email cadastrado para acessar seus dados
+                Digite seu telefone ou email cadastrado para acessar seus dados
               </CardDescription>
             </CardHeader>
             
             <CardContent>
               <form onSubmit={handleSearch} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="searchEmail">Email cadastrado *</Label>
+                  <Label htmlFor="searchContato">Telefone ou email cadastrado *</Label>
                   <Input
-                    id="searchEmail"
-                    type="email"
-                    value={searchEmail}
-                    onChange={(e) => setSearchEmail(e.target.value)}
-                    placeholder="seu@email.com"
+                    id="searchContato"
+                    type="text"
+                    value={searchContato}
+                    onChange={(e) => setSearchContato(e.target.value)}
+                    placeholder="(00) 00000-0000 ou seu@email.com"
                     disabled={loading}
                   />
                 </div>
@@ -691,7 +723,7 @@ export default function CadastroMembro() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <PublicHeader showBackButton backTo="/cadastro" />
+      <PublicHeader showBackButton backTo={cadastroBackLink} />
       
       <div className="flex-1 p-4 py-8">
         <Card className="w-full max-w-lg mx-auto shadow-soft">
@@ -745,7 +777,7 @@ export default function CadastroMembro() {
                 </InputMask>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="sexo">Sexo</Label>
                   <Select
@@ -785,7 +817,7 @@ export default function CadastroMembro() {
 
               <div className="space-y-2">
                 <Label>Data de nascimento</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Select
                     value={formData.dia_nascimento}
                     onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
@@ -875,7 +907,7 @@ export default function CadastroMembro() {
                     </InputMask>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label htmlFor="cidade">Cidade</Label>
                       <Input

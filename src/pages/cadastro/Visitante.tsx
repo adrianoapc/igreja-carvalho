@@ -16,6 +16,20 @@ import { useSearchParams } from "react-router-dom";
 export default function CadastroVisitante() {
   const [searchParams] = useSearchParams();
   const aceitouJesus = searchParams.get("aceitou") === "true";
+  const igrejaIdParam = searchParams.get("igreja_id");
+  const filialIdParam = searchParams.get("filial_id");
+  const todasFiliaisParam = searchParams.get("todas_filiais") === "true";
+
+  const buildCadastroBackLink = () => {
+    const params = new URLSearchParams();
+    if (igrejaIdParam) params.set("igreja_id", igrejaIdParam);
+    if (filialIdParam) params.set("filial_id", filialIdParam);
+    if (todasFiliaisParam) params.set("todas_filiais", "true");
+    if (aceitouJesus) params.set("aceitou", "true");
+    const query = params.toString();
+    return query ? `/cadastro?${query}` : "/cadastro";
+  };
+  const cadastroBackLink = buildCadastroBackLink();
   
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -105,6 +119,9 @@ export default function CadastroVisitante() {
             observacoes: formData.observacoes.trim() || null,
             aceitou_jesus: formData.aceitou_jesus,
             deseja_contato: formData.deseja_contato,
+            igreja_id: igrejaIdParam,
+            filial_id: filialIdParam,
+            todas_filiais: todasFiliaisParam,
           }
         }
       });
@@ -135,7 +152,7 @@ export default function CadastroVisitante() {
   if (success) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo="/cadastro" />
+        <PublicHeader showBackButton backTo={cadastroBackLink} />
         
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
@@ -159,7 +176,7 @@ export default function CadastroVisitante() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <PublicHeader showBackButton backTo="/cadastro" />
+        <PublicHeader showBackButton backTo={cadastroBackLink} />
       
       <div className="flex-1 flex items-center justify-center p-4 py-8">
         <Card className="w-full max-w-md shadow-soft">
@@ -250,7 +267,7 @@ export default function CadastroVisitante() {
 
               <div className="space-y-2">
                 <Label>Data de aniversário</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Select
                     value={formData.dia_nascimento}
                     onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}

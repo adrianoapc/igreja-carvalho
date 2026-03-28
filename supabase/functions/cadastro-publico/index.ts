@@ -51,11 +51,19 @@ interface CadastroVisitanteData {
   email?: string
   sexo?: string
   data_nascimento?: string
+  estado_civil?: string
+  cidade?: string
+  bairro?: string
+  profissao?: string
   entrou_por?: string
   necessidades_especiais?: string
   observacoes?: string
   aceitou_jesus?: boolean
   deseja_contato?: boolean
+  deseja_trilha?: boolean
+  igreja_id?: string
+  filial_id?: string
+  todas_filiais?: boolean
 }
 
 interface AtualizarMembroData {
@@ -72,6 +80,27 @@ interface AtualizarMembroData {
   estado?: string
   endereco?: string
   profissao?: string
+  igreja_id?: string
+  filial_id?: string
+  todas_filiais?: boolean
+}
+
+interface BuscarMembroData {
+  contato?: string
+  email?: string
+  telefone?: string
+  igreja_id?: string
+  filial_id?: string
+  todas_filiais?: boolean
+}
+
+// deno-lint-ignore no-explicit-any
+function applyTenantFilters(query: any, contexto: { igreja_id?: string; filial_id?: string; todas_filiais?: boolean }) {
+  let nextQuery = query.eq('igreja_id', contexto.igreja_id)
+  if (!contexto.todas_filiais && contexto.filial_id) {
+    nextQuery = nextQuery.eq('filial_id', contexto.filial_id)
+  }
+  return nextQuery
 }
 
 // Helper to log audit events
@@ -149,6 +178,13 @@ Deno.serve(async (req) => {
     
     if (action === 'cadastrar_visitante') {
       const visitanteData = data as CadastroVisitanteData
+
+      if (!visitanteData.igreja_id) {
+        return new Response(
+          JSON.stringify({ error: 'Link inválido: igreja não informada.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       
       // Validação básica
       if (!visitanteData.nome?.trim()) {
@@ -172,12 +208,15 @@ Deno.serve(async (req) => {
       let visitanteExistente = null
       
       if (visitanteData.email?.trim()) {
-        const { data: byEmail } = await supabase
+        let byEmailQuery = supabase
           .from('profiles')
           .select('*')
           .in('status', ['visitante', 'frequentador'])
           .eq('email', visitanteData.email.trim().toLowerCase())
           .limit(1)
+
+        byEmailQuery = applyTenantFilters(byEmailQuery, visitanteData)
+        const { data: byEmail } = await byEmailQuery
         
         if (byEmail && byEmail.length > 0) {
           visitanteExistente = byEmail[0]
@@ -185,12 +224,15 @@ Deno.serve(async (req) => {
       }
       
       if (!visitanteExistente && telefoneNormalizado) {
-        const { data: byTelefone } = await supabase
+        let byTelefoneQuery = supabase
           .from('profiles')
           .select('*')
           .in('status', ['visitante', 'frequentador'])
           .eq('telefone', telefoneNormalizado)
           .limit(1)
+
+        byTelefoneQuery = applyTenantFilters(byTelefoneQuery, visitanteData)
+        const { data: byTelefone } = await byTelefoneQuery
         
         if (byTelefone && byTelefone.length > 0) {
           visitanteExistente = byTelefone[0]
@@ -219,6 +261,8 @@ Deno.serve(async (req) => {
             deseja_contato: visitanteData.deseja_contato ?? visitanteExistente.deseja_contato,
             sexo: visitanteData.sexo || visitanteExistente.sexo,
             data_nascimento: visitanteData.data_nascimento || visitanteExistente.data_nascimento,
+            igreja_id: visitanteExistente.igreja_id || visitanteData.igreja_id,
+            filial_id: visitanteExistente.filial_id || visitanteData.filial_id || null,
           })
           .eq('id', visitanteExistente.id)
           .select()
@@ -247,6 +291,8 @@ Deno.serve(async (req) => {
             data_primeira_visita: new Date().toISOString(),
             data_ultima_visita: new Date().toISOString(),
             numero_visitas: 1,
+            igreja_id: visitanteData.igreja_id,
+            filial_id: visitanteData.filial_id || null,
           })
           .select()
           .single()
@@ -264,28 +310,55 @@ Deno.serve(async (req) => {
     }
     
     if (action === 'buscar_membro') {
-      const { email } = data
-      
-      if (!email?.trim()) {
-        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Missing email')
+      const buscaData = data as BuscarMembroData
+      const contato = buscaData.contato || buscaData.email || buscaData.telefone
+
+      if (!buscaData.igreja_id) {
+        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Missing igreja_id')
         return new Response(
-          JSON.stringify({ error: 'Email é obrigatório' }),
+          JSON.stringify({ error: 'Link inválido: igreja não informada.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
       
-      // Security: Only return MINIMAL fields necessary for the update form
-      // Exclude ALL sensitive PII - only return what's needed to display the form
-      const { data: profile, error } = await supabase
+      if (!contato?.trim()) {
+        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Missing email')
+        return new Response(
+          JSON.stringify({ error: 'Telefone ou email é obrigatório' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const contatoLimpo = contato.trim()
+      const emailBusca = contatoLimpo.includes('@') ? contatoLimpo.toLowerCase() : null
+      const telefoneBusca = !emailBusca ? normalizarTelefone(contatoLimpo) : null
+
+      if (!emailBusca && !telefoneBusca) {
+        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Invalid contact format')
+        return new Response(
+          JSON.stringify({ error: 'Informe um email ou telefone válido' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      let profileQuery = supabase
         .from('profiles')
-        .select('id, nome')
-        .eq('email', email.trim().toLowerCase())
-        .eq('status', 'membro')
+        .select('id, nome, telefone, email, sexo, data_nascimento, estado_civil, necessidades_especiais, cep, cidade, bairro, estado, endereco, profissao, status, igreja_id, filial_id, user_id')
+        .in('status', ['membro', 'visitante', 'frequentador'])
         .single()
+
+      profileQuery = applyTenantFilters(profileQuery, buscaData)
+      if (emailBusca) {
+        profileQuery = profileQuery.eq('email', emailBusca)
+      } else if (telefoneBusca) {
+        profileQuery = profileQuery.eq('telefone', telefoneBusca)
+      }
+
+      const { data: profile, error } = await profileQuery
       
       if (error || !profile) {
         // Security: Log failed lookup attempts for audit
-        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Member not found', { email_hash: email.substring(0, 3) + '***' })
+        await logAudit(supabase, 'cadastro-publico', 'buscar_membro', clientIP, false, 'Member not found', { contato_hash: contatoLimpo.substring(0, 3) + '***' })
         // Security: Use generic error message to prevent email enumeration
         return new Response(
           JSON.stringify({ error: 'Não foi possível processar a solicitação' }),
@@ -302,9 +375,172 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    if (action === 'cadastrar_cafe_vp') {
+      const cafeData = data as CadastroVisitanteData
+
+      if (!cafeData.igreja_id) {
+        return new Response(
+          JSON.stringify({ error: 'Link inválido: igreja não informada.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!cafeData.nome?.trim()) {
+        return new Response(
+          JSON.stringify({ error: 'Nome é obrigatório' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!cafeData.telefone?.trim() && !cafeData.email?.trim()) {
+        return new Response(
+          JSON.stringify({ error: 'Informe pelo menos um contato (telefone ou email)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const telefoneNormalizado = normalizarTelefone(cafeData.telefone)
+      const emailNormalizado = cafeData.email?.trim().toLowerCase() || null
+
+      let profileExistente = null
+
+      if (emailNormalizado) {
+        let byEmailQuery = supabase
+          .from('profiles')
+          .select('*')
+          .in('status', ['membro', 'visitante', 'frequentador'])
+          .eq('email', emailNormalizado)
+          .limit(1)
+
+        byEmailQuery = applyTenantFilters(byEmailQuery, cafeData)
+        const { data: byEmail } = await byEmailQuery
+
+        if (byEmail && byEmail.length > 0) {
+          profileExistente = byEmail[0]
+        }
+      }
+
+      if (!profileExistente && telefoneNormalizado) {
+        let byTelefoneQuery = supabase
+          .from('profiles')
+          .select('*')
+          .in('status', ['membro', 'visitante', 'frequentador'])
+          .eq('telefone', telefoneNormalizado)
+          .limit(1)
+
+        byTelefoneQuery = applyTenantFilters(byTelefoneQuery, cafeData)
+        const { data: byTelefone } = await byTelefoneQuery
+
+        if (byTelefone && byTelefone.length > 0) {
+          profileExistente = byTelefone[0]
+        }
+      }
+
+      const observacaoEvento = `Café V&P (${new Date().toISOString().slice(0, 10)})`
+      const observacoesCombinadas = [
+        profileExistente?.observacoes,
+        cafeData.observacoes?.trim(),
+        observacaoEvento,
+      ]
+        .filter((item) => !!item && String(item).trim().length > 0)
+        .join(' | ')
+
+      if (profileExistente) {
+        const updatePayload = {
+          nome: cafeData.nome.trim() || profileExistente.nome,
+          telefone: telefoneNormalizado || profileExistente.telefone,
+          email: emailNormalizado || profileExistente.email,
+          sexo: cafeData.sexo || profileExistente.sexo,
+          estado_civil: cafeData.estado_civil || profileExistente.estado_civil,
+          data_nascimento: cafeData.data_nascimento || profileExistente.data_nascimento,
+          cidade: cafeData.cidade?.trim() || profileExistente.cidade,
+          bairro: cafeData.bairro?.trim() || profileExistente.bairro,
+          profissao: cafeData.profissao?.trim() || profileExistente.profissao,
+          necessidades_especiais:
+            cafeData.necessidades_especiais?.trim() || profileExistente.necessidades_especiais,
+          observacoes: observacoesCombinadas || profileExistente.observacoes,
+          aceitou_jesus: cafeData.aceitou_jesus || profileExistente.aceitou_jesus,
+          deseja_contato: cafeData.deseja_contato ?? profileExistente.deseja_contato,
+          entrou_por: profileExistente.entrou_por || 'cafe_vp',
+          igreja_id: profileExistente.igreja_id || cafeData.igreja_id,
+          filial_id: profileExistente.filial_id || cafeData.filial_id || null,
+        }
+
+        const { data: updated, error: updateError } = await supabase
+          .from('profiles')
+          .update(updatePayload)
+          .eq('id', profileExistente.id)
+          .select()
+          .single()
+
+        if (updateError) throw updateError
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            isUpdate: true,
+            data: updated,
+            message:
+              profileExistente.status === 'membro'
+                ? 'Cadastro localizado como membro e atualizado sem duplicidade.'
+                : 'Cadastro existente localizado e atualizado sem duplicidade.',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const { data: created, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          nome: cafeData.nome.trim(),
+          telefone: telefoneNormalizado,
+          email: emailNormalizado,
+          sexo: cafeData.sexo || null,
+          estado_civil: cafeData.estado_civil || null,
+          data_nascimento: cafeData.data_nascimento || null,
+          cidade: cafeData.cidade?.trim() || null,
+          bairro: cafeData.bairro?.trim() || null,
+          profissao: cafeData.profissao?.trim() || null,
+          necessidades_especiais: cafeData.necessidades_especiais?.trim() || null,
+          observacoes: observacoesCombinadas || null,
+          aceitou_jesus: cafeData.aceitou_jesus || false,
+          deseja_contato: cafeData.deseja_contato ?? true,
+          entrou_por: 'cafe_vp',
+          status: 'visitante',
+          data_primeira_visita: new Date().toISOString(),
+          data_ultima_visita: new Date().toISOString(),
+          numero_visitas: 1,
+          igreja_id: cafeData.igreja_id,
+          filial_id: cafeData.filial_id || null,
+        })
+        .select()
+        .single()
+
+      if (insertError) throw insertError
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          isUpdate: false,
+          data: created,
+          message: cafeData.deseja_trilha
+            ? 'Cadastro Café V&P realizado! Já registramos seu interesse na trilha de membros.'
+            : 'Cadastro Café V&P realizado com sucesso!',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     
     if (action === 'atualizar_membro') {
       const membroData = data as AtualizarMembroData
+
+      if (!membroData.igreja_id) {
+        return new Response(
+          JSON.stringify({ error: 'Link inválido: igreja não informada.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       
       if (!membroData.id || !membroData.nome?.trim()) {
         return new Response(
@@ -314,12 +550,14 @@ Deno.serve(async (req) => {
       }
       
       // Buscar dados atuais do perfil
-      const { data: currentProfile, error: fetchError } = await supabase
+      let currentProfileQuery = supabase
         .from('profiles')
         .select('*')
         .eq('id', membroData.id)
-        .eq('status', 'membro')
-        .single()
+        .in('status', ['membro', 'visitante', 'frequentador'])
+
+      currentProfileQuery = applyTenantFilters(currentProfileQuery, membroData)
+      const { data: currentProfile, error: fetchError } = await currentProfileQuery.single()
       
       if (fetchError || !currentProfile) {
         return new Response(
@@ -386,6 +624,8 @@ Deno.serve(async (req) => {
           dados_novos: dadosNovos,
           dados_antigos: dadosAntigos,
           status: 'pendente',
+          igreja_id: currentProfile.igreja_id || membroData.igreja_id,
+          filial_id: currentProfile.filial_id || membroData.filial_id || null,
         })
         .select()
         .single()

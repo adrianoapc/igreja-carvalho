@@ -182,7 +182,7 @@ export default function PessoaDetalhes() {
             id,
             nome
           )
-        `
+        `,
         )
         .eq("membro_id", id)
         .order("data_inicio", { ascending: false });
@@ -196,7 +196,7 @@ export default function PessoaDetalhes() {
             data_inicio: f.data_inicio as string | undefined,
             ativo: Boolean(f.ativo),
           };
-        }) || []
+        }) || [],
       );
     } catch (error) {
       console.error("Erro ao buscar pessoa:", error);
@@ -604,7 +604,7 @@ export default function PessoaDetalhes() {
                         {pessoa.data_nascimento
                           ? `${format(
                               new Date(pessoa.data_nascimento),
-                              "dd/MM/yyyy"
+                              "dd/MM/yyyy",
                             )} (${calcularIdade(pessoa.data_nascimento)})`
                           : "—"}
                       </span>
@@ -805,7 +805,7 @@ export default function PessoaDetalhes() {
                           <span className="text-sm font-semibold text-right">
                             {format(
                               new Date(pessoa.data_batismo),
-                              "dd/MM/yyyy"
+                              "dd/MM/yyyy",
                             )}
                           </span>
                         </div>
@@ -839,7 +839,7 @@ export default function PessoaDetalhes() {
                         {pessoa.data_conversao
                           ? format(
                               new Date(pessoa.data_conversao),
-                              "dd/MM/yyyy"
+                              "dd/MM/yyyy",
                             )
                           : "—"}
                       </span>
@@ -1143,8 +1143,6 @@ export default function PessoaDetalhes() {
             pessoaId={pessoa.id}
             pessoaNome={pessoa.nome}
             pessoaEmail={pessoa.email}
-            pessoaTelefone={pessoa.telefone}
-            pessoaIgrejaId={(pessoa as any).igreja_id}
             onSuccess={fetchPessoa}
           />
 
@@ -1154,8 +1152,6 @@ export default function PessoaDetalhes() {
             pessoaId={pessoa.id}
             pessoaNome={pessoa.nome}
             pessoaEmail={pessoa.email}
-            pessoaTelefone={pessoa.telefone}
-            pessoaIgrejaId={(pessoa as any).igreja_id}
             onSuccess={fetchPessoa}
           />
         </>

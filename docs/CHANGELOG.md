@@ -10,6 +10,47 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Alterado
 
+#### ☕ Cadastro Público Café V&P (28 Mar/2026)
+
+- **Tipo**: feature + ux + backend
+- **Resumo**: Novo fluxo público mobile em formato wizard para recepção/alinhamento de novos membros no `Café V&P`, com idempotência por contato e escopo multi-tenant.
+- **Módulos afetados**: Cadastro Público, Pessoas (Links Externos), Edge Functions
+- **Impacto no usuário**:
+  - Nova página pública `Café V&P` com UX mobile-first, etapas guiadas e visual convidativo.
+  - Busca/registro idempotente por **telefone ou email**, sem duplicar pessoa já cadastrada.
+  - Contexto por `igreja_id`/`filial_id` preservado em link e QR Code compartilhados.
+
+**Arquivos criados:**
+
+- `src/pages/cadastro/CafeVP.tsx`
+- `docs/diagramas/fluxo-cafe-vp-cadastro.md`
+
+**Arquivos modificados:**
+
+- `src/App.tsx`
+- `src/pages/cadastro/Index.tsx`
+- `src/components/pessoas/LinksExternosCard.tsx`
+- `supabase/functions/cadastro-publico/index.ts`
+
+#### 👥 Correção de Links Externos de Cadastro + Ajustes Mobile (28 Mar/2026)
+
+- **Tipo**: fix + ux
+- **Resumo**: Corrigido fluxo de links externos de cadastro em `Pessoas`, removendo o uso de URL curta (`/s/:slug`) no compartilhamento e preservando parâmetros de contexto (`igreja_id`/`filial_id`) durante a navegação pública.
+- **Módulos afetados**: Pessoas > Links Externos, Cadastro Público (Index/Visitante/Membro)
+- **Impacto no usuário**:
+  - Links de cadastro voltam a abrir corretamente, sem retorno `400` por rota curta inválida.
+  - Contexto de igreja/filial é mantido ao navegar entre `cadastro` → `visitante`/`membro`.
+  - Busca pública de cadastro de pessoa no fluxo de membro agora aceita **telefone ou email**.
+  - Busca e atualização pública passam a respeitar escopo por `igreja_id` e `filial_id`, evitando cruzamento entre igrejas.
+  - Formulário público de membro/visitante melhora no mobile com grids responsivos.
+
+**Arquivos modificados:**
+
+- `src/components/pessoas/LinksExternosCard.tsx`
+- `src/pages/cadastro/Index.tsx`
+- `src/pages/cadastro/Visitante.tsx`
+- `src/pages/cadastro/Membro.tsx`
+
 #### 💰 Gestão Unificada de Dados Financeiros + Importação de Extratos Bancários (9 Jan/2026)
 
 - **Tipo**: feature + database

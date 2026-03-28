@@ -27,7 +27,6 @@ const Install = lazy(() => import("./pages/Install"));
 const BiometricLogin = lazy(() => import("./pages/BiometricLogin"));
 const ContextSelect = lazy(() => import("./pages/ContextSelect"));
 const ForcedPasswordChange = lazy(() => import("./pages/ForcedPasswordChange"));
-const DefinirSenha = lazy(() => import("./pages/DefinirSenha"));
 const ReviewPage = lazy(() => import("./pages/ReviewPage"));
 
 // Módulos
@@ -63,6 +62,7 @@ const AnnouncementsAdmin = lazy(() => import("./pages/AnnouncementsAdmin"));
 const CadastroIndex = lazy(() => import("./pages/cadastro/Index"));
 const CadastroVisitante = lazy(() => import("./pages/cadastro/Visitante"));
 const CadastroMembro = lazy(() => import("./pages/cadastro/Membro"));
+const CadastroCafeVP = lazy(() => import("./pages/cadastro/CafeVP"));
 
 // Inscrição Pública (QR Code)
 const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
@@ -254,7 +254,6 @@ const App = () => (
                   path="/forced-password-change"
                   element={<ForcedPasswordChange />}
                 />
-                <Route path="/definir-senha" element={<DefinirSenha />} />
                 <Route path="/maintenance" element={<Maintenance />} />
                 {/* Rota removida: /financas/config-formas-pagamento (unificada em FormasPagamento) */}
                 <Route path="/install" element={<Install />} />
@@ -272,6 +271,7 @@ const App = () => (
                   element={<CadastroVisitante />}
                 />
                 <Route path="/cadastro/membro" element={<CadastroMembro />} />
+                <Route path="/cadastro/cafe-vp" element={<CadastroCafeVP />} />
                 <Route path="/cadastro/igreja" element={<NovaIgreja />} />
 
                 {/* Inscrição Pública (QR Code) */}

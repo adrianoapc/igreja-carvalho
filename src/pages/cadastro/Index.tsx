@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/layout/PublicHeader";
-import { Users, UserPlus, Heart } from "lucide-react";
+import { Users, UserPlus, Heart, Coffee } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
@@ -14,17 +14,31 @@ export default function CadastroIndex() {
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   
   const aceitouJesus = searchParams.get("aceitou") === "true";
+  const igrejaIdParam = searchParams.get("igreja_id");
+  const filialIdParam = searchParams.get("filial_id");
+  const todasFiliaisParam = searchParams.get("todas_filiais");
+  const igrejaContexto = igrejaIdParam || igrejaId;
+
+  const buildCadastroPath = (path: string, includeAceitou = false) => {
+    const params = new URLSearchParams();
+    if (igrejaIdParam) params.set("igreja_id", igrejaIdParam);
+    if (filialIdParam) params.set("filial_id", filialIdParam);
+    if (todasFiliaisParam === "true") params.set("todas_filiais", "true");
+    if (includeAceitou && aceitouJesus) params.set("aceitou", "true");
+    const query = params.toString();
+    return query ? `${path}?${query}` : path;
+  };
 
   useEffect(() => {
     const fetchIgrejaInfo = async () => {
-      if (!igrejaId) {
+      if (!igrejaContexto) {
         return;
       }
 
       const { data } = await supabase
         .from("configuracoes_igreja")
         .select("*")
-        .eq("igreja_id", igrejaId)
+        .eq("igreja_id", igrejaContexto)
         .maybeSingle();
       if (data) {
         setIgrejaInfo({ nome: data.nome_igreja, subtitulo: data.subtitulo || "" });
@@ -33,7 +47,7 @@ export default function CadastroIndex() {
     if (!igrejaLoading) {
       fetchIgrejaInfo();
     }
-  }, [igrejaId, igrejaLoading]);
+  }, [igrejaContexto, igrejaLoading]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -68,7 +82,7 @@ export default function CadastroIndex() {
                 </p>
                 <Button 
                   className="w-full" 
-                  onClick={() => navigate("/cadastro/membro")}
+                  onClick={() => navigate(buildCadastroPath("/cadastro/membro"))}
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Atualizar meu perfil de membro
@@ -92,10 +106,27 @@ export default function CadastroIndex() {
                 <Button 
                   variant="outline"
                   className="w-full" 
-                  onClick={() => navigate(`/cadastro/visitante${aceitouJesus ? "?aceitou=true" : ""}`)}
+                  onClick={() => navigate(buildCadastroPath("/cadastro/visitante", true))}
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
                   Cadastrar como visitante
+                </Button>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-orange-200/60 dark:border-orange-800/40 p-3 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-pink-500/10">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Coffee className="w-4 h-4 text-orange-600" />
+                  Café V&P
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Recepção e alinhamento de novos membros. Preencha seu cadastro em formato guiado.
+                </p>
+                <Button
+                  className="w-full"
+                  onClick={() => navigate(buildCadastroPath("/cadastro/cafe-vp"))}
+                >
+                  <Coffee className="w-4 h-4 mr-2" />
+                  Preencher cadastro Café V&P
                 </Button>
               </div>
             </div>
