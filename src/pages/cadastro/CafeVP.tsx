@@ -12,12 +12,24 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -57,8 +69,11 @@ export default function CadastroCafeVP() {
   });
 
   const dias = useMemo(
-    () => Array.from({ length: 31 }, (_, index) => (index + 1).toString().padStart(2, "0")),
-    []
+    () =>
+      Array.from({ length: 31 }, (_, index) =>
+        (index + 1).toString().padStart(2, "0"),
+      ),
+    [],
   );
 
   const meses = useMemo(
@@ -76,7 +91,7 @@ export default function CadastroCafeVP() {
       { value: "11", label: "Novembro" },
       { value: "12", label: "Dezembro" },
     ],
-    []
+    [],
   );
 
   const anos = useMemo(() => {
@@ -134,7 +149,8 @@ export default function CadastroCafeVP() {
     if (!igrejaIdParam) {
       toast({
         title: "Link inválido",
-        description: "Esse link está incompleto. Pede pra equipe te enviar novamente.",
+        description:
+          "Esse link está incompleto. Pede pra equipe te enviar novamente.",
         variant: "destructive",
       });
       return;
@@ -152,7 +168,8 @@ export default function CadastroCafeVP() {
     if (!formData.telefone.trim() && !formData.email.trim()) {
       toast({
         title: "Contato necessário",
-        description: "Antes de finalizar, coloca telefone ou email pra gente te acompanhar.",
+        description:
+          "Antes de finalizar, coloca telefone ou email pra gente te acompanhar.",
         variant: "destructive",
       });
       return;
@@ -166,30 +183,34 @@ export default function CadastroCafeVP() {
         dataNascimento = `${formData.ano_nascimento || "1900"}-${formData.mes_nascimento}-${formData.dia_nascimento}`;
       }
 
-      const { data: result, error } = await supabase.functions.invoke("cadastro-publico", {
-        body: {
-          action: "cadastrar_cafe_vp",
-          data: {
-            nome: formData.nome.trim(),
-            telefone: formData.telefone.trim() || null,
-            email: formData.email.trim() || null,
-            sexo: formData.sexo || null,
-            estado_civil: formData.estado_civil || null,
-            data_nascimento: dataNascimento,
-            cidade: formData.cidade.trim() || null,
-            bairro: formData.bairro.trim() || null,
-            profissao: formData.profissao.trim() || null,
-            necessidades_especiais: formData.necessidades_especiais.trim() || null,
-            observacoes: formData.observacoes.trim() || null,
-            aceitou_jesus: formData.aceitou_jesus,
-            deseja_contato: formData.deseja_contato,
-            deseja_trilha: formData.deseja_trilha,
-            igreja_id: igrejaIdParam,
-            filial_id: filialIdParam,
-            todas_filiais: todasFiliaisParam,
+      const { data: result, error } = await supabase.functions.invoke(
+        "cadastro-publico",
+        {
+          body: {
+            action: "cadastrar_cafe_vp",
+            data: {
+              nome: formData.nome.trim(),
+              telefone: formData.telefone.trim() || null,
+              email: formData.email.trim() || null,
+              sexo: formData.sexo || null,
+              estado_civil: formData.estado_civil || null,
+              data_nascimento: dataNascimento,
+              cidade: formData.cidade.trim() || null,
+              bairro: formData.bairro.trim() || null,
+              profissao: formData.profissao.trim() || null,
+              necessidades_especiais:
+                formData.necessidades_especiais.trim() || null,
+              observacoes: formData.observacoes.trim() || null,
+              aceitou_jesus: formData.aceitou_jesus,
+              deseja_contato: formData.deseja_contato,
+              deseja_trilha: formData.deseja_trilha,
+              igreja_id: igrejaIdParam,
+              filial_id: filialIdParam,
+              todas_filiais: todasFiliaisParam,
+            },
           },
         },
-      });
+      );
 
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
@@ -198,7 +219,9 @@ export default function CadastroCafeVP() {
         title: result?.isUpdate
           ? "Achamos seu cadastro e atualizamos ✨"
           : "Cadastro enviado com sucesso 🎉",
-        description: result?.message || "Perfeito! O time do Café V&P vai continuar seu acompanhamento.",
+        description:
+          result?.message ||
+          "Perfeito! O time do Café V&P vai continuar seu acompanhamento.",
       });
 
       setSuccess(true);
@@ -237,12 +260,18 @@ export default function CadastroCafeVP() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/15 flex items-center justify-center">
                 <CheckCircle2 className="w-9 h-9 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">Tudo certo por aqui! 🎉</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Tudo certo por aqui! 🎉
+              </h2>
               <p className="text-muted-foreground mb-6">
-                Obrigado por preencher seu cadastro do <strong>Café V&P</strong>.
-                Em breve nosso time continua seu acolhimento e próximos passos.
+                Obrigado por preencher seu cadastro do <strong>Café V&P</strong>
+                . Em breve nosso time continua seu acolhimento e próximos
+                passos.
               </p>
-              <Button onClick={() => (window.location.href = cadastroBackLink)} className="w-full">
+              <Button
+                onClick={() => (window.location.href = cadastroBackLink)}
+                className="w-full"
+              >
                 Voltar para o início
               </Button>
             </CardContent>
@@ -262,7 +291,9 @@ export default function CadastroCafeVP() {
                 <Coffee className="w-3.5 h-3.5" />
                 Café V&P
               </div>
-              <span className="text-xs text-muted-foreground font-medium">Etapa {step}/4</span>
+              <span className="text-xs text-muted-foreground font-medium">
+                Etapa {step}/4
+              </span>
             </div>
 
             <Progress value={stepProgress} className="h-2 mb-4" />
@@ -274,7 +305,9 @@ export default function CadastroCafeVP() {
             </div>
 
             <CardTitle className="text-xl leading-tight">{stepTitle}</CardTitle>
-            <CardDescription className="text-sm">{stepDescription}</CardDescription>
+            <CardDescription className="text-sm">
+              {stepDescription}
+            </CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -287,7 +320,8 @@ export default function CadastroCafeVP() {
                         <Sparkles className="w-5 h-5 text-orange-600" />
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        É rapidinho: seu cadastro ajuda a gente a te receber com carinho e sem burocracia.
+                        É rapidinho: seu cadastro ajuda a gente a te receber com
+                        carinho e sem burocracia.
                       </p>
                     </div>
                   </div>
@@ -297,7 +331,9 @@ export default function CadastroCafeVP() {
                     <Input
                       id="nome"
                       value={formData.nome}
-                      onChange={(event) => setFormData({ ...formData, nome: event.target.value })}
+                      onChange={(event) =>
+                        setFormData({ ...formData, nome: event.target.value })
+                      }
                       placeholder="Como você gosta de ser chamado(a)?"
                       disabled={loading}
                     />
@@ -307,7 +343,9 @@ export default function CadastroCafeVP() {
                     <Label htmlFor="sexo">Sexo</Label>
                     <Select
                       value={formData.sexo}
-                      onValueChange={(value) => setFormData({ ...formData, sexo: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, sexo: value })
+                      }
                       disabled={loading}
                     >
                       <SelectTrigger id="sexo">
@@ -327,7 +365,8 @@ export default function CadastroCafeVP() {
                   <div className="rounded-lg p-3 bg-blue-500/10 border border-blue-500/20 flex items-center gap-2">
                     <HeartHandshake className="w-4 h-4 text-blue-600" />
                     <p className="text-xs text-blue-900 dark:text-blue-300">
-                      Se você já tem cadastro, a gente encontra e atualiza sem duplicar ✨
+                      Se você já tem cadastro, a gente encontra e atualiza sem
+                      duplicar ✨
                     </p>
                   </div>
 
@@ -336,7 +375,12 @@ export default function CadastroCafeVP() {
                     <InputMask
                       mask="(99) 99999-9999"
                       value={formData.telefone}
-                      onChange={(event) => setFormData({ ...formData, telefone: event.target.value })}
+                      onChange={(event) =>
+                        setFormData({
+                          ...formData,
+                          telefone: event.target.value,
+                        })
+                      }
                       disabled={loading}
                     >
                       {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
@@ -356,7 +400,9 @@ export default function CadastroCafeVP() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                      onChange={(event) =>
+                        setFormData({ ...formData, email: event.target.value })
+                      }
                       placeholder="voce@email.com"
                       disabled={loading}
                     />
@@ -371,7 +417,9 @@ export default function CadastroCafeVP() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <Select
                         value={formData.dia_nascimento}
-                        onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, dia_nascimento: value })
+                        }
                         disabled={loading}
                       >
                         <SelectTrigger>
@@ -387,7 +435,9 @@ export default function CadastroCafeVP() {
                       </Select>
                       <Select
                         value={formData.mes_nascimento}
-                        onValueChange={(value) => setFormData({ ...formData, mes_nascimento: value })}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, mes_nascimento: value })
+                        }
                         disabled={loading}
                       >
                         <SelectTrigger>
@@ -403,7 +453,9 @@ export default function CadastroCafeVP() {
                       </Select>
                       <Select
                         value={formData.ano_nascimento}
-                        onValueChange={(value) => setFormData({ ...formData, ano_nascimento: value })}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, ano_nascimento: value })
+                        }
                         disabled={loading}
                       >
                         <SelectTrigger>
@@ -425,7 +477,9 @@ export default function CadastroCafeVP() {
                       <Label htmlFor="estado_civil">Estado civil</Label>
                       <Select
                         value={formData.estado_civil}
-                        onValueChange={(value) => setFormData({ ...formData, estado_civil: value })}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, estado_civil: value })
+                        }
                         disabled={loading}
                       >
                         <SelectTrigger id="estado_civil">
@@ -434,7 +488,9 @@ export default function CadastroCafeVP() {
                         <SelectContent>
                           <SelectItem value="solteiro">Solteiro(a)</SelectItem>
                           <SelectItem value="casado">Casado(a)</SelectItem>
-                          <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                          <SelectItem value="divorciado">
+                            Divorciado(a)
+                          </SelectItem>
                           <SelectItem value="viuvo">Viúvo(a)</SelectItem>
                         </SelectContent>
                       </Select>
@@ -445,7 +501,12 @@ export default function CadastroCafeVP() {
                       <Input
                         id="profissao"
                         value={formData.profissao}
-                        onChange={(event) => setFormData({ ...formData, profissao: event.target.value })}
+                        onChange={(event) =>
+                          setFormData({
+                            ...formData,
+                            profissao: event.target.value,
+                          })
+                        }
                         placeholder="Sua profissão"
                         disabled={loading}
                       />
@@ -458,7 +519,12 @@ export default function CadastroCafeVP() {
                       <Input
                         id="cidade"
                         value={formData.cidade}
-                        onChange={(event) => setFormData({ ...formData, cidade: event.target.value })}
+                        onChange={(event) =>
+                          setFormData({
+                            ...formData,
+                            cidade: event.target.value,
+                          })
+                        }
                         placeholder="Cidade"
                         disabled={loading}
                       />
@@ -468,7 +534,12 @@ export default function CadastroCafeVP() {
                       <Input
                         id="bairro"
                         value={formData.bairro}
-                        onChange={(event) => setFormData({ ...formData, bairro: event.target.value })}
+                        onChange={(event) =>
+                          setFormData({
+                            ...formData,
+                            bairro: event.target.value,
+                          })
+                        }
                         placeholder="Bairro"
                         disabled={loading}
                       />
@@ -476,12 +547,17 @@ export default function CadastroCafeVP() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="necessidades_especiais">Necessidades especiais</Label>
+                    <Label htmlFor="necessidades_especiais">
+                      Necessidades especiais
+                    </Label>
                     <Input
                       id="necessidades_especiais"
                       value={formData.necessidades_especiais}
                       onChange={(event) =>
-                        setFormData({ ...formData, necessidades_especiais: event.target.value })
+                        setFormData({
+                          ...formData,
+                          necessidades_especiais: event.target.value,
+                        })
                       }
                       placeholder="Ex.: mobilidade, audição, visão..."
                       disabled={loading}
@@ -495,7 +571,9 @@ export default function CadastroCafeVP() {
                   <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <UserRound className="w-4 h-4 text-emerald-600" />
-                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Resumo rápido</p>
+                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                        Resumo rápido
+                      </p>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       <strong>{formData.nome || "Nome não informado"}</strong>
@@ -509,7 +587,12 @@ export default function CadastroCafeVP() {
                     <Textarea
                       id="observacoes"
                       value={formData.observacoes}
-                      onChange={(event) => setFormData({ ...formData, observacoes: event.target.value })}
+                      onChange={(event) =>
+                        setFormData({
+                          ...formData,
+                          observacoes: event.target.value,
+                        })
+                      }
                       placeholder="Algo que você quer compartilhar com a equipe?"
                       disabled={loading}
                       className="min-h-[90px]"
@@ -522,11 +605,17 @@ export default function CadastroCafeVP() {
                         id="aceitou_jesus"
                         checked={formData.aceitou_jesus}
                         onCheckedChange={(checked) =>
-                          setFormData({ ...formData, aceitou_jesus: checked as boolean })
+                          setFormData({
+                            ...formData,
+                            aceitou_jesus: checked as boolean,
+                          })
                         }
                         disabled={loading}
                       />
-                      <label htmlFor="aceitou_jesus" className="text-sm leading-none">
+                      <label
+                        htmlFor="aceitou_jesus"
+                        className="text-sm leading-none"
+                      >
                         Tomei uma decisão por Jesus recentemente
                       </label>
                     </div>
@@ -536,11 +625,17 @@ export default function CadastroCafeVP() {
                         id="deseja_trilha"
                         checked={formData.deseja_trilha}
                         onCheckedChange={(checked) =>
-                          setFormData({ ...formData, deseja_trilha: checked as boolean })
+                          setFormData({
+                            ...formData,
+                            deseja_trilha: checked as boolean,
+                          })
                         }
                         disabled={loading}
                       />
-                      <label htmlFor="deseja_trilha" className="text-sm leading-none">
+                      <label
+                        htmlFor="deseja_trilha"
+                        className="text-sm leading-none"
+                      >
                         Quero seguir para a trilha de novos membros
                       </label>
                     </div>
@@ -550,11 +645,17 @@ export default function CadastroCafeVP() {
                         id="deseja_contato"
                         checked={formData.deseja_contato}
                         onCheckedChange={(checked) =>
-                          setFormData({ ...formData, deseja_contato: checked as boolean })
+                          setFormData({
+                            ...formData,
+                            deseja_contato: checked as boolean,
+                          })
                         }
                         disabled={loading}
                       />
-                      <label htmlFor="deseja_contato" className="text-sm leading-none">
+                      <label
+                        htmlFor="deseja_contato"
+                        className="text-sm leading-none"
+                      >
                         Autorizo contato da equipe da igreja 💬
                       </label>
                     </div>
@@ -563,7 +664,8 @@ export default function CadastroCafeVP() {
                   <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
                     <MapPinHouse className="w-4 h-4 text-amber-700 mt-0.5" />
                     <p className="text-xs text-amber-900 dark:text-amber-200">
-                      Seus dados são usados apenas para acolhimento e acompanhamento pastoral.
+                      Seus dados são usados apenas para acolhimento e
+                      acompanhamento pastoral.
                     </p>
                   </div>
                 </div>
@@ -582,7 +684,12 @@ export default function CadastroCafeVP() {
                 </Button>
 
                 {step < 4 ? (
-                  <Button type="button" onClick={goNext} disabled={loading} className="w-full">
+                  <Button
+                    type="button"
+                    onClick={goNext}
+                    disabled={loading}
+                    className="w-full"
+                  >
                     Próxima
                     <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>

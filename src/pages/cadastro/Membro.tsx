@@ -1,17 +1,42 @@
 import { useState, useEffect, type InputHTMLAttributes } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle, Search, ArrowLeft, UserPlus, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle,
+  Search,
+  ArrowLeft,
+  UserPlus,
+  AlertCircle,
+} from "lucide-react";
 import InputMask from "react-input-mask";
 import { useSearchParams } from "react-router-dom";
 
-type Step = "search" | "form" | "success" | "pending" | "not_found" | "new_register";
+type Step =
+  | "search"
+  | "form"
+  | "success"
+  | "pending"
+  | "not_found"
+  | "new_register";
 
 export default function CadastroMembro() {
   const [searchParams] = useSearchParams();
@@ -52,10 +77,14 @@ export default function CadastroMembro() {
   });
 
   const currentYear = new Date().getFullYear();
-  const anos = Array.from({ length: 100 }, (_, i) => (currentYear - i).toString());
+  const anos = Array.from({ length: 100 }, (_, i) =>
+    (currentYear - i).toString(),
+  );
   const { toast } = useToast();
 
-  const dias = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"));
+  const dias = Array.from({ length: 31 }, (_, i) =>
+    (i + 1).toString().padStart(2, "0"),
+  );
   const meses = [
     { value: "01", label: "Janeiro" },
     { value: "02", label: "Fevereiro" },
@@ -73,12 +102,12 @@ export default function CadastroMembro() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!searchContato.trim()) {
       toast({
         title: "Erro",
         description: "Digite seu telefone ou email para buscar seu cadastro",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -87,23 +116,26 @@ export default function CadastroMembro() {
 
     try {
       // Usar edge function para busca pública
-      const { data: result, error } = await supabase.functions.invoke('cadastro-publico', {
-        body: {
-          action: 'buscar_membro',
-          data: {
-            contato: searchContato.trim(),
-            igreja_id: igrejaIdParam,
-            filial_id: filialIdParam,
-            todas_filiais: todasFiliaisParam,
-          }
-        }
-      });
+      const { data: result, error } = await supabase.functions.invoke(
+        "cadastro-publico",
+        {
+          body: {
+            action: "buscar_membro",
+            data: {
+              contato: searchContato.trim(),
+              igreja_id: igrejaIdParam,
+              filial_id: filialIdParam,
+              todas_filiais: todasFiliaisParam,
+            },
+          },
+        },
+      );
 
       if (error) throw error;
-      
+
       if (result?.error || !result?.data) {
         const contato = searchContato.trim();
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           email: contato.includes("@") ? contato : prev.email,
           telefone: !contato.includes("@") ? contato : prev.telefone,
@@ -115,7 +147,7 @@ export default function CadastroMembro() {
 
       const data = result.data;
       setProfile(data);
-      
+
       // Extrair dia, mês e ano da data de nascimento se existir
       let diaNasc = "";
       let mesNasc = "";
@@ -146,14 +178,14 @@ export default function CadastroMembro() {
         endereco: data.endereco || "",
         profissao: data.profissao || "",
       });
-      
+
       setStep("form");
     } catch (error) {
       console.error("Erro ao buscar perfil:", error);
       toast({
         title: "Erro",
         description: "Não foi possível buscar seu cadastro. Tente novamente.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -162,12 +194,12 @@ export default function CadastroMembro() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.nome.trim()) {
       toast({
         title: "Erro",
         description: "Nome é obrigatório",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -183,29 +215,33 @@ export default function CadastroMembro() {
       }
 
       // Usar edge function para atualização pública
-      const { data: result, error } = await supabase.functions.invoke('cadastro-publico', {
-        body: {
-          action: 'atualizar_membro',
-          data: {
-            id: profile.id,
-            nome: formData.nome.trim(),
-            telefone: formData.telefone.trim() || null,
-            sexo: formData.sexo || null,
-            data_nascimento: dataNascimento,
-            estado_civil: formData.estado_civil || null,
-            necessidades_especiais: formData.necessidades_especiais.trim() || null,
-            cep: formData.cep.trim() || null,
-            cidade: formData.cidade.trim() || null,
-            bairro: formData.bairro.trim() || null,
-            estado: formData.estado || null,
-            endereco: formData.endereco.trim() || null,
-            profissao: formData.profissao.trim() || null,
-            igreja_id: igrejaIdParam,
-            filial_id: filialIdParam,
-            todas_filiais: todasFiliaisParam,
-          }
-        }
-      });
+      const { data: result, error } = await supabase.functions.invoke(
+        "cadastro-publico",
+        {
+          body: {
+            action: "atualizar_membro",
+            data: {
+              id: profile.id,
+              nome: formData.nome.trim(),
+              telefone: formData.telefone.trim() || null,
+              sexo: formData.sexo || null,
+              data_nascimento: dataNascimento,
+              estado_civil: formData.estado_civil || null,
+              necessidades_especiais:
+                formData.necessidades_especiais.trim() || null,
+              cep: formData.cep.trim() || null,
+              cidade: formData.cidade.trim() || null,
+              bairro: formData.bairro.trim() || null,
+              estado: formData.estado || null,
+              endereco: formData.endereco.trim() || null,
+              profissao: formData.profissao.trim() || null,
+              igreja_id: igrejaIdParam,
+              filial_id: filialIdParam,
+              todas_filiais: todasFiliaisParam,
+            },
+          },
+        },
+      );
 
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
@@ -229,7 +265,7 @@ export default function CadastroMembro() {
       toast({
         title: "Erro",
         description: "Não foi possível atualizar seus dados. Tente novamente.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -238,12 +274,12 @@ export default function CadastroMembro() {
 
   const handleNewRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.nome.trim()) {
       toast({
         title: "Erro",
         description: "Nome é obrigatório",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -252,7 +288,7 @@ export default function CadastroMembro() {
       toast({
         title: "Erro",
         description: "Sexo é obrigatório",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -266,31 +302,35 @@ export default function CadastroMembro() {
         dataNascimento = `${ano}-${formData.mes_nascimento}-${formData.dia_nascimento}`;
       }
 
-      const { data: result, error } = await supabase.functions.invoke('cadastro-publico', {
-        body: {
-          action: 'cadastrar_visitante',
-          data: {
-            nome: formData.nome.trim(),
-            telefone: formData.telefone.trim() || null,
-            email: formData.email.trim() || null,
-            sexo: formData.sexo,
-            data_nascimento: dataNascimento,
-            estado_civil: formData.estado_civil || null,
-            necessidades_especiais: formData.necessidades_especiais.trim() || null,
-            cep: formData.cep.trim() || null,
-            cidade: formData.cidade.trim() || null,
-            bairro: formData.bairro.trim() || null,
-            estado: formData.estado || null,
-            endereco: formData.endereco.trim() || null,
-            profissao: formData.profissao.trim() || null,
-            tipo: 'frequentador',
-            deseja_contato: true,
-            igreja_id: igrejaIdParam,
-            filial_id: filialIdParam,
-            todas_filiais: todasFiliaisParam,
-          }
-        }
-      });
+      const { data: result, error } = await supabase.functions.invoke(
+        "cadastro-publico",
+        {
+          body: {
+            action: "cadastrar_visitante",
+            data: {
+              nome: formData.nome.trim(),
+              telefone: formData.telefone.trim() || null,
+              email: formData.email.trim() || null,
+              sexo: formData.sexo,
+              data_nascimento: dataNascimento,
+              estado_civil: formData.estado_civil || null,
+              necessidades_especiais:
+                formData.necessidades_especiais.trim() || null,
+              cep: formData.cep.trim() || null,
+              cidade: formData.cidade.trim() || null,
+              bairro: formData.bairro.trim() || null,
+              estado: formData.estado || null,
+              endereco: formData.endereco.trim() || null,
+              profissao: formData.profissao.trim() || null,
+              tipo: "frequentador",
+              deseja_contato: true,
+              igreja_id: igrejaIdParam,
+              filial_id: filialIdParam,
+              todas_filiais: todasFiliaisParam,
+            },
+          },
+        },
+      );
 
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
@@ -305,7 +345,7 @@ export default function CadastroMembro() {
       toast({
         title: "Erro",
         description: "Não foi possível realizar o cadastro. Tente novamente.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -316,7 +356,7 @@ export default function CadastroMembro() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <PublicHeader showBackButton backTo={cadastroBackLink} />
-        
+
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
             <CardContent className="pt-8 pb-8">
@@ -325,15 +365,22 @@ export default function CadastroMembro() {
                 Cadastro não encontrado
               </h2>
               <p className="text-muted-foreground mb-6">
-                Não encontramos um cadastro para <strong>{searchContato}</strong>. 
-                Deseja criar um novo cadastro?
+                Não encontramos um cadastro para{" "}
+                <strong>{searchContato}</strong>. Deseja criar um novo cadastro?
               </p>
               <div className="flex flex-col gap-3">
-                <Button onClick={() => setStep("new_register")} className="w-full">
+                <Button
+                  onClick={() => setStep("new_register")}
+                  className="w-full"
+                >
                   <UserPlus className="w-4 h-4 mr-2" />
                   Sim, quero me cadastrar
                 </Button>
-                <Button variant="outline" onClick={() => setStep("search")} className="w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep("search")}
+                  className="w-full"
+                >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Tentar outro email
                 </Button>
@@ -349,14 +396,14 @@ export default function CadastroMembro() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <PublicHeader showBackButton backTo={cadastroBackLink} />
-        
+
         <div className="flex-1 p-4 py-8">
           <Card className="w-full max-w-lg mx-auto shadow-soft">
             <CardHeader>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="w-fit mb-2" 
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-fit mb-2"
                 onClick={() => setStep("not_found")}
               >
                 <ArrowLeft className="w-4 h-4 mr-1" />
@@ -369,7 +416,7 @@ export default function CadastroMembro() {
                 Preencha seus dados para se cadastrar
               </CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handleNewRegister} className="space-y-4">
                 <div className="space-y-2">
@@ -377,7 +424,9 @@ export default function CadastroMembro() {
                   <Input
                     id="nome"
                     value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nome: e.target.value })
+                    }
                     placeholder="Seu nome completo"
                     disabled={loading}
                   />
@@ -389,7 +438,9 @@ export default function CadastroMembro() {
                     id="email_new"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     placeholder="seu@email.com"
                     disabled={loading}
                   />
@@ -400,7 +451,9 @@ export default function CadastroMembro() {
                   <InputMask
                     mask="(99) 99999-9999"
                     value={formData.telefone}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, telefone: e.target.value })
+                    }
                     disabled={loading}
                   >
                     {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
@@ -419,7 +472,9 @@ export default function CadastroMembro() {
                     <Label htmlFor="sexo_new">Sexo *</Label>
                     <Select
                       value={formData.sexo}
-                      onValueChange={(value) => setFormData({ ...formData, sexo: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, sexo: value })
+                      }
                       disabled={loading}
                     >
                       <SelectTrigger id="sexo_new">
@@ -436,7 +491,9 @@ export default function CadastroMembro() {
                     <Label htmlFor="estado_civil_new">Estado civil</Label>
                     <Select
                       value={formData.estado_civil}
-                      onValueChange={(value) => setFormData({ ...formData, estado_civil: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, estado_civil: value })
+                      }
                       disabled={loading}
                     >
                       <SelectTrigger id="estado_civil_new">
@@ -445,7 +502,9 @@ export default function CadastroMembro() {
                       <SelectContent>
                         <SelectItem value="solteiro">Solteiro(a)</SelectItem>
                         <SelectItem value="casado">Casado(a)</SelectItem>
-                        <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                        <SelectItem value="divorciado">
+                          Divorciado(a)
+                        </SelectItem>
                         <SelectItem value="viuvo">Viúvo(a)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -457,7 +516,9 @@ export default function CadastroMembro() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Select
                       value={formData.dia_nascimento}
-                      onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, dia_nascimento: value })
+                      }
                       disabled={loading}
                     >
                       <SelectTrigger>
@@ -465,13 +526,17 @@ export default function CadastroMembro() {
                       </SelectTrigger>
                       <SelectContent>
                         {dias.map((dia) => (
-                          <SelectItem key={dia} value={dia}>{dia}</SelectItem>
+                          <SelectItem key={dia} value={dia}>
+                            {dia}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <Select
                       value={formData.mes_nascimento}
-                      onValueChange={(value) => setFormData({ ...formData, mes_nascimento: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, mes_nascimento: value })
+                      }
                       disabled={loading}
                     >
                       <SelectTrigger>
@@ -479,13 +544,17 @@ export default function CadastroMembro() {
                       </SelectTrigger>
                       <SelectContent>
                         {meses.map((mes) => (
-                          <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>
+                          <SelectItem key={mes.value} value={mes.value}>
+                            {mes.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <Select
                       value={formData.ano_nascimento}
-                      onValueChange={(value) => setFormData({ ...formData, ano_nascimento: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, ano_nascimento: value })
+                      }
                       disabled={loading}
                     >
                       <SelectTrigger>
@@ -493,7 +562,9 @@ export default function CadastroMembro() {
                       </SelectTrigger>
                       <SelectContent>
                         {anos.map((ano) => (
-                          <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                          <SelectItem key={ano} value={ano}>
+                            {ano}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -505,18 +576,27 @@ export default function CadastroMembro() {
                   <Input
                     id="profissao_new"
                     value={formData.profissao}
-                    onChange={(e) => setFormData({ ...formData, profissao: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, profissao: e.target.value })
+                    }
                     placeholder="Sua profissão"
                     disabled={loading}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="necessidades_especiais_new">Possui alguma necessidade especial?</Label>
+                  <Label htmlFor="necessidades_especiais_new">
+                    Possui alguma necessidade especial?
+                  </Label>
                   <Input
                     id="necessidades_especiais_new"
                     value={formData.necessidades_especiais}
-                    onChange={(e) => setFormData({ ...formData, necessidades_especiais: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        necessidades_especiais: e.target.value,
+                      })
+                    }
                     placeholder="Ex: cadeirante, deficiência auditiva, etc."
                     disabled={loading}
                   />
@@ -524,17 +604,21 @@ export default function CadastroMembro() {
 
                 <div className="border-t border-border pt-4 mt-4">
                   <h3 className="font-medium text-sm mb-3">Endereço</h3>
-                  
+
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor="cep_new">CEP</Label>
                       <InputMask
                         mask="99999-999"
                         value={formData.cep}
-                        onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, cep: e.target.value })
+                        }
                         disabled={loading}
                       >
-                        {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
+                        {(
+                          inputProps: InputHTMLAttributes<HTMLInputElement>,
+                        ) => (
                           <Input
                             {...inputProps}
                             id="cep_new"
@@ -550,7 +634,9 @@ export default function CadastroMembro() {
                         <Input
                           id="cidade_new"
                           value={formData.cidade}
-                          onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                          onChange={(e) =>
+                            setFormData({ ...formData, cidade: e.target.value })
+                          }
                           placeholder="Cidade"
                           disabled={loading}
                         />
@@ -559,15 +645,47 @@ export default function CadastroMembro() {
                         <Label htmlFor="estado_new">Estado</Label>
                         <Select
                           value={formData.estado}
-                          onValueChange={(value) => setFormData({ ...formData, estado: value })}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, estado: value })
+                          }
                           disabled={loading}
                         >
                           <SelectTrigger id="estado_new">
                             <SelectValue placeholder="UF" />
                           </SelectTrigger>
                           <SelectContent>
-                            {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map((uf) => (
-                              <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                            {[
+                              "AC",
+                              "AL",
+                              "AP",
+                              "AM",
+                              "BA",
+                              "CE",
+                              "DF",
+                              "ES",
+                              "GO",
+                              "MA",
+                              "MT",
+                              "MS",
+                              "MG",
+                              "PA",
+                              "PB",
+                              "PR",
+                              "PE",
+                              "PI",
+                              "RJ",
+                              "RN",
+                              "RS",
+                              "RO",
+                              "RR",
+                              "SC",
+                              "SP",
+                              "SE",
+                              "TO",
+                            ].map((uf) => (
+                              <SelectItem key={uf} value={uf}>
+                                {uf}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -579,7 +697,9 @@ export default function CadastroMembro() {
                       <Input
                         id="bairro_new"
                         value={formData.bairro}
-                        onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, bairro: e.target.value })
+                        }
                         placeholder="Bairro"
                         disabled={loading}
                       />
@@ -590,7 +710,9 @@ export default function CadastroMembro() {
                       <Input
                         id="endereco_new"
                         value={formData.endereco}
-                        onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, endereco: e.target.value })
+                        }
                         placeholder="Rua, número, complemento"
                         disabled={loading}
                       />
@@ -623,7 +745,7 @@ export default function CadastroMembro() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <PublicHeader showBackButton backTo={cadastroBackLink} />
-        
+
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
             <CardContent className="pt-8 pb-8">
@@ -632,10 +754,11 @@ export default function CadastroMembro() {
                 Solicitação enviada!
               </h2>
               <p className="text-muted-foreground mb-6">
-                Sua atualização foi enviada e será analisada pela secretaria da igreja. 
-                Você será notificado quando suas alterações forem aprovadas.
+                Sua atualização foi enviada e será analisada pela secretaria da
+                igreja. Você será notificado quando suas alterações forem
+                aprovadas.
               </p>
-              <Button onClick={() => window.location.href = "/public"}>
+              <Button onClick={() => (window.location.href = "/public")}>
                 Voltar para o início
               </Button>
             </CardContent>
@@ -649,7 +772,7 @@ export default function CadastroMembro() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <PublicHeader showBackButton backTo={cadastroBackLink} />
-        
+
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
             <CardContent className="pt-8 pb-8">
@@ -658,9 +781,10 @@ export default function CadastroMembro() {
                 Tudo certo!
               </h2>
               <p className="text-muted-foreground mb-6">
-                Seu cadastro está atualizado. Obrigado por manter seus dados em dia!
+                Seu cadastro está atualizado. Obrigado por manter seus dados em
+                dia!
               </p>
-              <Button onClick={() => window.location.href = "/public"}>
+              <Button onClick={() => (window.location.href = "/public")}>
                 Voltar para o início
               </Button>
             </CardContent>
@@ -674,7 +798,7 @@ export default function CadastroMembro() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <PublicHeader showBackButton backTo={cadastroBackLink} />
-        
+
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft">
             <CardHeader className="text-center">
@@ -685,11 +809,13 @@ export default function CadastroMembro() {
                 Digite seu telefone ou email cadastrado para acessar seus dados
               </CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handleSearch} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="searchContato">Telefone ou email cadastrado *</Label>
+                  <Label htmlFor="searchContato">
+                    Telefone ou email cadastrado *
+                  </Label>
                   <Input
                     id="searchContato"
                     type="text"
@@ -724,14 +850,14 @@ export default function CadastroMembro() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <PublicHeader showBackButton backTo={cadastroBackLink} />
-      
+
       <div className="flex-1 p-4 py-8">
         <Card className="w-full max-w-lg mx-auto shadow-soft">
           <CardHeader>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-fit mb-2" 
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-fit mb-2"
               onClick={() => setStep("search")}
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
@@ -741,10 +867,16 @@ export default function CadastroMembro() {
               Atualize seus dados
             </CardTitle>
             <CardDescription>
-              Olá {profile && typeof profile === 'object' && 'nome' in profile ? String((profile as { nome?: string }).nome || '').split(" ")[0] : ''}! Atualize suas informações abaixo.
+              Olá{" "}
+              {profile && typeof profile === "object" && "nome" in profile
+                ? String((profile as { nome?: string }).nome || "").split(
+                    " ",
+                  )[0]
+                : ""}
+              ! Atualize suas informações abaixo.
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -752,7 +884,9 @@ export default function CadastroMembro() {
                 <Input
                   id="nome"
                   value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
                   placeholder="Seu nome completo"
                   disabled={loading}
                 />
@@ -763,7 +897,9 @@ export default function CadastroMembro() {
                 <InputMask
                   mask="(99) 99999-9999"
                   value={formData.telefone}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, telefone: e.target.value })
+                  }
                   disabled={loading}
                 >
                   {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
@@ -782,7 +918,9 @@ export default function CadastroMembro() {
                   <Label htmlFor="sexo">Sexo</Label>
                   <Select
                     value={formData.sexo}
-                    onValueChange={(value) => setFormData({ ...formData, sexo: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, sexo: value })
+                    }
                     disabled={loading}
                   >
                     <SelectTrigger id="sexo">
@@ -799,7 +937,9 @@ export default function CadastroMembro() {
                   <Label htmlFor="estado_civil">Estado civil</Label>
                   <Select
                     value={formData.estado_civil}
-                    onValueChange={(value) => setFormData({ ...formData, estado_civil: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, estado_civil: value })
+                    }
                     disabled={loading}
                   >
                     <SelectTrigger id="estado_civil">
@@ -820,7 +960,9 @@ export default function CadastroMembro() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Select
                     value={formData.dia_nascimento}
-                    onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, dia_nascimento: value })
+                    }
                     disabled={loading}
                   >
                     <SelectTrigger>
@@ -828,13 +970,17 @@ export default function CadastroMembro() {
                     </SelectTrigger>
                     <SelectContent>
                       {dias.map((dia) => (
-                        <SelectItem key={dia} value={dia}>{dia}</SelectItem>
+                        <SelectItem key={dia} value={dia}>
+                          {dia}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Select
                     value={formData.mes_nascimento}
-                    onValueChange={(value) => setFormData({ ...formData, mes_nascimento: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, mes_nascimento: value })
+                    }
                     disabled={loading}
                   >
                     <SelectTrigger>
@@ -842,13 +988,17 @@ export default function CadastroMembro() {
                     </SelectTrigger>
                     <SelectContent>
                       {meses.map((mes) => (
-                        <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>
+                        <SelectItem key={mes.value} value={mes.value}>
+                          {mes.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Select
                     value={formData.ano_nascimento}
-                    onValueChange={(value) => setFormData({ ...formData, ano_nascimento: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, ano_nascimento: value })
+                    }
                     disabled={loading}
                   >
                     <SelectTrigger>
@@ -856,7 +1006,9 @@ export default function CadastroMembro() {
                     </SelectTrigger>
                     <SelectContent>
                       {anos.map((ano) => (
-                        <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                        <SelectItem key={ano} value={ano}>
+                          {ano}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -868,18 +1020,27 @@ export default function CadastroMembro() {
                 <Input
                   id="profissao"
                   value={formData.profissao}
-                  onChange={(e) => setFormData({ ...formData, profissao: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, profissao: e.target.value })
+                  }
                   placeholder="Sua profissão"
                   disabled={loading}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="necessidades_especiais">Possui alguma necessidade especial?</Label>
+                <Label htmlFor="necessidades_especiais">
+                  Possui alguma necessidade especial?
+                </Label>
                 <Input
                   id="necessidades_especiais"
                   value={formData.necessidades_especiais}
-                  onChange={(e) => setFormData({ ...formData, necessidades_especiais: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      necessidades_especiais: e.target.value,
+                    })
+                  }
                   placeholder="Ex: cadeirante, deficiência auditiva, etc."
                   disabled={loading}
                 />
@@ -887,14 +1048,16 @@ export default function CadastroMembro() {
 
               <div className="border-t border-border pt-4 mt-4">
                 <h3 className="font-medium text-sm mb-3">Endereço</h3>
-                
+
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <Label htmlFor="cep">CEP</Label>
                     <InputMask
                       mask="99999-999"
                       value={formData.cep}
-                      onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cep: e.target.value })
+                      }
                       disabled={loading}
                     >
                       {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
@@ -913,7 +1076,9 @@ export default function CadastroMembro() {
                       <Input
                         id="cidade"
                         value={formData.cidade}
-                        onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, cidade: e.target.value })
+                        }
                         placeholder="Cidade"
                         disabled={loading}
                       />
@@ -922,15 +1087,47 @@ export default function CadastroMembro() {
                       <Label htmlFor="estado">Estado</Label>
                       <Select
                         value={formData.estado}
-                        onValueChange={(value) => setFormData({ ...formData, estado: value })}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, estado: value })
+                        }
                         disabled={loading}
                       >
                         <SelectTrigger id="estado">
                           <SelectValue placeholder="UF" />
                         </SelectTrigger>
                         <SelectContent>
-                          {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map((uf) => (
-                            <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                          {[
+                            "AC",
+                            "AL",
+                            "AP",
+                            "AM",
+                            "BA",
+                            "CE",
+                            "DF",
+                            "ES",
+                            "GO",
+                            "MA",
+                            "MT",
+                            "MS",
+                            "MG",
+                            "PA",
+                            "PB",
+                            "PR",
+                            "PE",
+                            "PI",
+                            "RJ",
+                            "RN",
+                            "RS",
+                            "RO",
+                            "RR",
+                            "SC",
+                            "SP",
+                            "SE",
+                            "TO",
+                          ].map((uf) => (
+                            <SelectItem key={uf} value={uf}>
+                              {uf}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -942,7 +1139,9 @@ export default function CadastroMembro() {
                     <Input
                       id="bairro"
                       value={formData.bairro}
-                      onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, bairro: e.target.value })
+                      }
                       placeholder="Bairro"
                       disabled={loading}
                     />
@@ -953,7 +1152,9 @@ export default function CadastroMembro() {
                     <Input
                       id="endereco"
                       value={formData.endereco}
-                      onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, endereco: e.target.value })
+                      }
                       placeholder="Rua, número, complemento"
                       disabled={loading}
                     />

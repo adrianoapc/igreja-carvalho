@@ -8,7 +8,16 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, QrCode, Link2, Heart, Users, UserPlus, Coffee, Sparkles } from "lucide-react";
+import {
+  Copy,
+  QrCode,
+  Link2,
+  Heart,
+  Users,
+  UserPlus,
+  Coffee,
+  Sparkles,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,27 +37,27 @@ export function LinksExternosCard() {
 
   const baseUrl = window.location.origin;
 
-  const withContext = useCallback((
-    path: string,
-    extra?: Record<string, string | boolean>
-  ) => {
-    const params = new URLSearchParams();
-    if (igrejaId) params.set("igreja_id", igrejaId);
-    if (!isAllFiliais && filialId) params.set("filial_id", filialId);
-    if (isAllFiliais) params.set("todas_filiais", "true");
-    if (extra) {
-      Object.entries(extra).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.set(key, String(value));
-        }
-      });
-    }
-    const query = params.toString();
-    const separator = path.includes("?") ? "&" : "?";
-    return query
-      ? `${baseUrl}${path}${separator}${query}`
-      : `${baseUrl}${path}`;
-  }, [baseUrl, igrejaId, filialId, isAllFiliais]);
+  const withContext = useCallback(
+    (path: string, extra?: Record<string, string | boolean>) => {
+      const params = new URLSearchParams();
+      if (igrejaId) params.set("igreja_id", igrejaId);
+      if (!isAllFiliais && filialId) params.set("filial_id", filialId);
+      if (isAllFiliais) params.set("todas_filiais", "true");
+      if (extra) {
+        Object.entries(extra).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            params.set(key, String(value));
+          }
+        });
+      }
+      const query = params.toString();
+      const separator = path.includes("?") ? "&" : "?";
+      return query
+        ? `${baseUrl}${path}${separator}${query}`
+        : `${baseUrl}${path}`;
+    },
+    [baseUrl, igrejaId, filialId, isAllFiliais],
+  );
 
   const links = useMemo(
     () => [
@@ -105,7 +114,7 @@ export function LinksExternosCard() {
         linkType: "cafe_vp_qr" as const,
       },
     ],
-    [withContext]
+    [withContext],
   );
 
   const copyToClipboard = async (url: string, title: string) => {
@@ -260,7 +269,7 @@ export function LinksExternosCard() {
                 <div className="p-4 bg-white rounded-lg">
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-                      selectedLink.url
+                      selectedLink.url,
                     )}`}
                     alt={`QR Code para ${selectedLink.title}`}
                     className="w-48 h-48"

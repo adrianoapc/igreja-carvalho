@@ -1,10 +1,22 @@
 import { useState, useEffect, type InputHTMLAttributes } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { useToast } from "@/hooks/use-toast";
@@ -30,7 +42,7 @@ export default function CadastroVisitante() {
     return query ? `/cadastro?${query}` : "/cadastro";
   };
   const cadastroBackLink = buildCadastroBackLink();
-  
+
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
@@ -58,7 +70,9 @@ export default function CadastroVisitante() {
   ];
   const { toast } = useToast();
 
-  const dias = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"));
+  const dias = Array.from({ length: 31 }, (_, i) =>
+    (i + 1).toString().padStart(2, "0"),
+  );
   const meses = [
     { value: "01", label: "Janeiro" },
     { value: "02", label: "Fevereiro" },
@@ -76,12 +90,12 @@ export default function CadastroVisitante() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.nome.trim()) {
       toast({
         title: "Erro",
         description: "Nome é obrigatório",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -90,7 +104,7 @@ export default function CadastroVisitante() {
       toast({
         title: "Erro",
         description: "Informe pelo menos um contato (telefone ou email)",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -105,33 +119,39 @@ export default function CadastroVisitante() {
       }
 
       // Usar edge function para cadastro público (sem autenticação)
-      const { data: result, error } = await supabase.functions.invoke('cadastro-publico', {
-        body: {
-          action: 'cadastrar_visitante',
-          data: {
-            nome: formData.nome.trim(),
-            telefone: formData.telefone.trim() || null,
-            email: formData.email.trim() || null,
-            sexo: formData.sexo || null,
-            data_nascimento: dataNascimento,
-            entrou_por: formData.entrou_por || null,
-            necessidades_especiais: formData.necessidades_especiais.trim() || null,
-            observacoes: formData.observacoes.trim() || null,
-            aceitou_jesus: formData.aceitou_jesus,
-            deseja_contato: formData.deseja_contato,
-            igreja_id: igrejaIdParam,
-            filial_id: filialIdParam,
-            todas_filiais: todasFiliaisParam,
-          }
-        }
-      });
+      const { data: result, error } = await supabase.functions.invoke(
+        "cadastro-publico",
+        {
+          body: {
+            action: "cadastrar_visitante",
+            data: {
+              nome: formData.nome.trim(),
+              telefone: formData.telefone.trim() || null,
+              email: formData.email.trim() || null,
+              sexo: formData.sexo || null,
+              data_nascimento: dataNascimento,
+              entrou_por: formData.entrou_por || null,
+              necessidades_especiais:
+                formData.necessidades_especiais.trim() || null,
+              observacoes: formData.observacoes.trim() || null,
+              aceitou_jesus: formData.aceitou_jesus,
+              deseja_contato: formData.deseja_contato,
+              igreja_id: igrejaIdParam,
+              filial_id: filialIdParam,
+              todas_filiais: todasFiliaisParam,
+            },
+          },
+        },
+      );
 
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
 
       toast({
-        title: result?.isUpdate ? "Cadastro atualizado!" : "Cadastro realizado!",
-        description: result?.isUpdate 
+        title: result?.isUpdate
+          ? "Cadastro atualizado!"
+          : "Cadastro realizado!",
+        description: result?.isUpdate
           ? `Obrigado ${result.data?.nome}! Seu cadastro foi atualizado.`
           : "Obrigado por se cadastrar! Será um prazer ter você conosco.",
       });
@@ -142,7 +162,7 @@ export default function CadastroVisitante() {
       toast({
         title: "Erro",
         description: "Não foi possível realizar o cadastro. Tente novamente.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -153,7 +173,7 @@ export default function CadastroVisitante() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <PublicHeader showBackButton backTo={cadastroBackLink} />
-        
+
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
             <CardContent className="pt-8 pb-8">
@@ -162,9 +182,10 @@ export default function CadastroVisitante() {
                 Cadastro realizado!
               </h2>
               <p className="text-muted-foreground mb-6">
-                Obrigado por se cadastrar! Será um prazer ter você conosco em nossos cultos.
+                Obrigado por se cadastrar! Será um prazer ter você conosco em
+                nossos cultos.
               </p>
-              <Button onClick={() => window.location.href = "/public"}>
+              <Button onClick={() => (window.location.href = "/public")}>
                 Voltar para o início
               </Button>
             </CardContent>
@@ -176,8 +197,8 @@ export default function CadastroVisitante() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo={cadastroBackLink} />
-      
+      <PublicHeader showBackButton backTo={cadastroBackLink} />
+
       <div className="flex-1 flex items-center justify-center p-4 py-8">
         <Card className="w-full max-w-md shadow-soft">
           <CardHeader className="text-center pb-2">
@@ -198,12 +219,12 @@ export default function CadastroVisitante() {
               {aceitouJesus ? "Parabéns pela sua decisão!" : "Seja bem-vindo!"}
             </CardTitle>
             <CardDescription className="text-base">
-              {aceitouJesus 
+              {aceitouJesus
                 ? "Que alegria ter você conosco! Sua vida nunca mais será a mesma. Preencha seus dados para que possamos caminhar juntos."
                 : "É uma alegria receber você! Preencha seus dados para nos conhecermos melhor e podermos te acompanhar nessa jornada."}
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -211,7 +232,9 @@ export default function CadastroVisitante() {
                 <Input
                   id="nome"
                   value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
                   placeholder="Seu nome completo"
                   disabled={loading}
                 />
@@ -222,7 +245,9 @@ export default function CadastroVisitante() {
                 <InputMask
                   mask="(99) 99999-9999"
                   value={formData.telefone}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, telefone: e.target.value })
+                  }
                   disabled={loading}
                 >
                   {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
@@ -242,7 +267,9 @@ export default function CadastroVisitante() {
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   placeholder="seu@email.com"
                   disabled={loading}
                 />
@@ -252,7 +279,9 @@ export default function CadastroVisitante() {
                 <Label htmlFor="sexo">Sexo</Label>
                 <Select
                   value={formData.sexo}
-                  onValueChange={(value) => setFormData({ ...formData, sexo: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, sexo: value })
+                  }
                   disabled={loading}
                 >
                   <SelectTrigger id="sexo">
@@ -270,7 +299,9 @@ export default function CadastroVisitante() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Select
                     value={formData.dia_nascimento}
-                    onValueChange={(value) => setFormData({ ...formData, dia_nascimento: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, dia_nascimento: value })
+                    }
                     disabled={loading}
                   >
                     <SelectTrigger>
@@ -278,13 +309,17 @@ export default function CadastroVisitante() {
                     </SelectTrigger>
                     <SelectContent>
                       {dias.map((dia) => (
-                        <SelectItem key={dia} value={dia}>{dia}</SelectItem>
+                        <SelectItem key={dia} value={dia}>
+                          {dia}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Select
                     value={formData.mes_nascimento}
-                    onValueChange={(value) => setFormData({ ...formData, mes_nascimento: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, mes_nascimento: value })
+                    }
                     disabled={loading}
                   >
                     <SelectTrigger>
@@ -292,7 +327,9 @@ export default function CadastroVisitante() {
                     </SelectTrigger>
                     <SelectContent>
                       {meses.map((mes) => (
-                        <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>
+                        <SelectItem key={mes.value} value={mes.value}>
+                          {mes.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -303,7 +340,9 @@ export default function CadastroVisitante() {
                 <Label htmlFor="entrou_por">Como conheceu a igreja?</Label>
                 <Select
                   value={formData.entrou_por}
-                  onValueChange={(value) => setFormData({ ...formData, entrou_por: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, entrou_por: value })
+                  }
                   disabled={loading}
                 >
                   <SelectTrigger id="entrou_por">
@@ -311,18 +350,27 @@ export default function CadastroVisitante() {
                   </SelectTrigger>
                   <SelectContent>
                     {opcoesComoConheceu.map((opcao) => (
-                      <SelectItem key={opcao.value} value={opcao.value}>{opcao.label}</SelectItem>
+                      <SelectItem key={opcao.value} value={opcao.value}>
+                        {opcao.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="necessidades_especiais">Possui alguma necessidade especial?</Label>
+                <Label htmlFor="necessidades_especiais">
+                  Possui alguma necessidade especial?
+                </Label>
                 <Input
                   id="necessidades_especiais"
                   value={formData.necessidades_especiais}
-                  onChange={(e) => setFormData({ ...formData, necessidades_especiais: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      necessidades_especiais: e.target.value,
+                    })
+                  }
                   placeholder="Ex: cadeirante, deficiência auditiva, etc."
                   disabled={loading}
                 />
@@ -333,7 +381,9 @@ export default function CadastroVisitante() {
                 <Textarea
                   id="observacoes"
                   value={formData.observacoes}
-                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
                   placeholder="Algo que gostaria de compartilhar..."
                   disabled={loading}
                   className="min-h-[80px]"
@@ -345,8 +395,11 @@ export default function CadastroVisitante() {
                   <Checkbox
                     id="aceitou_jesus"
                     checked={formData.aceitou_jesus}
-                    onCheckedChange={(checked) => 
-                      setFormData({ ...formData, aceitou_jesus: checked as boolean })
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        aceitou_jesus: checked as boolean,
+                      })
                     }
                     disabled={loading}
                   />
@@ -362,8 +415,11 @@ export default function CadastroVisitante() {
                   <Checkbox
                     id="deseja_contato"
                     checked={formData.deseja_contato}
-                    onCheckedChange={(checked) => 
-                      setFormData({ ...formData, deseja_contato: checked as boolean })
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        deseja_contato: checked as boolean,
+                      })
                     }
                     disabled={loading}
                   />

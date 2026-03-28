@@ -82,7 +82,9 @@ const PessoasAlteracoes = lazy(
 const AprovarAlteracao = lazy(() => import("./pages/pessoas/AprovarAlteracao"));
 const PessoaDetalhes = lazy(() => import("./pages/PessoaDetalhes"));
 const EditarPessoa = lazy(() => import("./pages/pessoas/EditarPessoa"));
-const EditarContatosPage = lazy(() => import("./pages/pessoas/EditarContatosPage"));
+const EditarContatosPage = lazy(
+  () => import("./pages/pessoas/EditarContatosPage"),
+);
 
 // Gabinete
 const GabinetePastoral = lazy(() => import("./pages/GabinetePastoral"));
@@ -244,998 +246,1007 @@ const App = () => (
                   </div>
                 }
               >
-              <Routes>
-                {/* Rotas de Autenticação (públicas) */}
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/biometric-login" element={<BiometricLogin />} />
-                <Route path="/context-select" element={<ContextSelect />} />
-                <Route
-                  path="/forced-password-change"
-                  element={<ForcedPasswordChange />}
-                />
-                <Route path="/maintenance" element={<Maintenance />} />
-                {/* Rota removida: /financas/config-formas-pagamento (unificada em FormasPagamento) */}
-                <Route path="/install" element={<Install />} />
-                <Route path="/public/:slug" element={<Public />} />
-
-                {/* Telão e Check-in (Públicos ou tokenizados) */}
-                <Route path="/telao/:id" element={<Telao />} />
-                <Route path="/telao/liturgia/:id" element={<TelaoLiturgia />} />
-                <Route path="/checkin/:tipo/:id" element={<Checkin />} />
-
-                {/* Cadastro Público */}
-                <Route path="/cadastro" element={<CadastroIndex />} />
-                <Route
-                  path="/cadastro/visitante"
-                  element={<CadastroVisitante />}
-                />
-                <Route path="/cadastro/membro" element={<CadastroMembro />} />
-                <Route path="/cadastro/cafe-vp" element={<CadastroCafeVP />} />
-                <Route path="/cadastro/igreja" element={<NovaIgreja />} />
-
-                {/* Inscrição Pública (QR Code) */}
-                <Route
-                  path="/inscricao/:token"
-                  element={<InscricaoPublica />}
-                />
-
-                {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}
-                <Route element={<MainLayout />}>
-                  <Route
-                    path="/"
-                    element={
-                      <AuthGate>
-                        <Dashboard />
-                      </AuthGate>
-                    }
-                  />
-
-                  <Route
-                    path="/revisao"
-                    element={
-                      <AuthGate>
-                        <ReviewPage />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/revisao/:slug"
-                    element={
-                      <AuthGate>
-                        <ReviewPage />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Perfil & Família */}
-                  <Route
-                    path="/perfil"
-                    element={
-                      <AuthGate>
-                        <Perfil />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/perfil/familia"
-                    element={
-                      <AuthGate>
-                        <MinhaFamilia />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/perfil/wallet"
-                    element={
-                      <AuthGate>
-                        <FamilyWallet />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/biblia"
-                    element={
-                      <AuthGate>
-                        <Biblia />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/agenda"
-                    element={
-                      <AuthGate>
-                        <Agenda />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/chamada"
-                    element={
-                      <AuthGate>
-                        <Chamada />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/voluntariado"
-                    element={
-                      <AuthGate>
-                        <Voluntariado />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/voluntariado/candidatos"
-                    element={
-                      <AuthGate>
-                        <VoluntariadoCandidatos />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/voluntariado/historico"
-                    element={
-                      <AuthGate>
-                        <VoluntariadoHistorico />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/voluntariado/testes"
-                    element={
-                      <AuthGate>
-                        <TestesCrud />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/voluntariado/integracao"
-                    element={
-                      <AuthGate>
-                        <IntegracaoDashboard />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/voluntariado/meu-teste/:testeId"
-                    element={
-                      <AuthGate>
-                        <MeuTeste />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/voluntariado/minha-jornada"
-                    element={
-                      <AuthGate>
-                        <MinhaJornada />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Comunicação */}
-                  <Route
-                    path="/publicacao"
-                    element={
-                      <AuthGate>
-                        <Publicacao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/comunicados"
-                    element={
-                      <AuthGate>
-                        <Comunicados />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/mural"
-                    element={
-                      <AuthGate>
-                        <Announcements />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/admin/mural"
-                    element={
-                      <AuthGate>
-                        <AnnouncementsAdmin />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Pessoas */}
-                  <Route
-                    path="/pessoas"
-                    element={
-                      <AuthGate>
-                        <PessoasIndex />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/todos"
-                    element={
-                      <AuthGate>
-                        <PessoasTodos />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/membros"
-                    element={
-                      <AuthGate>
-                        <PessoasMembros />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/visitantes"
-                    element={
-                      <AuthGate>
-                        <PessoasVisitantes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/frequentadores"
-                    element={
-                      <AuthGate>
-                        <PessoasFrequentadores />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/contatos"
-                    element={
-                      <AuthGate>
-                        <PessoasContatos />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/pendentes"
-                    element={
-                      <AuthGate>
-                        <PessoasAlteracoes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/alteracoes-pendentes"
-                    element={
-                      <AuthGate>
-                        <PessoasAlteracoes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/alteracoes/:id"
-                    element={
-                      <AuthGate>
-                        <AprovarAlteracao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/:id/editar"
-                    element={
-                      <AuthGate>
-                        <EditarPessoa />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/:id"
-                    element={
-                      <AuthGate>
-                        <PessoaDetalhes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/pessoas/:id/editar-contatos"
-                    element={
-                      <AuthGate>
-                        <EditarContatosPage />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Gabinete */}
-                  <Route
-                    path="/gabinete"
-                    element={
-                      <AuthGate>
-                        <GabinetePastoral />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/gabinete/atendimento/:id"
-                    element={
-                      <AuthGate>
-                        <AtendimentoProntuario />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Intercessão - Hub */}
-                  <Route
-                    path="/intercessao"
-                    element={
-                      <AuthGate>
-                        <Intercessao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/intercessao/diario"
-                    element={
-                      <AuthGate>
-                        <DiarioDeOracao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/intercessao/sala-de-guerra"
-                    element={
-                      <AuthGate>
-                        <SalaDeGuerra />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/intercessao/equipes"
-                    element={
-                      <AuthGate>
-                        <GestaoEquipes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/intercessao/sentimentos"
-                    element={
-                      <AuthGate>
-                        <Sentimentos />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Ministério Kids */}
-                  <Route
-                    path="/kids"
-                    element={
-                      <AuthGate>
-                        <Kids />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/kids/dashboard"
-                    element={
-                      <AuthGate>
-                        <KidsDashboard />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/kids/criancas"
-                    element={
-                      <AuthGate>
-                        <KidsCriancas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/kids/scanner"
-                    element={
-                      <AuthGate>
-                        <KidsScanner />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/kids/turma-ativa"
-                    element={
-                      <AuthGate>
-                        <KidsTurmaAtiva />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/kids/config"
-                    element={
-                      <AuthGate>
-                        <KidsConfig />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Ensino */}
-                  <Route
-                    path="/ensino"
-                    element={
-                      <AuthGate>
-                        <Ensino />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/ensino/dashboard"
-                    element={
-                      <AuthGate>
-                        <EnsinoDashboard />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/ensino/jornadas"
-                    element={
-                      <AuthGate>
-                        <Jornadas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/ensino/jornadas/:id"
-                    element={
-                      <AuthGate>
-                        <DetalhesJornada />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/ensino/jornadas/:id/board"
-                    element={
-                      <AuthGate>
-                        <JornadaBoard />
-                      </AuthGate>
-                    }
-                  />
-                  {/* Redirects legado de Jornadas para o módulo de Ensino */}
-                  <Route
-                    path="/jornadas"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/ensino/jornadas" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/jornadas/:id"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/ensino/jornadas/:id" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/jornadas/:id/board"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/ensino/jornadas/:id/board" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/ensinamentos"
-                    element={
-                      <AuthGate>
-                        <Ensinamentos />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cursos"
-                    element={
-                      <AuthGate>
-                        <MeusCursos />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cursos/:id"
-                    element={
-                      <AuthGate>
-                        <CursoPlayer />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cursos/:id/aula/:aulaId"
-                    element={
-                      <AuthGate>
-                        <CursoPlayer />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Eventos & Escalas */}
-                  <Route
-                    path="/eventos"
-                    element={
-                      <AuthGate>
-                        <EventosGeral />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/geral"
-                    element={
-                      <AuthGate>
-                        <EventosGeral />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/lista"
-                    element={
-                      <AuthGate>
-                        <EventosLista />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/times"
-                    element={
-                      <AuthGate>
-                        <EventosTimes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/categorias"
-                    element={
-                      <AuthGate>
-                        <EventosCategorias />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/posicoes"
-                    element={
-                      <AuthGate>
-                        <EventosPosicoes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/templates"
-                    element={
-                      <AuthGate>
-                        <EventosTemplates />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/midias"
-                    element={
-                      <AuthGate>
-                        <EventosMidias />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/liturgia"
-                    element={
-                      <AuthGate>
-                        <EventosLiturgia />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/eventos/:id"
-                    element={
-                      <AuthGate>
-                        <EventoDetalhes />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Redirects legado de /cultos para /eventos */}
-                  <Route
-                    path="/cultos"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/eventos" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cultos/geral"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/eventos/geral" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cultos/lista"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/eventos/lista" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cultos/liturgia"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/eventos/liturgia" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cultos/times"
-                    element={
-                      <AuthGate>
-                        <Navigate to="/eventos/times" replace />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/cultos/:id"
-                    element={
-                      <AuthGate>
-                        <EventoDetalhes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/escalas"
-                    element={
-                      <AuthGate>
-                        <Escalas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/minhas-escalas"
-                    element={
-                      <AuthGate>
-                        <MinhasEscalas />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Oração */}
-                  <Route
-                    path="/oracao/player/:escalaId"
-                    element={
-                      <AuthGate>
-                        <PrayerPlayer />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Mídias */}
-                  <Route
-                    path="/midias"
-                    element={
-                      <AuthGate>
-                        <Midias />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/midias/geral"
-                    element={
-                      <AuthGate>
-                        <EventosMidias />
-                      </AuthGate>
-                    }
-                  />
-
-                  {/* Financeiro */}
-                  {/* 🥥 PROVA DE CONCEITO RBAC: Bloqueio da rota principal */}
-                  <Route
-                    path="/financas"
-                    element={
-                      <AuthGate requiredPermission="financeiro.view">
-                        <Financas />
-                      </AuthGate>
-                    }
-                  />
-
-                  <Route
-                    path="/financas/dashboard"
-                    element={
-                      <AuthGate>
-                        <FinancasDashboard />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/dashboard-ofertas"
-                    element={
-                      <AuthGate>
-                        <FinancasDashboardOfertas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/projecao"
-                    element={
-                      <AuthGate>
-                        <FinancasProjecao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/insights"
-                    element={
-                      <AuthGate>
-                        <FinancasInsights />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/entradas"
-                    element={
-                      <AuthGate>
-                        <FinancasEntradas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/saidas"
-                    element={
-                      <AuthGate>
-                        <FinancasSaidas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/contas"
-                    element={
-                      <AuthGate>
-                        <FinancasContas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/reembolsos"
-                    element={
-                      <AuthGate>
-                        <FinancasReembolsos />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/transferencias"
-                    element={
-                      <AuthGate>
-                        <FinancasTransferencias />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/categorias"
-                    element={
-                      <AuthGate>
-                        <FinancasCategorias />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/centros-custo"
-                    element={
-                      <AuthGate>
-                        <FinancasCentrosCusto />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/fornecedores"
-                    element={
-                      <AuthGate>
-                        <FinancasFornecedores />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/bases-ministeriais"
-                    element={
-                      <AuthGate>
-                        <FinancasBases />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/formas-pagamento"
-                    element={
-                      <AuthGate>
-                        <FinancasFormas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/dre"
-                    element={
-                      <AuthGate>
-                        <FinancasDRE />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/ofertas"
-                    element={
-                      <AuthGate>
-                        <FinancasRelatorioOferta />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/importar"
-                    element={
-                      <AuthGate>
-                        <FinancasImportar />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/config-financeiro"
-                    element={
-                      <AuthGate>
-                        <FinancasConfigFinanceiro />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/gerenciar-dados"
-                    element={
-                      <AuthGate>
-                        <FinancasGerenciarDados />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/reclassificacao"
-                    element={
-                      <AuthGate>
-                        <FinancasReclassificacao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/reconciliacao"
-                    element={
-                      <AuthGate>
-                        <FinancasReconciliacao />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/financas/sessoes-contagem"
-                    element={
-                      <AuthGate>
-                        <FinancasSessoesContagem />
-                      </AuthGate>
-                    }
-                  />
+                <Routes>
+                  {/* Rotas de Autenticação (públicas) */}
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/biometric-login" element={<BiometricLogin />} />
+                  <Route path="/context-select" element={<ContextSelect />} />
+                  <Route
+                    path="/forced-password-change"
+                    element={<ForcedPasswordChange />}
+                  />
+                  <Route path="/maintenance" element={<Maintenance />} />
                   {/* Rota removida: /financas/config-formas-pagamento (unificada em FormasPagamento) */}
+                  <Route path="/install" element={<Install />} />
+                  <Route path="/public/:slug" element={<Public />} />
 
-                  {/* Projetos */}
+                  {/* Telão e Check-in (Públicos ou tokenizados) */}
+                  <Route path="/telao/:id" element={<Telao />} />
                   <Route
-                    path="/projetos"
-                    element={
-                      <AuthGate>
-                        <Projetos />
-                      </AuthGate>
-                    }
+                    path="/telao/liturgia/:id"
+                    element={<TelaoLiturgia />}
                   />
+                  <Route path="/checkin/:tipo/:id" element={<Checkin />} />
+
+                  {/* Cadastro Público */}
+                  <Route path="/cadastro" element={<CadastroIndex />} />
                   <Route
-                    path="/projetos/backlog"
-                    element={
-                      <AuthGate>
-                        <Backlog />
-                      </AuthGate>
-                    }
+                    path="/cadastro/visitante"
+                    element={<CadastroVisitante />}
                   />
+                  <Route path="/cadastro/membro" element={<CadastroMembro />} />
                   <Route
-                    path="/projetos/:id"
-                    element={
-                      <AuthGate>
-                        <ProjetoDetalhes />
-                      </AuthGate>
-                    }
+                    path="/cadastro/cafe-vp"
+                    element={<CadastroCafeVP />}
+                  />
+                  <Route path="/cadastro/igreja" element={<NovaIgreja />} />
+
+                  {/* Inscrição Pública (QR Code) */}
+                  <Route
+                    path="/inscricao/:token"
+                    element={<InscricaoPublica />}
                   />
 
-                  {/* Admin & Configurações */}
-                  <Route
-                    path="/admin"
-                    element={
-                      <AuthGate>
-                        <Admin />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/admin/permissoes"
-                    element={
-                      <AuthGate>
-                        <AdminPermissions />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/admin/webhooks"
-                    element={
-                      <AuthGate>
-                        <AdminWebhooks />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/admin/notificacoes"
-                    element={
-                      <AuthGate>
-                        <AdminNotificacoes />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/admin/chatbots"
-                    element={
-                      <AuthGate>
-                        <AdminChatbots />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/admin/revisao-duplicatas"
-                    element={
-                      <AuthGate>
-                        <RevisaoDuplicatas />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/configuracoes-igreja"
-                    element={
-                      <AuthGate>
-                        <ConfiguracoesIgreja />
-                      </AuthGate>
-                    }
-                  />
-                  <Route
-                    path="/configuracoes"
-                    element={
-                      <AuthGate>
-                        <Configuracoes />
-                      </AuthGate>
-                    }
-                  />
-                </Route>
+                  {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}
+                  <Route element={<MainLayout />}>
+                    <Route
+                      path="/"
+                      element={
+                        <AuthGate>
+                          <Dashboard />
+                        </AuthGate>
+                      }
+                    />
 
-                {/* --- ROTAS SUPER ADMIN (Layout Separado) --- */}
-                <Route element={<SuperAdminLayout />}>
-                  <Route path="/superadmin" element={<SuperAdminDashboard />} />
-                  <Route
-                    path="/superadmin/igrejas"
-                    element={<SuperAdminIgrejas />}
-                  />
-                  <Route
-                    path="/superadmin/metricas"
-                    element={<SuperAdminMetricas />}
-                  />
-                  <Route
-                    path="/superadmin/config-globais"
-                    element={<SuperAdminConfiguracoesGlobais />}
-                  />
-                </Route>
+                    <Route
+                      path="/revisao"
+                      element={
+                        <AuthGate>
+                          <ReviewPage />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/revisao/:slug"
+                      element={
+                        <AuthGate>
+                          <ReviewPage />
+                        </AuthGate>
+                      }
+                    />
 
-                {/* Catch-all */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </AuthContextProvider>
-        </BrowserRouter>
+                    {/* Perfil & Família */}
+                    <Route
+                      path="/perfil"
+                      element={
+                        <AuthGate>
+                          <Perfil />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/perfil/familia"
+                      element={
+                        <AuthGate>
+                          <MinhaFamilia />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/perfil/wallet"
+                      element={
+                        <AuthGate>
+                          <FamilyWallet />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/biblia"
+                      element={
+                        <AuthGate>
+                          <Biblia />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/agenda"
+                      element={
+                        <AuthGate>
+                          <Agenda />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/chamada"
+                      element={
+                        <AuthGate>
+                          <Chamada />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/voluntariado"
+                      element={
+                        <AuthGate>
+                          <Voluntariado />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/voluntariado/candidatos"
+                      element={
+                        <AuthGate>
+                          <VoluntariadoCandidatos />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/voluntariado/historico"
+                      element={
+                        <AuthGate>
+                          <VoluntariadoHistorico />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/voluntariado/testes"
+                      element={
+                        <AuthGate>
+                          <TestesCrud />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/voluntariado/integracao"
+                      element={
+                        <AuthGate>
+                          <IntegracaoDashboard />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/voluntariado/meu-teste/:testeId"
+                      element={
+                        <AuthGate>
+                          <MeuTeste />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/voluntariado/minha-jornada"
+                      element={
+                        <AuthGate>
+                          <MinhaJornada />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Comunicação */}
+                    <Route
+                      path="/publicacao"
+                      element={
+                        <AuthGate>
+                          <Publicacao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/comunicados"
+                      element={
+                        <AuthGate>
+                          <Comunicados />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/mural"
+                      element={
+                        <AuthGate>
+                          <Announcements />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/admin/mural"
+                      element={
+                        <AuthGate>
+                          <AnnouncementsAdmin />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Pessoas */}
+                    <Route
+                      path="/pessoas"
+                      element={
+                        <AuthGate>
+                          <PessoasIndex />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/todos"
+                      element={
+                        <AuthGate>
+                          <PessoasTodos />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/membros"
+                      element={
+                        <AuthGate>
+                          <PessoasMembros />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/visitantes"
+                      element={
+                        <AuthGate>
+                          <PessoasVisitantes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/frequentadores"
+                      element={
+                        <AuthGate>
+                          <PessoasFrequentadores />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/contatos"
+                      element={
+                        <AuthGate>
+                          <PessoasContatos />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/pendentes"
+                      element={
+                        <AuthGate>
+                          <PessoasAlteracoes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/alteracoes-pendentes"
+                      element={
+                        <AuthGate>
+                          <PessoasAlteracoes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/alteracoes/:id"
+                      element={
+                        <AuthGate>
+                          <AprovarAlteracao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/:id/editar"
+                      element={
+                        <AuthGate>
+                          <EditarPessoa />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/:id"
+                      element={
+                        <AuthGate>
+                          <PessoaDetalhes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/:id/editar-contatos"
+                      element={
+                        <AuthGate>
+                          <EditarContatosPage />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Gabinete */}
+                    <Route
+                      path="/gabinete"
+                      element={
+                        <AuthGate>
+                          <GabinetePastoral />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/gabinete/atendimento/:id"
+                      element={
+                        <AuthGate>
+                          <AtendimentoProntuario />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Intercessão - Hub */}
+                    <Route
+                      path="/intercessao"
+                      element={
+                        <AuthGate>
+                          <Intercessao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/intercessao/diario"
+                      element={
+                        <AuthGate>
+                          <DiarioDeOracao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/intercessao/sala-de-guerra"
+                      element={
+                        <AuthGate>
+                          <SalaDeGuerra />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/intercessao/equipes"
+                      element={
+                        <AuthGate>
+                          <GestaoEquipes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/intercessao/sentimentos"
+                      element={
+                        <AuthGate>
+                          <Sentimentos />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Ministério Kids */}
+                    <Route
+                      path="/kids"
+                      element={
+                        <AuthGate>
+                          <Kids />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/kids/dashboard"
+                      element={
+                        <AuthGate>
+                          <KidsDashboard />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/kids/criancas"
+                      element={
+                        <AuthGate>
+                          <KidsCriancas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/kids/scanner"
+                      element={
+                        <AuthGate>
+                          <KidsScanner />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/kids/turma-ativa"
+                      element={
+                        <AuthGate>
+                          <KidsTurmaAtiva />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/kids/config"
+                      element={
+                        <AuthGate>
+                          <KidsConfig />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Ensino */}
+                    <Route
+                      path="/ensino"
+                      element={
+                        <AuthGate>
+                          <Ensino />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/ensino/dashboard"
+                      element={
+                        <AuthGate>
+                          <EnsinoDashboard />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/ensino/jornadas"
+                      element={
+                        <AuthGate>
+                          <Jornadas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/ensino/jornadas/:id"
+                      element={
+                        <AuthGate>
+                          <DetalhesJornada />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/ensino/jornadas/:id/board"
+                      element={
+                        <AuthGate>
+                          <JornadaBoard />
+                        </AuthGate>
+                      }
+                    />
+                    {/* Redirects legado de Jornadas para o módulo de Ensino */}
+                    <Route
+                      path="/jornadas"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/ensino/jornadas" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/jornadas/:id"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/ensino/jornadas/:id" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/jornadas/:id/board"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/ensino/jornadas/:id/board" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/ensinamentos"
+                      element={
+                        <AuthGate>
+                          <Ensinamentos />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cursos"
+                      element={
+                        <AuthGate>
+                          <MeusCursos />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cursos/:id"
+                      element={
+                        <AuthGate>
+                          <CursoPlayer />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cursos/:id/aula/:aulaId"
+                      element={
+                        <AuthGate>
+                          <CursoPlayer />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Eventos & Escalas */}
+                    <Route
+                      path="/eventos"
+                      element={
+                        <AuthGate>
+                          <EventosGeral />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/geral"
+                      element={
+                        <AuthGate>
+                          <EventosGeral />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/lista"
+                      element={
+                        <AuthGate>
+                          <EventosLista />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/times"
+                      element={
+                        <AuthGate>
+                          <EventosTimes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/categorias"
+                      element={
+                        <AuthGate>
+                          <EventosCategorias />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/posicoes"
+                      element={
+                        <AuthGate>
+                          <EventosPosicoes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/templates"
+                      element={
+                        <AuthGate>
+                          <EventosTemplates />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/midias"
+                      element={
+                        <AuthGate>
+                          <EventosMidias />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/liturgia"
+                      element={
+                        <AuthGate>
+                          <EventosLiturgia />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/eventos/:id"
+                      element={
+                        <AuthGate>
+                          <EventoDetalhes />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Redirects legado de /cultos para /eventos */}
+                    <Route
+                      path="/cultos"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/eventos" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cultos/geral"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/eventos/geral" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cultos/lista"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/eventos/lista" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cultos/liturgia"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/eventos/liturgia" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cultos/times"
+                      element={
+                        <AuthGate>
+                          <Navigate to="/eventos/times" replace />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/cultos/:id"
+                      element={
+                        <AuthGate>
+                          <EventoDetalhes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/escalas"
+                      element={
+                        <AuthGate>
+                          <Escalas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/minhas-escalas"
+                      element={
+                        <AuthGate>
+                          <MinhasEscalas />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Oração */}
+                    <Route
+                      path="/oracao/player/:escalaId"
+                      element={
+                        <AuthGate>
+                          <PrayerPlayer />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Mídias */}
+                    <Route
+                      path="/midias"
+                      element={
+                        <AuthGate>
+                          <Midias />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/midias/geral"
+                      element={
+                        <AuthGate>
+                          <EventosMidias />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Financeiro */}
+                    {/* 🥥 PROVA DE CONCEITO RBAC: Bloqueio da rota principal */}
+                    <Route
+                      path="/financas"
+                      element={
+                        <AuthGate requiredPermission="financeiro.view">
+                          <Financas />
+                        </AuthGate>
+                      }
+                    />
+
+                    <Route
+                      path="/financas/dashboard"
+                      element={
+                        <AuthGate>
+                          <FinancasDashboard />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/dashboard-ofertas"
+                      element={
+                        <AuthGate>
+                          <FinancasDashboardOfertas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/projecao"
+                      element={
+                        <AuthGate>
+                          <FinancasProjecao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/insights"
+                      element={
+                        <AuthGate>
+                          <FinancasInsights />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/entradas"
+                      element={
+                        <AuthGate>
+                          <FinancasEntradas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/saidas"
+                      element={
+                        <AuthGate>
+                          <FinancasSaidas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/contas"
+                      element={
+                        <AuthGate>
+                          <FinancasContas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/reembolsos"
+                      element={
+                        <AuthGate>
+                          <FinancasReembolsos />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/transferencias"
+                      element={
+                        <AuthGate>
+                          <FinancasTransferencias />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/categorias"
+                      element={
+                        <AuthGate>
+                          <FinancasCategorias />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/centros-custo"
+                      element={
+                        <AuthGate>
+                          <FinancasCentrosCusto />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/fornecedores"
+                      element={
+                        <AuthGate>
+                          <FinancasFornecedores />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/bases-ministeriais"
+                      element={
+                        <AuthGate>
+                          <FinancasBases />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/formas-pagamento"
+                      element={
+                        <AuthGate>
+                          <FinancasFormas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/dre"
+                      element={
+                        <AuthGate>
+                          <FinancasDRE />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/ofertas"
+                      element={
+                        <AuthGate>
+                          <FinancasRelatorioOferta />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/importar"
+                      element={
+                        <AuthGate>
+                          <FinancasImportar />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/config-financeiro"
+                      element={
+                        <AuthGate>
+                          <FinancasConfigFinanceiro />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/gerenciar-dados"
+                      element={
+                        <AuthGate>
+                          <FinancasGerenciarDados />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/reclassificacao"
+                      element={
+                        <AuthGate>
+                          <FinancasReclassificacao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/reconciliacao"
+                      element={
+                        <AuthGate>
+                          <FinancasReconciliacao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/sessoes-contagem"
+                      element={
+                        <AuthGate>
+                          <FinancasSessoesContagem />
+                        </AuthGate>
+                      }
+                    />
+                    {/* Rota removida: /financas/config-formas-pagamento (unificada em FormasPagamento) */}
+
+                    {/* Projetos */}
+                    <Route
+                      path="/projetos"
+                      element={
+                        <AuthGate>
+                          <Projetos />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/projetos/backlog"
+                      element={
+                        <AuthGate>
+                          <Backlog />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/projetos/:id"
+                      element={
+                        <AuthGate>
+                          <ProjetoDetalhes />
+                        </AuthGate>
+                      }
+                    />
+
+                    {/* Admin & Configurações */}
+                    <Route
+                      path="/admin"
+                      element={
+                        <AuthGate>
+                          <Admin />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/admin/permissoes"
+                      element={
+                        <AuthGate>
+                          <AdminPermissions />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/admin/webhooks"
+                      element={
+                        <AuthGate>
+                          <AdminWebhooks />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/admin/notificacoes"
+                      element={
+                        <AuthGate>
+                          <AdminNotificacoes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/admin/chatbots"
+                      element={
+                        <AuthGate>
+                          <AdminChatbots />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/admin/revisao-duplicatas"
+                      element={
+                        <AuthGate>
+                          <RevisaoDuplicatas />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/configuracoes-igreja"
+                      element={
+                        <AuthGate>
+                          <ConfiguracoesIgreja />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/configuracoes"
+                      element={
+                        <AuthGate>
+                          <Configuracoes />
+                        </AuthGate>
+                      }
+                    />
+                  </Route>
+
+                  {/* --- ROTAS SUPER ADMIN (Layout Separado) --- */}
+                  <Route element={<SuperAdminLayout />}>
+                    <Route
+                      path="/superadmin"
+                      element={<SuperAdminDashboard />}
+                    />
+                    <Route
+                      path="/superadmin/igrejas"
+                      element={<SuperAdminIgrejas />}
+                    />
+                    <Route
+                      path="/superadmin/metricas"
+                      element={<SuperAdminMetricas />}
+                    />
+                    <Route
+                      path="/superadmin/config-globais"
+                      element={<SuperAdminConfiguracoesGlobais />}
+                    />
+                  </Route>
+
+                  {/* Catch-all */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </AuthContextProvider>
+          </BrowserRouter>
         </HideValuesProvider>
       </TooltipProvider>
     </ThemeProvider>

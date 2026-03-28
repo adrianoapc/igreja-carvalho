@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { Users, UserPlus, Heart, Coffee } from "lucide-react";
@@ -10,9 +16,12 @@ import { useIgrejaId } from "@/hooks/useIgrejaId";
 export default function CadastroIndex() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [igrejaInfo, setIgrejaInfo] = useState({ nome: "Igreja Carvalho", subtitulo: "" });
+  const [igrejaInfo, setIgrejaInfo] = useState({
+    nome: "Igreja Carvalho",
+    subtitulo: "",
+  });
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
-  
+
   const aceitouJesus = searchParams.get("aceitou") === "true";
   const igrejaIdParam = searchParams.get("igreja_id");
   const filialIdParam = searchParams.get("filial_id");
@@ -41,7 +50,10 @@ export default function CadastroIndex() {
         .eq("igreja_id", igrejaContexto)
         .maybeSingle();
       if (data) {
-        setIgrejaInfo({ nome: data.nome_igreja, subtitulo: data.subtitulo || "" });
+        setIgrejaInfo({
+          nome: data.nome_igreja,
+          subtitulo: data.subtitulo || "",
+        });
       }
     };
     if (!igrejaLoading) {
@@ -52,7 +64,7 @@ export default function CadastroIndex() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <PublicHeader showBackButton backTo="/public" />
-      
+
       <div className="flex-1 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-soft">
           <CardHeader className="text-center">
@@ -60,10 +72,11 @@ export default function CadastroIndex() {
               Bem-vindo(a)!
             </CardTitle>
             <CardDescription className="text-base">
-              Ajude a {igrejaInfo.nome} a te conhecer melhor preenchendo seu perfil.
+              Ajude a {igrejaInfo.nome} a te conhecer melhor preenchendo seu
+              perfil.
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent className="space-y-4">
             {aceitouJesus && (
               <div className="p-4 bg-primary/10 rounded-lg text-center mb-4">
@@ -78,11 +91,14 @@ export default function CadastroIndex() {
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">Membro</h3>
                 <p className="text-sm text-muted-foreground">
-                  Se você é membro da igreja, mantenha seus dados de cadastro atualizados aqui.
+                  Se você é membro da igreja, mantenha seus dados de cadastro
+                  atualizados aqui.
                 </p>
-                <Button 
-                  className="w-full" 
-                  onClick={() => navigate(buildCadastroPath("/cadastro/membro"))}
+                <Button
+                  className="w-full"
+                  onClick={() =>
+                    navigate(buildCadastroPath("/cadastro/membro"))
+                  }
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Atualizar meu perfil de membro
@@ -103,10 +119,12 @@ export default function CadastroIndex() {
                 <p className="text-sm text-muted-foreground">
                   Se você é visitante da igreja, deixe seu nome e contato aqui.
                 </p>
-                <Button 
+                <Button
                   variant="outline"
-                  className="w-full" 
-                  onClick={() => navigate(buildCadastroPath("/cadastro/visitante", true))}
+                  className="w-full"
+                  onClick={() =>
+                    navigate(buildCadastroPath("/cadastro/visitante", true))
+                  }
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
                   Cadastrar como visitante
@@ -119,11 +137,14 @@ export default function CadastroIndex() {
                   Café V&P
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Recepção e alinhamento de novos membros. Preencha seu cadastro em formato guiado.
+                  Recepção e alinhamento de novos membros. Preencha seu cadastro
+                  em formato guiado.
                 </p>
                 <Button
                   className="w-full"
-                  onClick={() => navigate(buildCadastroPath("/cadastro/cafe-vp"))}
+                  onClick={() =>
+                    navigate(buildCadastroPath("/cadastro/cafe-vp"))
+                  }
                 >
                   <Coffee className="w-4 h-4 mr-2" />
                   Preencher cadastro Café V&P
