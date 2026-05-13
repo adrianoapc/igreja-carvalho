@@ -1,0 +1,19 @@
+# Igreja Carvalho
+
+> Sistema completo de gestão para a Igreja Carvalho — membros, finanças, eventos, kids, escalas e comunicação em um só lugar.
+
+A Igreja Carvalho utiliza esta plataforma para gerenciar suas atividades e comunicar-se com membros e visitantes. Inclui agenda de cultos e eventos, anúncios, área do membro, cadastros públicos e leitura da Bíblia.
+
+## Pages
+
+- [Início](/): Boas-vindas, próximos cultos e ações rápidas.
+- [Agenda](/agenda): Próximos cultos, eventos e celebrações.
+- [Anúncios](/announcements): Comunicados e novidades da igreja.
+- [Bíblia](/biblia): Leitura online da Palavra de Deus.
+- [Área do Membro](/auth): Login e cadastro para membros.
+- [Cadastro](/cadastro): Formulários públicos de cadastro.
+- [Cadastro Café V&P](/cadastro/cafe-vp): Inscrição para o Café Visitantes & Pastores.
+
+## Optional
+
+- [Nova Igreja](/cadastro/igreja): Cadastro de novas filiais.
