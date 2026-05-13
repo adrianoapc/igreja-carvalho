@@ -12,3 +12,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://app.igrejacarvalho.com.br/sitemap.xml
