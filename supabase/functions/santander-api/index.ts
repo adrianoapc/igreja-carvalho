@@ -256,7 +256,17 @@ async function validateAuth(
   }
 
   const token = authHeader.replace('Bearer ', '')
-  
+
+  // Bypass: service_role é trusted (chamadas internas de cron / edge-to-edge)
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (serviceKey && token === serviceKey) {
+    console.log('[santander-api] Service role token detected — bypassing user validation')
+    return {
+      authorized: true,
+      context: { userId: 'service_role', igrejaId: targetIgrejaId, roles: ['service_role'] },
+    }
+  }
+
   // Validar token e obter claims
   const { data: claims, error: claimsError } = await supabaseAdmin.auth.getClaims(token)
   
