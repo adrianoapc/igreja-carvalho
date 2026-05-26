@@ -176,6 +176,9 @@ const FinancasReclassificacao = lazy(
 const FinancasReconciliacao = lazy(
   () => import("./pages/financas/Reconciliacao"),
 );
+const FinancasPixRecebido = lazy(
+  () => import("./pages/financas/PixRecebido"),
+);
 const FinancasSessoesContagem = lazy(
   () => import("./pages/financas/SessoesContagem"),
 );
@@ -187,6 +190,9 @@ const FinancasInsights = lazy(() => import("./pages/financas/Insights"));
 const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
 const FinancasTransferencias = lazy(
   () => import("./pages/financas/Transferencias"),
+);
+const FinancasIntegracoes = lazy(
+  () => import("./pages/financas/Integracoes"),
 );
 
 // Projetos
@@ -1023,6 +1029,14 @@ const App = () => (
                       }
                     />
                     <Route
+                      path="/financas/integracoes"
+                      element={
+                        <AuthGate>
+                          <FinancasIntegracoes />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
                       path="/financas/categorias"
                       element={
                         <AuthGate>
@@ -1115,6 +1129,14 @@ const App = () => (
                       element={
                         <AuthGate>
                           <FinancasReconciliacao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/financas/pix-recebido"
+                      element={
+                        <AuthGate>
+                          <FinancasPixRecebido />
                         </AuthGate>
                       }
                     />

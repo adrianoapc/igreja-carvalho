@@ -86,11 +86,14 @@ export default function Integracoes() {
   };
 
   const handleEdit = (integracaoId: string) => {
+    console.log('[Integracoes] Editando integração:', integracaoId);
     setEditingId(integracaoId);
     setOpenDialog(true);
   };
 
   const handleTest = async (integracao: Integracao) => {
+    console.log('[Integracoes] Testando integração:', integracao.id, integracao.provedor);
+    
     if (integracao.provedor !== "santander") {
       toast.info("Teste disponível apenas para Santander no momento");
       return;
@@ -270,12 +273,16 @@ export default function Integracoes() {
                     })}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                       {integracao.provedor === "santander" && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleTest(integracao)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleTest(integracao);
+                          }}
                           disabled={testingId === integracao.id}
                           title="Testar conexão"
                         >
@@ -289,14 +296,26 @@ export default function Integracoes() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleEdit(integracao.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('[Integracoes] Botão Editar clicado:', integracao.id);
+                          handleEdit(integracao.id);
+                        }}
+                        title="Editar integração"
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDeleteId(integracao.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('[Integracoes] Botão Deletar clicado:', integracao.id);
+                          setDeleteId(integracao.id);
+                        }}
+                        title="Deletar integração"
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>

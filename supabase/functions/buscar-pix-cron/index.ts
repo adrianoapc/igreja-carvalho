@@ -7,7 +7,6 @@ const corsHeaders = {
 
 const FUNCTION_NAME = "buscar-pix-cron";
 const DEFAULT_LOOKBACK_DAYS = 7;
-const OVERLAP_MINUTES = 5;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -79,20 +78,28 @@ Deno.serve(async (req) => {
 
     for (const integracao of integracoes) {
       try {
-        const { data: ultimoPix } = await supabase
-          .from("pix_webhook_temp")
-          .select("data_pix")
+        // Buscar última sessão finalizada para calcular janela de sincronização
+        // Usa a mesma lógica de RelatorioOferta.tsx e useFinanceiroSessao.ts
+        const { data: ultimaSessao } = await supabase
+          .from("sessoes_contagem")
+          .select("data_fechamento")
           .eq("igreja_id", integracao.igreja_id)
-          .order("data_pix", { ascending: false })
+          .eq("status", "finalizado")
+          .order("data_fechamento", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        const baseInicio = ultimoPix?.data_pix
-          ? new Date(ultimoPix.data_pix)
-          : new Date(Date.now() - DEFAULT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
-
-        const inicio = new Date(baseInicio.getTime() - OVERLAP_MINUTES * 60 * 1000);
         const fim = new Date();
+        let inicio: Date;
+
+        if (ultimaSessao?.data_fechamento) {
+          // Usar 1 segundo após o fechamento da última sessão
+          inicio = new Date(ultimaSessao.data_fechamento);
+          inicio.setSeconds(inicio.getSeconds() + 1);
+        } else {
+          // Fallback: últimos 7 dias
+          inicio = new Date(Date.now() - DEFAULT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+        }
 
         const response = await fetch(`${supabaseUrl}/functions/v1/santander-api`, {
           method: "POST",
@@ -133,6 +140,20 @@ Deno.serve(async (req) => {
       p_details: `importados=${totalImportados}; duplicados=${totalDuplicados}; erros=${erros.length}`,
     });
 
+    // Notificar admins em caso de erro total
+    if (status === "error" && erros.length > 0) {
+      const mensagemErro = erros.map((e) => `Integração ${e.integracao_id}: ${e.erro}`).join("; ");
+      
+      await supabase.rpc("notify_admins", {
+        p_titulo: "Erro ao buscar PIX automaticamente",
+        p_mensagem: `Falha ao sincronizar PIX via cron. Erros: ${mensagemErro}`,
+        p_tipo: "error",
+        p_igreja_id: erros[0]?.integracao_id ? 
+          (integracoes.find(i => i.id === erros[0].integracao_id)?.igreja_id || null) : 
+          null,
+      });
+    }
+
     return new Response(
       JSON.stringify({
         success: status !== "error",
@@ -143,10 +164,20 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    
     await supabase.rpc("log_edge_function_execution", {
       p_function_name: FUNCTION_NAME,
       p_status: "error",
-      p_details: err instanceof Error ? err.message : String(err),
+      p_details: errorMessage,
+    });
+
+    // Notificar admins sobre erro crítico
+    await supabase.rpc("notify_admins", {
+      p_titulo: "Erro crítico no cron de PIX",
+      p_mensagem: `Falha geral ao executar buscar-pix-cron: ${errorMessage}`,
+      p_tipo: "error",
+      p_igreja_id: null, // erro geral, não específico de uma igreja
     });
 
     return new Response(

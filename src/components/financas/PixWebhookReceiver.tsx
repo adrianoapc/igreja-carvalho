@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,23 @@ import {
   TrendingUp,
   Trash2,
   Link2,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import { toast } from "sonner";
+import { buscarPixRecebidos, getSantanderIntegracaoId } from "@/hooks/useSantanderPix";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PixWebhookItem {
   id: string;
@@ -35,19 +47,26 @@ interface PixWebhookItem {
 export function PixWebhookReceiver() {
   const { formatValue } = useHideValues();
   const { igrejaId } = useAuthContext();
+  const queryClient = useQueryClient();
   const [filtroStatus, setFiltroStatus] = useState<
     "todos" | "recebido" | "processado" | "vinculado" | "erro"
   >("recebido");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Query para buscar PIX recebidos
   const {
     data: pixRecebidos = [],
     isLoading,
     refetch,
+    isFetching,
   } = useQuery({
     queryKey: ["pix-webhook-temp", igrejaId, filtroStatus],
     queryFn: async () => {
       if (!igrejaId) return [];
+
+      console.log('[PixWebhook] Buscando PIX - Igreja:', igrejaId, 'Filtro:', filtroStatus);
 
       let query = supabase
         .from("pix_webhook_temp")
@@ -61,11 +80,129 @@ export function PixWebhookReceiver() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('[PixWebhook] Erro ao buscar:', error);
+        throw error;
+      }
+      
+      console.log('[PixWebhook] PIX encontrados:', data?.length || 0);
       return data as PixWebhookItem[];
     },
     enabled: !!igrejaId,
+    refetchOnWindowFocus: false,
   });
+
+  // Handler para vincular PIX com oferta
+  const handleVincular = (pix: PixWebhookItem) => {
+    console.log('[PixWebhook] Vinculando PIX:', pix.pix_id);
+    toast.info("Função de vinculação em desenvolvimento", {
+      description: `PIX de ${formatValue(pix.valor)} será vinculado ao relatório de ofertas`,
+    });
+    // TODO: Implementar navegação para RelatorioOferta com PIX pré-selecionado
+  };
+
+  // Handler para deletar PIX
+  const handleDelete = async () => {
+    if (!deleteId || !igrejaId) return;
+
+    setIsDeleting(true);
+    console.log('[PixWebhook] Iniciando deleção - ID:', deleteId, 'Igreja:', igrejaId);
+    
+    try {
+      // Usar service role através de uma Edge Function ou fazer direto com auth
+      const { data: deleteResult, error } = await supabase
+        .from("pix_webhook_temp")
+        .delete()
+        .eq("id", deleteId)
+        .eq("igreja_id", igrejaId)
+        .select();
+
+      console.log('[PixWebhook] Resultado da deleção:', { deleteResult, error });
+
+      if (error) {
+        console.error('[PixWebhook] Erro ao deletar:', error);
+        throw error;
+      }
+
+      if (!deleteResult || deleteResult.length === 0) {
+        console.warn('[PixWebhook] Nenhum registro foi deletado. Pode ser problema de permissão RLS.');
+        toast.warning("PIX não encontrado ou sem permissão para deletar");
+        setDeleteId(null);
+        setIsDeleting(false);
+        return;
+      }
+
+      console.log('[PixWebhook] PIX deletado com sucesso:', deleteResult);
+      toast.success("PIX deletado com sucesso");
+      
+      // Limpar estado
+      setDeleteId(null);
+      
+      // Invalidar cache e refetch
+      queryClient.setQueryData(
+        ["pix-webhook-temp", igrejaId, filtroStatus],
+        (old: PixWebhookItem[] = []) => old.filter((item) => item.id !== deleteId)
+      );
+      
+      // Aguardar refetch completar
+      setTimeout(() => {
+        refetch();
+      }, 100);
+      
+    } catch (error: any) {
+      console.error("[PixWebhook] Exceção ao deletar PIX:", error);
+      toast.error(`Erro ao deletar PIX: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Handler para sincronizar PIX via API (polling)
+  const handleSyncPix = async () => {
+    if (!igrejaId) return;
+
+    setIsSyncing(true);
+    try {
+      console.log('[PixWebhook] Sincronizando PIX via API Santander...');
+      
+      // Buscar integração ativa
+      const integracaoId = await getSantanderIntegracaoId(igrejaId);
+      if (!integracaoId) {
+        toast.error("Integração Santander não encontrada", {
+          description: "Configure a integração em Finanças > Integrações",
+        });
+        return;
+      }
+
+      // Buscar PIX dos últimos 7 dias
+      const hoje = new Date();
+      const seteDiasAtras = new Date();
+      seteDiasAtras.setDate(hoje.getDate() - 7);
+
+      const resultado = await buscarPixRecebidos({
+        integracaoId,
+        igrejaId,
+        dataInicio: seteDiasAtras.toISOString(),
+        dataFim: hoje.toISOString(),
+      });
+
+      console.log('[PixWebhook] Resultado da sincronização:', resultado);
+
+      toast.success("PIX sincronizados com sucesso!", {
+        description: `${resultado.importados || 0} novos PIX importados, ${resultado.duplicados || 0} já existentes`,
+      });
+
+      // Refetch para atualizar a lista
+      await refetch();
+    } catch (error: any) {
+      console.error("[PixWebhook] Erro ao sincronizar PIX:", error);
+      toast.error("Erro ao buscar PIX via API", {
+        description: error.message || "Verifique a integração com Santander",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Calcular totais
   const totalRecebidos = pixRecebidos.reduce(
@@ -126,19 +263,34 @@ export function PixWebhookReceiver() {
             Transações recebidas em tempo real via webhook do banco
           </p>
         </div>
-        <Button
-          onClick={() => refetch()}
-          variant="outline"
-          size="sm"
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-          ) : (
-            <TrendingUp className="w-4 h-4 mr-2" />
-          )}
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleSyncPix}
+            variant="outline"
+            size="sm"
+            disabled={isSyncing}
+          >
+            {isSyncing ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Sincronizar via API
+          </Button>
+          <Button
+            onClick={() => refetch()}
+            variant="outline"
+            size="sm"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <TrendingUp className="w-4 h-4 mr-2" />
+            )}
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Resumo */}
@@ -206,7 +358,7 @@ export function PixWebhookReceiver() {
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[500px] border rounded-lg">
-            {isLoading ? (
+            {isLoading || isFetching ? (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
@@ -276,6 +428,10 @@ export function PixWebhookReceiver() {
                               variant="ghost"
                               className="h-7"
                               title="Vincular com oferta"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleVincular(pix);
+                              }}
                             >
                               <Link2 className="w-3 h-3" />
                             </Button>
@@ -296,6 +452,12 @@ export function PixWebhookReceiver() {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-destructive hover:text-destructive"
+                            title="Deletar PIX"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('[PixWebhook] Deletando PIX:', pix.pix_id);
+                              setDeleteId(pix.id);
+                            }}
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -312,15 +474,42 @@ export function PixWebhookReceiver() {
 
       {/* Info Box */}
       <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30">
-        <CardContent className="pt-6 text-sm text-muted-foreground">
+        <CardContent className="pt-6 text-sm text-muted-foreground space-y-2">
           <p>
             💡 <strong>Como funciona:</strong> Os PIX são recebidos via webhook
             do banco em tempo real. Cada transação fica aguardando processamento
             para ser vinculada com o relatório de ofertas e classificada por
             culto.
           </p>
+          <p>
+            🔄 <strong>Webhook não funcionando?</strong> Use o botão "Sincronizar via API" 
+            para buscar PIX recebidos dos últimos 7 dias diretamente da API do Santander. 
+            Ideal para resgatar transações que não chegaram via webhook.
+          </p>
         </CardContent>
       </Card>
+
+      {/* Alert Dialog para confirmação de deleção */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deletar PIX Recebido?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O registro do PIX será permanentemente removido da tabela temporária.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2 justify-end">
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deletando..." : "Deletar"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -60,3 +60,50 @@ Este projeto é uma aplicação web multi-tenant para gestão de igrejas, basead
 - Saída sempre pronta para commit
 
 Consulte sempre os docs e ADRs antes de propor mudanças estruturais.
+
+## Auditoria e Planejamento de Fechamento
+
+### Objetivo
+
+Quando solicitado a fazer varredura ou auditoria do sistema, o agente deve:
+
+- Usar `docs/funcionalidades.md` como fonte primária de módulos esperados
+- Cruzar com o código real em `src/pages/`, `src/hooks/`, `src/components/` e `supabase/functions/`
+- Cruzar débitos com comentários TODO/FIXME no código e com `docs/COPILOT_PROMPTS.MD`
+- Nunca inventar módulos — se não encontrar evidência, marcar como "(a confirmar)"
+
+### Fontes de verdade para auditoria (ordem de prioridade)
+
+1. Código-fonte (`src/`, `supabase/functions/`, `supabase/migrations/`)
+2. `docs/funcionalidades.md` — módulos e regras documentados
+3. `docs/01-Arquitetura/` — visão macro e ADRs
+4. Comentários inline (TODO, FIXME, HACK) — débito técnico
+
+### Classificação de status
+
+Use sempre:
+
+- ✅ Completo — funcional de ponta a ponta, com RLS e hooks corretos
+- ⚠️ Parcial — existe no código mas falta algo (UI, RLS, RPC, hook, doc)
+- ❌ Não implementado — documentado ou referenciado mas sem código
+- 🗑️ Sem uso — existe no código mas sem rota, sem referência, sem uso aparente
+- 🔴 Débito técnico — TODO/FIXME, mock, hardcode, sem tratamento de erro, sem RLS
+
+### Classificação de débito técnico
+
+| Tipo           | Descrição                                               |
+| -------------- | ------------------------------------------------------- |
+| `bug`          | Comportamento incorreto identificado                    |
+| `refactor`     | Código funcional mas fora dos padrões do projeto        |
+| `todo`         | Marcado explicitamente no código                        |
+| `missing-rls`  | Tabela ou operação sem política RLS                     |
+| `missing-rpc`  | Lógica de negócio no frontend que deveria ser RPC       |
+| `mock`         | Dado hardcoded ou simulado em produção                  |
+| `missing-test` | Fluxo crítico sem script de teste em `docs/automacoes/` |
+| `sem-doc`      | Funcionalidade implementada sem documentação em `docs/` |
+
+### Output esperado
+
+- Sempre em Markdown puro, pronto para salvar em `docs/auditoria-[modulo]-[data].md`
+- Resumo consolidado ao final com tabela de módulos e ordem de fechamento recomendada
+- Débitos críticos destacados separadamente
