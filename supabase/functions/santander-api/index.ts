@@ -399,7 +399,7 @@ async function getSantanderPixToken(
   // NÃO duplicar client_id/client_secret no body — causa 400 "parâmetros necessários".
   const tokenBody = new URLSearchParams({
     grant_type: 'client_credentials',
-    scope: 'cob.write cob.read cobv.write cobv.read lotecobv.write lotecobv.read pix.write pix.read webhook.write webhook.read payloadlocation.write payloadlocation.read',
+    scope: 'cob.write cob.read pix.write pix.read',
   }).toString()
 
   console.log('[santander-api] PIX Token request URL:', SANTANDER_PIX_TOKEN_URL)
