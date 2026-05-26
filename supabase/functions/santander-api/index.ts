@@ -395,15 +395,15 @@ async function getSantanderPixToken(
   // PIX API usa Basic Auth com client_id:client_secret
   const basicAuth = btoa(`${creds.clientId}:${creds.clientSecret}`)
 
+  // IMPORTANTE: Santander PIX exige Basic Auth APENAS no header.
+  // NÃO duplicar client_id/client_secret no body — causa 400 "parâmetros necessários".
   const tokenBody = new URLSearchParams({
-    client_id: creds.clientId,
-    client_secret: creds.clientSecret,
     grant_type: 'client_credentials',
     scope: 'cob.write cob.read cobv.write cobv.read lotecobv.write lotecobv.read pix.write pix.read webhook.write webhook.read payloadlocation.write payloadlocation.read',
   }).toString()
 
   console.log('[santander-api] PIX Token request URL:', SANTANDER_PIX_TOKEN_URL)
-  console.log('[santander-api] PIX Token body params: grant_type, scope, client_id, client_secret')
+  console.log('[santander-api] PIX Token body params: grant_type, scope (Basic Auth no header)')
 
   const fetchOptions: RequestInit & { client?: Deno.HttpClient } = {
     method: 'POST',
