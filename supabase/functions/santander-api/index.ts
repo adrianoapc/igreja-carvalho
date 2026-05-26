@@ -395,15 +395,17 @@ async function getSantanderPixToken(
   // PIX API usa Basic Auth com client_id:client_secret
   const basicAuth = btoa(`${creds.clientId}:${creds.clientSecret}`)
 
+  // Santander PIX: enviar Basic Auth no header E client_id/client_secret no body
+  // (combinação exigida pelo gateway PIX da BCB/Santander)
   const tokenBody = new URLSearchParams({
+    grant_type: 'client_credentials',
+    scope: 'cob.write cob.read pix.write pix.read',
     client_id: creds.clientId,
     client_secret: creds.clientSecret,
-    grant_type: 'client_credentials',
-    scope: 'cob.write cob.read cobv.write cobv.read lotecobv.write lotecobv.read pix.write pix.read webhook.write webhook.read payloadlocation.write payloadlocation.read',
   }).toString()
 
   console.log('[santander-api] PIX Token request URL:', SANTANDER_PIX_TOKEN_URL)
-  console.log('[santander-api] PIX Token body params: grant_type, scope, client_id, client_secret')
+  console.log('[santander-api] PIX Token body params: grant_type, scope, client_id, client_secret + Basic header')
 
   const fetchOptions: RequestInit & { client?: Deno.HttpClient } = {
     method: 'POST',
