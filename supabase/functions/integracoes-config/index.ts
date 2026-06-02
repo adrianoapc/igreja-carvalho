@@ -20,6 +20,7 @@ type CreateIntegracaoPayload = {
   tipo_auth?: "token" | "sftp";
 
   // Credenciais Open Banking / Cash Management (ou genéricas)
+  // Em modo SFTP, o frontend mapeia: client_id=username, client_secret=password, application_key=host
   client_id?: string | null;
   client_secret?: string | null;
   application_key?: string | null;
@@ -32,12 +33,8 @@ type CreateIntegracaoPayload = {
   pfx_blob?: string | null;
   pfx_password?: string | null;
 
-  // SFTP
-  sftp_host?: string | null;
-  sftp_port?: string | null;
-  sftp_username?: string | null;
-  sftp_password?: string | null;
-  sftp_path?: string | null;
+  // Config não-sensível (ex.: { sftp: { port, path } })
+  config?: Record<string, unknown> | null;
 };
 
 type UpdateIntegracaoPayload = {
@@ -58,11 +55,7 @@ type UpdateIntegracaoPayload = {
   pfx_blob?: string | null;
   pfx_password?: string | null;
 
-  sftp_host?: string | null;
-  sftp_port?: string | null;
-  sftp_username?: string | null;
-  sftp_password?: string | null;
-  sftp_path?: string | null;
+  config?: Record<string, unknown> | null;
 };
 
 type IntegracaoPayload = CreateIntegracaoPayload | UpdateIntegracaoPayload;
