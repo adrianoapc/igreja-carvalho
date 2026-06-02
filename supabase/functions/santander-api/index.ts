@@ -987,11 +987,28 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Application Key não configurada' }, 400)
     }
 
+    // Diagnóstico de credenciais decodificadas (sem expor secrets)
+    console.log('[santander-api] Decoded creds lengths:', {
+      clientId: clientId?.length,
+      clientId_prefix: clientId ? clientId.substring(0, 4) + '...' : null,
+      clientSecret: clientSecret?.length,
+      applicationKey: applicationKey?.length,
+      pfxBlob: pfxBlob?.length,
+      pfxPassword: pfxPassword?.length,
+    })
+
     // Create mTLS HttpClient
     if (pfxBlob && pfxPassword) {
       try {
         console.log('[santander-api] Converting PFX to PEM for mTLS...')
-        const { cert, key } = pfxToPem(pfxBlob, pfxPassword)
+        const { cert, key, certInfo } = pfxToPem(pfxBlob, pfxPassword)
+        console.log('[santander-api] Certificate info:', JSON.stringify(certInfo, null, 2))
+        if (certInfo?.isExpired) {
+          console.error('[santander-api] ⚠️ CERTIFICADO EXPIRADO!')
+        }
+        if (certInfo?.notYetValid) {
+          console.error('[santander-api] ⚠️ CERTIFICADO AINDA NÃO VÁLIDO!')
+        }
         httpClient = Deno.createHttpClient({ cert, key })
         console.log('[santander-api] mTLS HttpClient created successfully')
       } catch (pfxError) {
