@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/table";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2, TestTube2, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History } from "lucide-react";
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
+import { IntegracaoLogsDialog } from "@/components/financas/IntegracaoLogsDialog";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +40,9 @@ export default function Integracoes() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [importingId, setImportingId] = useState<string | null>(null);
+  const [logsIntegracaoId, setLogsIntegracaoId] = useState<string | null>(null);
+
 
   // Buscar integrações
   const { data: integracoes, isLoading, error } = useQuery({
@@ -205,6 +210,34 @@ export default function Integracoes() {
     }
   };
 
+  const handleImport = async (integracao: Integracao) => {
+    setImportingId(integracao.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("getnet-sftp", {
+        body: { action: "import_extrato", integracao_id: integracao.id },
+      });
+      if (error) {
+        toast.error(`Erro na importação: ${error.message}`);
+        return;
+      }
+      if (data?.success) {
+        toast.success(`Importação concluída: ${data.arquivo}`, {
+          description: `Recebido: ${data.total_recebido} · Inserido: ${data.total_inserido} · Ignorado: ${data.total_ignorado}`,
+        });
+      } else {
+        toast.error("Falha na importação", {
+          description: data?.error || "Veja o histórico para detalhes",
+        });
+      }
+    } catch (err) {
+      console.error("Import exception:", err);
+      toast.error("Erro ao importar extrato");
+    } finally {
+      setImportingId(null);
+    }
+  };
+
+
   const getProviderLabel = (provedor: string) => {
     const labels: Record<string, string> = {
       santander: "Santander",
@@ -307,7 +340,8 @@ export default function Integracoes() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                      {integracao.provedor === "santander" && (
+                      {(integracao.provedor === "santander" ||
+                        (integracao as { tipo_auth?: string }).tipo_auth === "sftp") && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -326,6 +360,40 @@ export default function Integracoes() {
                           )}
                         </Button>
                       )}
+                      {(integracao as { tipo_auth?: string }).tipo_auth === "sftp" && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleImport(integracao);
+                            }}
+                            disabled={importingId === integracao.id}
+                            title="Importar extrato agora"
+                          >
+                            {importingId === integracao.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4 text-green-600" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLogsIntegracaoId(integracao.id);
+                            }}
+                            title="Histórico de execuções"
+                          >
+                            <History className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+
                       <Button
                         variant="ghost"
                         size="sm"
@@ -384,6 +452,14 @@ export default function Integracoes() {
           });
         }}
       />
+
+      <IntegracaoLogsDialog
+        open={!!logsIntegracaoId}
+        onOpenChange={(open) => !open && setLogsIntegracaoId(null)}
+        integracaoId={logsIntegracaoId}
+      />
+
+
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>

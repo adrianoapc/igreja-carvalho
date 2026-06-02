@@ -53,6 +53,11 @@ export function IntegracaoCriarDialog({
   const [sftpUsername, setSftpUsername] = useState("");
   const [sftpPassword, setSftpPassword] = useState("");
   const [sftpPath, setSftpPath] = useState("");
+  const [sftpFilePattern, setSftpFilePattern] = useState(".csv");
+  const [sftpLayout, setSftpLayout] = useState("settlement_v1");
+  const [sftpContaId, setSftpContaId] = useState<string>("");
+  const [contas, setContas] = useState<Array<{ id: string; label: string }>>([]);
+
 
   const [ativo, setAtivo] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -91,8 +96,12 @@ export function IntegracaoCriarDialog({
             if (sftpCfg) {
               if (sftpCfg.port != null) setSftpPort(String(sftpCfg.port));
               if (sftpCfg.path != null) setSftpPath(String(sftpCfg.path));
+              if ((sftpCfg as any).file_pattern != null) setSftpFilePattern(String((sftpCfg as any).file_pattern));
+              if ((sftpCfg as any).layout != null) setSftpLayout(String((sftpCfg as any).layout));
+              if ((sftpCfg as any).conta_id != null) setSftpContaId(String((sftpCfg as any).conta_id));
             }
           }
+
         } catch (err) {
           console.error("Error loading integration:", err);
           toast.error("Erro ao carregar dados da integração");
@@ -101,6 +110,25 @@ export function IntegracaoCriarDialog({
       load();
     }
   }, [isEditMode, open, integracaoId]);
+
+  // Carregar contas da igreja para o select de "Conta destino" no modo SFTP
+  useEffect(() => {
+    if (!open || !igrejaId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("contas")
+        .select("id, nome, banco")
+        .eq("igreja_id", igrejaId)
+        .eq("ativo", true)
+        .order("nome");
+      setContas(
+        (data || []).map((c: any) => ({
+          id: c.id,
+          label: `${c.nome}${c.banco ? ` (${c.banco})` : ""}`,
+        }))
+      );
+    })();
+  }, [open, igrejaId]);
 
   useEffect(() => {
     if (!open) {
@@ -118,12 +146,16 @@ export function IntegracaoCriarDialog({
         setSftpUsername("");
         setSftpPassword("");
         setSftpPath("");
+        setSftpFilePattern(".csv");
+        setSftpLayout("settlement_v1");
+        setSftpContaId("");
         setAtivo(true);
         setProvedor("santander");
         setTipoAuth("token");
       }, 200);
     }
   }, [open]);
+
 
   const handlePfxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -188,8 +220,12 @@ export function IntegracaoCriarDialog({
     const sftp: Record<string, unknown> = {};
     if (sftpPort) sftp.port = sftpPort;
     if (sftpPath) sftp.path = sftpPath;
+    if (sftpFilePattern) sftp.file_pattern = sftpFilePattern;
+    if (sftpLayout) sftp.layout = sftpLayout;
+    if (sftpContaId) sftp.conta_id = sftpContaId;
     return Object.keys(sftp).length ? { sftp } : undefined;
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -597,8 +633,54 @@ export function IntegracaoCriarDialog({
                   disabled={loading}
                 />
               </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="sftpFilePattern">Extensão / padrão de arquivo</Label>
+                  <Input
+                    id="sftpFilePattern"
+                    placeholder=".csv"
+                    value={sftpFilePattern}
+                    onChange={(e) => setSftpFilePattern(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sftpLayout">Layout do arquivo</Label>
+                  <Select value={sftpLayout} onValueChange={setSftpLayout}>
+                    <SelectTrigger id="sftpLayout">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="settlement_v1">
+                        Getnet — Settlement v1 (CSV)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sftpContaId">Conta bancária destino</Label>
+                <Select value={sftpContaId} onValueChange={setSftpContaId}>
+                  <SelectTrigger id="sftpContaId">
+                    <SelectValue placeholder="Selecione a conta para receber os extratos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contas.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Os lançamentos importados via SFTP serão associados a esta conta.
+                </p>
+              </div>
             </div>
           )}
+
 
           <div className="flex items-center justify-between py-2">
             <Label htmlFor="ativo">Ativo</Label>
