@@ -340,7 +340,8 @@ export default function Integracoes() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                      {integracao.provedor === "santander" && (
+                      {(integracao.provedor === "santander" ||
+                        (integracao as { tipo_auth?: string }).tipo_auth === "sftp") && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -359,6 +360,40 @@ export default function Integracoes() {
                           )}
                         </Button>
                       )}
+                      {(integracao as { tipo_auth?: string }).tipo_auth === "sftp" && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleImport(integracao);
+                            }}
+                            disabled={importingId === integracao.id}
+                            title="Importar extrato agora"
+                          >
+                            {importingId === integracao.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4 text-green-600" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLogsIntegracaoId(integracao.id);
+                            }}
+                            title="Histórico de execuções"
+                          >
+                            <History className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+
                       <Button
                         variant="ghost"
                         size="sm"
