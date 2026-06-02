@@ -17,6 +17,7 @@ type CreateIntegracaoPayload = {
   provedor: string;
   cnpj: string;
   ativo?: boolean;
+  tipo_auth?: "token" | "sftp";
 
   // Credenciais Open Banking / Cash Management (ou genéricas)
   client_id?: string | null;
@@ -30,6 +31,13 @@ type CreateIntegracaoPayload = {
   // PFX (base64)
   pfx_blob?: string | null;
   pfx_password?: string | null;
+
+  // SFTP
+  sftp_host?: string | null;
+  sftp_port?: string | null;
+  sftp_username?: string | null;
+  sftp_password?: string | null;
+  sftp_path?: string | null;
 };
 
 type UpdateIntegracaoPayload = {
@@ -38,6 +46,7 @@ type UpdateIntegracaoPayload = {
   igreja_id: string;
   cnpj: string;
   ativo?: boolean;
+  tipo_auth?: "token" | "sftp";
 
   client_id?: string | null;
   client_secret?: string | null;
@@ -48,9 +57,16 @@ type UpdateIntegracaoPayload = {
 
   pfx_blob?: string | null;
   pfx_password?: string | null;
+
+  sftp_host?: string | null;
+  sftp_port?: string | null;
+  sftp_username?: string | null;
+  sftp_password?: string | null;
+  sftp_path?: string | null;
 };
 
 type IntegracaoPayload = CreateIntegracaoPayload | UpdateIntegracaoPayload;
+
 
 function json(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), {
