@@ -96,8 +96,12 @@ export function IntegracaoCriarDialog({
             if (sftpCfg) {
               if (sftpCfg.port != null) setSftpPort(String(sftpCfg.port));
               if (sftpCfg.path != null) setSftpPath(String(sftpCfg.path));
+              if ((sftpCfg as any).file_pattern != null) setSftpFilePattern(String((sftpCfg as any).file_pattern));
+              if ((sftpCfg as any).layout != null) setSftpLayout(String((sftpCfg as any).layout));
+              if ((sftpCfg as any).conta_id != null) setSftpContaId(String((sftpCfg as any).conta_id));
             }
           }
+
         } catch (err) {
           console.error("Error loading integration:", err);
           toast.error("Erro ao carregar dados da integração");
