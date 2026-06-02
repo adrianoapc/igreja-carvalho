@@ -53,6 +53,11 @@ export function IntegracaoCriarDialog({
   const [sftpUsername, setSftpUsername] = useState("");
   const [sftpPassword, setSftpPassword] = useState("");
   const [sftpPath, setSftpPath] = useState("");
+  const [sftpFilePattern, setSftpFilePattern] = useState(".csv");
+  const [sftpLayout, setSftpLayout] = useState("settlement_v1");
+  const [sftpContaId, setSftpContaId] = useState<string>("");
+  const [contas, setContas] = useState<Array<{ id: string; label: string }>>([]);
+
 
   const [ativo, setAtivo] = useState(true);
   const [loading, setLoading] = useState(false);
